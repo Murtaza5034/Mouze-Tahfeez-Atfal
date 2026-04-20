@@ -8,6 +8,7 @@
     "start": "vite",
    "build": "vite build --debug"
     "preview": "vite preview"
+    "postinstall": "..."
   },
   "dependencies": {
     "react": "^18.2.0",
