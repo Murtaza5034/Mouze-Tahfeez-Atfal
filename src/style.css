@@ -414,3 +414,148 @@ button {
     gap: 16px;
   }
 }
+
+/* Home Dashboard Styles */
+.home-dashboard {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.dashboard-section {
+  background: white;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(183, 137, 31, 0.12);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  color: #8b6d31;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+
+.schedule-list, .announcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: #fdfaf3;
+  border: 1px solid rgba(183, 137, 31, 0.08);
+}
+
+.schedule-item.done {
+  background: #f3f8f4;
+  border-color: rgba(76, 175, 80, 0.1);
+  opacity: 0.8;
+}
+
+.time-strip {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #b7891f;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 85px;
+  flex-shrink: 0;
+}
+
+.task-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.task-info p {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #4a3410;
+}
+
+.status-icon {
+  color: #4caf50;
+}
+
+.pending-circle {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e0d1b1;
+  border-radius: 50%;
+}
+
+.news-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(183, 137, 31, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.news-card:hover {
+  transform: translateX(4px);
+  border-color: #b7891f;
+}
+
+.news-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.news-card h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: #4a3410;
+}
+
+.tag {
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.tag.urgent {
+  background: #fff0f0;
+  color: #e53935;
+}
+
+.tag.update {
+  background: #f0f7ff;
+  color: #1e88e5;
+}
+
+.date {
+  font-size: 0.75rem;
+  color: #8b6d31;
+  font-weight: 600;
+}
+
+.chevron {
+  color: #b7891f;
+}
