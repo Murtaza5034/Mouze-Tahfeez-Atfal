@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { User, BookOpen, GraduationCap, Info, ChevronRight, Hash, Bookmark } from "lucide-react";
+import { User, BookOpen, GraduationCap, Info, ChevronRight, Hash, Bookmark, Calendar, Bell, Clock, CheckCircle2 } from "lucide-react";
 import "./style.css";
 
 export default function App() {
@@ -23,10 +23,20 @@ export default function App() {
     },
     Home: {
       eyebrow: "Education Home",
-      title: "A warm and simple school app",
+      title: "Welcome back, Guardian",
       description:
-        "Keep daily learning, announcements, and important school actions easy to access for families.",
-      highlights: ["Today's lesson plan", "Upcoming parent meeting", "2 homework reminders"],
+        "Access your child's daily learning schedule, important announcements, and school actions here.",
+      highlights: ["Attendance: Present", "Lesson: Surah Al-Kahf", "Homework: Pending"],
+      announcements: [
+        { id: 1, title: "Parent Teacher Meeting", date: "April 25th", type: "Urgent" },
+        { id: 2, title: "Uniform Update", date: "April 22nd", type: "Update" }
+      ],
+      schedule: [
+        { time: "08:15 AM", task: "Dawat Ni Majlis", done: true },
+        { time: "09:00 AM", task: "Hifz Session 1", done: true },
+        { time: "11:30 AM", task: "Revision Class", done: false },
+        { time: "01:00 PM", task: "Lunch Break", done: false }
+      ]
     },
     "Child Summary": {
       eyebrow: "Progress Overview",
@@ -114,6 +124,50 @@ export default function App() {
           </div>
           <div className="hero-chip">Academic Session 2026</div>
         </section>
+
+        {activePage === "Home" && (
+          <div className="home-dashboard">
+            <div className="dashboard-section">
+              <div className="section-header">
+                <Calendar size={18} />
+                <h3>Today's Schedule</h3>
+              </div>
+              <div className="schedule-list">
+                {currentPage.schedule.map((item, i) => (
+                  <div key={i} className={`schedule-item ${item.done ? 'done' : ''}`}>
+                    <div className="time-strip">
+                      <Clock size={14} />
+                      {item.time}
+                    </div>
+                    <div className="task-info">
+                      <p>{item.task}</p>
+                      {item.done ? <CheckCircle2 size={16} className="status-icon" /> : <div className="pending-circle" />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="dashboard-section">
+              <div className="section-header">
+                <Bell size={18} />
+                <h3>Announcements</h3>
+              </div>
+              <div className="announcement-list">
+                {currentPage.announcements.map((news) => (
+                  <div key={news.id} className="news-card">
+                    <div className="news-meta">
+                      <span className={`tag ${news.type.toLowerCase()}`}>{news.type}</span>
+                      <span className="date">{news.date}</span>
+                    </div>
+                    <h4>{news.title}</h4>
+                    <ChevronRight size={16} className="chevron" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {activePage === "Profile" && currentPage.childInfo && (
           <div className="child-info-card">
