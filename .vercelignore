@@ -1,7 +1,8 @@
 node_modules
-dist
-.vercel
+.git
+.github
+.vscode
 .env
 .env.local
-.vscode
+README.md
 *.log
