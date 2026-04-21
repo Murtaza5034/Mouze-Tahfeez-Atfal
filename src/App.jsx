@@ -129,6 +129,15 @@ export default function App() {
     setWeeklyResult(null);
   };
 
+  if (loading && !studentProfile && user) {
+    return (
+      <div className="loading-screen">
+        <div className="spinner"></div>
+        <p>Fetching your child's data...</p>
+      </div>
+    );
+  }
+
   if (!user && !loading) {
     return <Login onLoginSuccess={(u) => setUser(u)} />;
   }
@@ -137,7 +146,7 @@ export default function App() {
     return (
       <div className="loading-screen">
         <div className="spinner"></div>
-        <p>Loading your dashboard...</p>
+        <p>Loading Mauze Tahfeez...</p>
       </div>
     );
   }
@@ -184,7 +193,7 @@ export default function App() {
       description:
         "Understand memorization progress, behavior notes, and weekly teacher feedback without switching screens.",
       highlights: [
-        `Teacher note: ${hifzDetails?.teacher_note || 'Waiting for feedback'}`,
+        `Teacher note: ${hifzDetails?.teacher_note || 'No teacher feedback for this period.'}`,
       ],
     },
     Policy: {
