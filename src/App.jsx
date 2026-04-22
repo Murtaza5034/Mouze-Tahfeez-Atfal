@@ -2113,6 +2113,8 @@ export default function App() {
     portalAccessList: [],
     teacherProfiles: [],
   });
+  const [customGroups, setCustomGroups] = useState([]);
+  const [teacherAttendance, setTeacherAttendance] = useState([]);
   const [teacherGroupFilter, setTeacherGroupFilter] = useState("All");
   const [adminTeacherFilter, setAdminTeacherFilter] = useState("All");
   const [teacherProfiles, setTeacherProfiles] = useState([]);
