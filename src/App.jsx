@@ -2039,6 +2039,24 @@ function TeacherPortal({
                 </div>
                 {selectedStudentId === student.student_id && (
                   <div className="card-expanded-stats" style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                    <div className="quick-management" style={{ marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
+                      <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '8px' }}>CHANGE ASSIGNMENT</p>
+                      <div className="form-grid">
+                        <select 
+                          className="mini-select"
+                          value={student.teacherName}
+                          onChange={(e) => onAssignChild({ 
+                            preventDefault: () => {}, 
+                            target: { student_id: student.student_id, teacher_name: e.target.value, group_name: student.groupName } 
+                          }, true)}
+                        >
+                          <option value="">No Teacher</option>
+                          {Array.from(new Set(portalAccessList.filter(a => a.portal_role === "teacher").map(a => a.full_name || a.email))).map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                     <TahfeezReportCard student={student} weeklyResult={student.latestResult} />
                   </div>
                 )}
@@ -2670,9 +2688,18 @@ export default function App() {
     showAction("success", "Group added successfully.");
   };
 
-  const handleAssignChild = async (event) => {
-    event.preventDefault();
-    const { student_id, teacher_name, group_name } = adminForms.assignChild;
+  const handleAssignChild = async (event, isQuick = false) => {
+    if (event.preventDefault) event.preventDefault();
+    
+    let student_id, teacher_name, group_name;
+    
+    if (isQuick) {
+      student_id = event.target.student_id;
+      teacher_name = event.target.teacher_name;
+      group_name = event.target.group_name;
+    } else {
+      ({ student_id, teacher_name, group_name } = adminForms.assignChild);
+    }
 
     if (!student_id) return;
 

@@ -99,3 +99,20 @@
   align-items: center;
   gap: 12px;
 }
+
+.mini-select {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 0.85rem;
+  color: #1e293b;
+  cursor: pointer;
+  outline: none;
+}
+
+.mini-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+}
