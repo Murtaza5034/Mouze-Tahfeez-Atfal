@@ -856,7 +856,7 @@ function ParentPortal({
                     />
                     <div className="teacher-details">
                       <h3>{teacher.full_name}</h3>
-                      <p className="teacher-specialty">Muhaffiz / Teacher</p>
+                      <p className="teacher-specialty">{"Muhaffiz / Teacher"}</p>
                       <div className="contact-actions">
                         {teacher.phone_number && (
                           <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
@@ -864,7 +864,7 @@ function ParentPortal({
                           </a>
                         )}
                         {teacher.whatsapp_number && (
-                          <a href={`https://wa.me/${teacher.whatsapp_number.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                          <a href={`https://wa.me/${teacher.whatsapp_number.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
                              WhatsApp
                           </a>
                         )}
@@ -1090,8 +1090,8 @@ function AdminPortal({
                         {selectedStudent.groupName} · {selectedStudent.teacherName}
                       </p>
                       <div className="pill-row">
-                        <span className="mini-pill">ITS: {selectedStudent.its || "N/A"}</span>
-                        <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N/A"}</span>
+                        <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
+                        <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
                         <span className="mini-pill">
                           Surah: {selectedStudent.hifz?.surat || "Pending"}
                         </span>
@@ -1752,7 +1752,7 @@ function AdminPortal({
                       <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
                         <span className={`badge ${access.portal_role}`}>{ROLE_LABELS[access.portal_role]}</span>
                         {access.portal_role === "teacher" && (
-                          <span className="badge info">{access.salary_per_minute}rs/min</span>
+                          <span className="badge info">{`${access.salary_per_minute} rs-min`}</span>
                         )}
                       </div>
                       <span style={{ fontSize: "12px", opacity: 0.7 }}>{access.email}</span>
@@ -1879,7 +1879,7 @@ function TeacherPortal({
                     <span className="salary-value">{monthlySalary.totalMinutes}</span>
                   </div>
                   <div className="salary-item">
-                    <span className="salary-label">Rate/Min</span>
+                    <span className="salary-label">{"Rate - Min"}</span>
                     <span className="salary-value">₹{monthlySalary.rate}</span>
                   </div>
                   <div className="salary-item total-item">
@@ -2011,7 +2011,7 @@ function TeacherPortal({
                       name="rank"
                       value={teacherForms.result.rank}
                       onChange={onTeacherFormChange}
-                      placeholder="A / 1 / Excellent"
+                      placeholder={"A-1 Excellent"}
                     />
                   </label>
 
@@ -2085,7 +2085,7 @@ function TeacherPortal({
                 </div>
 
                 <label>
-                  <span>Attendance / Performance Note</span>
+                  <span>{"Attendance-Performance Note"}</span>
                   <textarea
                     name="attendance_note"
                     rows="3"
