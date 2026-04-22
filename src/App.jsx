@@ -12,7 +12,7 @@ import {
   Menu,
   ShieldCheck,
   Sparkles,
-  Trash2,
+  Trash,
   X,
   User,
   Users,
@@ -1173,7 +1173,7 @@ function AdminPortal({
                         onClick={() => onDeleteRecord("schedule", "id")(item.id)}
                         aria-label="Delete schedule"
                       >
-                        <Trash2 size={16} />
+                        <Trash size={16} />
                       </button>
                     </article>
                   );
@@ -1257,7 +1257,7 @@ function AdminPortal({
                       onClick={() => onDeleteRecord("events", "id")(item.id)}
                       aria-label="Delete announcement"
                     >
-                      <Trash2 size={16} />
+                      <Trash size={16} />
                     </button>
                   </article>
                 ))}
@@ -1443,7 +1443,7 @@ function AdminPortal({
                       onClick={() => onDeleteRecord("custom_groups", "id")(group.id)}
                       aria-label="Delete group"
                     >
-                      <Trash2 size={16} />
+                      <Trash size={16} />
                     </button>
                   </article>
                 ))}
@@ -1614,7 +1614,7 @@ function AdminPortal({
                       className="delete-icon-btn" 
                       onClick={() => onDeleteRecord("teacher_profiles", "id")(profile.id)}
                     >
-                      <Trash2 size={16} />
+                      <Trash size={16} />
                     </button>
                   </article>
                 ))}
@@ -1745,7 +1745,7 @@ function AdminPortal({
                       onClick={() => onDeleteRecord("user_portal_access", "id")(access.id)}
                       aria-label="Delete access"
                     >
-                      <Trash2 size={16} />
+                      <Trash size={16} />
                     </button>
                   </article>
                 ))}
