@@ -1,0 +1,362 @@
+/* ========================================
+   PARENT PORTAL — Golden & White Theme
+   Mobile-app style layout
+   ======================================== */
+
+:root {
+  --gold: #c9a84c;
+  --gold-light: #f5d98a;
+  --gold-dark: #a07830;
+  --gold-gradient: linear-gradient(135deg, #c9a84c, #f5d98a, #c9a84c);
+  --gold-bg: #fffbf0;
+  --white: #ffffff;
+  --text-dark: #1a1209;
+  --text-mid: #5a4a20;
+  --text-muted: #9d8054;
+  --border: #e8d89a;
+  --shadow: 0 4px 20px rgba(180, 130, 30, 0.12);
+}
+
+/* Shell */
+.parent-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--gold-bg);
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ---- Sidebar Overlay ---- */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 10, 0, 0.5);
+  z-index: 1999;
+  backdrop-filter: blur(3px);
+}
+
+/* ---- Slide-in Drawer ---- */
+.parent-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100vh;
+  background: linear-gradient(180deg, #1a1109 0%, #2d1f08 100%);
+  color: white;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 30px rgba(0, 0, 0, 0.4);
+}
+
+.parent-drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.3);
+  background: rgba(201, 168, 76, 0.1);
+}
+
+.drawer-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--gold);
+}
+
+.drawer-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 2px;
+}
+
+.drawer-sub {
+  font-size: 0.78rem;
+  color: rgba(245, 217, 138, 0.8);
+  margin: 0;
+}
+
+.drawer-close {
+  margin-left: auto;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: white;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.2s;
+}
+
+.drawer-close:hover { background: rgba(201, 168, 76, 0.3); }
+
+.drawer-nav {
+  flex: 1;
+  padding: 16px 0;
+  overflow-y: auto;
+}
+
+.drawer-section-label {
+  font-size: 0.7rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(245, 217, 138, 0.5);
+  padding: 16px 20px 6px;
+  margin: 0;
+}
+
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 20px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.drawer-link:hover,
+.drawer-link.active {
+  background: rgba(201, 168, 76, 0.15);
+  color: var(--gold-light);
+}
+
+.drawer-link.logout {
+  color: #f87171;
+}
+
+.drawer-link.logout:hover {
+  background: rgba(248, 113, 113, 0.1);
+  color: #fca5a5;
+}
+
+.drawer-footer {
+  padding: 12px 0 32px;
+  border-top: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+/* ---- Top Header Bar ---- */
+.parent-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #1a1109, #3d2a0a);
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+.parent-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  object-fit: cover;
+}
+
+.topbar-brand {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--gold-light);
+  letter-spacing: 0.3px;
+}
+
+.topbar-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: rgba(245, 217, 138, 0.6);
+}
+
+.topbar-menu-btn {
+  background: rgba(201, 168, 76, 0.15);
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  color: var(--gold-light);
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.topbar-menu-btn:hover {
+  background: rgba(201, 168, 76, 0.35);
+}
+
+/* ---- Main Content Area ---- */
+.parent-main {
+  flex: 1;
+  padding: 20px 16px 100px; /* bottom padding for nav bar */
+  overflow-y: auto;
+}
+
+/* ---- Bottom Navigation Bar ---- */
+.parent-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  background: linear-gradient(180deg, #1a1109, #2d1f08);
+  border-top: 1px solid rgba(201, 168, 76, 0.35);
+  z-index: 1000;
+  padding: 6px 0 env(safe-area-inset-bottom, 6px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+  background: none;
+  border: none;
+  color: rgba(245, 217, 138, 0.45);
+  cursor: pointer;
+  transition: all 0.22s;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.bottom-nav-btn span {
+  font-size: 0.7rem;
+}
+
+.bottom-nav-btn:hover {
+  color: var(--gold-light);
+}
+
+.bottom-nav-btn.active {
+  color: var(--gold-light);
+  position: relative;
+}
+
+.bottom-nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 2.5px;
+  background: var(--gold-gradient);
+  border-radius: 0 0 4px 4px;
+}
+
+/* ---- Page Content Cards ---- */
+.parent-page-header {
+  margin-bottom: 20px;
+}
+
+.parent-page-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  margin: 0 0 4px;
+}
+
+.parent-page-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-dark);
+  margin: 0 0 6px;
+}
+
+.parent-page-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ---- Dashboard Sections ---- */
+.home-dashboard .dashboard-section {
+  background: var(--white);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.home-dashboard .section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #fdf8ec, #faf3d8);
+  border-bottom: 1px solid var(--border);
+  color: var(--gold-dark);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* Schedule and Announcement override colors */
+.schedule-item .time-strip {
+  color: var(--gold-dark);
+}
+
+.schedule-item.done .time-strip {
+  color: #16a34a;
+}
+
+/* Announcements */
+.news-card {
+  border-left: 3px solid var(--gold);
+}
+
+.news-card .tag {
+  background: #fef9e7;
+  color: var(--gold-dark);
+  border: 1px solid var(--gold-light);
+}
+
+/* Teacher cards */
+.teacher-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+/* Bottom nav safe area for iOS */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .parent-bottom-nav {
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+}

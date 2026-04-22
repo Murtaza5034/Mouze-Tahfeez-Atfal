@@ -24,6 +24,7 @@ import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
 import "./admin-sidebar.css";
+import "./parent-portal.css";
 
 const ROLE_LABELS = {
   parents: "Parents",
@@ -603,73 +604,66 @@ function ParentPortal({
 
   const currentPage = pages[activePage];
 
+  const bottomPages = [
+    { key: "Home", label: "Home", icon: Home },
+    { key: "Child Summary", label: "Progress", icon: GraduationCap },
+    { key: "Schedule", label: "Schedule", icon: Calendar },
+    { key: "Teachers", label: "Teachers", icon: Users },
+  ];
+
   return (
-    <div className="admin-shell">
+    <div className="parent-shell">
       {/* Sidebar Overlay */}
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
-      <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
-        <div className="sidebar-header">
-           <div className="brand-header-flex">
-            <img src={studentProfile?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
-            <div>
-              <p className="brand-tag" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Welcome</p>
-              <h1 className="brand-title" style={{ fontSize: '1rem', color: 'white', margin: 0 }}>{studentProfile?.name || "Parent Portal"}</h1>
-            </div>
+
+      {/* Slide-In Sidebar */}
+      <aside className={`parent-drawer ${menuOpen ? 'open' : ''}`}>
+        <div className="drawer-header">
+          <img src={studentProfile?.photo_url || "/logo.png"} alt="Profile" className="drawer-avatar" />
+          <div>
+            <h3 className="drawer-name">{studentProfile?.name || "Student"}</h3>
+            <p className="drawer-sub">ITS: {studentProfile?.its || "..."} &nbsp;|&nbsp; {studentProfile?.groupName || "..."}</p>
           </div>
+          <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
-        <nav className="sidebar-nav">
-          <p className="sidebar-category">Profile</p>
-          <div style={{ padding: '0 12px', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}>
-            <p style={{ margin: '4px 0' }}>ITS: {studentProfile?.its || "..."}</p>
-            <p style={{ margin: '4px 0' }}>Group: {studentProfile?.groupName || "..."}</p>
-          </div>
-          <p className="sidebar-category" style={{ marginTop: '16px' }}>Actions</p>
-          {assignedRoles.filter(r => r !== 'parents').map((role) => (
-            <button key={role} className="sidebar-link" onClick={() => { onRoleChange(role); setMenuOpen(false); }}>
-               <LogOut size={18} /> Switch to {role}
-            </button>
-          ))}
-          <button className="sidebar-link" onClick={onLogout}>
-            <LogOut size={18} /> Logout
+        <nav className="drawer-nav">
+          <p className="drawer-section-label">More Pages</p>
+          <button className={`drawer-link ${activePage === "Announcements" ? "active" : ""}`} onClick={() => { setActivePage("Announcements"); setMenuOpen(false); }}>
+            <Bell size={18} /> Announcements
+          </button>
+          <button className={`drawer-link ${activePage === "Profile" ? "active" : ""}`} onClick={() => { setActivePage("Profile"); setMenuOpen(false); }}>
+            <User size={18} /> My Profile
           </button>
         </nav>
+        <div className="drawer-footer">
+          {assignedRoles.filter(r => r !== 'parents').map((role) => (
+            <button key={role} className="drawer-link" onClick={() => { onRoleChange(role); setMenuOpen(false); }}>
+              <LogOut size={18} /> Switch to {role}
+            </button>
+          ))}
+          <button className="drawer-link logout" onClick={onLogout}>
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
       </aside>
 
-      <main className="admin-main" style={{ flex: 1 }}>
-        {/* Top Navigation Bar */}
-        <header className="pro-top-bar">
-          <div className="pro-top-left">
-            <button className="sidebar-toggle-btn-inline" onClick={() => setMenuOpen(!menuOpen)}>
-              <Menu size={20} />
-            </button>
-            <img src="/logo.png" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-            <span style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>Mauze Tahfeez</span>
+      {/* Top Header Bar */}
+      <header className="parent-topbar">
+        <div className="parent-topbar-left">
+          <img src="/logo.png" alt="Logo" className="topbar-logo" />
+          <div>
+            <span className="topbar-brand">Mauze Tahfeez</span>
+            <span className="topbar-sub">Parents Portal</span>
           </div>
-          <nav className="pro-tab-nav">
-            {pageNames.map(page => (
-              <button
-                key={page}
-                className={`tab-link ${activePage === (navigationMap[page] || page) ? 'active' : ''}`}
-                onClick={() => setActivePage(navigationMap[page] || page)}
-              >
-                {page}
-              </button>
-            ))}
-          </nav>
-          <div className="pro-top-right">
-            <span className="role-chip">{studentProfile?.name?.split(' ')[0] || "Parent"}</span>
-          </div>
-        </header>
+        </div>
+        <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
+          <Menu size={22} />
+        </button>
+      </header>
 
-        <section className="admin-content-pad" style={{ padding: '24px' }}>
-          {showCelebration && <Celebration />}
-          {currentPage && (
-            <div style={{ marginBottom: '24px' }}>
-              <p style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--primary)', margin: '0 0 4px' }}>{currentPage.eyebrow}</p>
-              <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>{currentPage.title}</h2>
-              <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>{currentPage.description}</p>
-            </div>
-          )}
+      {/* Main Content */}
+      <main className="parent-main">
+        {showCelebration && <Celebration />}
 
         {activePage === "Schedule" ? (
           <div className="home-dashboard">
@@ -841,9 +835,22 @@ function ParentPortal({
           </div>
         ) : null}
 
-        {currentPage && <InfoHighlights items={currentPage.highlights} />}
-        </section>
+        {currentPage?.highlights && activePage === "Profile" && <InfoHighlights items={currentPage.highlights} />}
       </main>
+
+      {/* Bottom Tab Bar - 4 main pages */}
+      <nav className="parent-bottom-nav">
+        {bottomPages.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            className={`bottom-nav-btn ${activePage === key ? "active" : ""}`}
+            onClick={() => setActivePage(key)}
+          >
+            <Icon size={22} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
