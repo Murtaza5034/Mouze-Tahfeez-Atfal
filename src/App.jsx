@@ -413,7 +413,7 @@ function TahfeezReportCard({ student, weeklyResult }) {
     <div className="progress-overview">
       <div className="section-title-group">
         <BookOpen size={20} />
-        <h3>{student ? `${student.name}'s Tahfeez Report` : "Weekly Result"}</h3>
+        <h3>{student ? (student.name + "'s Tahfeez Report") : "Weekly Result"}</h3>
       </div>
 
       <div className="result-card-premium">
@@ -422,43 +422,43 @@ function TahfeezReportCard({ student, weeklyResult }) {
             <img src="/logo.png" alt="Logo" />
           </div>
           <div className="school-info">
-            <h4>RAWDAT TAHFEEZ UL ATFAAL</h4>
+            <h4>{"RAWDAT TAHFEEZ UL ATFAAL"}</h4>
             <p>{student?.groupName || "Tahfeez Group"}</p>
           </div>
           <div className="report-badge">
-            <span className="arabic-kanz" style={{ fontSize: '18px', display: 'block', marginBottom: '4px' }}>تقرير التحفيظ</span>
-            <span>TAHFEEZ REPORT</span>
+            <span className="arabic-kanz" style={{ fontSize: '18px', display: 'block', marginBottom: '4px' }}>{"تقرير التحفيظ"}</span>
+            <span>{"TAHFEEZ REPORT"}</span>
           </div>
         </div>
         <div style={{ textAlign: 'center', margin: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '10px' }}>
            <p className="arabic-kanz" style={{ fontSize: '20px', color: '#1e293b' }}>
-             الأسبوع: {weeklyResult?.week_count || '...'} | شهر: {weeklyResult?.month_name_arabic || '...'}
+             {`الأسبوع: ${weeklyResult?.week_count || '...'} | شهر: ${weeklyResult?.month_name_arabic || '...'}`}
            </p>
         </div>
 
         <div className="result-main">
           <div className="total-score-block">
-            <span className="score-title">WEEKLY SCORE</span>
-            <span className="jumla-label">Jumla</span>
+            <span className="score-title">{"WEEKLY SCORE"}</span>
+            <span className="jumla-label">{"Jumla"}</span>
             <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
             <span className="max-score">{" / 100"}</span>
           </div>
 
           <div className="score-details-box">
             <div className="score-row">
-              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>مراجعة</span>
+              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>{"مراجعة"}</span>
               <span className="score-val">{`${weeklyResult?.murajazah || "0"} / 30`}</span>
             </div>
             <div className="score-row">
-              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>جزء حالي</span>
+              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>{"جزء حالي"}</span>
               <span className="score-val">{`${weeklyResult?.juz_hali || "0"} / 30`}</span>
             </div>
             <div className="score-row">
-              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>تخطيط</span>
+              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>{"تخطيط"}</span>
               <span className="score-val">{`${weeklyResult?.takhteet || "0"} / 20`}</span>
             </div>
             <div className="score-row">
-              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>جديد</span>
+              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>{"جديد"}</span>
               <span className="score-val">{`${weeklyResult?.jadeed || "0"} / 20`}</span>
             </div>
           </div>
@@ -467,43 +467,43 @@ function TahfeezReportCard({ student, weeklyResult }) {
                <Trophy size={60} color="#fbbf24" fill="#fbbf24" />
                <span className="rank-text-overlay">{weeklyResult?.rank || "-"}</span>
             </div>
-            <span className="rank-label">Rank</span>
+            <span className="rank-label">{"Rank"}</span>
           </div>
         </div>
 
         <div className="result-footer">
           <div className="target-box">
-            <h5>Next Week Target</h5>
+            <h5>{"Next Week Target"}</h5>
             <div className="target-fields">
               <div className="field">
-                <span>Juz:</span>
+                <span>{"Juz:"}</span>
                 <strong>{weeklyResult?.next_week_juz || "-"}</strong>
               </div>
               <div className="field">
-                <span>Page:</span>
+                <span>{"Page:"}</span>
                 <strong>{weeklyResult?.next_week_page || "-"}</strong>
               </div>
             </div>
             <div className="sub-field">
-              <span>Total Jadeed Pages:</span>
+              <span>{"Total Jadeed Pages:"}</span>
               <strong>{weeklyResult?.total_jadeed_pages || "0"}</strong>
             </div>
           </div>
 
           <div className="target-box highlight">
-            <h5>Target Till Istifadah Ilmiyah</h5>
+            <h5>{"Target Till Istifadah Ilmiyah"}</h5>
             <div className="target-fields">
               <div className="field">
-                <span>Juz:</span>
+                <span>{"Juz:"}</span>
                 <strong>{weeklyResult?.istifadah_juz || "-"}</strong>
               </div>
               <div className="field">
-                <span>Page:</span>
+                <span>{"Page:"}</span>
                 <strong>{weeklyResult?.istifadah_page || "-"}</strong>
               </div>
             </div>
             <div className="sub-field">
-              <span>Attendance Count:</span>
+              <span>{"Attendance Count:"}</span>
               <strong>{weeklyResult?.attendance_count || "-"}</strong>
             </div>
           </div>
