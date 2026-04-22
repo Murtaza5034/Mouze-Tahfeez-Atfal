@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "start": "vite",
-    "build": "vite build",
+   "build": "npm run build --verbose"
     "preview": "vite preview"
+    "postinstall": "..."
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.0",
