@@ -538,8 +538,18 @@ function ParentPortal({
   const { studentProfile, hifzDetails, announcements, schedule, attendance, weeklyResult } =
     parentData;
 
-  const pageNames = ["Home", "Schedule", "Announcements", "Teachers"];
+  const pageNames = ["Home", "Schedule", "Progress", "Announcements", "Teachers"];
   const assignedRoles = getAssignedRoles(user);
+
+  // Re-mapping "Progress" to "Child Summary"
+  const navigationMap = {
+    "Home": "Home",
+    "Schedule": "Schedule",
+    "Announcements": "Announcements",
+    "Teachers": "Teachers",
+    "Progress": "Child Summary",
+    "Profile": "Profile"
+  };
 
   const myTeacher = teacherProfiles.find(t => 
     normalizeText(t.full_name) === normalizeText(studentProfile?.teacher_name)
@@ -795,13 +805,15 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Child Summary" ? (
-          <TahfeezReportCard
-            student={{
-              name: studentProfile?.name,
-              groupName: studentProfile?.class_level,
-            }}
-            weeklyResult={weeklyResult}
-          />
+          <div className="card-appear">
+            <TahfeezReportCard
+              student={{
+                name: studentProfile?.name,
+                groupName: studentProfile?.class_level,
+              }}
+              weeklyResult={weeklyResult}
+            />
+          </div>
         ) : null}
         {activePage === "Teachers" ? (
           <div className="management-grid">
@@ -853,8 +865,8 @@ function ParentPortal({
             <button
               key={page}
               type="button"
-              className={activePage === page ? "nav-link active" : "nav-link"}
-              onClick={() => setActivePage(page)}
+              className={activePage === (navigationMap[page] || page) ? "nav-link active" : "nav-link"}
+              onClick={() => setActivePage(navigationMap[page] || page)}
             >
               <span className="nav-icon"><Icon size={20} /></span>
               <span className="nav-text">{page}</span>
