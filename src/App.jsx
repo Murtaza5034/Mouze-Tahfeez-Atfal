@@ -9,8 +9,11 @@ import {
   Hash,
   Layers3,
   LogOut,
+  Menu,
   ShieldCheck,
   Sparkles,
+  Trash2,
+  X,
   User,
   Users,
 } from "lucide-react";
@@ -19,6 +22,7 @@ import Login from "./Login";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
+import "./admin-sidebar.css";
 
 const ROLE_LABELS = {
   parents: "Parents",
@@ -93,6 +97,39 @@ function writeLocalArray(key, value) {
 
   window.localStorage.setItem(key, JSON.stringify(value));
 }
+
+function Celebration() {
+  const pieces = Array.from({ length: 50 });
+  return (
+    <div className="celebration-overlay">
+      {pieces.map((_, i) => (
+        <div 
+          key={i} 
+          className="confetti" 
+          style={{
+            left: `${Math.random() * 100}%`,
+            backgroundColor: ['#fbbf24', '#3b82f6', '#ef4444', '#10b981', '#a855f7'][Math.floor(Math.random() * 5)],
+            animationDelay: `${Math.random() * 2}s`,
+            animationDuration: `${2 + Math.random() * 2}s`
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+const sendPushNotification = async (title, body) => {
+  if (!("Notification" in window)) return;
+  
+  if (Notification.permission === "granted") {
+    new Notification(title, { body, icon: "/logo.png" });
+  } else if (Notification.permission !== "denied") {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      new Notification(title, { body, icon: "/logo.png" });
+    }
+  }
+};
 
 function normalizeText(value) {
   return String(value || "")
@@ -488,6 +525,16 @@ function ParentPortal({
   onRoleChange,
   teacherProfiles = [],
 }) {
+  const [showCelebration, setShowCelebration] = useState(false);
+
+  useEffect(() => {
+    if (activePage === "Child Summary") {
+      setShowCelebration(true);
+      const timer = setTimeout(() => setShowCelebration(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [activePage]);
+
   const { studentProfile, hifzDetails, announcements, schedule, attendance, weeklyResult } =
     parentData;
 
@@ -638,6 +685,7 @@ function ParentPortal({
       </header>
 
       <main className="page-card">
+        {showCelebration && <Celebration />}
         {currentPage && (
           <>
             <p className="page-eyebrow">{currentPage.eyebrow}</p>
@@ -845,15 +893,8 @@ function AdminPortal({
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
 
-  const pageNames = [
-    "Overview",
-    "Announcements",
-    "Schedule",
-    "Teachers",
-    "Staff Profiles",
-    "Groups",
-    "Portal Access",
-  ];
+  const sidebarLinks = ["Staff Profiles", "Groups", "Portal Access"];
+  const navPages = ["Overview", "Announcements", "Schedule", "Teachers"];
 
   const selectedStudent =
     students.find((student) => String(student.student_id) === String(selectedStudentId)) ||
@@ -893,107 +934,90 @@ function AdminPortal({
   ];
 
   return (
-    <div className="app-shell">
-      <div
-        className={menuOpen ? "sidebar-overlay visible" : "sidebar-overlay"}
-        onClick={() => setMenuOpen(false)}
-      />
-
-      <aside className={menuOpen ? "sidebar open" : "sidebar"}>
+    <div className="admin-shell">
+      <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <div>
-            <p className="sidebar-tag">Administration</p>
-            <h2>{user?.email}</h2>
-          </div>
-          <button
-            type="button"
-            className="close-menu"
-            onClick={() => setMenuOpen(false)}
-            aria-label="Close menu"
-          >
-            X
-          </button>
-        </div>
-
-        <div className="sidebar-links">
-          {getAssignedRoles(user).map((role) => (
-            <button
-              key={role}
-              type="button"
-              className="sidebar-link"
-              onClick={() => onRoleChange(role)}
-            >
-              Go to {ROLE_LABELS[role] || role} Portal
-            </button>
-          ))}
-          <button type="button" className="sidebar-link logout-btn" onClick={onLogout}>
-            <LogOut size={18} />
-            Logout
-          </button>
-        </div>
-      </aside>
-
-      <header className="topbar">
-        <button
-          type="button"
-          className="menu-button"
-          onClick={() => setMenuOpen(true)}
-          aria-label="Open menu"
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-
-        <div className="brand-block">
-          <div className="brand-header-flex">
-            <img src="/logo.png" alt="Logo" className="nav-logo" />
+           <div className="brand-header-flex">
+            <img src="/logo.png" alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag">School Administration</p>
-              <h1 className="brand-title">Admin Workspace</h1>
+              <p className="brand-tag" style={{ color: 'rgba(255,255,255,0.6)' }}>Admin View</p>
+              <h2 className="brand-title" style={{ color: 'white', fontSize: '1rem', margin: 0 }}>Manager</h2>
             </div>
           </div>
         </div>
-
-        <div className="top-status">
-          <span>Admin View</span>
-        </div>
-      </header>
-
-      <main className="page-card">
-        <p className="page-eyebrow">Administrative Control</p>
-        <h2>Manage schedules, teachers, groups, and child progress</h2>
-        <p className="page-description">
-          Create daily schedules, publish announcements, review every child result, and monitor
-          teacher attendance from one workspace.
-        </p>
-
-        <section className="hero-panel">
-          <div>
-            <p className="hero-label">Current page</p>
-            <h3>{activePage}</h3>
-          </div>
-          <div className="hero-chip">School-wide management</div>
-        </section>
-
-        {actionMessage ? (
-          <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
-        ) : null}
-
-        <div className="portal-stats">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <article key={stat.label} className="stat-card">
-                <div className="stat-icon">
-                  <Icon size={18} />
-                </div>
-                <strong>{stat.value}</strong>
-                <span>{stat.label}</span>
-              </article>
-            );
+        <nav className="sidebar-nav">
+          <p className="sidebar-category" style={{ padding: '0 16px', fontSize: '10px', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px' }}>Main Dashboard</p>
+          {navPages.map(page => {
+             const Icon = NAV_ICONS[page] || Layers3;
+             return (
+               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
+                 <Icon size={18} /> {page === "Announcements" ? "Updates" : page}
+               </button>
+             )
           })}
-        </div>
+          
+          <p className="sidebar-category" style={{ padding: '0 16px', fontSize: '10px', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px', marginTop: '24px' }}>Management</p>
+          {sidebarLinks.map(page => {
+             const Icon = NAV_ICONS[page] || Users;
+             return (
+               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
+                 <Icon size={18} /> {page}
+               </button>
+             )
+          })}
+
+          <div style={{ marginTop: 'auto', padding: '16px 0' }}>
+            {getAssignedRoles(user).filter(r => r !== 'admin').map((role) => (
+              <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
+                 <LogOut size={18} /> Switch to {role}
+              </button>
+            ))}
+            <button className="sidebar-link" onClick={onLogout}>
+              <LogOut size={18} /> Logout
+            </button>
+          </div>
+        </nav>
+      </aside>
+
+      <main className="admin-main">
+        <header className="topbar">
+          <button
+            type="button"
+            className="menu-button-mobile"
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{ background: 'none', border: 'none', padding: '12px', display: 'none' }}
+          >
+            <Menu size={24} />
+          </button>
+          <div className="brand-block">
+             <h2 className="page-title" style={{ margin: 0 }}>{activePage}</h2>
+          </div>
+          <div className="header-actions">
+             <button className="role-chip" onClick={() => onRoleChange("parents")}>
+               Parents View
+             </button>
+          </div>
+        </header>
+
+        <section className="admin-content-pad" style={{ padding: '24px' }}>
+          {actionMessage && (
+            <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+          )}
+
+          <div className="portal-stats">
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <article key={stat.label} className="stat-card">
+                  <div className="stat-icon">
+                    <Icon size={18} />
+                  </div>
+                  <strong>{stat.value}</strong>
+                  <span>{stat.label}</span>
+                </article>
+              );
+            })}
+          </div>
 
         {activePage === "Overview" ? (
           <div className="management-grid two-columns">
@@ -1719,32 +1743,8 @@ function AdminPortal({
               </div>
             </section>
           </div>
-        ) : null}
+        </section>
       </main>
-
-      <nav className="navbar admin-navbar" aria-label="Admin navigation">
-        {[
-          { id: "Overview", label: "Overview" },
-          { id: "Schedule", label: "Schedule" },
-          { id: "Announcements", label: "Updates" },
-          { id: "Staff Profiles", label: "Staff" },
-          { id: "Groups", label: "Groups" },
-          { id: "Portal Access", label: "Access" },
-        ].map((item) => {
-          const Icon = NAV_ICONS[item.id] || Layers3;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              className={activePage === item.id ? "nav-link active" : "nav-link"}
-              onClick={() => setActivePage(item.id)}
-            >
-              <span className="nav-icon"><Icon size={20} /></span>
-              <span className="nav-text">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
     </div>
   );
 }
@@ -2684,6 +2684,7 @@ export default function App() {
       portalAccess: { email: "", full_name: "", portal_role: "parents" },
     }));
     showAction("success", "Portal access granted successfully.");
+    sendPushNotification("Access Granted", `Welcome ${payload.full_name}!`);
   };
 
   const handleAdminFormChange = (formKey) => (event) => {
@@ -2742,6 +2743,7 @@ export default function App() {
       },
     }));
     showAction("success", "Announcement created successfully.");
+    sendPushNotification("New Update!", payload.title);
   };
 
   const handleCreateSchedule = async (event) => {
@@ -2773,6 +2775,7 @@ export default function App() {
       },
     }));
     showAction("success", "Schedule created successfully.");
+    sendPushNotification("Schedule Updated", `New task added: ${payload.task_name}`);
   };
 
   const handleRecordTeacherAttendance = async (event) => {
