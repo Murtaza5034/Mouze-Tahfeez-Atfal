@@ -838,8 +838,22 @@ function AdminPortal({
   onRoleChange,
   user,
   onAssignChild,
+  adminTeacherFilter,
+  setAdminTeacherFilter,
+  onDeleteRecord,
+  onUpdateTeacherProfile,
 }) {
-  const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList } = adminData;
+  const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
+
+  const pageNames = [
+    "Overview",
+    "Announcements",
+    "Schedule",
+    "Teachers",
+    "Staff Profiles",
+    "Groups",
+    "Portal Access",
+  ];
 
   const selectedStudent =
     students.find((student) => String(student.student_id) === String(selectedStudentId)) ||
@@ -1111,11 +1125,20 @@ function AdminPortal({
                   );
 
                   return (
-                    <article key={`${item.student_id}-${item.task_time}-${index}`} className="record-card">
-                      <strong>{item.task_name}</strong>
-                      <span>
-                        {student?.name || "Unknown child"} · {item.task_time || "--:--"}
-                      </span>
+                    <article key={`${item.student_id}-${item.task_time}-${index}`} className="record-card flex-row-card">
+                      <div className="card-primary-info">
+                        <strong>{item.task_name}</strong>
+                        <span>
+                          {student?.name || "Unknown child"} · {item.task_time || "--:--"}
+                        </span>
+                      </div>
+                      <button 
+                        className="delete-icon-btn" 
+                        onClick={() => onDeleteRecord("schedule", "id")(item.id)}
+                        aria-label="Delete schedule"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </article>
                   );
                 })}
@@ -1186,11 +1209,20 @@ function AdminPortal({
               </div>
               <div className="record-stack">
                 {announcements.map((item) => (
-                  <article key={item.id || `${item.title}-${item.event_date}`} className="record-card">
-                    <strong>{item.title}</strong>
-                    <span>
-                      {item.type || "Update"} · {item.event_date || "No date"}
-                    </span>
+                  <article key={item.id || `${item.title}-${item.event_date}`} className="record-card flex-row-card">
+                    <div className="card-primary-info">
+                      <strong>{item.title}</strong>
+                      <span>
+                        {item.type || "Update"} · {item.event_date || "No date"}
+                      </span>
+                    </div>
+                    <button 
+                      className="delete-icon-btn" 
+                      onClick={() => onDeleteRecord("events", "id")(item.id)}
+                      aria-label="Delete announcement"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </article>
                 ))}
                 {announcements.length === 0 ? (
@@ -1365,9 +1397,18 @@ function AdminPortal({
 
               <div className="record-stack">
                 {customGroups.map((group, index) => (
-                  <article key={`${group.group_name}-${index}`} className="record-card">
-                    <strong>{group.group_name}</strong>
-                    <span>{group.teacher_name}</span>
+                  <article key={`${group.group_name}-${index}`} className="record-card flex-row-card">
+                    <div className="card-primary-info">
+                      <strong>{group.group_name}</strong>
+                      <span>{group.teacher_name}</span>
+                    </div>
+                    <button 
+                      className="delete-icon-btn" 
+                      onClick={() => onDeleteRecord("custom_groups", "id")(group.id)}
+                      aria-label="Delete group"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </article>
                 ))}
                 {customGroups.length === 0 ? (
@@ -1456,6 +1497,89 @@ function AdminPortal({
                         </span>
                       ))}
                     </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {activePage === "Staff Profiles" ? (
+          <div className="management-grid two-columns">
+            <section className="form-card">
+              <div className="card-headline">
+                <User size={18} />
+                <h3>Update Staff Profile</h3>
+              </div>
+              <form className="stack-form" onSubmit={onUpdateTeacherProfile}>
+                <label>
+                  <span>Teacher Full Name (Must match Supabase Auth name)</span>
+                  <input
+                    type="text"
+                    name="full_name"
+                    value={adminForms.teacherProfile.full_name}
+                    onChange={onAdminFormChange("teacherProfile")}
+                    placeholder="Muhaffiz Ahmed"
+                    required
+                  />
+                </label>
+                <div className="form-grid">
+                  <label>
+                    <span>Phone Number</span>
+                    <input
+                      type="text"
+                      name="phone_number"
+                      value={adminForms.teacherProfile.phone_number}
+                      onChange={onAdminFormChange("teacherProfile")}
+                      placeholder="+92 300 1234567"
+                    />
+                  </label>
+                  <label>
+                    <span>WhatsApp Number</span>
+                    <input
+                      type="text"
+                      name="whatsapp_number"
+                      value={adminForms.teacherProfile.whatsapp_number}
+                      onChange={onAdminFormChange("teacherProfile")}
+                      placeholder="923001234567"
+                    />
+                  </label>
+                </div>
+                <label>
+                  <span>Profile Photo URL</span>
+                  <input
+                    type="text"
+                    name="photo_url"
+                    value={adminForms.teacherProfile.photo_url}
+                    onChange={onAdminFormChange("teacherProfile")}
+                    placeholder="https://example.com/photo.jpg"
+                  />
+                </label>
+                <button type="submit" className="action-button">Save Profile</button>
+              </form>
+            </section>
+
+            <section className="data-card">
+              <div className="card-headline">
+                <ShieldCheck size={18} />
+                <h3>Existing Profiles</h3>
+              </div>
+              <div className="record-stack">
+                {teacherProfiles.map(profile => (
+                  <article key={profile.id} className="record-card flex-row-card">
+                    <div className="profile-identity-row">
+                      <img src={profile.photo_url || "/default-avatar.png"} alt="" className="user-dp-badge" />
+                      <div>
+                        <strong>{profile.full_name}</strong>
+                        <p style={{ fontSize: '11px' }}>{profile.whatsapp_number}</p>
+                      </div>
+                    </div>
+                    <button 
+                      className="delete-icon-btn" 
+                      onClick={() => onDeleteRecord("teacher_profiles", "id")(profile.id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </article>
                 ))}
               </div>
@@ -1580,9 +1704,13 @@ function AdminPortal({
                       </div>
                       <span style={{ fontSize: "12px", opacity: 0.7 }}>{access.email}</span>
                     </div>
-                    <span className={`role-badge role-${access.portal_role}`}>
-                      {access.portal_role}
-                    </span>
+                    <button 
+                      className="delete-icon-btn" 
+                      onClick={() => onDeleteRecord("user_portal_access", "id")(access.id)}
+                      aria-label="Delete access"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </article>
                 ))}
                 {(!portalAccessList || portalAccessList.length === 0) ? (
@@ -1599,7 +1727,7 @@ function AdminPortal({
           { id: "Overview", label: "Overview" },
           { id: "Schedule", label: "Schedule" },
           { id: "Announcements", label: "Updates" },
-          { id: "Teachers", label: "Teachers" },
+          { id: "Staff Profiles", label: "Staff" },
           { id: "Groups", label: "Groups" },
           { id: "Portal Access", label: "Access" },
         ].map((item) => {
@@ -2152,6 +2280,13 @@ export default function App() {
       student_id: "",
       teacher_name: "",
       group_name: "",
+    },
+    teacherProfile: {
+      user_id: "",
+      full_name: "",
+      photo_url: "",
+      phone_number: "",
+      whatsapp_number: "",
     },
   });
   const [teacherForms, setTeacherForms] = useState({
@@ -2743,6 +2878,46 @@ export default function App() {
     showAction("success", "Child assigned to muhaffiz successfully.");
   };
 
+  const handleDeleteRecord = (table, idField = "id") => async (id) => {
+    if (!window.confirm("Are you sure you want to delete this record?")) return;
+
+    const { error } = await supabase.from(table).delete().eq(idField, id);
+
+    if (error) {
+      showAction("error", error.message);
+      return;
+    }
+
+    // Refresh school data
+    await loadPortalData(portalRole, user, parentData.studentProfile);
+    showAction("success", "Record deleted successfully.");
+  };
+
+  const handleUpdateTeacherProfile = async (event) => {
+    event.preventDefault();
+    const payload = adminForms.teacherProfile;
+
+    const { error } = await supabase
+      .from("teacher_profiles")
+      .upsert({
+        user_id: payload.user_id || undefined,
+        full_name: payload.full_name,
+        photo_url: payload.photo_url,
+        phone_number: payload.phone_number,
+        whatsapp_number: payload.whatsapp_number,
+        is_active: true,
+      }, { onConflict: 'full_name' });
+
+    if (error) {
+      showAction("error", error.message);
+      return;
+    }
+
+    await loadPortalData(portalRole, user, parentData.studentProfile);
+    setAdminForms(curr => ({ ...curr, teacherProfile: { full_name: "", photo_url: "", phone_number: "", whatsapp_number: "" }}));
+    showAction("success", "Teacher profile updated.");
+  };
+
   const handleTeacherResultSubmit = async (event) => {
     event.preventDefault();
 
@@ -2859,6 +3034,8 @@ export default function App() {
         onAssignChild={handleAssignChild}
         adminTeacherFilter={adminTeacherFilter}
         setAdminTeacherFilter={setAdminTeacherFilter}
+        onDeleteRecord={handleDeleteRecord}
+        onUpdateTeacherProfile={handleUpdateTeacherProfile}
       />
     );
   }
