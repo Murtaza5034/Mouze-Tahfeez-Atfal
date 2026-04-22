@@ -637,6 +637,7 @@ function ParentPortal({
 
   const currentPage = pages[activePage];
 
+  return (
     <div className="admin-shell">
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <button 
