@@ -7,6 +7,7 @@ import {
   Clock,
   GraduationCap,
   Hash,
+  Home,
   Layers3,
   LogOut,
   Menu,
@@ -414,31 +415,31 @@ function TahfeezReportCard({ student, weeklyResult }) {
 
   return (
     <div className="progress-overview">
-       <div className="result-card-premium">
+       <div className="result-card-premium card-appear">
           <div className="result-card-header">
              <div className="school-logo"><img src="/logo.png" alt="Logo" /></div>
              <div className="school-info">
-                <h4>{"RAWDAT TAHFEEZ UL ATFAAL"}</h4>
+                <h4>RAWDAT TAHFEEZ UL ATFAAL</h4>
                 <p>{student?.groupName || "Tahfeez Group"}</p>
              </div>
              <div className="report-badge">
-                <span className="arabic-kanz" style={{ fontSize: "18px", ...arabicStyle }}>{"تقرير التحفيظ"}</span>
-                <span>{"TAHFEEZ REPORT"}</span>
+                <span className="arabic-kanz" style={{ fontSize: "18px", ...arabicStyle }}>تقرير التحفيظ</span>
+                <span>TAHFEEZ REPORT</span>
              </div>
           </div>
 
-          <div style={{ textAlign: "center", padding: "10px", borderBottom: "1px solid #eee" }}>
-             <p style={{ fontWeight: "600", color: "#64748b" }}>
+          <div className="result-week-meta">
+             <p>
                 {`Week: ${weeklyResult?.week_count || "..."} | Month: ${weeklyResult?.month_name_arabic || "..."}`}
              </p>
           </div>
 
           <div className="result-main">
              <div className="total-score-block">
-                <span className="score-title">{"WEEKLY SCORE"}</span>
-                <span className="jumla-label">{"Jumla"}</span>
+                <span className="score-title">WEEKLY SCORE</span>
+                <span className="jumla-label">Jumla</span>
                 <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
-                <span className="max-score">{" / 100"}</span>
+                <span className="max-score">/ 100</span>
              </div>
 
              <div className="score-details-box">
@@ -456,23 +457,23 @@ function TahfeezReportCard({ student, weeklyResult }) {
              </div>
 
              <div className="trophy-container">
-                <Trophy size={60} color="#fbbf24" fill="#fbbf24" />
+                <Trophy size={64} color="var(--accent-gold)" fill="var(--light-gold)" />
                 <span className="rank-text-overlay">{weeklyResult?.rank || "-"}</span>
              </div>
           </div>
 
           <div className="result-footer">
              <div className="target-box">
-                <h5>{"Next Week Target"}</h5>
-                <p>{"Juz: "}{weeklyResult?.next_week_juz || "-"}</p>
-                <p>{"Page: "}{weeklyResult?.next_week_page || "-"}</p>
-                <p>{"Total Jadeed: "}{weeklyResult?.total_jadeed_pages || "0"}</p>
+                <h5>Next Week Target</h5>
+                <p>Juz: {weeklyResult?.next_week_juz || "-"}</p>
+                <p>Page: {weeklyResult?.next_week_page || "-"}</p>
+                <p>Total Jadeed: {weeklyResult?.total_jadeed_pages || "0"}</p>
              </div>
              <div className="target-box highlight">
-                <h5>{"Target Till Istifadah"}</h5>
-                <p>{"Juz: "}{weeklyResult?.istifadah_juz || "-"}</p>
-                <p>{"Page: "}{weeklyResult?.istifadah_page || "-"}</p>
-                <p>{"Attendance: "}{weeklyResult?.attendance_count || "-"}</p>
+                <h5>Target Till Istifadah</h5>
+                <p>Juz: {weeklyResult?.istifadah_juz || "-"}</p>
+                <p>Page: {weeklyResult?.istifadah_page || "-"}</p>
+                <p>Attendance: {weeklyResult?.attendance_count || "-"}</p>
              </div>
           </div>
 
@@ -958,10 +959,10 @@ function AdminPortal({
         
         <div className="sidebar-header">
            <div className="brand-header-flex">
-            <img src="/logo.png" alt="Logo" className="nav-logo profile-dp-circle" />
+            <img src="/logo.png" alt="Logo" className="nav-logo" />
             <div>
-              <p className="brand-tag" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>Management Portal</p>
-              <h2 className="brand-title" style={{ color: 'white', fontSize: '1rem', margin: 0 }}>Admin</h2>
+              <p className="brand-tag">Management Portal</p>
+              <h2 className="brand-title">Admin</h2>
             </div>
           </div>
         </div>
@@ -976,7 +977,7 @@ function AdminPortal({
              )
           })}
           
-          <p className="sidebar-category" style={{ marginTop: '24px' }}>Management</p>
+          <p className="sidebar-category management-cat">Management</p>
           {sidebarLinks.map(page => {
              const Icon = NAV_ICONS[page] || Users;
              return (
@@ -986,13 +987,13 @@ function AdminPortal({
              )
           })}
 
-          <div style={{ marginTop: 'auto', padding: '16px 0' }}>
+          <div className="sidebar-footer">
             {getAssignedRoles(user).filter(r => r !== 'admin').map((role) => (
               <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
                  <LogOut size={18} /> Switch to {role}
               </button>
             ))}
-            <button className="sidebar-link" onClick={onLogout}>
+            <button className="sidebar-link logout-btn" onClick={onLogout}>
               <LogOut size={18} /> Logout
             </button>
           </div>
@@ -1005,12 +1006,11 @@ function AdminPortal({
             type="button"
             className="menu-button-mobile"
             onClick={() => setMenuOpen(!menuOpen)}
-            style={{ background: 'none', border: 'none', padding: '12px', display: 'none' }}
           >
-            <Menu size={24} />
+            <Menu size={22} />
           </button>
           <div className="brand-block">
-             <h2 className="page-title" style={{ margin: 0 }}>{activePage}</h2>
+             <h2 className="page-title">{activePage}</h2>
           </div>
           <div className="header-actions">
              <button className="role-chip" onClick={() => onRoleChange("parents")}>
@@ -1803,15 +1803,15 @@ function TeacherPortal({
         </button>
         <div className="sidebar-header">
            <div className="brand-header-flex">
-            <img src={portalAccess?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
+            <img src={portalAccess?.photo_url || "/logo.png"} alt="Logo" className="nav-logo" />
             <div>
-              <p className="brand-tag" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>Teacher Portal</p>
-              <h2 className="brand-title" style={{ color: 'white', fontSize: '1rem', margin: 0 }}>{portalAccess?.full_name || "Lecturer"}</h2>
+              <p className="brand-tag">Teacher Portal</p>
+              <h2 className="brand-title">{portalAccess?.full_name || "Teacher"}</h2>
             </div>
           </div>
         </div>
         <nav className="sidebar-nav">
-          <p className="sidebar-category">Workplace</p>
+          <p className="sidebar-category management-cat">Workplace</p>
           {[
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
@@ -1822,13 +1822,13 @@ function TeacherPortal({
             </button>
           ))}
           
-          <div style={{ marginTop: 'auto', padding: '16px 0' }}>
+          <div className="sidebar-footer">
             {getAssignedRoles(user).filter(r => r !== 'teacher').map((role) => (
               <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
                  <LogOut size={18} /> Switch to {role}
               </button>
             ))}
-            <button className="sidebar-link" onClick={onLogout}>
+            <button className="sidebar-link logout-btn" onClick={onLogout}>
               <LogOut size={18} /> Logout
             </button>
           </div>
