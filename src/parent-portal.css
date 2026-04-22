@@ -1,5 +1,70 @@
 /* ========================================
+   SHARED STATS STRIP — All Portals
+   ======================================== */
+.portal-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pstat-card {
+  background: var(--white, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  padding: 14px 10px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: transform 0.2s;
+}
+
+.pstat-card:hover { transform: translateY(-2px); }
+
+.pstat-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--gold-dark, #1e293b);
+  line-height: 1.1;
+}
+
+.pstat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+}
+
+.pstat-sub {
+  font-size: 0.68rem;
+  color: #aaa;
+}
+
+/* Teacher & Admin portals (dark sidebar) — brighter cards */
+.teacher-stats .pstat-card,
+.admin-stats .pstat-card {
+  background: linear-gradient(135deg, #f8faff, #eff6ff);
+  border-color: #dbeafe;
+}
+
+.teacher-stats .pstat-value,
+.admin-stats .pstat-value {
+  color: #1e40af;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .portal-stats-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ========================================
    PARENT PORTAL — Golden & White Theme
+
    Mobile-app style layout
    ======================================== */
 

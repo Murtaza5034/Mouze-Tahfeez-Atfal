@@ -696,6 +696,29 @@ function ParentPortal({
 
         {activePage === "Home" ? (
           <div className="home-dashboard">
+            {/* ---- Parent Stats Strip ---- */}
+            <div className="portal-stats-strip">
+              <div className="pstat-card">
+                <span className="pstat-value">{weeklyResult?.total_score ?? "--"}</span>
+                <span className="pstat-label">Weekly Score</span>
+                <span className="pstat-sub">out of 100</span>
+              </div>
+              <div className="pstat-card">
+                <span className="pstat-value" style={{ fontSize: attendance?.status === 'Absent' ? '0.9rem' : undefined }}>{attendance?.status || "Present"}</span>
+                <span className="pstat-label">Attendance</span>
+                <span className="pstat-sub">Today</span>
+              </div>
+              <div className="pstat-card">
+                <span className="pstat-value">{hifzDetails?.juz || "--"}</span>
+                <span className="pstat-label">Juz</span>
+                <span className="pstat-sub">{hifzDetails?.surat || "In progress"}</span>
+              </div>
+              <div className="pstat-card">
+                <span className="pstat-value" style={{ fontSize: '0.75rem', lineHeight: '1.2' }}>{hifzDetails?.muhaffiz_name || "Pending"}</span>
+                <span className="pstat-label">Teacher</span>
+                <span className="pstat-sub">Muhaffiz</span>
+              </div>
+            </div>
             <div className="dashboard-section">
               <div className="section-header">
                 <Calendar size={18} />
@@ -1001,17 +1024,15 @@ function AdminPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
-          <div className="portal-stats">
+          <div className="portal-stats-strip admin-stats">
             {stats.map((stat) => {
               const Icon = stat.icon;
               return (
-                <article key={stat.label} className="stat-card">
-                  <div className="stat-icon">
-                    <Icon size={18} />
-                  </div>
-                  <strong>{stat.value}</strong>
-                  <span>{stat.label}</span>
-                </article>
+                <div key={stat.label} className="pstat-card">
+                  <span className="pstat-value">{stat.value}</span>
+                  <span className="pstat-label">{stat.label}</span>
+                  <span className="pstat-sub"><Icon size={12} style={{ verticalAlign: 'middle' }} /></span>
+                </div>
               );
             })}
           </div>
@@ -1835,6 +1856,37 @@ function TeacherPortal({
 
         {activePage === "My Group" ? (
           <div className="portal-content">
+            {/* ---- Teacher Stats Strip ---- */}
+            <div className="portal-stats-strip teacher-stats">
+              <div className="pstat-card">
+                <span className="pstat-value">{filteredStudents.length}</span>
+                <span className="pstat-label">Students</span>
+                <span className="pstat-sub">In my group</span>
+              </div>
+              <div className="pstat-card">
+                <span className="pstat-value">
+                  {Math.round((filteredStudents.filter(s => s.latestResult).length / Math.max(filteredStudents.length, 1)) * 100) || 0}%
+                </span>
+                <span className="pstat-label">Results</span>
+                <span className="pstat-sub">Submitted</span>
+              </div>
+              <div className="pstat-card">
+                <span className="pstat-value">
+                  {filteredStudents.length > 0
+                    ? Math.round(filteredStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / filteredStudents.length)
+                    : "--"}
+                </span>
+                <span className="pstat-label">Avg Score</span>
+                <span className="pstat-sub">This week</span>
+              </div>
+              {portalAccess?.show_salary_card && monthlySalary && (
+                <div className="pstat-card">
+                  <span className="pstat-value" style={{ fontSize: '0.9rem' }}>Rs. {monthlySalary.amount?.toFixed(0) || "0"}</span>
+                  <span className="pstat-label">Salary</span>
+                  <span className="pstat-sub">This month</span>
+                </div>
+              )}
+            </div>
             {portalAccess?.show_salary_card && monthlySalary && (
               <section className="data-card salary-callout">
                 <div className="card-headline">
