@@ -2114,6 +2114,7 @@ function TeacherPortal({
                       <p>
                         {selectedStudent.groupName} · {selectedStudent.teacherName}
                       </p>
+                    </div>
                   </div>
                   <TahfeezReportCard
                     student={selectedStudent}
