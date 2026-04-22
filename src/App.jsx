@@ -620,6 +620,13 @@ function ParentPortal({
         "Keep uniform policy, attendance rules, fee guidance, and safeguarding details available anytime.",
       highlights: ["Attendance policy", "Fee and payment rules", "Safety and pickup rules"],
     },
+    Schedule: {
+      eyebrow: "Daily Plan",
+      title: "Learning Schedule",
+      description: "Detailed breakdown of your child's daily school activities and tasks.",
+      schedule: schedule.length > 0 ? schedule : [{ task_time: "--:--", task_name: "No tasks found" }],
+      highlights: [`Next task: ${schedule[0]?.task_name || "None"}`],
+    },
     Teachers: {
       eyebrow: "Our Staff",
       title: "Teacher Contacts",
@@ -702,6 +709,35 @@ function ParentPortal({
           </section>
         ) : null}
 
+        {activePage === "Schedule" ? (
+          <div className="home-dashboard">
+            <div className="dashboard-section">
+              <div className="section-header">
+                <Calendar size={18} />
+                <h3>Study Schedule</h3>
+              </div>
+              <div className="schedule-list">
+                {currentPage.schedule.map((item, index) => (
+                  <div key={`${item.task_name}-${index}`} className={`schedule-item ${item.is_done ? "done" : ""}`}>
+                    <div className="time-strip">
+                      <Clock size={14} />
+                      {item.task_time}
+                    </div>
+                    <div className="task-info">
+                      <p>{item.task_name}</p>
+                      {item.is_done ? (
+                        <CheckCircle2 size={16} className="status-icon" />
+                      ) : (
+                        <div className="pending-circle" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {activePage === "Home" ? (
           <div className="home-dashboard">
             <div className="dashboard-section">
@@ -710,7 +746,7 @@ function ParentPortal({
                 <h3>Today's Schedule</h3>
               </div>
               <div className="schedule-list">
-                {currentPage.schedule.map((item, index) => (
+                {pages.Schedule.schedule.map((item, index) => (
                   <div key={`${item.task_name}-${index}`} className={`schedule-item ${item.is_done ? "done" : ""}`}>
                     <div className="time-strip">
                       <Clock size={14} />
@@ -2078,7 +2114,6 @@ function TeacherPortal({
                       <p>
                         {selectedStudent.groupName} · {selectedStudent.teacherName}
                       </p>
-                    </div>
                   </div>
                   <TahfeezReportCard
                     student={selectedStudent}
@@ -2096,76 +2131,30 @@ function TeacherPortal({
 
         {activePage === "Overview" ? (
           <div className="management-grid">
-            {actionMessage ? (
-          <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
-        ) : null}
-
-        <div className="toolbar-row">
-          <label className="filter-box">
-            <span>Filter by Muhaffiz</span>
-            <select 
-              value={adminTeacherFilter} 
-              onChange={(e) => setAdminTeacherFilter(e.target.value)}
-            >
-              <option value="All">All Teachers</option>
-              {Array.from(new Set(students.map(s => s.teacherName))).map(name => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="management-grid">
-          {students
-            .filter(s => adminTeacherFilter === "All" || normalizeText(s.teacherName) === normalizeText(adminTeacherFilter))
-            .map((student) => (
-              <section 
-                key={student.student_id} 
-                className={`data-card student-interactive-card ${selectedStudentId === student.student_id ? 'active' : ''}`}
-                onClick={() => setSelectedStudentId(student.student_id)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="student-profile-hero">
-                  <div className="profile-identity-row">
-                    <img 
-                      src={student.photoUrl || "/default-avatar.png"} 
-                      alt={student.name} 
-                      className="user-dp-badge"
-                    />
-                    <div>
-                      <h3>{student.name}</h3>
-                      <p>{student.groupName} · {student.hifz?.surat || "No surah"}</p>
+            <div className="data-card">
+              <div className="card-headline">
+                <Sparkles size={18} />
+                <h3>Your Students Performance</h3>
+              </div>
+              <div className="record-stack">
+                {filteredStudents.map((student) => (
+                  <article key={student.student_id} className="record-card">
+                    <div className="card-primary-info">
+                       <strong>{student.name}</strong>
+                       <span>{student.hifzStatus}</span>
                     </div>
-                  </div>
-                </div>
-                {selectedStudentId === student.student_id && (
-                  <div className="card-expanded-stats" style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                    <div className="quick-management" style={{ marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
-                      <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '8px' }}>CHANGE ASSIGNMENT</p>
-                      <div className="form-grid">
-                        <select 
-                          className="mini-select"
-                          value={student.teacherName}
-                          onChange={(e) => onAssignChild({ 
-                            preventDefault: () => {}, 
-                            target: { student_id: student.student_id, teacher_name: e.target.value, group_name: student.groupName } 
-                          }, true)}
-                        >
-                          <option value="">No Teacher</option>
-                          {Array.from(new Set(portalAccessList.filter(a => a.portal_role === "teacher").map(a => a.full_name || a.email))).map(name => (
-                            <option key={name} value={name}>{name}</option>
-                          ))}
-                        </select>
-                      </div>
+                    <div className="performance-pill" style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem' }}>
+                       Latest Result: {student.latestResult?.rank || "pending"}
                     </div>
-                    <TahfeezReportCard student={student} weeklyResult={student.latestResult} />
-                  </div>
+                  </article>
+                ))}
+                {filteredStudents.length === 0 && (
+                  <div className="empty-state">No students found in your group.</div>
                 )}
-              </section>
-            ))}
-        </div>
-      </div>
-    ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
         </section>
       </main>
     </div>
@@ -2388,6 +2377,7 @@ export default function App() {
             scheduleResponse,
             resultResponse,
             announcementResponse,
+            teacherProfilesResponse,
           ] = await Promise.all([
             supabase
               .from("hifz_details")
@@ -2410,6 +2400,7 @@ export default function App() {
               .limit(1)
               .maybeSingle(),
             supabase.from("events").select("*").order("event_date", { ascending: false }),
+            supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
           ]);
 
           nextParentState = {
@@ -2419,10 +2410,12 @@ export default function App() {
             schedule: scheduleResponse.data || [],
             attendance: attendanceResponse.data || null,
             weeklyResult: resultResponse.data || null,
+            teacherProfiles: teacherProfilesResponse.data || [],
           };
         }
 
         setParentData(nextParentState);
+        setTeacherProfiles(nextParentState.teacherProfiles || []);
       } else {
         const [
           profilesResponse,
