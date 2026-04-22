@@ -18,6 +18,7 @@ import { supabase } from "./supabaseClient";
 import Login from "./Login";
 import "./style.css";
 import "./salary.css";
+import "./teacher-profiles.css";
 
 const ROLE_LABELS = {
   parents: "Parents",
@@ -485,11 +486,22 @@ function ParentPortal({
   setMenuOpen,
   onLogout,
   onRoleChange,
+  teacherProfiles = [],
 }) {
   const { studentProfile, hifzDetails, announcements, schedule, attendance, weeklyResult } =
     parentData;
 
+  const pageNames = ["Home", "Schedule", "Announcements", "Teachers"];
   const assignedRoles = getAssignedRoles(user);
+
+  const myTeacher = teacherProfiles.find(t => 
+    normalizeText(t.full_name) === normalizeText(studentProfile?.teacher_name)
+  );
+
+  const sortedTeachers = useMemo(() => {
+    if (!myTeacher) return teacherProfiles;
+    return [myTeacher, ...teacherProfiles.filter(t => t.id !== myTeacher.id)];
+  }, [teacherProfiles, myTeacher]);
 
   if (loading && !studentProfile && user) {
     return <LoadingScreen message="Fetching your child's data..." />;
@@ -547,10 +559,15 @@ function ParentPortal({
         "Keep uniform policy, attendance rules, fee guidance, and safeguarding details available anytime.",
       highlights: ["Attendance policy", "Fee and payment rules", "Safety and pickup rules"],
     },
+    Teachers: {
+      eyebrow: "Our Staff",
+      title: "Teacher Contacts",
+      description: "Direct contact options for your child's Muhaffiz and other staff.",
+      highlights: ["WhatsApp support", "Call verification"],
+    },
   };
 
   const currentPage = pages[activePage];
-  const pageNames = Object.keys(pages);
 
   return (
     <div className="app-shell">
@@ -607,10 +624,10 @@ function ParentPortal({
 
         <div className="brand-block">
           <div className="brand-header-flex">
-            <img src="/logo.png" alt="Logo" className="nav-logo" />
+            <img src={studentProfile?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag">Education App</p>
-              <h1 className="brand-title">Mauze Tahfeez</h1>
+              <p className="brand-tag">Welcome, Parents</p>
+              <h1 className="brand-title">{studentProfile?.name || "Child's Portal"}</h1>
             </div>
           </div>
         </div>
@@ -621,11 +638,15 @@ function ParentPortal({
       </header>
 
       <main className="page-card">
-        <p className="page-eyebrow">{currentPage.eyebrow}</p>
-        <h2>{currentPage.title}</h2>
-        <p className="page-description">{currentPage.description}</p>
+        {currentPage && (
+          <>
+            <p className="page-eyebrow">{currentPage.eyebrow}</p>
+            <h2>{currentPage.title}</h2>
+            <p className="page-description">{currentPage.description}</p>
+          </>
+        )}
 
-        {activePage !== "Child Summary" ? (
+        {activePage !== "Child Summary" && activePage !== "Teachers" ? (
           <section className="hero-panel">
             <div>
               <p className="hero-label">Current page</p>
@@ -734,8 +755,47 @@ function ParentPortal({
             weeklyResult={weeklyResult}
           />
         ) : null}
+        {activePage === "Teachers" ? (
+          <div className="management-grid">
+            <p className="page-eyebrow">Our Staff</p>
+            <h2>Contact your child's teachers</h2>
+            <div className="teacher-info-stack">
+              {sortedTeachers.map((teacher) => (
+                <article key={teacher.id} className={`data-card teacher-profile-card ${teacher.id === myTeacher?.id ? 'pinned' : ''}`}>
+                  {teacher.id === myTeacher?.id && <span className="pin-badge">My Child's Teacher</span>}
+                  <div className="teacher-card-inner">
+                    <img 
+                      src={teacher.photo_url || "/default-avatar.png"} 
+                      alt={teacher.full_name} 
+                      className="teacher-photo-square" 
+                    />
+                    <div className="teacher-details">
+                      <h3>{teacher.full_name}</h3>
+                      <p className="teacher-specialty">Muhaffiz / Teacher</p>
+                      <div className="contact-actions">
+                        {teacher.phone_number && (
+                          <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
+                             Call Now
+                          </a>
+                        )}
+                        {teacher.whatsapp_number && (
+                          <a href={`https://wa.me/${teacher.whatsapp_number.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                             WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+              {sortedTeachers.length === 0 && (
+                <div className="empty-state">No teacher information available yet.</div>
+              )}
+            </div>
+          </div>
+        ) : null}
 
-        <InfoHighlights items={currentPage.highlights} />
+        {currentPage && <InfoHighlights items={currentPage.highlights} />}
       </main>
 
       <nav className="navbar" aria-label="Bottom navigation">
@@ -1639,10 +1699,10 @@ function TeacherPortal({
 
         <div className="brand-block">
           <div className="brand-header-flex">
-            <img src="/logo.png" alt="Logo" className="nav-logo" />
+            <img src={portalAccess?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
               <p className="brand-tag">Teacher Access</p>
-              <h1 className="brand-title">Muhaffiz Portal</h1>
+              <h1 className="brand-title">{portalAccess?.full_name || "Muhaffiz Portal"}</h1>
             </div>
           </div>
         </div>
@@ -1665,19 +1725,7 @@ function TeacherPortal({
           <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
         ) : null}
 
-        <div className="toolbar-row">
-          <label className="filter-box">
-            <span>Group Filter</span>
-            <select value={selectedGroup} onChange={onTeacherGroupFilterChange}>
-              <option value="All">All groups</option>
-              {availableGroups.map((group) => (
-                <option key={group} value={group}>
-                  {group}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        {/* Group filter removed as requested - showing only assigned students */}
 
         {activePage === "My Group" ? (
           <div className="portal-content">
@@ -1947,25 +1995,56 @@ function TeacherPortal({
 
         {activePage === "Overview" ? (
           <div className="management-grid">
-            {filteredStudents.map((student) => (
-              <section key={student.student_id} className="data-card">
+            {actionMessage ? (
+          <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+        ) : null}
+
+        <div className="toolbar-row">
+          <label className="filter-box">
+            <span>Filter by Muhaffiz</span>
+            <select 
+              value={adminTeacherFilter} 
+              onChange={(e) => setAdminTeacherFilter(e.target.value)}
+            >
+              <option value="All">All Teachers</option>
+              {Array.from(new Set(students.map(s => s.teacherName))).map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="management-grid">
+          {students
+            .filter(s => adminTeacherFilter === "All" || normalizeText(s.teacherName) === normalizeText(adminTeacherFilter))
+            .map((student) => (
+              <section 
+                key={student.student_id} 
+                className={`data-card student-interactive-card ${selectedStudentId === student.student_id ? 'active' : ''}`}
+                onClick={() => setSelectedStudentId(student.student_id)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="student-profile-hero">
-                  <StudentAvatar student={student} />
-                  <div>
-                    <h3>{student.name}</h3>
-                    <p>
-                      {student.groupName} · {student.hifz?.surat || "No current surah"}
-                    </p>
+                  <div className="profile-identity-row">
+                    <img 
+                      src={student.photoUrl || "/default-avatar.png"} 
+                      alt={student.name} 
+                      className="user-dp-badge"
+                    />
+                    <div>
+                      <h3>{student.name}</h3>
+                      <p>{student.groupName} · {student.hifz?.surat || "No surah"}</p>
+                    </div>
                   </div>
                 </div>
-                <TahfeezReportCard student={student} weeklyResult={student.latestResult} />
+                {selectedStudentId === student.student_id && (
+                  <div className="card-expanded-stats" style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                    <TahfeezReportCard student={student} weeklyResult={student.latestResult} />
+                  </div>
+                )}
               </section>
             ))}
-            {filteredStudents.length === 0 ? (
-              <div className="empty-state">No child overviews available yet.</div>
-            ) : null}
-          </div>
-        ) : null}
+        </div>
       </main>
 
       <nav className="navbar admin-navbar" aria-label="Teacher navigation">
@@ -2010,10 +2089,11 @@ export default function App() {
     announcements: [],
     schedule: [],
     portalAccessList: [],
+    teacherProfiles: [],
   });
-  const [customGroups, setCustomGroups] = useState([]);
-  const [teacherAttendance, setTeacherAttendance] = useState([]);
   const [teacherGroupFilter, setTeacherGroupFilter] = useState("All");
+  const [adminTeacherFilter, setAdminTeacherFilter] = useState("All");
+  const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [adminForms, setAdminForms] = useState({
     announcement: {
       title: "",
@@ -2245,9 +2325,9 @@ export default function App() {
           supabase.from("weekly_results").select("*").order("week_date", { ascending: false }),
           supabase.from("events").select("*").order("event_date", { ascending: false }),
           supabase.from("schedule").select("*").order("task_time", { ascending: true }),
-          supabase.from("user_portal_access").select("*").order("created_at", { ascending: false }),
           supabase.from("custom_groups").select("*").order("group_name", { ascending: true }),
           supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }),
+          supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
         ]);
 
         const students = buildStudents(
@@ -2258,6 +2338,7 @@ export default function App() {
 
         setTeacherAttendance(attendanceResponse.data || []);
         setCustomGroups(groupsResponse.data || []);
+        setTeacherProfiles(teacherProfilesResponse.data || []);
 
         setSchoolData({
           students,
@@ -2265,6 +2346,7 @@ export default function App() {
           announcements: eventsResponse.data || [],
           schedule: scheduleResponse.data || [],
           portalAccessList: portalAccessResponse.data || [],
+          teacherProfiles: teacherProfilesResponse.data || [],
         });
 
         if (students.length > 0) {
@@ -2318,10 +2400,7 @@ export default function App() {
     });
 
     const baseStudents = matchedStudents.length > 0 ? matchedStudents : schoolData.students;
-    const filteredStudents =
-      teacherGroupFilter === "All"
-        ? baseStudents
-        : baseStudents.filter((student) => student.groupName === teacherGroupFilter);
+    const filteredStudents = baseStudents;
 
     return {
       availableGroups,
@@ -2714,6 +2793,7 @@ export default function App() {
         setMenuOpen={setMenuOpen}
         onLogout={handleLogout}
         onRoleChange={storeRole}
+        teacherProfiles={schoolData.teacherProfiles}
       />
     );
   }
@@ -2744,6 +2824,8 @@ export default function App() {
         setActivePage={setActivePage}
         user={user}
         onAssignChild={handleAssignChild}
+        adminTeacherFilter={adminTeacherFilter}
+        setAdminTeacherFilter={setAdminTeacherFilter}
       />
     );
   }

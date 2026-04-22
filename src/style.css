@@ -1487,6 +1487,37 @@ button {
     padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
   }
 
+  .profile-dp-circle {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important; /* Curved square */
+  object-fit: cover !important;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.teacher-photo-square {
+  width: 90px;
+  height: 90px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: #f1f5f9;
+}
+
+.teacher-profile-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.teacher-profile-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+}
+
+.pinned {
+  border: 2px solid #fbbf24 !important;
+  background: #fffcf0 !important;
+}
+  
   .flex-row-card {
     flex-direction: column;
     align-items: flex-start;

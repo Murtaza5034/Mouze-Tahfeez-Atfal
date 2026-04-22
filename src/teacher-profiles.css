@@ -1,0 +1,101 @@
+/* --- Teacher Profile Cards --- */
+.teacher-info-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.teacher-profile-card {
+  position: relative;
+  border: 1px solid var(--border-color);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.teacher-profile-card.pinned {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.05);
+}
+
+.pin-badge {
+  position: absolute;
+  top: -10px;
+  right: 20px;
+  background: #fbbf24;
+  color: #000;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.teacher-card-inner {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.teacher-photo-square {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 16px; /* Curved square */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: var(--bg-secondary);
+}
+
+.teacher-details h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.teacher-specialty {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 4px 0 12px 0;
+}
+
+.contact-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.contact-btn {
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: opacity 0.2s;
+}
+
+.contact-btn.call {
+  background: var(--primary);
+  color: white;
+}
+
+.contact-btn.whatsapp {
+  background: #25d366;
+  color: white;
+}
+
+.contact-btn:hover {
+  opacity: 0.9;
+}
+
+/* --- Profile DP Styling in Cards --- */
+.user-dp-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.profile-identity-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
