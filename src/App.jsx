@@ -651,7 +651,7 @@ function ParentPortal({
            <div className="brand-header-flex">
             <img src={studentProfile?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>أهلاً بك</p>
+              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>{"أهلاً بك"}</p>
               <h1 className="brand-title" style={{ fontSize: '1rem', color: 'white', margin: 0 }}>{studentProfile?.name || "Parent"}</h1>
             </div>
           </div>
@@ -969,7 +969,7 @@ function AdminPortal({
            <div className="brand-header-flex">
             <img src="/logo.png" alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>لوحة التحكم</p>
+              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>{"لوحة التحكم"}</p>
               <h2 className="brand-title" style={{ color: 'white', fontSize: '1rem', margin: 0 }}>Manager</h2>
             </div>
           </div>
@@ -1816,7 +1816,7 @@ function TeacherPortal({
            <div className="brand-header-flex">
             <img src={portalAccess?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>بوابة المعلم</p>
+              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>{"بوابة المعلم"}</p>
               <h2 className="brand-title" style={{ color: 'white', fontSize: '1rem', margin: 0 }}>{portalAccess?.full_name || "Teacher"}</h2>
             </div>
           </div>
