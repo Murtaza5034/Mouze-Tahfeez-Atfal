@@ -1493,6 +1493,11 @@ button {
     gap: 12px;
   }
   
+  .salary-flex {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
   .sidebar {
     width: min(300px, 88vw);
     padding: 20px 16px;

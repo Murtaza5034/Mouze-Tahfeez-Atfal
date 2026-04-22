@@ -17,6 +17,7 @@ import {
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
 import "./style.css";
+import "./salary.css";
 
 const ROLE_LABELS = {
   parents: "Parents",
@@ -105,7 +106,7 @@ function toNumber(value) {
 async function findPortalAccess(userId) {
   const { data, error } = await supabase
     .from("user_portal_access")
-    .select("portal_role, is_active, full_name")
+    .select("*")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -776,6 +777,7 @@ function AdminPortal({
   setActivePage,
   onRoleChange,
   user,
+  onAssignChild,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList } = adminData;
 
@@ -1314,6 +1316,67 @@ function AdminPortal({
               </div>
             </section>
 
+            <section className="form-card">
+              <div className="card-headline">
+                <User size={18} />
+                <h3>Assign Child to Muhaffiz</h3>
+              </div>
+              <form className="stack-form" onSubmit={onAssignChild}>
+                <label>
+                  <span>Select Child</span>
+                  <select
+                    name="student_id"
+                    value={adminForms.assignChild?.student_id || ""}
+                    onChange={onAdminFormChange("assignChild")}
+                    required
+                  >
+                    <option value="">-- Choose student --</option>
+                    {students.map((s) => (
+                      <option key={s.student_id} value={s.student_id}>
+                        {s.name} ({s.groupName})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="form-grid">
+                  <label>
+                    <span>Target Teacher</span>
+                    <select
+                      name="teacher_name"
+                      value={adminForms.assignChild?.teacher_name || ""}
+                      onChange={onAdminFormChange("assignChild")}
+                      required
+                    >
+                      <option value="">-- Choose Teacher --</option>
+                      {Array.from(new Set(portalAccessList.filter(a => a.portal_role === "teacher").map(a => a.full_name || a.email))).map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Target Group</span>
+                    <select
+                      name="group_name"
+                      value={adminForms.assignChild?.group_name || ""}
+                      onChange={onAdminFormChange("assignChild")}
+                      required
+                    >
+                      <option value="">-- Choose Group --</option>
+                      {customGroups.map(g => (
+                        <option key={g.id} value={g.group_name}>{g.group_name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <button type="submit" className="action-button">
+                  Assign Child
+                </button>
+              </form>
+            </section>
+
             <section className="data-card">
               <div className="card-headline">
                 <Users size={18} />
@@ -1386,6 +1449,49 @@ function AdminPortal({
                       <option value="admin">Admin Portal</option>
                     </select>
                   </label>
+                  <label>
+                    <span>Link to Student (Parents only)</span>
+                    <select
+                      name="student_id"
+                      value={adminForms.portalAccess.student_id}
+                      onChange={onAdminFormChange("portalAccess")}
+                    >
+                      <option value="">-- No Student Linked --</option>
+                      {students.map((s) => (
+                        <option key={s.student_id} value={s.student_id}>
+                          {s.name} ({s.groupName})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="form-grid">
+                  <label>
+                    <span>Salary per Minute (Teacher)</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      name="salary_per_minute"
+                      value={adminForms.portalAccess.salary_per_minute}
+                      onChange={onAdminFormChange("portalAccess")}
+                    />
+                  </label>
+                  <label className="checkbox-label" style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "24px" }}>
+                    <input
+                      type="checkbox"
+                      name="show_salary_card"
+                      checked={adminForms.portalAccess.show_salary_card}
+                      onChange={(e) => {
+                        const { checked } = e.target;
+                        setAdminForms((current) => ({
+                          ...current,
+                          portalAccess: { ...current.portalAccess, show_salary_card: checked },
+                        }));
+                      }}
+                    />
+                    <span>Show Salary Card to Teacher</span>
+                  </label>
                 </div>
                 <button type="submit" className="action-button">
                   Grant Access
@@ -1406,7 +1512,13 @@ function AdminPortal({
                   <article key={access.id || index} className="record-card flex-row-card">
                     <div className="card-primary-info">
                       <strong>{access.full_name || access.email}</strong>
-                      <span>{access.email}</span>
+                      <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                        <span className={`badge ${access.portal_role}`}>{ROLE_LABELS[access.portal_role]}</span>
+                        {access.portal_role === "teacher" && (
+                          <span className="badge info">{access.salary_per_minute}rs/min</span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: "12px", opacity: 0.7 }}>{access.email}</span>
                     </div>
                     <span className={`role-badge role-${access.portal_role}`}>
                       {access.portal_role}
@@ -1463,6 +1575,8 @@ function TeacherPortal({
   teacherData,
   teacherForms,
   user,
+  portalAccess,
+  monthlySalary,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const selectedStudent =
@@ -1539,13 +1653,6 @@ function TeacherPortal({
       </header>
 
       <main className="page-card">
-        <p className="page-eyebrow">Teacher Operations</p>
-        <h2>Manage your group cards and submit tahfeez reports</h2>
-        <p className="page-description">
-          Review your children by group, monitor memorization status, and fill the same tahfeez
-          report values shown in the child summary page.
-        </p>
-
         <section className="hero-panel">
           <div>
             <p className="hero-label">Current page</p>
@@ -1573,26 +1680,52 @@ function TeacherPortal({
         </div>
 
         {activePage === "My Group" ? (
-          <div className="student-card-grid">
-            {filteredStudents.map((student) => (
-              <article key={student.student_id} className="student-card">
-                <div className="student-card-head">
-                  <StudentAvatar student={student} />
-                  <div>
-                    <h3>{student.name}</h3>
-                    <p>{student.groupName}</p>
+          <div className="portal-content">
+            {portalAccess?.show_salary_card && monthlySalary && (
+              <section className="data-card salary-callout">
+                <div className="card-headline">
+                  <Sparkles size={18} />
+                  <h3>Monthly Salary Update</h3>
+                </div>
+                <div className="salary-flex">
+                  <div className="salary-item">
+                    <span className="salary-label">Total Minutes</span>
+                    <span className="salary-value">{monthlySalary.totalMinutes}</span>
+                  </div>
+                  <div className="salary-item">
+                    <span className="salary-label">Rate/Min</span>
+                    <span className="salary-value">₹{monthlySalary.rate}</span>
+                  </div>
+                  <div className="salary-item total-item">
+                    <span className="salary-label">Total Amount</span>
+                    <span className="salary-value highlight">₹{monthlySalary.amount.toFixed(2)}</span>
                   </div>
                 </div>
-                <div className="pill-row">
-                  <span className="mini-pill">Juz {student.hifz?.juz || "N/A"}</span>
-                  <span className="mini-pill">{student.hifz?.surat || "No surah set"}</span>
-                </div>
-                <p className="student-status-copy">{student.hifzStatus}</p>
-              </article>
-            ))}
-            {filteredStudents.length === 0 ? (
-              <div className="empty-state">No children found for this teacher filter.</div>
-            ) : null}
+                <p className="hint-text">Calculated based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
+              </section>
+            )}
+
+            <div className="student-card-grid">
+              {filteredStudents.map((student) => (
+                <article key={student.student_id} className="student-card">
+                  <div className="student-card-head">
+                    <StudentAvatar student={student} />
+                    <div>
+                      <h3>{student.name}</h3>
+                      <p>{student.groupName}</p>
+                    </div>
+                  </div>
+                  <div className="pill-row">
+                    <span className="mini-pill">Juz {student.hifz?.juz || "N/A"}</span>
+                    <span className="mini-pill">{student.hifz?.surat || "No surah set"}</span>
+                  </div>
+                  <p className="student-status-copy">{student.hifzStatus}</p>
+                </article>
+              ))}
+              {filteredStudents.length === 0 ? (
+                <div className="empty-state">No children found for this teacher filter.</div>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -1908,6 +2041,13 @@ export default function App() {
       full_name: "",
       portal_role: "parents",
       student_id: "",
+      salary_per_minute: "2.3",
+      show_salary_card: false,
+    },
+    assignChild: {
+      student_id: "",
+      teacher_name: "",
+      group_name: "",
     },
   });
   const [teacherForms, setTeacherForms] = useState({
@@ -2188,8 +2328,32 @@ export default function App() {
       teacherIdentity,
       selectedGroup: teacherGroupFilter,
       filteredStudents,
+      attendances: teacherAttendance,
     };
-  }, [schoolData.students, teacherGroupFilter, teacherIdentity]);
+  }, [schoolData.students, teacherGroupFilter, teacherIdentity, teacherAttendance]);
+
+  const monthlySalary = useMemo(() => {
+    if (portalRole !== "teacher") return null;
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const monthAttendance = (teacherData.attendances || []).filter((a) => {
+      const d = new Date(a.attendance_date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const totalMinutes = monthAttendance.reduce((sum, a) => sum + toNumber(a.minutes_present), 0);
+    const rate = toNumber(portalAccess.salary_per_minute || 2.3);
+
+    return {
+      totalMinutes,
+      rate,
+      amount: totalMinutes * rate,
+      daysPresent: monthAttendance.length,
+    };
+  }, [teacherData.attendances, portalAccess.salary_per_minute, portalRole]);
 
   function storeRole(role) {
     setPortalRole(role);
@@ -2257,6 +2421,9 @@ export default function App() {
       target_email: payload.email,
       target_role: payload.portal_role,
       target_name: payload.full_name,
+      target_student_id: payload.student_id || null,
+      target_salary_rate: Number(payload.salary_per_minute || 2.3),
+      target_show_card: !!payload.show_salary_card,
     });
 
     if (error) {
@@ -2424,6 +2591,46 @@ export default function App() {
     showAction("success", "Group added successfully.");
   };
 
+  const handleAssignChild = async (event) => {
+    event.preventDefault();
+    const { student_id, teacher_name, group_name } = adminForms.assignChild;
+
+    if (!student_id) return;
+
+    // We update multiple tables to ensure consistency across the app's lookups
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ teacher_name, group_name, class_level: group_name })
+      .eq("student_id", student_id);
+
+    const { error: hifzError } = await supabase
+      .from("hifz_details")
+      .update({ muhaffiz_name: teacher_name, group_name })
+      .eq("student_id", student_id);
+
+    if (profileError || hifzError) {
+      showAction("error", profileError?.message || hifzError?.message);
+      return;
+    }
+
+    // Refresh school data locally
+    setSchoolData((current) => ({
+      ...current,
+      students: current.students.map((s) =>
+        String(s.student_id) === String(student_id)
+          ? { ...s, teacherName: teacher_name, groupName: group_name }
+          : s
+      ),
+    }));
+
+    setAdminForms((current) => ({
+      ...current,
+      assignChild: { student_id: "", teacher_name: "", group_name: "" },
+    }));
+
+    showAction("success", "Child assigned to muhaffiz successfully.");
+  };
+
   const handleTeacherResultSubmit = async (event) => {
     event.preventDefault();
 
@@ -2536,6 +2743,7 @@ export default function App() {
         setSelectedStudentId={setSelectedStudentId}
         setActivePage={setActivePage}
         user={user}
+        onAssignChild={handleAssignChild}
       />
     );
   }
@@ -2555,6 +2763,8 @@ export default function App() {
       teacherData={teacherData}
       teacherForms={teacherForms}
       user={user}
+      portalAccess={portalAccess}
+      monthlySalary={monthlySalary}
     />
   );
 }

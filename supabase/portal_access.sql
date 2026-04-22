@@ -83,7 +83,9 @@ create or replace function public.grant_portal_access(
   target_email text,
   target_role text,
   target_name text,
-  target_student_id text default null
+  target_student_id text default null,
+  target_salary_rate numeric default 2.3,
+  target_show_card boolean default false
 ) returns void
 language plpgsql
 security definer
@@ -101,11 +103,13 @@ begin
     raise exception 'User not found in Supabase Auth mapping. They must sign up first.';
   end if;
 
-  insert into public.user_portal_access(user_id, email, full_name, portal_role, is_active)
-  values(target_user_id, target_email, target_name, target_role, true)
+  insert into public.user_portal_access(user_id, email, full_name, portal_role, is_active, salary_per_minute, show_salary_card)
+  values(target_user_id, target_email, target_name, target_role, true, target_salary_rate, target_show_card)
   on conflict (user_id) do update
   set portal_role = excluded.portal_role,
       full_name = excluded.full_name,
+      salary_per_minute = excluded.salary_per_minute,
+      show_salary_card = excluded.show_salary_card,
       is_active = true;
 
   -- Link student to profile if provided
