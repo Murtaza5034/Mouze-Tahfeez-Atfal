@@ -1958,16 +1958,24 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     
-    // Failsafe: Force loading off after 8 seconds no matter what
     const failsafe = setTimeout(() => {
       if (mounted) setLoading(false);
-    }, 8000);
+    }, 5000);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    async function initialize() {
+      const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
-      console.log("Auth Event:", event);
+
+      if (session) {
+        handleAuthChange("INITIAL_SESSION", session);
+      } else {
+        setLoading(false);
+      }
+    }
+
+    async function handleAuthChange(event, session) {
+      if (!mounted) return;
+      console.log("Auth event:", event);
 
       if (session) {
         setUser(session.user);
@@ -1979,7 +1987,6 @@ export default function App() {
 
           if (mounted) {
             if (!access.ok) {
-              console.error("Access denied:", access.message);
               await supabase.auth.signOut();
               setActionMessage({ type: "error", text: access.message });
               setLoading(false);
@@ -2002,6 +2009,14 @@ export default function App() {
           setLoading(false);
         }
       }
+    }
+
+    initialize();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      handleAuthChange(event, session);
     });
 
     return () => {
