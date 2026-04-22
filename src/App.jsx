@@ -2063,26 +2063,30 @@ function TeacherPortal({
               </section>
             ))}
         </div>
-      </main>
+      </div>
+    ) : null}
+  </main>
 
-      <nav className="navbar admin-navbar" aria-label="Teacher navigation">
-        {["My Group", "Fill Result", "Overview"].map((page) => {
-          const Icon = NAV_ICONS[page] || Layers3;
-          return (
-            <button
-              key={page}
-              type="button"
-              className={activePage === page ? "nav-link active" : "nav-link"}
-              onClick={() => setActivePage(page)}
-            >
-              <span className="nav-icon"><Icon size={20} /></span>
-              <span className="nav-text">{page}</span>
-            </button>
-          );
-        })}
-      </nav>
-    </div>
-  );
+  <nav className="navbar admin-navbar" aria-label="Teacher navigation">
+    {["My Group", "Fill Result", "Overview"].map((page) => {
+      const Icon = NAV_ICONS[page] || Layers3;
+      return (
+        <button
+          key={page}
+          type="button"
+          className={activePage === page ? "nav-link active" : "nav-link"}
+          onClick={() => setActivePage(page)}
+        >
+          <span className="nav-icon">
+            <Icon size={20} />
+          </span>
+          <span className="nav-text">{page}</span>
+        </button>
+      );
+    })}
+  </nav>
+</div>
+);
 }
 
 export default function App() {
