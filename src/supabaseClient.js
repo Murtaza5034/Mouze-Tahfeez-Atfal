@@ -8,10 +8,6 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || fallbackSupabaseUrl
 const supabaseAnonKey =
   import.meta.env.VITE_SUPABASE_ANON_KEY || fallbackSupabaseAnonKey
 
-if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-  console.warn(
-    'Supabase environment variables are missing. Falling back to built-in public project credentials.'
-  )
-}
+// Supabase initialization with optional environment variables and built-in fallbacks.
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
