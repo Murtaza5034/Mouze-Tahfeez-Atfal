@@ -1755,9 +1755,9 @@ function AdminPortal({
               </div>
             </section>
           </div>
-        </section>
-      </main>
-    </div>
+        ) : null}
+      </section>
+    </main>
   );
 }
 
