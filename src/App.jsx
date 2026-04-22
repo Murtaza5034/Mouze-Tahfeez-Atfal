@@ -409,110 +409,76 @@ function InfoHighlights({ items }) {
 }
 
 function TahfeezReportCard({ student, weeklyResult }) {
+  const arabicStyle = { fontFamily: "'Amiri', serif" };
+
   return (
     <div className="progress-overview">
-      <div className="section-title-group">
-        <BookOpen size={20} />
-        <h3>{student ? (student.name + "'s Tahfeez Report") : "Weekly Result"}</h3>
-      </div>
-
-      <div className="result-card-premium">
-        <div className="result-card-header">
-          <div className="school-logo">
-            <img src="/logo.png" alt="Logo" />
-          </div>
-          <div className="school-info">
-            <h4>{"RAWDAT TAHFEEZ UL ATFAAL"}</h4>
-            <p>{student?.groupName || "Tahfeez Group"}</p>
-          </div>
-          <div className="report-badge">
-            <span className="arabic-kanz" style={{ fontSize: '18px', display: 'block', marginBottom: '4px' }}>{"تقرير التحفيظ"}</span>
-            <span>{"TAHFEEZ REPORT"}</span>
-          </div>
-        </div>
-        <div style={{ textAlign: 'center', margin: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '10px' }}>
-           <p style={{ fontSize: '16px', color: '#64748b', fontWeight: '500' }}>
-             {`Week: ${weeklyResult?.week_count || '...'} | Month: ${weeklyResult?.month_name_arabic || '...'}`}
-           </p>
-        </div>
-
-        <div className="result-main">
-          <div className="total-score-block">
-            <span className="score-title">{"WEEKLY SCORE"}</span>
-            <span className="jumla-label">{"Jumla"}</span>
-            <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
-            <span className="max-score">{" / 100"}</span>
+       <div className="result-card-premium">
+          <div className="result-card-header">
+             <div className="school-logo"><img src="/logo.png" alt="Logo" /></div>
+             <div className="school-info">
+                <h4>{"RAWDAT TAHFEEZ UL ATFAAL"}</h4>
+                <p>{student?.groupName || "Tahfeez Group"}</p>
+             </div>
+             <div className="report-badge">
+                <span className="arabic-kanz" style={{ fontSize: "18px", ...arabicStyle }}>{"تقرير التحفيظ"}</span>
+                <span>{"TAHFEEZ REPORT"}</span>
+             </div>
           </div>
 
-          <div className="score-details-box">
-            <div className="score-row">
-              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>{"مراجعة"}</span>
-              <span className="score-val">{`${weeklyResult?.murajazah || "0"} / 30`}</span>
-            </div>
-            <div className="score-row">
-              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>{"جزء حالي"}</span>
-              <span className="score-val">{`${weeklyResult?.juz_hali || "0"} / 30`}</span>
-            </div>
-            <div className="score-row">
-              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>{"تخطيط"}</span>
-              <span className="score-val">{`${weeklyResult?.takhteet || "0"} / 20`}</span>
-            </div>
-            <div className="score-row">
-              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>{"جديد"}</span>
-              <span className="score-val">{`${weeklyResult?.jadeed || "0"} / 20`}</span>
-            </div>
+          <div style={{ textAlign: "center", padding: "10px", borderBottom: "1px solid #eee" }}>
+             <p style={{ fontWeight: "600", color: "#64748b" }}>
+                {`Week: ${weeklyResult?.week_count || "..."} | Month: ${weeklyResult?.month_name_arabic || "..."}`}
+             </p>
           </div>
 
-            <div className="trophy-container">
-               <Trophy size={60} color="#fbbf24" fill="#fbbf24" />
-               <span className="rank-text-overlay">{weeklyResult?.rank || "-"}</span>
-            </div>
-            <span className="rank-label">{"Rank"}</span>
-          </div>
-        </div>
+          <div className="result-main">
+             <div className="total-score-block">
+                <span className="score-title">{"WEEKLY SCORE"}</span>
+                <span className="jumla-label">{"Jumla"}</span>
+                <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
+                <span className="max-score">{" / 100"}</span>
+             </div>
 
-        <div className="result-footer">
-          <div className="target-box">
-            <h5>{"Next Week Target"}</h5>
-            <div className="target-fields">
-              <div className="field">
-                <span>{"Juz:"}</span>
-                <strong>{weeklyResult?.next_week_juz || "-"}</strong>
-              </div>
-              <div className="field">
-                <span>{"Page:"}</span>
-                <strong>{weeklyResult?.next_week_page || "-"}</strong>
-              </div>
-            </div>
-            <div className="sub-field">
-              <span>{"Total Jadeed Pages:"}</span>
-              <strong>{weeklyResult?.total_jadeed_pages || "0"}</strong>
-            </div>
+             <div className="score-details-box">
+                {[
+                  { label: "مراجعة", val: weeklyResult?.murajazah, max: 30 },
+                  { label: "جزء حالي", val: weeklyResult?.juz_hali, max: 30 },
+                  { label: "تخطيط", val: weeklyResult?.takhteet, max: 20 },
+                  { label: "جديد", val: weeklyResult?.jadeed, max: 20 }
+                ].map((item) => (
+                  <div key={item.label} className="score-row">
+                    <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label}</span>
+                    <span className="score-val">{`${item.val || "0"} / ${item.max}`}</span>
+                  </div>
+                ))}
+             </div>
+
+             <div className="trophy-container">
+                <Trophy size={60} color="#fbbf24" fill="#fbbf24" />
+                <span className="rank-text-overlay">{weeklyResult?.rank || "-"}</span>
+             </div>
           </div>
 
-          <div className="target-box highlight">
-            <h5>{"Target Till Istifadah Ilmiyah"}</h5>
-            <div className="target-fields">
-              <div className="field">
-                <span>{"Juz:"}</span>
-                <strong>{weeklyResult?.istifadah_juz || "-"}</strong>
-              </div>
-              <div className="field">
-                <span>{"Page:"}</span>
-                <strong>{weeklyResult?.istifadah_page || "-"}</strong>
-              </div>
-            </div>
-            <div className="sub-field">
-              <span>{"Attendance Count:"}</span>
-              <strong>{weeklyResult?.attendance_count || "-"}</strong>
-            </div>
+          <div className="result-footer">
+             <div className="target-box">
+                <h5>{"Next Week Target"}</h5>
+                <p>{"Juz: "}{weeklyResult?.next_week_juz || "-"}</p>
+                <p>{"Page: "}{weeklyResult?.next_week_page || "-"}</p>
+                <p>{"Total Jadeed: "}{weeklyResult?.total_jadeed_pages || "0"}</p>
+             </div>
+             <div className="target-box highlight">
+                <h5>{"Target Till Istifadah"}</h5>
+                <p>{"Juz: "}{weeklyResult?.istifadah_juz || "-"}</p>
+                <p>{"Page: "}{weeklyResult?.istifadah_page || "-"}</p>
+                <p>{"Attendance: "}{weeklyResult?.attendance_count || "-"}</p>
+             </div>
           </div>
-        </div>
 
-        {weeklyResult?.attendance_note ? (
-          <div className="attendance-ribbon">{weeklyResult.attendance_note}</div>
-        ) : null}
-      </div>
+          {weeklyResult?.attendance_note && (
+             <div className="attendance-ribbon">{weeklyResult.attendance_note}</div>
+          )}
+       </div>
     </div>
   );
 }
