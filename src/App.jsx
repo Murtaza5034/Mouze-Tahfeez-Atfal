@@ -441,25 +441,25 @@ function TahfeezReportCard({ student, weeklyResult }) {
             <span className="score-title">WEEKLY SCORE</span>
             <span className="jumla-label">Jumla</span>
             <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
-            <span className="max-score">/ 100</span>
+            <span className="max-score">{" / 100"}</span>
           </div>
 
           <div className="score-details-box">
             <div className="score-row">
               <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>مراجعة</span>
-              <span className="score-val">{weeklyResult?.murajazah || "0"} / 30</span>
+              <span className="score-val">{`${weeklyResult?.murajazah || "0"} / 30`}</span>
             </div>
             <div className="score-row">
               <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>جزء حالي</span>
-              <span className="score-val">{weeklyResult?.juz_hali || "0"} / 30</span>
+              <span className="score-val">{`${weeklyResult?.juz_hali || "0"} / 30`}</span>
             </div>
             <div className="score-row">
               <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>تخطيط</span>
-              <span className="score-val">{weeklyResult?.takhteet || "0"} / 20</span>
+              <span className="score-val">{`${weeklyResult?.takhteet || "0"} / 20`}</span>
             </div>
             <div className="score-row">
               <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>جديد</span>
-              <span className="score-val">{weeklyResult?.jadeed || "0"} / 20</span>
+              <span className="score-val">{`${weeklyResult?.jadeed || "0"} / 20`}</span>
             </div>
           </div>
 
