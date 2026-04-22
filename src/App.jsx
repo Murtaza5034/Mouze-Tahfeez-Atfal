@@ -605,76 +605,71 @@ function ParentPortal({
 
   return (
     <div className="admin-shell">
-      <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
-        <button 
-          className="sidebar-toggle-btn" 
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label={menuOpen ? "Close" : "Open"}
-        >
-          {menuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+      {/* Sidebar Overlay */}
+      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
+      <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
            <div className="brand-header-flex">
             <img src={studentProfile?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>Welcome</p>
+              <p className="brand-tag" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Welcome</p>
               <h1 className="brand-title" style={{ fontSize: '1rem', color: 'white', margin: 0 }}>{studentProfile?.name || "Parent Portal"}</h1>
             </div>
           </div>
         </div>
         <nav className="sidebar-nav">
-          <p className="sidebar-category">Menu</p>
-          {pageNames.map(page => {
-             const Icon = NAV_ICONS[page] || Layers3;
-             return (
-               <button key={page} className={`sidebar-link ${activePage === (navigationMap[page] || page) ? 'active' : ''}`} onClick={() => setActivePage(navigationMap[page] || page)}>
-                 <Icon size={18} /> {page}
-               </button>
-             )
-          })}
-          
-          <div style={{ marginTop: 'auto', padding: '16px 0' }}>
-            {assignedRoles.filter(r => r !== 'parents').map((role) => (
-              <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
-                 <LogOut size={18} /> Switch to {role}
-              </button>
-            ))}
-            <button className="sidebar-link" onClick={onLogout}>
-              <LogOut size={18} /> Logout
-            </button>
+          <p className="sidebar-category">Profile</p>
+          <div style={{ padding: '0 12px', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}>
+            <p style={{ margin: '4px 0' }}>ITS: {studentProfile?.its || "..."}</p>
+            <p style={{ margin: '4px 0' }}>Group: {studentProfile?.groupName || "..."}</p>
           </div>
+          <p className="sidebar-category" style={{ marginTop: '16px' }}>Actions</p>
+          {assignedRoles.filter(r => r !== 'parents').map((role) => (
+            <button key={role} className="sidebar-link" onClick={() => { onRoleChange(role); setMenuOpen(false); }}>
+               <LogOut size={18} /> Switch to {role}
+            </button>
+          ))}
+          <button className="sidebar-link" onClick={onLogout}>
+            <LogOut size={18} /> Logout
+          </button>
         </nav>
       </aside>
 
-      <main className="admin-main">
-        <header className="topbar">
-          <div className="brand-block">
-             <h2 className="page-title">{activePage}</h2>
+      <main className="admin-main" style={{ flex: 1 }}>
+        {/* Top Navigation Bar */}
+        <header className="pro-top-bar">
+          <div className="pro-top-left">
+            <button className="sidebar-toggle-btn-inline" onClick={() => setMenuOpen(!menuOpen)}>
+              <Menu size={20} />
+            </button>
+            <img src="/logo.png" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+            <span style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>Mauze Tahfeez</span>
           </div>
-          <div className="header-actions">
-             <span className="role-chip">{loading ? "..." : "Parents Portal"}</span>
+          <nav className="pro-tab-nav">
+            {pageNames.map(page => (
+              <button
+                key={page}
+                className={`tab-link ${activePage === (navigationMap[page] || page) ? 'active' : ''}`}
+                onClick={() => setActivePage(navigationMap[page] || page)}
+              >
+                {page}
+              </button>
+            ))}
+          </nav>
+          <div className="pro-top-right">
+            <span className="role-chip">{studentProfile?.name?.split(' ')[0] || "Parent"}</span>
           </div>
         </header>
 
-        <section className="admin-content-pad" style={{ padding: '20px' }}>
+        <section className="admin-content-pad" style={{ padding: '24px' }}>
           {showCelebration && <Celebration />}
           {currentPage && (
-            <div style={{ marginBottom: '30px' }}>
-              <p className="page-eyebrow arabic-kanz" style={{ fontSize: '18px', color: 'var(--primary)' }}>{currentPage.eyebrow}</p>
-              <h2 style={{ fontSize: '1.8rem', margin: '4px 0' }}>{currentPage.title}</h2>
-              <p className="page-description">{currentPage.description}</p>
+            <div style={{ marginBottom: '24px' }}>
+              <p style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--primary)', margin: '0 0 4px' }}>{currentPage.eyebrow}</p>
+              <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>{currentPage.title}</h2>
+              <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>{currentPage.description}</p>
             </div>
           )}
-
-        {activePage !== "Child Summary" && activePage !== "Teachers" ? (
-          <section className="hero-panel">
-            <div>
-              <p className="hero-label">Current page</p>
-              <h3>{activePage}</h3>
-            </div>
-            <div className="hero-chip">Academic Session 2026</div>
-          </section>
-        ) : null}
 
         {activePage === "Schedule" ? (
           <div className="home-dashboard">
