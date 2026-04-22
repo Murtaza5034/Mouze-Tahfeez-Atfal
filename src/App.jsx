@@ -12,6 +12,7 @@ import {
   Menu,
   ShieldCheck,
   Sparkles,
+  Trophy,
   Trash,
   X,
   User,
@@ -425,8 +426,14 @@ function TahfeezReportCard({ student, weeklyResult }) {
             <p>{student?.groupName || "Tahfeez Group"}</p>
           </div>
           <div className="report-badge">
+            <span className="arabic-kanz" style={{ fontSize: '18px', display: 'block', marginBottom: '4px' }}>تقرير التحفيظ</span>
             <span>TAHFEEZ REPORT</span>
           </div>
+        </div>
+        <div style={{ textAlign: 'center', margin: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '10px' }}>
+           <p className="arabic-kanz" style={{ fontSize: '20px', color: '#1e293b' }}>
+             الأسبوع: {weeklyResult?.week_count || '...'} | شهر: {weeklyResult?.month_name_arabic || '...'}
+           </p>
         </div>
 
         <div className="result-main">
@@ -439,31 +446,28 @@ function TahfeezReportCard({ student, weeklyResult }) {
 
           <div className="score-details-box">
             <div className="score-row">
-              <span className="arabic-label">Murajazah</span>
+              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>مراجعة</span>
               <span className="score-val">{weeklyResult?.murajazah || "0"} / 30</span>
             </div>
             <div className="score-row">
-              <span className="arabic-label">Juz Hali</span>
+              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>جزء حالي</span>
               <span className="score-val">{weeklyResult?.juz_hali || "0"} / 30</span>
             </div>
             <div className="score-row">
-              <span className="arabic-label">Takhteet</span>
+              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>تخطيط</span>
               <span className="score-val">{weeklyResult?.takhteet || "0"} / 20</span>
             </div>
             <div className="score-row">
-              <span className="arabic-label">Jadeed</span>
+              <span className="arabic-label arabic-kanz" style={{ fontSize: '16px' }}>جديد</span>
               <span className="score-val">{weeklyResult?.jadeed || "0"} / 20</span>
             </div>
           </div>
 
-          <div className="rank-block">
-            <div className="medal-stack">
-              <div className="medal bronze">3</div>
-              <div className="medal silver">2</div>
-              <div className="medal gold">1</div>
+            <div className="trophy-container">
+               <Trophy size={60} color="#fbbf24" fill="#fbbf24" />
+               <span className="rank-text-overlay">{weeklyResult?.rank || "-"}</span>
             </div>
-            <span className="rank-label">RANK</span>
-            <div className="rank-value">{weeklyResult?.rank || "-"}</div>
+            <span className="rank-label">Rank</span>
           </div>
         </div>
 
@@ -626,83 +630,67 @@ function ParentPortal({
 
   const currentPage = pages[activePage];
 
-  return (
-    <div className="app-shell">
-      <div
-        className={menuOpen ? "sidebar-overlay visible" : "sidebar-overlay"}
-        onClick={() => setMenuOpen(false)}
-      />
-
-      <aside className={menuOpen ? "sidebar open" : "sidebar"}>
-        <div className="sidebar-header">
-          <div>
-            <p className="sidebar-tag">Logged in as</p>
-            <h2>{user?.email}</h2>
-          </div>
-          <button
-            type="button"
-            className="close-menu"
-            onClick={() => setMenuOpen(false)}
-            aria-label="Close menu"
-          >
-            X
-          </button>
-        </div>
-
-        <div className="sidebar-links">
-          {assignedRoles.map((role) => (
-            <button
-              key={role}
-              type="button"
-              className="sidebar-link"
-              onClick={() => onRoleChange(role)}
-            >
-              Go to {ROLE_LABELS[role] || role} Portal
-            </button>
-          ))}
-          <button type="button" className="sidebar-link logout-btn" onClick={onLogout}>
-            <LogOut size={18} />
-            Logout
-          </button>
-        </div>
-      </aside>
-
-      <header className="topbar">
-        <button
-          type="button"
-          className="menu-button"
-          onClick={() => setMenuOpen(true)}
-          aria-label="Open menu"
+    <div className="admin-shell">
+      <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
+        <button 
+          className="sidebar-toggle-btn" 
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label={menuOpen ? "Close" : "Open"}
         >
-          <span />
-          <span />
-          <span />
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-
-        <div className="brand-block">
-          <div className="brand-header-flex">
+        <div className="sidebar-header">
+           <div className="brand-header-flex">
             <img src={studentProfile?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag">Welcome, Parents</p>
-              <h1 className="brand-title">{studentProfile?.name || "Child's Portal"}</h1>
+              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>أهلاً بك</p>
+              <h1 className="brand-title" style={{ fontSize: '1rem', color: 'white', margin: 0 }}>{studentProfile?.name || "Parent"}</h1>
             </div>
           </div>
         </div>
+        <nav className="sidebar-nav">
+          <p className="sidebar-category">Menu</p>
+          {pageNames.map(page => {
+             const Icon = NAV_ICONS[page] || Layers3;
+             return (
+               <button key={page} className={`sidebar-link ${activePage === (navigationMap[page] || page) ? 'active' : ''}`} onClick={() => setActivePage(navigationMap[page] || page)}>
+                 <Icon size={18} /> {page}
+               </button>
+             )
+          })}
+          
+          <div style={{ marginTop: 'auto', padding: '16px 0' }}>
+            {assignedRoles.filter(r => r !== 'parents').map((role) => (
+              <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
+                 <LogOut size={18} /> Switch to {role}
+              </button>
+            ))}
+            <button className="sidebar-link" onClick={onLogout}>
+              <LogOut size={18} /> Logout
+            </button>
+          </div>
+        </nav>
+      </aside>
 
-        <div className="top-status">
-          <span>{loading ? "Refreshing..." : "Parents View"}</span>
-        </div>
-      </header>
+      <main className="admin-main">
+        <header className="topbar">
+          <div className="brand-block">
+             <h2 className="page-title">{activePage}</h2>
+          </div>
+          <div className="header-actions">
+             <span className="role-chip">{loading ? "..." : "Parents Portal"}</span>
+          </div>
+        </header>
 
-      <main className="page-card">
-        {showCelebration && <Celebration />}
-        {currentPage && (
-          <>
-            <p className="page-eyebrow">{currentPage.eyebrow}</p>
-            <h2>{currentPage.title}</h2>
-            <p className="page-description">{currentPage.description}</p>
-          </>
-        )}
+        <section className="admin-content-pad" style={{ padding: '20px' }}>
+          {showCelebration && <Celebration />}
+          {currentPage && (
+            <div style={{ marginBottom: '30px' }}>
+              <p className="page-eyebrow arabic-kanz" style={{ fontSize: '18px', color: 'var(--primary)' }}>{currentPage.eyebrow}</p>
+              <h2 style={{ fontSize: '1.8rem', margin: '4px 0' }}>{currentPage.title}</h2>
+              <p className="page-description">{currentPage.description}</p>
+            </div>
+          )}
 
         {activePage !== "Child Summary" && activePage !== "Teachers" ? (
           <section className="hero-panel">
@@ -856,24 +844,8 @@ function ParentPortal({
         ) : null}
 
         {currentPage && <InfoHighlights items={currentPage.highlights} />}
+        </section>
       </main>
-
-      <nav className="navbar" aria-label="Bottom navigation">
-        {pageNames.map((page) => {
-          const Icon = NAV_ICONS[page] || Sparkles;
-          return (
-            <button
-              key={page}
-              type="button"
-              className={activePage === (navigationMap[page] || page) ? "nav-link active" : "nav-link"}
-              onClick={() => setActivePage(navigationMap[page] || page)}
-            >
-              <span className="nav-icon"><Icon size={20} /></span>
-              <span className="nav-text">{page}</span>
-            </button>
-          );
-        })}
-      </nav>
     </div>
   );
 }
@@ -947,32 +919,40 @@ function AdminPortal({
 
   return (
     <div className="admin-shell">
-      <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
+      <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
+        <button 
+          className="sidebar-toggle-btn" 
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label={menuOpen ? "Close Sidebar" : "Open Sidebar"}
+        >
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        
         <div className="sidebar-header">
            <div className="brand-header-flex">
             <img src="/logo.png" alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag" style={{ color: 'rgba(255,255,255,0.6)' }}>Admin View</p>
+              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>لوحة التحكم</p>
               <h2 className="brand-title" style={{ color: 'white', fontSize: '1rem', margin: 0 }}>Manager</h2>
             </div>
           </div>
         </div>
         <nav className="sidebar-nav">
-          <p className="sidebar-category" style={{ padding: '0 16px', fontSize: '10px', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px' }}>Main Dashboard</p>
+          <p className="sidebar-category">Main Dashboard</p>
           {navPages.map(page => {
              const Icon = NAV_ICONS[page] || Layers3;
              return (
-               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
+               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => setActivePage(page)}>
                  <Icon size={18} /> {page === "Announcements" ? "Updates" : page}
                </button>
              )
           })}
           
-          <p className="sidebar-category" style={{ padding: '0 16px', fontSize: '10px', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px', marginTop: '24px' }}>Management</p>
+          <p className="sidebar-category" style={{ marginTop: '24px' }}>Management</p>
           {sidebarLinks.map(page => {
              const Icon = NAV_ICONS[page] || Users;
              return (
-               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
+               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => setActivePage(page)}>
                  <Icon size={18} /> {page}
                </button>
              )
@@ -1786,85 +1766,65 @@ function TeacherPortal({
     ) || filteredStudents[0] || null;
 
   return (
-    <div className="app-shell">
-      <div
-        className={menuOpen ? "sidebar-overlay visible" : "sidebar-overlay"}
-        onClick={() => setMenuOpen(false)}
-      />
-
-      <aside className={menuOpen ? "sidebar open" : "sidebar"}>
-        <div className="sidebar-header">
-          <div>
-            <p className="sidebar-tag">Teacher Workspace</p>
-            <h2>{user?.email}</h2>
-          </div>
-          <button
-            type="button"
-            className="close-menu"
-            onClick={() => setMenuOpen(false)}
-            aria-label="Close menu"
-          >
-            X
-          </button>
-        </div>
-
-        <div className="sidebar-links">
-          {getAssignedRoles(user).map((role) => (
-            <button
-              key={role}
-              type="button"
-              className="sidebar-link"
-              onClick={() => onRoleChange(role)}
-            >
-              Go to {ROLE_LABELS[role] || role} Portal
-            </button>
-          ))}
-          <button type="button" className="sidebar-link logout-btn" onClick={onLogout}>
-            <LogOut size={18} />
-            Logout
-          </button>
-        </div>
-      </aside>
-
-      <header className="topbar">
-        <button
-          type="button"
-          className="menu-button"
-          onClick={() => setMenuOpen(true)}
-          aria-label="Open menu"
+    <div className="admin-shell">
+      <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
+        <button 
+          className="sidebar-toggle-btn" 
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label={menuOpen ? "Close" : "Open"}
         >
-          <span />
-          <span />
-          <span />
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-
-        <div className="brand-block">
-          <div className="brand-header-flex">
+        <div className="sidebar-header">
+           <div className="brand-header-flex">
             <img src={portalAccess?.photo_url || "/logo.png"} alt="Logo" className="nav-logo profile-dp-circle" />
             <div>
-              <p className="brand-tag">Teacher Access</p>
-              <h1 className="brand-title">{portalAccess?.full_name || "Muhaffiz Portal"}</h1>
+              <p className="brand-tag arabic-kanz" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>بوابة المعلم</p>
+              <h2 className="brand-title" style={{ color: 'white', fontSize: '1rem', margin: 0 }}>{portalAccess?.full_name || "Teacher"}</h2>
             </div>
           </div>
         </div>
-
-        <div className="top-status">
-          <span>{teacherIdentity || "Teacher View"}</span>
-        </div>
-      </header>
-
-      <main className="page-card">
-        <section className="hero-panel">
-          <div>
-            <p className="hero-label">Current page</p>
-            <h3>{activePage}</h3>
+        <nav className="sidebar-nav">
+          <p className="sidebar-category">Workplace</p>
+          {[
+            { id: "My Group", label: "Students", icon: Users },
+            { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
+            { id: "Overview", label: "Performance", icon: Layers3 },
+          ].map(page => (
+            <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => setActivePage(page.id)}>
+              <page.icon size={18} /> {page.label}
+            </button>
+          ))}
+          
+          <div style={{ marginTop: 'auto', padding: '16px 0' }}>
+            {getAssignedRoles(user).filter(r => r !== 'teacher').map((role) => (
+              <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
+                 <LogOut size={18} /> Switch to {role}
+              </button>
+            ))}
+            <button className="sidebar-link" onClick={onLogout}>
+              <LogOut size={18} /> Logout
+            </button>
           </div>
-          <div className="hero-chip">{selectedGroup || "All groups"}</div>
-        </section>
+        </nav>
+      </aside>
 
-        {actionMessage ? (
-          <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
-        ) : null}
+      <main className="admin-main">
+        <header className="topbar">
+          <div className="brand-block">
+             <h2 className="page-title">{activePage}</h2>
+          </div>
+          {portalAccess.show_salary_card && monthlySalary && (
+            <div className="salary-pill">
+              Estimated: <strong>{monthlySalary.total.toFixed(0)}rs</strong>
+            </div>
+          )}
+        </header>
+
+        <section className="admin-content-pad" style={{ padding: '24px' }}>
+          {actionMessage && (
+            <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+          )}
 
         {/* Group filter removed as requested - showing only assigned students */}
 
@@ -2206,28 +2166,10 @@ function TeacherPortal({
         </div>
       </div>
     ) : null}
-  </main>
-
-  <nav className="navbar admin-navbar" aria-label="Teacher navigation">
-    {["My Group", "Fill Result", "Overview"].map((page) => {
-      const Icon = NAV_ICONS[page] || Layers3;
-      return (
-        <button
-          key={page}
-          type="button"
-          className={activePage === page ? "nav-link active" : "nav-link"}
-          onClick={() => setActivePage(page)}
-        >
-          <span className="nav-icon">
-            <Icon size={20} />
-          </span>
-          <span className="nav-text">{page}</span>
-        </button>
-      );
-    })}
-  </nav>
-</div>
-);
+        </section>
+      </main>
+    </div>
+  );
 }
 
 export default function App() {
