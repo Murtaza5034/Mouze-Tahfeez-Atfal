@@ -2619,7 +2619,15 @@ export default function App() {
 
         setTeacherAttendance(attendanceResponse.data || []);
         setCustomGroups(groupsResponse.data || []);
-        setTeacherProfiles(teacherProfilesResponse.data || []);
+        const enrichedProfiles = (teacherProfilesResponse.data || []).map(profile => {
+          const access = (portalAccessResponse.data || []).find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
+          return {
+            ...profile,
+            salary_per_minute: access?.salary_per_minute || 2.3,
+            show_salary_card: access?.show_salary_card ?? true
+          };
+        });
+        setTeacherProfiles(enrichedProfiles);
 
         setSchoolData({
           students,
@@ -2627,7 +2635,7 @@ export default function App() {
           announcements: eventsResponse.data || [],
           schedule: scheduleResponse.data || [],
           portalAccessList: portalAccessResponse.data || [],
-          teacherProfiles: teacherProfilesResponse.data || [],
+          teacherProfiles: enrichedProfiles,
         });
 
         if (students.length > 0) {
@@ -3035,13 +3043,30 @@ export default function App() {
         photo_url: payload.photo_url,
         phone_number: payload.phone_number,
         whatsapp_number: payload.whatsapp_number,
-        salary_per_minute: Number(payload.salary_per_minute || 2.3),
-        show_salary_card: !!payload.show_salary_card,
+    // Update the profile information
+    const { error: profileError } = await supabase
+      .from("teacher_profiles")
+      .upsert({
+        user_id: payload.user_id || undefined,
+        full_name: payload.full_name,
+        photo_url: payload.photo_url,
+        phone_number: payload.phone_number,
+        whatsapp_number: payload.whatsapp_number,
         is_active: true,
       }, { onConflict: 'full_name' });
 
-    if (error) {
-      showAction("error", error.message);
+    // Update the portal access settings (salary/visibility) separately
+    // as they reside in a different table that already has these columns
+    const { error: accessError } = await supabase
+      .from("user_portal_access")
+      .update({
+        salary_per_minute: Number(payload.salary_per_minute || 2.3),
+        show_salary_card: !!payload.show_salary_card,
+      })
+      .eq("full_name", payload.full_name);
+
+    if (profileError || accessError) {
+      showAction("error", profileError?.message || accessError?.message);
       return;
     }
 
