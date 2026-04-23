@@ -1916,7 +1916,7 @@ function TeacherPortal({
           </div>
           {portalAccess.show_salary_card && monthlySalary && (
             <div className="salary-pill">
-              Estimated: <strong>{monthlySalary.total.toFixed(0)}rs</strong>
+              Estimated: <strong>{monthlySalary.amount?.toFixed(0) || "0"}rs</strong>
             </div>
           )}
         </header>
@@ -1978,7 +1978,7 @@ function TeacherPortal({
                   </div>
                   <div className="salary-item total-item">
                     <span className="salary-label">Total Amount</span>
-                    <span className="salary-value highlight">₹{monthlySalary.amount.toFixed(2)}</span>
+                    <span className="salary-value highlight">₹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
                   </div>
                 </div>
                 <p className="hint-text">Calculated based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
