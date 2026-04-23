@@ -18,6 +18,8 @@ import {
   X,
   User,
   Users,
+  Phone,
+  MessageCircle,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
@@ -902,7 +904,7 @@ function ParentPortal({
                       <div className="contact-actions">
                         {teacher.phone_number && (
                           <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                             <Hash size={16} /> Call Now
+                             <Phone size={16} /> Call Now
                           </a>
                         )}
                         {teacher.whatsapp_number && (
@@ -912,7 +914,7 @@ function ParentPortal({
                             rel="noreferrer" 
                             className="contact-btn whatsapp"
                           >
-                             <Users size={16} /> WhatsApp
+                             <MessageCircle size={16} /> WhatsApp
                           </a>
                         )}
                       </div>
@@ -3035,7 +3037,7 @@ export default function App() {
         setMenuOpen={setMenuOpen}
         onLogout={handleLogout}
         onRoleChange={storeRole}
-        teacherProfiles={schoolData.teacherProfiles}
+        teacherProfiles={teacherProfiles}
       />
     );
   }
