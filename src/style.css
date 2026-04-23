@@ -1692,3 +1692,82 @@ h1, h2, h3, h4, h5 {
   font-size: 1rem;
   color: var(--deep-brown);
 }
+
+/* --- Premium Hifz Stats Strip --- */
+.hifz-stats-premium-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.premium-stat-pill {
+  background: var(--premium-white);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow-premium);
+  transition: transform 0.3s;
+}
+
+.premium-stat-pill:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-gold);
+}
+
+.pill-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.pill-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.pill-value {
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: var(--deep-brown);
+}
+
+.pill-sub {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--soft-brown);
+}
+
+@media (max-width: 600px) {
+  .hifz-stats-premium-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .premium-stat-pill {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .pill-icon {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .pill-value {
+    font-size: 1rem;
+  }
+}

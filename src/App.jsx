@@ -757,27 +757,24 @@ function ParentPortal({
         {activePage === "Home" ? (
           <div className="home-dashboard">
             {/* ---- Parent Stats Strip ---- */}
-            <div className="portal-stats-strip">
-              <div className="pstat-card">
-                <span className="pstat-value">{weeklyResult?.total_score ?? "--"}</span>
-                <span className="pstat-label">Weekly Score</span>
-                <span className="pstat-sub">out of 100</span>
-              </div>
-              <div className="pstat-card">
-                <span className="pstat-label">Daily Status</span>
-                <span className="pstat-value">{attendance?.status || "Present"}</span>
-                <span className="pstat-sub">{getToday()}</span>
-              </div>
-              <div className="pstat-card">
-                <span className="pstat-value">{hifzDetails?.juz || "--"}</span>
-                <span className="pstat-label">Juz</span>
-                <span className="pstat-sub">{hifzDetails?.surat || "In progress"}</span>
-              </div>
-              <div className="pstat-card">
-                <span className="pstat-label">Muhaffiz</span>
-                <span className="pstat-value">{hifzDetails?.muhaffiz_name || "Pending"}</span>
-                <span className="pstat-sub">Direct Teacher</span>
-              </div>
+            <div className="hifz-stats-premium-strip">
+              {[
+                { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
+                { label: "Daily Status", val: attendance?.status || "Present", sub: getToday(), icon: Clock, color: "#5d4037" },
+                { label: "Current Juz", val: hifzDetails?.juz || "--", sub: hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
+                { label: "My Muhaffiz", val: hifzDetails?.muhaffiz_name?.split(' ')[0] || "Pending", sub: "Direct Teacher", icon: GraduationCap, color: "#d4af37" },
+              ].map((stat, i) => (
+                <div key={i} className="premium-stat-pill card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                  <div className="pill-icon" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                    <stat.icon size={18} />
+                  </div>
+                  <div className="pill-info">
+                    <span className="pill-label">{stat.label}</span>
+                    <strong className="pill-value">{stat.val}</strong>
+                    <span className="pill-sub">{stat.sub}</span>
+                  </div>
+                </div>
+              ))}
             </div>
             <div className="dashboard-section">
               <div className="section-header">
@@ -1673,6 +1670,33 @@ function AdminPortal({
                     placeholder="https://example.com/photo.jpg"
                   />
                 </label>
+                <div className="form-grid">
+                  <label>
+                    <span>Salary per Minute</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      name="salary_per_minute"
+                      value={adminForms.teacherProfile.salary_per_minute || "2.3"}
+                      onChange={onAdminFormChange("teacherProfile")}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', marginTop: '20px' }}>
+                    <input
+                      type="checkbox"
+                      name="show_salary_card"
+                      checked={adminForms.teacherProfile.show_salary_card}
+                      onChange={(e) => {
+                        const { checked } = e.target;
+                        setAdminForms(curr => ({
+                          ...curr,
+                          teacherProfile: { ...curr.teacherProfile, show_salary_card: checked }
+                        }));
+                      }}
+                    />
+                    <span>Show Salary Card to Teacher</span>
+                  </label>
+                </div>
                 <button type="submit" className="action-button">Save Profile</button>
               </form>
             </section>
@@ -2373,6 +2397,8 @@ export default function App() {
       photo_url: "",
       phone_number: "",
       whatsapp_number: "",
+      salary_per_minute: "2.3",
+      show_salary_card: true,
     },
   });
   const [teacherForms, setTeacherForms] = useState({
@@ -2666,28 +2692,20 @@ export default function App() {
     };
   }, [schoolData.students, teacherGroupFilter, teacherIdentity, teacherAttendance]);
 
-  const monthlySalary = useMemo(() => {
-    if (portalRole !== "teacher") return null;
-
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    const monthAttendance = (teacherData.attendances || []).filter((a) => {
-      const d = new Date(a.attendance_date);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    });
-
-    const totalMinutes = monthAttendance.reduce((sum, a) => sum + toNumber(a.minutes_present), 0);
-    const rate = toNumber(portalAccess.salary_per_minute || 2.3);
+    const teacherProfile = (teacherProfiles || []).find(p => 
+      normalizeText(p.full_name) === normalizeText(teacherIdentity)
+    );
+    const rate = toNumber(teacherProfile?.salary_per_minute || portalAccess.salary_per_minute || 2.3);
+    const showCard = teacherProfile ? !!teacherProfile.show_salary_card : !!portalAccess.show_salary_card;
 
     return {
       totalMinutes,
       rate,
       amount: totalMinutes * rate,
       daysPresent: monthAttendance.length,
+      showCard
     };
-  }, [teacherData.attendances, portalAccess.salary_per_minute, portalRole]);
+  }, [teacherData.attendances, portalAccess.salary_per_minute, portalAccess.show_salary_card, portalRole, teacherProfiles, teacherIdentity]);
 
   function storeRole(role) {
     setPortalRole(role);
@@ -3004,6 +3022,8 @@ export default function App() {
         photo_url: payload.photo_url,
         phone_number: payload.phone_number,
         whatsapp_number: payload.whatsapp_number,
+        salary_per_minute: Number(payload.salary_per_minute || 2.3),
+        show_salary_card: !!payload.show_salary_card,
         is_active: true,
       }, { onConflict: 'full_name' });
 
