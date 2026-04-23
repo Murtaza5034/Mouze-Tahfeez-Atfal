@@ -3035,14 +3035,6 @@ export default function App() {
     event.preventDefault();
     const payload = adminForms.teacherProfile;
 
-    const { error } = await supabase
-      .from("teacher_profiles")
-      .upsert({
-        user_id: payload.user_id || undefined,
-        full_name: payload.full_name,
-        photo_url: payload.photo_url,
-        phone_number: payload.phone_number,
-        whatsapp_number: payload.whatsapp_number,
     // Update the profile information
     const { error: profileError } = await supabase
       .from("teacher_profiles")
@@ -3056,7 +3048,6 @@ export default function App() {
       }, { onConflict: 'full_name' });
 
     // Update the portal access settings (salary/visibility) separately
-    // as they reside in a different table that already has these columns
     const { error: accessError } = await supabase
       .from("user_portal_access")
       .update({
