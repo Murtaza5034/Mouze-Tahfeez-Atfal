@@ -2692,6 +2692,19 @@ export default function App() {
     };
   }, [schoolData.students, teacherGroupFilter, teacherIdentity, teacherAttendance]);
 
+  const monthlySalary = useMemo(() => {
+    if (portalRole !== "teacher") return null;
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const monthAttendance = (teacherData.attendances || []).filter((a) => {
+      const d = new Date(a.attendance_date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const totalMinutes = monthAttendance.reduce((sum, a) => sum + toNumber(a.minutes_present), 0);
     const teacherProfile = (teacherProfiles || []).find(p => 
       normalizeText(p.full_name) === normalizeText(teacherIdentity)
     );
