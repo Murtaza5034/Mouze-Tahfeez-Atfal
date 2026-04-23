@@ -1663,3 +1663,13 @@ h1, h2, h3, h4, h5 {
   color: var(--text-muted);
   font-weight: 600;
 }
+
+.target-box.highlight-wusool {
+  background: #fdfaf3;
+  border-color: #e0d1b1;
+}
+
+.target-box.highlight-matrookah {
+  background: #fff5f5;
+  border-color: #fed7d7;
+}

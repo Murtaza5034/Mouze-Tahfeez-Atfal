@@ -503,6 +503,19 @@ function TahfeezReportCard({ student, weeklyResult }) {
           </div>
 
           <div className="result-footer">
+             <div className="target-box highlight-wusool">
+                <h5 className="arabic-kanz" style={{...arabicStyle, fontSize: '1.1rem'}}>وصول الى الاْن</h5>
+                <p>Juz: {weeklyResult?.wusool_juz || "-"}</p>
+                <p>Page: {weeklyResult?.wusool_page || "-"}</p>
+             </div>
+             <div className="target-box highlight-matrookah">
+                <h5>Notes</h5>
+                <p>1 متروكة: {weeklyResult?.matrookah || "0"}</p>
+                <p>2 ضعيفة: {weeklyResult?.daeefah || "0"}</p>
+             </div>
+          </div>
+
+          <div className="result-footer">
              <div className="target-box">
                 <h5>Next Week Target</h5>
                 <p>Juz: {weeklyResult?.next_week_juz || "-"}</p>
@@ -694,6 +707,9 @@ function ParentPortal({
 
       {/* Top Header Bar */}
       <header className="parent-topbar">
+        <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
+          <Menu size={22} />
+        </button>
         <div className="parent-topbar-left">
           <img src="/logo.png" alt="Logo" className="topbar-logo" />
           <div>
@@ -701,9 +717,6 @@ function ParentPortal({
             <span className="topbar-sub">Parents Portal</span>
           </div>
         </div>
-        <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
-          <Menu size={22} />
-        </button>
       </header>
 
       {/* Main Content */}
@@ -2110,6 +2123,50 @@ function TeacherPortal({
 
                 <div className="form-grid">
                   <label>
+                    <span>Wusool Juz</span>
+                    <input
+                      type="text"
+                      name="wusool_juz"
+                      value={teacherForms.result.wusool_juz}
+                      onChange={onTeacherFormChange}
+                    />
+                  </label>
+                  <label>
+                    <span>Wusool Page</span>
+                    <input
+                      type="text"
+                      name="wusool_page"
+                      value={teacherForms.result.wusool_page}
+                      onChange={onTeacherFormChange}
+                    />
+                  </label>
+                </div>
+
+                <div className="form-grid">
+                  <label>
+                    <span>Matrookah (متروكة)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      name="matrookah"
+                      value={teacherForms.result.matrookah}
+                      onChange={onTeacherFormChange}
+                    />
+                  </label>
+                  <label>
+                    <span>Daeefah (ضعيفة)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      name="daeefah"
+                      value={teacherForms.result.daeefah}
+                      onChange={onTeacherFormChange}
+                    />
+                  </label>
+                </div>
+
+                <div className="form-grid">
+                  <label>
                     <span>Next Week Juz</span>
                     <input
                       type="text"
@@ -2330,6 +2387,10 @@ export default function App() {
       total_jadeed_pages: "",
       istifadah_juz: "",
       istifadah_page: "",
+      wusool_juz: "",
+      wusool_page: "",
+      matrookah: "",
+      daeefah: "",
       attendance_count: "",
       attendance_note: "",
     },
@@ -2972,6 +3033,8 @@ export default function App() {
       juz_hali: toNumber(teacherForms.result.juz_hali),
       takhteet: toNumber(teacherForms.result.takhteet),
       jadeed: toNumber(teacherForms.result.jadeed),
+      matrookah: toNumber(teacherForms.result.matrookah),
+      daeefah: toNumber(teacherForms.result.daeefah),
     };
 
     const { data, error } = await supabase.from("weekly_results").insert([payload]).select().single();
@@ -3010,6 +3073,10 @@ export default function App() {
         total_jadeed_pages: "",
         istifadah_juz: "",
         istifadah_page: "",
+        wusool_juz: "",
+        wusool_page: "",
+        matrookah: "",
+        daeefah: "",
         attendance_count: "",
         attendance_note: "",
       },
