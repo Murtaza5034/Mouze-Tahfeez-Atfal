@@ -502,14 +502,13 @@ function TahfeezReportCard({ student, weeklyResult }) {
              </div>
           </div>
 
-          <div className="result-footer">
+          <div className="result-footer-grid">
              <div className="target-box highlight-wusool">
                 <h5 className="arabic-kanz" style={{...arabicStyle, fontSize: '1.1rem'}}>وصول الى الاْن</h5>
                 <p>Juz: {weeklyResult?.wusool_juz || "-"}</p>
                 <p>Page: {weeklyResult?.wusool_page || "-"}</p>
              </div>
              <div className="target-box highlight-matrookah">
-                <h5 className="arabic-kanz" style={{...arabicStyle, fontSize: '1.1rem'}}>ملاحظات</h5>
                 <div className="note-item-row">
                    <span className="note-val">{weeklyResult?.matrookah || "-"}</span>
                    <span className="note-label arabic-kanz" style={arabicStyle}>:متروكة</span>
@@ -519,9 +518,6 @@ function TahfeezReportCard({ student, weeklyResult }) {
                    <span className="note-label arabic-kanz" style={arabicStyle}>:ضعيفة</span>
                 </div>
              </div>
-          </div>
-
-          <div className="result-footer">
              <div className="target-box">
                 <h5>Next Week Target</h5>
                 <p>Juz: {weeklyResult?.next_week_juz || "-"}</p>
