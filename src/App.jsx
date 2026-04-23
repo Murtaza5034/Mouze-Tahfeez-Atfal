@@ -651,6 +651,9 @@ function ParentPortal({
 
       {/* Top Header Bar */}
       <header className="parent-topbar">
+        <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
+          <Menu size={22} />
+        </button>
         <div className="parent-topbar-left">
           <img src="/logo.png" alt="Logo" className="topbar-logo" />
           <div>
@@ -658,9 +661,6 @@ function ParentPortal({
             <span className="topbar-sub">Parents Portal</span>
           </div>
         </div>
-        <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
-          <Menu size={22} />
-        </button>
       </header>
 
       {/* Main Content */}
