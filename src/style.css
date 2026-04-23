@@ -1673,3 +1673,21 @@ h1, h2, h3, h4, h5 {
   background: #fff5f5;
   border-color: #fed7d7;
 }
+
+.note-item-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.note-val {
+  font-weight: 800;
+  color: #c53030;
+}
+
+.note-label {
+  font-size: 1rem;
+  color: var(--deep-brown);
+}

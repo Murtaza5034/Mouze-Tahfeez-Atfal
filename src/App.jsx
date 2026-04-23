@@ -509,9 +509,15 @@ function TahfeezReportCard({ student, weeklyResult }) {
                 <p>Page: {weeklyResult?.wusool_page || "-"}</p>
              </div>
              <div className="target-box highlight-matrookah">
-                <h5>Notes</h5>
-                <p>1 متروكة: {weeklyResult?.matrookah || "0"}</p>
-                <p>2 ضعيفة: {weeklyResult?.daeefah || "0"}</p>
+                <h5 className="arabic-kanz" style={{...arabicStyle, fontSize: '1.1rem'}}>ملاحظات</h5>
+                <div className="note-item-row">
+                   <span className="note-val">{weeklyResult?.matrookah || "-"}</span>
+                   <span className="note-label arabic-kanz" style={arabicStyle}>:متروكة</span>
+                </div>
+                <div className="note-item-row">
+                   <span className="note-val">{weeklyResult?.daeefah || "-"}</span>
+                   <span className="note-label arabic-kanz" style={arabicStyle}>:ضعيفة</span>
+                </div>
              </div>
           </div>
 
@@ -2146,21 +2152,21 @@ function TeacherPortal({
                   <label>
                     <span>Matrookah (متروكة)</span>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
                       name="matrookah"
                       value={teacherForms.result.matrookah}
                       onChange={onTeacherFormChange}
+                      placeholder="e.g. 1, 2, 5"
                     />
                   </label>
                   <label>
                     <span>Daeefah (ضعيفة)</span>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
                       name="daeefah"
                       value={teacherForms.result.daeefah}
                       onChange={onTeacherFormChange}
+                      placeholder="e.g. 3, 7"
                     />
                   </label>
                 </div>
@@ -3033,8 +3039,8 @@ export default function App() {
       juz_hali: toNumber(teacherForms.result.juz_hali),
       takhteet: toNumber(teacherForms.result.takhteet),
       jadeed: toNumber(teacherForms.result.jadeed),
-      matrookah: toNumber(teacherForms.result.matrookah),
-      daeefah: toNumber(teacherForms.result.daeefah),
+      matrookah: teacherForms.result.matrookah,
+      daeefah: teacherForms.result.daeefah,
     };
 
     const { data, error } = await supabase.from("weekly_results").insert([payload]).select().single();
