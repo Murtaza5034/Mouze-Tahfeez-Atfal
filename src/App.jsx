@@ -111,7 +111,8 @@ function Celebration() {
           className="confetti" 
           style={{
             left: `${Math.random() * 100}%`,
-            backgroundColor: ['#fbbf24', '#3b82f6', '#ef4444', '#10b981', '#a855f7'][Math.floor(Math.random() * 5)],
+            backgroundColor: 'var(--primary-gold)',
+            color: 'white',
             animationDelay: `${Math.random() * 2}s`,
             animationDuration: `${2 + Math.random() * 2}s`
           }}
@@ -457,7 +458,7 @@ function TahfeezReportCard({ student, weeklyResult }) {
              </div>
 
              <div className="trophy-container">
-                <Trophy size={64} color="var(--accent-gold)" fill="var(--light-gold)" />
+                <Trophy size={64} className="trophy-icon" />
                 <span className="rank-text-overlay">{weeklyResult?.rank || "-"}</span>
              </div>
           </div>
@@ -705,9 +706,9 @@ function ParentPortal({
                 <span className="pstat-sub">out of 100</span>
               </div>
               <div className="pstat-card">
-                <span className="pstat-value" style={{ fontSize: attendance?.status === 'Absent' ? '0.9rem' : undefined }}>{attendance?.status || "Present"}</span>
-                <span className="pstat-label">Attendance</span>
-                <span className="pstat-sub">Today</span>
+                <span className="pstat-label">Daily Status</span>
+                <span className="pstat-value">{attendance?.status || "Present"}</span>
+                <span className="pstat-sub">{getToday()}</span>
               </div>
               <div className="pstat-card">
                 <span className="pstat-value">{hifzDetails?.juz || "--"}</span>
@@ -715,9 +716,9 @@ function ParentPortal({
                 <span className="pstat-sub">{hifzDetails?.surat || "In progress"}</span>
               </div>
               <div className="pstat-card">
-                <span className="pstat-value" style={{ fontSize: '0.75rem', lineHeight: '1.2' }}>{hifzDetails?.muhaffiz_name || "Pending"}</span>
-                <span className="pstat-label">Teacher</span>
-                <span className="pstat-sub">Muhaffiz</span>
+                <span className="pstat-label">Muhaffiz</span>
+                <span className="pstat-value">{hifzDetails?.muhaffiz_name || "Pending"}</span>
+                <span className="pstat-sub">Direct Teacher</span>
               </div>
             </div>
             <div className="dashboard-section">
@@ -820,31 +821,57 @@ function ParentPortal({
           </div>
         ) : null}
         {activePage === "Teachers" ? (
-          <div className="management-grid">
-            <p className="page-eyebrow">Our Staff</p>
-            <h2>Contact your child's teachers</h2>
+          <div className="card-appear">
+            <div className="section-title-block">
+               <p className="page-eyebrow">Our Professional Staff</p>
+               <h2 className="page-title">Teacher Contacts</h2>
+               <p className="page-description">
+                 Direct contact options for your child's Muhaffiz and other school staff members.
+               </p>
+            </div>
+
             <div className="teacher-info-stack">
               {sortedTeachers.map((teacher) => (
-                <article key={teacher.id} className={`data-card teacher-profile-card ${teacher.id === myTeacher?.id ? 'pinned' : ''}`}>
-                  {teacher.id === myTeacher?.id && <span className="pin-badge">My Child's Teacher</span>}
+                <article 
+                  key={teacher.id} 
+                  className={`premium-card teacher-profile-card ${teacher.id === myTeacher?.id ? 'pinned' : ''}`}
+                >
+                  {teacher.id === myTeacher?.id && (
+                    <div className="pin-badge">
+                      <Sparkles size={12} /> My Child's Teacher
+                    </div>
+                  )}
                   <div className="teacher-card-inner">
                     <img 
-                      src={teacher.photo_url || "/default-avatar.png"} 
+                      src={teacher.photo_url || "/logo.png"} 
                       alt={teacher.full_name} 
                       className="teacher-photo-square" 
                     />
                     <div className="teacher-details">
                       <h3>{teacher.full_name}</h3>
-                      <p className="teacher-specialty">{"Muhaffiz / Teacher"}</p>
+                      <p className="teacher-specialty">Muhaffiz / Tahfeez Instructor</p>
+                      
+                      <div className="teacher-contact-meta">
+                         <div className="meta-item">
+                            <Clock size={14} /> 
+                            <span>Available: 8:00 AM - 2:00 PM</span>
+                         </div>
+                      </div>
+
                       <div className="contact-actions">
                         {teacher.phone_number && (
                           <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                             Call Now
+                             <Hash size={16} /> Call Now
                           </a>
                         )}
                         {teacher.whatsapp_number && (
-                          <a href={`https://wa.me/${teacher.whatsapp_number.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
-                             WhatsApp
+                          <a 
+                            href={`https://wa.me/${teacher.whatsapp_number.replace(/[^\d]/g, '')}`} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="contact-btn whatsapp"
+                          >
+                             <Users size={16} /> WhatsApp
                           </a>
                         )}
                       </div>
@@ -853,7 +880,10 @@ function ParentPortal({
                 </article>
               ))}
               {sortedTeachers.length === 0 && (
-                <div className="empty-state">No teacher information available yet.</div>
+                <div className="empty-state premium-card">
+                   <Users size={48} opacity={0.2} />
+                   <p>No teacher information available at this moment.</p>
+                </div>
               )}
             </div>
           </div>
@@ -1019,7 +1049,7 @@ function AdminPortal({
           </div>
         </header>
 
-        <section className="admin-content-pad" style={{ padding: '24px' }}>
+        <section className="admin-content-pad">
           {actionMessage && (
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
@@ -1847,7 +1877,7 @@ function TeacherPortal({
           )}
         </header>
 
-        <section className="admin-content-pad" style={{ padding: '24px' }}>
+        <section className="admin-content-pad">
           {actionMessage && (
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
@@ -2165,7 +2195,7 @@ function TeacherPortal({
                        <strong>{student.name}</strong>
                        <span>{student.hifzStatus}</span>
                     </div>
-                    <div className="performance-pill" style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem' }}>
+                    <div className="performance-pill">
                        Latest Result: {student.latestResult?.rank || "pending"}
                     </div>
                   </article>

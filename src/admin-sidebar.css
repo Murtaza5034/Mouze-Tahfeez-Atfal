@@ -5,19 +5,19 @@
 }
 
 .admin-sidebar {
-  width: 280px;
+  width: var(--sidebar-width);
   height: 100vh;
   position: fixed;
   top: 0;
   left: 0;
-  background: linear-gradient(180deg, var(--premium-white) 0%, var(--off-white) 100%);
+  background: var(--off-white);
   color: var(--text-main);
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--glass-border);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 2000;
-  box-shadow: 4px 0 24px rgba(138, 101, 21, 0.08);
+  box-shadow: 10px 0 30px rgba(61, 43, 31, 0.05);
 }
 
 .admin-sidebar.collapsed {
@@ -27,7 +27,7 @@
 .sidebar-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(74, 52, 16, 0.1);
+  background: rgba(61, 43, 31, 0.15);
   z-index: 1999;
   backdrop-filter: blur(4px);
 }
@@ -38,7 +38,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 100vh;
-  margin-left: 280px;
+  margin-left: var(--sidebar-width);
   transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -51,6 +51,7 @@
   }
   .admin-sidebar:not(.collapsed) {
     transform: translateX(0);
+    box-shadow: 20px 0 60px rgba(61, 43, 31, 0.2);
   }
 }
 
@@ -58,62 +59,82 @@
   position: absolute;
   right: -48px;
   top: 20px;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   background: var(--premium-white);
   border: 1px solid var(--glass-border);
   color: var(--dark-gold);
-  border-radius: 12px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 4px 0 12px rgba(138, 101, 21, 0.1);
+  box-shadow: 4px 0 16px rgba(61, 43, 31, 0.1);
   z-index: 2001;
+  transition: all 0.2s;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--light-gold);
+  color: var(--deep-brown);
 }
 
 .sidebar-nav {
   flex: 1;
-  padding: 20px 0;
+  padding: 24px 0;
   overflow-y: auto;
 }
 
 .sidebar-category {
   font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--primary-gold);
-  padding: 24px 20px 8px;
+  color: var(--soft-brown);
+  padding: 24px 24px 10px;
   margin: 0;
+  opacity: 0.8;
 }
 
 .sidebar-link {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: calc(100% - 24px);
-  margin: 4px 12px;
-  padding: 12px 16px;
+  gap: 14px;
+  width: calc(100% - 32px);
+  margin: 4px 16px;
+  padding: 14px 18px;
   background: transparent;
   border: none;
   color: var(--text-main);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
-  transition: all 0.3s ease;
-  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 14px;
 }
 
-.sidebar-link:hover,
-.sidebar-link.active {
+.sidebar-link:hover {
   background: var(--light-gold);
   color: var(--dark-gold);
+  padding-left: 22px;
+}
+
+.sidebar-link.active {
+  background: linear-gradient(90deg, var(--light-gold) 0%, transparent 100%);
+  color: var(--dark-gold);
+  border-left: 4px solid var(--primary-gold);
+  border-radius: 4px 14px 14px 4px;
 }
 
 .sidebar-link svg {
   color: var(--primary-gold);
+  transition: all 0.3s;
+}
+
+.sidebar-link.active svg {
+  color: var(--dark-gold);
+  transform: scale(1.1);
 }
 
 /* --- Trophy Rank Animation --- */

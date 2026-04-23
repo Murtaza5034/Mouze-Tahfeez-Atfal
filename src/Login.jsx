@@ -143,7 +143,7 @@ export default function Login({ onLoginSuccess }) {
         </form>
 
         <div className="login-footer">
-          <p>Portal access is controlled from the Supabase `user_portal_access` table for each account.</p>
+          <p>&copy; 2026 Mahad al zahra Aljamea tus saifiyah Galiakot</p>
         </div>
       </div>
     </div>
