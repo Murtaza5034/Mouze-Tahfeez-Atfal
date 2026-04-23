@@ -1792,33 +1792,7 @@ function AdminPortal({
                   </label>
                 </div>
 
-                <div className="form-grid">
-                  <label>
-                    <span>Salary per Minute (Teacher)</span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      name="salary_per_minute"
-                      value={adminForms.portalAccess.salary_per_minute}
-                      onChange={onAdminFormChange("portalAccess")}
-                    />
-                  </label>
-                  <label className="checkbox-label" style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "24px" }}>
-                    <input
-                      type="checkbox"
-                      name="show_salary_card"
-                      checked={adminForms.portalAccess.show_salary_card}
-                      onChange={(e) => {
-                        const { checked } = e.target;
-                        setAdminForms((current) => ({
-                          ...current,
-                          portalAccess: { ...current.portalAccess, show_salary_card: checked },
-                        }));
-                      }}
-                    />
-                    <span>Show Salary Card to Teacher</span>
-                  </label>
-                </div>
+
                 <button type="submit" className="action-button">
                   Grant Access
                 </button>
@@ -2795,8 +2769,6 @@ export default function App() {
       target_role: payload.portal_role,
       target_name: payload.full_name,
       target_student_id: payload.student_id || null,
-      target_salary_rate: Number(payload.salary_per_minute || 2.3),
-      target_show_card: !!payload.show_salary_card,
     });
 
     if (error) {
@@ -2990,8 +2962,11 @@ export default function App() {
 
     const { error: hifzError } = await supabase
       .from("hifz_details")
-      .update({ muhaffiz_name: teacher_name, group_name })
-      .eq("student_id", student_id);
+      .upsert({ 
+        student_id, 
+        muhaffiz_name: teacher_name, 
+        group_name 
+      }, { onConflict: 'student_id' });
 
     if (profileError || hifzError) {
       showAction("error", profileError?.message || hifzError?.message);
