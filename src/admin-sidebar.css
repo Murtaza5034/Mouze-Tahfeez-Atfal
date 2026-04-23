@@ -63,7 +63,7 @@
   height: 44px;
   background: var(--premium-white);
   border: 1px solid var(--glass-border);
-  color: var(--dark-gold);
+  color: #666;
   border-radius: 14px;
   display: flex;
   align-items: center;

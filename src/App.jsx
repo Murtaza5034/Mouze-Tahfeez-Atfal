@@ -411,6 +411,43 @@ function InfoHighlights({ items }) {
   );
 }
 
+function AttendanceCard({ count, total = 6 }) {
+  const percent = Math.min(100, Math.max(0, (count / total) * 100));
+  // Invert percent for inset (100% means empty, 0% means full)
+  const fillInset = 100 - percent;
+
+  return (
+    <div className="attendance-card-modern card-appear">
+      <div className="attendance-lighting" />
+      <div className="attendance-visual">
+        <svg className="attendance-number-svg" viewBox="0 0 100 100">
+          <text 
+            x="50" 
+            y="75" 
+            textAnchor="middle" 
+            className="attendance-number-text"
+          >
+            {count || 0}
+          </text>
+          <text 
+            x="50" 
+            y="75" 
+            textAnchor="middle" 
+            className="attendance-fill-text"
+            style={{ '--fill-percent': `${fillInset}%` }}
+          >
+            {count || 0}
+          </text>
+        </svg>
+      </div>
+      <div>
+        <h4 className="attendance-label-big">{count || 0} days out of {total}</h4>
+        <p className="attendance-sub-label">he or she come this week</p>
+      </div>
+    </div>
+  );
+}
+
 function TahfeezReportCard({ student, weeklyResult }) {
   const arabicStyle = { fontFamily: "'Amiri', serif" };
 
@@ -474,7 +511,6 @@ function TahfeezReportCard({ student, weeklyResult }) {
                 <h5>Target Till Istifadah</h5>
                 <p>Juz: {weeklyResult?.istifadah_juz || "-"}</p>
                 <p>Page: {weeklyResult?.istifadah_page || "-"}</p>
-                <p>Attendance: {weeklyResult?.attendance_count || "-"}</p>
              </div>
           </div>
 
@@ -482,6 +518,11 @@ function TahfeezReportCard({ student, weeklyResult }) {
              <div className="attendance-ribbon">{weeklyResult.attendance_note}</div>
           )}
        </div>
+
+       <AttendanceCard 
+         count={weeklyResult?.attendance_count} 
+         total={6} 
+       />
     </div>
   );
 }
@@ -651,9 +692,6 @@ function ParentPortal({
 
       {/* Top Header Bar */}
       <header className="parent-topbar">
-        <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
-          <Menu size={22} />
-        </button>
         <div className="parent-topbar-left">
           <img src="/logo.png" alt="Logo" className="topbar-logo" />
           <div>
@@ -661,6 +699,9 @@ function ParentPortal({
             <span className="topbar-sub">Parents Portal</span>
           </div>
         </div>
+        <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
+          <Menu size={22} />
+        </button>
       </header>
 
       {/* Main Content */}
@@ -1018,7 +1059,7 @@ function AdminPortal({
           })}
 
           <div className="sidebar-footer">
-            {getAssignedRoles(user).filter(r => r !== 'admin').map((role) => (
+            {getAssignedRoles(user).filter(r => r !== 'admin' && r !== 'parents').map((role) => (
               <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
                  <LogOut size={18} /> Switch to {role}
               </button>
@@ -1031,21 +1072,9 @@ function AdminPortal({
       </aside>
 
       <main className="admin-main">
-        <header className="topbar">
-          <button
-            type="button"
-            className="menu-button-mobile"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            <Menu size={22} />
-          </button>
+        <header className="topbar admin-topbar-dynamic">
           <div className="brand-block">
              <h2 className="page-title">{activePage}</h2>
-          </div>
-          <div className="header-actions">
-             <button className="role-chip" onClick={() => onRoleChange("parents")}>
-               Parents View
-             </button>
           </div>
         </header>
 
@@ -1853,7 +1882,7 @@ function TeacherPortal({
           ))}
           
           <div className="sidebar-footer">
-            {getAssignedRoles(user).filter(r => r !== 'teacher').map((role) => (
+            {getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents').map((role) => (
               <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
                  <LogOut size={18} /> Switch to {role}
               </button>

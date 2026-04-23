@@ -1581,3 +1581,85 @@ h1, h2, h3, h4, h5 {
   color: #d81b60;
   border: 1px solid rgba(216, 27, 96, 0.2);
 }
+/* --- Attendance Animation --- */
+.attendance-card-modern {
+  background: var(--premium-white);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 24px;
+  margin-top: 20px;
+  box-shadow: var(--shadow-premium);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.attendance-visual {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attendance-number-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.attendance-number-text {
+  font-size: 80px;
+  font-weight: 900;
+  fill: none;
+  stroke: #eee;
+  stroke-width: 2;
+  font-family: 'Inter', sans-serif;
+}
+
+.attendance-fill-text {
+  font-size: 80px;
+  font-weight: 900;
+  fill: var(--primary-gold);
+  clip-path: inset(var(--fill-percent) 0 0 0); /* Bottom up fill: inset(100% to 0%) */
+  transition: clip-path 2s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.6));
+}
+
+@keyframes gold-shimmer {
+  0% { stop-color: #c5a059; stop-opacity: 1; }
+  50% { stop-color: #f9f4e8; stop-opacity: 0.8; }
+  100% { stop-color: #c5a059; stop-opacity: 1; }
+}
+
+.attendance-lighting {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(197, 160, 89, 0.1) 0%, transparent 70%);
+  animation: pulse-light 2s infinite ease-in-out;
+}
+
+@keyframes pulse-light {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+.attendance-label-big {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--deep-brown);
+}
+
+.attendance-sub-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
