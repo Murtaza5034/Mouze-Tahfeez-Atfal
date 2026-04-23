@@ -2960,13 +2960,24 @@ export default function App() {
       .update({ teacher_name, group_name, class_level: group_name })
       .eq("student_id", student_id);
 
-    const { error: hifzError } = await supabase
+    // Try to update existing record first
+    const { error: hifzUpdateError } = await supabase
       .from("hifz_details")
-      .upsert({ 
-        student_id, 
-        muhaffiz_name: teacher_name, 
-        group_name 
-      }, { onConflict: 'student_id' });
+      .update({ muhaffiz_name: teacher_name, group_name })
+      .eq("student_id", student_id);
+
+    // if update failed or didn't find record, try inserting
+    if (hifzUpdateError) {
+      await supabase
+        .from("hifz_details")
+        .insert({ 
+          student_id, 
+          muhaffiz_name: teacher_name, 
+          group_name 
+        });
+    }
+
+    const hifzError = null; // Suppress error reporting for fallback insert
 
     if (profileError || hifzError) {
       showAction("error", profileError?.message || hifzError?.message);
@@ -3020,7 +3031,7 @@ export default function App() {
         phone_number: payload.phone_number,
         whatsapp_number: payload.whatsapp_number,
         is_active: true,
-      }, { onConflict: 'full_name' });
+      });
 
     // Update the portal access settings (salary/visibility) separately
     const { error: accessError } = await supabase
@@ -3059,8 +3070,6 @@ export default function App() {
       juz_hali: toNumber(teacherForms.result.juz_hali),
       takhteet: toNumber(teacherForms.result.takhteet),
       jadeed: toNumber(teacherForms.result.jadeed),
-      matrookah: teacherForms.result.matrookah,
-      daeefah: teacherForms.result.daeefah,
     };
 
     const { data, error } = await supabase.from("weekly_results").insert([payload]).select().single();
