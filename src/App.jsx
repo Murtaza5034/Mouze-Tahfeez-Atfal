@@ -990,7 +990,7 @@ function ParentPortal({
                 {teacherProfiles
                   .filter(t => studentProfile?.teacher_name && normalizeText(t.full_name) === normalizeText(studentProfile.teacher_name))
                   .map(teacher => {
-                    const waNumber = (teacher.whatsapp_number || "").replace(/\D/g, "");
+                    const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
                     return (
                       <article key={`pinned-${teacher.id}`} className="premium-card teacher-profile-card pinned">
                         <div className="pin-badge">
@@ -1032,7 +1032,8 @@ function ParentPortal({
                 {teacherProfiles
                   .filter(t => !studentProfile?.teacher_name || normalizeText(t.full_name) !== normalizeText(studentProfile.teacher_name))
                   .map((teacher) => {
-                    const waNumber = (teacher.whatsapp_number || "").replace(/\D/g, "");
+                    // Using a safer method than regex literal to avoid bundler issues
+                    const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
                     return (
                       <article 
                         key={teacher.id} 
