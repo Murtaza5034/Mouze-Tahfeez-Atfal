@@ -984,111 +984,83 @@ function ParentPortal({
             />
           </div>
         ) : null}
+
         {activePage === "Teachers" ? (
           <div className="card-appear">
             <div className="section-title-block">
                <p className="page-eyebrow">Our Professional Staff</p>
                <h2 className="page-title">Teacher Contacts</h2>
-               <p className="page-description">
-                 Direct contact options for your child's Muhaffiz and other school staff members.
-               </p>
             </div>
-
-              <div className="teacher-info-stack">
-                {/* Pin Assigned Teacher to Top */}
-                {teacherProfiles
-                  .filter(t => studentProfile?.teacher_name && normalizeText(t.full_name) === normalizeText(studentProfile.teacher_name))
-                  .map(teacher => {
-                    const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
-                    const photo = teacher.photo_url || "/logo.png";
-                    return (
-                      <article key={`pinned-${teacher.id}`} className="premium-card teacher-profile-card pinned">
-                        <div className="pin-badge">
-                          <Sparkles size={12} /> My Child's Muhaffiz
-                        </div>
-                        <div className="teacher-card-inner">
-                          <img 
-                            src={photo} 
-                            alt={teacher.full_name} 
-                            className="teacher-photo-square" 
-                          />
-                          <div className="teacher-details">
-                            <h3>{teacher.full_name}</h3>
-                            <p className="teacher-specialty">Assigned Muhaffiz</p>
-                            <div className="contact-actions">
-                              {teacher.phone_number && (
-                                <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                                   <Phone size={16} /> Call
-                                </a>
-                              )}
-                              {waNumber && (
-                                <a 
-                                  href={`https://wa.me/${waNumber}`} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className="contact-btn whatsapp"
-                                >
-                                   <MessageCircle size={16} /> WhatsApp
-                                </a>
-                              )}
-                            </div>
+            <div className="teacher-info-stack">
+              {teacherProfiles
+                .filter(t => studentProfile?.teacher_name && normalizeText(t.full_name) === normalizeText(studentProfile.teacher_name))
+                .map(teacher => {
+                  const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                  const photo = teacher.photo_url || ASSETS.LOGO;
+                  return (
+                    <article key={teacher.id} className="premium-card teacher-profile-card pinned">
+                      <div className="pin-badge">
+                        <Sparkles size={12} /> My Child's Muhaffiz
+                      </div>
+                      <div className="teacher-card-inner">
+                        <img src={photo} alt={teacher.full_name} className="teacher-photo-square" />
+                        <div className="teacher-details">
+                          <h3>{teacher.full_name}</h3>
+                          <p className="teacher-specialty">Assigned Muhaffiz</p>
+                          <div className="contact-actions">
+                            {teacher.phone_number && (
+                              <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
+                                <Phone size={16} /> Call
+                              </a>
+                            )}
+                            {waNumber && (
+                              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                                <MessageCircle size={16} /> WhatsApp
+                              </a>
+                            )}
                           </div>
                         </div>
-                      </article>
-                    );
-                  })}
+                      </div>
+                    </article>
+                  );
+                })}
 
-                {/* Show All Other Teachers */}
-                {teacherProfiles
-                  .filter(t => !studentProfile?.teacher_name || normalizeText(t.full_name) !== normalizeText(studentProfile.teacher_name))
-                  .map((teacher) => {
-                    const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
-                    const photo = teacher.photo_url || ASSETS.LOGO;
-                    return (
-                      <article 
-                        key={teacher.id} 
-                        className="premium-card teacher-profile-card"
-                      >
-                        <div className="teacher-card-inner">
-                          <img 
-                            src={photo} 
-                            alt={teacher.full_name} 
-                            className="teacher-photo-square" 
-                          />
-                          <div className="teacher-details">
-                            <h3>{teacher.full_name}</h3>
-                            <p className="teacher-specialty">Muhaffiz {UI_TEXT.PER_MAX} Tahfeez Instructor</p>
-                            
-                            <div className="contact-actions">
-                              {teacher.phone_number && (
-                                <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                                   <Phone size={16} /> Call
-                                </a>
-                              )}
-                              {waNumber && (
-                                <a 
-                                  href={`https://wa.me/${waNumber}`} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className="contact-btn whatsapp"
-                                >
-                                   <MessageCircle size={16} /> WhatsApp
-                                </a>
-                              )}
-                            </div>
+              {teacherProfiles
+                .filter(t => !studentProfile?.teacher_name || normalizeText(t.full_name) !== normalizeText(studentProfile.teacher_name))
+                .map((teacher) => {
+                  const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                  const photo = teacher.photo_url || ASSETS.LOGO;
+                  return (
+                    <article key={teacher.id} className="premium-card teacher-profile-card">
+                      <div className="teacher-card-inner">
+                        <img src={photo} alt={teacher.full_name} className="teacher-photo-square" />
+                        <div className="teacher-details">
+                          <h3>{teacher.full_name}</h3>
+                          <p className="teacher-specialty">Muhaffiz</p>
+                          <div className="contact-actions">
+                            {teacher.phone_number && (
+                              <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
+                                <Phone size={16} /> Call
+                              </a>
+                            )}
+                            {waNumber && (
+                              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                                <MessageCircle size={16} /> WhatsApp
+                              </a>
+                            )}
                           </div>
                         </div>
-                      </article>
-                    );
-                  })}
+                      </div>
+                    </article>
+                  );
+                })}
+            </div>
+            {teacherProfiles.length === 0 && (
+              <div className="empty-state premium-card">
+                  <Users size={48} opacity={0.2} />
+                  <p>No teacher information available at this moment.</p>
               </div>
-              {teacherProfiles.length === 0 && (
-                <div className="empty-state premium-card">
-                   <Users size={48} opacity={0.2} />
-                   <p>No teacher information available at this moment.</p>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         ) : null}
 
@@ -3172,10 +3144,18 @@ export default function App() {
 
     if (!student_id) return;
 
+    // Search for teacher user_id to store as muhaffiz_id
+    const teacherRecord = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(teacher_name));
+
     // We update multiple tables to ensure consistency across the app's lookups
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({ teacher_name, group_name, class_level: group_name })
+      .update({ 
+        teacher_name, 
+        group_name, 
+        class_level: group_name,
+        muhaffiz_id: teacherRecord?.user_id || null 
+      })
       .eq("student_id", student_id);
 
     // Try to update existing record first
