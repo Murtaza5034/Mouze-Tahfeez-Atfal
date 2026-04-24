@@ -1006,17 +1006,10 @@ function ParentPortal({
                       <h3>{teacher.full_name}</h3>
                       <p className="teacher-specialty">Muhaffiz / Tahfeez Instructor</p>
                       
-                      <div className="teacher-contact-meta">
-                         <div className="meta-item">
-                            <Clock size={14} /> 
-                            <span>Available: 8:00 AM - 2:00 PM</span>
-                         </div>
-                      </div>
-
                       <div className="contact-actions">
                         {teacher.phone_number && (
                           <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                             <Phone size={16} /> Call Now
+                             <Phone size={16} /> Call
                           </a>
                         )}
                         {teacher.whatsapp_number && (
@@ -1658,17 +1651,19 @@ function AdminPortal({
                       required
                     >
                       <option value="">-- Choose Teacher --</option>
-                      {(adminForms.assignChild?.group_name 
-                        ? portalAccessList.filter(a => 
-                            a.portal_role === "teacher" && 
-                            customGroups.some(g => g.group_name === adminForms.assignChild.group_name && normalizeText(g.teacher_name) === normalizeText(a.full_name))
-                          )
-                        : portalAccessList.filter(a => a.portal_role === "teacher")
-                      ).map(a => (
-                        <option key={a.full_name || a.email} value={a.full_name || a.email}>
-                          {a.full_name || a.email}
-                        </option>
-                      ))}
+                      {(() => {
+                        const selectedGroupName = adminForms.assignChild?.group_name;
+                        const groupTeacher = customGroups.find(g => g.group_name === selectedGroupName)?.teacher_name;
+                        
+                        // Filter teachers list: if a group is selected, prioritize/show only matching teachers
+                        const teachers = portalAccessList.filter(a => a.portal_role === "teacher");
+                        
+                        return teachers.map(a => (
+                          <option key={a.id} value={a.full_name || a.email}>
+                            {a.full_name || a.email} {groupTeacher && normalizeText(a.full_name) === normalizeText(groupTeacher) ? " (Assigned to this group)" : ""}
+                          </option>
+                        ));
+                      })()}
                     </select>
                   </label>
 
@@ -2772,8 +2767,8 @@ export default function App() {
       return teacherMatches || groupMatches;
     });
 
-    const baseStudents = matchedStudents.length > 0 ? matchedStudents : schoolData.students;
-    const filteredStudents = baseStudents;
+    // Strict filtering: If user is a teacher, they MUST only see their assigned students
+    const filteredStudents = matchedStudents;
 
     return {
       availableGroups,
