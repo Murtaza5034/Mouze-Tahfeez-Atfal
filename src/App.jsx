@@ -988,7 +988,7 @@ function ParentPortal({
               <div className="teacher-info-stack">
                 {/* Pin Assigned Teacher to Top */}
                 {teacherProfiles
-                  .filter(t => student?.teacherName && normalizeText(t.full_name) === normalizeText(student.teacherName))
+                  .filter(t => studentProfile?.teacher_name && normalizeText(t.full_name) === normalizeText(studentProfile.teacher_name))
                   .map(teacher => (
                     <article key={`pinned-${teacher.id}`} className="premium-card teacher-profile-card pinned">
                       <div className="pin-badge">
@@ -1011,7 +1011,7 @@ function ParentPortal({
                             )}
                             {teacher.whatsapp_number && (
                               <a 
-                                href={`https://wa.me/${teacher.whatsapp_number.replace(/[^\d]/g, '')}`} 
+                                href={`https://wa.me/${teacher.whatsapp_number.replace(/\D/g, "")}`} 
                                 target="_blank" 
                                 rel="noreferrer" 
                                 className="contact-btn whatsapp"
@@ -1027,7 +1027,7 @@ function ParentPortal({
 
                 {/* Show All Other Teachers */}
                 {teacherProfiles
-                  .filter(t => !student?.teacherName || normalizeText(t.full_name) !== normalizeText(student.teacherName))
+                  .filter(t => !studentProfile?.teacher_name || normalizeText(t.full_name) !== normalizeText(studentProfile.teacher_name))
                   .map((teacher) => (
                     <article 
                       key={teacher.id} 
@@ -1051,7 +1051,7 @@ function ParentPortal({
                             )}
                             {teacher.whatsapp_number && (
                               <a 
-                                href={`https://wa.me/${teacher.whatsapp_number.replace(/[^\d]/g, '')}`} 
+                                href={`https://wa.me/${teacher.whatsapp_number.replace(/\D/g, "")}`} 
                                 target="_blank" 
                                 rel="noreferrer" 
                                 className="contact-btn whatsapp"
@@ -1065,7 +1065,7 @@ function ParentPortal({
                     </article>
                   ))}
               </div>
-              {sortedTeachers.length === 0 && (
+              {teacherProfiles.length === 0 && (
                 <div className="empty-state premium-card">
                    <Users size={48} opacity={0.2} />
                    <p>No teacher information available at this moment.</p>
