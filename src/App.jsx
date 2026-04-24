@@ -1473,7 +1473,7 @@ function AdminPortal({
 
               <div className="teacher-attendance-grid">
                 {portalAccessList
-                  .filter(a => a.portal_role === "teacher" && a.show_salary_card === true)
+                  .filter(a => normalizeText(a.portal_role) === "teacher" && (a.show_salary_card === true || String(a.show_salary_card) === 'true'))
                   .map(teacher => {
                     const teacherGroups = customGroups.filter(g => normalizeText(g.teacher_name) === normalizeText(teacher.full_name));
                     return (
@@ -1653,14 +1653,22 @@ function AdminPortal({
                       <option value="">-- Choose Teacher --</option>
                       {(() => {
                         const selectedGroupName = adminForms.assignChild?.group_name;
-                        const groupTeacher = customGroups.find(g => g.group_name === selectedGroupName)?.teacher_name;
+                        const teachers = portalAccessList.filter(a => normalizeText(a.portal_role) === "teacher");
                         
-                        // Filter teachers list: if a group is selected, prioritize/show only matching teachers
-                        const teachers = portalAccessList.filter(a => a.portal_role === "teacher");
+                        if (selectedGroupName) {
+                          const groupInfo = customGroups.find(g => g.group_name === selectedGroupName);
+                          if (groupInfo) {
+                            return (
+                              <option value={groupInfo.teacher_name}>
+                                {groupInfo.teacher_name} (Group Muhaffiz)
+                              </option>
+                            );
+                          }
+                        }
                         
                         return teachers.map(a => (
                           <option key={a.id} value={a.full_name || a.email}>
-                            {a.full_name || a.email} {groupTeacher && normalizeText(a.full_name) === normalizeText(groupTeacher) ? " (Assigned to this group)" : ""}
+                            {a.full_name || a.email}
                           </option>
                         ));
                       })()}
