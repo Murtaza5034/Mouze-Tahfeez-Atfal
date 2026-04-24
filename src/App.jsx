@@ -3062,7 +3062,6 @@ export default function App() {
 
     const payload = {
       ...teacherForms.result,
-      total_score: totalScore,
       student_id: teacherForms.result.student_id,
       attendance_count: toNumber(teacherForms.result.attendance_count),
       total_jadeed_pages: toNumber(teacherForms.result.total_jadeed_pages),
