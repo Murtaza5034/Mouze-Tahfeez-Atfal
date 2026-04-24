@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap');
+
 :root {
   /* White, Brown, and Golden Professional Palette */
   --primary-gold: #c5a059;
@@ -1878,10 +1880,8 @@ h1, h2, h3, h4, h5 {
   }
 }
 
-@media (max-width: 600px) {
-  .attendance-stars-container {
-    gap: 4px;
-  }
+.kids-font {
+  font-family: 'Bubblegum Sans', cursive;
 }
 
 @media (max-width: 600px) {

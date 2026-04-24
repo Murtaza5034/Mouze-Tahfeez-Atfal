@@ -505,7 +505,7 @@ function AttendanceCard({ count, total = 6 }) {
         ))}
       </div>
       <div>
-        <h4 className="attendance-rating-text">
+        <h4 className="attendance-rating-text kids-font">
           {total} days out {count || 0}
         </h4>
         <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
@@ -524,7 +524,7 @@ function JadeedPagesCard({ count }) {
         <BookOpen size={80} className="jadeed-icon-bg" />
         <span className="jadeed-count-overlay">{count || 0}</span>
       </div>
-      <h4 className="attendance-rating-text" style={{ fontSize: '1.1rem' }}>
+      <h4 className="attendance-rating-text kids-font" style={{ fontSize: '1.1rem' }}>
         Total Jadeed Pages
       </h4>
       <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
@@ -548,23 +548,22 @@ function TahfeezReportCard({ student, weeklyResult }) {
                 <p>{student?.groupName || "Tahfeez Group"}</p>
              </div>
              <div className="report-badge">
-                <span className="arabic-kanz" style={{ fontSize: "18px", ...arabicStyle }}>تقرير التحفيظ</span>
-                <span>TAHFEEZ REPORT</span>
+                <span className="kids-font" style={{ fontSize: "20px" }}>TAHFEEZ REPORT 1447H</span>
              </div>
           </div>
 
           <div className="result-week-meta">
              <div className="week-meta-grid">
                 <div className="meta-col">
-                   <span className="meta-label">Week:</span>
+                   <span className="meta-label kids-font">Week:</span>
                    <span className="meta-val">{fatemi.week}</span>
                 </div>
                 <div className="meta-col">
-                   <span className="meta-label">Date:</span>
+                   <span className="meta-label kids-font">Date:</span>
                    <span className="meta-val">{fatemi.date}</span>
                 </div>
                 <div className="meta-col">
-                   <span className="meta-label">Month:</span>
+                   <span className="meta-label kids-font">Month:</span>
                    <span className="meta-val arabic-kanz" style={arabicStyle}>{fatemi.monthName}</span>
                 </div>
              </div>
@@ -572,7 +571,7 @@ function TahfeezReportCard({ student, weeklyResult }) {
 
           <div className="result-main">
              <div className="total-score-block">
-                <span className="score-title">WEEKLY SCORE</span>
+                <span className="score-title kids-font">WEEKLY SCORE</span>
                 <span className="jumla-label arabic-kanz" style={arabicStyle}>جملة</span>
                 <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
                 <span className="max-score">/ 100</span>
@@ -615,13 +614,13 @@ function TahfeezReportCard({ student, weeklyResult }) {
                 </div>
              </div>
              <div className="target-box">
-                <h5>Next Week Target</h5>
+                <h5 className="kids-font">Next Week Target</h5>
                 <p>Juz: {weeklyResult?.next_week_juz || "-"}</p>
                 <p>Page: {weeklyResult?.next_week_page || "-"}</p>
                 <p>Total Jadeed: {weeklyResult?.total_jadeed_pages || "0"}</p>
              </div>
              <div className="target-box highlight">
-                <h5>Target Till Istifadah</h5>
+                <h5 className="kids-font">Target Till Istifadah</h5>
                 <p>Juz: {weeklyResult?.istifadah_juz || "-"}</p>
                 <p>Page: {weeklyResult?.istifadah_page || "-"}</p>
              </div>
