@@ -414,37 +414,28 @@ function InfoHighlights({ items }) {
 }
 
 function AttendanceCard({ count, total = 6 }) {
-  const percent = Math.min(100, Math.max(0, (count / total) * 100));
-  // Invert percent for inset (100% means empty, 0% means full)
-  const fillInset = 100 - percent;
+  const stars = Array.from({ length: total }, (_, i) => i < Number(count || 0));
 
   return (
     <div className="attendance-card-modern card-appear">
       <div className="attendance-lighting" />
-      <div className="attendance-visual">
-        <svg className="attendance-number-svg" viewBox="0 0 100 100">
-          <text 
-            x="50" 
-            y="75" 
-            textAnchor="middle" 
-            className="attendance-number-text"
-          >
-            {count || 0}
-          </text>
-          <text 
-            x="50" 
-            y="75" 
-            textAnchor="middle" 
-            className="attendance-fill-text"
-            style={{ '--fill-percent': `${fillInset}%` }}
-          >
-            {count || 0}
-          </text>
-        </svg>
+      <div className="attendance-stars-container">
+        {stars.map((isFilled, i) => (
+          <Sparkles 
+            key={i} 
+            size={32} 
+            className={`attendance-star ${isFilled ? 'filled' : 'empty'}`}
+            style={{ animationDelay: `${i * 0.1}s` }}
+          />
+        ))}
       </div>
       <div>
-        <h4 className="attendance-label-big">{count || 0} days out of {total}</h4>
-        <p className="attendance-sub-label">he or she come this week</p>
+        <h4 className="attendance-rating-text">
+          {total} days out {count || 0}
+        </h4>
+        <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
+          Weekly student presence score
+        </p>
       </div>
     </div>
   );
