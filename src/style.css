@@ -1857,10 +1857,14 @@ h1, h2, h3, h4, h5 {
   text-shadow: 0 0 10px white;
 }
 
-@media (max-width: 600px) {
-  .report-footer-cards {
-    grid-template-columns: 1fr;
-  }
+/* --- Fatemi Selector --- */
+.fatemi-selector {
+  display: flex;
+  gap: 10px;
+}
+
+.fatemi-selector select {
+  flex: 1;
 }
 
 @media (max-width: 600px) {

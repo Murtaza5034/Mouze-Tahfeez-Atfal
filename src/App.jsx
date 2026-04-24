@@ -150,7 +150,7 @@ function toNumber(value) {
 const ARABIC_MONTHS = [
   "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر", 
   "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم", 
-  "رمضان المعظم", "شوال المكرم", "ذو القعدة", "ذو الحجة"
+  "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
 ];
 
 function getFatemiInfo(dateStr) {
@@ -447,6 +447,47 @@ function InfoHighlights({ items }) {
   );
 }
 
+function FatemiDateSelector({ value, onChange }) {
+  const info = useMemo(() => getFatemiInfo(value), [value]);
+  const years = [1445, 1446, 1447, 1448];
+  const days = Array.from({ length: 30 }, (_, i) => i + 1);
+
+  const handleSelectChange = (type, newVal) => {
+    const d = type === 'day' ? newVal : info.date;
+    const m = type === 'month' ? newVal : info.month;
+    const y = type === 'year' ? newVal : info.year;
+
+    const targetYear = parseInt(y);
+    const approxDate = new Date(targetYear - 579, m - 1, d); 
+    
+    for (let i = -15; i <= 15; i++) {
+      const testDate = new Date(approxDate);
+      testDate.setDate(testDate.getDate() + i);
+      const testInfo = getFatemiInfo(testDate.toISOString().split('T')[0]);
+      if (parseInt(testInfo.date) === parseInt(d) && parseInt(testInfo.month) === parseInt(m) && String(testInfo.year) === String(y)) {
+        onChange({ target: { name: 'week_date', value: testDate.toISOString().split('T')[0] } });
+        return;
+      }
+    }
+  };
+
+  return (
+    <div className="fatemi-selector">
+      <select value={info.date} onChange={(e) => handleSelectChange('day', e.target.value)}>
+        {days.map(d => <option key={d} value={d}>{d}</option>)}
+      </select>
+      <select value={info.month} onChange={(e) => handleSelectChange('month', e.target.value)}>
+        {ARABIC_MONTHS.map((name, i) => (
+          <option key={name} value={i + 1}>{name}</option>
+        ))}
+      </select>
+      <select value={info.year} onChange={(e) => handleSelectChange('year', e.target.value)}>
+        {years.map(y => <option key={y} value={y}>{y}</option>)}
+      </select>
+    </div>
+  );
+}
+
 function AttendanceCard({ count, total = 6 }) {
   const stars = Array.from({ length: total }, (_, i) => i < Number(count || 0));
 
@@ -532,7 +573,7 @@ function TahfeezReportCard({ student, weeklyResult }) {
           <div className="result-main">
              <div className="total-score-block">
                 <span className="score-title">WEEKLY SCORE</span>
-                <span className="jumla-label">Jumla</span>
+                <span className="jumla-label arabic-kanz" style={arabicStyle}>جملة</span>
                 <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
                 <span className="max-score">/ 100</span>
              </div>
@@ -2108,13 +2149,10 @@ function TeacherPortal({
                   </label>
 
                   <label>
-                    <span>Week Date</span>
-                    <input
-                      type="date"
-                      name="week_date"
+                    <span>Fatemi (Misri) Calendar Date</span>
+                    <FatemiDateSelector
                       value={teacherForms.result.week_date}
                       onChange={onTeacherFormChange}
-                      required
                     />
                   </label>
                 </div>
