@@ -475,6 +475,24 @@ function AttendanceCard({ count, total = 6 }) {
   );
 }
 
+function JadeedPagesCard({ count }) {
+  return (
+    <div className="jadeed-pages-card card-appear">
+      <div className="attendance-lighting" />
+      <div className="jadeed-icon-container">
+        <BookOpen size={80} className="jadeed-icon-bg" />
+        <span className="jadeed-count-overlay">{count || 0}</span>
+      </div>
+      <h4 className="attendance-rating-text" style={{ fontSize: '1.1rem' }}>
+        Total Jadeed Pages
+      </h4>
+      <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
+        New pages memorized this week
+      </p>
+    </div>
+  );
+}
+
 function TahfeezReportCard({ student, weeklyResult }) {
   const arabicStyle = { fontFamily: "'Amiri', serif" };
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
@@ -573,10 +591,15 @@ function TahfeezReportCard({ student, weeklyResult }) {
           )}
        </div>
 
-       <AttendanceCard 
-         count={weeklyResult?.attendance_count} 
-         total={6} 
-       />
+       <div className="report-footer-cards">
+         <AttendanceCard 
+           count={weeklyResult?.attendance_count} 
+           total={6} 
+         />
+         <JadeedPagesCard 
+           count={weeklyResult?.total_jadeed_pages} 
+         />
+       </div>
     </div>
   );
 }
