@@ -1869,6 +1869,79 @@ h1, h2, h3, h4, h5 {
   flex: 1;
 }
 
+/* --- Teacher Attendance Grid --- */
+.attendance-common-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px;
+  background: var(--light-gold);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.teacher-attendance-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teacher-attend-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.tcard-info strong {
+  display: block;
+  font-size: 1rem;
+  color: var(--deep-brown);
+}
+
+.tcard-info p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.tcard-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.attend-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.attend-btn.present {
+  background: #4caf50;
+  color: white;
+}
+
+.attend-btn.present:hover {
+  background: #43a047;
+  transform: translateY(-2px);
+}
+
+.attend-btn.absent {
+  background: #f44336;
+  color: white;
+}
+
+.attend-btn.absent:hover {
+  background: #e53935;
+  transform: translateY(-2px);
+}
+
 @media (max-width: 600px) {
   .week-meta-grid {
     gap: 12px;

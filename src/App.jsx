@@ -1455,81 +1455,74 @@ function AdminPortal({
                 <Clock size={18} />
                 <h3>Mark Teacher Attendance in Minutes</h3>
               </div>
-              <form className="stack-form" onSubmit={onRecordTeacherAttendance}>
-                <div className="form-grid">
-                  <label>
-                    <span>Teacher</span>
-                    <select
-                      name="teacher_name"
-                      value={adminForms.teacherAttendance.teacher_name}
-                      onChange={onAdminFormChange("teacherAttendance")}
-                      required
-                    >
-                      <option value="">Select teacher</option>
-                      {teacherSummaries.map((teacher) => (
-                        <option key={teacher.teacherName} value={teacher.teacherName}>
-                          {teacher.teacherName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    <span>Date</span>
-                    <input
-                      type="date"
-                      name="attendance_date"
-                      value={adminForms.teacherAttendance.attendance_date}
-                      onChange={onAdminFormChange("teacherAttendance")}
-                      required
-                    />
-                  </label>
-                </div>
-
-                <div className="form-grid">
-                  <label>
-                    <span>Minutes Present</span>
-                    <input
-                      type="number"
-                      min="0"
-                      name="minutes_present"
-                      value={adminForms.teacherAttendance.minutes_present}
-                      onChange={onAdminFormChange("teacherAttendance")}
-                      placeholder="240"
-                      required
-                    />
-                  </label>
-
-                  <label>
-                    <span>Status</span>
-                    <select
-                      name="status"
-                      value={adminForms.teacherAttendance.status}
-                      onChange={onAdminFormChange("teacherAttendance")}
-                    >
-                      <option value="Present">Present</option>
-                      <option value="Late">Late</option>
-                      <option value="Half Day">Half Day</option>
-                      <option value="Absent">Absent</option>
-                    </select>
-                  </label>
-                </div>
-
+              
+              <div className="attendance-common-inputs">
                 <label>
-                  <span>Note</span>
-                  <textarea
-                    name="note"
-                    value={adminForms.teacherAttendance.note}
+                  <span>Attendance Date</span>
+                  <input
+                    type="date"
+                    name="attendance_date"
+                    value={adminForms.teacherAttendance.attendance_date}
                     onChange={onAdminFormChange("teacherAttendance")}
-                    rows="3"
-                    placeholder="Optional notes about attendance or class coverage"
                   />
                 </label>
+                <label>
+                  <span>Default Minutes</span>
+                  <input
+                    type="number"
+                    name="minutes_present"
+                    value={adminForms.teacherAttendance.minutes_present}
+                    onChange={onAdminFormChange("teacherAttendance")}
+                    placeholder="240"
+                  />
+                </label>
+              </div>
 
-                <button type="submit" className="action-button">
-                  Save Attendance
-                </button>
-              </form>
+              <div className="teacher-attendance-grid">
+                {portalAccessList
+                  .filter(a => a.portal_role === "teacher" && a.show_salary_card === true)
+                  .map(teacher => {
+                    const teacherGroups = customGroups.filter(g => normalizeText(g.teacher_name) === normalizeText(teacher.full_name));
+                    return (
+                      <div key={teacher.id} className="teacher-attend-card">
+                        <div className="tcard-info">
+                          <strong>{teacher.full_name}</strong>
+                          <p>{teacherGroups.map(g => g.group_name).join(", ") || "No Group"}</p>
+                        </div>
+                        <div className="tcard-actions">
+                          <button 
+                            className="attend-btn present"
+                            onClick={() => onRecordTeacherAttendance(null, {
+                              teacher_name: teacher.full_name,
+                              attendance_date: adminForms.teacherAttendance.attendance_date,
+                              minutes_present: Number(adminForms.teacherAttendance.minutes_present || 240),
+                              status: 'Present',
+                              note: 'Quick Mark'
+                            })}
+                          >
+                            Present
+                          </button>
+                          <button 
+                            className="attend-btn absent"
+                            onClick={() => onRecordTeacherAttendance(null, {
+                              teacher_name: teacher.full_name,
+                              attendance_date: adminForms.teacherAttendance.attendance_date,
+                              minutes_present: 0,
+                              status: 'Absent',
+                              note: 'Quick Mark'
+                            })}
+                          >
+                            Absent
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+                {portalAccessList.filter(a => a.portal_role === "teacher" && a.show_salary_card === true).length === 0 && (
+                  <div className="empty-state">No teachers found with 'Show Salary Card' enabled.</div>
+                )}
+              </div>
             </section>
 
             <section className="data-card">
@@ -1665,8 +1658,16 @@ function AdminPortal({
                       required
                     >
                       <option value="">-- Choose Teacher --</option>
-                      {Array.from(new Set(portalAccessList.filter(a => a.portal_role === "teacher").map(a => a.full_name || a.email))).map(name => (
-                        <option key={name} value={name}>{name}</option>
+                      {(adminForms.assignChild?.group_name 
+                        ? portalAccessList.filter(a => 
+                            a.portal_role === "teacher" && 
+                            customGroups.some(g => g.group_name === adminForms.assignChild.group_name && normalizeText(g.teacher_name) === normalizeText(a.full_name))
+                          )
+                        : portalAccessList.filter(a => a.portal_role === "teacher")
+                      ).map(a => (
+                        <option key={a.full_name || a.email} value={a.full_name || a.email}>
+                          {a.full_name || a.email}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -3039,10 +3040,10 @@ export default function App() {
     sendPushNotification("Schedule Updated", `New task added: ${payload.task_name}`);
   };
 
-  const handleRecordTeacherAttendance = async (event) => {
-    event.preventDefault();
+  const handleRecordTeacherAttendance = async (event, quickRecord = null) => {
+    if (event && event.preventDefault) event.preventDefault();
 
-    const record = {
+    const record = quickRecord || {
       teacher_name: adminForms.teacherAttendance.teacher_name,
       attendance_date: adminForms.teacherAttendance.attendance_date,
       minutes_present: Number(adminForms.teacherAttendance.minutes_present || 0),
