@@ -991,6 +991,7 @@ function ParentPortal({
                   .filter(t => studentProfile?.teacher_name && normalizeText(t.full_name) === normalizeText(studentProfile.teacher_name))
                   .map(teacher => {
                     const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                    const photo = teacher.photo_url || "/logo.png";
                     return (
                       <article key={`pinned-${teacher.id}`} className="premium-card teacher-profile-card pinned">
                         <div className="pin-badge">
@@ -998,7 +999,7 @@ function ParentPortal({
                         </div>
                         <div className="teacher-card-inner">
                           <img 
-                            src={teacher.photo_url || "/logo.png"} 
+                            src={photo} 
                             alt={teacher.full_name} 
                             className="teacher-photo-square" 
                           />
@@ -1032,8 +1033,8 @@ function ParentPortal({
                 {teacherProfiles
                   .filter(t => !studentProfile?.teacher_name || normalizeText(t.full_name) !== normalizeText(studentProfile.teacher_name))
                   .map((teacher) => {
-                    // Using a safer method than regex literal to avoid bundler issues
                     const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                    const photo = teacher.photo_url || "/logo.png";
                     return (
                       <article 
                         key={teacher.id} 
@@ -1041,7 +1042,7 @@ function ParentPortal({
                       >
                         <div className="teacher-card-inner">
                           <img 
-                            src={teacher.photo_url || "/logo.png"} 
+                            src={photo} 
                             alt={teacher.full_name} 
                             className="teacher-photo-square" 
                           />
