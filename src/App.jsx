@@ -147,6 +147,40 @@ function toNumber(value) {
   return Number(value || 0);
 }
 
+const ARABIC_MONTHS = [
+  "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر", 
+  "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم", 
+  "رمضان المعظم", "شوال المكرم", "ذو القعدة", "ذو الحجة"
+];
+
+function getFatemiInfo(dateStr) {
+  if (!dateStr) return { week: "...", month: "...", date: "...", monthName: "..." };
+  
+  try {
+    const date = new Date(dateStr);
+    // Use tabular islamic calendar which matches Fatemi (Misri) calendar
+    const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric'
+    }).formatToParts(date);
+    
+    const d = parseInt(parts.find(p => p.type === 'day').value);
+    const m = parseInt(parts.find(p => p.type === 'month').value);
+    const y = parts.find(p => p.type === 'year').value;
+    
+    return {
+      week: Math.ceil(d / 7),
+      month: m,
+      date: d,
+      year: y,
+      monthName: ARABIC_MONTHS[m - 1] || "..."
+    };
+  } catch (e) {
+    return { week: "...", month: "...", date: "...", monthName: "..." };
+  }
+}
+
 async function findPortalAccess(userId) {
   const { data, error } = await supabase
     .from("user_portal_access")
@@ -443,6 +477,7 @@ function AttendanceCard({ count, total = 6 }) {
 
 function TahfeezReportCard({ student, weeklyResult }) {
   const arabicStyle = { fontFamily: "'Amiri', serif" };
+  const fatemi = getFatemiInfo(weeklyResult?.week_date);
 
   return (
     <div className="progress-overview">
@@ -460,9 +495,20 @@ function TahfeezReportCard({ student, weeklyResult }) {
           </div>
 
           <div className="result-week-meta">
-             <p>
-                {`Week: ${weeklyResult?.week_count || "..."} | Month: ${weeklyResult?.month_name_arabic || "..."}`}
-             </p>
+             <div className="week-meta-grid">
+                <div className="meta-col">
+                   <span className="meta-label">Week:</span>
+                   <span className="meta-val">{fatemi.week}</span>
+                </div>
+                <div className="meta-col">
+                   <span className="meta-label">Date:</span>
+                   <span className="meta-val">{fatemi.date}</span>
+                </div>
+                <div className="meta-col">
+                   <span className="meta-label">Month:</span>
+                   <span className="meta-val arabic-kanz" style={arabicStyle}>{fatemi.monthName}</span>
+                </div>
+             </div>
           </div>
 
           <div className="result-main">
