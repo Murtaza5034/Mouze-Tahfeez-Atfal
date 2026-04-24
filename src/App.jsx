@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
+  Send,
   Sparkles,
   Trophy,
   Trash,
@@ -65,6 +66,7 @@ const NAV_ICONS = {
   Overview: Layers3,
   Schedule: Calendar,
   Announcements: Bell,
+  Notifications: Send,
   Teachers: GraduationCap,
   Groups: Users,
   "Portal Access": ShieldCheck,
@@ -133,15 +135,29 @@ function Celebration() {
   );
 }
 
-const sendPushNotification = async (title, body) => {
+const sendPushNotification = async (title, body, redirectPath = null) => {
   if (!("Notification" in window)) return;
   
+  const showNotification = () => {
+    const notification = new Notification(title, { body, icon: "/logo.png" });
+    if (redirectPath) {
+      notification.onclick = () => {
+        window.focus();
+        if (redirectPath.startsWith("http")) {
+          window.open(redirectPath, "_blank");
+        } else {
+          window.location.hash = redirectPath;
+        }
+      };
+    }
+  };
+
   if (Notification.permission === "granted") {
-    new Notification(title, { body, icon: "/logo.png" });
+    showNotification();
   } else if (Notification.permission !== "denied") {
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
-      new Notification(title, { body, icon: "/logo.png" });
+      showNotification();
     }
   }
 };
@@ -167,7 +183,6 @@ function getFatemiInfo(dateStr) {
   
   try {
     const date = new Date(dateStr);
-    // Use tabular islamic calendar which matches Fatemi (Misri) calendar
     const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
       day: 'numeric',
       month: 'numeric',
@@ -681,7 +696,6 @@ function ParentPortal({
   const pageNames = ["Home", "Schedule", "Progress", "Announcements", "Teachers"];
   const assignedRoles = getAssignedRoles(user);
 
-  // Re-mapping "Progress" to "Child Summary"
   const navigationMap = {
     "Home": "Home",
     "Schedule": "Schedule",
@@ -782,10 +796,8 @@ function ParentPortal({
 
   return (
     <div className="parent-shell">
-      {/* Sidebar Overlay */}
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
 
-      {/* Slide-In Sidebar */}
       <aside className={`parent-drawer ${menuOpen ? 'open' : ''}`}>
         <div className="drawer-header">
           <img src={studentProfile?.photo_url || "/logo.png"} alt="Profile" className="drawer-avatar" />
@@ -816,7 +828,6 @@ function ParentPortal({
         </div>
       </aside>
 
-      {/* Top Header Bar */}
       <header className="parent-topbar">
         <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
           <Menu size={22} />
@@ -830,7 +841,6 @@ function ParentPortal({
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="parent-main">
         {showCelebration && <Celebration />}
 
@@ -865,7 +875,6 @@ function ParentPortal({
 
         {activePage === "Home" ? (
           <div className="home-dashboard">
-            {/* ---- Parent Stats Strip ---- */}
             <div className="hifz-stats-premium-strip">
               {[
                 { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
@@ -1067,7 +1076,6 @@ function ParentPortal({
         {currentPage?.highlights && activePage === "Profile" && <InfoHighlights items={currentPage.highlights} />}
       </main>
 
-      {/* Bottom Tab Bar - 4 main pages */}
       <nav className="parent-bottom-nav">
         {bottomPages.map(({ key, label, icon: Icon }) => (
           <button
@@ -1108,10 +1116,11 @@ function AdminPortal({
   setAdminTeacherFilter,
   onDeleteRecord,
   onUpdateTeacherProfile,
+  onSendCustomNotification,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
 
-  const sidebarLinks = ["Staff Profiles", "Groups", "Portal Access"];
+  const sidebarLinks = ["Staff Profiles", "Groups", "Portal Access", "Notifications"];
   const navPages = ["Overview", "Announcements", "Schedule", "Teachers"];
 
   const selectedStudent =
@@ -1288,6 +1297,23 @@ function AdminPortal({
               ) : (
                 <div className="empty-state">No student records found yet.</div>
               )}
+            </section>
+          </div>
+        ) : null}
+
+        {activePage === "Notifications" ? (
+          <div className="management-grid">
+            <section className="form-card">
+              <div className="card-headline">
+                <Send size={18} />
+                <h3>Push Notification</h3>
+              </div>
+              <form className="stack-form" onSubmit={onSendCustomNotification}>
+                <label><span>Title</span><input type="text" name="title" value={adminForms.customNotification.title} onChange={onAdminFormChange("customNotification")} required /></label>
+                <label><span>Body</span><textarea name="body" value={adminForms.customNotification.body} onChange={onAdminFormChange("customNotification")} required /></label>
+                <label><span>Redirect Page</span><input type="text" name="redirect_page" value={adminForms.customNotification.redirect_page} onChange={onAdminFormChange("customNotification")} /></label>
+                <button type="submit" className="action-button">Send Notification</button>
+              </form>
             </section>
           </div>
         ) : null}
@@ -2072,11 +2098,8 @@ function TeacherPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
-        {/* Group filter removed as requested - showing only assigned students */}
-
         {activePage === "My Group" ? (
           <div className="portal-content">
-            {/* ---- Teacher Stats Strip ---- */}
             <div className="portal-stats-strip teacher-stats">
               <div className="pstat-card">
                 <span className="pstat-value">{filteredStudents.length}</span>
@@ -2479,6 +2502,13 @@ export default function App() {
       type: "Update",
       event_date: getToday(),
     },
+    customNotification: {
+      title: "",
+      body: "",
+      target_audience: "all",
+      target_uuid: "",
+      redirect_page: "Home"
+    },
     schedule: {
       student_id: "",
       task_time: "08:00",
@@ -2552,14 +2582,6 @@ export default function App() {
       document.head.removeChild(link);
     };
   }, []);
-
-  useEffect(() => {
-    // No-op - removed local storage sync
-  }, [teacherAttendance]);
-
-  useEffect(() => {
-    // No-op - removed local storage sync
-  }, [customGroups]);
 
   useEffect(() => {
     setActivePage(DEFAULT_PAGE_BY_ROLE[portalRole] || DEFAULT_PAGE_BY_ROLE.parents);
@@ -2805,7 +2827,6 @@ export default function App() {
       return teacherMatches || groupMatches;
     });
 
-    // Strict filtering: If user is a teacher, they MUST only see their assigned students
     const filteredStudents = matchedStudents;
 
     return {
@@ -2885,7 +2906,6 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    // Clear state immediately for instant UI feedback
     setUser(null);
     setPortalAccess(emptyPortalAccess);
     setParentData(emptyParentData);
@@ -2898,7 +2918,6 @@ export default function App() {
     });
     showAction(null, null);
 
-    // Call backend signOut in parallel or afterward
     await supabase.auth.signOut();
   };
 
@@ -2957,13 +2976,11 @@ export default function App() {
       },
     }));
 
-    // If student or date changes, load existing or create placeholder
     if (name === "student_id" || name === "week_date") {
       const studentId = name === "student_id" ? value : teacherForms.result.student_id;
       const weekDate = name === "week_date" ? value : teacherForms.result.week_date;
 
       if (studentId && weekDate) {
-        // Try to find existing
         const existing = schoolData.weeklyResults.find(r => 
           String(r.student_id) === String(studentId) && r.week_date === weekDate
         );
@@ -2974,7 +2991,6 @@ export default function App() {
             result: { ...curr.result, ...existing, student_id: studentId, week_date: weekDate }
           }));
         } else {
-          // Auto-insert placeholder row if requested
           const { data, error } = await supabase
             .from("weekly_results")
             .upsert({ 
@@ -2993,7 +3009,6 @@ export default function App() {
               ...curr,
               result: { ...curr.result, ...data, student_id: studentId, week_date: weekDate }
             }));
-            // Refresh local data so it shows in other lists
             setSchoolData(prev => ({
               ...prev,
               weeklyResults: [data, ...prev.weeklyResults]
@@ -3004,18 +3019,24 @@ export default function App() {
     }
   };
 
-  const handleTeacherGroupFilterChange = (event) => {
-    setTeacherGroupFilter(event.target.value);
+  const handleSendCustomNotification = async (event) => {
+    event.preventDefault();
+    const payload = adminForms.customNotification;
+
+    let notifTitle = `[${payload.target_audience.toUpperCase()}] ${payload.title}`;
+    sendPushNotification(notifTitle, payload.body, payload.redirect_page);
+    showAction("success", "Custom Notification Sent!");
+
+    setAdminForms((current) => ({
+      ...current,
+      customNotification: { title: "", body: "", target_audience: "all", target_uuid: "", redirect_page: "Home" },
+    }));
   };
 
   const handleCreateAnnouncement = async (event) => {
     event.preventDefault();
 
-    const payload = {
-      title: adminForms.announcement.title,
-      type: adminForms.announcement.type,
-      event_date: adminForms.announcement.event_date,
-    };
+    const payload = adminForms.announcement;
 
     const { data, error } = await supabase.from("events").insert([payload]).select().single();
 
@@ -3030,12 +3051,7 @@ export default function App() {
     }));
     setAdminForms((current) => ({
       ...current,
-      announcement: {
-        ...current.announcement,
-        title: "",
-        type: "Update",
-        event_date: getToday(),
-      },
+      announcement: { title: "", type: "Update", event_date: getToday() },
     }));
     showAction("success", "Announcement created successfully.");
     sendPushNotification("New Update!", payload.title);
@@ -3125,6 +3141,13 @@ export default function App() {
         group_name: "",
         teacher_name: "",
       },
+      customNotification: {
+        title: "",
+        body: "",
+        target_audience: "all",
+        target_uuid: "",
+        redirect_page: "Home"
+      }
     }));
     showAction("success", "Group added successfully.");
   };
@@ -3373,6 +3396,7 @@ export default function App() {
         setAdminTeacherFilter={setAdminTeacherFilter}
         onDeleteRecord={handleDeleteRecord}
         onUpdateTeacherProfile={handleUpdateTeacherProfile}
+        onSendCustomNotification={handleSendCustomNotification}
       />
     );
   }
