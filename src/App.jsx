@@ -35,6 +35,15 @@ const ROLE_LABELS = {
   teacher: "Teacher",
 };
 
+const ASSETS = {
+  LOGO: "/logo.png",
+};
+
+const UI_TEXT = {
+  PER_MAX: " / ",
+  OF_TOTAL: " out of ",
+};
+
 const DEFAULT_PAGE_BY_ROLE = {
   parents: "Home",
   admin: "Overview",
@@ -574,7 +583,7 @@ function TahfeezReportCard({ student, weeklyResult }) {
                 <span className="score-title kids-font">WEEKLY SCORE</span>
                 <span className="jumla-label arabic-kanz" style={arabicStyle}>جملة</span>
                 <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
-                <span className="max-score">/ 100</span>
+                <span className="max-score">{UI_TEXT.PER_MAX} 100</span>
              </div>
 
              <div className="score-details-box">
@@ -586,7 +595,7 @@ function TahfeezReportCard({ student, weeklyResult }) {
                 ].map((item) => (
                   <div key={item.label} className="score-row">
                     <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label}</span>
-                    <span className="score-val">{`${item.val || "0"} / ${item.max}`}</span>
+                    <span className="score-val">{item.val || "0"}{UI_TEXT.PER_MAX}{item.max}</span>
                   </div>
                 ))}
              </div>
@@ -1034,7 +1043,7 @@ function ParentPortal({
                   .filter(t => !studentProfile?.teacher_name || normalizeText(t.full_name) !== normalizeText(studentProfile.teacher_name))
                   .map((teacher) => {
                     const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
-                    const photo = teacher.photo_url || "/logo.png";
+                    const photo = teacher.photo_url || ASSETS.LOGO;
                     return (
                       <article 
                         key={teacher.id} 
@@ -1048,7 +1057,7 @@ function ParentPortal({
                           />
                           <div className="teacher-details">
                             <h3>{teacher.full_name}</h3>
-                            <p className="teacher-specialty">Muhaffiz / Tahfeez Instructor</p>
+                            <p className="teacher-specialty">Muhaffiz {UI_TEXT.PER_MAX} Tahfeez Instructor</p>
                             
                             <div className="contact-actions">
                               {teacher.phone_number && (
