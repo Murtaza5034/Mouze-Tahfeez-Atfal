@@ -1865,6 +1865,18 @@ function TeacherPortal({
       (student) => String(student.student_id) === String(teacherForms.result.student_id)
     ) || filteredStudents[0] || null;
 
+  const liveResult = useMemo(() => {
+    if (!selectedStudent) return null;
+    const form = teacherForms.result;
+    const total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(form[f]), 0);
+    
+    return {
+      ...selectedStudent.latestResult,
+      ...form,
+      total_score
+    };
+  }, [selectedStudent, teacherForms.result]);
+
   return (
     <div className="admin-shell">
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
@@ -2255,9 +2267,9 @@ function TeacherPortal({
                       </p>
                     </div>
                   </div>
-                  <TahfeezReportCard
+                   <TahfeezReportCard
                     student={selectedStudent}
-                    weeklyResult={selectedStudent.latestResult}
+                    weeklyResult={liveResult}
                   />
                 </>
               ) : (
@@ -2803,8 +2815,9 @@ export default function App() {
     }));
   };
 
-  const handleTeacherFormChange = (event) => {
+  const handleTeacherFormChange = async (event) => {
     const { name, value } = event.target;
+    
     setTeacherForms((current) => ({
       ...current,
       result: {
@@ -2812,6 +2825,52 @@ export default function App() {
         [name]: value,
       },
     }));
+
+    // If student or date changes, load existing or create placeholder
+    if (name === "student_id" || name === "week_date") {
+      const studentId = name === "student_id" ? value : teacherForms.result.student_id;
+      const weekDate = name === "week_date" ? value : teacherForms.result.week_date;
+
+      if (studentId && weekDate) {
+        // Try to find existing
+        const existing = schoolData.weeklyResults.find(r => 
+          String(r.student_id) === String(studentId) && r.week_date === weekDate
+        );
+
+        if (existing) {
+          setTeacherForms(curr => ({
+            ...curr,
+            result: { ...curr.result, ...existing, student_id: studentId, week_date: weekDate }
+          }));
+        } else {
+          // Auto-insert placeholder row if requested
+          const { data, error } = await supabase
+            .from("weekly_results")
+            .upsert({ 
+              student_id: studentId, 
+              week_date: weekDate,
+              murajazah: 0,
+              juz_hali: 0,
+              takhteet: 0,
+              jadeed: 0
+            }, { onConflict: 'student_id,week_date' })
+            .select()
+            .maybeSingle();
+
+          if (data) {
+             setTeacherForms(curr => ({
+              ...curr,
+              result: { ...curr.result, ...data, student_id: studentId, week_date: weekDate }
+            }));
+            // Refresh local data so it shows in other lists
+            setSchoolData(prev => ({
+              ...prev,
+              weeklyResults: [data, ...prev.weeklyResults]
+            }));
+          }
+        }
+      }
+    }
   };
 
   const handleTeacherGroupFilterChange = (event) => {
