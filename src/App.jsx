@@ -3198,6 +3198,7 @@ export default function App() {
     }));
 
     showAction("success", "Child assigned to muhaffiz successfully.");
+    sendPushNotification("Assignment Updated", `Student has been assigned to ${teacher_name} in group ${group_name}.`);
   };
 
   const handleDeleteRecord = (table, idField = "id") => async (id) => {
@@ -3314,6 +3315,7 @@ export default function App() {
       },
     }));
     showAction("success", "Tahfeez report saved successfully.");
+    sendPushNotification("Tahfeez Report Submitted", "A new progress report has been saved for the student.");
   };
 
   if (!user && !loading) {
