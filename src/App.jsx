@@ -989,81 +989,87 @@ function ParentPortal({
                 {/* Pin Assigned Teacher to Top */}
                 {teacherProfiles
                   .filter(t => studentProfile?.teacher_name && normalizeText(t.full_name) === normalizeText(studentProfile.teacher_name))
-                  .map(teacher => (
-                    <article key={`pinned-${teacher.id}`} className="premium-card teacher-profile-card pinned">
-                      <div className="pin-badge">
-                        <Sparkles size={12} /> My Child's Muhaffiz
-                      </div>
-                      <div className="teacher-card-inner">
-                        <img 
-                          src={teacher.photo_url || "/logo.png"} 
-                          alt={teacher.full_name} 
-                          className="teacher-photo-square" 
-                        />
-                        <div className="teacher-details">
-                          <h3>{teacher.full_name}</h3>
-                          <p className="teacher-specialty">Assigned Muhaffiz</p>
-                          <div className="contact-actions">
-                            {teacher.phone_number && (
-                              <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                                 <Phone size={16} /> Call
-                              </a>
-                            )}
-                            {teacher.whatsapp_number && (
-                              <a 
-                                href={`https://wa.me/${teacher.whatsapp_number.replace(/\D/g, "")}`} 
-                                target="_blank" 
-                                rel="noreferrer" 
-                                className="contact-btn whatsapp"
-                              >
-                                 <MessageCircle size={16} /> WhatsApp
-                              </a>
-                            )}
+                  .map(teacher => {
+                    const waNumber = (teacher.whatsapp_number || "").replace(/\D/g, "");
+                    return (
+                      <article key={`pinned-${teacher.id}`} className="premium-card teacher-profile-card pinned">
+                        <div className="pin-badge">
+                          <Sparkles size={12} /> My Child's Muhaffiz
+                        </div>
+                        <div className="teacher-card-inner">
+                          <img 
+                            src={teacher.photo_url || "/logo.png"} 
+                            alt={teacher.full_name} 
+                            className="teacher-photo-square" 
+                          />
+                          <div className="teacher-details">
+                            <h3>{teacher.full_name}</h3>
+                            <p className="teacher-specialty">Assigned Muhaffiz</p>
+                            <div className="contact-actions">
+                              {teacher.phone_number && (
+                                <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
+                                   <Phone size={16} /> Call
+                                </a>
+                              )}
+                              {waNumber && (
+                                <a 
+                                  href={`https://wa.me/${waNumber}`} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="contact-btn whatsapp"
+                                >
+                                   <MessageCircle size={16} /> WhatsApp
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
 
                 {/* Show All Other Teachers */}
                 {teacherProfiles
                   .filter(t => !studentProfile?.teacher_name || normalizeText(t.full_name) !== normalizeText(studentProfile.teacher_name))
-                  .map((teacher) => (
-                    <article 
-                      key={teacher.id} 
-                      className="premium-card teacher-profile-card"
-                    >
-                      <div className="teacher-card-inner">
-                        <img 
-                          src={teacher.photo_url || "/logo.png"} 
-                          alt={teacher.full_name} 
-                          className="teacher-photo-square" 
-                        />
-                        <div className="teacher-details">
-                          <h3>{teacher.full_name}</h3>
-                          <p className="teacher-specialty">Muhaffiz / Tahfeez Instructor</p>
-                          
-                          <div className="contact-actions">
-                            {teacher.phone_number && (
-                              <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                                 <Phone size={16} /> Call
-                              </a>
-                            )}
-                            {teacher.whatsapp_number && (
-                              <a 
-                                href={`https://wa.me/${teacher.whatsapp_number.replace(/\D/g, "")}`} 
-                                target="_blank" 
-                                rel="noreferrer" 
-                                className="contact-btn whatsapp"
-                              >
-                                 <MessageCircle size={16} /> WhatsApp
-                              </a>
-                            )}
+                  .map((teacher) => {
+                    const waNumber = (teacher.whatsapp_number || "").replace(/\D/g, "");
+                    return (
+                      <article 
+                        key={teacher.id} 
+                        className="premium-card teacher-profile-card"
+                      >
+                        <div className="teacher-card-inner">
+                          <img 
+                            src={teacher.photo_url || "/logo.png"} 
+                            alt={teacher.full_name} 
+                            className="teacher-photo-square" 
+                          />
+                          <div className="teacher-details">
+                            <h3>{teacher.full_name}</h3>
+                            <p className="teacher-specialty">Muhaffiz / Tahfeez Instructor</p>
+                            
+                            <div className="contact-actions">
+                              {teacher.phone_number && (
+                                <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
+                                   <Phone size={16} /> Call
+                                </a>
+                              )}
+                              {waNumber && (
+                                <a 
+                                  href={`https://wa.me/${waNumber}`} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="contact-btn whatsapp"
+                                >
+                                   <MessageCircle size={16} /> WhatsApp
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
               </div>
               {teacherProfiles.length === 0 && (
                 <div className="empty-state premium-card">
