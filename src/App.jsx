@@ -1189,6 +1189,7 @@ function AdminPortal({
   onDeleteRecord,
   onUpdateTeacherProfile,
   onSendCustomNotification,
+  notifications,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
 
@@ -1381,10 +1382,72 @@ function AdminPortal({
                 <h3>Push Notification</h3>
               </div>
               <form className="stack-form" onSubmit={onSendCustomNotification}>
-                <label><span>Title</span><input type="text" name="title" value={adminForms.customNotification.title} onChange={onAdminFormChange("customNotification")} required /></label>
-                <label><span>Body</span><textarea name="body" value={adminForms.customNotification.body} onChange={onAdminFormChange("customNotification")} required /></label>
-                <label><span>Redirect Page</span><input type="text" name="redirect_page" value={adminForms.customNotification.redirect_page} onChange={onAdminFormChange("customNotification")} /></label>
-                <button type="submit" className="action-button">Send Notification</button>
+                <div className="form-grid">
+                  <label>
+                    <span>Target Portal</span>
+                    <select 
+                      name="target_audience" 
+                      value={adminForms.customNotification.target_audience} 
+                      onChange={onAdminFormChange("customNotification")}
+                    >
+                      <option value="all">Broadcast to All</option>
+                      <option value="parents">Parents Portal Only</option>
+                      <option value="teacher">Teachers Portal Only</option>
+                      <option value="user">Specific User (Direct)</option>
+                    </select>
+                  </label>
+                  {adminForms.customNotification.target_audience === "user" && (
+                    <label>
+                      <span>User UUID</span>
+                      <input 
+                        type="text" 
+                        name="target_uuid" 
+                        value={adminForms.customNotification.target_uuid || ""} 
+                        onChange={onAdminFormChange("customNotification")} 
+                        placeholder="e.g. 550e8400-e29b-..." 
+                        required 
+                      />
+                    </label>
+                  )}
+                </div>
+                <label>
+                  <span>Notification Title</span>
+                  <input 
+                    type="text" 
+                    name="title" 
+                    value={adminForms.customNotification.title} 
+                    onChange={onAdminFormChange("customNotification")} 
+                    placeholder="Important Update"
+                    required 
+                  />
+                </label>
+                <label>
+                  <span>Message Body</span>
+                  <textarea 
+                    name="body" 
+                    value={adminForms.customNotification.body} 
+                    onChange={onAdminFormChange("customNotification")} 
+                    placeholder="Enter your message here..."
+                    required 
+                  />
+                </label>
+                <label>
+                  <span>Redirect Page</span>
+                  <select 
+                    name="redirect_page" 
+                    value={adminForms.customNotification.redirect_page} 
+                    onChange={onAdminFormChange("customNotification")}
+                  >
+                    <option value="Home">Home</option>
+                    <option value="Announcements">Announcements</option>
+                    <option value="Schedule">Schedule</option>
+                    <option value="Overview">Performance/Overview</option>
+                    <option value="Profile">Profile</option>
+                  </select>
+                </label>
+                <button type="submit" className="action-button">
+                  <Send size={18} /> Dispatch Notification
+                </button>
               </form>
             </section>
           </div>
@@ -3540,7 +3603,8 @@ export default function App() {
         {enablerUI}
         <AdminPortal
           activePage={activePage}
-        actionMessage={actionMessage}
+          actionMessage={actionMessage}
+          notifications={notificationsList}
         adminData={{
           ...schoolData,
           customGroups,
@@ -3578,6 +3642,7 @@ export default function App() {
       <TeacherPortal
         actionMessage={actionMessage}
         activePage={activePage}
+        notifications={notificationsList}
         menuOpen={menuOpen}
         onLogout={handleLogout}
         onRoleChange={storeRole}
