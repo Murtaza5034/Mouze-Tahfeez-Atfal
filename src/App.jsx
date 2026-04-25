@@ -21,6 +21,7 @@ import {
   Users,
   Phone,
   MessageCircle,
+  ArrowRight,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
@@ -173,37 +174,61 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
   await supabase.from("system_notifications").insert([dbPayload]);
 };
 
-function NotificationEnabler({ permission, onRequest, onOpenPanel }) {
+function NotificationEnabler({ permission, onRequest }) {
+  if (permission === "granted" || permission === "denied") return null;
   return (
     <div style={{ display: "flex", gap: "10px", alignItems: "center", marginLeft: "auto", marginRight: "12px" }}>
-      {(permission !== "granted" && permission !== "denied") && (
-        <button onClick={onRequest} className="notification-enabler-btn">
-          Enable Alerts
-        </button>
-      )}
-      <button onClick={onOpenPanel} className="notification-bell-btn">
-        <Bell size={18} />
+      <button onClick={onRequest} className="notification-enabler-btn">
+        Enable Alerts
       </button>
     </div>
   );
 }
 
-function NotificationsPanel({ notifications, onClose }) {
+function AnnouncementsPage({ notifications, setActivePage }) {
+  const images = [
+    "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=400&q=80",
+    "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=400&q=80",
+    "https://images.unsplash.com/photo-1577563908411-50cb98976ffe?auto=format&fit=crop&w=400&q=80"
+  ];
+
   return (
-    <div className="notifications-panel-overlay" onClick={onClose}>
-      <div className="notifications-panel" onClick={e => e.stopPropagation()}>
-         <h3>Recent Notifications</h3>
-         {notifications.length === 0 ? (
-           <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No notifications found.</p>
-         ) : (
-           notifications.map(n => (
-             <div key={n.id} className="notification-item">
-               <h4>{n.title}</h4>
-               <p>{n.body}</p>
-               <span className="time">{new Date(n.created_at).toLocaleString()}</span>
-             </div>
-           ))
-         )}
+    <div className="announcements-page fade-in">
+      <div className="page-header" style={{ marginBottom: 0 }}>
+        <div>
+          <h2 className="premium-title">System Announcements</h2>
+          <p className="subtitle">Important updates and notifications from the administration</p>
+        </div>
+      </div>
+      <div className="announcements-grid">
+        {notifications.length === 0 ? (
+          <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
+            <Bell size={48} style={{ opacity: 0.2 }} />
+            <p>No new announcements</p>
+          </div>
+        ) : (
+          notifications.map((n, i) => (
+            <div key={n.id} className="announce-card">
+              <img src={images[i % images.length]} alt="Announcement" className="announce-img" />
+              <div className="announce-content">
+                <div className="announce-badge">{n.target_role === 'all' ? 'Broadcast' : 'Targeted'}</div>
+                <h4>{n.title}</h4>
+                <p>{n.body}</p>
+                <div className="announce-footer">
+                  <span className="announce-time">{new Date(n.created_at).toLocaleDateString()}</span>
+                  <button className="announce-btn" onClick={() => {
+                     if (n.redirect_page) {
+                       window.location.hash = n.redirect_page;
+                       setActivePage(n.redirect_page);
+                     }
+                  }}>
+                    Open <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -3015,7 +3040,6 @@ export default function App() {
   };
 
   const [notificationsList, setNotificationsList] = useState([]);
-  const [showNotifPanel, setShowNotifPanel] = useState(false);
   const latestNotifIdRef = useRef(null);
 
   useEffect(() => {
@@ -3485,12 +3509,8 @@ export default function App() {
         <NotificationEnabler 
           permission={notificationPermission} 
           onRequest={requestNotificationPermission} 
-          onOpenPanel={() => setShowNotifPanel(true)}
         />
       </div>
-      {showNotifPanel && (
-        <NotificationsPanel notifications={notificationsList} onClose={() => setShowNotifPanel(false)} />
-      )}
     </React.Fragment>
   );
 
