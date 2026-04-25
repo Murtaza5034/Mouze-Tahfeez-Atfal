@@ -162,6 +162,17 @@ const sendPushNotification = async (title, body, redirectPath = null) => {
   }
 };
 
+const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home") => {
+  const dbPayload = {
+    title,
+    body,
+    target_role: targetRole,
+    target_user: targetUser,
+    redirect_page: redirectPage
+  };
+  await supabase.from("system_notifications").insert([dbPayload]);
+};
+
 function NotificationEnabler({ permission, onRequest }) {
   if (permission === "granted" || permission === "denied") return null;
   return (
@@ -2963,7 +2974,7 @@ export default function App() {
       portalAccess: { email: "", full_name: "", portal_role: "parents" },
     }));
     showAction("success", "Portal access granted successfully.");
-    sendPushNotification("Access Granted", `Welcome ${payload.full_name}!`);
+    broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, payload.email);
   };
 
   useEffect(() => {
@@ -3083,10 +3094,7 @@ export default function App() {
        notifTitle = `[Direct] ${payload.title}`;
     }
 
-    // 1. Send locally to sender
-    sendPushNotification(notifTitle, payload.body, payload.redirect_page);
-    
-    // 2. Save to DB for cross-device pushing
+    // Save to DB for cross-device pushing
     const dbPayload = {
       title: notifTitle,
       body: payload.body,
@@ -3125,7 +3133,7 @@ export default function App() {
       announcement: { title: "", type: "Update", event_date: getToday() },
     }));
     showAction("success", "Announcement created successfully.");
-    sendPushNotification("New Update!", payload.title);
+    broadcastNotification("New Update!", payload.title, "all", null, "Announcements");
   };
 
   const handleCreateSchedule = async (event) => {
@@ -3157,7 +3165,7 @@ export default function App() {
       },
     }));
     showAction("success", "Schedule created successfully.");
-    sendPushNotification("Schedule Updated", `New task added: ${payload.task_name}`);
+    broadcastNotification("Schedule Updated", `New task added: ${payload.task_name}`, "parents", null, "Schedule");
   };
 
   const handleRecordTeacherAttendance = async (event, quickRecord = null) => {
@@ -3292,7 +3300,7 @@ export default function App() {
     }));
 
     showAction("success", "Child assigned to muhaffiz successfully.");
-    sendPushNotification("Assignment Updated", `Student has been assigned to ${teacher_name} in group ${group_name}.`);
+    broadcastNotification("Assignment Updated", `Student has been assigned to ${teacher_name} in group ${group_name}.`, "parents", null, "Teachers");
   };
 
   const handleDeleteRecord = (table, idField = "id") => async (id) => {
@@ -3409,7 +3417,7 @@ export default function App() {
       },
     }));
     showAction("success", "Tahfeez report saved successfully.");
-    sendPushNotification("Tahfeez Report Submitted", "A new progress report has been saved for the student.");
+    broadcastNotification("Tahfeez Report Submitted", "A new progress report has been saved for the student.", "parents", null, "Progress");
   };
 
   if (!user && !loading) {
