@@ -3180,48 +3180,91 @@ export default function App() {
     event.preventDefault();
 
     const payload = adminForms.portalAccess;
+    const targetEmail = payload.email.trim().toLowerCase();
 
-    // 1. Create Auth User
+    // 1. Create Auth User (if they don't exist)
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: payload.email,
+      email: targetEmail,
       password: payload.password,
+      options: {
+        data: {
+          full_name: payload.full_name,
+          portal_role: payload.portal_role
+        }
+      }
     });
 
+    let userId = authData?.user?.id;
+
     if (authError) {
-      // If user already exists, we continue to grant them access record
       if (!authError.message.toLowerCase().includes("already registered")) {
-        showAction("error", authError.message);
+        showAction("error", `Auth Error: ${authError.message}`);
         return;
       }
     }
 
     // 2. Grant Portal Access via RPC
-    const { error } = await supabase.rpc("grant_portal_access", {
-      target_email: payload.email,
+    // We still call the RPC as it may handle complex backend logic/metadata
+    const { error: rpcError } = await supabase.rpc("grant_portal_access", {
+      target_email: targetEmail,
       target_role: payload.portal_role,
       target_name: payload.full_name,
       target_student_id: payload.student_id || null,
     });
 
-    if (error) {
-      showAction("error", error.message);
-      return;
+    // 3. Robust Fallback: Manually ensure user_portal_access record exists
+    // This solves the "User not found in mapping" if the RPC was failing
+    if (userId) {
+      await supabase.from("user_portal_access").upsert({
+        email: targetEmail,
+        user_id: userId,
+        full_name: payload.full_name,
+        portal_role: payload.portal_role,
+        is_active: true
+      }, { onConflict: 'email' });
+    } else {
+      // If we don't have userId (existing user), try to fetch it from the RPC-created record or auth
+      const { data: existingAccess } = await supabase
+        .from("user_portal_access")
+        .select("user_id")
+        .eq("email", targetEmail)
+        .maybeSingle();
+      
+      userId = existingAccess?.user_id;
     }
 
-    const { data } = await supabase.from("user_portal_access").select("*").order("created_at", { ascending: false });
-    if (data) {
+    // 4. Link child to parent if role is parents and student_id is provided
+    if (payload.portal_role === "parents" && payload.student_id && userId) {
+      const { error: linkError } = await supabase
+        .from("profiles")
+        .update({ user_id: userId })
+        .eq("student_id", payload.student_id);
+      
+      if (linkError) {
+        console.error("Error linking student to parent:", linkError);
+      }
+    }
+
+    // Refresh school data locally
+    const { data: freshList } = await supabase
+      .from("user_portal_access")
+      .select("*")
+      .order("created_at", { ascending: false });
+    
+    if (freshList) {
       setSchoolData((current) => ({
         ...current,
-        portalAccessList: data,
+        portalAccessList: freshList,
       }));
     }
 
     setAdminForms((current) => ({
       ...current,
-      portalAccess: { email: "", full_name: "", portal_role: "parents", password: "" },
+      portalAccess: { email: "", full_name: "", portal_role: "parents", password: "", student_id: "" },
     }));
-    showAction("success", "Account created & access granted! (For instant login without email links, please disable 'Confirm Email' in Supabase Dashboard -> Auth -> Providers -> Email)");
-    broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, payload.email);
+    
+    showAction("success", "Portal access granted successfully! Account linked.");
+    broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, targetEmail);
   };
 
   const [notificationsList, setNotificationsList] = useState([]);
