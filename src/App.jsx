@@ -1278,6 +1278,7 @@ function AdminPortal({
 
   return (
     <div className="admin-shell">
+      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)}></div>}
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
            <div className="brand-header-flex">
@@ -2286,6 +2287,7 @@ function TeacherPortal({
 
   return (
     <div className="admin-shell">
+      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)}></div>}
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
            <div className="brand-header-flex">
@@ -3184,8 +3186,11 @@ export default function App() {
     });
 
     if (authError) {
-      showAction("error", authError.message);
-      return;
+      // If user already exists, we continue to grant them access record
+      if (!authError.message.toLowerCase().includes("already registered")) {
+        showAction("error", authError.message);
+        return;
+      }
     }
 
     // 2. Grant Portal Access via RPC
@@ -3213,7 +3218,7 @@ export default function App() {
       ...current,
       portalAccess: { email: "", full_name: "", portal_role: "parents", password: "" },
     }));
-    showAction("success", "Portal access granted successfully.");
+    showAction("success", "Account created & access granted! (For instant login without email links, please disable 'Confirm Email' in Supabase Dashboard -> Auth -> Providers -> Email)");
     broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, payload.email);
   };
 
