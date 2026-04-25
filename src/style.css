@@ -2314,3 +2314,36 @@ h1, h2, h3, h4, h5 {
   background: #dc2626;
   color: white;
 }
+
+/* PWA App Refinements */
+:root {
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+body {
+  background: var(--bg-gradient);
+  overscroll-behavior-y: contain; /* Prevents pull-to-refresh pull-away */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.topbar {
+  padding-top: var(--safe-top);
+}
+
+@media (max-width: 1024px) {
+  .admin-sidebar {
+    height: calc(100vh - var(--safe-top) - var(--safe-bottom));
+    top: var(--safe-top);
+  }
+}
+
+/* Ensure consistent app-like alignment */
+.admin-shell, .parent-shell {
+  min-height: calc(100vh - var(--safe-top) - var(--safe-bottom));
+}
+
+.premium-status-alert {
+  top: calc(20px + var(--safe-top));
+}
+
