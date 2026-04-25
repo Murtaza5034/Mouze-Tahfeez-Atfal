@@ -3480,6 +3480,7 @@ export default function App() {
         onUpdateTeacherProfile={handleUpdateTeacherProfile}
         onSendCustomNotification={handleSendCustomNotification}
       />
+      </React.Fragment>
     );
   }
 
