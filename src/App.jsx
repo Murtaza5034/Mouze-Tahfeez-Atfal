@@ -1232,7 +1232,7 @@ function AdminPortal({
           {navPages.map(page => {
              const Icon = NAV_ICONS[page] || Layers3;
              return (
-               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => setActivePage(page)}>
+               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
                  <Icon size={18} /> {page === "Announcements" ? "Updates" : page}
                </button>
              )
@@ -1242,7 +1242,7 @@ function AdminPortal({
           {sidebarLinks.map(page => {
              const Icon = NAV_ICONS[page] || Users;
              return (
-               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => setActivePage(page)}>
+               <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
                  <Icon size={18} /> {page}
                </button>
              )
@@ -2110,7 +2110,7 @@ function TeacherPortal({
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
           ].map(page => (
-            <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => setActivePage(page.id)}>
+            <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
               <page.icon size={18} /> {page.label}
             </button>
           ))}
