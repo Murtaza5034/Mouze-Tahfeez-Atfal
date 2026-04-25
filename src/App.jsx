@@ -1279,14 +1279,6 @@ function AdminPortal({
   return (
     <div className="admin-shell">
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
-        <button 
-          className="sidebar-toggle-btn" 
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label={menuOpen ? "Close Sidebar" : "Open Sidebar"}
-        >
-          {menuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-        
         <div className="sidebar-header">
            <div className="brand-header-flex">
             <img src="/logo.png" alt="Logo" className="nav-logo" />
@@ -1332,11 +1324,11 @@ function AdminPortal({
 
       <main className="admin-main">
         <header className="topbar admin-topbar-dynamic">
-          <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
-            <Menu size={22} />
-          </button>
-          <div className="brand-block">
-             <h2 className="page-title">{activePage}</h2>
+          <div className="admin-header-left">
+            <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
+              <Menu size={22} />
+            </button>
+            <h2 className="page-title">{activePage}</h2>
           </div>
         </header>
 
