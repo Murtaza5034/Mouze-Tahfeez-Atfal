@@ -1233,7 +1233,7 @@ function AdminPortal({
              const Icon = NAV_ICONS[page] || Layers3;
              return (
                <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
-                 <Icon size={18} /> {page === "Announcements" ? "Updates" : page}
+                 <Icon size={18} /> {page}
                </button>
              )
           })}
@@ -1243,7 +1243,7 @@ function AdminPortal({
              const Icon = NAV_ICONS[page] || Users;
              return (
                <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
-                 <Icon size={18} /> {page}
+                 <Icon size={18} /> {page === "Notifications" ? "Send Push Alert" : page}
                </button>
              )
           })}
