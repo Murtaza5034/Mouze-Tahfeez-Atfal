@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   Bell,
   BookOpen,
@@ -173,12 +173,39 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
   await supabase.from("system_notifications").insert([dbPayload]);
 };
 
-function NotificationEnabler({ permission, onRequest }) {
-  if (permission === "granted" || permission === "denied") return null;
+function NotificationEnabler({ permission, onRequest, onOpenPanel }) {
   return (
-    <button onClick={onRequest} className="notification-enabler-btn" style={{ marginLeft: "auto", marginRight: "12px" }}>
-      <Bell size={14} /> Enable Alerts
-    </button>
+    <div style={{ display: "flex", gap: "10px", alignItems: "center", marginLeft: "auto", marginRight: "12px" }}>
+      {(permission !== "granted" && permission !== "denied") && (
+        <button onClick={onRequest} className="notification-enabler-btn">
+          Enable Alerts
+        </button>
+      )}
+      <button onClick={onOpenPanel} className="notification-bell-btn">
+        <Bell size={18} />
+      </button>
+    </div>
+  );
+}
+
+function NotificationsPanel({ notifications, onClose }) {
+  return (
+    <div className="notifications-panel-overlay" onClick={onClose}>
+      <div className="notifications-panel" onClick={e => e.stopPropagation()}>
+         <h3>Recent Notifications</h3>
+         {notifications.length === 0 ? (
+           <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No notifications found.</p>
+         ) : (
+           notifications.map(n => (
+             <div key={n.id} className="notification-item">
+               <h4>{n.title}</h4>
+               <p>{n.body}</p>
+               <span className="time">{new Date(n.created_at).toLocaleString()}</span>
+             </div>
+           ))
+         )}
+      </div>
+    </div>
   );
 }
 
@@ -2977,36 +3004,50 @@ export default function App() {
     broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, payload.email);
   };
 
+  const [notificationsList, setNotificationsList] = useState([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const latestNotifIdRef = useRef(null);
+
   useEffect(() => {
-    if (!user || notificationPermission !== "granted") return;
-    
-    // We only want notifications that happened while we are looking at the page, 
-    // or very recently. Using a ref or just simple time tracking:
-    let lastChecked = new Date().toISOString();
+    if (!user) return;
 
     const checkNotifications = async () => {
       const { data, error } = await supabase
         .from("system_notifications")
         .select("*")
-        .gt("created_at", lastChecked)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(30);
 
-      if (!error && data && data.length > 0) {
-        data.forEach(notif => {
-          const isTargeted = 
-            notif.target_role === "all" || 
-            notif.target_role === portalRole ||
-            notif.target_user === user.id ||
-            notif.target_user === user.email;
+      if (!error && data) {
+        const myNotifs = data.filter(notif => 
+          notif.target_role === "all" || 
+          notif.target_role === portalRole ||
+          notif.target_user === user.id ||
+          notif.target_user === user.email
+        );
+        
+        setNotificationsList(myNotifs);
 
-          if (isTargeted) {
-            sendPushNotification(notif.title, notif.body, notif.redirect_page);
+        if (myNotifs.length > 0) {
+          const currentLatestId = myNotifs[0].id;
+          
+          // If we have a new notification that we haven't seen since mount/last check
+          if (latestNotifIdRef.current && latestNotifIdRef.current !== currentLatestId) {
+             const newNotifs = [];
+             for (let n of myNotifs) {
+               if (n.id === latestNotifIdRef.current) break;
+               newNotifs.push(n);
+             }
+             if (notificationPermission === "granted") {
+                newNotifs.reverse().forEach(n => sendPushNotification(n.title, n.body, n.redirect_page));
+             }
           }
-        });
-        lastChecked = data[data.length - 1].created_at;
+          latestNotifIdRef.current = currentLatestId;
+        }
       }
     };
 
+    checkNotifications();
     const interval = setInterval(checkNotifications, 10000); // Check every 10s
     return () => clearInterval(interval);
   }, [user, portalRole, notificationPermission]);
@@ -3429,9 +3470,18 @@ export default function App() {
   }
 
   const enablerUI = (
-    <div style={{ position: "fixed", top: "12px", right: "70px", zIndex: 9999 }}>
-      <NotificationEnabler permission={notificationPermission} onRequest={requestNotificationPermission} />
-    </div>
+    <React.Fragment>
+      <div style={{ position: "fixed", top: "12px", right: "70px", zIndex: 9999 }}>
+        <NotificationEnabler 
+          permission={notificationPermission} 
+          onRequest={requestNotificationPermission} 
+          onOpenPanel={() => setShowNotifPanel(true)}
+        />
+      </div>
+      {showNotifPanel && (
+        <NotificationsPanel notifications={notificationsList} onClose={() => setShowNotifPanel(false)} />
+      )}
+    </React.Fragment>
   );
 
   if (portalRole === "parents") {
