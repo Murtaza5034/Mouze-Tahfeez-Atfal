@@ -2250,3 +2250,67 @@ h1, h2, h3, h4, h5 {
   transform: scale(1.1);
   color: #ef4444;
 }
+
+/* Faculty Attendance Styles */
+.faculty-card-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px !important;
+}
+
+.faculty-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.faculty-name {
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.faculty-email {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.faculty-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn-mini {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.action-btn-mini.present {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.action-btn-mini.present:hover {
+  background: #16a34a;
+  color: white;
+}
+
+.action-btn-mini.absent {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.action-btn-mini.absent:hover {
+  background: #dc2626;
+  color: white;
+}

@@ -1236,7 +1236,7 @@ function AdminPortal({
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
 
-  const sidebarLinks = ["Staff Profiles", "Groups", "Portal Access", "Notifications"];
+  const sidebarLinks = ["Staff Profiles", "Groups", "Portal Access", "Faculty", "Notifications"];
   const navPages = ["Overview", "Announcements", "Schedule", "Teachers"];
 
   const selectedStudent =
@@ -2078,6 +2078,50 @@ function AdminPortal({
           </div>
         ) : null}
 
+        {activePage === "Faculty" ? (
+          <div className="management-grid">
+            <section className="data-card">
+              <div className="card-headline">
+                <Users size={18} />
+                <h3>Faculty Attendance</h3>
+              </div>
+              <div className="record-stack">
+                {portalAccessList && portalAccessList.filter(a => a.portal_role === 'teacher').map(teacher => (
+                  <article key={teacher.id} className="record-card faculty-card-flex">
+                    <div className="faculty-info">
+                       <strong className="faculty-name">{teacher.full_name}</strong>
+                       <span className="faculty-email">{teacher.email}</span>
+                    </div>
+                    <div className="faculty-actions">
+                       <button className="action-btn-mini present" onClick={() => handleRecordTeacherAttendance(null, {
+                          teacher_name: teacher.full_name,
+                          attendance_date: new Date().toISOString().split('T')[0],
+                          minutes_present: 240,
+                          status: 'Present',
+                          note: 'Quick Record'
+                       })}>
+                         Present
+                       </button>
+                       <button className="action-btn-mini absent" onClick={() => handleRecordTeacherAttendance(null, {
+                          teacher_name: teacher.full_name,
+                          attendance_date: new Date().toISOString().split('T')[0],
+                          minutes_present: 0,
+                          status: 'Absent',
+                          note: 'Quick Record'
+                       })}>
+                         Absent
+                       </button>
+                    </div>
+                  </article>
+                ))}
+                {(!portalAccessList || portalAccessList.filter(a => a.portal_role === 'teacher').length === 0) && (
+                  <div className="empty-state">No teachers found in portal access list.</div>
+                )}
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         {activePage === "Portal Access" ? (
           <div className="management-grid two-columns">
             <section className="form-card">
@@ -2124,6 +2168,19 @@ function AdminPortal({
                       <option value="admin">Admin Portal</option>
                     </select>
                   </label>
+                  <label>
+                    <span>Account Password</span>
+                    <input
+                      type="password"
+                      name="password"
+                      value={adminForms.portalAccess.password || ""}
+                      onChange={onAdminFormChange("portalAccess")}
+                      placeholder="Min 6 characters"
+                      required
+                    />
+                  </label>
+                </div>
+                <div className="form-grid">
                   <label>
                     <span>Link to Student (Parents only)</span>
                     <select
@@ -2230,13 +2287,6 @@ function TeacherPortal({
   return (
     <div className="admin-shell">
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
-        <button 
-          className="sidebar-toggle-btn" 
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label={menuOpen ? "Close" : "Open"}
-        >
-          {menuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
         <div className="sidebar-header">
            <div className="brand-header-flex">
             <img src={portalAccess?.photo_url || "/logo.png"} alt="Logo" className="nav-logo" />
@@ -2273,9 +2323,12 @@ function TeacherPortal({
       </aside>
 
       <main className="admin-main">
-        <header className="topbar">
-          <div className="brand-block">
-             <h2 className="page-title">{activePage}</h2>
+        <header className="topbar admin-topbar-dynamic">
+          <div className="admin-header-left">
+            <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
+              <Menu size={22} />
+            </button>
+            <h2 className="page-title">{activePage}</h2>
           </div>
           {portalAccess.show_salary_card && monthlySalary && (
             <div className="salary-pill">
@@ -3124,6 +3177,18 @@ export default function App() {
 
     const payload = adminForms.portalAccess;
 
+    // 1. Create Auth User
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: payload.email,
+      password: payload.password,
+    });
+
+    if (authError) {
+      showAction("error", authError.message);
+      return;
+    }
+
+    // 2. Grant Portal Access via RPC
     const { error } = await supabase.rpc("grant_portal_access", {
       target_email: payload.email,
       target_role: payload.portal_role,
@@ -3146,7 +3211,7 @@ export default function App() {
 
     setAdminForms((current) => ({
       ...current,
-      portalAccess: { email: "", full_name: "", portal_role: "parents" },
+      portalAccess: { email: "", full_name: "", portal_role: "parents", password: "" },
     }));
     showAction("success", "Portal access granted successfully.");
     broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, payload.email);
