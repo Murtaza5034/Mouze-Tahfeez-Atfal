@@ -185,6 +185,32 @@ function NotificationEnabler({ permission, onRequest }) {
   );
 }
 
+function AnnouncementDetailsModal({ announcement, onClose }) {
+  if (!announcement) return null;
+  return (
+    <div className="notifications-panel-overlay" onClick={onClose}>
+      <div className="notifications-panel announce-details-modal" onClick={e => e.stopPropagation()}>
+         <button className="panel-close-btn" onClick={onClose}><X size={20} /></button>
+         <div className="details-header">
+           <img 
+             src={announcement.image_url || "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=800&q=80"} 
+             alt="Announcement" 
+             className="details-hero-img" 
+           />
+           <div className="details-badge">{announcement.target_role === 'all' ? 'System Broadcast' : 'Targeted Update'}</div>
+         </div>
+         <div className="details-body">
+           <h2>{announcement.title}</h2>
+           <p className="details-date">{new Date(announcement.created_at).toLocaleDateString()} at {new Date(announcement.created_at).toLocaleTimeString()}</p>
+           <div className="details-content">
+             {announcement.body}
+           </div>
+         </div>
+      </div>
+    </div>
+  );
+}
+
 function PremiumStatusAlert({ notification, onClose }) {
   if (!notification) return null;
   return (
@@ -237,12 +263,9 @@ function AnnouncementsPage({ notifications, setActivePage }) {
                 <div className="announce-footer">
                   <span className="announce-time">{new Date(n.created_at).toLocaleDateString()}</span>
                   <button className="announce-btn" onClick={() => {
-                     if (n.redirect_page) {
-                       window.location.hash = n.redirect_page;
-                       setActivePage(n.redirect_page);
-                     }
+                     setSelectedAnnouncement(n);
                   }}>
-                    Open <ArrowRight size={16} />
+                    Open Details <ArrowRight size={16} />
                   </button>
                 </div>
               </div>
@@ -3139,6 +3162,7 @@ export default function App() {
 
   const [notificationsList, setNotificationsList] = useState([]);
   const [activeStatusAlert, setActiveStatusAlert] = useState(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const latestNotifIdRef = useRef(null);
 
   useEffect(() => {
@@ -3197,6 +3221,10 @@ export default function App() {
     if (permission === "granted") {
       showAction("success", "Notifications Enabled!");
     }
+  };
+
+  const handleTeacherGroupFilterChange = (group) => {
+    setTeacherGroupFilter(group);
   };
 
   const handleAdminFormChange = (formKey) => (event) => {
@@ -3613,6 +3641,10 @@ export default function App() {
       <PremiumStatusAlert 
         notification={activeStatusAlert} 
         onClose={() => setActiveStatusAlert(null)} 
+      />
+      <AnnouncementDetailsModal 
+        announcement={selectedAnnouncement} 
+        onClose={() => setSelectedAnnouncement(null)} 
       />
       <div style={{ position: "fixed", top: "12px", right: "70px", zIndex: 9999 }}>
         <NotificationEnabler 
