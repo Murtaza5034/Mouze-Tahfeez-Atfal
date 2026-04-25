@@ -283,3 +283,30 @@
   0% { transform: translateY(10px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
+
+/* Sidebar Close Button (inside sidebar) */
+.sidebar-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.sidebar-close-btn:hover {
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--dark-gold);
+}
+
+@media (min-width: 1025px) {
+  .sidebar-close-btn {
+    display: none; /* Hide inside sidebar on desktop as header button handles it */
+  }
+}
+

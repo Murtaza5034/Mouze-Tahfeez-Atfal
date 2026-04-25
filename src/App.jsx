@@ -1287,6 +1287,7 @@ function AdminPortal({
               <p className="brand-tag">Management Portal</p>
               <h2 className="brand-title">Admin</h2>
             </div>
+            <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
           </div>
         </div>
         <nav className="sidebar-nav">
@@ -1327,7 +1328,7 @@ function AdminPortal({
         <header className="topbar admin-topbar-dynamic">
           <div className="admin-header-left">
             <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
-              <Menu size={22} />
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
             <h2 className="page-title">{activePage}</h2>
           </div>
@@ -2296,6 +2297,7 @@ function TeacherPortal({
               <p className="brand-tag">Teacher Portal</p>
               <h2 className="brand-title">{portalAccess?.full_name || "Teacher"}</h2>
             </div>
+            <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
           </div>
         </div>
         <nav className="sidebar-nav">
@@ -2328,7 +2330,7 @@ function TeacherPortal({
         <header className="topbar admin-topbar-dynamic">
           <div className="admin-header-left">
             <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
-              <Menu size={22} />
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
             <h2 className="page-title">{activePage}</h2>
           </div>
