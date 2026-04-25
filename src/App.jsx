@@ -1541,6 +1541,10 @@ function AdminPortal({
           </div>
         ) : null}
 
+        {activePage === "Announcements" ? (
+          <AnnouncementsPage notifications={notifications} setActivePage={setActivePage} />
+        ) : null}
+
         {activePage === "Teachers" ? (
           <div className="management-grid two-columns">
             <section className="form-card">
@@ -2065,6 +2069,7 @@ function TeacherPortal({
   user,
   portalAccess,
   monthlySalary,
+  notifications,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const selectedStudent =
@@ -2106,6 +2111,7 @@ function TeacherPortal({
         <nav className="sidebar-nav">
           <p className="sidebar-category management-cat">Workplace</p>
           {[
+            { id: "Announcements", label: "Announcements", icon: Bell },
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
@@ -2507,6 +2513,10 @@ function TeacherPortal({
               </div>
             </div>
           </div>
+        ) : null}
+
+        {activePage === "Announcements" ? (
+          <AnnouncementsPage notifications={notifications} setActivePage={setActivePage} />
         ) : null}
         </section>
       </main>
