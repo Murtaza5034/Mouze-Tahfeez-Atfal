@@ -162,6 +162,15 @@ const sendPushNotification = async (title, body, redirectPath = null) => {
   }
 };
 
+function NotificationEnabler({ permission, onRequest }) {
+  if (permission === "granted" || permission === "denied") return null;
+  return (
+    <button onClick={onRequest} className="notification-enabler-btn" style={{ marginLeft: "auto", marginRight: "12px" }}>
+      <Bell size={14} /> Enable Alerts
+    </button>
+  );
+}
+
 function normalizeText(value) {
   return String(value || "")
     .trim()
@@ -2468,6 +2477,9 @@ function TeacherPortal({
 }
 
 export default function App() {
+  const [notificationPermission, setNotificationPermission] = useState(
+    "Notification" in window ? Notification.permission : "denied"
+  );
   const [user, setUser] = useState(null);
   const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
   const [portalRole, setPortalRole] = useState(() => {
@@ -2954,6 +2966,49 @@ export default function App() {
     sendPushNotification("Access Granted", `Welcome ${payload.full_name}!`);
   };
 
+  useEffect(() => {
+    if (!user || notificationPermission !== "granted") return;
+    
+    // We only want notifications that happened while we are looking at the page, 
+    // or very recently. Using a ref or just simple time tracking:
+    let lastChecked = new Date().toISOString();
+
+    const checkNotifications = async () => {
+      const { data, error } = await supabase
+        .from("system_notifications")
+        .select("*")
+        .gt("created_at", lastChecked)
+        .order("created_at", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        data.forEach(notif => {
+          const isTargeted = 
+            notif.target_role === "all" || 
+            notif.target_role === portalRole ||
+            notif.target_user === user.id ||
+            notif.target_user === user.email;
+
+          if (isTargeted) {
+            sendPushNotification(notif.title, notif.body, notif.redirect_page);
+          }
+        });
+        lastChecked = data[data.length - 1].created_at;
+      }
+    };
+
+    const interval = setInterval(checkNotifications, 10000); // Check every 10s
+    return () => clearInterval(interval);
+  }, [user, portalRole, notificationPermission]);
+
+  const requestNotificationPermission = async () => {
+    if (!("Notification" in window)) return;
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    if (permission === "granted") {
+      showAction("success", "Notifications Enabled!");
+    }
+  };
+
   const handleAdminFormChange = (formKey) => (event) => {
     const { name, value } = event.target;
     setAdminForms((current) => ({
@@ -3024,8 +3079,24 @@ export default function App() {
     const payload = adminForms.customNotification;
 
     let notifTitle = `[${payload.target_audience.toUpperCase()}] ${payload.title}`;
+    if (payload.target_audience === "user" && payload.target_uuid) {
+       notifTitle = `[Direct] ${payload.title}`;
+    }
+
+    // 1. Send locally to sender
     sendPushNotification(notifTitle, payload.body, payload.redirect_page);
-    showAction("success", "Custom Notification Sent!");
+    
+    // 2. Save to DB for cross-device pushing
+    const dbPayload = {
+      title: notifTitle,
+      body: payload.body,
+      target_role: payload.target_audience === "user" ? "user" : payload.target_audience,
+      target_user: payload.target_audience === "user" ? payload.target_uuid : null,
+      redirect_page: payload.redirect_page
+    };
+    await supabase.from("system_notifications").insert([dbPayload]);
+
+    showAction("success", "Custom Notification Dispatched!");
 
     setAdminForms((current) => ({
       ...current,
@@ -3349,27 +3420,38 @@ export default function App() {
     return <LoadingScreen message="Loading Mauze Tahfeez..." />;
   }
 
+  const enablerUI = (
+    <div style={{ position: "fixed", top: "12px", right: "70px", zIndex: 9999 }}>
+      <NotificationEnabler permission={notificationPermission} onRequest={requestNotificationPermission} />
+    </div>
+  );
+
   if (portalRole === "parents") {
     return (
-      <ParentPortal
-        activePage={activePage}
-        parentData={parentData}
-        setActivePage={setActivePage}
-        user={user}
-        loading={loading}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-        onLogout={handleLogout}
-        onRoleChange={storeRole}
-        teacherProfiles={teacherProfiles}
-      />
+      <React.Fragment>
+        {enablerUI}
+        <ParentPortal
+          activePage={activePage}
+          parentData={parentData}
+          setActivePage={setActivePage}
+          user={user}
+          loading={loading}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          onLogout={handleLogout}
+          onRoleChange={storeRole}
+          teacherProfiles={teacherProfiles}
+        />
+      </React.Fragment>
     );
   }
 
   if (portalRole === "admin") {
     return (
-      <AdminPortal
-        activePage={activePage}
+      <React.Fragment>
+        {enablerUI}
+        <AdminPortal
+          activePage={activePage}
         actionMessage={actionMessage}
         adminData={{
           ...schoolData,
@@ -3402,22 +3484,25 @@ export default function App() {
   }
 
   return (
-    <TeacherPortal
-      actionMessage={actionMessage}
-      activePage={activePage}
-      menuOpen={menuOpen}
-      onLogout={handleLogout}
-      onRoleChange={storeRole}
-      onTeacherFormChange={handleTeacherFormChange}
-      onTeacherGroupFilterChange={handleTeacherGroupFilterChange}
-      onTeacherResultSubmit={handleTeacherResultSubmit}
-      setActivePage={setActivePage}
-      setMenuOpen={setMenuOpen}
-      teacherData={teacherData}
-      teacherForms={teacherForms}
-      user={user}
-      portalAccess={portalAccess}
-      monthlySalary={monthlySalary}
-    />
+    <React.Fragment>
+      {enablerUI}
+      <TeacherPortal
+        actionMessage={actionMessage}
+        activePage={activePage}
+        menuOpen={menuOpen}
+        onLogout={handleLogout}
+        onRoleChange={storeRole}
+        onTeacherFormChange={handleTeacherFormChange}
+        onTeacherGroupFilterChange={handleTeacherGroupFilterChange}
+        onTeacherResultSubmit={handleTeacherResultSubmit}
+        setActivePage={setActivePage}
+        setMenuOpen={setMenuOpen}
+        teacherData={teacherData}
+        teacherForms={teacherForms}
+        user={user}
+        portalAccess={portalAccess}
+        monthlySalary={monthlySalary}
+      />
+    </React.Fragment>
   );
 }
