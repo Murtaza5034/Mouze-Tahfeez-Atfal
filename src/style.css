@@ -2098,3 +2098,75 @@ h1, h2, h3, h4, h5 {
 .announce-time { font-size: 12px; color: #9ca3af; }
 .announce-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--light-gold); color: var(--deep-brown); border: none; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s; }
 .announce-btn:hover { background: var(--gold-dark); color: white; }
+
+/* Premium Status Alert */
+.premium-status-alert {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  width: 90%;
+  max-width: 450px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  animation: slideDownFade 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.status-alert-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.status-alert-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #d4af37, #f1c40f);
+  color: white;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
+.status-alert-text {
+  flex: 1;
+}
+
+.status-alert-text strong {
+  display: block;
+  font-size: 15px;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.status-alert-text p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.status-alert-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.status-alert-close:hover {
+  color: var(--text-primary);
+}
+
+@keyframes slideDownFade {
+  from { opacity: 0; transform: translate(-50%, -20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

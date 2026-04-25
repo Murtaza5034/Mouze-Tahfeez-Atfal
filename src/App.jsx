@@ -185,6 +185,26 @@ function NotificationEnabler({ permission, onRequest }) {
   );
 }
 
+function PremiumStatusAlert({ notification, onClose }) {
+  if (!notification) return null;
+  return (
+    <div className="premium-status-alert fade-in">
+      <div className="status-alert-content">
+        <div className="status-alert-icon">
+          <Bell size={20} />
+        </div>
+        <div className="status-alert-text">
+          <strong>{notification.title}</strong>
+          <p>{notification.body}</p>
+        </div>
+        <button className="status-alert-close" onClick={onClose}>
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AnnouncementsPage({ notifications, setActivePage }) {
   const images = [
     "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=400&q=80",
@@ -1289,6 +1309,9 @@ function AdminPortal({
 
       <main className="admin-main">
         <header className="topbar admin-topbar-dynamic">
+          <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
+            <Menu size={22} />
+          </button>
           <div className="brand-block">
              <h2 className="page-title">{activePage}</h2>
           </div>
@@ -1299,18 +1322,20 @@ function AdminPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
-          <div className="portal-stats-strip admin-stats">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.label} className="pstat-card">
-                  <span className="pstat-value">{stat.value}</span>
-                  <span className="pstat-label">{stat.label}</span>
-                  <span className="pstat-sub"><Icon size={12} style={{ verticalAlign: 'middle' }} /></span>
-                </div>
-              );
-            })}
-          </div>
+          {activePage === "Overview" && (
+            <div className="portal-stats-strip admin-stats">
+              {stats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <div key={stat.label} className="pstat-card">
+                    <span className="pstat-value">{stat.value}</span>
+                    <span className="pstat-label">{stat.label}</span>
+                    <span className="pstat-sub"><Icon size={12} style={{ verticalAlign: 'middle' }} /></span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
         {activePage === "Overview" ? (
           <div className="management-grid two-columns">
@@ -1429,6 +1454,16 @@ function AdminPortal({
                     onChange={onAdminFormChange("customNotification")} 
                     placeholder="Enter your message here..."
                     required 
+                  />
+                </label>
+                <label>
+                  <span>Image URL (Optional)</span>
+                  <input 
+                    type="text" 
+                    name="image_url" 
+                    value={adminForms.customNotification.image_url || ""} 
+                    onChange={onAdminFormChange("customNotification")} 
+                    placeholder="https://example.com/image.jpg"
                   />
                 </label>
                 <label>
@@ -3103,6 +3138,7 @@ export default function App() {
   };
 
   const [notificationsList, setNotificationsList] = useState([]);
+  const [activeStatusAlert, setActiveStatusAlert] = useState(null);
   const latestNotifIdRef = useRef(null);
 
   useEffect(() => {
@@ -3125,22 +3161,27 @@ export default function App() {
         
         setNotificationsList(myNotifs);
 
-        if (myNotifs.length > 0) {
-          const currentLatestId = myNotifs[0].id;
-          
-          // If we have a new notification that we haven't seen since mount/last check
-          if (latestNotifIdRef.current && latestNotifIdRef.current !== currentLatestId) {
-             const newNotifs = [];
-             for (let n of myNotifs) {
-               if (n.id === latestNotifIdRef.current) break;
-               newNotifs.push(n);
-             }
-             if (notificationPermission === "granted") {
-                newNotifs.reverse().forEach(n => sendPushNotification(n.title, n.body, n.redirect_page));
-             }
+          if (myNotifs.length > 0) {
+            const currentLatestId = myNotifs[0].id;
+            
+            // If we have a new notification that we haven't seen since mount/last check
+            if (latestNotifIdRef.current && latestNotifIdRef.current !== currentLatestId) {
+               const newNotifs = [];
+               for (let n of myNotifs) {
+                 if (n.id === latestNotifIdRef.current) break;
+                 newNotifs.push(n);
+               }
+               
+               // Trigger premium status alert for the most recent one
+               setActiveStatusAlert(myNotifs[0]);
+               setTimeout(() => setActiveStatusAlert(null), 8000);
+
+               if (notificationPermission === "granted") {
+                  newNotifs.reverse().forEach(n => sendPushNotification(n.title, n.body, n.redirect_page));
+               }
+            }
+            latestNotifIdRef.current = currentLatestId;
           }
-          latestNotifIdRef.current = currentLatestId;
-        }
       }
     };
 
@@ -3238,7 +3279,8 @@ export default function App() {
       body: payload.body,
       target_role: payload.target_audience === "user" ? "user" : payload.target_audience,
       target_user: payload.target_audience === "user" ? payload.target_uuid : null,
-      redirect_page: payload.redirect_page
+      redirect_page: payload.redirect_page,
+      image_url: payload.image_url || null
     };
     await supabase.from("system_notifications").insert([dbPayload]);
 
@@ -3568,6 +3610,10 @@ export default function App() {
 
   const enablerUI = (
     <React.Fragment>
+      <PremiumStatusAlert 
+        notification={activeStatusAlert} 
+        onClose={() => setActiveStatusAlert(null)} 
+      />
       <div style={{ position: "fixed", top: "12px", right: "70px", zIndex: 9999 }}>
         <NotificationEnabler 
           permission={notificationPermission} 
