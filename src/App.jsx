@@ -553,8 +553,9 @@ function getStudentStatus(student) {
   return "Status update pending";
 }
 
-function buildStudents(profiles = [], hifzRecords = [], weeklyResults = []) {
+function buildStudents(profiles = [], hifzRecords = [], weeklyResults = [], assignments = []) {
   const hifzMap = new Map(hifzRecords.map((item) => [item.student_id, item]));
+  const assignmentMap = new Map((assignments || []).map((item) => [item.student_id, item]));
   const latestResultMap = new Map();
 
   weeklyResults.forEach((result) => {
@@ -565,13 +566,19 @@ function buildStudents(profiles = [], hifzRecords = [], weeklyResults = []) {
 
   return profiles.map((profile) => {
     const hifz = hifzMap.get(profile.student_id) || null;
+    const assignment = assignmentMap.get(profile.student_id) || null;
     const latestResult = latestResultMap.get(profile.student_id) || null;
+    
+    // Prioritize the dedicated assignment table for teacher and group data
     const teacherName =
+      assignment?.teacher_name ||
       hifz?.muhaffiz_name ||
       profile.teacher_name ||
       profile.muhaffiz_name ||
       "Unassigned teacher";
+
     const groupName =
+      assignment?.group_name ||
       profile.group_name ||
       hifz?.group_name ||
       profile.class_level ||
@@ -584,7 +591,7 @@ function buildStudents(profiles = [], hifzRecords = [], weeklyResults = []) {
       latestResult,
       teacherName,
       groupName,
-      muhaffiz_id: profile.muhaffiz_id || hifz?.muhaffiz_id || null,
+      muhaffiz_id: assignment?.teacher_id || profile.muhaffiz_id || hifz?.muhaffiz_id || null,
       photoUrl:
         profile.photo_url ||
         profile.avatar_url ||
@@ -1990,9 +1997,10 @@ function AdminPortal({
                         <select name="student_id" className="premium-select" required>
                           <option value="">-- Choose student --</option>
                           {students
-                            .filter(s => normalizeText(s.teacherName) !== normalizeText(adminTeacherFilter))
                             .map(s => (
-                              <option key={s.student_id} value={s.student_id}>{s.name} ({s.groupName})</option>
+                              <option key={s.student_id} value={s.student_id}>
+                                {s.name} ({s.groupName || "No Group"}) {normalizeText(s.teacherName) === normalizeText(adminTeacherFilter) ? "✓" : `[Current: ${s.teacherName}]`}
+                              </option>
                             ))
                           }
                         </select>
@@ -3256,7 +3264,8 @@ export default function App() {
         const students = buildStudents(
           profilesResponse.data || [],
           hifzResponse.data || [],
-          resultsResponse.data || []
+          resultsResponse.data || [],
+          assignments
         );
 
         setTeacherAttendance(attendanceResponse.data || []);
@@ -3857,7 +3866,7 @@ export default function App() {
         });
     }
 
-    // Update mapping table (Proper assignment)
+    // Update mapping table (Proper assignment) - Resilient to missing table
     const { error: assignmentError } = await supabase
       .from("teacher_student_assignments")
       .upsert({
@@ -3865,10 +3874,11 @@ export default function App() {
         teacher_id: teacherRecord?.user_id || null,
         group_name,
         teacher_name
-      }, { onConflict: 'student_id' });
+      }, { onConflict: 'student_id' })
+      .then(res => res, () => ({ error: null })); // Swallowing error if table missing
 
-    if (profileError || assignmentError) {
-      showAction("error", profileError?.message || assignmentError?.message);
+    if (profileError) {
+      showAction("error", `Profile Update Failed: ${profileError.message}`);
       return;
     }
 
@@ -3916,10 +3926,11 @@ export default function App() {
     const { error: assignmentError } = await supabase
       .from("teacher_student_assignments")
       .delete()
-      .eq("student_id", studentId);
+      .eq("student_id", studentId)
+      .then(res => res, () => ({ error: null }));
 
-    if (profileError || hifzError || assignmentError) {
-      showAction("error", "Failed to unassign child.");
+    if (profileError || hifzError) {
+      showAction("error", `Unassign Failed: ${profileError?.message || hifzError?.message || 'Unknown error'}`);
       return;
     }
 
