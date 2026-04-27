@@ -1976,10 +1976,25 @@ function AdminPortal({
                       <span>Muhaffiz (Teacher)</span>
                       <select name="teacher_id" className="premium-select">
                         <option value="">-- No Teacher (Unlinked) --</option>
+                        {/* Show users from portal access */}
                         {portalAccessList
-                          .filter(a => a.portal_role === 'teacher' || a.portal_role === 'muhaffiz')
+                          .filter(a => 
+                            a.portal_role?.toLowerCase().includes('teacher') || 
+                            a.portal_role?.toLowerCase().includes('muhaffiz')
+                          )
                           .map(p => (
-                            <option key={p.user_id || p.id} value={p.user_id}>{p.full_name || p.email}</option>
+                            <option key={`portal-${p.user_id || p.id}`} value={p.user_id}>
+                              {p.full_name || p.email} (Portal Access)
+                            </option>
+                          ))
+                        }
+                        {/* Also show from teacher_profiles table as fallback/additional */}
+                        {teacherProfiles
+                          .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id))
+                          .map(tp => (
+                            <option key={`profile-${tp.id}`} value={tp.user_id}>
+                              {tp.full_name} (Profile only)
+                            </option>
                           ))
                         }
                       </select>
