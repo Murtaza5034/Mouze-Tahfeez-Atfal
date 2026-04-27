@@ -2042,15 +2042,16 @@ function AdminPortal({
                       <span>Parent / Guardian</span>
                       <select name="parent_id" className="premium-select">
                         <option value="">-- No Parent (Unlinked) --</option>
-                        {portalAccessList.length > 0 ? (
+                        {portalAccessList && portalAccessList.length > 0 ? (
                           portalAccessList
                             .filter(a => 
                               a.portal_role?.toLowerCase().includes('parent') || 
-                              a.portal_role?.toLowerCase().includes('guardian')
+                              a.portal_role?.toLowerCase().includes('guardian') ||
+                              portalAccessList.length < 5
                             )
                             .map(p => (
                               <option key={`parent-${p.user_id || p.id}`} value={p.user_id}>
-                                {p.full_name || p.email}
+                                {p.full_name || p.email} ({p.portal_role})
                               </option>
                             ))
                         ) : (
@@ -2058,6 +2059,9 @@ function AdminPortal({
                         )}
                       </select>
                     </label>
+                  </div>
+                  <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--brown-dark)', opacity: 0.6 }}>
+                    Total portal users in system: {portalAccessList?.length || 0}
                   </div>
 
                   <div className="form-actions-row">
@@ -2507,36 +2511,45 @@ function AdminPortal({
               </form>
             </section>
 
-            <section className="data-card">
+            <section className="data-card card-appear" style={{ gridColumn: '1 / -1', marginTop: '30px' }}>
               <div className="card-headline">
-                <Users size={18} />
-                <h3>Current Portal Access</h3>
+                <ShieldCheck size={18} />
+                <h3>System Portal Audit ({portalAccessList?.length || 0})</h3>
               </div>
-              <div className="record-stack">
-                {portalAccessList && portalAccessList.map((access, index) => (
-                  <article key={access.id || index} className="record-card flex-row-card">
-                    <div className="card-primary-info">
-                      <strong>{access.full_name || access.email}</strong>
-                      <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-                        <span className={`badge ${access.portal_role}`}>{ROLE_LABELS[access.portal_role]}</span>
-                        {access.portal_role === "teacher" && (
-                          <span className="badge info">{`${access.salary_per_minute} rs-min`}</span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: "12px", opacity: 0.7 }}>{access.email}</span>
-                    </div>
-                    <button 
-                      className="delete-icon-btn" 
-                      onClick={() => onDeleteRecord("user_portal_access", "id")(access.id)}
-                      aria-label="Delete access"
-                    >
-                      <Trash size={16} />
-                    </button>
-                  </article>
-                ))}
-                {(!portalAccessList || portalAccessList.length === 0) ? (
-                  <div className="empty-state">No access records found.</div>
-                ) : null}
+              <div className="portal-debug-table" style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--brown-light)', color: 'var(--premium-white)' }}>
+                      <th style={{ padding: '12px' }}>Name</th>
+                      <th style={{ padding: '12px' }}>Email</th>
+                      <th style={{ padding: '12px' }}>Role</th>
+                      <th style={{ padding: '12px' }}>UUID (user_id)</th>
+                      <th style={{ padding: '12px' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {portalAccessList && portalAccessList.map((access) => (
+                      <tr key={access.id} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: '12px' }}>{access.full_name}</td>
+                        <td style={{ padding: '12px' }}>{access.email}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span className={`badge ${access.portal_role}`}>{access.portal_role}</span>
+                        </td>
+                        <td style={{ padding: '12px', fontFamily: 'monospace', fontSize: '11px' }}>{access.user_id || 'NOT LINKED'}</td>
+                        <td style={{ padding: '12px' }}>
+                           <button className="btn-text-only red" onClick={() => onDeleteRecord("user_portal_access", "id")(access.id)}>Remove</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {(!portalAccessList || portalAccessList.length === 0) && (
+                      <tr>
+                        <td colSpan="5" style={{ padding: '30px', textAlign: 'center', opacity: 0.5 }}>
+                          No access records found in the database. Try "Grant Access" above.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </section>
           </div>
