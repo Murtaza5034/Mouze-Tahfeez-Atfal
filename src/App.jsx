@@ -1260,7 +1260,7 @@ function AdminPortal({
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
 
-  const sidebarLinks = ["Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications"];
+  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications"];
   const navPages = ["Overview", "Announcements", "Schedule", "Teachers"];
 
   const selectedStudent =
@@ -1361,6 +1361,74 @@ function AdminPortal({
         <section className="admin-content-pad">
           {actionMessage && (
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+          )}
+
+          {activePage === "Student Registry" && (
+            <div className="admin-section fade-in">
+              <div className="section-header">
+                <h2 className="premium-title">Student Registry</h2>
+                <p className="subtitle">Add and manage students in the system</p>
+              </div>
+              
+              <div className="assignment-form-complex card-appear">
+                <form className="stack-form" onSubmit={async (e) => {
+                  e.preventDefault();
+                  const name = e.target.student_name.value;
+                  const group = e.target.group_name.value;
+                  if (!name) return;
+                  
+                  const { data, error } = await supabase.from("profiles").insert([{
+                    name,
+                    group_name: group,
+                    is_active: true
+                  }]).select().single();
+                  
+                  if (error) {
+                    alert("Error adding student: " + error.message);
+                  } else {
+                    alert("Student added successfully!");
+                    e.target.reset();
+                    window.location.reload(); 
+                  }
+                }}>
+                  <div className="form-row">
+                    <label>
+                      <span>Student Full Name</span>
+                      <input name="student_name" type="text" placeholder="Enter name..." required className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Initial Group / Class</span>
+                      <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
+                    </label>
+                  </div>
+                  <button type="submit" className="action-button">Add Student to Database</button>
+                </form>
+              </div>
+
+              <div className="assigned-list card-appear" style={{ marginTop: '30px' }}>
+                <h3 className="premium-subtitle">Current Students ({students.length})</h3>
+                <div className="assigned-grid">
+                  {students.map(s => (
+                    <div key={s.student_id} className="assigned-child-card">
+                      <div className="child-info-header">
+                        <StudentAvatar student={s} size="small" />
+                        <div>
+                          <h4>{s.name}</h4>
+                          <p>{s.groupName || 'No Group'}</p>
+                        </div>
+                      </div>
+                      <button 
+                        className="btn-text-only red" 
+                        onClick={() => onDeleteRecord("profiles", "student_id")(s.student_id)}
+                        style={{ marginTop: '10px' }}
+                      >
+                        Remove Student
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
 
           {activePage === "Overview" && (
@@ -3582,8 +3650,29 @@ export default function App() {
     if (!("Notification" in window)) return;
     const permission = await Notification.requestPermission();
     setNotificationPermission(permission);
+    
     if (permission === "granted") {
       showAction("success", "Notifications Enabled!");
+      
+      // Professional Push Subscription logic
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: 'BEl627pGr_3G334B_h1kX7hB-4hX-4k-kL9n...' // User would replace with their VAPID key
+        });
+        
+        // Save subscription to Supabase
+        await supabase.from("push_subscriptions").upsert({
+          user_id: user?.id,
+          subscription: subscription,
+          updated_at: new Date()
+        });
+        
+        console.log("Push subscription successful");
+      } catch (err) {
+        console.warn("Push subscription failed (Safe to ignore if no VAPID key):", err);
+      }
     }
   };
 
