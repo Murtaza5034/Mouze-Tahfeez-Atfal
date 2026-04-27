@@ -22,6 +22,9 @@ import {
   Phone,
   MessageCircle,
   ArrowRight,
+  CheckCircle,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
@@ -207,6 +210,52 @@ function AnnouncementDetailsModal({ announcement, onClose }) {
            </div>
          </div>
       </div>
+    </div>
+  );
+}
+
+function NotificationBell({ notifications }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const unreadCount = notifications.length;
+
+  return (
+    <div className="notif-bell-container">
+      <button className="notif-bell-btn" onClick={() => setIsOpen(!isOpen)} aria-label="Notifications">
+        <Bell size={22} />
+        {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+      </button>
+
+      {isOpen && (
+        <React.Fragment>
+          <div className="notifications-panel-overlay" onClick={() => setIsOpen(false)} />
+          <div className="notifications-panel fade-in" onClick={e => e.stopPropagation()}>
+            <div className="panel-header">
+              <h3>System Notifications</h3>
+              <button className="panel-close-btn" onClick={() => setIsOpen(false)}><X size={18} /></button>
+            </div>
+            <div className="panel-list">
+              {notifications.map((n, i) => (
+                <div key={n.id || i} className="notification-item">
+                  <div className="notif-item-header">
+                    <span className={`mini-pill ${n.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px' }}>
+                      {n.target_role?.toUpperCase()}
+                    </span>
+                    <h4>{n.title}</h4>
+                  </div>
+                  <p>{n.body}</p>
+                  <span className="time">{new Date(n.created_at).toLocaleString()}</span>
+                </div>
+              ))}
+              {notifications.length === 0 && (
+                <div className="empty-panel">
+                  <Bell size={32} style={{ opacity: 0.2 }} />
+                  <p>No notifications yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </React.Fragment>
+      )}
     </div>
   );
 }
@@ -1232,9 +1281,13 @@ function AdminPortal({
   onDeleteRecord,
   onUpdateTeacherProfile,
   onSendCustomNotification,
+  onClearHistory,
   notifications,
+  onUnassignChild,
+  setAdminTeacherFilter,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
+  const [selectedFacultyId, setSelectedFacultyId] = useState("");
 
   const sidebarLinks = ["Staff Profiles", "Groups", "Portal Access", "Faculty", "Notifications"];
   const navPages = ["Overview", "Announcements", "Schedule", "Teachers"];
@@ -1355,69 +1408,82 @@ function AdminPortal({
           )}
 
         {activePage === "Overview" ? (
-          <div className="management-grid two-columns">
-            <section className="data-card">
-              <div className="card-headline">
-                <Sparkles size={18} />
-                <h3>All Child Results</h3>
-              </div>
-              <div className="student-list">
-                {students.map((student) => (
-                  <button
-                    key={student.student_id}
-                    type="button"
-                    className={`student-row ${selectedStudent?.student_id === student.student_id ? "selected" : ""}`}
-                    onClick={() => setSelectedStudentId(student.student_id)}
-                  >
-                    <StudentAvatar student={student} size="small" />
-                    <div>
-                      <strong>{student.name}</strong>
-                      <span>
-                        {student.groupName} · {student.latestResult?.total_score || "No"} score
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
+          <div className="overview-container fade-in">
+             <div className="overview-selection-header card-appear">
+                <div className="selection-box">
+                   <div className="selection-label">
+                      <Users size={22} className="gold-icon" />
+                      <span>Quick Student Access</span>
+                   </div>
+                   <div className="selection-dropdown-row">
+                      <div className="custom-dropdown-wrapper">
+                        <label htmlFor="student-dropdown">Choose Student (Grouped by Muhaffiz)</label>
+                        <select 
+                          id="student-dropdown"
+                          className="premium-select"
+                          value={selectedStudentId || ""} 
+                          onChange={(e) => setSelectedStudentId(e.target.value)}
+                        >
+                          <option value="">-- Select Student --</option>
+                          {teacherSummaries.map(teacher => (
+                            <optgroup label={`Muhaffiz: ${teacher.teacherName}`} key={teacher.teacherName}>
+                               {students
+                                 .filter(s => (s.teacherName || "Unassigned teacher") === teacher.teacherName)
+                                 .map(s => (
+                                   <option key={s.student_id} value={s.student_id}>{s.name}</option>
+                                 ))
+                               }
+                            </optgroup>
+                          ))}
+                        </select>
+                      </div>
+                      <button className="assign-report-btn" onClick={() => {}}>
+                         <Sparkles size={18} /> Assign Children Report
+                      </button>
+                   </div>
+                </div>
+             </div>
 
-            <section className="data-card">
-              <div className="card-headline">
-                <ShieldCheck size={18} />
-                <h3>Individual Child Overview</h3>
-              </div>
-              {selectedStudent ? (
-                <>
-                  <div className="student-profile-hero">
-                    <StudentAvatar student={selectedStudent} />
-                    <div>
-                      <h3>{selectedStudent.name}</h3>
-                      <p>
-                        {selectedStudent.groupName} · {selectedStudent.teacherName}
-                      </p>
-                      <div className="pill-row">
-                        <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
-                        <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
-                        <span className="mini-pill">
-                          Surah: {selectedStudent.hifz?.surat || "Pending"}
-                        </span>
+             {selectedStudent ? (
+               <div className="report-vessel card-appear">
+                  <div className="vessel-connection">
+                     <div className="connection-line"></div>
+                     <div className="connection-dot"></div>
+                  </div>
+                  <div className="report-card-inner">
+                    <div className="student-profile-hero">
+                      <StudentAvatar student={selectedStudent} />
+                      <div>
+                        <h3>{selectedStudent.name}</h3>
+                        <p>{selectedStudent.groupName} · {selectedStudent.teacherName}</p>
+                        <div className="pill-row">
+                          <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
+                          <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
+                          <span className="mini-pill">Surah: {selectedStudent.hifz?.surat || "Pending"}</span>
+                        </div>
                       </div>
                     </div>
+                    <TahfeezReportCard
+                      student={selectedStudent}
+                      weeklyResult={selectedStudent.latestResult}
+                    />
                   </div>
-                  <TahfeezReportCard
-                    student={selectedStudent}
-                    weeklyResult={selectedStudent.latestResult}
-                  />
-                </>
-              ) : (
-                <div className="empty-state">No student records found yet.</div>
-              )}
-            </section>
+               </div>
+             ) : (
+               <div className="empty-overview card-appear">
+                  <div className="vessel-connection">
+                     <div className="connection-line"></div>
+                  </div>
+                  <BookOpen size={64} className="empty-icon" />
+                  <h3>No Student Selected</h3>
+                  <p>Please select a student from the dropdown above to view their detailed performance report.</p>
+               </div>
+             )}
           </div>
         ) : null}
 
         {activePage === "Notifications" ? (
-          <div className="management-grid">
+          <div className="management-grid two-columns">
             <section className="form-card">
               <div className="card-headline">
                 <Send size={18} />
@@ -1501,6 +1567,46 @@ function AdminPortal({
                   <Send size={18} /> Dispatch Notification
                 </button>
               </form>
+            </section>
+            <section className="data-card">
+              <div className="card-headline headline-with-action">
+                <div className="headline-left">
+                  <Clock size={18} />
+                  <h3>Sent Alert History</h3>
+                </div>
+                <button 
+                  className="clear-history-btn" 
+                  onClick={() => onClearHistory("system_notifications")()}
+                >
+                  Clear History
+                </button>
+              </div>
+              <div className="record-stack">
+                {notifications.map((item, index) => (
+                  <article key={item.id || index} className="record-card flex-row-card">
+                    <div className="card-primary-info">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '10px' }}>
+                          {item.target_role.toUpperCase()}
+                        </span>
+                        <strong>{item.title}</strong>
+                      </div>
+                      <span>{item.body.substring(0, 60)}{item.body.length > 60 ? '...' : ''}</span>
+                      <span className="record-date">{new Date(item.created_at).toLocaleString()}</span>
+                    </div>
+                    <button 
+                      className="delete-icon-btn" 
+                      onClick={() => onDeleteRecord("system_notifications", "id")(item.id)}
+                      aria-label="Delete notification"
+                    >
+                      <Trash size={16} />
+                    </button>
+                  </article>
+                ))}
+                {notifications.length === 0 && (
+                  <div className="empty-state">No notification history found.</div>
+                )}
+              </div>
             </section>
           </div>
         ) : null}
@@ -1631,6 +1737,19 @@ function AdminPortal({
                       <option value="Event">Event</option>
                     </select>
                   </label>
+
+                  <label>
+                    <span>Target Portal</span>
+                    <select
+                      name="target_role"
+                      value={adminForms.announcement.target_role || "all"}
+                      onChange={onAdminFormChange("announcement")}
+                    >
+                      <option value="all">Everyone</option>
+                      <option value="parents">Parents Only</option>
+                      <option value="teacher">Teachers Only</option>
+                    </select>
+                  </label>
                 </div>
 
                 <label>
@@ -1651,15 +1770,28 @@ function AdminPortal({
             </section>
 
             <section className="data-card">
-              <div className="card-headline">
-                <BookOpen size={18} />
-                <h3>Latest Announcements</h3>
+              <div className="card-headline headline-with-action">
+                <div className="headline-left">
+                  <BookOpen size={18} />
+                  <h3>Latest Announcements</h3>
+                </div>
+                <button 
+                  className="clear-history-btn" 
+                  onClick={() => onClearHistory("events")()}
+                >
+                  Clear All
+                </button>
               </div>
               <div className="record-stack">
                 {announcements.map((item) => (
                   <article key={item.id || `${item.title}-${item.event_date}`} className="record-card flex-row-card">
                     <div className="card-primary-info">
-                      <strong>{item.title}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '10px' }}>
+                          {(item.target_role || 'ALL').toUpperCase()}
+                        </span>
+                        <strong>{item.title}</strong>
+                      </div>
                       <span>
                         {item.type || "Update"} · {item.event_date || "No date"}
                       </span>
@@ -1805,11 +1937,114 @@ function AdminPortal({
         ) : null}
 
         {activePage === "Groups" ? (
-          <div className="management-grid two-columns">
+          <div className="management-grid">
+            <section className="data-card card-appear">
+              <div className="card-headline headline-with-action">
+                <div className="headline-left">
+                  <Users size={18} />
+                  <h3>Manage Teacher Assignments</h3>
+                </div>
+              </div>
+
+              <div className="teacher-assignment-controls">
+                <div className="selection-box">
+                  <label htmlFor="teacher-select">Select Teacher (Muhaffiz)</label>
+                  <div className="selection-dropdown-row">
+                    <select 
+                      id="teacher-select" 
+                      className="premium-select"
+                      value={adminTeacherFilter}
+                      onChange={(e) => setAdminTeacherFilter(e.target.value)}
+                    >
+                      <option value="All">-- View All Students --</option>
+                      {teacherProfiles
+                        .filter(p => portalAccessList.some(a => normalizeText(a.full_name) === normalizeText(p.full_name) && a.portal_role === 'teacher'))
+                        .map(p => (
+                          <option key={p.id} value={p.full_name}>{p.full_name}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                {adminTeacherFilter !== "All" && (
+                  <div className="assignment-form-mini card-appear">
+                    <h4>Assign new child to {adminTeacherFilter}</h4>
+                    <form className="mini-stack-form" onSubmit={(e) => {
+                      e.preventDefault();
+                      const student_id = e.target.student_id.value;
+                      const group_name = e.target.group_name.value;
+                      if (student_id) {
+                        onAssignChild({ 
+                          preventDefault: () => {}, 
+                          target: { 
+                            student_id, 
+                            teacher_name: adminTeacherFilter, 
+                            group_name 
+                          } 
+                        }, true);
+                        e.target.reset();
+                      }
+                    }}>
+                      <div className="form-grid">
+                        <select name="student_id" className="premium-select" required>
+                          <option value="">-- Choose student --</option>
+                          {students
+                            .filter(s => normalizeText(s.teacherName) !== normalizeText(adminTeacherFilter))
+                            .map(s => (
+                              <option key={s.student_id} value={s.student_id}>{s.name} ({s.groupName})</option>
+                            ))
+                          }
+                        </select>
+                        <select name="group_name" className="premium-select">
+                           <option value="">-- No Group --</option>
+                           {customGroups.map(g => (
+                             <option key={g.id} value={g.group_name}>{g.group_name}</option>
+                           ))}
+                        </select>
+                        <button type="submit" className="action-button-mini">Assign</button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+
+              <div className="assigned-children-grid">
+                {students
+                  .filter(s => adminTeacherFilter === "All" || normalizeText(s.teacherName) === normalizeText(adminTeacherFilter))
+                  .map(student => (
+                    <article key={student.student_id} className="assigned-child-card card-appear">
+                      <div className="child-card-main">
+                        <StudentAvatar student={student} size="small" />
+                        <div className="child-card-info">
+                          <strong>{student.name}</strong>
+                          <p>{student.groupName || "No Group"}</p>
+                          {adminTeacherFilter === "All" && (
+                            <span className="teacher-tag">Muhaffiz: {student.teacherName}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="child-card-actions">
+                        <button 
+                          className="unassign-btn" 
+                          onClick={() => onUnassignChild(student.student_id)}
+                          title="Remove from teacher"
+                        >
+                          <UserX size={16} /> Remove
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                {students.filter(s => adminTeacherFilter === "All" || normalizeText(s.teacherName) === normalizeText(adminTeacherFilter)).length === 0 && (
+                  <div className="empty-state">No students found for this selection.</div>
+                )}
+              </div>
+            </section>
+
             <section className="form-card">
               <div className="card-headline">
                 <Layers3 size={18} />
-                <h3>Group Management</h3>
+                <h3>Group Registry</h3>
               </div>
               <form className="stack-form" onSubmit={onCreateGroup}>
                 <div className="form-grid">
@@ -1820,30 +2055,30 @@ function AdminPortal({
                       name="group_name"
                       value={adminForms.group.group_name}
                       onChange={onAdminFormChange("group")}
-                      placeholder="Senior Tahfeez"
+                      placeholder="e.g. Senior Tahfeez"
                       required
                     />
                   </label>
-
                   <label>
-                    <span>Teacher Name</span>
-                    <input
-                      type="text"
+                    <span>Primary Muhaffiz</span>
+                    <select
                       name="teacher_name"
                       value={adminForms.group.teacher_name}
                       onChange={onAdminFormChange("group")}
-                      placeholder="Muhaffiz name"
                       required
-                    />
+                      className="premium-select"
+                    >
+                      <option value="">-- Select Teacher --</option>
+                      {teacherProfiles.map(p => (
+                        <option key={p.id} value={p.full_name}>{p.full_name}</option>
+                      ))}
+                    </select>
                   </label>
                 </div>
-
-                <button type="submit" className="action-button">
-                  Add Group
-                </button>
+                <button type="submit" className="action-button">Add Group</button>
               </form>
 
-              <div className="record-stack">
+              <div className="record-stack" style={{ marginTop: '20px' }}>
                 {customGroups.map((group, index) => (
                   <article key={`${group.group_name}-${index}`} className="record-card flex-row-card">
                     <div className="card-primary-info">
@@ -1853,122 +2088,16 @@ function AdminPortal({
                     <button 
                       className="delete-icon-btn" 
                       onClick={() => onDeleteRecord("custom_groups", "id")(group.id)}
-                      aria-label="Delete group"
                     >
                       <Trash size={16} />
                     </button>
-                  </article>
-                ))}
-                {customGroups.length === 0 ? (
-                  <div className="empty-state">No custom groups added yet.</div>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="form-card">
-              <div className="card-headline">
-                <User size={18} />
-                <h3>Assign Child to Muhaffiz</h3>
-              </div>
-              <form className="stack-form" onSubmit={onAssignChild}>
-                <label>
-                  <span>Select Child</span>
-                  <select
-                    name="student_id"
-                    value={adminForms.assignChild?.student_id || ""}
-                    onChange={onAdminFormChange("assignChild")}
-                    required
-                  >
-                    <option value="">-- Choose student --</option>
-                    {students.map((s) => (
-                      <option key={s.student_id} value={s.student_id}>
-                        {s.name} ({s.groupName})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="form-grid">
-                  <label>
-                    <span>Target Teacher</span>
-                    <select
-                      name="teacher_name"
-                      value={adminForms.assignChild?.teacher_name || ""}
-                      onChange={onAdminFormChange("assignChild")}
-                      required
-                    >
-                      <option value="">-- Choose Teacher --</option>
-                      {(() => {
-                        const selectedGroupName = adminForms.assignChild?.group_name;
-                        const teachers = portalAccessList.filter(a => normalizeText(a.portal_role) === "teacher");
-                        
-                        if (selectedGroupName) {
-                          const groupInfo = customGroups.find(g => g.group_name === selectedGroupName);
-                          if (groupInfo) {
-                            return (
-                              <option value={groupInfo.teacher_name}>
-                                {groupInfo.teacher_name} (Group Muhaffiz)
-                              </option>
-                            );
-                          }
-                        }
-                        
-                        return teachers.map(a => (
-                          <option key={a.id} value={a.full_name || a.email}>
-                            {a.full_name || a.email}
-                          </option>
-                        ));
-                      })()}
-                    </select>
-                  </label>
-
-                  <label>
-                    <span>Target Group</span>
-                    <select
-                      name="group_name"
-                      value={adminForms.assignChild?.group_name || ""}
-                      onChange={onAdminFormChange("assignChild")}
-                      required
-                    >
-                      <option value="">-- Choose Group --</option>
-                      {customGroups.map(g => (
-                        <option key={g.id} value={g.group_name}>{g.group_name}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <button type="submit" className="action-button">
-                  Assign Child
-                </button>
-              </form>
-            </section>
-
-            <section className="data-card">
-              <div className="card-headline">
-                <Users size={18} />
-                <h3>Existing Student Groups</h3>
-              </div>
-              <div className="group-stack">
-                {Object.entries(groupedStudents).map(([groupName, members]) => (
-                  <article key={groupName} className="group-card">
-                    <div className="group-header">
-                      <h4>{groupName}</h4>
-                      <span>{members.length} children</span>
-                    </div>
-                    <div className="pill-row">
-                      {members.slice(0, 5).map((student) => (
-                        <span key={student.student_id} className="mini-pill">
-                          {student.name}
-                        </span>
-                      ))}
-                    </div>
                   </article>
                 ))}
               </div>
             </section>
           </div>
         ) : null}
+
 
         {activePage === "Staff Profiles" ? (
           <div className="management-grid two-columns">
@@ -1980,14 +2109,40 @@ function AdminPortal({
               <form className="stack-form" onSubmit={onUpdateTeacherProfile}>
                 <label>
                   <span>Teacher Full Name (Must match Supabase Auth name)</span>
-                  <input
-                    type="text"
+                  <select
                     name="full_name"
                     value={adminForms.teacherProfile.full_name}
-                    onChange={onAdminFormChange("teacherProfile")}
-                    placeholder="Muhaffiz Ahmed"
+                    onChange={(e) => {
+                      const selectedName = e.target.value;
+                      const existingProfile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(selectedName));
+                      
+                      setAdminForms(curr => ({
+                        ...curr,
+                        teacherProfile: {
+                          ...curr.teacherProfile,
+                          full_name: selectedName,
+                          phone_number: existingProfile?.phone_number || "",
+                          whatsapp_number: existingProfile?.whatsapp_number || "",
+                          photo_url: existingProfile?.photo_url || "",
+                          salary_per_minute: existingProfile?.salary_per_minute || "2.3",
+                          show_salary_card: existingProfile?.show_salary_card ?? true
+                        }
+                      }));
+                    }}
                     required
-                  />
+                    className="premium-select"
+                  >
+                    <option value="">-- Select Teacher --</option>
+                    {portalAccessList
+                      .filter(a => 
+                        normalizeText(a.portal_role).includes("teacher") || 
+                        normalizeText(a.portal_role).includes("muhaffiz")
+                      )
+                      .map(a => (
+                        <option key={a.id} value={a.full_name}>{a.full_name}</option>
+                      ))
+                    }
+                  </select>
                 </label>
                 <div className="form-grid">
                   <label>
@@ -2082,42 +2237,129 @@ function AdminPortal({
 
         {activePage === "Faculty" ? (
           <div className="management-grid">
-            <section className="data-card">
-              <div className="card-headline">
-                <Users size={18} />
-                <h3>Faculty Attendance</h3>
+            <section className="data-card card-appear">
+              <div className="card-headline headline-with-action">
+                <div className="headline-left">
+                  <Users size={18} />
+                  <h3>Verified Faculty Management</h3>
+                </div>
               </div>
-              <div className="record-stack">
-                {portalAccessList && portalAccessList.filter(a => a.portal_role === 'teacher').map(teacher => (
-                  <article key={teacher.id} className="record-card faculty-card-flex">
-                    <div className="faculty-info">
-                       <strong className="faculty-name">{teacher.full_name}</strong>
-                       <span className="faculty-email">{teacher.email}</span>
-                    </div>
-                    <div className="faculty-actions">
-                       <button className="action-btn-mini present" onClick={() => handleRecordTeacherAttendance(null, {
-                          teacher_name: teacher.full_name,
-                          attendance_date: new Date().toISOString().split('T')[0],
-                          minutes_present: 240,
-                          status: 'Present',
-                          note: 'Quick Record'
-                       })}>
-                         Present
-                       </button>
-                       <button className="action-btn-mini absent" onClick={() => handleRecordTeacherAttendance(null, {
-                          teacher_name: teacher.full_name,
-                          attendance_date: new Date().toISOString().split('T')[0],
-                          minutes_present: 0,
-                          status: 'Absent',
-                          note: 'Quick Record'
-                       })}>
-                         Absent
-                       </button>
-                    </div>
-                  </article>
-                ))}
-                {(!portalAccessList || portalAccessList.filter(a => a.portal_role === 'teacher').length === 0) && (
-                  <div className="empty-state">No teachers found in portal access list.</div>
+
+              <div className="faculty-selector-box">
+                <label htmlFor="faculty-select">Select Faculty Member</label>
+                <div className="selection-dropdown-row">
+                  <select 
+                    id="faculty-select" 
+                    className="premium-select"
+                    value={selectedFacultyId}
+                    onChange={(e) => setSelectedFacultyId(e.target.value)}
+                  >
+                    <option value="">-- Choose a Faculty Member --</option>
+                    {teacherProfiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.full_name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="record-stack" style={{ marginTop: '20px' }}>
+                {selectedFacultyId ? (
+                  teacherProfiles
+                    .filter(p => String(p.id) === String(selectedFacultyId))
+                    .map(profile => {
+                      const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
+                      const today = new Date().toISOString().split('T')[0];
+                      const latestAttendance = teacherAttendance.find(a => 
+                        normalizeText(a.teacher_name) === normalizeText(profile.full_name) && 
+                        a.attendance_date === today
+                      );
+
+                      return (
+                        <div key={profile.id} className="faculty-vessel card-appear">
+                          <div className="vessel-connection">
+                             <div className="connection-line"></div>
+                             <div className="connection-dot"></div>
+                          </div>
+                          <article className="premium-faculty-card card-appear">
+                            <div className="p-faculty-header">
+                               <div className="p-faculty-profile">
+                                 <div className="p-faculty-avatar-container">
+                                   {profile.photo_url ? (
+                                     <img src={profile.photo_url} alt={profile.full_name} className="p-faculty-img" />
+                                   ) : (
+                                     <div className="p-faculty-avatar-fallback">
+                                       {profile.full_name.charAt(0)}
+                                     </div>
+                                   )}
+                                 </div>
+                                 <div className="p-faculty-meta">
+                                   <div className="name-row">
+                                     <h3 className="p-faculty-name">{profile.full_name}</h3>
+                                     <CheckCircle size={18} className="verified-badge" />
+                                   </div>
+                                   <span className="p-faculty-email">{access?.email || "No Email linked"}</span>
+                                 </div>
+                               </div>
+                               <div className={`p-status-badge ${latestAttendance?.status === 'Present' ? 'present' : latestAttendance?.status === 'Absent' ? 'absent' : 'pending'}`}>
+                                 {latestAttendance?.status || "Not Marked"}
+                               </div>
+                            </div>
+
+                            <div className="p-faculty-body">
+                               <div className="p-attendance-controls">
+                                  <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => onRecordTeacherAttendance(null, {
+                                     teacher_name: profile.full_name,
+                                     attendance_date: today,
+                                     minutes_present: 240,
+                                     status: 'Present',
+                                     note: 'Daily Attendance'
+                                  })}>
+                                    <div className="btn-icon-vessel"><UserCheck size={22} /></div>
+                                    <div className="btn-text-vessel">
+                                      <strong>Present</strong>
+                                      <span>Mark for Today</span>
+                                    </div>
+                                  </button>
+                                  
+                                  <button className={`p-mark-btn p-absent ${latestAttendance?.status === 'Absent' ? 'active' : ''}`} onClick={() => onRecordTeacherAttendance(null, {
+                                     teacher_name: profile.full_name,
+                                     attendance_date: today,
+                                     minutes_present: 0,
+                                     status: 'Absent',
+                                     note: 'Daily Attendance'
+                                  })}>
+                                    <div className="btn-icon-vessel"><UserX size={22} /></div>
+                                    <div className="btn-text-vessel">
+                                      <strong>Absent</strong>
+                                      <span>Mark for Today</span>
+                                    </div>
+                                  </button>
+                               </div>
+                            </div>
+                            
+                            {latestAttendance && (
+                              <div className="p-attendance-footer">
+                                <Clock size={14} />
+                                <span>Last updated today at {new Date(latestAttendance.created_at).toLocaleTimeString()}</span>
+                              </div>
+                            )}
+                          </article>
+                        </div>
+                      );
+                    })
+                ) : (
+                  <div className="empty-overview mini-empty card-appear">
+                    <User size={48} className="empty-icon-sub" />
+                    <h4>Select Faculty Member</h4>
+                    <p>Choose a verified member from the dropdown to view their profile and manage attendance.</p>
+                  </div>
+                )}
+                
+                {teacherProfiles.length === 0 && (
+                  <div className="empty-state">
+                    <Users size={48} opacity={0.2} />
+                    <p>No verified faculty profiles found. Please create profiles in 'Staff Profiles' first.</p>
+                  </div>
                 )}
               </div>
             </section>
@@ -2755,6 +2997,7 @@ export default function App() {
     announcement: {
       title: "",
       type: "Update",
+      target_role: "all",
       event_date: getToday(),
     },
     customNotification: {
@@ -3074,12 +3317,11 @@ export default function App() {
     );
 
     const matchedStudents = schoolData.students.filter((student) => {
-      const teacherMatches = normalizeText(student.teacherName).includes(
-        normalizeText(teacherIdentity)
-      );
-      const groupMatches = normalizeText(student.groupName).includes(normalizeText(teacherIdentity));
+      // Robust filtering: check by muhaffiz_id (UUID) first, then fallback to name matching
+      const idMatch = user?.id && student.muhaffiz_id === user.id;
+      const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
 
-      return teacherMatches || groupMatches;
+      return idMatch || nameMatch;
     });
 
     const filteredStudents = matchedStudents;
@@ -3275,51 +3517,68 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    const checkNotifications = async () => {
-      const { data, error } = await supabase
+    // 1. Initial Fetch of History
+    const fetchHistory = async () => {
+      const { data } = await supabase
         .from("system_notifications")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(30);
-
-      if (!error && data) {
+        .limit(20);
+      
+      if (data) {
         const myNotifs = data.filter(notif => 
           notif.target_role === "all" || 
           notif.target_role === portalRole ||
           notif.target_user === user.id ||
           notif.target_user === user.email
         );
-        
         setNotificationsList(myNotifs);
-
-          if (myNotifs.length > 0) {
-            const currentLatestId = myNotifs[0].id;
-            
-            // If we have a new notification that we haven't seen since mount/last check
-            if (latestNotifIdRef.current && latestNotifIdRef.current !== currentLatestId) {
-               const newNotifs = [];
-               for (let n of myNotifs) {
-                 if (n.id === latestNotifIdRef.current) break;
-                 newNotifs.push(n);
-               }
-               
-               // Trigger premium status alert for the most recent one
-               setActiveStatusAlert(myNotifs[0]);
-               setTimeout(() => setActiveStatusAlert(null), 8000);
-
-               if (notificationPermission === "granted") {
-                  newNotifs.reverse().forEach(n => sendPushNotification(n.title, n.body, n.redirect_page));
-               }
-            }
-            latestNotifIdRef.current = currentLatestId;
-          }
+        if (myNotifs.length > 0) latestNotifIdRef.current = myNotifs[0].id;
       }
     };
+    fetchHistory();
 
-    checkNotifications();
-    const interval = setInterval(checkNotifications, 10000); // Check every 10s
-    return () => clearInterval(interval);
-  }, [user, portalRole, notificationPermission]);
+    // 2. Real-time Subscription for Instant Alerts
+    const channel = supabase
+      .channel('realtime-notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', table: 'system_notifications', schema: 'public' },
+        (payload) => {
+          const newNotif = payload.new;
+          const isTargeted = 
+            newNotif.target_role === "all" || 
+            newNotif.target_role === portalRole ||
+            newNotif.target_user === user.id ||
+            newNotif.target_user === user.email;
+
+          if (isTargeted) {
+             // Update Local State
+             setNotificationsList(prev => [newNotif, ...prev]);
+             
+             // Show In-App Visual Alert
+             setActiveStatusAlert(newNotif);
+             setTimeout(() => setActiveStatusAlert(null), 8000);
+
+             // Trigger OS-Level Notification (Notification Bar)
+             if (Notification.permission === "granted") {
+                sendPushNotification(newNotif.title, newNotif.body, newNotif.redirect_page);
+             } else if (Notification.permission === "default") {
+                Notification.requestPermission().then(permission => {
+                   if (permission === "granted") {
+                      sendPushNotification(newNotif.title, newNotif.body, newNotif.redirect_page);
+                   }
+                });
+             }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, portalRole]);
 
   const requestNotificationPermission = async () => {
     if (!("Notification" in window)) return;
@@ -3445,10 +3704,10 @@ export default function App() {
     }));
     setAdminForms((current) => ({
       ...current,
-      announcement: { title: "", type: "Update", event_date: getToday() },
+      announcement: { title: "", type: "Update", target_role: "all", event_date: getToday() },
     }));
     showAction("success", "Announcement created successfully.");
-    broadcastNotification("New Update!", payload.title, "all", null, "Announcements");
+    broadcastNotification("New Update!", payload.title, payload.target_role || "all", null, "Announcements");
   };
 
   const handleCreateSchedule = async (event) => {
@@ -3562,7 +3821,7 @@ export default function App() {
     if (!student_id) return;
 
     // Search for teacher user_id to store as muhaffiz_id
-    const teacherRecord = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(teacher_name));
+    const teacherRecord = schoolData.portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(teacher_name));
 
     // We update multiple tables to ensure consistency across the app's lookups
     const { error: profileError } = await supabase
@@ -3592,10 +3851,8 @@ export default function App() {
         });
     }
 
-    const hifzError = null; // Suppress error reporting for fallback insert
-
-    if (profileError || hifzError) {
-      showAction("error", profileError?.message || hifzError?.message);
+    if (profileError) {
+      showAction("error", profileError.message);
       return;
     }
 
@@ -3604,7 +3861,7 @@ export default function App() {
       ...current,
       students: current.students.map((s) =>
         String(s.student_id) === String(student_id)
-          ? { ...s, teacherName: teacher_name, groupName: group_name }
+          ? { ...s, teacherName: teacher_name, groupName: group_name, muhaffiz_id: teacherRecord?.user_id || null }
           : s
       ),
     }));
@@ -3614,8 +3871,44 @@ export default function App() {
       assignChild: { student_id: "", teacher_name: "", group_name: "" },
     }));
 
-    showAction("success", "Child assigned to muhaffiz successfully.");
+    showAction("success", `Child assigned to ${teacher_name} successfully.`);
     broadcastNotification("Assignment Updated", `Student has been assigned to ${teacher_name} in group ${group_name}.`, "parents", null, "Teachers");
+  };
+
+  const handleUnassignChild = async (studentId) => {
+    if (!window.confirm("Are you sure you want to remove this child from their assigned muhaffiz?")) return;
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ 
+        teacher_name: null, 
+        group_name: null, 
+        class_level: null,
+        muhaffiz_id: null 
+      })
+      .eq("student_id", studentId);
+
+    const { error: hifzError } = await supabase
+      .from("hifz_details")
+      .update({ muhaffiz_name: null, group_name: null })
+      .eq("student_id", studentId);
+
+    if (profileError || hifzError) {
+      showAction("error", "Failed to unassign child.");
+      return;
+    }
+
+    // Refresh school data locally
+    setSchoolData((current) => ({
+      ...current,
+      students: current.students.map((s) =>
+        String(s.student_id) === String(studentId)
+          ? { ...s, teacherName: "Unassigned teacher", groupName: "Ungrouped", muhaffiz_id: null }
+          : s
+      ),
+    }));
+
+    showAction("success", "Child unassigned successfully.");
   };
 
   const handleDeleteRecord = (table, idField = "id") => async (id) => {
@@ -3631,6 +3924,26 @@ export default function App() {
     // Refresh school data
     await loadPortalData(portalRole, user, parentData.studentProfile);
     showAction("success", "Record deleted successfully.");
+  };
+
+  const handleClearHistory = (table) => async () => {
+    const tableLabel = table === "events" ? "Announcements" : "Notifications";
+    if (!window.confirm(`Are you sure you want to clear all ${tableLabel}? This action is irreversible.`)) return;
+
+    // Use a filter that is guaranteed to match all rows for different primary key types
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000") // Covers UUID
+      .neq("id", 0); // Covers Integer IDs
+
+    if (error) {
+      showAction("error", `Clear failed: ${error.message}`);
+      return;
+    }
+
+    await loadPortalData(portalRole, user, parentData.studentProfile);
+    showAction("success", `${tableLabel} history cleared.`);
   };
 
   const handleUpdateTeacherProfile = async (event) => {
@@ -3777,6 +4090,7 @@ export default function App() {
           onLogout={handleLogout}
           onRoleChange={storeRole}
           teacherProfiles={teacherProfiles}
+          notifications={notificationsList}
         />
       </React.Fragment>
     );
@@ -3816,6 +4130,8 @@ export default function App() {
         onDeleteRecord={handleDeleteRecord}
         onUpdateTeacherProfile={handleUpdateTeacherProfile}
         onSendCustomNotification={handleSendCustomNotification}
+        onClearHistory={handleClearHistory}
+        onUnassignChild={handleUnassignChild}
       />
       </React.Fragment>
     );
