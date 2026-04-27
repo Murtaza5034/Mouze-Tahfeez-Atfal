@@ -1296,7 +1296,7 @@ function AdminPortal({
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
 
-  const sidebarLinks = ["Staff Profiles", "Groups", "Portal Access", "Faculty", "Notifications"];
+  const sidebarLinks = ["Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications"];
   const navPages = ["Overview", "Announcements", "Schedule", "Teachers"];
 
   const selectedStudent =
@@ -1943,7 +1943,7 @@ function AdminPortal({
           </div>
         ) : null}
 
-        {activePage === "Groups" ? (
+        {activePage === "Assignments" ? (
           <div className="management-grid">
             <section className="data-card card-appear">
               <div className="card-headline headline-with-action">
@@ -2004,12 +2004,12 @@ function AdminPortal({
                             ))
                           }
                         </select>
-                        <select name="group_name" className="premium-select">
-                           <option value="">-- No Group --</option>
-                           {customGroups.map(g => (
-                             <option key={g.id} value={g.group_name}>{g.group_name}</option>
-                           ))}
-                        </select>
+                        <input 
+                          type="text" 
+                          name="group_name" 
+                          className="premium-input-mini" 
+                          placeholder="Group Name (Optional)" 
+                        />
                         <button type="submit" className="action-button-mini">Assign</button>
                       </div>
                     </form>
@@ -2049,59 +2049,6 @@ function AdminPortal({
               </div>
             </section>
 
-            <section className="form-card">
-              <div className="card-headline">
-                <Layers3 size={18} />
-                <h3>Group Registry</h3>
-              </div>
-              <form className="stack-form" onSubmit={onCreateGroup}>
-                <div className="form-grid">
-                  <label>
-                    <span>Group Name</span>
-                    <input
-                      type="text"
-                      name="group_name"
-                      value={adminForms.group.group_name}
-                      onChange={onAdminFormChange("group")}
-                      placeholder="e.g. Senior Tahfeez"
-                      required
-                    />
-                  </label>
-                  <label>
-                    <span>Primary Muhaffiz</span>
-                    <select
-                      name="teacher_name"
-                      value={adminForms.group.teacher_name}
-                      onChange={onAdminFormChange("group")}
-                      required
-                      className="premium-select"
-                    >
-                      <option value="">-- Select Teacher --</option>
-                      {teacherProfiles.map(p => (
-                        <option key={p.id} value={p.full_name}>{p.full_name}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <button type="submit" className="action-button">Add Group</button>
-              </form>
-
-              <div className="record-stack" style={{ marginTop: '20px' }}>
-                {customGroups.map((group, index) => (
-                  <article key={`${group.group_name}-${index}`} className="record-card flex-row-card">
-                    <div className="card-primary-info">
-                      <strong>{group.group_name}</strong>
-                      <span>{group.teacher_name}</span>
-                    </div>
-                    <button 
-                      className="delete-icon-btn" 
-                      onClick={() => onDeleteRecord("custom_groups", "id")(group.id)}
-                    >
-                      <Trash size={16} />
-                    </button>
-                  </article>
-                ))}
-              </div>
             </section>
           </div>
         ) : null}

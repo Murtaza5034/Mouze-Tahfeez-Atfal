@@ -2543,3 +2543,19 @@ body {
 .avatar-small { width: 40px; height: 40px; font-size: 0.8rem; }
 .avatar-medium { width: 56px; height: 56px; font-size: 1.1rem; }
 .avatar-large { width: 80px; height: 80px; font-size: 1.5rem; }
+
+/* --- Streamlined Inputs --- */
+.premium-input-mini {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: white;
+  font-size: 0.9rem;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.premium-input-mini:focus {
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.1);
+}
