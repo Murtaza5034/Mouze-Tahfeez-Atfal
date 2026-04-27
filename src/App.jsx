@@ -118,26 +118,7 @@ function writeLocalArray(key, value) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
-function Celebration() {
-  const pieces = Array.from({ length: 50 });
-  return (
-    <div className="celebration-overlay">
-      {pieces.map((_, i) => (
-        <div 
-          key={i} 
-          className="confetti" 
-          style={{
-            left: `${Math.random() * 100}%`,
-            backgroundColor: 'var(--primary-gold)',
-            color: 'white',
-            animationDelay: `${Math.random() * 2}s`,
-            animationDuration: `${2 + Math.random() * 2}s`
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+// Celebration component removed as requested.
 
 const sendPushNotification = async (title, body, redirectPath = null) => {
   if (!("Notification" in window)) return;
@@ -260,25 +241,7 @@ function NotificationBell({ notifications }) {
   );
 }
 
-function PremiumStatusAlert({ notification, onClose }) {
-  if (!notification) return null;
-  return (
-    <div className="premium-status-alert fade-in">
-      <div className="status-alert-content">
-        <div className="status-alert-icon">
-          <Bell size={20} />
-        </div>
-        <div className="status-alert-text">
-          <strong>{notification.title}</strong>
-          <p>{notification.body}</p>
-        </div>
-        <button className="status-alert-close" onClick={onClose}>
-          <X size={16} />
-        </button>
-      </div>
-    </div>
-  );
-}
+// PremiumStatusAlert component removed as requested.
 
 function AnnouncementsPage({ notifications, setActivePage }) {
   const images = [
@@ -3492,17 +3455,23 @@ export default function App() {
 
     // 3. Robust Fallback: Manually upsert to user_portal_access
     // If userId is missing (existing user), the RPC might have returned the record or we can fetch it
-    const { data: accessRecord } = await supabase
+    const { data: accessRecord, error: upsertError } = await supabase
       .from("user_portal_access")
       .upsert({
         email: targetEmail,
-        user_id: userId || undefined, // Keep existing user_id if we don't have it
+        user_id: userId || undefined,
         full_name: payload.full_name,
         portal_role: payload.portal_role,
         is_active: true
       }, { onConflict: 'email' })
       .select()
       .maybeSingle();
+    
+    if (upsertError) {
+      console.error("Portal access upsert failed:", upsertError);
+      showAction("error", `Portal access failed: ${upsertError.message}`);
+      return;
+    }
     
     const finalUserId = userId || accessRecord?.user_id;
 
@@ -3515,11 +3484,15 @@ export default function App() {
     }
 
     // Refresh school data locally
-    const { data: freshList } = await supabase
+    const { data: freshList, error: refreshError } = await supabase
       .from("user_portal_access")
       .select("*")
       .order("created_at", { ascending: false });
     
+    if (refreshError) {
+      console.error("Error refreshing portal list:", refreshError);
+    }
+
     if (freshList) {
       setSchoolData((current) => ({
         ...current,
@@ -3532,7 +3505,7 @@ export default function App() {
       portalAccess: { email: "", full_name: "", portal_role: "parents", password: "", student_id: "" },
     }));
     
-    showAction("success", "Portal access granted successfully! Account linked.");
+    showAction("success", "Portal access granted successfully!");
     broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, targetEmail);
   };
 
@@ -3583,9 +3556,7 @@ export default function App() {
              // Update Local State
              setNotificationsList(prev => [newNotif, ...prev]);
              
-             // Show In-App Visual Alert
-             setActiveStatusAlert(newNotif);
-             setTimeout(() => setActiveStatusAlert(null), 8000);
+             // OS-Level Push logic below
 
              // Trigger OS-Level Notification (Notification Bar)
              if (Notification.permission === "granted") {
@@ -3871,9 +3842,9 @@ export default function App() {
         .eq("student_id", student_id);
     }
 
-    // 3. Update teacher_student_assignments (The new specialized mapping table)
+    // 3. Update teacher_student_assignments (The mapping table)
     const assignmentPayload = {
-      student_id,
+      student_id: Number(student_id), // Force numeric
       teacher_id: teacher_id || null,
       teacher_name: teacherRecord?.full_name || null,
       parent_id: parent_id || null,
@@ -3881,13 +3852,16 @@ export default function App() {
       group_name: group_name || null
     };
 
+    console.log("Upserting assignment:", assignmentPayload);
+
     const { error: mappingError } = await supabase
       .from("teacher_student_assignments")
       .upsert(assignmentPayload, { onConflict: 'student_id' });
 
     if (mappingError) {
-      console.warn("Mapping table update failed (Expected if table doesn't exist):", mappingError);
-      // We don't block here because the Profiles update (Step 1) is the most important
+      console.error("Mapping table update failed:", mappingError);
+      showAction("error", `Assignment Mapping Failed: ${mappingError.message}`);
+      return;
     }
 
     // Refresh school data locally
@@ -4111,10 +4085,6 @@ export default function App() {
 
   const enablerUI = (
     <React.Fragment>
-      <PremiumStatusAlert 
-        notification={activeStatusAlert} 
-        onClose={() => setActiveStatusAlert(null)} 
-      />
       <AnnouncementDetailsModal 
         announcement={selectedAnnouncement} 
         onClose={() => setSelectedAnnouncement(null)} 
