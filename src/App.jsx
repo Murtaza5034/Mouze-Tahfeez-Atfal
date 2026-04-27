@@ -2048,8 +2048,6 @@ function AdminPortal({
                 )}
               </div>
             </section>
-
-            </section>
           </div>
         ) : null}
 
