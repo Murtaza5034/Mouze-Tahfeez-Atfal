@@ -1957,8 +1957,7 @@ function AdminPortal({
                   const data = {
                     student_id: e.target.student_id.value,
                     teacher_id: e.target.teacher_id.value,
-                    parent_id: e.target.parent_id.value,
-                    group_name: e.target.group_name.value
+                    parent_id: e.target.parent_id.value
                   };
                   if (data.student_id) onAssignChild(data);
                 }}>
@@ -1976,11 +1975,11 @@ function AdminPortal({
                     <label>
                       <span>Muhaffiz (Teacher)</span>
                       <select name="teacher_id" className="premium-select">
-                        <option value="">-- No Teacher --</option>
-                        {teacherProfiles
-                          .filter(p => portalAccessList.some(a => normalizeText(a.full_name) === normalizeText(p.full_name) && a.portal_role === 'teacher'))
+                        <option value="">-- No Teacher (Unlinked) --</option>
+                        {portalAccessList
+                          .filter(a => a.portal_role === 'teacher' || a.portal_role === 'muhaffiz')
                           .map(p => (
-                            <option key={p.user_id} value={p.user_id}>{p.full_name}</option>
+                            <option key={p.user_id || p.id} value={p.user_id}>{p.full_name || p.email}</option>
                           ))
                         }
                       </select>
@@ -1989,19 +1988,14 @@ function AdminPortal({
                     <label>
                       <span>Parent / Guardian</span>
                       <select name="parent_id" className="premium-select">
-                        <option value="">-- No Parent --</option>
+                        <option value="">-- No Parent (Unlinked) --</option>
                         {portalAccessList
-                          .filter(a => a.portal_role === 'parents')
+                          .filter(a => a.portal_role === 'parents' || a.portal_role === 'parent')
                           .map(p => (
-                            <option key={p.user_id} value={p.user_id}>{p.full_name}</option>
+                            <option key={p.user_id || p.id} value={p.user_id}>{p.full_name || p.email}</option>
                           ))
                         }
                       </select>
-                    </label>
-
-                    <label>
-                      <span>Group / Class</span>
-                      <input type="text" name="group_name" className="premium-input-mini" placeholder="e.g. Senior Hifz" />
                     </label>
                   </div>
 
@@ -2019,6 +2013,9 @@ function AdminPortal({
                       Clear All Links
                     </button>
                   </div>
+                  <p className="hint-text" style={{ marginTop: '12px', fontSize: '0.8rem', opacity: 0.7 }}>
+                    Tip: If names are missing, make sure you have granted them <strong>Portal Access</strong> first.
+                  </p>
                 </form>
               </div>
             </section>
@@ -2040,7 +2037,6 @@ function AdminPortal({
                           <StudentAvatar student={student} size="small" />
                           <div className="child-card-info">
                             <strong>{student.name}</strong>
-                            <p className="group-tag">{student.groupName || "No Group"}</p>
                             
                             <div className="assignment-details">
                               <div className="detail-item">
