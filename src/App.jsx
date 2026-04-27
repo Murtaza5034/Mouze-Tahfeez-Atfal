@@ -2005,9 +2005,14 @@ function AdminPortal({
                       <select name="parent_id" className="premium-select">
                         <option value="">-- No Parent (Unlinked) --</option>
                         {portalAccessList
-                          .filter(a => a.portal_role === 'parents' || a.portal_role === 'parent')
+                          .filter(a => 
+                            a.portal_role?.toLowerCase().includes('parent') || 
+                            a.portal_role?.toLowerCase().includes('guardian')
+                          )
                           .map(p => (
-                            <option key={p.user_id || p.id} value={p.user_id}>{p.full_name || p.email}</option>
+                            <option key={`parent-${p.user_id || p.id}`} value={p.user_id}>
+                              {p.full_name || p.email}
+                            </option>
                           ))
                         }
                       </select>
