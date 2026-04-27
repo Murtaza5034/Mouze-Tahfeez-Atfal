@@ -3833,47 +3833,60 @@ export default function App() {
 
   const handleAssignChild = async (data) => {
     const { student_id, teacher_id, parent_id, group_name } = data;
-    if (!student_id) return;
+    if (!student_id) {
+      showAction("error", "Please select a student first.");
+      return;
+    }
 
-    const teacherRecord = adminData.portalAccessList.find(a => String(a.user_id) === String(teacher_id));
+    console.log("Linking accounts for student:", student_id, { teacher_id, parent_id });
+
+    const teacherRecord = 
+      adminData.portalAccessList.find(a => String(a.user_id) === String(teacher_id)) ||
+      adminData.teacherProfiles.find(p => String(p.user_id) === String(teacher_id));
+    
     const parentRecord = adminData.portalAccessList.find(a => String(a.user_id) === String(parent_id));
 
-    // Update main profile with both links
+    // 1. Update Profiles table (The core link)
     const { error: profileError } = await supabase
       .from("profiles")
       .update({ 
         teacher_name: teacherRecord?.full_name || null, 
         group_name: group_name || null, 
-        class_level: group_name || null,
         muhaffiz_id: teacher_id || null,
-        user_id: parent_id || null
+        user_id: parent_id || null // This links the student to the parent's portal
       })
       .eq("student_id", student_id);
 
-    // Update hifz_details for teacher consistency
-    if (teacher_id) {
+    if (profileError) {
+      showAction("error", `Profile Update Failed: ${profileError.message}`);
+      return;
+    }
+
+    // 2. Update hifz_details for teacher consistency (Historical legacy)
+    if (teacherRecord) {
       await supabase
         .from("hifz_details")
-        .update({ muhaffiz_name: teacherRecord?.full_name })
+        .update({ muhaffiz_name: teacherRecord.full_name })
         .eq("student_id", student_id);
     }
 
-    // Update mapping table (Proper assignment)
-    await supabase
-      .from("teacher_student_assignments")
-      .upsert({
-        student_id,
-        teacher_id: teacher_id || null,
-        teacher_name: teacherRecord?.full_name || null,
-        parent_id: parent_id || null,
-        parent_name: parentRecord?.full_name || null,
-        group_name: group_name || null
-      }, { onConflict: 'student_id' })
-      .then(res => res, () => ({ error: null }));
+    // 3. Update teacher_student_assignments (The new specialized mapping table)
+    const assignmentPayload = {
+      student_id,
+      teacher_id: teacher_id || null,
+      teacher_name: teacherRecord?.full_name || null,
+      parent_id: parent_id || null,
+      parent_name: parentRecord?.full_name || null,
+      group_name: group_name || null
+    };
 
-    if (profileError) {
-      showAction("error", `Assignment Failed: ${profileError.message}`);
-      return;
+    const { error: mappingError } = await supabase
+      .from("teacher_student_assignments")
+      .upsert(assignmentPayload, { onConflict: 'student_id' });
+
+    if (mappingError) {
+      console.warn("Mapping table update failed (Expected if table doesn't exist):", mappingError);
+      // We don't block here because the Profiles update (Step 1) is the most important
     }
 
     // Refresh school data locally
