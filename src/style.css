@@ -2559,3 +2559,71 @@ body {
   border-color: var(--primary-gold);
   box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.1);
 }
+
+/* --- Assignment Dashboard Revamp --- */
+.assignment-form-complex {
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  border: 1px solid var(--glass-border);
+  margin-top: 16px;
+}
+
+.form-actions-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.assignment-details {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
+}
+
+.detail-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.detail-value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.group-tag {
+  display: inline-block;
+  background: var(--primary-gold);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.unassigned-card {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.action-button.secondary {
+  background: white !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+.action-button.secondary:hover {
+  background: #f8f8f8 !important;
+  border-color: #ddd !important;
+}

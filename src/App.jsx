@@ -1946,106 +1946,151 @@ function AdminPortal({
         {activePage === "Assignments" ? (
           <div className="management-grid">
             <section className="data-card card-appear">
-              <div className="card-headline headline-with-action">
-                <div className="headline-left">
-                  <Users size={18} />
-                  <h3>Manage Teacher Assignments</h3>
-                </div>
+              <div className="card-headline">
+                <Users size={18} />
+                <h3>Student Assignment Hub</h3>
               </div>
 
-              <div className="teacher-assignment-controls">
-                <div className="selection-box">
-                  <label htmlFor="teacher-select">Select Teacher (Muhaffiz)</label>
-                  <div className="selection-dropdown-row">
-                    <select 
-                      id="teacher-select" 
-                      className="premium-select"
-                      value={adminTeacherFilter}
-                      onChange={(e) => setAdminTeacherFilter(e.target.value)}
-                    >
-                      <option value="All">-- View All Students --</option>
-                      {teacherProfiles
-                        .filter(p => portalAccessList.some(a => normalizeText(a.full_name) === normalizeText(p.full_name) && a.portal_role === 'teacher'))
-                        .map(p => (
-                          <option key={p.id} value={p.full_name}>{p.full_name}</option>
-                        ))
-                      }
-                    </select>
-                  </div>
-                </div>
+              <div className="assignment-form-complex">
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const data = {
+                    student_id: e.target.student_id.value,
+                    teacher_id: e.target.teacher_id.value,
+                    parent_id: e.target.parent_id.value,
+                    group_name: e.target.group_name.value
+                  };
+                  if (data.student_id) onAssignChild(data);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Select Student</span>
+                      <select name="student_id" className="premium-select" required>
+                        <option value="">-- Choose Student --</option>
+                        {students.map(s => (
+                          <option key={s.student_id} value={s.student_id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </label>
 
-                {adminTeacherFilter !== "All" && (
-                  <div className="assignment-form-mini card-appear">
-                    <h4>Assign new child to {adminTeacherFilter}</h4>
-                    <form className="mini-stack-form" onSubmit={(e) => {
-                      e.preventDefault();
-                      const student_id = e.target.student_id.value;
-                      const group_name = e.target.group_name.value;
-                      if (student_id) {
-                        onAssignChild({ 
-                          preventDefault: () => {}, 
-                          target: { 
-                            student_id, 
-                            teacher_name: adminTeacherFilter, 
-                            group_name 
-                          } 
-                        }, true);
-                        e.target.reset();
-                      }
-                    }}>
-                      <div className="form-grid">
-                        <select name="student_id" className="premium-select" required>
-                          <option value="">-- Choose student --</option>
-                          {students
-                            .map(s => (
-                              <option key={s.student_id} value={s.student_id}>
-                                {s.name} ({s.groupName || "No Group"}) {normalizeText(s.teacherName) === normalizeText(adminTeacherFilter) ? "✓" : `[Current: ${s.teacherName}]`}
-                              </option>
-                            ))
-                          }
-                        </select>
-                        <input 
-                          type="text" 
-                          name="group_name" 
-                          className="premium-input-mini" 
-                          placeholder="Group Name (Optional)" 
-                        />
-                        <button type="submit" className="action-button-mini">Assign</button>
-                      </div>
-                    </form>
+                    <label>
+                      <span>Muhaffiz (Teacher)</span>
+                      <select name="teacher_id" className="premium-select">
+                        <option value="">-- No Teacher --</option>
+                        {teacherProfiles
+                          .filter(p => portalAccessList.some(a => normalizeText(a.full_name) === normalizeText(p.full_name) && a.portal_role === 'teacher'))
+                          .map(p => (
+                            <option key={p.user_id} value={p.user_id}>{p.full_name}</option>
+                          ))
+                        }
+                      </select>
+                    </label>
+
+                    <label>
+                      <span>Parent / Guardian</span>
+                      <select name="parent_id" className="premium-select">
+                        <option value="">-- No Parent --</option>
+                        {portalAccessList
+                          .filter(a => a.portal_role === 'parents')
+                          .map(p => (
+                            <option key={p.user_id} value={p.user_id}>{p.full_name}</option>
+                          ))
+                        }
+                      </select>
+                    </label>
+
+                    <label>
+                      <span>Group / Class</span>
+                      <input type="text" name="group_name" className="premium-input-mini" placeholder="e.g. Senior Hifz" />
+                    </label>
                   </div>
-                )}
+
+                  <div className="form-actions-row">
+                    <button type="submit" className="action-button">Link Accounts</button>
+                    <button 
+                      type="button" 
+                      className="action-button secondary"
+                      onClick={() => {
+                        const student_id = document.querySelector('select[name="student_id"]').value;
+                        if (student_id) onUnassignChild(student_id);
+                        else alert("Please select a student first.");
+                      }}
+                    >
+                      Clear All Links
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </section>
+
+            <section className="data-card card-appear" style={{ marginTop: '20px' }}>
+              <div className="card-headline">
+                <Layers3 size={18} />
+                <h3>Assigned Student List</h3>
               </div>
 
               <div className="assigned-children-grid">
                 {students
-                  .filter(s => adminTeacherFilter === "All" || normalizeText(s.teacherName) === normalizeText(adminTeacherFilter))
+                  .filter(s => s.muhaffiz_id || s.user_id)
+                  .map(student => {
+                    const parent = portalAccessList.find(a => a.user_id === student.user_id);
+                    return (
+                      <article key={student.student_id} className="assigned-child-card card-appear">
+                        <div className="child-card-main">
+                          <StudentAvatar student={student} size="small" />
+                          <div className="child-card-info">
+                            <strong>{student.name}</strong>
+                            <p className="group-tag">{student.groupName || "No Group"}</p>
+                            
+                            <div className="assignment-details">
+                              <div className="detail-item">
+                                <span className="detail-label">Teacher:</span>
+                                <span className="detail-value">{student.teacherName || "None"}</span>
+                              </div>
+                              <div className="detail-item">
+                                <span className="detail-label">Parent:</span>
+                                <span className="detail-value">{parent?.full_name || "Unlinked"}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="child-card-actions">
+                          <button 
+                            className="unassign-btn" 
+                            onClick={() => onUnassignChild(student.student_id)}
+                            title="Unlink student"
+                          >
+                            <UserX size={16} /> Unlink
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                {students.filter(s => s.muhaffiz_id || s.user_id).length === 0 && (
+                  <div className="empty-state">No linked students found.</div>
+                )}
+              </div>
+            </section>
+
+            <section className="data-card card-appear" style={{ marginTop: '20px', opacity: 0.8 }}>
+              <div className="card-headline">
+                <UserX size={18} />
+                <h3>Unassigned Students</h3>
+              </div>
+              <div className="assigned-children-grid">
+                {students
+                  .filter(s => !s.muhaffiz_id && !s.user_id)
                   .map(student => (
-                    <article key={student.student_id} className="assigned-child-card card-appear">
+                    <article key={student.student_id} className="assigned-child-card unassigned-card">
                       <div className="child-card-main">
                         <StudentAvatar student={student} size="small" />
                         <div className="child-card-info">
                           <strong>{student.name}</strong>
-                          <p>{student.groupName || "No Group"}</p>
-                          {adminTeacherFilter === "All" && (
-                            <span className="teacher-tag">Muhaffiz: {student.teacherName}</span>
-                          )}
+                          <p>Ready for assignment</p>
                         </div>
-                      </div>
-                      <div className="child-card-actions">
-                        <button 
-                          className="unassign-btn" 
-                          onClick={() => onUnassignChild(student.student_id)}
-                          title="Remove from teacher"
-                        >
-                          <UserX size={16} /> Remove
-                        </button>
                       </div>
                     </article>
                   ))}
-                {students.filter(s => adminTeacherFilter === "All" || normalizeText(s.teacherName) === normalizeText(adminTeacherFilter)).length === 0 && (
-                  <div className="empty-state">No students found for this selection.</div>
-                )}
               </div>
             </section>
           </div>
@@ -3765,64 +3810,48 @@ export default function App() {
     showAction("success", "Group added successfully.");
   };
 
-  const handleAssignChild = async (event, isQuick = false) => {
-    if (event.preventDefault) event.preventDefault();
-    
-    let student_id, teacher_name, group_name;
-    
-    if (isQuick) {
-      student_id = event.target.student_id;
-      teacher_name = event.target.teacher_name;
-      group_name = event.target.group_name;
-    } else {
-      ({ student_id, teacher_name, group_name } = adminForms.assignChild);
-    }
-
+  const handleAssignChild = async (data) => {
+    const { student_id, teacher_id, parent_id, group_name } = data;
     if (!student_id) return;
 
-    // Search for teacher user_id to store as muhaffiz_id
-    const teacherRecord = schoolData.portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(teacher_name));
+    const teacherRecord = adminData.teacherProfiles.find(p => p.user_id === teacher_id);
+    const parentRecord = adminData.portalAccessList.find(a => a.user_id === parent_id);
 
-    // We update multiple tables to ensure consistency across the app's lookups
+    // Update main profile with both links
     const { error: profileError } = await supabase
       .from("profiles")
       .update({ 
-        teacher_name, 
-        group_name, 
-        class_level: group_name,
-        muhaffiz_id: teacherRecord?.user_id || null 
+        teacher_name: teacherRecord?.full_name || null, 
+        group_name: group_name || null, 
+        class_level: group_name || null,
+        muhaffiz_id: teacher_id || null,
+        user_id: parent_id || null
       })
       .eq("student_id", student_id);
 
-    // Try to update existing record first
-    const { error: hifzUpdateError } = await supabase
-      .from("hifz_details")
-      .update({ muhaffiz_name: teacher_name })
-      .eq("student_id", student_id);
-
-    // if update failed or didn't find record, try inserting
-    if (hifzUpdateError) {
+    // Update hifz_details for teacher consistency
+    if (teacher_id) {
       await supabase
         .from("hifz_details")
-        .insert({ 
-          student_id, 
-          muhaffiz_name: teacher_name
-        });
+        .update({ muhaffiz_name: teacherRecord?.full_name })
+        .eq("student_id", student_id);
     }
 
-    // Update mapping table (Proper assignment) - Resilient to missing table
-    const { error: assignmentError } = await supabase
+    // Update mapping table (Proper assignment)
+    await supabase
       .from("teacher_student_assignments")
       .upsert({
         student_id,
-        teacher_id: teacherRecord?.user_id || null,
-        group_name,
-        teacher_name
+        teacher_id: teacher_id || null,
+        teacher_name: teacherRecord?.full_name || null,
+        parent_id: parent_id || null,
+        parent_name: parentRecord?.full_name || null,
+        group_name: group_name || null
       }, { onConflict: 'student_id' })
-      .then(res => res, () => ({ error: null })); // Swallowing error if table missing
+      .then(res => res, () => ({ error: null }));
 
     if (profileError) {
-      showAction("error", `Profile Update Failed: ${profileError.message}`);
+      showAction("error", `Assignment Failed: ${profileError.message}`);
       return;
     }
 
@@ -3831,22 +3860,29 @@ export default function App() {
       ...current,
       assignments: [
         ...current.assignments.filter(a => String(a.student_id) !== String(student_id)),
-        { student_id, teacher_id: teacherRecord?.user_id, group_name, teacher_name }
+        { 
+          student_id, 
+          teacher_id, 
+          teacher_name: teacherRecord?.full_name, 
+          parent_id, 
+          parent_name: parentRecord?.full_name, 
+          group_name 
+        }
       ],
       students: current.students.map((s) =>
         String(s.student_id) === String(student_id)
-          ? { ...s, teacherName: teacher_name, groupName: group_name, muhaffiz_id: teacherRecord?.user_id || null }
+          ? { 
+              ...s, 
+              teacherName: teacherRecord?.full_name || "Unassigned teacher", 
+              groupName: group_name || "Ungrouped", 
+              muhaffiz_id: teacher_id || null,
+              user_id: parent_id || null
+            }
           : s
       ),
     }));
 
-    setAdminForms((current) => ({
-      ...current,
-      assignChild: { student_id: "", teacher_name: "", group_name: "" },
-    }));
-
-    showAction("success", `Child assigned to ${teacher_name} successfully.`);
-    broadcastNotification("Assignment Updated", `Student has been assigned to ${teacher_name} in group ${group_name}.`, "parents", null, "Teachers");
+    showAction("success", `Assignment updated successfully.`);
   };
 
   const handleUnassignChild = async (studentId) => {
@@ -3858,7 +3894,8 @@ export default function App() {
         teacher_name: null, 
         group_name: null, 
         class_level: null,
-        muhaffiz_id: null 
+        muhaffiz_id: null,
+        user_id: null
       })
       .eq("student_id", studentId);
 
@@ -3884,12 +3921,12 @@ export default function App() {
       assignments: current.assignments.filter(a => String(a.student_id) !== String(studentId)),
       students: current.students.map((s) =>
         String(s.student_id) === String(studentId)
-          ? { ...s, teacherName: "Unassigned teacher", groupName: "Ungrouped", muhaffiz_id: null }
+          ? { ...s, teacherName: "Unassigned teacher", groupName: "Ungrouped", muhaffiz_id: null, user_id: null }
           : s
       ),
     }));
 
-    showAction("success", "Child unassigned successfully.");
+    showAction("success", "Student unassigned and unlinked from all accounts.");
   };
 
   const handleDeleteRecord = (table, idField = "id") => async (id) => {
