@@ -1976,27 +1976,33 @@ function AdminPortal({
                       <span>Muhaffiz (Teacher)</span>
                       <select name="teacher_id" className="premium-select">
                         <option value="">-- No Teacher (Unlinked) --</option>
-                        {/* Show users from portal access */}
-                        {portalAccessList
-                          .filter(a => 
-                            a.portal_role?.toLowerCase().includes('teacher') || 
-                            a.portal_role?.toLowerCase().includes('muhaffiz')
-                          )
-                          .map(p => (
-                            <option key={`portal-${p.user_id || p.id}`} value={p.user_id}>
-                              {p.full_name || p.email} (Portal Access)
-                            </option>
-                          ))
-                        }
-                        {/* Also show from teacher_profiles table as fallback/additional */}
-                        {teacherProfiles
-                          .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id))
-                          .map(tp => (
-                            <option key={`profile-${tp.id}`} value={tp.user_id}>
-                              {tp.full_name} (Profile only)
-                            </option>
-                          ))
-                        }
+                        {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
+                          <React.Fragment>
+                            {/* Show users from portal access */}
+                            {portalAccessList
+                              .filter(a => 
+                                a.portal_role?.toLowerCase().includes('teacher') || 
+                                a.portal_role?.toLowerCase().includes('muhaffiz')
+                              )
+                              .map(p => (
+                                <option key={`portal-${p.user_id || p.id}`} value={p.user_id}>
+                                  {p.full_name || p.email} (Portal Access)
+                                </option>
+                              ))
+                            }
+                            {/* Also show from teacher_profiles table as fallback/additional */}
+                            {teacherProfiles
+                              .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id))
+                              .map(tp => (
+                                <option key={`profile-${tp.id}`} value={tp.user_id}>
+                                  {tp.full_name} (Profile only)
+                                </option>
+                              ))
+                            }
+                          </React.Fragment>
+                        ) : (
+                          <option value="" disabled>No staff found (Add in 'Staff Profiles' or 'Portal Access')</option>
+                        )}
                       </select>
                     </label>
 
@@ -2004,17 +2010,20 @@ function AdminPortal({
                       <span>Parent / Guardian</span>
                       <select name="parent_id" className="premium-select">
                         <option value="">-- No Parent (Unlinked) --</option>
-                        {portalAccessList
-                          .filter(a => 
-                            a.portal_role?.toLowerCase().includes('parent') || 
-                            a.portal_role?.toLowerCase().includes('guardian')
-                          )
-                          .map(p => (
-                            <option key={`parent-${p.user_id || p.id}`} value={p.user_id}>
-                              {p.full_name || p.email}
-                            </option>
-                          ))
-                        }
+                        {portalAccessList.length > 0 ? (
+                          portalAccessList
+                            .filter(a => 
+                              a.portal_role?.toLowerCase().includes('parent') || 
+                              a.portal_role?.toLowerCase().includes('guardian')
+                            )
+                            .map(p => (
+                              <option key={`parent-${p.user_id || p.id}`} value={p.user_id}>
+                                {p.full_name || p.email}
+                              </option>
+                            ))
+                        ) : (
+                          <option value="" disabled>No parents found (Grant access first)</option>
+                        )}
                       </select>
                     </label>
                   </div>
@@ -3464,48 +3473,44 @@ export default function App() {
         showAction("error", `Auth Error: ${authError.message}`);
         return;
       }
+      // If already registered, we should still try to grant access
+      // The RPC below will handle the heavy lifting
     }
 
-    // 2. Grant Portal Access via RPC
-    // We still call the RPC as it may handle complex backend logic/metadata
-    const { error: rpcError } = await supabase.rpc("grant_portal_access", {
+    // 2. Grant Portal Access via RPC (Most reliable way)
+    const { data: rpcData, error: rpcError } = await supabase.rpc("grant_portal_access", {
       target_email: targetEmail,
       target_role: payload.portal_role,
       target_name: payload.full_name,
       target_student_id: payload.student_id || null,
     });
 
-    // 3. Robust Fallback: Manually ensure user_portal_access record exists
-    // This solves the "User not found in mapping" if the RPC was failing
-    if (userId) {
-      await supabase.from("user_portal_access").upsert({
+    if (rpcError) {
+      console.warn("RPC Grant Error (Expected if RPC missing):", rpcError);
+    }
+
+    // 3. Robust Fallback: Manually upsert to user_portal_access
+    // If userId is missing (existing user), the RPC might have returned the record or we can fetch it
+    const { data: accessRecord } = await supabase
+      .from("user_portal_access")
+      .upsert({
         email: targetEmail,
-        user_id: userId,
+        user_id: userId || undefined, // Keep existing user_id if we don't have it
         full_name: payload.full_name,
         portal_role: payload.portal_role,
         is_active: true
-      }, { onConflict: 'email' });
-    } else {
-      // If we don't have userId (existing user), try to fetch it from the RPC-created record or auth
-      const { data: existingAccess } = await supabase
-        .from("user_portal_access")
-        .select("user_id")
-        .eq("email", targetEmail)
-        .maybeSingle();
-      
-      userId = existingAccess?.user_id;
-    }
+      }, { onConflict: 'email' })
+      .select()
+      .maybeSingle();
+    
+    const finalUserId = userId || accessRecord?.user_id;
 
     // 4. Link child to parent if role is parents and student_id is provided
-    if (payload.portal_role === "parents" && payload.student_id && userId) {
-      const { error: linkError } = await supabase
+    if (payload.portal_role === "parents" && payload.student_id && finalUserId) {
+      await supabase
         .from("profiles")
-        .update({ user_id: userId })
+        .update({ user_id: finalUserId })
         .eq("student_id", payload.student_id);
-      
-      if (linkError) {
-        console.error("Error linking student to parent:", linkError);
-      }
     }
 
     // Refresh school data locally
@@ -3830,8 +3835,8 @@ export default function App() {
     const { student_id, teacher_id, parent_id, group_name } = data;
     if (!student_id) return;
 
-    const teacherRecord = adminData.teacherProfiles.find(p => p.user_id === teacher_id);
-    const parentRecord = adminData.portalAccessList.find(a => a.user_id === parent_id);
+    const teacherRecord = adminData.portalAccessList.find(a => String(a.user_id) === String(teacher_id));
+    const parentRecord = adminData.portalAccessList.find(a => String(a.user_id) === String(parent_id));
 
     // Update main profile with both links
     const { error: profileError } = await supabase
