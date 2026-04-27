@@ -1284,7 +1284,6 @@ function AdminPortal({
   onClearHistory,
   notifications,
   onUnassignChild,
-  setAdminTeacherFilter,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
