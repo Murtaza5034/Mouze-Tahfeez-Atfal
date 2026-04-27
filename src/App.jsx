@@ -2366,17 +2366,31 @@ function AdminPortal({
 
                             <div className="p-faculty-body">
                                <div className="p-attendance-controls">
-                                  <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => onRecordTeacherAttendance(null, {
-                                     teacher_name: profile.full_name,
-                                     attendance_date: today,
-                                     minutes_present: 240,
-                                     status: 'Present',
-                                     note: 'Daily Attendance'
-                                  })}>
+                                  <div className="p-minutes-manual card-appear">
+                                    <div className="vessel-label">Daily Minutes</div>
+                                    <input 
+                                      type="number" 
+                                      id={`mins-${profile.id}`} 
+                                      defaultValue="240" 
+                                      className="p-minutes-input" 
+                                      placeholder="Mins" 
+                                    />
+                                  </div>
+
+                                  <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => {
+                                     const mins = document.getElementById(`mins-${profile.id}`).value || 240;
+                                     onRecordTeacherAttendance(null, {
+                                        teacher_name: profile.full_name,
+                                        attendance_date: today,
+                                        minutes_present: Number(mins),
+                                        status: 'Present',
+                                        note: 'Daily Attendance'
+                                     });
+                                  }}>
                                     <div className="btn-icon-vessel"><UserCheck size={22} /></div>
                                     <div className="btn-text-vessel">
                                       <strong>Present</strong>
-                                      <span>Mark for Today</span>
+                                      <span>Mark with Custom Mins</span>
                                     </div>
                                   </button>
                                   

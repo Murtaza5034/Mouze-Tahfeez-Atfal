@@ -2627,3 +2627,41 @@ body {
   background: #f8f8f8 !important;
   border-color: #ddd !important;
 }
+
+/* --- Faculty Attendance Manual Minutes --- */
+.p-minutes-manual {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.p-minutes-manual .vessel-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: #5d4037;
+  opacity: 0.7;
+  padding-left: 4px;
+}
+
+.p-minutes-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 2px solid rgba(12, 91, 77, 0.1);
+  background: #f8fafc;
+  font-weight: 700;
+  color: #5d4037;
+  font-size: 1.1rem;
+  transition: all 0.2s ease;
+}
+
+.p-minutes-input:focus {
+  outline: none;
+  border-color: #d4af37;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
+}
