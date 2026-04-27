@@ -326,6 +326,26 @@ function AnnouncementsPage({ notifications, setActivePage }) {
   );
 }
 
+function guessTeacherIdentity(user, portalAccess) {
+  return portalAccess?.full_name || user?.user_metadata?.full_name || user?.email || "";
+}
+
+function StudentAvatar({ student, size = "medium" }) {
+  const initials = student.name
+    ? student.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "??";
+    
+  return (
+    <div className={`student-avatar avatar-${size}`}>
+      {student.photoUrl ? (
+        <img src={student.photoUrl} alt={student.name} />
+      ) : (
+        <span className="avatar-initials">{initials}</span>
+      )}
+    </div>
+  );
+}
+
 function normalizeText(value) {
   return String(value || "")
     .trim()
@@ -584,6 +604,7 @@ function buildStudents(profiles = [], hifzRecords = [], weeklyResults = []) {
       latestResult,
       teacherName,
       groupName,
+      muhaffiz_id: profile.muhaffiz_id || hifz?.muhaffiz_id || null,
       photoUrl:
         profile.photo_url ||
         profile.avatar_url ||
@@ -3035,6 +3056,7 @@ export default function App() {
       teacher_name: "",
       group_name: "",
     },
+    assignments: [],
     teacherProfile: {
       user_id: "",
       full_name: "",
@@ -3245,7 +3267,10 @@ export default function App() {
           supabase.from("custom_groups").select("*").order("group_name", { ascending: true }),
           supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }),
           supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
+          supabase.from("teacher_student_assignments").select("*"),
         ]);
+
+        const assignments = teacherAssignmentsResponse.data || [];
 
         const students = buildStudents(
           profilesResponse.data || [],
@@ -3272,6 +3297,7 @@ export default function App() {
           schedule: scheduleResponse.data || [],
           portalAccessList: portalAccessResponse.data || [],
           teacherProfiles: enrichedProfiles,
+          assignments,
         });
 
         if (students.length > 0) {
@@ -3850,14 +3876,28 @@ export default function App() {
         });
     }
 
-    if (profileError) {
-      showAction("error", profileError.message);
+    // Update mapping table (Proper assignment)
+    const { error: assignmentError } = await supabase
+      .from("teacher_student_assignments")
+      .upsert({
+        student_id,
+        teacher_id: teacherRecord?.user_id || null,
+        group_name,
+        teacher_name
+      }, { onConflict: 'student_id' });
+
+    if (profileError || assignmentError) {
+      showAction("error", profileError?.message || assignmentError?.message);
       return;
     }
 
     // Refresh school data locally
     setSchoolData((current) => ({
       ...current,
+      assignments: [
+        ...current.assignments.filter(a => String(a.student_id) !== String(student_id)),
+        { student_id, teacher_id: teacherRecord?.user_id, group_name, teacher_name }
+      ],
       students: current.students.map((s) =>
         String(s.student_id) === String(student_id)
           ? { ...s, teacherName: teacher_name, groupName: group_name, muhaffiz_id: teacherRecord?.user_id || null }
@@ -3892,7 +3932,12 @@ export default function App() {
       .update({ muhaffiz_name: null, group_name: null })
       .eq("student_id", studentId);
 
-    if (profileError || hifzError) {
+    const { error: assignmentError } = await supabase
+      .from("teacher_student_assignments")
+      .delete()
+      .eq("student_id", studentId);
+
+    if (profileError || hifzError || assignmentError) {
       showAction("error", "Failed to unassign child.");
       return;
     }
@@ -3900,6 +3945,7 @@ export default function App() {
     // Refresh school data locally
     setSchoolData((current) => ({
       ...current,
+      assignments: current.assignments.filter(a => String(a.student_id) !== String(studentId)),
       students: current.students.map((s) =>
         String(s.student_id) === String(studentId)
           ? { ...s, teacherName: "Unassigned teacher", groupName: "Ungrouped", muhaffiz_id: null }
