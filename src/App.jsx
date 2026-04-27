@@ -3237,6 +3237,7 @@ export default function App() {
           groupsResponse,
           attendanceResponse,
           teacherProfilesResponse,
+          teacherAssignmentsResponse,
         ] = await Promise.all([
           supabase.from("profiles").select("*").order("name", { ascending: true }),
           supabase.from("hifz_details").select("*"),
@@ -3247,7 +3248,7 @@ export default function App() {
           supabase.from("custom_groups").select("*").order("group_name", { ascending: true }),
           supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }),
           supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
-          supabase.from("teacher_student_assignments").select("*"),
+          supabase.from("teacher_student_assignments").select("*").then(res => res, () => ({ data: [], error: null })),
         ]);
 
         const assignments = teacherAssignmentsResponse.data || [];
