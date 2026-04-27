@@ -326,26 +326,6 @@ function AnnouncementsPage({ notifications, setActivePage }) {
   );
 }
 
-function guessTeacherIdentity(user, portalAccess) {
-  return portalAccess?.full_name || user?.user_metadata?.full_name || user?.email || "";
-}
-
-function StudentAvatar({ student, size = "medium" }) {
-  const initials = student.name
-    ? student.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-    : "??";
-    
-  return (
-    <div className={`student-avatar avatar-${size}`}>
-      {student.photoUrl ? (
-        <img src={student.photoUrl} alt={student.name} />
-      ) : (
-        <span className="avatar-initials">{initials}</span>
-      )}
-    </div>
-  );
-}
-
 function normalizeText(value) {
   return String(value || "")
     .trim()
