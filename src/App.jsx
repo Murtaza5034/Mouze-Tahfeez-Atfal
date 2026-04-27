@@ -3852,7 +3852,7 @@ export default function App() {
     // Try to update existing record first
     const { error: hifzUpdateError } = await supabase
       .from("hifz_details")
-      .update({ muhaffiz_name: teacher_name, group_name })
+      .update({ muhaffiz_name: teacher_name })
       .eq("student_id", student_id);
 
     // if update failed or didn't find record, try inserting
@@ -3861,8 +3861,7 @@ export default function App() {
         .from("hifz_details")
         .insert({ 
           student_id, 
-          muhaffiz_name: teacher_name, 
-          group_name 
+          muhaffiz_name: teacher_name
         });
     }
 
@@ -3920,7 +3919,7 @@ export default function App() {
 
     const { error: hifzError } = await supabase
       .from("hifz_details")
-      .update({ muhaffiz_name: null, group_name: null })
+      .update({ muhaffiz_name: null })
       .eq("student_id", studentId);
 
     const { error: assignmentError } = await supabase
