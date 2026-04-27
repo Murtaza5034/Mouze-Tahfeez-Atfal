@@ -592,6 +592,7 @@ function buildStudents(profiles = [], hifzRecords = [], weeklyResults = [], assi
       teacherName,
       groupName,
       muhaffiz_id: assignment?.teacher_id || profile.muhaffiz_id || hifz?.muhaffiz_id || null,
+      user_id: assignment?.parent_id || profile.user_id || null,
       photoUrl:
         profile.photo_url ||
         profile.avatar_url ||
