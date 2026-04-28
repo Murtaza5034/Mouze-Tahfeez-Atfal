@@ -2305,11 +2305,24 @@ function AdminPortal({
               </div>
 
               <div className="record-stack">
+                {/* Debug: Show all portal access data */}
+                <div style={{ marginBottom: '20px', padding: '10px', background: '#f0f0f0', fontSize: '12px' }}>
+                  <strong>DEBUG - Portal Access List:</strong>
+                  <pre>{JSON.stringify(portalAccessList.map(a => ({
+                    id: a.id,
+                    full_name: a.full_name,
+                    portal_role: a.portal_role,
+                    show_salary_card: a.show_salary_card
+                  })), null, 2)}</pre>
+                </div>
+                
                 {portalAccessList
-                  .filter(access => 
-                    (normalizeText(access.portal_role).includes("teacher") || normalizeText(access.portal_role).includes("muhaffiz")) && 
-                    access.show_salary_card === true
-                  )
+                  .filter(access => {
+                    const isTeacher = normalizeText(access.portal_role).includes("teacher") || normalizeText(access.portal_role).includes("muhaffiz");
+                    const hasSalaryCard = access.show_salary_card === true || String(access.show_salary_card) === 'true';
+                    console.log('Filtering access:', access.full_name, 'isTeacher:', isTeacher, 'hasSalaryCard:', hasSalaryCard);
+                    return isTeacher && hasSalaryCard;
+                  })
                   .map(access => {
                     const profile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(access.full_name));
                     const today = new Date().toISOString().split('T')[0];
