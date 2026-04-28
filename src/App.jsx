@@ -2305,21 +2305,21 @@ function AdminPortal({
               </div>
 
               <div className="record-stack">
-                {teacherProfiles
-                  .filter(profile => {
-                    const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
-                    return access?.show_salary_card === true;
-                  })
-                  .map(profile => {
-                    const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
+                {portalAccessList
+                  .filter(access => 
+                    (normalizeText(access.portal_role).includes("teacher") || normalizeText(access.portal_role).includes("muhaffiz")) && 
+                    access.show_salary_card === true
+                  )
+                  .map(access => {
+                    const profile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(access.full_name));
                     const today = new Date().toISOString().split('T')[0];
                     const latestAttendance = teacherAttendance.find(a => 
-                      normalizeText(a.teacher_name) === normalizeText(profile.full_name) && 
+                      normalizeText(a.teacher_name) === normalizeText(access.full_name) && 
                       a.attendance_date === today
                     );
 
                     return (
-                      <div key={profile.id} className="faculty-vessel card-appear">
+                      <div key={access.id} className="faculty-vessel card-appear">
                         <div className="vessel-connection">
                            <div className="connection-line"></div>
                            <div className="connection-dot"></div>
@@ -2328,20 +2328,20 @@ function AdminPortal({
                           <div className="p-faculty-header">
                              <div className="p-faculty-profile">
                                <div className="p-faculty-avatar-container">
-                                 {profile.photo_url ? (
-                                   <img src={profile.photo_url} alt={profile.full_name} className="p-faculty-img" />
+                                 {profile?.photo_url || access.photo_url ? (
+                                   <img src={profile?.photo_url || access.photo_url} alt={access.full_name} className="p-faculty-img" />
                                  ) : (
                                    <div className="p-faculty-avatar-fallback">
-                                     {profile.full_name.charAt(0)}
+                                     {access.full_name.charAt(0)}
                                    </div>
                                  )}
                                </div>
                                <div className="p-faculty-meta">
                                  <div className="name-row">
-                                   <h3 className="p-faculty-name">{profile.full_name}</h3>
+                                   <h3 className="p-faculty-name">{access.full_name}</h3>
                                    <CheckCircle size={18} className="verified-badge" />
                                  </div>
-                                 <span className="p-faculty-email">{access?.email || "No Email linked"}</span>
+                                 <span className="p-faculty-email">{access.email || "No Email linked"}</span>
                                </div>
                              </div>
                              <div className={`p-status-badge ${latestAttendance?.status === 'Present' ? 'present' : latestAttendance?.status === 'Absent' ? 'absent' : 'pending'}`}>
@@ -2355,7 +2355,7 @@ function AdminPortal({
                                   <div className="vessel-label">Daily Minutes</div>
                                   <input 
                                     type="number" 
-                                    id={`mins-${profile.id}`} 
+                                    id={`mins-${access.id}`} 
                                     defaultValue="240" 
                                     className="p-minutes-input" 
                                     placeholder="Mins" 
@@ -2363,9 +2363,9 @@ function AdminPortal({
                                 </div>
 
                                 <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => {
-                                   const mins = document.getElementById(`mins-${profile.id}`).value || 240;
+                                   const mins = document.getElementById(`mins-${access.id}`).value || 240;
                                    onRecordTeacherAttendance(null, {
-                                      teacher_name: profile.full_name,
+                                      teacher_name: access.full_name,
                                       attendance_date: today,
                                       minutes_present: Number(mins),
                                       status: 'Present',
@@ -2380,7 +2380,7 @@ function AdminPortal({
                                 </button>
                                 
                                 <button className={`p-mark-btn p-absent ${latestAttendance?.status === 'Absent' ? 'active' : ''}`} onClick={() => onRecordTeacherAttendance(null, {
-                                   teacher_name: profile.full_name,
+                                   teacher_name: access.full_name,
                                    attendance_date: today,
                                    minutes_present: 0,
                                    status: 'Absent',
@@ -2406,10 +2406,10 @@ function AdminPortal({
                     );
                   })}
                 
-                {teacherProfiles.filter(profile => {
-                  const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
-                  return access?.show_salary_card === true;
-                }).length === 0 && (
+                {portalAccessList.filter(access => 
+                  (normalizeText(access.portal_role).includes("teacher") || normalizeText(access.portal_role).includes("muhaffiz")) && 
+                  access.show_salary_card === true
+                ).length === 0 && (
                   <div className="empty-state">
                     <Users size={48} opacity={0.2} />
                     <p>No teachers found with 'Show Salary Card' enabled.</p>
