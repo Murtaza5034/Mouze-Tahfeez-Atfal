@@ -5,11 +5,15 @@ create table if not exists public.teacher_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade unique,
   full_name text not null,
+  email text,
   photo_url text,
   phone_number text,
   whatsapp_number text,
+  salary_per_minute numeric default 2.3,
+  show_salary_card boolean default true,
   is_active boolean default true,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 alter table public.teacher_profiles enable row level security;
