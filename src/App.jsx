@@ -2305,6 +2305,35 @@ function AdminPortal({
               </div>
 
               <div className="record-stack">
+                {/* Comprehensive Debugging */}
+                <div style={{ marginBottom: '20px', padding: '15px', background: '#fff3cd', border: '2px solid #ffc107', borderRadius: '8px', fontSize: '12px' }}>
+                  <strong>🔍 DEBUGGING INFO:</strong>
+                  <div style={{ marginTop: '10px' }}>
+                    <strong>Total portalAccessList items:</strong> {portalAccessList.length}
+                  </div>
+                  <div style={{ marginTop: '10px' }}>
+                    <strong>All items:</strong>
+                    <pre style={{ background: '#f8f9fa', padding: '10px', overflow: 'auto', maxHeight: '300px' }}>
+                      {JSON.stringify(portalAccessList, null, 2)}
+                    </pre>
+                  </div>
+                  <div style={{ marginTop: '10px' }}>
+                    <strong>Filtered teachers with show_salary_card:</strong>
+                    <pre style={{ background: '#f8f9fa', padding: '10px' }}>
+                      {JSON.stringify(portalAccessList.filter(access => {
+                        const isTeacher = normalizeText(access.portal_role).includes("teacher") || normalizeText(access.portal_role).includes("muhaffiz");
+                        const hasSalaryCard = access.show_salary_card === true || String(access.show_salary_card).toUpperCase() === 'TRUE';
+                        return isTeacher && hasSalaryCard;
+                      }).map(a => ({
+                        full_name: a.full_name,
+                        portal_role: a.portal_role,
+                        show_salary_card: a.show_salary_card,
+                        show_salary_card_type: typeof a.show_salary_card
+                      })), null, 2)}
+                    </pre>
+                  </div>
+                </div>
+
                 {portalAccessList
                   .filter(access => {
                     const isTeacher = normalizeText(access.portal_role).includes("teacher") || normalizeText(access.portal_role).includes("muhaffiz");
