@@ -2300,138 +2300,119 @@ function AdminPortal({
               <div className="card-headline headline-with-action">
                 <div className="headline-left">
                   <Users size={18} />
-                  <h3>Verified Faculty Management</h3>
+                  <h3>Faculty Attendance Management</h3>
                 </div>
               </div>
 
-              <div className="faculty-selector-box">
-                <label htmlFor="faculty-select">Select Faculty Member</label>
-                <div className="selection-dropdown-row">
-                  <select 
-                    id="faculty-select" 
-                    className="premium-select"
-                    value={selectedFacultyId}
-                    onChange={(e) => setSelectedFacultyId(e.target.value)}
-                  >
-                    <option value="">-- Choose a Faculty Member --</option>
-                    {teacherProfiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.full_name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <div className="record-stack">
+                {teacherProfiles
+                  .filter(profile => {
+                    const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
+                    return access?.show_salary_card === true;
+                  })
+                  .map(profile => {
+                    const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
+                    const today = new Date().toISOString().split('T')[0];
+                    const latestAttendance = teacherAttendance.find(a => 
+                      normalizeText(a.teacher_name) === normalizeText(profile.full_name) && 
+                      a.attendance_date === today
+                    );
 
-              <div className="record-stack" style={{ marginTop: '20px' }}>
-                {selectedFacultyId ? (
-                  teacherProfiles
-                    .filter(p => String(p.id) === String(selectedFacultyId))
-                    .map(profile => {
-                      const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
-                      const today = new Date().toISOString().split('T')[0];
-                      const latestAttendance = teacherAttendance.find(a => 
-                        normalizeText(a.teacher_name) === normalizeText(profile.full_name) && 
-                        a.attendance_date === today
-                      );
-
-                      return (
-                        <div key={profile.id} className="faculty-vessel card-appear">
-                          <div className="vessel-connection">
-                             <div className="connection-line"></div>
-                             <div className="connection-dot"></div>
-                          </div>
-                          <article className="premium-faculty-card card-appear">
-                            <div className="p-faculty-header">
-                               <div className="p-faculty-profile">
-                                 <div className="p-faculty-avatar-container">
-                                   {profile.photo_url ? (
-                                     <img src={profile.photo_url} alt={profile.full_name} className="p-faculty-img" />
-                                   ) : (
-                                     <div className="p-faculty-avatar-fallback">
-                                       {profile.full_name.charAt(0)}
-                                     </div>
-                                   )}
-                                 </div>
-                                 <div className="p-faculty-meta">
-                                   <div className="name-row">
-                                     <h3 className="p-faculty-name">{profile.full_name}</h3>
-                                     <CheckCircle size={18} className="verified-badge" />
-                                   </div>
-                                   <span className="p-faculty-email">{access?.email || "No Email linked"}</span>
-                                 </div>
-                               </div>
-                               <div className={`p-status-badge ${latestAttendance?.status === 'Present' ? 'present' : latestAttendance?.status === 'Absent' ? 'absent' : 'pending'}`}>
-                                 {latestAttendance?.status || "Not Marked"}
-                               </div>
-                            </div>
-
-                            <div className="p-faculty-body">
-                               <div className="p-attendance-controls">
-                                  <div className="p-minutes-manual card-appear">
-                                    <div className="vessel-label">Daily Minutes</div>
-                                    <input 
-                                      type="number" 
-                                      id={`mins-${profile.id}`} 
-                                      defaultValue="240" 
-                                      className="p-minutes-input" 
-                                      placeholder="Mins" 
-                                    />
-                                  </div>
-
-                                  <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => {
-                                     const mins = document.getElementById(`mins-${profile.id}`).value || 240;
-                                     onRecordTeacherAttendance(null, {
-                                        teacher_name: profile.full_name,
-                                        attendance_date: today,
-                                        minutes_present: Number(mins),
-                                        status: 'Present',
-                                        note: 'Daily Attendance'
-                                     });
-                                  }}>
-                                    <div className="btn-icon-vessel"><UserCheck size={22} /></div>
-                                    <div className="btn-text-vessel">
-                                      <strong>Present</strong>
-                                      <span>Mark with Custom Mins</span>
-                                    </div>
-                                  </button>
-                                  
-                                  <button className={`p-mark-btn p-absent ${latestAttendance?.status === 'Absent' ? 'active' : ''}`} onClick={() => onRecordTeacherAttendance(null, {
-                                     teacher_name: profile.full_name,
-                                     attendance_date: today,
-                                     minutes_present: 0,
-                                     status: 'Absent',
-                                     note: 'Daily Attendance'
-                                  })}>
-                                    <div className="btn-icon-vessel"><UserX size={22} /></div>
-                                    <div className="btn-text-vessel">
-                                      <strong>Absent</strong>
-                                      <span>Mark for Today</span>
-                                    </div>
-                                  </button>
-                               </div>
-                            </div>
-                            
-                            {latestAttendance && (
-                              <div className="p-attendance-footer">
-                                <Clock size={14} />
-                                <span>Last updated today at {new Date(latestAttendance.created_at).toLocaleTimeString()}</span>
-                              </div>
-                            )}
-                          </article>
+                    return (
+                      <div key={profile.id} className="faculty-vessel card-appear">
+                        <div className="vessel-connection">
+                           <div className="connection-line"></div>
+                           <div className="connection-dot"></div>
                         </div>
-                      );
-                    })
-                ) : (
-                  <div className="empty-overview mini-empty card-appear">
-                    <User size={48} className="empty-icon-sub" />
-                    <h4>Select Faculty Member</h4>
-                    <p>Choose a verified member from the dropdown to view their profile and manage attendance.</p>
-                  </div>
-                )}
+                        <article className="premium-faculty-card card-appear">
+                          <div className="p-faculty-header">
+                             <div className="p-faculty-profile">
+                               <div className="p-faculty-avatar-container">
+                                 {profile.photo_url ? (
+                                   <img src={profile.photo_url} alt={profile.full_name} className="p-faculty-img" />
+                                 ) : (
+                                   <div className="p-faculty-avatar-fallback">
+                                     {profile.full_name.charAt(0)}
+                                   </div>
+                                 )}
+                               </div>
+                               <div className="p-faculty-meta">
+                                 <div className="name-row">
+                                   <h3 className="p-faculty-name">{profile.full_name}</h3>
+                                   <CheckCircle size={18} className="verified-badge" />
+                                 </div>
+                                 <span className="p-faculty-email">{access?.email || "No Email linked"}</span>
+                               </div>
+                             </div>
+                             <div className={`p-status-badge ${latestAttendance?.status === 'Present' ? 'present' : latestAttendance?.status === 'Absent' ? 'absent' : 'pending'}`}>
+                               {latestAttendance?.status || "Not Marked"}
+                             </div>
+                          </div>
+
+                          <div className="p-faculty-body">
+                             <div className="p-attendance-controls">
+                                <div className="p-minutes-manual card-appear">
+                                  <div className="vessel-label">Daily Minutes</div>
+                                  <input 
+                                    type="number" 
+                                    id={`mins-${profile.id}`} 
+                                    defaultValue="240" 
+                                    className="p-minutes-input" 
+                                    placeholder="Mins" 
+                                  />
+                                </div>
+
+                                <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => {
+                                   const mins = document.getElementById(`mins-${profile.id}`).value || 240;
+                                   onRecordTeacherAttendance(null, {
+                                      teacher_name: profile.full_name,
+                                      attendance_date: today,
+                                      minutes_present: Number(mins),
+                                      status: 'Present',
+                                      note: 'Daily Attendance'
+                                   });
+                                }}>
+                                  <div className="btn-icon-vessel"><UserCheck size={22} /></div>
+                                  <div className="btn-text-vessel">
+                                    <strong>Present</strong>
+                                    <span>Mark with Custom Mins</span>
+                                  </div>
+                                </button>
+                                
+                                <button className={`p-mark-btn p-absent ${latestAttendance?.status === 'Absent' ? 'active' : ''}`} onClick={() => onRecordTeacherAttendance(null, {
+                                   teacher_name: profile.full_name,
+                                   attendance_date: today,
+                                   minutes_present: 0,
+                                   status: 'Absent',
+                                   note: 'Daily Attendance'
+                                })}>
+                                  <div className="btn-icon-vessel"><UserX size={22} /></div>
+                                  <div className="btn-text-vessel">
+                                    <strong>Absent</strong>
+                                    <span>Mark for Today</span>
+                                  </div>
+                                </button>
+                             </div>
+                          </div>
+                          
+                          {latestAttendance && (
+                            <div className="p-attendance-footer">
+                              <Clock size={14} />
+                              <span>Last updated today at {new Date(latestAttendance.created_at).toLocaleTimeString()}</span>
+                            </div>
+                          )}
+                        </article>
+                      </div>
+                    );
+                  })}
                 
-                {teacherProfiles.length === 0 && (
+                {teacherProfiles.filter(profile => {
+                  const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
+                  return access?.show_salary_card === true;
+                }).length === 0 && (
                   <div className="empty-state">
                     <Users size={48} opacity={0.2} />
-                    <p>No verified faculty profiles found. Please create profiles in 'Staff Profiles' first.</p>
+                    <p>No teachers found with 'Show Salary Card' enabled.</p>
                   </div>
                 )}
               </div>
@@ -3031,6 +3012,51 @@ function TeacherPortal({
                 )}
               </div>
             </div>
+
+            {portalAccess?.show_salary_card && (
+              <div className="data-card">
+                <div className="card-headline">
+                  <Clock size={18} />
+                  <h3>Your Attendance & Salary</h3>
+                </div>
+                <div className="record-stack">
+                  {teacherData.attendances
+                    .filter(attendance => normalizeText(attendance.teacher_name) === normalizeText(teacherIdentity))
+                    .sort((a, b) => new Date(b.attendance_date) - new Date(a.attendance_date))
+                    .slice(0, 10)
+                    .map((attendance, index) => {
+                      const teacherProfile = (teacherProfiles || []).find(p => 
+                        normalizeText(p.full_name) === normalizeText(teacherIdentity)
+                      );
+                      const rate = toNumber(teacherProfile?.salary_per_minute || portalAccess.salary_per_minute || 2.3);
+                      const dailySalary = toNumber(attendance.minutes_present) * rate;
+                      
+                      return (
+                        <article key={`${attendance.attendance_date}-${index}`} className="record-card">
+                          <div className="card-primary-info">
+                            <strong>{new Date(attendance.attendance_date).toLocaleDateString()}</strong>
+                            <span className={`status-badge ${attendance.status?.toLowerCase()}`}>
+                              {attendance.status || "Not Marked"}
+                            </span>
+                          </div>
+                          <div className="attendance-details">
+                            <div className="attendance-info">
+                              <span>Minutes: {attendance.minutes_present}</span>
+                              <span className="salary-amount">Rs. {dailySalary.toFixed(2)}</span>
+                            </div>
+                            {attendance.note && (
+                              <span className="attendance-note">{attendance.note}</span>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  {teacherData.attendances.filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity)).length === 0 && (
+                    <div className="empty-state">No attendance records found.</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
 
@@ -3866,6 +3892,17 @@ export default function App() {
       status: adminForms.teacherAttendance.status,
       note: adminForms.teacherAttendance.note,
     };
+
+    // Check admin attendance limit (3 times per day)
+    const today = new Date().toISOString().split('T')[0];
+    const todayAttendanceCount = teacherAttendance.filter(a => 
+      a.attendance_date === today
+    ).length;
+
+    if (todayAttendanceCount >= 3) {
+      showAction("error", "Daily attendance limit reached (3 records per day).");
+      return;
+    }
 
     const { data, error } = await supabase.from("teacher_attendance").insert([record]).select().single();
 
