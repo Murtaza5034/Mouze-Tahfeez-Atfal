@@ -928,10 +928,10 @@ function ParentPortal({
 
       <aside className={`parent-drawer ${menuOpen ? 'open' : ''}`}>
         <div className="drawer-header">
-          <img src={user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url || "/logo.png"} alt="Profile" className="drawer-avatar" style={{ borderRadius: '50%' }} />
+          <img src={studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"} alt="Profile" className="drawer-avatar" style={{ borderRadius: '50%' }} />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 className="drawer-name">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Parent"}</h3>
-            <p className="drawer-sub">Child: {studentProfile?.name || "Student"}</p>
+            <h3 className="drawer-name">{studentProfile?.name || "Student"}</h3>
+            <p className="drawer-sub">ITS: {studentProfile?.its || "..."} &nbsp;|&nbsp; {studentProfile?.groupName || "..."}</p>
           </div>
           <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
