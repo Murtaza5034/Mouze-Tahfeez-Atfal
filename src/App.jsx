@@ -378,9 +378,9 @@ function formatRoleList(roles) {
 
 async function findParentProfile(userId) {
   const { data, error } = await supabase
-    .from("profiles")
+    .from("child_profiles")
     .select("*")
-    .eq("user_id", userId)
+    .eq("parent_user_id", userId)
     .maybeSingle();
 
   if (error) {
@@ -516,9 +516,7 @@ function getStudentStatus(student) {
   return "Status update pending";
 }
 
-function buildStudents(profiles = [], hifzRecords = [], weeklyResults = [], assignments = []) {
-  const hifzMap = new Map(hifzRecords.map((item) => [item.student_id, item]));
-  const assignmentMap = new Map((assignments || []).map((item) => [item.student_id, item]));
+function buildStudents(childProfiles = [], weeklyResults = []) {
   const latestResultMap = new Map();
 
   weeklyResults.forEach((result) => {
@@ -527,42 +525,22 @@ function buildStudents(profiles = [], hifzRecords = [], weeklyResults = [], assi
     }
   });
 
-  return profiles.map((profile) => {
-    const hifz = hifzMap.get(profile.student_id) || null;
-    const assignment = assignmentMap.get(profile.student_id) || null;
+  return childProfiles.map((profile) => {
     const latestResult = latestResultMap.get(profile.student_id) || null;
     
-    // Prioritize the dedicated assignment table for teacher and group data
-    const teacherName =
-      assignment?.teacher_name ||
-      hifz?.muhaffiz_name ||
-      profile.teacher_name ||
-      profile.muhaffiz_name ||
-      "Unassigned teacher";
-
-    const groupName =
-      assignment?.group_name ||
-      profile.group_name ||
-      hifz?.group_name ||
-      profile.class_level ||
-      teacherName ||
-      "Ungrouped";
-
     return {
       ...profile,
-      hifz,
+      student_id: profile.student_id,
+      name: profile.full_name,
+      arabic_name: profile.arabic_name,
+      its: profile.its || "...",
       latestResult,
-      teacherName,
-      groupName,
-      muhaffiz_id: assignment?.teacher_id || profile.muhaffiz_id || hifz?.muhaffiz_id || null,
-      user_id: assignment?.parent_id || profile.user_id || null,
-      photoUrl:
-        profile.photo_url ||
-        profile.avatar_url ||
-        hifz?.photo_url ||
-        hifz?.avatar_url ||
-        "",
-      hifzStatus: getStudentStatus({ hifz, latestResult }),
+      teacherName: profile.teacher_name || "Unassigned teacher",
+      groupName: profile.group_name || "Ungrouped",
+      muhaffiz_id: profile.teacher_id || null,
+      user_id: profile.parent_user_id || null,
+      photoUrl: profile.photo_url || "",
+      hifzStatus: profile.surat ? `Memorizing ${profile.surat}` : "Status pending",
     };
   });
 }
@@ -931,6 +909,11 @@ function ParentPortal({
           <img src={studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"} alt="Profile" className="drawer-avatar" style={{ borderRadius: '50%' }} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <h3 className="drawer-name">{studentProfile?.name || "Student"}</h3>
+            {studentProfile?.arabic_name && (
+              <h4 style={{ fontSize: '0.95rem', color: 'var(--text-muted)', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 'bold' }}>
+                {studentProfile.arabic_name}
+              </h4>
+            )}
             <p className="drawer-sub">ITS: {studentProfile?.its || "..."} &nbsp;|&nbsp; {studentProfile?.groupName || "..."}</p>
           </div>
           <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
@@ -1364,13 +1347,20 @@ function AdminPortal({
               <div className="assignment-form-complex card-appear">
                 <form className="stack-form" onSubmit={async (e) => {
                   e.preventDefault();
-                  const name = e.target.student_name.value;
-                  const group = e.target.group_name.value;
-                  if (!name) return;
+                  const formData = new FormData(e.target);
+                  const full_name = formData.get("full_name");
                   
-                  const { data, error } = await supabase.from("profiles").insert([{
-                    name,
-                    group_name: group,
+                  if (!full_name) return;
+                  
+                  const { data, error } = await supabase.from("child_profiles").insert([{
+                    full_name,
+                    arabic_name: formData.get("arabic_name"),
+                    parent_email: formData.get("parent_email"),
+                    juz: formData.get("juz"),
+                    surat: formData.get("surat"),
+                    photo_url: formData.get("photo_url"),
+                    group_name: formData.get("group_name"),
+                    its: formData.get("its"),
                     is_active: true
                   }]).select().single();
                   
@@ -1384,11 +1374,41 @@ function AdminPortal({
                 }}>
                   <div className="form-row">
                     <label>
-                      <span>Student Full Name</span>
-                      <input name="student_name" type="text" placeholder="Enter name..." required className="premium-input" />
+                      <span>Full Name (English)</span>
+                      <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
                     </label>
                     <label>
-                      <span>Initial Group / Class</span>
+                      <span>Arabic Name</span>
+                      <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input" />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      <span>Parent Auth Email</span>
+                      <input name="parent_email" type="email" placeholder="parent@example.com" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Photo URL</span>
+                      <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      <span>Juz</span>
+                      <input name="juz" type="text" placeholder="e.g. 30" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Surat / Ayat</span>
+                      <input name="surat" type="text" placeholder="e.g. Al-Naba" className="premium-input" />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      <span>ITS Number</span>
+                      <input name="its" type="text" placeholder="ITS" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Group / Class</span>
                       <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
                     </label>
                   </div>
@@ -1410,7 +1430,7 @@ function AdminPortal({
                       </div>
                       <button 
                         className="btn-text-only red" 
-                        onClick={() => onDeleteRecord("profiles", "student_id")(s.student_id)}
+                        onClick={() => onDeleteRecord("child_profiles", "student_id")(s.student_id)}
                         style={{ marginTop: '10px' }}
                       >
                         Remove Student
@@ -3274,18 +3294,12 @@ export default function App() {
 
         if (profileData) {
           const [
-            hifzResponse,
             attendanceResponse,
             scheduleResponse,
             resultResponse,
             announcementResponse,
             teacherProfilesResponse,
           ] = await Promise.all([
-            supabase
-              .from("hifz_details")
-              .select("*")
-              .eq("student_id", profileData.student_id)
-              .maybeSingle(),
             supabase
               .from("attendance")
               .select("*")
@@ -3307,7 +3321,7 @@ export default function App() {
 
           nextParentState = {
             studentProfile: profileData,
-            hifzDetails: hifzResponse.data || null,
+            hifzDetails: { juz: profileData.juz, surat: profileData.surat },
             announcements: announcementResponse.data || [],
             schedule: scheduleResponse.data || [],
             attendance: attendanceResponse.data || null,
@@ -3321,7 +3335,6 @@ export default function App() {
       } else {
         const [
           profilesResponse,
-          hifzResponse,
           resultsResponse,
           eventsResponse,
           scheduleResponse,
@@ -3329,10 +3342,8 @@ export default function App() {
           groupsResponse,
           attendanceResponse,
           teacherProfilesResponse,
-          teacherAssignmentsResponse,
         ] = await Promise.all([
-          supabase.from("profiles").select("*").order("name", { ascending: true }),
-          supabase.from("hifz_details").select("*"),
+          supabase.from("child_profiles").select("*").order("full_name", { ascending: true }),
           supabase.from("weekly_results").select("*").order("week_date", { ascending: false }),
           supabase.from("events").select("*").order("event_date", { ascending: false }),
           supabase.from("schedule").select("*").order("task_time", { ascending: true }),
@@ -3340,16 +3351,11 @@ export default function App() {
           supabase.from("custom_groups").select("*").order("group_name", { ascending: true }),
           supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }),
           supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
-          supabase.from("teacher_student_assignments").select("*").then(res => res, () => ({ data: [], error: null })),
         ]);
-
-        const assignments = teacherAssignmentsResponse.data || [];
 
         const students = buildStudents(
           profilesResponse.data || [],
-          hifzResponse.data || [],
-          resultsResponse.data || [],
-          assignments
+          resultsResponse.data || []
         );
 
         setTeacherAttendance(attendanceResponse.data || []);
@@ -3955,14 +3961,15 @@ export default function App() {
     
     const parentRecord = adminData.portalAccessList.find(a => String(a.user_id) === String(parent_id));
 
-    // 1. Update Profiles table (The core link)
+    // Update child_profiles table directly
     const { error: profileError } = await supabase
-      .from("profiles")
+      .from("child_profiles")
       .update({ 
         teacher_name: teacherRecord?.full_name || null, 
         group_name: group_name || null, 
-        muhaffiz_id: teacher_id || null,
-        user_id: parent_id || null // This links the student to the parent's portal
+        teacher_id: teacher_id || null,
+        parent_user_id: parent_id || null, // This links the student to the parent's portal
+        parent_email: parentRecord?.email || null
       })
       .eq("student_id", student_id);
 
@@ -3971,50 +3978,9 @@ export default function App() {
       return;
     }
 
-    // 2. Update hifz_details for teacher consistency (Historical legacy)
-    if (teacherRecord) {
-      await supabase
-        .from("hifz_details")
-        .update({ muhaffiz_name: teacherRecord.full_name })
-        .eq("student_id", student_id);
-    }
-
-    // 3. Update teacher_student_assignments (The mapping table)
-    const assignmentPayload = {
-      student_id: Number(student_id), // Force numeric
-      teacher_id: teacher_id || null,
-      teacher_name: teacherRecord?.full_name || null,
-      parent_id: parent_id || null,
-      parent_name: parentRecord?.full_name || null,
-      group_name: group_name || null
-    };
-
-    console.log("Upserting assignment:", assignmentPayload);
-
-    const { error: mappingError } = await supabase
-      .from("teacher_student_assignments")
-      .upsert(assignmentPayload, { onConflict: 'student_id' });
-
-    if (mappingError) {
-      console.error("Mapping table update failed:", mappingError);
-      showAction("error", `Assignment Mapping Failed: ${mappingError.message}`);
-      return;
-    }
-
     // Refresh school data locally
     setSchoolData((current) => ({
       ...current,
-      assignments: [
-        ...current.assignments.filter(a => String(a.student_id) !== String(student_id)),
-        { 
-          student_id, 
-          teacher_id, 
-          teacher_name: teacherRecord?.full_name, 
-          parent_id, 
-          parent_name: parentRecord?.full_name, 
-          group_name 
-        }
-      ],
       students: current.students.map((s) =>
         String(s.student_id) === String(student_id)
           ? { 
@@ -4035,36 +4001,24 @@ export default function App() {
     if (!window.confirm("Are you sure you want to remove this child from their assigned muhaffiz?")) return;
 
     const { error: profileError } = await supabase
-      .from("profiles")
+      .from("child_profiles")
       .update({ 
         teacher_name: null, 
         group_name: null, 
-        class_level: null,
-        muhaffiz_id: null,
-        user_id: null
+        teacher_id: null,
+        parent_user_id: null,
+        parent_email: null
       })
       .eq("student_id", studentId);
 
-    const { error: hifzError } = await supabase
-      .from("hifz_details")
-      .update({ muhaffiz_name: null })
-      .eq("student_id", studentId);
-
-    const { error: assignmentError } = await supabase
-      .from("teacher_student_assignments")
-      .delete()
-      .eq("student_id", studentId)
-      .then(res => res, () => ({ error: null }));
-
-    if (profileError || hifzError) {
-      showAction("error", `Unassign Failed: ${profileError?.message || hifzError?.message || 'Unknown error'}`);
+    if (profileError) {
+      showAction("error", `Unassign Failed: ${profileError?.message || 'Unknown error'}`);
       return;
     }
 
     // Refresh school data locally
     setSchoolData((current) => ({
       ...current,
-      assignments: current.assignments.filter(a => String(a.student_id) !== String(studentId)),
       students: current.students.map((s) =>
         String(s.student_id) === String(studentId)
           ? { ...s, teacherName: "Unassigned teacher", groupName: "Ungrouped", muhaffiz_id: null, user_id: null }
