@@ -2125,30 +2125,30 @@ function AdminPortal({
                         <option value="">-- No Teacher (Unlinked) --</option>
                         {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
                           <React.Fragment>
-                            {/* Show users from portal access */}
+                            {/* Show users from portal access who are teachers/muhaffiz */}
                             {portalAccessList
                               .filter(a => 
-                                a.portal_role?.toLowerCase().includes('teacher') || 
-                                a.portal_role?.toLowerCase().includes('muhaffiz')
+                                normalizeText(a.portal_role).includes('teacher') || 
+                                normalizeText(a.portal_role).includes('muhaffiz')
                               )
                               .map(p => (
                                 <option key={`portal-${p.id}`} value={p.user_id || p.email}>
-                                  {p.full_name || p.email} (Portal Access)
+                                  {p.full_name || p.email}
                                 </option>
                               ))
                             }
-                            {/* Also show from teacher_profiles table as fallback/additional */}
+                            {/* Also show from teacher_profiles table if not in portalAccessList */}
                             {teacherProfiles
-                              .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id))
+                              .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
                               .map(tp => (
                                 <option key={`profile-${tp.id}`} value={tp.user_id}>
-                                  {tp.full_name} (Profile only)
+                                  {tp.full_name} (Profile)
                                 </option>
                               ))
                             }
                           </React.Fragment>
                         ) : (
-                          <option value="" disabled>No staff found (Add in 'Staff Profiles' or 'Portal Access')</option>
+                          <option value="" disabled>No staff found</option>
                         )}
                       </select>
                     </label>
@@ -2159,7 +2159,10 @@ function AdminPortal({
                         <option value="">-- No Parent (Unlinked) --</option>
                         {portalAccessList && portalAccessList.length > 0 ? (
                           portalAccessList
-                            .filter(p => normalizeText(p.portal_role) === 'parents')
+                            .filter(p => {
+                              const role = normalizeText(p.portal_role);
+                              return role === 'parents' || role === 'parent';
+                            })
                             .map(p => (
                               <option key={`parent-${p.id}`} value={p.user_id || p.email}>
                                 {p.full_name || p.email || 'Unnamed User'}
@@ -3394,6 +3397,17 @@ export default function App() {
         };
 
         if (parentProfiles.length > 0) {
+          // AUTO-LINK: If any profile only has email but no ID, link it now
+          const profilesToLink = parentProfiles.filter(p => !p.parent_user_id && p.parent_email && normalizeText(p.parent_email) === normalizeText(currentUser.email));
+          if (profilesToLink.length > 0) {
+            console.log("Auto-linking parent user_id to student profiles:", profilesToLink.length);
+            await Promise.all(profilesToLink.map(p => 
+              supabase.from("child_profiles").update({ parent_user_id: currentUser.id }).eq("student_id", p.student_id)
+            ));
+            // Update local objects to reflect the link immediately
+            profilesToLink.forEach(p => p.parent_user_id = currentUser.id);
+          }
+
           // If multiple students, and none selected, use first
           const activeStudent = parentProfiles.find(p => String(p.student_id) === String(selectedStudentId)) || parentProfiles[0];
           
@@ -4112,11 +4126,12 @@ export default function App() {
       .eq("student_id", student_id);
 
     if (profileError) {
-      showAction("error", `Profile Update Failed: ${profileError.message}`);
+      console.error("Link update error:", profileError);
+      showAction("error", `Connection Failed: ${profileError.message}`);
       return;
     }
 
-    // Auto-update parent_user_id if we have a match in portalAccessList
+    // Secondary Check: If we have an ID for parent but it wasn't set, force it
     if (parentRecord?.user_id && !updatePayload.parent_user_id) {
        await supabase.from("child_profiles").update({ parent_user_id: parentRecord.user_id }).eq("student_id", student_id);
     }
