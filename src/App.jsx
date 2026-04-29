@@ -928,10 +928,10 @@ function ParentPortal({
 
       <aside className={`parent-drawer ${menuOpen ? 'open' : ''}`}>
         <div className="drawer-header">
-          <img src={studentProfile?.photo_url || "/logo.png"} alt="Profile" className="drawer-avatar" />
-          <div>
-            <h3 className="drawer-name">{studentProfile?.name || "Student"}</h3>
-            <p className="drawer-sub">ITS: {studentProfile?.its || "..."} &nbsp;|&nbsp; {studentProfile?.groupName || "..."}</p>
+          <img src={user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url || "/logo.png"} alt="Profile" className="drawer-avatar" style={{ borderRadius: '50%' }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h3 className="drawer-name">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Parent"}</h3>
+            <p className="drawer-sub">Child: {studentProfile?.name || "Student"}</p>
           </div>
           <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
@@ -1297,10 +1297,10 @@ function AdminPortal({
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
            <div className="brand-header-flex">
-            <img src="/logo.png" alt="Logo" className="nav-logo" />
-            <div>
+            <img src={user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url || "/logo.png"} alt="Profile" className="nav-logo" />
+            <div style={{ minWidth: 0, flex: 1 }}>
               <p className="brand-tag">Management Portal</p>
-              <h2 className="brand-title">Admin</h2>
+              <h2 className="brand-title">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"}</h2>
             </div>
             <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
           </div>
@@ -2581,10 +2581,10 @@ function TeacherPortal({
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
            <div className="brand-header-flex">
-            <img src={portalAccess?.photo_url || "/logo.png"} alt="Logo" className="nav-logo" />
-            <div>
+            <img src={portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url || "/logo.png"} alt="Profile" className="nav-logo" />
+            <div style={{ minWidth: 0, flex: 1 }}>
               <p className="brand-tag">Teacher Portal</p>
-              <h2 className="brand-title">{portalAccess?.full_name || "Teacher"}</h2>
+              <h2 className="brand-title">{portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Teacher"}</h2>
             </div>
             <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
           </div>

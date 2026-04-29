@@ -128,11 +128,17 @@
   font-weight: 800;
   color: var(--deep-brown);
   margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .drawer-sub {
   font-size: 0.85rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .drawer-close {
