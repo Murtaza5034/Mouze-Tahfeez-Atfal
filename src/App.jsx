@@ -806,6 +806,9 @@ function ParentPortal({
   onRoleChange,
   teacherProfiles = [],
   setSelectedStudentId,
+  onLogout,
+  loadPortalData,
+  portalRole,
 }) {
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult } = parentData;
     parentData;
@@ -1274,6 +1277,8 @@ function AdminPortal({
   onClearHistory,
   notifications,
   onUnassignChild,
+  loadPortalData,
+  portalRole,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -2702,6 +2707,8 @@ function TeacherPortal({
   portalAccess,
   monthlySalary,
   notifications,
+  loadPortalData,
+  portalRole,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const selectedStudent =
@@ -4384,6 +4391,8 @@ export default function App() {
           menuOpen={menuOpen}
           setMenuOpen={setMenuOpen}
           onLogout={handleLogout}
+          loadPortalData={loadPortalData}
+          portalRole={portalRole}
           onRoleChange={storeRole}
           teacherProfiles={teacherProfiles}
           notifications={notificationsList}
@@ -4429,6 +4438,8 @@ export default function App() {
         onSendCustomNotification={handleSendCustomNotification}
         onClearHistory={handleClearHistory}
         onUnassignChild={handleUnassignChild}
+        loadPortalData={loadPortalData}
+        portalRole={portalRole}
       />
       </React.Fragment>
     );
@@ -4440,7 +4451,10 @@ export default function App() {
       <TeacherPortal
         actionMessage={actionMessage}
         activePage={activePage}
+        monthlySalary={monthlySalary}
         notifications={notificationsList}
+        loadPortalData={loadPortalData}
+        portalRole={portalRole}
         menuOpen={menuOpen}
         onLogout={handleLogout}
         onRoleChange={storeRole}
@@ -4453,7 +4467,6 @@ export default function App() {
         teacherForms={teacherForms}
         user={user}
         portalAccess={portalAccess}
-        monthlySalary={monthlySalary}
       />
     </React.Fragment>
   );
