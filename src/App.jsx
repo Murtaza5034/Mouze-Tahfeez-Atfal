@@ -695,7 +695,7 @@ function JadeedPagesCard({ count }) {
 }
 
 function TahfeezReportCard({ student, weeklyResult }) {
-  const arabicStyle = { fontFamily: "'Amiri', serif" };
+  const arabicStyle = { fontFamily: "'Kanz al Marjaan', serif" };
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
 
   return (
@@ -734,7 +734,7 @@ function TahfeezReportCard({ student, weeklyResult }) {
                 <span className="score-title kids-font">WEEKLY SCORE</span>
                 <span className="jumla-label arabic-kanz" style={arabicStyle}>جملة</span>
                 <div className="score-circle">{weeklyResult?.total_score || "0"}</div>
-                <span className="max-score">{UI_TEXT.PER_MAX} 100</span>
+                <span className="max-score"> / 100</span>
              </div>
 
              <div className="score-details-box">
@@ -746,7 +746,7 @@ function TahfeezReportCard({ student, weeklyResult }) {
                 ].map((item) => (
                   <div key={item.label} className="score-row">
                     <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label}</span>
-                    <span className="score-val">{item.val || "0"}{UI_TEXT.PER_MAX}{item.max}</span>
+                    <span className="score-val">{item.val || "0"} / {item.max}</span>
                   </div>
                 ))}
              </div>

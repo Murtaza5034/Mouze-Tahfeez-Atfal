@@ -1,5 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap');
 
+@font-face {
+  font-family: 'Kanz al Marjaan';
+  src: url('/Kanz al Marjaan/kanz-al-marjaan-webfont.eot');
+  src: url('/Kanz al Marjaan/kanz-al-marjaan-webfont.eot?#iefix') format('embedded-opentype'),
+       url('/Kanz al Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+       url('/Kanz al Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
+       url('/Kanz al Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype'),
+       url('/Kanz al Marjaan/kanz-al-marjaan-webfont.svg#KanzalMarjaanRegular') format('svg');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* White, Brown, and Golden Professional Palette */
   --primary-gold: #c5a059;
@@ -34,7 +47,7 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Kanz al Marjaan', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--cream-bg);
   color: var(--text-main);
   line-height: 1.6;
@@ -118,7 +131,7 @@ h1, h2, h3, h4, h5 {
 }
 
 .arabic-kanz {
-  font-family: 'Amiri', serif;
+  font-family: 'Kanz al Marjaan', serif;
   direction: rtl;
   color: var(--dark-gold);
 }
@@ -1036,7 +1049,7 @@ h1, h2, h3, h4, h5 {
 }
 
 .jumla-label {
-  font-family: 'Amiri', serif;
+  font-family: 'Kanz al Marjaan', serif;
   font-size: 2rem;
   color: #8b0000;
   margin: 4px 0;
@@ -1087,7 +1100,7 @@ h1, h2, h3, h4, h5 {
 }
 
 .arabic-label {
-  font-family: 'Amiri', serif;
+  font-family: 'Kanz al Marjaan', serif;
   font-size: 1.4rem;
   color: var(--dark-gold);
 }
@@ -1675,7 +1688,7 @@ h1, h2, h3, h4, h5 {
   fill: none;
   stroke: #eee;
   stroke-width: 2;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
 }
 
 .attendance-fill-text {
@@ -1832,7 +1845,7 @@ h1, h2, h3, h4, h5 {
 }
 
 .attendance-rating-text {
-  font-family: 'Amiri', serif;
+  font-family: 'Kanz al Marjaan', serif;
   font-size: 1.3rem;
   font-weight: 700;
   color: var(--deep-brown);
