@@ -2000,19 +2000,80 @@ function AdminPortal({
                   const data = {
                     student_id: e.target.student_id.value,
                     teacher_id: e.target.teacher_id.value,
-                    parent_id: e.target.parent_id.value
+                    parent_id: e.target.parent_id.value,
+                    full_name: e.target.full_name?.value,
+                    arabic_name: e.target.arabic_name?.value,
+                    juz: e.target.juz?.value,
+                    surat: e.target.surat?.value,
+                    photo_url: e.target.photo_url?.value,
+                    group_name: e.target.group_name?.value,
+                    its: e.target.its?.value,
                   };
                   if (data.student_id) onAssignChild(data);
                 }}>
                   <div className="form-grid">
                     <label>
                       <span>Select Student</span>
-                      <select name="student_id" className="premium-select" required>
+                      <select 
+                        name="student_id" 
+                        className="premium-select" 
+                        required
+                        onChange={(e) => {
+                          const s = students.find(x => String(x.student_id) === e.target.value);
+                          if (s) {
+                            const form = e.target.form;
+                            if (form.full_name) form.full_name.value = s.name || '';
+                            if (form.arabic_name) form.arabic_name.value = s.arabic_name || '';
+                            if (form.group_name) form.group_name.value = s.groupName === 'Ungrouped' ? '' : (s.groupName || '');
+                            if (form.juz) form.juz.value = s.juz || '';
+                            if (form.surat) form.surat.value = s.surat || '';
+                            if (form.photo_url) form.photo_url.value = s.photoUrl || '';
+                            if (form.its) form.its.value = s.its === '...' ? '' : (s.its || '');
+                            if (form.teacher_id) form.teacher_id.value = s.muhaffiz_id || '';
+                            if (form.parent_id) form.parent_id.value = s.user_id || '';
+                          }
+                        }}
+                      >
                         <option value="">-- Choose Student --</option>
                         {students.map(s => (
                           <option key={s.student_id} value={s.student_id}>{s.name}</option>
                         ))}
                       </select>
+                    </label>
+
+                    <label>
+                      <span>Full Name (English)</span>
+                      <input name="full_name" type="text" placeholder="Update name..." className="premium-input" />
+                    </label>
+
+                    <label>
+                      <span>Arabic Name</span>
+                      <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input" />
+                    </label>
+
+                    <label>
+                      <span>Group / Class</span>
+                      <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
+                    </label>
+
+                    <label>
+                      <span>Juz</span>
+                      <input name="juz" type="text" placeholder="e.g. 30" className="premium-input" />
+                    </label>
+
+                    <label>
+                      <span>Surat / Ayat</span>
+                      <input name="surat" type="text" placeholder="e.g. Al-Naba" className="premium-input" />
+                    </label>
+
+                    <label>
+                      <span>Photo URL</span>
+                      <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                    </label>
+
+                    <label>
+                      <span>ITS Number</span>
+                      <input name="its" type="text" placeholder="ITS" className="premium-input" />
                     </label>
 
                     <label>
@@ -2075,8 +2136,8 @@ function AdminPortal({
                     Total portal users in system: {portalAccessList?.length || 0}
                   </div>
 
-                  <div className="form-actions-row">
-                    <button type="submit" className="action-button">Link Accounts</button>
+                  <div className="form-actions-row" style={{ gridColumn: '1 / -1' }}>
+                    <button type="submit" className="action-button">Save Assignments & Updates</button>
                     <button 
                       type="button" 
                       className="action-button secondary"
@@ -3406,7 +3467,7 @@ export default function App() {
       console.error("Error fetching portal data:", error);
       setActionMessage({
         type: "error",
-        text: "Some data could not be loaded. Please check your table permissions and try again.",
+        text: `Data Error: ${error?.message || "Some data could not be loaded. Please check your table permissions and try again."}`,
       });
     } finally {
       setLoading(false);
@@ -3946,7 +4007,7 @@ export default function App() {
   };
 
   const handleAssignChild = async (data) => {
-    const { student_id, teacher_id, parent_id, group_name } = data;
+    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its } = data;
     if (!student_id) {
       showAction("error", "Please select a student first.");
       return;
@@ -3961,15 +4022,24 @@ export default function App() {
     const parentRecord = adminData.portalAccessList.find(a => String(a.user_id) === String(parent_id));
 
     // Update child_profiles table directly
+    const updatePayload = {
+      teacher_name: teacherRecord?.full_name || null, 
+      teacher_id: teacher_id || null,
+      parent_user_id: parent_id || null, // This links the student to the parent's portal
+      parent_email: parentRecord?.email || null
+    };
+
+    if (full_name) updatePayload.full_name = full_name;
+    if (arabic_name !== undefined) updatePayload.arabic_name = arabic_name;
+    if (group_name !== undefined) updatePayload.group_name = group_name;
+    if (juz !== undefined) updatePayload.juz = juz;
+    if (surat !== undefined) updatePayload.surat = surat;
+    if (photo_url !== undefined) updatePayload.photo_url = photo_url;
+    if (its !== undefined) updatePayload.its = its;
+
     const { error: profileError } = await supabase
       .from("child_profiles")
-      .update({ 
-        teacher_name: teacherRecord?.full_name || null, 
-        group_name: group_name || null, 
-        teacher_id: teacher_id || null,
-        parent_user_id: parent_id || null, // This links the student to the parent's portal
-        parent_email: parentRecord?.email || null
-      })
+      .update(updatePayload)
       .eq("student_id", student_id);
 
     if (profileError) {
