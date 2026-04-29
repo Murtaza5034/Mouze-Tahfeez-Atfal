@@ -2159,21 +2159,27 @@ function AdminPortal({
                         <option value="">-- No Parent (Unlinked) --</option>
                         {portalAccessList && portalAccessList.length > 0 ? (
                           portalAccessList
-                            .filter(p => {
-                              const role = normalizeText(p.portal_role);
-                              // Show anyone with 'parent' in role OR anyone with no role at all
-                              // BUT exclude those who are ONLY 'admin' or ONLY 'teacher'
-                              if (role.includes('parent')) return true;
-                              if (!role) return true;
-                              return false;
+                            .slice() // Clone before sort
+                            .sort((a, b) => {
+                              const aRole = normalizeText(a.portal_role);
+                              const bRole = normalizeText(b.portal_role);
+                              const aIsParent = aRole.includes('parent');
+                              const bIsParent = bRole.includes('parent');
+                              if (aIsParent && !bIsParent) return -1;
+                              if (!aIsParent && bIsParent) return 1;
+                              return (a.full_name || "").localeCompare(b.full_name || "");
                             })
-                            .map(p => (
-                              <option key={`parent-${p.id}`} value={p.user_id || p.email}>
-                                {p.full_name || p.email || 'Unnamed'} {p.portal_role ? `(${p.portal_role})` : '(No Role)'}
-                              </option>
-                            ))
+                            .map(p => {
+                              const isParent = normalizeText(p.portal_role).includes('parent');
+                              return (
+                                <option key={`parent-${p.id}`} value={p.user_id || p.email}>
+                                  {isParent ? '👤 ' : ''}
+                                  {p.full_name || p.email || 'Unnamed'} ({p.portal_role || 'No Role'})
+                                </option>
+                              );
+                            })
                         ) : (
-                          <option value="" disabled>No parents found (Grant Access first)</option>
+                          <option value="" disabled>No portal users found (Grant Access first)</option>
                         )}
                       </select>
                     </label>
