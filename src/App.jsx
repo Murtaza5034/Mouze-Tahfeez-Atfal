@@ -1412,7 +1412,8 @@ function AdminPortal({
                   } else {
                     alert("Student added successfully!");
                     e.target.reset();
-                    window.location.reload(); 
+                    // Better than reload: refresh the data in memory
+                    loadPortalData(portalRole, user);
                   }
                 }}>
                   <div className="form-row">
@@ -2057,31 +2058,39 @@ function AdminPortal({
                   <div className="form-grid">
                     <label>
                       <span>Select Student</span>
-                      <select 
-                        name="student_id" 
-                        className="premium-select" 
-                        required
-                        onChange={(e) => {
-                          const s = students.find(x => String(x.student_id) === e.target.value);
-                          if (s) {
-                            const form = e.target.form;
-                            if (form.full_name) form.full_name.value = s.name || '';
-                            if (form.arabic_name) form.arabic_name.value = s.arabic_name || '';
-                            if (form.group_name) form.group_name.value = s.groupName === 'Ungrouped' ? '' : (s.groupName || '');
-                            if (form.juz) form.juz.value = s.juz || '';
-                            if (form.surat) form.surat.value = s.surat || '';
-                            if (form.photo_url) form.photo_url.value = s.photoUrl || '';
-                            if (form.its) form.its.value = s.its === '...' ? '' : (s.its || '');
-                            if (form.teacher_id) form.teacher_id.value = s.muhaffiz_id || '';
-                            if (form.parent_id) form.parent_id.value = s.user_id || '';
-                          }
-                        }}
-                      >
-                        <option value="">-- Choose Student --</option>
-                        {students.map(s => (
-                          <option key={s.student_id} value={s.student_id}>{s.name}</option>
-                        ))}
-                      </select>
+                        <select 
+                          name="student_id" 
+                          className="premium-select" 
+                          required
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val) return;
+                            const s = students.find(x => String(x.student_id) === String(val));
+                            if (s) {
+                              const form = e.target.form;
+                              if (form.full_name) form.full_name.value = s.name || '';
+                              if (form.arabic_name) form.arabic_name.value = s.arabic_name || '';
+                              if (form.group_name) form.group_name.value = s.groupName === 'Ungrouped' ? '' : (s.groupName || '');
+                              if (form.juz) form.juz.value = s.juz || '';
+                              if (form.surat) form.surat.value = s.surat || '';
+                              if (form.photo_url) form.photo_url.value = s.photoUrl || '';
+                              if (form.its) form.its.value = s.its === '...' ? '' : (s.its || '');
+                              if (form.teacher_id) form.teacher_id.value = s.muhaffiz_id || '';
+                              if (form.parent_id) form.parent_id.value = s.user_id || '';
+                            }
+                          }}
+                        >
+                          <option value="">-- Choose Student --</option>
+                          {students && students.length > 0 ? (
+                            students.map(s => (
+                              <option key={s.student_id} value={s.student_id}>
+                                {s.name || 'Unnamed Student'}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="" disabled>No students found in Registry</option>
+                          )}
+                        </select>
                     </label>
 
                     <label>
