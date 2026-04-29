@@ -278,6 +278,42 @@
   transform: translateY(-2px);
 }
 
+/* ---- Student Switcher ---- */
+.topbar-student-switcher {
+  display: flex;
+  align-items: center;
+  background: var(--premium-white);
+  border: 1.5px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 4px 8px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s;
+}
+
+.topbar-student-switcher:hover {
+  border-color: var(--primary-gold);
+  box-shadow: var(--shadow-gold);
+}
+
+.student-select-minimal {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--deep-brown);
+  cursor: pointer;
+  padding: 4px 0;
+  outline: none;
+}
+
+.child-switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
 /* ---- Main Content Area ---- */
 .parent-main {
   flex: 1;

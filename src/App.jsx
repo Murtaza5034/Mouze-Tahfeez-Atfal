@@ -376,18 +376,28 @@ function formatRoleList(roles) {
   return roles.map((role) => ROLE_LABELS[role] || role).join(", ");
 }
 
-async function findParentProfile(userId) {
-  const { data, error } = await supabase
+async function findParentProfiles(userId, email = null) {
+  let query = supabase
     .from("child_profiles")
-    .select("*")
-    .eq("parent_user_id", userId)
-    .maybeSingle();
+    .select("*");
+  
+  if (userId && email) {
+    query = query.or(`parent_user_id.eq.${userId},parent_email.eq.${email}`);
+  } else if (userId) {
+    query = query.eq("parent_user_id", userId);
+  } else if (email) {
+    query = query.eq("parent_email", email);
+  } else {
+    return [];
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
   }
 
-  return data || null;
+  return data || [];
 }
 
 async function authorizePortalAccess(user, requestedRole) {
@@ -424,14 +434,15 @@ async function authorizePortalAccess(user, requestedRole) {
   }
 
   if (requestedRole === "parents") {
-    const parentProfile = await findParentProfile(user.id);
+    const parentProfiles = await findParentProfiles(user.id, user.email);
 
-    if (parentProfile) {
+    if (parentProfiles.length > 0) {
       return {
         ok: true,
         role: "parents",
         assignedRoles: assignedRoles.length > 0 ? assignedRoles : ["parents"],
-        parentProfile,
+        parentProfile: parentProfiles[0],
+        allParentProfiles: parentProfiles,
         accessRow: tableAccess || null,
       };
     }
@@ -539,6 +550,7 @@ function buildStudents(childProfiles = [], weeklyResults = []) {
       groupName: profile.group_name || "Ungrouped",
       muhaffiz_id: profile.teacher_id || null,
       user_id: profile.parent_user_id || null,
+      parent_email: profile.parent_email || null,
       photoUrl: profile.photo_url || "",
       hifzStatus: profile.surat ? `Memorizing ${profile.surat}` : "Status pending",
     };
@@ -790,13 +802,11 @@ function ParentPortal({
   loading,
   menuOpen,
   setMenuOpen,
-  onLogout,
   onRoleChange,
   teacherProfiles = [],
+  setSelectedStudentId,
 }) {
-
-
-  const { studentProfile, hifzDetails, announcements, schedule, attendance, weeklyResult } =
+  const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult } = parentData;
     parentData;
 
   const pageNames = ["Home", "Schedule", "Progress", "Announcements", "Teachers"];
@@ -914,10 +924,27 @@ function ParentPortal({
                 {studentProfile.arabic_name}
               </h4>
             )}
-            <p className="drawer-sub">ITS: {studentProfile?.its || "..."} &nbsp;|&nbsp; {studentProfile?.groupName || "..."}</p>
+            <p className="drawer-sub">ITS: {studentProfile?.its || "..."}</p>
           </div>
           <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
+
+        {allProfiles.length > 1 && (
+          <div className="drawer-nav" style={{ paddingBottom: 0 }}>
+            <p className="drawer-section-label">Switch Child</p>
+            <div className="child-switch-list">
+              {allProfiles.map(p => (
+                <button 
+                  key={p.student_id} 
+                  className={`drawer-link ${String(p.student_id) === String(studentProfile?.student_id) ? "active" : ""}`}
+                  onClick={() => { setSelectedStudentId(p.student_id); setMenuOpen(false); }}
+                >
+                  <User size={16} /> {p.full_name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <nav className="drawer-nav">
           <p className="drawer-section-label">More Pages</p>
           <button className={`drawer-link ${activePage === "Announcements" ? "active" : ""}`} onClick={() => { setActivePage("Announcements"); setMenuOpen(false); }}>
@@ -940,16 +967,32 @@ function ParentPortal({
       </aside>
 
       <header className="parent-topbar">
-        <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
-          <Menu size={22} />
-        </button>
-        <div className="parent-topbar-left">
-          <img src="/logo.png" alt="Logo" className="topbar-logo" />
-          <div>
-            <span className="topbar-brand">Mauze Tahfeez</span>
-            <span className="topbar-sub">Parents Portal</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
+            <Menu size={22} />
+          </button>
+          <div className="parent-topbar-left">
+            <img src="/logo.png" alt="Logo" className="topbar-logo" />
+            <div>
+              <span className="topbar-brand">Mauze Tahfeez</span>
+              <span className="topbar-sub">Parents Portal</span>
+            </div>
           </div>
         </div>
+
+        {allProfiles.length > 1 && (
+          <div className="topbar-student-switcher">
+             <select 
+               className="student-select-minimal"
+               value={studentProfile?.student_id}
+               onChange={(e) => setSelectedStudentId(e.target.value)}
+             >
+               {allProfiles.map(p => (
+                 <option key={p.student_id} value={p.student_id}>{p.full_name.split(' ')[0]}</option>
+               ))}
+             </select>
+          </div>
+        )}
       </header>
 
       <main className="parent-main">
@@ -2089,7 +2132,7 @@ function AdminPortal({
                                 a.portal_role?.toLowerCase().includes('muhaffiz')
                               )
                               .map(p => (
-                                <option key={`portal-${p.user_id || p.id}`} value={p.user_id}>
+                                <option key={`portal-${p.id}`} value={p.user_id || p.email}>
                                   {p.full_name || p.email} (Portal Access)
                                 </option>
                               ))
@@ -2116,18 +2159,14 @@ function AdminPortal({
                         <option value="">-- No Parent (Unlinked) --</option>
                         {portalAccessList && portalAccessList.length > 0 ? (
                           portalAccessList
-                            .filter(a => 
-                              a.portal_role?.toLowerCase().includes('parent') || 
-                              a.portal_role?.toLowerCase().includes('guardian') ||
-                              portalAccessList.length < 5
-                            )
+                            .filter(p => normalizeText(p.portal_role) === 'parents')
                             .map(p => (
-                              <option key={`parent-${p.user_id || p.id}`} value={p.user_id}>
-                                {p.full_name || p.email} ({p.portal_role})
+                              <option key={`parent-${p.id}`} value={p.user_id || p.email}>
+                                {p.full_name || p.email || 'Unnamed User'}
                               </option>
                             ))
                         ) : (
-                          <option value="" disabled>No parents found (Grant access first)</option>
+                          <option value="" disabled>No parents found (Grant Access first)</option>
                         )}
                       </select>
                     </label>
@@ -3342,10 +3381,11 @@ export default function App() {
 
     try {
       if (role === "parents") {
-        const profileData = parentProfileOverride || (await findParentProfile(currentUser.id));
+        const parentProfiles = parentProfileOverride ? [parentProfileOverride] : (await findParentProfiles(currentUser.id, currentUser.email));
 
         let nextParentState = {
-          studentProfile: profileData,
+          studentProfile: parentProfiles[0] || null,
+          allProfiles: parentProfiles,
           hifzDetails: null,
           announcements: [],
           schedule: [],
@@ -3353,7 +3393,10 @@ export default function App() {
           weeklyResult: null,
         };
 
-        if (profileData) {
+        if (parentProfiles.length > 0) {
+          // If multiple students, and none selected, use first
+          const activeStudent = parentProfiles.find(p => String(p.student_id) === String(selectedStudentId)) || parentProfiles[0];
+          
           const [
             attendanceResponse,
             scheduleResponse,
@@ -3364,15 +3407,15 @@ export default function App() {
             supabase
               .from("attendance")
               .select("*")
-              .eq("student_id", profileData.student_id)
+              .eq("student_id", activeStudent.student_id)
               .order("attendance_date", { ascending: false })
               .limit(1)
               .maybeSingle(),
-            supabase.from("schedule").select("*").eq("student_id", profileData.student_id),
+            supabase.from("schedule").select("*").eq("student_id", activeStudent.student_id),
             supabase
               .from("weekly_results")
               .select("*")
-              .eq("student_id", profileData.student_id)
+              .eq("student_id", activeStudent.student_id)
               .order("week_date", { ascending: false })
               .limit(1)
               .maybeSingle(),
@@ -3387,14 +3430,17 @@ export default function App() {
           if (teacherProfilesResponse.error) throw teacherProfilesResponse.error;
 
           nextParentState = {
-            studentProfile: profileData,
-            hifzDetails: { juz: profileData.juz, surat: profileData.surat },
+            studentProfile: activeStudent,
+            allProfiles: parentProfiles,
+            hifzDetails: { juz: activeStudent.juz, surat: activeStudent.surat },
             announcements: announcementResponse.data || [],
             schedule: scheduleResponse.data || [],
             attendance: attendanceResponse.data || null,
             weeklyResult: resultResponse.data || null,
             teacherProfiles: teacherProfilesResponse.data || [],
           };
+          
+          if (!selectedStudentId) setSelectedStudentId(activeStudent.student_id);
         }
 
         setParentData(nextParentState);
@@ -4037,27 +4083,28 @@ export default function App() {
 
     console.log("Linking accounts for student:", student_id, { teacher_id, parent_id });
 
+    // Fix: Use schoolData instead of undefined adminData
     const teacherRecord = 
-      adminData.portalAccessList.find(a => String(a.user_id) === String(teacher_id)) ||
-      adminData.teacherProfiles.find(p => String(p.user_id) === String(teacher_id));
+      schoolData.portalAccessList.find(a => String(a.user_id) === String(teacher_id) || String(a.email) === String(teacher_id)) ||
+      schoolData.teacherProfiles.find(p => String(p.user_id) === String(teacher_id));
     
-    const parentRecord = adminData.portalAccessList.find(a => String(a.user_id) === String(parent_id));
+    const parentRecord = schoolData.portalAccessList.find(a => String(a.user_id) === String(parent_id) || String(a.email) === String(parent_id));
 
     // Update child_profiles table directly
     const updatePayload = {
       teacher_name: teacherRecord?.full_name || null, 
-      teacher_id: teacher_id || null,
-      parent_user_id: parent_id || null, // This links the student to the parent's portal
-      parent_email: parentRecord?.email || null
+      teacher_id: teacherRecord?.user_id || teacher_id || null,
+      parent_user_id: parentRecord?.user_id || (parent_id?.includes('@') ? null : parent_id) || null, 
+      parent_email: parentRecord?.email || (parent_id?.includes('@') ? parent_id : null) || null
     };
 
-    if (full_name) updatePayload.full_name = full_name;
-    if (arabic_name !== undefined) updatePayload.arabic_name = arabic_name;
-    if (group_name !== undefined) updatePayload.group_name = group_name;
-    if (juz !== undefined) updatePayload.juz = juz;
-    if (surat !== undefined) updatePayload.surat = surat;
-    if (photo_url !== undefined) updatePayload.photo_url = photo_url;
-    if (its !== undefined) updatePayload.its = its;
+    if (full_name && full_name.trim()) updatePayload.full_name = full_name.trim();
+    if (arabic_name && arabic_name.trim()) updatePayload.arabic_name = arabic_name.trim();
+    if (group_name && group_name.trim()) updatePayload.group_name = group_name.trim();
+    if (juz && juz.trim()) updatePayload.juz = juz.trim();
+    if (surat && surat.trim()) updatePayload.surat = surat.trim();
+    if (photo_url && photo_url.trim()) updatePayload.photo_url = photo_url.trim();
+    if (its && its.trim()) updatePayload.its = its.trim();
 
     const { error: profileError } = await supabase
       .from("child_profiles")
@@ -4069,6 +4116,11 @@ export default function App() {
       return;
     }
 
+    // Auto-update parent_user_id if we have a match in portalAccessList
+    if (parentRecord?.user_id && !updatePayload.parent_user_id) {
+       await supabase.from("child_profiles").update({ parent_user_id: parentRecord.user_id }).eq("student_id", student_id);
+    }
+
     // Refresh school data locally
     setSchoolData((current) => ({
       ...current,
@@ -4078,8 +4130,9 @@ export default function App() {
               ...s, 
               teacherName: teacherRecord?.full_name || "Unassigned teacher", 
               groupName: group_name || "Ungrouped", 
-              muhaffiz_id: teacher_id || null,
-              user_id: parent_id || null
+              muhaffiz_id: teacherRecord?.user_id || teacher_id || null,
+              user_id: parentRecord?.user_id || null,
+              parent_email: parentRecord?.email || null
             }
           : s
       ),
@@ -4296,6 +4349,7 @@ export default function App() {
           onRoleChange={storeRole}
           teacherProfiles={teacherProfiles}
           notifications={notificationsList}
+          setSelectedStudentId={setSelectedStudentId}
         />
       </React.Fragment>
     );
