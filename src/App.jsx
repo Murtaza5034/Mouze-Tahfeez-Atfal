@@ -3380,6 +3380,12 @@ export default function App() {
             supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
           ]);
 
+          if (attendanceResponse.error) throw attendanceResponse.error;
+          if (scheduleResponse.error) throw scheduleResponse.error;
+          if (resultResponse.error) throw resultResponse.error;
+          if (announcementResponse.error) throw announcementResponse.error;
+          if (teacherProfilesResponse.error) throw teacherProfilesResponse.error;
+
           nextParentState = {
             studentProfile: profileData,
             hifzDetails: { juz: profileData.juz, surat: profileData.surat },
@@ -3413,6 +3419,22 @@ export default function App() {
           supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }),
           supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
         ]);
+
+        const dbErrors = [
+          profilesResponse.error,
+          resultsResponse.error,
+          eventsResponse.error,
+          scheduleResponse.error,
+          portalAccessResponse.error,
+          groupsResponse.error,
+          attendanceResponse.error,
+          teacherProfilesResponse.error
+        ].filter(Boolean);
+
+        if (dbErrors.length > 0) {
+          console.error("Database errors detected:", dbErrors);
+          throw new Error(dbErrors.map(e => e.message).join(" | "));
+        }
 
         const students = buildStudents(
           profilesResponse.data || [],
