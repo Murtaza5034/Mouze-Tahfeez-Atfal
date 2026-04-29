@@ -3377,7 +3377,6 @@ export default function App() {
           schedule: scheduleResponse.data || [],
           portalAccessList: portalAccessResponse.data || [],
           teacherProfiles: enrichedProfiles,
-          assignments,
         });
 
         if (students.length > 0) {
