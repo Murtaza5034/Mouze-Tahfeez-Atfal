@@ -1352,6 +1352,19 @@ function AdminPortal({
              )
           })}
 
+          <div className="sidebar-system-status">
+            <p className="sidebar-category">System Status</p>
+            <div className="status-item">
+              <Users size={14} /> Students: {students.length}
+            </div>
+            <div className="status-item">
+              <ShieldCheck size={14} /> Portal Users: {portalAccessList.length}
+            </div>
+            <button className="refresh-mini-btn" onClick={() => loadPortalData(portalRole, user)}>
+              <RotateCw size={14} /> Refresh Data
+            </button>
+          </div>
+
           <div className="sidebar-footer">
             {getAssignedRoles(user).filter(r => r !== 'admin' && r !== 'parents').map((role) => (
               <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
@@ -2168,27 +2181,17 @@ function AdminPortal({
                         <option value="">-- No Parent (Unlinked) --</option>
                         {portalAccessList && portalAccessList.length > 0 ? (
                           portalAccessList
-                            .slice() // Clone before sort
-                            .sort((a, b) => {
-                              const aRole = normalizeText(a.portal_role);
-                              const bRole = normalizeText(b.portal_role);
-                              const aIsParent = aRole.includes('parent');
-                              const bIsParent = bRole.includes('parent');
-                              if (aIsParent && !bIsParent) return -1;
-                              if (!aIsParent && bIsParent) return 1;
-                              return (a.full_name || "").localeCompare(b.full_name || "");
+                            .filter(p => {
+                              const r = (p.portal_role || "").toLowerCase();
+                              return r.includes("parent") || r === "" || r === "parents";
                             })
-                            .map(p => {
-                              const isParent = normalizeText(p.portal_role).includes('parent');
-                              return (
-                                <option key={`parent-${p.id}`} value={p.user_id || p.email}>
-                                  {isParent ? '👤 ' : ''}
-                                  {p.full_name || p.email || 'Unnamed'} ({p.portal_role || 'No Role'})
-                                </option>
-                              );
-                            })
+                            .map(p => (
+                              <option key={`parent-${p.id}`} value={p.user_id || p.email}>
+                                {p.full_name || p.email} ({p.portal_role || 'No Role'})
+                              </option>
+                            ))
                         ) : (
-                          <option value="" disabled>No portal users found (Grant Access first)</option>
+                          <option value="" disabled>No portal users found</option>
                         )}
                       </select>
                     </label>
