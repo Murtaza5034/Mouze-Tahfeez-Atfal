@@ -528,7 +528,7 @@ function getStudentStatus(student) {
   return "Status update pending";
 }
 
-function buildStudents(childProfiles = [], weeklyResults = []) {
+function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles = []) {
   const latestResultMap = new Map();
 
   weeklyResults.forEach((result) => {
@@ -540,6 +540,11 @@ function buildStudents(childProfiles = [], weeklyResults = []) {
   return childProfiles.map((profile) => {
     const latestResult = latestResultMap.get(profile.student_id) || null;
     
+    // Find teacher in profiles if name is missing
+    const teacherInProfiles = teacherProfiles.find(t => 
+      (profile.teacher_id && (t.id === profile.teacher_id || t.user_id === profile.teacher_id))
+    );
+
     return {
       ...profile,
       student_id: profile.student_id,
@@ -547,7 +552,7 @@ function buildStudents(childProfiles = [], weeklyResults = []) {
       arabic_name: profile.arabic_name,
       its: profile.its || "...",
       latestResult,
-      teacherName: profile.teacher_name || "Unassigned teacher",
+      teacherName: profile.teacher_name || teacherInProfiles?.full_name || "Unassigned teacher",
       groupName: profile.group_name || "Ungrouped",
       muhaffiz_id: profile.teacher_id || null,
       user_id: profile.parent_user_id || null,
@@ -629,7 +634,7 @@ function FatemiDateSelector({ value, onChange }) {
       </select>
       <select value={info.month} onChange={(e) => handleSelectChange('month', e.target.value)}>
         {ARABIC_MONTHS.map((name, i) => (
-          <option key={name} value={i + 1}>{name}</option>
+          <option key={name} value={i + 1} className="arabic-kanz" style={{ fontSize: '1.1rem' }}>{name}</option>
         ))}
       </select>
       <select value={info.year} onChange={(e) => handleSelectChange('year', e.target.value)}>
@@ -850,11 +855,11 @@ function ParentPortal({
         `Class: ${studentProfile?.class_level || "..."}`,
       ],
       childInfo: {
-        name: studentProfile?.name || "Loading...",
-        its: studentProfile?.its || "...",
+        name: studentProfile?.name || allProfiles[0]?.name || "Loading Student...",
+        its: studentProfile?.its || allProfiles[0]?.its || "...",
         hifzJuz: hifzDetails?.juz || "...",
         hifzSurat: hifzDetails?.surat || "...",
-        muhaffizName: hifzDetails?.muhaffiz_name || "...",
+        muhaffizName: hifzDetails?.muhaffiz_name || "Unassigned",
       },
     },
     Home: {
@@ -924,7 +929,7 @@ function ParentPortal({
           <div style={{ minWidth: 0, flex: 1 }}>
             <h3 className="drawer-name">{studentProfile?.name || "Student"}</h3>
             {studentProfile?.arabic_name && (
-              <h4 style={{ fontSize: '0.95rem', color: 'var(--text-muted)', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 'bold' }}>
+              <h4 className="arabic-kanz" style={{ fontSize: '1.2rem', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 'bold' }}>
                 {studentProfile.arabic_name}
               </h4>
             )}
@@ -1107,7 +1112,12 @@ function ParentPortal({
                 <User size={32} />
               </div>
               <div className="header-text">
-                <h3>{currentPage.childInfo.name}</h3>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {currentPage.childInfo.name}
+                  {studentProfile?.arabic_name && (
+                    <span className="arabic-kanz" style={{ fontSize: '1.2rem', opacity: 0.8 }}>{studentProfile.arabic_name}</span>
+                  )}
+                </h3>
                 <p>
                   <Hash size={12} /> ITS: {currentPage.childInfo.its}
                 </p>
@@ -1159,7 +1169,10 @@ function ParentPortal({
             </div>
             <div className="teacher-info-stack">
               {teacherProfiles
-                .filter(t => studentProfile?.teacher_name && normalizeText(t.full_name) === normalizeText(studentProfile.teacher_name))
+                .filter(t => {
+                  const assignedName = normalizeText(studentProfile?.teacherName || "");
+                  return assignedName && normalizeText(t.full_name) === assignedName;
+                })
                 .map(teacher => {
                   const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
                   const photo = teacher.photo_url || ASSETS.LOGO;
@@ -1192,7 +1205,10 @@ function ParentPortal({
                 })}
 
               {teacherProfiles
-                .filter(t => !studentProfile?.teacher_name || normalizeText(t.full_name) !== normalizeText(studentProfile.teacher_name))
+                .filter(t => {
+                  const assignedName = normalizeText(studentProfile?.teacherName || "");
+                  return !assignedName || normalizeText(t.full_name) !== assignedName;
+                })
                 .map((teacher) => {
                   const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
                   const photo = teacher.photo_url || ASSETS.LOGO;
@@ -1441,8 +1457,8 @@ function AdminPortal({
                       <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
                     </label>
                     <label>
-                      <span>Arabic Name</span>
-                      <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input" />
+                      <span>Arabic Name (اسم الطالب)</span>
+                      <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                     </label>
                   </div>
                   <div className="form-row">
@@ -1573,6 +1589,9 @@ function AdminPortal({
                           <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
                           <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
                           <span className="mini-pill">Surah: {selectedStudent.hifz?.surat || "Pending"}</span>
+                          {selectedStudent.arabic_name && (
+                            <span className="mini-pill arabic-kanz" style={{ fontSize: '1rem', color: 'var(--primary-gold)' }}>{selectedStudent.arabic_name}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2103,7 +2122,7 @@ function AdminPortal({
                           {students && students.length > 0 ? (
                             students.map(s => (
                               <option key={s.student_id} value={s.student_id}>
-                                {s.name || 'Unnamed Student'}
+                                {s.name || 'Unnamed Student'} {s.arabic_name ? `(${s.arabic_name})` : ''}
                               </option>
                             ))
                           ) : (
@@ -2118,8 +2137,8 @@ function AdminPortal({
                     </label>
 
                     <label>
-                      <span>Arabic Name</span>
-                      <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input" />
+                      <span>Arabic Name (اسم الطالب)</span>
+                      <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                     </label>
 
                     <label>
@@ -2849,9 +2868,12 @@ function TeacherPortal({
                 <article key={student.student_id} className="student-card">
                   <div className="student-card-head">
                     <StudentAvatar student={student} />
-                    <div>
-                      <h3>{student.name}</h3>
-                      <p>{student.groupName}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <h3 style={{ margin: 0 }}>{student.name}</h3>
+                      {student.arabic_name && (
+                        <span className="arabic-kanz" style={{ fontSize: '1.1rem', color: 'var(--primary-gold)', marginTop: '2px' }}>{student.arabic_name}</span>
+                      )}
+                      <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{student.groupName}</p>
                     </div>
                   </div>
                   <div className="pill-row">
@@ -2888,7 +2910,7 @@ function TeacherPortal({
                       <option value="">Select child</option>
                       {filteredStudents.map((student) => (
                         <option key={student.student_id} value={student.student_id}>
-                          {student.name} · {student.groupName}
+                          {student.name} {student.arabic_name ? `(${student.arabic_name})` : ''} · {student.groupName}
                         </option>
                       ))}
                     </select>
@@ -3414,21 +3436,22 @@ export default function App() {
 
     try {
       if (role === "parents") {
-        const parentProfiles = parentProfileOverride ? [parentProfileOverride] : (await findParentProfiles(currentUser.id, currentUser.email));
+        const rawProfiles = parentProfileOverride ? [parentProfileOverride] : (await findParentProfiles(currentUser.id, currentUser.email));
 
         let nextParentState = {
-          studentProfile: parentProfiles[0] || null,
-          allProfiles: parentProfiles,
+          studentProfile: null,
+          allProfiles: [],
           hifzDetails: null,
           announcements: [],
           schedule: [],
           attendance: null,
           weeklyResult: null,
+          teacherProfiles: [],
         };
 
-        if (parentProfiles.length > 0) {
+        if (rawProfiles.length > 0) {
           // AUTO-LINK: If any profile only has email but no ID, link it now
-          const profilesToLink = parentProfiles.filter(p => !p.parent_user_id && p.parent_email && normalizeText(p.parent_email) === normalizeText(currentUser.email));
+          const profilesToLink = rawProfiles.filter(p => !p.parent_user_id && p.parent_email && normalizeText(p.parent_email) === normalizeText(currentUser.email));
           if (profilesToLink.length > 0) {
             console.log("Auto-linking parent user_id to student profiles:", profilesToLink.length);
             await Promise.all(profilesToLink.map(p => 
@@ -3438,49 +3461,61 @@ export default function App() {
             profilesToLink.forEach(p => p.parent_user_id = currentUser.id);
           }
 
-          // If multiple students, and none selected, use first
-          const activeStudent = parentProfiles.find(p => String(p.student_id) === String(selectedStudentId)) || parentProfiles[0];
+          // Fetch necessary data for all potential students
+          const studentIds = rawProfiles.map(p => p.student_id);
           
           const [
             attendanceResponse,
             scheduleResponse,
-            resultResponse,
+            resultsResponse,
             announcementResponse,
             teacherProfilesResponse,
           ] = await Promise.all([
             supabase
               .from("attendance")
               .select("*")
-              .eq("student_id", activeStudent.student_id)
-              .order("attendance_date", { ascending: false })
-              .limit(1)
-              .maybeSingle(),
-            supabase.from("schedule").select("*").eq("student_id", activeStudent.student_id),
+              .in("student_id", studentIds)
+              .order("attendance_date", { ascending: false }),
+            supabase.from("schedule").select("*").in("student_id", studentIds),
             supabase
               .from("weekly_results")
               .select("*")
-              .eq("student_id", activeStudent.student_id)
-              .order("week_date", { ascending: false })
-              .limit(1)
-              .maybeSingle(),
+              .in("student_id", studentIds)
+              .order("week_date", { ascending: false }),
             supabase.from("events").select("*").order("event_date", { ascending: false }),
             supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
           ]);
 
           if (attendanceResponse.error) throw attendanceResponse.error;
           if (scheduleResponse.error) throw scheduleResponse.error;
-          if (resultResponse.error) throw resultResponse.error;
+          if (resultsResponse.error) throw resultsResponse.error;
           if (announcementResponse.error) throw announcementResponse.error;
           if (teacherProfilesResponse.error) throw teacherProfilesResponse.error;
 
+          const processedStudents = buildStudents(
+            rawProfiles,
+            resultsResponse.data || [],
+            teacherProfilesResponse.data || []
+          );
+
+          // If multiple students, and none selected, use first
+          const activeStudent = processedStudents.find(p => String(p.student_id) === String(selectedStudentId)) || processedStudents[0];
+          const activeResult = (resultsResponse.data || []).find(r => String(r.student_id) === String(activeStudent.student_id));
+          const activeAttendance = (attendanceResponse.data || []).find(a => String(a.student_id) === String(activeStudent.student_id));
+          const activeSchedule = (scheduleResponse.data || []).filter(s => String(s.student_id) === String(activeStudent.student_id));
+
           nextParentState = {
             studentProfile: activeStudent,
-            allProfiles: parentProfiles,
-            hifzDetails: { juz: activeStudent.juz, surat: activeStudent.surat },
+            allProfiles: processedStudents,
+            hifzDetails: {
+              juz: activeStudent.juz || "--",
+              surat: activeStudent.surat || "Pending",
+              muhaffiz_name: activeStudent.teacherName || "Pending",
+            },
             announcements: announcementResponse.data || [],
-            schedule: scheduleResponse.data || [],
-            attendance: attendanceResponse.data || null,
-            weeklyResult: resultResponse.data || null,
+            schedule: activeSchedule,
+            attendance: activeAttendance || null,
+            weeklyResult: activeResult || null,
             teacherProfiles: teacherProfilesResponse.data || [],
           };
           
@@ -3528,7 +3563,8 @@ export default function App() {
 
         const students = buildStudents(
           profilesResponse.data || [],
-          resultsResponse.data || []
+          resultsResponse.data || [],
+          enrichedProfiles
         );
 
         setTeacherAttendance(attendanceResponse.data || []);
