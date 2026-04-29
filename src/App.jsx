@@ -816,15 +816,7 @@ function ParentPortal({
   onRoleChange,
   teacherProfiles = [],
 }) {
-  const [showCelebration, setShowCelebration] = useState(false);
 
-  useEffect(() => {
-    if (activePage === "Child Summary") {
-      setShowCelebration(true);
-      const timer = setTimeout(() => setShowCelebration(false), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [activePage]);
 
   const { studentProfile, hifzDetails, announcements, schedule, attendance, weeklyResult } =
     parentData;
@@ -978,7 +970,6 @@ function ParentPortal({
       </header>
 
       <main className="parent-main">
-        {showCelebration && <Celebration />}
 
         {activePage === "Schedule" ? (
           <div className="home-dashboard">
