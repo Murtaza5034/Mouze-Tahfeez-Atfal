@@ -2161,11 +2161,15 @@ function AdminPortal({
                           portalAccessList
                             .filter(p => {
                               const role = normalizeText(p.portal_role);
-                              return role === 'parents' || role === 'parent';
+                              // Show anyone with 'parent' in role OR anyone with no role at all
+                              // BUT exclude those who are ONLY 'admin' or ONLY 'teacher'
+                              if (role.includes('parent')) return true;
+                              if (!role) return true;
+                              return false;
                             })
                             .map(p => (
                               <option key={`parent-${p.id}`} value={p.user_id || p.email}>
-                                {p.full_name || p.email || 'Unnamed User'}
+                                {p.full_name || p.email || 'Unnamed'} {p.portal_role ? `(${p.portal_role})` : '(No Role)'}
                               </option>
                             ))
                         ) : (
