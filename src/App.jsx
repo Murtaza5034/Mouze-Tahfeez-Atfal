@@ -157,6 +157,41 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     redirect_page: redirectPage
   };
   await supabase.from("system_notifications").insert([dbPayload]);
+
+  // OneSignal REST API Integration
+  try {
+    const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
+    const ONESIGNAL_REST_API_KEY = import.meta.env.VITE_ONESIGNAL_REST_API_KEY;
+
+    const notificationPayload = {
+      app_id: ONESIGNAL_APP_ID,
+      headings: { en: title },
+      contents: { en: body },
+      data: { redirect_page: redirectPage },
+    };
+
+    if (targetRole === "all") {
+      notificationPayload.included_segments = ["All"];
+    } else {
+      notificationPayload.filters = [
+        { field: "tag", key: "portal_role", relation: "=", value: targetRole }
+      ];
+      if (targetUser) {
+        notificationPayload.filters.push({ field: "tag", key: "user_email", relation: "=", value: targetUser });
+      }
+    }
+
+    await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
+      },
+      body: JSON.stringify(notificationPayload)
+    });
+  } catch (err) {
+    console.error("OneSignal broadcast failed:", err);
+  }
 };
 
 function NotificationEnabler({ permission, onRequest }) {
@@ -3415,6 +3450,17 @@ export default function App() {
 
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
+            
+            // OneSignal Tagging for Targeted Notifications
+            if (window.OneSignal) {
+              window.OneSignal.push(function() {
+                window.OneSignal.sendTags({
+                  portal_role: access.role,
+                  user_email: session.user.email
+                });
+              });
+            }
+
             await loadPortalData(access.role, session.user, access.parentProfile);
           }
         } catch (err) {
@@ -3445,6 +3491,22 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Handle OneSignal Notification Clicks for Redirection
+  useEffect(() => {
+    if (window.OneSignal) {
+      window.OneSignal.push(function() {
+        window.OneSignal.on('notificationClicked', function(event) {
+          const data = event.notification.additionalData;
+          if (data && data.redirect_page) {
+            console.log("OneSignal: Redirecting to", data.redirect_page);
+            setActivePage(data.redirect_page);
+            setMenuOpen(false);
+          }
+        });
+      });
+    }
+  }, [setActivePage]);
 
   async function loadPortalData(role, currentUser, parentProfileOverride = null) {
     if (!currentUser) {
@@ -4027,16 +4089,14 @@ export default function App() {
        notifTitle = `[Direct] ${payload.title}`;
     }
 
-    // Save to DB for cross-device pushing
-    const dbPayload = {
-      title: notifTitle,
-      body: payload.body,
-      target_role: payload.target_audience === "user" ? "user" : payload.target_audience,
-      target_user: payload.target_audience === "user" ? payload.target_uuid : null,
-      redirect_page: payload.redirect_page,
-      image_url: payload.image_url || null
-    };
-    await supabase.from("system_notifications").insert([dbPayload]);
+    // Trigger OneSignal and Supabase notification via shared function
+    await broadcastNotification(
+      notifTitle,
+      payload.body,
+      payload.target_audience === "user" ? "user" : payload.target_audience,
+      payload.target_audience === "user" ? payload.target_uuid : null,
+      payload.redirect_page
+    );
 
     showAction("success", "Custom Notification Dispatched!");
 

@@ -10,6 +10,19 @@
     <link rel="apple-touch-icon" href="/logo.png" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <title>Mauze Tahfeez</title>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignal.js" async=""></script>
+    <script>
+      window.OneSignal = window.OneSignal || [];
+      OneSignal.push(function() {
+        OneSignal.init({
+          appId: "%VITE_ONESIGNAL_APP_ID%",
+          safari_web_id: "YOUR_SAFARI_WEB_ID",
+          notifyButton: {
+            enable: true,
+          },
+        });
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
