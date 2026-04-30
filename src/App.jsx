@@ -121,32 +121,7 @@ function writeLocalArray(key, value) {
 
 // Celebration component removed as requested.
 
-const sendPushNotification = async (title, body, redirectPath = null) => {
-  if (!("Notification" in window)) return;
-  
-  const showNotification = () => {
-    const notification = new Notification(title, { body, icon: "/logo.png" });
-    if (redirectPath) {
-      notification.onclick = () => {
-        window.focus();
-        if (redirectPath.startsWith("http")) {
-          window.open(redirectPath, "_blank");
-        } else {
-          window.location.hash = redirectPath;
-        }
-      };
-    }
-  };
 
-  if (Notification.permission === "granted") {
-    showNotification();
-  } else if (Notification.permission !== "denied") {
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") {
-      showNotification();
-    }
-  }
-};
 
 const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home") => {
   const dbPayload = {
@@ -3452,12 +3427,15 @@ export default function App() {
             setPortalAccess(access.accessRow || emptyPortalAccess);
             
             // OneSignal Tagging for Targeted Notifications
+            // OneSignal Tagging & Auto-Prompt for Targeted Notifications
             if (window.OneSignal) {
               window.OneSignal.push(function() {
                 window.OneSignal.sendTags({
                   portal_role: access.role,
                   user_email: session.user.email
                 });
+                // Automatically prompt to allow notifications on login
+                window.OneSignal.showNativePrompt();
               });
             }
 
@@ -3956,21 +3934,8 @@ export default function App() {
             newNotif.target_user === user.email;
 
           if (isTargeted) {
-             // Update Local State
              setNotificationsList(prev => [newNotif, ...prev]);
-             
-             // OS-Level Push logic below
-
-             // Trigger OS-Level Notification (Notification Bar)
-             if (Notification.permission === "granted") {
-                sendPushNotification(newNotif.title, newNotif.body, newNotif.redirect_page);
-             } else if (Notification.permission === "default") {
-                Notification.requestPermission().then(permission => {
-                   if (permission === "granted") {
-                      sendPushNotification(newNotif.title, newNotif.body, newNotif.redirect_page);
-                   }
-                });
-             }
+             // OneSignal handles the push delivery from the server-side
           }
         }
       )
@@ -4472,12 +4437,6 @@ export default function App() {
         announcement={selectedAnnouncement} 
         onClose={() => setSelectedAnnouncement(null)} 
       />
-      <div style={{ position: "fixed", top: "12px", right: "70px", zIndex: 9999 }}>
-        <NotificationEnabler 
-          permission={notificationPermission} 
-          onRequest={requestNotificationPermission} 
-        />
-      </div>
     </React.Fragment>
   );
 
