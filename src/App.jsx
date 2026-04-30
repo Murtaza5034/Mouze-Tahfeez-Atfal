@@ -1754,13 +1754,20 @@ function AdminPortal({
                    <button 
                      className="action-button" 
                      style={{ background: '#ef4444', marginTop: '10px' }}
-                     onClick={() => {
-                       window.OneSignal.push(() => {
-                         window.OneSignal.Slidedown.prompt();
-                       });
+                     onClick={async () => {
+                       try {
+                         if (window.OneSignal && !Array.isArray(window.OneSignal)) {
+                           await window.OneSignal.Notifications.requestPermission();
+                         } else {
+                           alert("OneSignal is still loading. Please wait 5 seconds and try again.");
+                         }
+                       } catch (e) {
+                         console.error("Manual Prompt Error:", e);
+                         alert("Connection failed. Check your browser's address bar for blocked notifications.");
+                       }
                      }}
                    >
-                     Re-Attempt Native Connection
+                     Force Browser Connection 🔗
                    </button>
                 </div>
               </section>
