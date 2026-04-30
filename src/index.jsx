@@ -11,3 +11,12 @@ root.render(
     <App />
   </StrictMode>
 );
+
+// Manual OneSignal Worker Registration (Ground Zero Fix)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
+      .then(reg => console.log('OneSignal Worker Registered Manual:', reg))
+      .catch(err => console.error('Worker Registration Failed:', err));
+  });
+}

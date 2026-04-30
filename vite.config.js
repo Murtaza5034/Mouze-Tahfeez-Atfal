@@ -8,12 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
-        // Tell PWA to ignore OneSignal workers
-        navigateFallbackDenylist: [/^\/OneSignalSDK/],
-      },
+      injectRegister: null, // Disable PWA SW registration to favor OneSignal
       includeAssets: ['logo.png', 'favicon.ico'],
       manifest: {
         name: 'Mauze Tahfeez Management',

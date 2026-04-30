@@ -14,23 +14,12 @@
     <script>
       window.OneSignal = window.OneSignal || [];
       OneSignal.push(function() {
-        console.log("OneSignal: Initializing Ultimate Mode...");
         OneSignal.init({
           appId: "41019813-9c1b-47fe-83bd-87ac1e1b7021",
           allowLocalhostAsSecureOrigin: true,
-          serviceWorkerPath: 'OneSignalSDKWorker.js',
-          serviceWorkerParam: { scope: '/' },
-          notifyButton: { enable: true },
-          promptOptions: {
-            slidedown: {
-              enabled: true,
-              autoPrompt: true,
-              timeDelay: 1,
-              pageViews: 1
-            }
-          }
+          serviceWorkerPath: 'OneSignalSDKWorker.js'
         }).then(() => {
-          console.log("OneSignal: Init Success");
+          OneSignal.Slidedown.prompt();
         });
       });
     </script>
