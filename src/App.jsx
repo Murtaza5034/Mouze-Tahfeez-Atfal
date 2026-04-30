@@ -3269,7 +3269,7 @@ export default function App() {
       return "parents";
     }
 
-    return window.localStorage.getItem(STORAGE_KEYS.role) || "parents";
+    return "parents"; // Start with a safe default, will be overridden by auth
   });
   const [activePage, setActivePage] = useState(DEFAULT_PAGE_BY_ROLE.parents);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -3405,8 +3405,10 @@ export default function App() {
 
     async function handleAuthChange(event, session) {
       if (!mounted) return;
-      console.log("Auth event:", event);
-
+      
+      // Prevent portal flicker by showing loading screen during role resolution
+      setLoading(true);
+      
       if (session) {
         setUser(session.user);
         try {
@@ -3426,15 +3428,18 @@ export default function App() {
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
             
-            // OneSignal Tagging for Targeted Notifications
             // OneSignal Tagging & Auto-Prompt for Targeted Notifications
             if (window.OneSignal) {
               window.OneSignal.push(function() {
+                // Ensure tags are sent correctly
                 window.OneSignal.sendTags({
                   portal_role: access.role,
                   user_email: session.user.email
+                }).then(() => {
+                  console.log("OneSignal: Tags sent for", access.role);
                 });
-                // Automatically prompt to allow notifications on login
+                
+                // Prompt for notifications on login
                 window.OneSignal.showNativePrompt();
               });
             }
