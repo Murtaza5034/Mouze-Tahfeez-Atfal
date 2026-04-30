@@ -1742,6 +1742,28 @@ function AdminPortal({
                   <Send size={18} /> Dispatch Notification
                 </button>
               </form>
+              <section className="data-card" style={{ marginTop: '20px', border: '1px solid #fee2e2' }}>
+                <div className="card-headline">
+                  <ShieldCheck size={18} color="#ef4444" />
+                  <h3 style={{ color: '#b91c1c' }}>Notification Debugger (Admin Only)</h3>
+                </div>
+                <div style={{ padding: '10px', fontSize: '12px', background: '#fef2f2', borderRadius: '12px' }}>
+                   <p><strong>Browser Status:</strong> {Notification.permission}</p>
+                   <p><strong>OneSignal ID:</strong> {window.OneSignal?.User?.PushSubscription?.id || "Searching..."}</p>
+                   <p><strong>Service Worker:</strong> {navigator.serviceWorker.controller ? "Active ✅" : "Missing ❌"}</p>
+                   <button 
+                     className="action-button" 
+                     style={{ background: '#ef4444', marginTop: '10px' }}
+                     onClick={() => {
+                       window.OneSignal.push(() => {
+                         window.OneSignal.Slidedown.prompt();
+                       });
+                     }}
+                   >
+                     Re-Attempt Native Connection
+                   </button>
+                </div>
+              </section>
             </section>
             <section className="data-card">
               <div className="card-headline headline-with-action">
