@@ -133,7 +133,7 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
   };
   await supabase.from("system_notifications").insert([dbPayload]);
 
-  // OneSignal REST API Integration
+  // OneSignal REST API Integration (Hard-Linked)
   try {
     const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || "41019813-9c1b-47fe-83bd-87ac1e1b7021";
     const ONESIGNAL_REST_API_KEY = import.meta.env.VITE_ONESIGNAL_REST_API_KEY || "ztkwwt3qlevwegw6pyormk4op";
@@ -143,7 +143,9 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
       headings: { en: title },
       contents: { en: body },
       data: { redirect_page: redirectPage },
-      web_url: window.location.origin + "/#" + redirectPage
+      web_url: window.location.origin + "/#" + redirectPage,
+      chrome_web_icon: window.location.origin + "/logo.png",
+      android_accent_color: "c5a059"
     };
 
     if (targetRole === "all") {
@@ -166,9 +168,11 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
       body: JSON.stringify(notificationPayload)
     });
     
+    const result = await response.json();
     if (!response.ok) {
-      const errData = await response.json();
-      console.error("OneSignal API Error:", errData);
+      console.error("OneSignal API Error:", result);
+    } else {
+      console.log("OneSignal Push Sent Successfully:", result);
     }
   } catch (err) {
     console.error("OneSignal broadcast failed:", err);
@@ -1642,85 +1646,88 @@ function AdminPortal({
 
         {activePage === "Notifications" ? (
           <div className="management-grid two-columns">
-            <section className="form-card">
-              <div className="card-headline">
-                <Send size={18} />
-                <h3>Push Notification</h3>
+            <section className="form-card card-appear">
+              <div className="card-headline headline-with-action">
+                <div className="headline-left">
+                  <Send size={18} />
+                  <h3>OneSignal Control Center</h3>
+                </div>
+                <div className="one-signal-status-pill">
+                   {window.OneSignal?.User?.PushSubscription?.id ? (
+                     <span className="status-badge present">Connected ✅</span>
+                   ) : (
+                     <span className="status-badge pending">Disconnected ❌</span>
+                   )}
+                </div>
               </div>
               <form className="stack-form" onSubmit={onSendCustomNotification}>
                 <div className="form-grid">
                   <label>
-                    <span>Target Portal</span>
+                    <span>Target Audience</span>
                     <select 
                       name="target_audience" 
                       value={adminForms.customNotification.target_audience} 
                       onChange={onAdminFormChange("customNotification")}
+                      className="premium-select"
                     >
-                      <option value="all">Broadcast to All</option>
+                      <option value="all">Broadcast to Everyone</option>
                       <option value="parents">Parents Portal Only</option>
                       <option value="teacher">Teachers Portal Only</option>
-                      <option value="user">Specific User (Direct)</option>
+                      <option value="user">Direct to Specific Email</option>
                     </select>
                   </label>
                   {adminForms.customNotification.target_audience === "user" && (
                     <label>
-                      <span>User UUID</span>
+                      <span>Recipient Email</span>
                       <input 
-                        type="text" 
+                        type="email" 
                         name="target_uuid" 
                         value={adminForms.customNotification.target_uuid || ""} 
                         onChange={onAdminFormChange("customNotification")} 
-                        placeholder="e.g. 550e8400-e29b-..." 
+                        placeholder="user@example.com" 
                         required 
                       />
                     </label>
                   )}
                 </div>
                 <label>
-                  <span>Notification Title</span>
+                  <span>Alert Title</span>
                   <input 
                     type="text" 
                     name="title" 
                     value={adminForms.customNotification.title} 
                     onChange={onAdminFormChange("customNotification")} 
-                    placeholder="Important Update"
+                    placeholder="e.g. Urgent Update" 
                     required 
                   />
                 </label>
                 <label>
-                  <span>Message Body</span>
+                  <span>Message Content</span>
                   <textarea 
-                    name="body" 
-                    value={adminForms.customNotification.body} 
+                    name="message" 
+                    value={adminForms.customNotification.message} 
                     onChange={onAdminFormChange("customNotification")} 
-                    placeholder="Enter your message here..."
+                    placeholder="Write your message here..." 
                     required 
+                    rows={4}
                   />
                 </label>
-                <label>
-                  <span>Image URL (Optional)</span>
-                  <input 
-                    type="text" 
-                    name="image_url" 
-                    value={adminForms.customNotification.image_url || ""} 
-                    onChange={onAdminFormChange("customNotification")} 
-                    placeholder="https://example.com/image.jpg"
-                  />
-                </label>
-                <label>
-                  <span>Redirect Page</span>
-                  <select 
-                    name="redirect_page" 
-                    value={adminForms.customNotification.redirect_page} 
-                    onChange={onAdminFormChange("customNotification")}
-                  >
-                    <option value="Home">Home</option>
-                    <option value="Announcements">Announcements</option>
-                    <option value="Schedule">Schedule</option>
-                    <option value="Overview">Performance/Overview</option>
-                    <option value="Profile">Profile</option>
-                  </select>
-                </label>
+                <div className="form-grid">
+                   <label>
+                     <span>Destination Page</span>
+                     <select 
+                       name="redirect_page" 
+                       value={adminForms.customNotification.redirect_page} 
+                       onChange={onAdminFormChange("customNotification")}
+                       className="premium-select"
+                     >
+                       <option value="Home">Home Screen</option>
+                       <option value="Announcements">Announcements</option>
+                       <option value="Attendance">Attendance Page</option>
+                       <option value="Progress">Progress Reports</option>
+                     </select>
+                   </label>
+                </div>
                 <button type="submit" className="action-button">
                   <Send size={18} /> Dispatch Notification
                 </button>
