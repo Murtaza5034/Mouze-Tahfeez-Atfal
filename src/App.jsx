@@ -244,7 +244,7 @@ function NotificationBell({ notifications }) {
 
 // PremiumStatusAlert component removed as requested.
 
-function AnnouncementsPage({ notifications, setActivePage }) {
+function AnnouncementsPage({ notifications, setActivePage, setSelectedAnnouncement }) {
   const images = [
     "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=400&q=80",
     "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=400&q=80",
@@ -1161,6 +1161,14 @@ function ParentPortal({
           </div>
         ) : null}
 
+        {activePage === "Announcements" ? (
+          <AnnouncementsPage 
+            notifications={parentData.announcements} 
+            setActivePage={setActivePage} 
+            setSelectedAnnouncement={setSelectedAnnouncement}
+          />
+        ) : null}
+
         {activePage === "Teachers" ? (
           <div className="card-appear">
             <div className="section-title-block">
@@ -1245,6 +1253,8 @@ function ParentPortal({
             )}
           </div>
         ) : null}
+
+
 
         {currentPage?.highlights && activePage === "Profile" && <InfoHighlights items={currentPage.highlights} />}
       </main>
@@ -1946,8 +1956,13 @@ function AdminPortal({
         ) : null}
 
         {activePage === "Announcements" ? (
-          <AnnouncementsPage notifications={notifications} setActivePage={setActivePage} />
+          <AnnouncementsPage 
+            notifications={announcements} 
+            setActivePage={setActivePage} 
+            setSelectedAnnouncement={setSelectedAnnouncement}
+          />
         ) : null}
+
 
         {activePage === "Teachers" ? (
           <div className="management-grid two-columns">
@@ -3220,8 +3235,13 @@ function TeacherPortal({
         ) : null}
 
         {activePage === "Announcements" ? (
-          <AnnouncementsPage notifications={notifications} setActivePage={setActivePage} />
+          <AnnouncementsPage 
+            notifications={notifications} 
+            setActivePage={setActivePage} 
+            setSelectedAnnouncement={setSelectedAnnouncement}
+          />
         ) : null}
+
         </section>
       </main>
     </div>
@@ -3561,14 +3581,6 @@ export default function App() {
           throw new Error(dbErrors.map(e => e.message).join(" | "));
         }
 
-        const students = buildStudents(
-          profilesResponse.data || [],
-          resultsResponse.data || [],
-          enrichedProfiles
-        );
-
-        setTeacherAttendance(attendanceResponse.data || []);
-        setCustomGroups(groupsResponse.data || []);
         const enrichedProfiles = (teacherProfilesResponse.data || []).map(profile => {
           const access = (portalAccessResponse.data || []).find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
           return {
@@ -3578,6 +3590,16 @@ export default function App() {
           };
         });
         setTeacherProfiles(enrichedProfiles);
+
+        const students = buildStudents(
+          profilesResponse.data || [],
+          resultsResponse.data || [],
+          enrichedProfiles
+        );
+
+        setTeacherAttendance(attendanceResponse.data || []);
+        setCustomGroups(groupsResponse.data || []);
+
 
         setSchoolData({
           students,
@@ -4433,6 +4455,7 @@ export default function App() {
           teacherProfiles={teacherProfiles}
           notifications={notificationsList}
           setSelectedStudentId={setSelectedStudentId}
+          setSelectedAnnouncement={setSelectedAnnouncement}
         />
       </React.Fragment>
     );
@@ -4476,6 +4499,7 @@ export default function App() {
         onUnassignChild={handleUnassignChild}
         loadPortalData={loadPortalData}
         portalRole={portalRole}
+        setSelectedAnnouncement={setSelectedAnnouncement}
       />
       </React.Fragment>
     );
@@ -4499,6 +4523,7 @@ export default function App() {
         onTeacherResultSubmit={handleTeacherResultSubmit}
         setActivePage={setActivePage}
         setMenuOpen={setMenuOpen}
+        setSelectedAnnouncement={setSelectedAnnouncement}
         teacherData={teacherData}
         teacherForms={teacherForms}
         user={user}
