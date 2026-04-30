@@ -1656,7 +1656,17 @@ function AdminPortal({
                    {window.OneSignal?.User?.PushSubscription?.id ? (
                      <span className="status-badge present">Connected ✅</span>
                    ) : (
-                     <span className="status-badge pending">Disconnected ❌</span>
+                     <button 
+                       className="status-badge pending" 
+                       onClick={() => {
+                         window.OneSignal.push(() => {
+                           window.OneSignal.Slidedown.prompt();
+                         });
+                       }}
+                       style={{ border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                     >
+                       Connect Now 🔗
+                     </button>
                    )}
                 </div>
               </div>
