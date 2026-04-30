@@ -3982,31 +3982,16 @@ export default function App() {
   }, [user, portalRole]);
 
   const requestNotificationPermission = async () => {
-    if (!("Notification" in window)) return;
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-    
-    if (permission === "granted") {
-      showAction("success", "Notifications Enabled!");
-      
-      // Professional Push Subscription logic
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: 'BEl627pGr_3G334B_h1kX7hB-4hX-4k-kL9n...' // User would replace with their VAPID key
-        });
-        
-        // Save subscription to Supabase
-        await supabase.from("push_subscriptions").upsert({
-          user_id: user?.id,
-          subscription: subscription,
-          updated_at: new Date()
-        });
-        
-        console.log("Push subscription successful");
-      } catch (err) {
-        console.warn("Push subscription failed (Safe to ignore if no VAPID key):", err);
+    if (window.OneSignal) {
+      window.OneSignal.push(function() {
+        window.OneSignal.showNativePrompt();
+      });
+      showAction("success", "Requesting permission...");
+    } else if ("Notification" in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === "granted") {
+        showAction("success", "Notifications Enabled!");
       }
     }
   };
