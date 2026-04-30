@@ -3445,7 +3445,7 @@ export default function App() {
                   console.log("OneSignal: Tags sent for", access.role);
                 });
                 
-                // Automatically prompt to allow notifications on login using Slidedown
+                // Force registration/prompt for notifications on login
                 window.OneSignal.slidedown.prompt();
               });
             }
