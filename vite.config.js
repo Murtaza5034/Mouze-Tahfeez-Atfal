@@ -8,6 +8,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        // Tell PWA to ignore OneSignal workers
+        navigateFallbackDenylist: [/^\/OneSignalSDK/],
+      },
       includeAssets: ['logo.png', 'favicon.ico'],
       manifest: {
         name: 'Mauze Tahfeez Management',
@@ -33,5 +38,5 @@ export default defineConfig({
       }
     })
   ],
-  base: './',
+  base: '/',
 })
