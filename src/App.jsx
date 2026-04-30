@@ -135,18 +135,19 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
 
   // OneSignal REST API Integration
   try {
-    const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
-    const ONESIGNAL_REST_API_KEY = import.meta.env.VITE_ONESIGNAL_REST_API_KEY;
+    const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || "41019813-9c1b-47fe-83bd-87ac1e1b7021";
+    const ONESIGNAL_REST_API_KEY = import.meta.env.VITE_ONESIGNAL_REST_API_KEY || "ztkwwt3qlevwegw6pyormk4op";
 
     const notificationPayload = {
       app_id: ONESIGNAL_APP_ID,
       headings: { en: title },
       contents: { en: body },
       data: { redirect_page: redirectPage },
+      web_url: window.location.origin + "/#" + redirectPage
     };
 
     if (targetRole === "all") {
-      notificationPayload.included_segments = ["All"];
+      notificationPayload.included_segments = ["Subscribed Users"];
     } else {
       notificationPayload.filters = [
         { field: "tag", key: "portal_role", relation: "=", value: targetRole }
@@ -156,7 +157,7 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
       }
     }
 
-    await fetch("https://onesignal.com/api/v1/notifications", {
+    const response = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json; charset=utf-8",
@@ -164,6 +165,11 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
       },
       body: JSON.stringify(notificationPayload)
     });
+    
+    if (!response.ok) {
+      const errData = await response.json();
+      console.error("OneSignal API Error:", errData);
+    }
   } catch (err) {
     console.error("OneSignal broadcast failed:", err);
   }
@@ -4428,12 +4434,12 @@ export default function App() {
     broadcastNotification("Tahfeez Report Submitted", "A new progress report has been saved for the student.", "parents", null, "Progress");
   };
 
-  if (!user && !loading) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+  if (loading) {
+    return <LoadingScreen message="Connecting to Mauze Tahfeez..." />;
   }
 
-  if (loading && !user) {
-    return <LoadingScreen message="Loading Mauze Tahfeez..." />;
+  if (!user) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
   const enablerUI = (
