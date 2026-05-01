@@ -982,17 +982,23 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   padding: 15px !important;
 }
 
+.continue-prompt-container {
+  width: 100%;
+  text-align: center;
+  margin-top: 20px;
+  border-top: 1px dashed rgba(0,0,0,0.1);
+  padding-top: 15px;
+}
+
 .continue-prompt {
   font-family: 'Inter', sans-serif;
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: #888;
   font-style: italic;
-  margin-left: 15px;
-  display: inline-block;
-  vertical-align: middle;
-  background: rgba(0,0,0,0.02);
-  padding: 4px 12px;
+  background: #fcfcfc;
+  padding: 6px 15px;
   border-radius: 50px;
+  border: 1px solid #eee;
 }
 
 .history-card-premium {

@@ -372,7 +372,13 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
       if (testMode === "self") {
         const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/13/by_page/${q.page}`);
         const audioData = await audioRes.json();
-        if (audioData.audio_files?.length > 0) setAudioGuidanceUrl(audioData.audio_files[0].url);
+        if (audioData.audio_files?.length > 0) {
+          const url = audioData.audio_files[0].url;
+          setAudioGuidanceUrl(url);
+          // Auto-play for Self Mode
+          const audio = new Audio(url);
+          audio.play().catch(e => console.log("Auto-play blocked by browser, user must click play."));
+        }
       }
 
       // Fetch Verses with Tajweed Words
@@ -573,33 +579,34 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
             </div>
 
             {currentQuestion && (
-              <div className="question-display-lively card-appear">
-                <div className="q-label-badge">
-                  {testMode === "self" ? "Sheikh Hussary Voice Guidance:" : "Teacher Prompt (First Verse):"}
+              <div className="question-display-lively mushaf-page card-appear">
+                <div className="q-label-badge" style={{ marginBottom: '15px' }}>
+                  {testMode === "self" ? "✨ Sheikh Hussary Guidance (Auto-Playing...)" : "📖 Teacher Prompt (First Verse):"}
                 </div>
+                
                 {testMode === "self" && audioGuidanceUrl && (
-                  <audio src={audioGuidanceUrl} controls className="abdulbasit-audio" />
+                  <audio src={audioGuidanceUrl} controls autoPlay className="abdulbasit-audio" />
                 )}
                 
-                <div className="q-page-render misri-font mushaf-page">
-                  <div className="mushaf-inner">
-                    {revealedWords.map((w, idx) => (
-                      w && (
-                        <span 
-                          key={idx} 
-                          className={`q-word ${mistakes.find(m => m && m.wordId === w.id) ? 'has-mistake' : ''}`}
-                          onClick={() => recording && logWordMistake(w, "Word")}
-                          dangerouslySetInnerHTML={{ __html: w.text_tajweed || w.text_uthmani }}
-                        />
-                      )
-                    ))}
-                    {testMode === "teacher" && !loadingQuestion && revealedWords.length > 0 && (
-                      <span className="continue-prompt">... Student continues recitation ...</span>
-                    )}
-                  </div>
+                <div className="mushaf-inner misri-font" style={{ minHeight: '150px' }}>
+                  {revealedWords.map((w, idx) => (
+                    w && (
+                      <span 
+                        key={idx} 
+                        className={`q-word ${mistakes.find(m => m && m.wordId === w.id) ? 'has-mistake' : ''}`}
+                        onClick={() => recording && logWordMistake(w, "Word")}
+                        dangerouslySetInnerHTML={{ __html: w.text_tajweed || w.text_uthmani }}
+                      />
+                    )
+                  ))}
+                  {testMode === "teacher" && !loadingQuestion && revealedWords.length > 0 && (
+                    <div className="continue-prompt-container">
+                      <span className="continue-prompt">Student continues from here...</span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="q-meta-info">
+                <div className="q-meta-info" style={{ marginTop: '20px' }}>
                   <span className="q-page-pill">Page {currentQuestion.page}</span>
                   <span className={`q-diff-pill ${difficulty}`}>{difficulty} ({difficulty === 'easy' ? '7 Lines' : '15 Lines'})</span>
                 </div>
