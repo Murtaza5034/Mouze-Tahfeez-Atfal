@@ -388,38 +388,33 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     setMistakes([]);
 
     try {
-      // Fetch Audio
-      const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/12/by_page/${q.page}`);
-      const audioData = await audioRes.json();
-      if (testMode === "self" && audioData.audio_files?.length > 0) {
-        const url = audioData.audio_files[0].url;
-        setAudioGuidanceUrl(url);
-        new Audio(url).play().catch(() => {});
-      }
-
-      // Fetch Verses with full metadata
+      // Step 1: Fetch Verses with full metadata
       const textRes = await fetch(`https://api.quran.com/api/v4/verses/by_page/${q.page}?words=true&word_fields=text_uthmani,text_tajweed&fields=text_uthmani`);
       const textData = await textRes.json();
+      const verses = textData.verses; // All verses on the page
       
-      const lineLimit = difficulty === 'easy' ? 7 : 15;
-      const verses = textData.verses.slice(0, lineLimit);
-      setVersesData(verses);
+      // Target only the FIRST verse for the prompt/examination
+      const targetVerse = verses[0];
+      setVersesData([targetVerse]);
 
-      // Get Surah Info from first verse
-      const firstVerse = verses[0];
-      const surahRes = await fetch(`https://api.quran.com/api/v4/chapters/${firstVerse.verse_key.split(":")[0]}`);
+      // Step 2: Fetch Audio for that SPECIFIC verse (Hussary ID 12)
+      if (testMode === "self") {
+        const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/12/by_verse/${targetVerse.verse_key}`);
+        const audioData = await audioRes.json();
+        if (audioData.audio_files?.length > 0) {
+          const url = audioData.audio_files[0].url;
+          setAudioGuidanceUrl(url);
+          new Audio(url).play().catch(() => {});
+        }
+      }
+
+      // Step 3: Get Surah Info
+      const surahRes = await fetch(`https://api.quran.com/api/v4/chapters/${targetVerse.verse_key.split(":")[0]}`);
       const surahData = await surahRes.json();
       setSurahInfo(surahData.chapter);
 
-      // Prepare words for animation
-      let allWords = [];
-      const versesToAnimate = testMode === "teacher" ? verses.slice(0, 1) : verses;
-      
-      versesToAnimate.forEach(v => {
-        v.words.forEach(w => {
-          allWords.push(w);
-        });
-      });
+      // Step 4: Prepare words for animation (Only one verse)
+      const allWords = targetVerse.words;
 
       let i = 0;
       const interval = setInterval(() => {
