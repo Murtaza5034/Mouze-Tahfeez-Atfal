@@ -565,13 +565,15 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 
                 <div className="q-page-render misri-font">
                   {revealedWords.map((w, idx) => (
-                    <span 
-                      key={idx} 
-                      className={`q-word ${mistakes.find(m => m.wordId === w.id) ? 'has-mistake' : ''}`}
-                      onClick={() => recording && logWordMistake(w, "Word")}
-                    >
-                      {w.text_uthmani}
-                    </span>
+                    w && (
+                      <span 
+                        key={idx} 
+                        className={`q-word ${mistakes.find(m => m && m.wordId === w.id) ? 'has-mistake' : ''}`}
+                        onClick={() => recording && logWordMistake(w, "Word")}
+                      >
+                        {w.text_uthmani}
+                      </span>
+                    )
                   ))}
                   {testMode === "teacher" && !loadingQuestion && revealedWords.length > 0 && (
                     <span className="continue-prompt">... Student continues recitation ...</span>
@@ -615,8 +617,8 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
             history.map((entry, i) => (
               <div key={i} className="history-card-premium card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
                 <div className="history-card-top">
-                  <span className="q-page-reference">Page {entry.question?.page || "--"}</span>
-                  <span className="timestamp">{new Date(entry.timestamp).toLocaleDateString()}</span>
+                  <span className="q-page-reference">Page {entry.page_number || "--"}</span>
+                  <span className="timestamp">{new Date(entry.created_at).toLocaleDateString()}</span>
                 </div>
                 <div className="history-card-main">
                   <div className="h-marhala-row">
@@ -632,8 +634,9 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                   <div className="h-page-view misri-font">
                     {entry.verses_json?.map((v, vIdx) => (
                       <div key={vIdx} className="h-verse">
-                        {v.words.map((w, wIdx) => {
-                          const mistake = entry.mistakes?.find(m => m.wordId === w.id);
+                        {v?.words?.map((w, wIdx) => {
+                          if (!w) return null;
+                          const mistake = entry.mistakes?.find(m => m && m.wordId === w.id);
                           return (
                             <span 
                               key={wIdx} 
