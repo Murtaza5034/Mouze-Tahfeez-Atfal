@@ -1359,13 +1359,22 @@ function AdminPortal({
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)}></div>}
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
-            <SidebarHeader 
-              photoUrl={portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
-              name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"} 
-              arabicName={portalAccess?.arabic_name || user?.user_metadata?.arabic_name}
-              tag="Management Portal" 
-            />
+            {(() => {
+              const adminName = portalAccess?.full_name || user?.user_metadata?.full_name || "";
+              const adminProfile = (adminData.teacherProfiles || []).find(t => normalizeText(t.full_name) === normalizeText(adminName));
+              const photo = adminProfile?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || "/logo.png";
+              
+              return (
+                <SidebarHeader 
+                  photoUrl={photo} 
+                  name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"} 
+                  arabicName={portalAccess?.arabic_name || user?.user_metadata?.arabic_name}
+                  tag="Management Portal" 
+                />
+              );
+            })()}
             <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+
 
         </div>
         <nav className="sidebar-nav">
@@ -2656,12 +2665,13 @@ function TeacherPortal({
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
             <SidebarHeader 
-              photoUrl={portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
+              photoUrl={teacherData.teacherIdentity?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
               name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Teacher"} 
               arabicName={portalAccess?.arabic_name}
               tag="Teacher Portal" 
             />
             <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+
 
         </div>
         <nav className="sidebar-nav">
