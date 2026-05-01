@@ -320,9 +320,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   const [student_id, setStudentId] = useState(studentProfile?.student_id || studentProfile?.id || null);
 
   useEffect(() => {
-    const sid = studentProfile?.student_id || studentProfile?.id;
+    const sid = studentProfile?.student_id || studentProfile?.id || studentProfile?.uuid || studentProfile?.studentId;
     if (sid) {
+      console.log("Ikhtebar: Detected student ID:", sid);
       setStudentId(sid);
+    } else {
+      console.warn("Ikhtebar: Could not detect student ID in profile:", studentProfile);
     }
   }, [studentProfile]);
 
@@ -393,8 +396,11 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
       const textData = await textRes.json();
       const verses = textData.verses; // All verses on the page
       
-      // Target only the FIRST verse for the prompt/examination
-      const targetVerse = verses[0];
+      // Target the verse
+      const targetVerse = verses?.[0];
+      if (!targetVerse) {
+        throw new Error("No verses found on page " + q.page);
+      }
       setVersesData([targetVerse]);
 
       // Step 2: Fetch Audio for that SPECIFIC verse (Hussary ID 12)
@@ -545,12 +551,15 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
           created_at: new Date().toISOString()
         };
 
-        const { error: dbError } = await supabase.from("quran_ikhtebar").insert([entry]);
+        console.log("Ikhtebar: Attempting to save record for student:", student_id);
+        const { data: savedData, error: dbError } = await supabase.from("quran_ikhtebar").insert([entry]).select();
+        
         if (!dbError) {
-          console.log("Record saved successfully. Refreshing history...");
+          console.log("Ikhtebar: Record saved successfully:", savedData);
           await fetchHistory();
         } else {
-          console.error("Database save error:", dbError);
+          console.error("Ikhtebar: Database save error details:", dbError);
+          alert("Error saving record: " + dbError.message);
         }
       };
 
