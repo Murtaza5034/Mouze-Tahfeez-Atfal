@@ -132,53 +132,6 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     redirect_page: redirectPage
   };
   await supabase.from("system_notifications").insert([dbPayload]);
-
-  // OneSignal REST API Integration
-  try {
-    const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || "41019813-9c1b-47fe-83bd-87ac1e1b7021";
-    const ONESIGNAL_REST_API_KEY = import.meta.env.VITE_ONESIGNAL_REST_API_KEY || "ztkwwt3qlevwegw6pyormk4op";
-
-    const notificationPayload = {
-      app_id: ONESIGNAL_APP_ID,
-      headings: { en: title },
-      contents: { en: body },
-      data: { redirect_page: redirectPage },
-      web_url: window.location.origin + "/#" + redirectPage,
-      chrome_web_icon: window.location.origin + "/logo.png",
-      android_accent_color: "c5a059"
-    };
-
-    if (targetRole === "all") {
-      notificationPayload.included_segments = ["Subscribed Users"];
-    } else if (targetRole === "user" && targetUser) {
-      notificationPayload.filters = [
-        { field: "tag", key: "user_email", relation: "=", value: targetUser }
-      ];
-    } else {
-      notificationPayload.filters = [
-        { field: "tag", key: "portal_role", relation: "=", value: targetRole }
-      ];
-      if (targetUser) {
-        notificationPayload.filters.push({ field: "tag", key: "user_email", relation: "=", value: targetUser });
-      }
-    }
-
-    const response = await fetch("https://onesignal.com/api/v1/notifications", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
-      },
-      body: JSON.stringify(notificationPayload)
-    });
-    
-    if (!response.ok) {
-      const result = await response.json();
-      console.error("OneSignal API Error:", result);
-    }
-  } catch (err) {
-    console.error("OneSignal broadcast failed:", err);
-  }
 };
 
 function NotificationEnabler({ permission, onRequest }) {
@@ -1344,14 +1297,12 @@ function AdminPortal({
   onUnassignChild,
   loadPortalData,
   portalRole,
-  oneSignalId,
-  notificationPermission,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
 
   const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications"];
-  const navPages = ["Overview", "Announcements", "Schedule", "Teachers"];
+  const navPages = ["Overview", "Announcements", "Schedule"];
 
   const selectedStudent =
     students.find((student) => String(student.student_id) === String(selectedStudentId)) ||
@@ -1669,25 +1620,7 @@ function AdminPortal({
                   <Send size={18} />
                   <h3>System Notifications</h3>
                 </div>
-                <div className="one-signal-status-pill">
-                    {oneSignalId ? (
-                      <span className="status-badge present">Connected ✅</span>
-                    ) : (
-                      <button 
-                        className="status-badge pending" 
-                        onClick={() => {
-                          if (window.OneSignal && typeof window.OneSignal.push === 'function') {
-                            window.OneSignal.push(() => {
-                              window.OneSignal.Slidedown?.prompt();
-                              window.OneSignal.Notifications?.requestPermission();
-                            });
-                          }
-                        }}
-                      >
-                        Connect Now 🔗
-                      </button>
-                    )}
-                 </div>
+
               </div>
               <form className="stack-form" onSubmit={onSendCustomNotification}>
                 <div className="form-grid">
@@ -1761,28 +1694,7 @@ function AdminPortal({
                   <Send size={18} /> Dispatch Notification
                 </button>
               </form>
-              <section className="data-card" style={{ marginTop: '20px', border: '1px solid #fee2e2' }}>
-                <div className="card-headline">
-                  <ShieldCheck size={18} color="#ef4444" />
-                  <h3 style={{ color: '#b91c1c' }}>OneSignal Debugger</h3>
-                </div>
-                <div style={{ padding: '10px', fontSize: '12px', background: '#fef2f2', borderRadius: '12px' }}>
-                   <p><strong>OneSignal ID:</strong> {oneSignalId || "Searching..."}</p>
-                   <button 
-                     className="action-button" 
-                     style={{ background: '#ef4444', marginTop: '10px' }}
-                     onClick={() => {
-                       if (window.OneSignal && typeof window.OneSignal.push === 'function') {
-                         window.OneSignal.push(() => {
-                           window.OneSignal.Notifications?.requestPermission();
-                         });
-                       }
-                     }}
-                   >
-                     Force Browser Connection 🔗
-                   </button>
-                </div>
-              </section>
+
             </section>
             <section className="data-card">
               <div className="card-headline headline-with-action">
@@ -2038,124 +1950,7 @@ function AdminPortal({
         ) : null}
 
 
-        {activePage === "Teachers" ? (
-          <div className="management-grid two-columns">
-            <section className="form-card">
-              <div className="card-headline">
-                <Clock size={18} />
-                <h3>Mark Teacher Attendance in Minutes</h3>
-              </div>
-              
-              <div className="attendance-common-inputs">
-                <label>
-                  <span>Attendance Date</span>
-                  <input
-                    type="date"
-                    name="attendance_date"
-                    value={adminForms.teacherAttendance.attendance_date}
-                    onChange={onAdminFormChange("teacherAttendance")}
-                  />
-                </label>
-                <label>
-                  <span>Default Minutes</span>
-                  <input
-                    type="number"
-                    name="minutes_present"
-                    value={adminForms.teacherAttendance.minutes_present}
-                    onChange={onAdminFormChange("teacherAttendance")}
-                    placeholder="240"
-                  />
-                </label>
-              </div>
 
-              <div className="teacher-attendance-grid">
-                {portalAccessList
-                  .filter(a => 
-                    (normalizeText(a.portal_role).includes("teacher") || normalizeText(a.portal_role).includes("muhaffiz")) && 
-                    (a.show_salary_card === true || String(a.show_salary_card) === 'true' || a.salary_per_minute > 0)
-                  )
-                  .map(teacher => {
-                    const teacherGroups = customGroups.filter(g => normalizeText(g.teacher_name) === normalizeText(teacher.full_name));
-                    return (
-                      <div key={teacher.id} className="teacher-attend-card">
-                        <div className="tcard-info">
-                          <strong>{teacher.full_name}</strong>
-                          <p>{teacherGroups.map(g => g.group_name).join(", ") || "No Group"}</p>
-                        </div>
-                        <div className="tcard-actions">
-                          <button 
-                            className="attend-btn present"
-                            onClick={() => onRecordTeacherAttendance(null, {
-                              teacher_name: teacher.full_name,
-                              attendance_date: adminForms.teacherAttendance.attendance_date,
-                              minutes_present: Number(adminForms.teacherAttendance.minutes_present || 240),
-                              status: 'Present',
-                              note: 'Quick Mark'
-                            })}
-                          >
-                            Present
-                          </button>
-                          <button 
-                            className="attend-btn absent"
-                            onClick={() => onRecordTeacherAttendance(null, {
-                              teacher_name: teacher.full_name,
-                              attendance_date: adminForms.teacherAttendance.attendance_date,
-                              minutes_present: 0,
-                              status: 'Absent',
-                              note: 'Quick Mark'
-                            })}
-                          >
-                            Absent
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                }
-                {portalAccessList.filter(a => a.portal_role === "teacher" && a.show_salary_card === true).length === 0 && (
-                  <div className="empty-state">No teachers found with 'Show Salary Card' enabled.</div>
-                )}
-              </div>
-            </section>
-
-            <section className="data-card">
-              <div className="card-headline">
-                <Users size={18} />
-                <h3>Teacher Overview</h3>
-              </div>
-              <div className="record-stack">
-                {teacherSummaries.map((teacher) => (
-                  <article key={teacher.teacherName} className="record-card">
-                    <strong>{teacher.teacherName}</strong>
-                    <span>
-                      {teacher.totalStudents} children · {teacher.groups.join(", ")}
-                    </span>
-                  </article>
-                ))}
-              </div>
-
-              <div className="card-headline spaced">
-                <ShieldCheck size={18} />
-                <h3>Recent Attendance Logs</h3>
-              </div>
-              <div className="record-stack">
-                {teacherAttendance.map((item, index) => (
-                  <article key={`${item.teacher_name}-${item.attendance_date}-${index}`} className="record-card">
-                    <strong>
-                      {item.teacher_name} · {item.minutes_present} mins
-                    </strong>
-                    <span>
-                      {item.status} · {item.attendance_date}
-                    </span>
-                  </article>
-                ))}
-                {teacherAttendance.length === 0 ? (
-                  <div className="empty-state">No teacher attendance records yet.</div>
-                ) : null}
-              </div>
-            </section>
-          </div>
-        ) : null}
 
         {activePage === "Assignments" ? (
           <div className="management-grid">
@@ -3326,7 +3121,6 @@ export default function App() {
   const [notificationPermission, setNotificationPermission] = useState(
     "Notification" in window ? Notification.permission : "denied"
   );
-  const [oneSignalId, setOneSignalId] = useState("");
   const [user, setUser] = useState(null);
   const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
   const [portalRole, setPortalRole] = useState(() => {
@@ -3493,15 +3287,6 @@ export default function App() {
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
             await loadPortalData(access.role, session.user, access.parentProfile);
-            
-            // Restore OneSignal Tagging
-            if (window.OneSignal) {
-              window.OneSignal.User.addTags({
-                portal_role: access.role,
-                user_email: session.user.email,
-                user_name: session.user.user_metadata?.full_name || session.user.email
-              });
-            }
           }
         } catch (err) {
           console.error("Auth initialization error:", err);
@@ -3532,36 +3317,7 @@ export default function App() {
     };
   }, []);
 
-  // Monitor OneSignal Status
-  useEffect(() => {
-    let mounted = true;
-    const checkOneSignal = () => {
-      const OneSignal = window.OneSignal;
-      if (OneSignal && typeof OneSignal.push === 'function') {
-        OneSignal.push(() => {
-          const id = OneSignal.User?.PushSubscription?.id;
-          if (id && mounted) setOneSignalId(id || "");
-          if (mounted) setNotificationPermission(Notification.permission);
-        });
-      }
-    };
 
-    if (window.OneSignal) {
-       window.OneSignal.Notifications?.addEventListener("click", (event) => {
-          const data = event.notification.additionalData;
-          if (data && data.redirect_page) {
-            setActivePage(data.redirect_page);
-            setMenuOpen(false);
-          }
-       });
-    }
-
-    const interval = setInterval(checkOneSignal, 3000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [setActivePage]);
 
 
 
@@ -4577,8 +4333,6 @@ export default function App() {
         loadPortalData={loadPortalData}
         portalRole={portalRole}
         setSelectedAnnouncement={setSelectedAnnouncement}
-        oneSignalId={oneSignalId}
-        notificationPermission={notificationPermission}
       />
       </React.Fragment>
     );
