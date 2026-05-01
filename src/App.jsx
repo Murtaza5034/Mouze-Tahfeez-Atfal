@@ -132,6 +132,53 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     redirect_page: redirectPage
   };
   await supabase.from("system_notifications").insert([dbPayload]);
+
+  // OneSignal REST API Integration
+  try {
+    const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || "41019813-9c1b-47fe-83bd-87ac1e1b7021";
+    const ONESIGNAL_REST_API_KEY = import.meta.env.VITE_ONESIGNAL_REST_API_KEY || "ztkwwt3qlevwegw6pyormk4op";
+
+    const notificationPayload = {
+      app_id: ONESIGNAL_APP_ID,
+      headings: { en: title },
+      contents: { en: body },
+      data: { redirect_page: redirectPage },
+      web_url: window.location.origin + "/#" + redirectPage,
+      chrome_web_icon: window.location.origin + "/logo.png",
+      android_accent_color: "c5a059"
+    };
+
+    if (targetRole === "all") {
+      notificationPayload.included_segments = ["Subscribed Users"];
+    } else if (targetRole === "user" && targetUser) {
+      notificationPayload.filters = [
+        { field: "tag", key: "user_email", relation: "=", value: targetUser }
+      ];
+    } else {
+      notificationPayload.filters = [
+        { field: "tag", key: "portal_role", relation: "=", value: targetRole }
+      ];
+      if (targetUser) {
+        notificationPayload.filters.push({ field: "tag", key: "user_email", relation: "=", value: targetUser });
+      }
+    }
+
+    const response = await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
+      },
+      body: JSON.stringify(notificationPayload)
+    });
+    
+    if (!response.ok) {
+      const result = await response.json();
+      console.error("OneSignal API Error:", result);
+    }
+  } catch (err) {
+    console.error("OneSignal broadcast failed:", err);
+  }
 };
 
 function NotificationEnabler({ permission, onRequest }) {
@@ -1604,8 +1651,17 @@ function AdminPortal({
                   <h3>System Notifications</h3>
                 </div>
                 <div className="one-signal-status-pill">
-                    <span className="status-badge gold">System Notifications Active</span>
-                </div>
+                    {oneSignalId ? (
+                      <span className="status-badge present">Connected ✅</span>
+                    ) : (
+                      <button 
+                        className="status-badge pending" 
+                        onClick={() => window.OneSignal?.Slidedown?.prompt()}
+                      >
+                        Connect Now 🔗
+                      </button>
+                    )}
+                 </div>
               </div>
               <form className="stack-form" onSubmit={onSendCustomNotification}>
                 <div className="form-grid">
@@ -1679,7 +1735,22 @@ function AdminPortal({
                   <Send size={18} /> Dispatch Notification
                 </button>
               </form>
-
+              <section className="data-card" style={{ marginTop: '20px', border: '1px solid #fee2e2' }}>
+                <div className="card-headline">
+                  <ShieldCheck size={18} color="#ef4444" />
+                  <h3 style={{ color: '#b91c1c' }}>OneSignal Debugger</h3>
+                </div>
+                <div style={{ padding: '10px', fontSize: '12px', background: '#fef2f2', borderRadius: '12px' }}>
+                   <p><strong>OneSignal ID:</strong> {oneSignalId || "Searching..."}</p>
+                   <button 
+                     className="action-button" 
+                     style={{ background: '#ef4444', marginTop: '10px' }}
+                     onClick={() => window.OneSignal?.Notifications?.requestPermission()}
+                   >
+                     Force Browser Connection 🔗
+                   </button>
+                </div>
+              </section>
             </section>
             <section className="data-card">
               <div className="card-headline headline-with-action">
@@ -3223,6 +3294,7 @@ export default function App() {
   const [notificationPermission, setNotificationPermission] = useState(
     "Notification" in window ? Notification.permission : "denied"
   );
+  const [oneSignalId, setOneSignalId] = useState("");
   const [user, setUser] = useState(null);
   const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
   const [portalRole, setPortalRole] = useState(() => {
@@ -3389,6 +3461,15 @@ export default function App() {
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
             await loadPortalData(access.role, session.user, access.parentProfile);
+            
+            // Restore OneSignal Tagging
+            if (window.OneSignal) {
+              window.OneSignal.User.addTags({
+                portal_role: access.role,
+                user_email: session.user.email,
+                user_name: session.user.user_metadata?.full_name || session.user.email
+              });
+            }
           }
         } catch (err) {
           console.error("Auth initialization error:", err);
@@ -3418,6 +3499,34 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Monitor OneSignal Status
+  useEffect(() => {
+    let mounted = true;
+    const checkOneSignal = () => {
+      if (window.OneSignal && !Array.isArray(window.OneSignal)) {
+        const id = window.OneSignal.User?.PushSubscription?.id;
+        if (id && mounted) setOneSignalId(id);
+        if (mounted) setNotificationPermission(Notification.permission);
+      }
+    };
+
+    if (window.OneSignal) {
+       window.OneSignal.Notifications?.addEventListener("click", (event) => {
+          const data = event.notification.additionalData;
+          if (data && data.redirect_page) {
+            setActivePage(data.redirect_page);
+            setMenuOpen(false);
+          }
+       });
+    }
+
+    const interval = setInterval(checkOneSignal, 3000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [setActivePage]);
 
 
 
