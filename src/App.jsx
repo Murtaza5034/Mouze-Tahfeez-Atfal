@@ -420,7 +420,16 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   };
 
   const logWordMistake = (word, type) => {
-    setMistakes(prev => [...prev, { type, wordId: word.id, wordText: word.text_uthmani, time: new Date().toLocaleTimeString() }]);
+    setMistakes(prev => {
+      const exists = prev.find(m => m.wordId === word.id && m.type === type);
+      if (exists) return prev;
+      return [...prev, { 
+        type, 
+        wordId: word.id, 
+        wordText: word.text_uthmani || word.text || "General", 
+        time: new Date().toLocaleTimeString() 
+      }];
+    });
     playBeep();
     if (testMode === "self") pauseAndRestartOnMistake();
   };
@@ -667,11 +676,19 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
                 {recording && (
                   <div className="live-mistake-panel fade-in">
-                    <p className="live-label">TAP A WORD TO MARK MISTAKE:</p>
-                    <div className="mistake-btns-lively">
-                      <button onClick={() => playBeep()}>Manual Beep</button>
-                      <button onClick={() => logWordMistake({ id: 'general', text_uthmani: 'General' }, "Ahkam")}>Ahkam Mistake</button>
+                    <p className="live-label">🔴 MARK MISTAKES LIVE:</p>
+                    <div className="mistake-btns-grid">
+                      <button className="mistake-btn word" onClick={() => logWordMistake({ id: Date.now(), text_uthmani: 'Word' }, "Word")}>
+                        Word Mistake
+                      </button>
+                      <button className="mistake-btn ahkam" onClick={() => logWordMistake({ id: Date.now(), text_uthmani: 'Ahkam' }, "Ahkam")}>
+                        Ahkam/Makharij
+                      </button>
+                      <button className="mistake-btn beep" onClick={() => playBeep()}>
+                        Manual Beep
+                      </button>
                     </div>
+                    <p className="helper-text">You can also tap words in the Mushaf above to mark specific Word mistakes.</p>
                   </div>
                 )}
               </div>

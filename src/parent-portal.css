@@ -985,6 +985,59 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   justify-content: center;
 }
 
-.arabic-kanz {
-  font-family: 'Kanz al Marjaan', 'Amiri', serif;
+/* Professional Naskh Typography */
+.misri-font {
+  font-family: 'Scheherazade New', 'Amiri', 'Me Quran', serif;
+  direction: rtl;
+  text-align: center;
+  line-height: 2.6;
+  letter-spacing: 0.5px;
+  word-spacing: 10px;
+}
+
+.mistake-btns-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.mistake-btn {
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+}
+
+.mistake-btn.word { background: #3b82f6; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
+.mistake-btn.ahkam { background: #eab308; box-shadow: 0 4px 10px rgba(234, 179, 8, 0.3); }
+.mistake-btn.beep { background: #ef4444; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
+
+.mistake-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.live-mistake-panel {
+  background: #fff;
+  border: 1px solid #eee;
+  padding: 20px;
+  border-radius: 12px;
+  margin-top: 25px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.helper-text {
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 10px;
+  text-align: center;
 }
