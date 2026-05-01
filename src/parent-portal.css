@@ -860,36 +860,30 @@
 
 /* Misri / Egyptian Style Quran Typography */
 .misri-font {
-  font-family: 'Kanz al Marjaan', 'Me Quran', serif;
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Me Quran', serif;
   direction: rtl;
   text-align: center;
-  line-height: 2.2;
+  line-height: 2.8;
+  letter-spacing: 1px;
+  word-spacing: 12px;
 }
 
-.q-page-render {
-  background: #fdf6e3;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: inset 0 0 50px rgba(0,0,0,0.05);
-  margin-bottom: 24px;
-  border: 1px solid #eee;
+.mushaf-inner {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 12px;
+  gap: 20px;
+  max-width: 95%;
+  margin: 0 auto;
 }
 
 .q-word {
-  font-size: 1.8rem;
-  padding: 4px 8px;
-  border-radius: 6px;
+  font-size: 2.4rem;
+  padding: 4px 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
-  color: #333;
-}
-
-.q-word:hover {
-  background: rgba(0,0,0,0.05);
+  color: #1a1a1a;
 }
 
 .q-word.has-mistake {
@@ -904,44 +898,31 @@
   border-radius: 8px;
   border: 1px solid #eee;
   margin: 15px 0;
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
 }
 
 .h-word {
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   margin: 0 4px;
-  padding: 2px 4px;
+  padding: 2px 6px;
   border-radius: 4px;
 }
 
 .h-word.mistake-blue {
   background: #dbeafe;
   color: #1e40af;
-  border-bottom: 2px solid #3b82f6;
+  border-bottom: 3px solid #3b82f6;
 }
 
 .h-word.mistake-yellow {
   background: #fef9c3;
   color: #854d0e;
-  border-bottom: 2px solid #eab308;
+  border-bottom: 3px solid #eab308;
 }
 
-.star-rating {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.mistake-dot.blue {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.mistake-dot.yellow {
-  background: #fef9c3;
-  color: #854d0e;
-}
+.mistake-dot.blue { background: #dbeafe; color: #1e40af; }
+.mistake-dot.yellow { background: #fef9c3; color: #854d0e; }
 
 /* Tajweed Color Coding (Al-Muhafiz Style) */
 tajweed.ghn { color: #ff0055 !important; font-weight: bold; } /* Ghunna */
@@ -951,29 +932,11 @@ tajweed.ql { color: #00aa00 !important; font-weight: bold; } /* Qalqala */
 tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
 
 .mushaf-page {
-  background: #fff9e6 !important; /* Cream paper color */
-  border: 12px double var(--primary-gold) !important;
-  padding: 30px !important;
+  background: #fff9e6 !important;
+  border: 15px double var(--primary-gold) !important;
+  padding: 40px !important;
   position: relative;
-  overflow: hidden;
-}
-
-.mushaf-page::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  border: 2px solid var(--primary-gold);
-  margin: 5px;
-  pointer-events: none;
-}
-
-.mushaf-inner {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 15px;
-  max-width: 90%;
-  margin: 0 auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
 }
 
 .mushaf-card-view {

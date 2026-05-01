@@ -368,16 +368,15 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     setMistakes([]);
 
     try {
-      // Audio Logic: Sheikh Hussary (ID 13) for Self Mode only
+      // Audio Logic: Sheikh Hussary (ID 12 - Muallim) for Self Mode only
       if (testMode === "self") {
-        const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/13/by_page/${q.page}`);
+        const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/12/by_page/${q.page}`);
         const audioData = await audioRes.json();
         if (audioData.audio_files?.length > 0) {
           const url = audioData.audio_files[0].url;
           setAudioGuidanceUrl(url);
-          // Auto-play for Self Mode
           const audio = new Audio(url);
-          audio.play().catch(e => console.log("Auto-play blocked by browser, user must click play."));
+          audio.play().catch(e => console.log("Auto-play blocked"));
         }
       }
 
@@ -521,7 +520,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
         };
 
         const { error: dbError } = await supabase.from("quran_ikhtebar").insert([entry]);
-        if (!dbError) fetchHistory();
+        if (!dbError) {
+          console.log("Record saved successfully. Refreshing history...");
+          await fetchHistory();
+        } else {
+          console.error("Database save error:", dbError);
+        }
       };
 
       mediaRecorderRef.current.start();
