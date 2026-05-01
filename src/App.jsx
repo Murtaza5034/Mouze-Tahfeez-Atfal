@@ -1676,9 +1676,11 @@ function AdminPortal({
                       <button 
                         className="status-badge pending" 
                         onClick={() => {
-                          if (window.OneSignal && !Array.isArray(window.OneSignal)) {
-                            window.OneSignal.Slidedown?.prompt();
-                            window.OneSignal.Notifications?.requestPermission();
+                          if (window.OneSignal && typeof window.OneSignal.push === 'function') {
+                            window.OneSignal.push(() => {
+                              window.OneSignal.Slidedown?.prompt();
+                              window.OneSignal.Notifications?.requestPermission();
+                            });
                           }
                         }}
                       >
@@ -1769,7 +1771,13 @@ function AdminPortal({
                    <button 
                      className="action-button" 
                      style={{ background: '#ef4444', marginTop: '10px' }}
-                     onClick={() => window.OneSignal?.Notifications?.requestPermission()}
+                     onClick={() => {
+                       if (window.OneSignal && typeof window.OneSignal.push === 'function') {
+                         window.OneSignal.push(() => {
+                           window.OneSignal.Notifications?.requestPermission();
+                         });
+                       }
+                     }}
                    >
                      Force Browser Connection 🔗
                    </button>
@@ -3528,16 +3536,13 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     const checkOneSignal = () => {
-      // Try to find OneSignal from window or Deferred list
-      let OneSignal = window.OneSignal;
-      if (!OneSignal && window.OneSignalDeferred && !Array.isArray(window.OneSignalDeferred)) {
-         OneSignal = window.OneSignalDeferred;
-      }
-
-      if (OneSignal && !Array.isArray(OneSignal)) {
-        const id = OneSignal.User?.PushSubscription?.id;
-        if (id && mounted) setOneSignalId(id);
-        if (mounted) setNotificationPermission(Notification.permission);
+      const OneSignal = window.OneSignal;
+      if (OneSignal && typeof OneSignal.push === 'function') {
+        OneSignal.push(() => {
+          const id = OneSignal.User?.PushSubscription?.id;
+          if (id && mounted) setOneSignalId(id || "");
+          if (mounted) setNotificationPermission(Notification.permission);
+        });
       }
     };
 
