@@ -45,6 +45,38 @@ const ASSETS = {
   LOGO: "/logo.png",
 };
 
+function SidebarHeader({ photoUrl, name, arabicName, tag }) {
+  const isArabic = (text) => /[\u0600-\u06FF]/.test(text);
+  const nameIsArabic = isArabic(name);
+  const finalPhoto = (photoUrl && photoUrl !== "" && photoUrl !== "null" && photoUrl !== "undefined") ? photoUrl : "/logo.png";
+  
+  return (
+    <div className="sidebar-profile-centered">
+      <div className="avatar-vessel-centered">
+        <img 
+          src={finalPhoto} 
+          alt="Profile" 
+          className="sidebar-avatar-img" 
+          onError={(e) => { e.target.src = "/logo.png"; }}
+          loading="eager"
+        />
+        <div className="avatar-ring"></div>
+      </div>
+      <div className="profile-info-centered">
+        <p className="profile-tag-premium">{tag}</p>
+        <h2 className={`profile-name-premium ${nameIsArabic ? 'arabic-kanz' : ''}`}>
+          {name}
+        </h2>
+        {arabicName && (
+          <h3 className="profile-arabic-premium arabic-kanz">
+            {arabicName}
+          </h3>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const UI_TEXT = {
   PER_MAX: " / ",
   OF_TOTAL: " out of ",
@@ -1245,34 +1277,7 @@ function ParentPortal({
   );
 }
 
-function SidebarHeader({ photoUrl, name, arabicName, tag }) {
-  const isArabic = (text) => /[\u0600-\u06FF]/.test(text);
-  const nameIsArabic = isArabic(name);
-  
-  return (
-    <div className="sidebar-profile-centered">
-      <div className="avatar-vessel-centered">
-        <img 
-          src={photoUrl || "/logo.png"} 
-          alt="Profile" 
-          className="sidebar-avatar-img" 
-        />
-        <div className="avatar-ring"></div>
-      </div>
-      <div className="profile-info-centered">
-        <p className="profile-tag-premium">{tag}</p>
-        <h2 className={`profile-name-premium ${nameIsArabic ? 'arabic-kanz' : ''}`}>
-          {name}
-        </h2>
-        {arabicName && (
-          <h3 className="profile-arabic-premium arabic-kanz">
-            {arabicName}
-          </h3>
-        )}
-      </div>
-    </div>
-  );
-}
+
 
 function AdminPortal({
   activePage,
