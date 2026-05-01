@@ -1297,6 +1297,23 @@ function ParentPortal({
   );
 }
 
+function SidebarHeader({ photoUrl, name, tag }) {
+  return (
+    <div className="brand-header-flex">
+      <img 
+        src={photoUrl || "/logo.png"} 
+        alt="Profile" 
+        className="nav-logo" 
+        style={{ width: '40px', height: '40px', borderRadius: '12px', objectFit: 'cover' }} 
+      />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <p className="brand-tag">{tag}</p>
+        <h2 className="brand-title">{name}</h2>
+      </div>
+    </div>
+  );
+}
+
 function AdminPortal({
   activePage,
   actionMessage,
@@ -2810,11 +2827,11 @@ function TeacherPortal({
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
            <div className="brand-header-flex">
-            <img src={portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url || "/logo.png"} alt="Profile" className="nav-logo" />
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <p className="brand-tag">Teacher Portal</p>
-              <h2 className="brand-title">{portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Teacher"}</h2>
-            </div>
+            <SidebarHeader 
+              photoUrl={portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
+              name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Teacher"} 
+              tag="Teacher Portal" 
+            />
             <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
           </div>
         </div>
