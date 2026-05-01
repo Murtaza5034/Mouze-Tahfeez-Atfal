@@ -249,7 +249,230 @@ function NotificationBell({ notifications }) {
   );
 }
 
-// PremiumStatusAlert component removed as requested.
+// Quran Ikhtebar Component
+function QuranIkhtebar({ studentProfile, hifzDetails }) {
+  const marhalas = [
+    { name: "Marhala Ula", range: "Juz 30" },
+    { name: "Marhala Saniyah", range: "Juz 28-30" },
+    { name: "Marhala Salesah", range: "Juz 26-30" },
+    { name: "Marhala Rabeah", range: "Juz 1-5 + 26-30" },
+    { name: "Marhala Khamesah", range: "Juz 1-10 + 26-30" },
+    { name: "Marhala Sadesah", range: "Juz 1-15 + 26-30" },
+    { name: "Marhala Sabeah", range: "Juz 1-20 + 26-30" },
+    { name: "Marhala Saminah", range: "Juz 1-25 + 26-30" },
+  ];
+
+  const [selectedMarhala, setSelectedMarhala] = useState(marhalas[0]);
+  const [difficulty, setDifficulty] = useState("medium");
+  const [recording, setRecording] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [mistakes, setMistakes] = useState([]);
+  const [history, setHistory] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem("quran_ikhtebar_history");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const generateQuestion = () => {
+    const questions = {
+      easy: ["Recite the start of any Surah in this range.", "Complete the Ayat: 'Inna a'tainaka...'", "Recite Surah Al-Fatiha with proper Tajweed."],
+      medium: ["Recite from the middle of Surah Al-Mulk.", "Recite Ayat Al-Kursi and explain one Tajweed rule.", "Recite Surah Al-Waqiah from the start."],
+      hard: ["Recite from a random spot in Juz 28.", "Identify and recite a verse containing 'Idgham'.", "Recite Surah Ar-Rahman with perfect Makharaj."]
+    };
+    const pool = questions[difficulty];
+    setCurrentQuestion(pool[Math.floor(Math.random() * pool.length)]);
+    setMistakes([]);
+  };
+
+  const playBeep = () => {
+    const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+    audio.play();
+  };
+
+  const logMistake = (type) => {
+    setMistakes([...mistakes, { type, time: new Date().toLocaleTimeString() }]);
+    playBeep();
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const url = URL.createObjectURL(blob);
+        const entry = {
+          studentName: studentProfile?.name || "Child",
+          marhala: selectedMarhala.name,
+          difficulty,
+          question: currentQuestion,
+          mistakes: [...mistakes],
+          url,
+          timestamp: new Date().toISOString()
+        };
+        const newHistory = [entry, ...history];
+        setHistory(newHistory);
+        window.localStorage.setItem("quran_ikhtebar_history", JSON.stringify(newHistory));
+      };
+      mediaRecorderRef.current.start();
+      setRecording(true);
+    } catch (err) {
+      alert("Microphone access denied or error: " + err.message);
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
+
+  const downloadFile = (url, name) => {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.click();
+  };
+
+  return (
+    <div className="ikhtebar-container fade-in">
+      <div className="ikhtebar-header-card premium-card">
+        <div className="header-icon-box">
+          <BookOpen size={32} />
+        </div>
+        <div className="header-text">
+          <h2>Quran Ikhtebar Page</h2>
+          <p>Test your child's memorization with professional tools</p>
+        </div>
+      </div>
+
+      <div className="ikhtebar-main-grid">
+        <section className="ikhtebar-setup-card premium-card">
+          <h3 className="section-title"><Sparkles size={18} /> Test Configuration</h3>
+          
+          <div className="setup-form">
+            <label className="form-group">
+              <span>Select Marhala (Juz Wise)</span>
+              <select 
+                value={selectedMarhala.name} 
+                onChange={(e) => setSelectedMarhala(marhalas.find(m => m.name === e.target.value))}
+                className="premium-select"
+              >
+                {marhalas.map(m => (
+                  <option key={m.name} value={m.name}>{m.name} ({m.range})</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="form-group">
+              <span>Difficulty Level</span>
+              <div className="difficulty-toggle">
+                {["easy", "medium", "hard"].map(level => (
+                  <button 
+                    key={level}
+                    className={`diff-btn ${difficulty === level ? 'active' : ''} ${level}`}
+                    onClick={() => setDifficulty(level)}
+                  >
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </label>
+
+            <button className="generate-btn action-button" onClick={generateQuestion}>
+              <RotateCw size={18} /> Generate New Question
+            </button>
+          </div>
+
+          {currentQuestion && (
+            <div className="question-box card-appear">
+              <div className="q-label">Current Question:</div>
+              <p className="q-text">{currentQuestion}</p>
+              
+              <div className="recording-controls">
+                {!recording ? (
+                  <button className="rec-btn start" onClick={startRecording}>
+                    <div className="rec-dot"></div> Start Live Recording
+                  </button>
+                ) : (
+                  <button className="rec-btn stop" onClick={stopRecording}>
+                    <div className="rec-square"></div> Stop & Save Recording
+                  </button>
+                )}
+              </div>
+
+              {recording && (
+                <div className="mistake-logger fade-in">
+                  <p>Log Mistake (Tap to Beep):</p>
+                  <div className="mistake-btns">
+                    <button onClick={() => logMistake("Word")}>Word Mistake</button>
+                    <button onClick={() => logMistake("Ahkam")}>Ahkam Mistake</button>
+                    <button onClick={() => logMistake("Makharij")}>Makharij Mistake</button>
+                  </div>
+                  <div className="current-mistakes-list">
+                    {mistakes.map((m, i) => (
+                      <span key={i} className="mistake-pill">{m.type}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="quran-embed-card premium-card">
+          <h3 className="section-title"><BookOpen size={18} /> Misri Tajweed Quran</h3>
+          <div className="embed-container">
+            <iframe 
+              src="https://quran.com/?locale=en&font=quran-complex-v2" 
+              title="Tajweed Quran"
+              width="100%" 
+              height="500" 
+              style={{ borderRadius: '12px', border: 'none' }}
+            />
+          </div>
+        </section>
+      </div>
+
+      <div className="ikhtebar-history-section">
+        <h3 className="section-title"><Clock size={18} /> Ikhtebar History (Premium)</h3>
+        <div className="history-grid">
+          {history.length === 0 ? (
+            <div className="empty-history">No tests taken yet.</div>
+          ) : (
+            history.map((entry, i) => (
+              <div key={i} className="history-card-premium card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                <div className="history-card-top">
+                  <span className={`diff-badge ${entry.difficulty}`}>{entry.difficulty}</span>
+                  <span className="timestamp">{new Date(entry.timestamp).toLocaleDateString()}</span>
+                </div>
+                <div className="history-card-main">
+                  <h4>{entry.marhala}</h4>
+                  <p className="h-question">"{entry.question}"</p>
+                  <div className="mistake-summary">
+                    <strong>Mistakes:</strong> {entry.mistakes.length > 0 ? entry.mistakes.map(m => m.type).join(", ") : "None! Perfect Recitation"}
+                  </div>
+                </div>
+                <div className="history-card-footer">
+                  <audio src={entry.url} controls className="mini-audio" />
+                  <button className="download-btn" onClick={() => downloadFile(entry.url, `ikhtebar_${entry.timestamp}.webm`)}>
+                    Download <RotateCw size={14} style={{ marginLeft: '4px' }} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function AnnouncementsPage({ notifications, setActivePage, setSelectedAnnouncement }) {
   const images = [
@@ -825,7 +1048,7 @@ function ParentPortal({
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult } = parentData;
     parentData;
 
-  const pageNames = ["Home", "Schedule", "Progress", "Announcements", "Teachers"];
+  const pageNames = ["Home", "Schedule", "Progress", "Announcements", "Teachers", "Quran Ikhtebar"];
   const assignedRoles = getAssignedRoles(user);
 
   const navigationMap = {
@@ -834,7 +1057,8 @@ function ParentPortal({
     "Announcements": "Announcements",
     "Teachers": "Teachers",
     "Progress": "Child Summary",
-    "Profile": "Profile"
+    "Profile": "Profile",
+    "Quran Ikhtebar": "Quran Ikhtebar",
   };
 
   const myTeacher = teacherProfiles.find(t => 
@@ -963,6 +1187,9 @@ function ParentPortal({
           </button>
           <button className={`drawer-link ${activePage === "Profile" ? "active" : ""}`} onClick={() => { setActivePage("Profile"); setMenuOpen(false); }}>
             <User size={18} /> My Profile
+          </button>
+          <button className={`drawer-link ${activePage === "Quran Ikhtebar" ? "active" : ""}`} onClick={() => { setActivePage("Quran Ikhtebar"); setMenuOpen(false); }}>
+            <BookOpen size={18} /> Quran Ikhtebar
           </button>
         </nav>
         <div className="drawer-footer">
@@ -1171,7 +1398,7 @@ function ParentPortal({
           />
         ) : null}
 
-        {activePage === "Teachers" ? (
+                {activePage === "Teachers" ? (
           <div className="card-appear">
             <div className="section-title-block">
                <p className="page-eyebrow">Our Professional Staff</p>
@@ -1255,6 +1482,14 @@ function ParentPortal({
             )}
           </div>
         ) : null}
+
+        {activePage === "Quran Ikhtebar" ? (
+          <QuranIkhtebar 
+            studentProfile={studentProfile}
+            hifzDetails={hifzDetails}
+          />
+        ) : null}
+
 
 
 
