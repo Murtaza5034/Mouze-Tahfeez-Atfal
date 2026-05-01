@@ -132,55 +132,6 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     redirect_page: redirectPage
   };
   await supabase.from("system_notifications").insert([dbPayload]);
-
-  // OneSignal REST API Integration (Hard-Linked)
-  try {
-    const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || "41019813-9c1b-47fe-83bd-87ac1e1b7021";
-    const ONESIGNAL_REST_API_KEY = import.meta.env.VITE_ONESIGNAL_REST_API_KEY || "ztkwwt3qlevwegw6pyormk4op";
-
-    const notificationPayload = {
-      app_id: ONESIGNAL_APP_ID,
-      headings: { en: title },
-      contents: { en: body },
-      data: { redirect_page: redirectPage },
-      web_url: window.location.origin + "/#" + redirectPage,
-      chrome_web_icon: window.location.origin + "/logo.png",
-      android_accent_color: "c5a059"
-    };
-
-    if (targetRole === "all") {
-      notificationPayload.included_segments = ["Subscribed Users"];
-    } else if (targetRole === "user" && targetUser) {
-      notificationPayload.filters = [
-        { field: "tag", key: "user_email", relation: "=", value: targetUser }
-      ];
-    } else {
-      notificationPayload.filters = [
-        { field: "tag", key: "portal_role", relation: "=", value: targetRole }
-      ];
-      if (targetUser) {
-        notificationPayload.filters.push({ field: "tag", key: "user_email", relation: "=", value: targetUser });
-      }
-    }
-
-    const response = await fetch("https://onesignal.com/api/v1/notifications", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
-      },
-      body: JSON.stringify(notificationPayload)
-    });
-    
-    const result = await response.json();
-    if (!response.ok) {
-      console.error("OneSignal API Error:", result);
-    } else {
-      console.log("OneSignal Push Sent Successfully:", result);
-    }
-  } catch (err) {
-    console.error("OneSignal broadcast failed:", err);
-  }
 };
 
 function NotificationEnabler({ permission, onRequest }) {
@@ -1650,28 +1601,10 @@ function AdminPortal({
               <div className="card-headline headline-with-action">
                 <div className="headline-left">
                   <Send size={18} />
-                  <h3>OneSignal Control Center</h3>
+                  <h3>System Notifications</h3>
                 </div>
                 <div className="one-signal-status-pill">
-                    {oneSignalId ? (
-                      <span className="status-badge present">Connected ✅</span>
-                    ) : (
-                      <button 
-                        className="status-badge pending" 
-                        onClick={() => {
-                          window.OneSignal.push(() => {
-                            if (window.OneSignal.Slidedown) {
-                              window.OneSignal.Slidedown.prompt();
-                            } else {
-                              window.OneSignal.Notifications.requestPermission();
-                            }
-                          });
-                        }}
-                        style={{ border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
-                      >
-                        Connect Now 🔗
-                      </button>
-                    )}
+                    <span className="status-badge gold">System Notifications Active</span>
                 </div>
               </div>
               <form className="stack-form" onSubmit={onSendCustomNotification}>
@@ -1746,35 +1679,7 @@ function AdminPortal({
                   <Send size={18} /> Dispatch Notification
                 </button>
               </form>
-              <section className="data-card" style={{ marginTop: '20px', border: '1px solid #fee2e2' }}>
-                <div className="card-headline">
-                  <ShieldCheck size={18} color="#ef4444" />
-                  <h3 style={{ color: '#b91c1c' }}>Notification Debugger (Admin Only)</h3>
-                </div>
-                <div style={{ padding: '10px', fontSize: '12px', background: '#fef2f2', borderRadius: '12px' }}>
-                   <p><strong>Browser Status:</strong> {notificationPermission}</p>
-                   <p><strong>OneSignal ID:</strong> {oneSignalId || "Searching..."}</p>
-                   <p><strong>Service Worker:</strong> {navigator.serviceWorker.controller ? "Active ✅" : "Missing ❌"}</p>
-                   <button 
-                     className="action-button" 
-                     style={{ background: '#ef4444', marginTop: '10px' }}
-                     onClick={async () => {
-                       try {
-                         if (window.OneSignal && !Array.isArray(window.OneSignal)) {
-                           await window.OneSignal.Notifications.requestPermission();
-                         } else {
-                           alert("OneSignal is still loading. Please wait 5 seconds and try again.");
-                         }
-                       } catch (e) {
-                         console.error("Manual Prompt Error:", e);
-                         alert("Connection failed. Check your browser's address bar for blocked notifications.");
-                       }
-                     }}
-                   >
-                     Force Browser Connection 🔗
-                   </button>
-                </div>
-              </section>
+
             </section>
             <section className="data-card">
               <div className="card-headline headline-with-action">
@@ -3318,7 +3223,6 @@ export default function App() {
   const [notificationPermission, setNotificationPermission] = useState(
     "Notification" in window ? Notification.permission : "denied"
   );
-  const [oneSignalId, setOneSignalId] = useState("");
   const [user, setUser] = useState(null);
   const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
   const [portalRole, setPortalRole] = useState(() => {
@@ -3484,33 +3388,6 @@ export default function App() {
 
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
-            
-            // OneSignal Tagging & Auto-Prompt for Targeted Notifications
-            if (window.OneSignal) {
-              window.OneSignal.push(function() {
-                // v16 API for tagging
-                if (window.OneSignal.User) {
-                  window.OneSignal.User.addTags({
-                    portal_role: access.role,
-                    user_email: session.user.email,
-                    user_name: session.user.user_metadata?.full_name || session.user.email
-                  });
-                  console.log("OneSignal: Tags updated for", access.role);
-                } else {
-                  // Fallback for older SDK versions if somehow loaded
-                  window.OneSignal.sendTags({
-                    portal_role: access.role,
-                    user_email: session.user.email
-                  });
-                }
-                
-                // Trigger prompt after login if not already subscribed
-                if (window.OneSignal.Slidedown) {
-                  window.OneSignal.Slidedown.prompt();
-                }
-              });
-            }
-
             await loadPortalData(access.role, session.user, access.parentProfile);
           }
         } catch (err) {
@@ -3542,47 +3419,7 @@ export default function App() {
     };
   }, []);
 
-  // Monitor OneSignal Status and Handle Notification Clicks
-  useEffect(() => {
-    let mounted = true;
-    
-    const checkOneSignal = () => {
-      if (window.OneSignal && !Array.isArray(window.OneSignal)) {
-        const id = window.OneSignal.User?.PushSubscription?.id;
-        if (id && mounted) setOneSignalId(id);
-        
-        // Update permission state
-        if (mounted) setNotificationPermission(Notification.permission);
-      }
-    };
 
-    if (window.OneSignal) {
-      window.OneSignal.push(() => {
-        checkOneSignal();
-        
-        // Listen for subscription changes
-        window.OneSignal.User.PushSubscription.addEventListener("change", (event) => {
-          if (mounted) setOneSignalId(event.current.id || "");
-        });
-
-        // Listen for notification clicks (v16 style)
-        window.OneSignal.Notifications.addEventListener("click", (event) => {
-          const data = event.notification.additionalData;
-          if (data && data.redirect_page) {
-            console.log("OneSignal: Redirecting to", data.redirect_page);
-            setActivePage(data.redirect_page);
-            setMenuOpen(false);
-          }
-        });
-      });
-    }
-
-    const interval = setInterval(checkOneSignal, 3000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [setActivePage]);
 
   async function loadPortalData(role, currentUser, parentProfileOverride = null) {
     if (!currentUser) {
@@ -4033,7 +3870,6 @@ export default function App() {
 
           if (isTargeted) {
              setNotificationsList(prev => [newNotif, ...prev]);
-             // OneSignal handles the push delivery from the server-side
           }
         }
       )
@@ -4045,12 +3881,7 @@ export default function App() {
   }, [user, portalRole]);
 
   const requestNotificationPermission = async () => {
-    if (window.OneSignal) {
-      window.OneSignal.push(function() {
-        window.OneSignal.showNativePrompt();
-      });
-      showAction("success", "Requesting permission...");
-    } else if ("Notification" in window) {
+    if ("Notification" in window) {
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
       if (permission === "granted") {
@@ -4137,7 +3968,7 @@ export default function App() {
        notifTitle = `[Direct] ${payload.title}`;
     }
 
-    // Trigger OneSignal and Supabase notification via shared function
+    // Trigger Supabase notification via shared function
     await broadcastNotification(
       notifTitle,
       payload.body,
