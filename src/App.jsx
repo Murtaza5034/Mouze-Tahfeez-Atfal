@@ -1675,7 +1675,12 @@ function AdminPortal({
                     ) : (
                       <button 
                         className="status-badge pending" 
-                        onClick={() => window.OneSignal?.Slidedown?.prompt()}
+                        onClick={() => {
+                          if (window.OneSignal && !Array.isArray(window.OneSignal)) {
+                            window.OneSignal.Slidedown?.prompt();
+                            window.OneSignal.Notifications?.requestPermission();
+                          }
+                        }}
                       >
                         Connect Now 🔗
                       </button>
@@ -3523,8 +3528,9 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     const checkOneSignal = () => {
-      if (window.OneSignal && !Array.isArray(window.OneSignal)) {
-        const id = window.OneSignal.User?.PushSubscription?.id;
+      const OneSignal = window.OneSignal;
+      if (OneSignal && !Array.isArray(OneSignal)) {
+        const id = OneSignal.User?.PushSubscription?.id;
         if (id && mounted) setOneSignalId(id);
         if (mounted) setNotificationPermission(Notification.permission);
       }
