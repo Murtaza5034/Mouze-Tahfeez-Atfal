@@ -350,10 +350,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     setMistakes([]);
 
     try {
-      // Fetch Abdulbasit Audio
-      const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/1/by_page/${q.page}`);
-      const audioData = await audioRes.json();
-      if (audioData.audio_files?.length > 0) setAudioGuidanceUrl(audioData.audio_files[0].url);
+      // Audio Logic: Sheikh Hussary (ID 13) for Self Mode only
+      if (testMode === "self") {
+        const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/13/by_page/${q.page}`);
+        const audioData = await audioRes.json();
+        if (audioData.audio_files?.length > 0) setAudioGuidanceUrl(audioData.audio_files[0].url);
+      }
 
       // Fetch Verses with Words
       const textRes = await fetch(`https://api.quran.com/api/v4/verses/by_page/${q.page}?words=true&word_fields=text_uthmani`);
@@ -363,9 +365,11 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
       const verses = textData.verses.slice(0, lineLimit);
       setVersesData(verses);
 
-      // Animation: Reveal words sequentially
+      // Animation logic: Self mode reveals all, Teacher mode reveals only first verse
       let allWords = [];
-      verses.forEach(v => {
+      const versesToAnimate = testMode === "teacher" ? verses.slice(0, 1) : verses;
+      
+      versesToAnimate.forEach(v => {
         v.words.forEach(w => {
           if (w.char_type_name !== 'end') allWords.push(w);
         });
@@ -552,8 +556,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
             {currentQuestion && (
               <div className="question-display-lively card-appear">
-                <div className="q-label-badge">Abdulbasit Voice Guidance:</div>
-                {audioGuidanceUrl && <audio src={audioGuidanceUrl} controls className="abdulbasit-audio" />}
+                <div className="q-label-badge">
+                  {testMode === "self" ? "Sheikh Hussary Voice Guidance:" : "Teacher Prompt (First Verse):"}
+                </div>
+                {testMode === "self" && audioGuidanceUrl && (
+                  <audio src={audioGuidanceUrl} controls className="abdulbasit-audio" />
+                )}
                 
                 <div className="q-page-render misri-font">
                   {revealedWords.map((w, idx) => (
@@ -565,6 +573,9 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                       {w.text_uthmani}
                     </span>
                   ))}
+                  {testMode === "teacher" && !loadingQuestion && revealedWords.length > 0 && (
+                    <span className="continue-prompt">... Student continues recitation ...</span>
+                  )}
                 </div>
 
                 <div className="q-meta-info">

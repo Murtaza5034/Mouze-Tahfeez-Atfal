@@ -943,6 +943,19 @@
   color: #854d0e;
 }
 
+.continue-prompt {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-left: 15px;
+  display: inline-block;
+  vertical-align: middle;
+  background: rgba(0,0,0,0.02);
+  padding: 4px 12px;
+  border-radius: 50px;
+}
+
 .history-card-premium {
   border-top: 4px solid var(--primary-gold);
 }
