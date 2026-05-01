@@ -1310,6 +1310,7 @@ function AdminPortal({
   onUnassignChild,
   loadPortalData,
   portalRole,
+  setSelectedAnnouncement,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -2640,6 +2641,7 @@ function TeacherPortal({
   notifications,
   loadPortalData,
   portalRole,
+  setSelectedAnnouncement,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const selectedStudent =
