@@ -1344,6 +1344,8 @@ function AdminPortal({
   onUnassignChild,
   loadPortalData,
   portalRole,
+  oneSignalId,
+  notificationPermission,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -4559,6 +4561,8 @@ export default function App() {
         loadPortalData={loadPortalData}
         portalRole={portalRole}
         setSelectedAnnouncement={setSelectedAnnouncement}
+        oneSignalId={oneSignalId}
+        notificationPermission={notificationPermission}
       />
       </React.Fragment>
     );
