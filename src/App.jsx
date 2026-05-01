@@ -307,24 +307,83 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
   const [selectedMarhalaName, setSelectedMarhalaName] = useState("Marhala Ula");
   const [difficulty, setDifficulty] = useState("medium");
+  const [testMode, setTestMode] = useState("teacher"); // 'self' or 'teacher'
   const [recording, setRecording] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [questionText, setQuestionText] = useState("");
+  const [revealedText, setRevealedText] = useState("");
+  const [audioGuidanceUrl, setAudioGuidanceUrl] = useState(null);
+  const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [mistakes, setMistakes] = useState([]);
-  const [history, setHistory] = useState(() => {
-    try {
-      const saved = window.localStorage.getItem("quran_ikhtebar_history");
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  const [history, setHistory] = useState([]);
+  const [student_id, setStudentId] = useState(studentProfile?.student_id || null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const silenceTimerRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
 
-  const generateQuestion = () => {
+  useEffect(() => {
+    fetchHistory();
+  }, [student_id]);
+
+  const fetchHistory = async () => {
+    if (!student_id) return;
+    const { data, error } = await supabase
+      .from("quran_ikhtebar")
+      .select("*")
+      .eq("student_id", student_id)
+      .order("created_at", { ascending: false });
+    if (data) setHistory(data);
+  };
+
+  const generateQuestion = async () => {
+    setLoadingQuestion(true);
+    setRevealedText("");
+    setAudioGuidanceUrl(null);
+    
     const pool = marhalaLibrary[selectedMarhalaName][difficulty];
-    const randomAyat = pool[Math.floor(Math.random() * pool.length)];
-    setCurrentQuestion(randomAyat);
+    const q = pool[Math.floor(Math.random() * pool.length)];
+    setCurrentQuestion(q);
     setMistakes([]);
+
+    try {
+      // Fetch Abdulbasit Audio (Reciter ID 1)
+      const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/1/by_page/${q.page}`);
+      const audioData = await audioRes.json();
+      if (audioData.audio_files && audioData.audio_files.length > 0) {
+        setAudioGuidanceUrl(audioData.audio_files[0].url);
+      }
+
+      // Fetch Verses for the page
+      const textRes = await fetch(`https://api.quran.com/api/v4/quran/verses/uthmani?page_number=${q.page}`);
+      const textData = await textRes.json();
+      
+      // Determine line count: Easy (7 lines), Med/Hard (15 lines)
+      const lineLimit = difficulty === 'easy' ? 7 : 15;
+      const verses = textData.verses.slice(0, lineLimit);
+      const fullText = verses.map(v => v.text_uthmani).join(" ۝ ");
+      setQuestionText(fullText);
+
+      // Animate Reveal
+      let i = 0;
+      const words = fullText.split(" ");
+      const interval = setInterval(() => {
+        if (i < words.length) {
+          setRevealedText(prev => prev + " " + words[i]);
+          i++;
+        } else {
+          clearInterval(interval);
+        }
+      }, 50);
+
+    } catch (err) {
+      console.error("Error fetching Quran data:", err);
+      setQuestionText(q.text);
+      setRevealedText(q.text);
+    }
+    setLoadingQuestion(false);
   };
 
   const playBeep = () => {
@@ -333,8 +392,54 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   };
 
   const logMistake = (type) => {
-    setMistakes([...mistakes, { type, time: new Date().toLocaleTimeString() }]);
+    setMistakes(prev => [...prev, { type, time: new Date().toLocaleTimeString() }]);
     playBeep();
+    if (testMode === "self") {
+      pauseAndRestartOnMistake();
+    }
+  };
+
+  const pauseAndRestartOnMistake = () => {
+    mediaRecorderRef.current?.pause();
+    setTimeout(() => {
+      alert("Mistake detected! Please correct your recitation and press OK to continue.");
+      mediaRecorderRef.current?.resume();
+    }, 500);
+  };
+
+  // Silence Detection for Self Mode
+  const startSilenceDetection = (stream) => {
+    if (testMode !== "self") return;
+    
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    analyserRef.current = audioContextRef.current.createAnalyser();
+    const source = audioContextRef.current.createMediaStreamSource(stream);
+    source.connect(analyserRef.current);
+    
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    const checkSilence = () => {
+      if (!recording) return;
+      analyserRef.current.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+      
+      if (average < 5) { // Threshold for silence
+        if (!silenceTimerRef.current) {
+          silenceTimerRef.current = setTimeout(() => {
+            logMistake("Silence/Pause");
+            silenceTimerRef.current = null;
+          }, 3000); // 3 seconds pause = beep
+        }
+      } else {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      }
+      requestAnimationFrame(checkSilence);
+    };
+    checkSilence();
   };
 
   const startRecording = async () => {
@@ -342,25 +447,46 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
+      
       mediaRecorderRef.current.ondataavailable = (e) => audioChunksRef.current.push(e.data);
-      mediaRecorderRef.current.onstop = () => {
+      mediaRecorderRef.current.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        const url = URL.createObjectURL(blob);
+        const fileName = `${student_id}/${Date.now()}.webm`;
+        
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("ikhtebar_recordings")
+          .upload(fileName, blob);
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          return;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from("ikhtebar_recordings")
+          .getPublicUrl(fileName);
+
+        // Save to Database
         const entry = {
-          studentName: studentProfile?.name || "Child",
+          student_id,
           marhala: selectedMarhalaName,
           difficulty,
-          question: currentQuestion,
-          mistakes: [...mistakes],
-          url,
-          timestamp: new Date().toISOString()
+          mode: testMode,
+          question_text: currentQuestion?.text,
+          page_number: currentQuestion?.page,
+          audio_url: publicUrlData.publicUrl,
+          mistakes: mistakes,
+          created_at: new Date().toISOString()
         };
-        const newHistory = [entry, ...history];
-        setHistory(newHistory);
-        window.localStorage.setItem("quran_ikhtebar_history", JSON.stringify(newHistory));
+
+        const { error: dbError } = await supabase.from("quran_ikhtebar").insert([entry]);
+        if (!dbError) fetchHistory();
       };
+
       mediaRecorderRef.current.start();
       setRecording(true);
+      startSilenceDetection(stream);
     } catch (err) {
       alert("Microphone access denied or error: " + err.message);
     }
@@ -410,6 +536,18 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
               </label>
 
               <label className="form-group">
+                <span>Ikhtebar Mode</span>
+                <select 
+                  value={testMode} 
+                  onChange={(e) => setTestMode(e.target.value)}
+                  className="premium-select"
+                >
+                  <option value="teacher">With Teacher (Manual Feedback)</option>
+                  <option value="self">Self Ikhtebar (Auto-Beep/Voice Monitor)</option>
+                </select>
+              </label>
+
+              <label className="form-group">
                 <span>Ikhtebar Difficulty</span>
                 <div className="difficulty-toggle">
                   {["easy", "medium", "hard"].map(level => (
@@ -424,18 +562,33 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 </div>
               </label>
 
-              <button className="generate-btn action-button" onClick={generateQuestion} style={{ background: 'var(--deep-brown)', color: 'white', marginTop: '10px' }}>
-                <RotateCw size={18} /> Generate Lively Question
+              <button 
+                className={`generate-btn action-button ${loadingQuestion ? 'loading' : ''}`} 
+                onClick={generateQuestion} 
+                disabled={loadingQuestion}
+                style={{ background: 'var(--deep-brown)', color: 'white', marginTop: '10px' }}
+              >
+                {loadingQuestion ? <RotateCw className="spin" size={18} /> : <Sparkles size={18} />} 
+                {loadingQuestion ? " Fetching Quran Data..." : " Generate Lively Question"}
               </button>
             </div>
 
             {currentQuestion && (
               <div className="question-display-lively card-appear">
-                <div className="q-label-badge">Recite Now:</div>
-                <h3 className="q-text-large arabic-kanz">{currentQuestion.text}</h3>
+                <div className="q-label-badge">Abdulbasit Voice Guidance:</div>
+                {audioGuidanceUrl && (
+                  <audio src={audioGuidanceUrl} controls className="abdulbasit-audio" />
+                )}
+                
+                <div className="q-text-reveal-container">
+                  <h3 className="q-text-large arabic-kanz text-reveal">{revealedText || "..."}</h3>
+                </div>
+
                 <div className="q-meta-info">
                   <span className="q-page-pill">Page {currentQuestion.page}</span>
-                  <span className={`q-diff-pill ${difficulty}`}>{difficulty}</span>
+                  <span className={`q-diff-pill ${difficulty}`}>
+                    {difficulty} ({difficulty === 'easy' ? '7 Lines' : '15 Lines'})
+                  </span>
                 </div>
                 
                 <div className="recording-controls-lively">
@@ -486,13 +639,14 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 <div className="history-card-main">
                   <div className="h-marhala-row">
                     <h4 className="arabic-kanz">{entry.marhala}</h4>
+                    <span className={`mode-badge ${entry.mode}`}>{entry.mode === 'self' ? 'Self' : 'Teacher'}</span>
                     <span className={`diff-badge ${entry.difficulty}`}>{entry.difficulty}</span>
                   </div>
-                  <p className="h-question arabic-kanz">{entry.question?.text}</p>
+                  <p className="h-question arabic-kanz" style={{ fontSize: '0.9rem', opacity: 0.8 }}>{entry.question_text}</p>
                   
                   <div className="history-mistake-feedback">
                     <strong>Mistakes Noted:</strong>
-                    {entry.mistakes.length > 0 ? (
+                    {entry.mistakes && entry.mistakes.length > 0 ? (
                       <div className="mistake-tag-row">
                         {entry.mistakes.map((m, idx) => <span key={idx} className="mistake-dot">{m.type}</span>)}
                       </div>
