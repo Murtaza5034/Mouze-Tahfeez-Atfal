@@ -317,11 +317,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [mistakes, setMistakes] = useState([]); 
   const [history, setHistory] = useState([]);
-  const [student_id, setStudentId] = useState(studentProfile?.student_id || null);
+  const [student_id, setStudentId] = useState(studentProfile?.student_id || studentProfile?.id || null);
 
   useEffect(() => {
-    if (studentProfile?.student_id) {
-      setStudentId(studentProfile.student_id);
+    const sid = studentProfile?.student_id || studentProfile?.id;
+    if (sid) {
+      setStudentId(sid);
     }
   }, [studentProfile]);
 
@@ -336,24 +337,41 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   }, [student_id]);
 
   const fetchHistory = async () => {
-    if (!student_id) {
-      console.log("No student_id found for history fetch");
-      return;
-    }
-    
-    console.log("Fetching history for student:", student_id);
-    const { data, error } = await supabase
-      .from("quran_ikhtebar")
-      .select("*")
-      .eq("student_id", student_id)
-      .order("created_at", { ascending: false });
+    try {
+      if (!student_id) {
+        console.warn("Ikhtebar: student_id is missing, skipping fetch.");
+        return;
+      }
       
-    if (error) {
-      console.error("History fetch error:", error);
-    }
-    if (data) {
-      console.log("History records found:", data.length);
-      setHistory(data);
+      console.log("Ikhtebar: Fetching history for student_id:", student_id);
+      
+      // Step 1: Check if we can even reach the table
+      const { count, error: tableError } = await supabase
+        .from("quran_ikhtebar")
+        .select('*', { count: 'exact', head: true });
+        
+      if (tableError) {
+        console.error("Ikhtebar: Table 'quran_ikhtebar' may not exist or is inaccessible:", tableError);
+        return;
+      }
+
+      // Step 2: Fetch actual data
+      const { data, error } = await supabase
+        .from("quran_ikhtebar")
+        .select("*")
+        .eq("student_id", student_id)
+        .order("created_at", { ascending: false });
+        
+      if (error) {
+        console.error("Ikhtebar: Fetch error:", error);
+      }
+      
+      if (data) {
+        console.log(`Ikhtebar: Successfully retrieved ${data.length} records.`);
+        setHistory(data);
+      }
+    } catch (e) {
+      console.error("Ikhtebar: Unexpected error in fetchHistory:", e);
     }
   };
 
