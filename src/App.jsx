@@ -3528,7 +3528,12 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     const checkOneSignal = () => {
-      const OneSignal = window.OneSignal;
+      // Try to find OneSignal from window or Deferred list
+      let OneSignal = window.OneSignal;
+      if (!OneSignal && window.OneSignalDeferred && !Array.isArray(window.OneSignalDeferred)) {
+         OneSignal = window.OneSignalDeferred;
+      }
+
       if (OneSignal && !Array.isArray(OneSignal)) {
         const id = OneSignal.User?.PushSubscription?.id;
         if (id && mounted) setOneSignalId(id);
