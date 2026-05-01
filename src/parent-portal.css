@@ -953,17 +953,38 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   padding-top: 15px;
 }
 
-.continue-prompt {
-  font-family: 'Inter', sans-serif;
-  font-size: 0.9rem;
-  color: #888;
-  font-style: italic;
-  background: #fcfcfc;
-  padding: 6px 15px;
-  border-radius: 50px;
-  border: 1px solid #eee;
+.mushaf-header {
+  text-align: center;
+  margin-bottom: 30px;
+  border-bottom: 2px solid var(--primary-gold);
+  padding-bottom: 15px;
 }
 
-.history-card-premium {
-  border-top: 4px solid var(--primary-gold);
+.s-name {
+  font-size: 2.2rem;
+  color: var(--primary-gold);
+  margin-bottom: 10px;
+}
+
+.bismillah {
+  font-size: 1.8rem;
+  color: #333;
+}
+
+.q-word.end {
+  color: var(--primary-gold);
+  font-weight: bold;
+  font-size: 1.6rem;
+  margin: 0 10px;
+  border: 1px solid var(--primary-gold);
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arabic-kanz {
+  font-family: 'Kanz al Marjaan', 'Amiri', serif;
 }

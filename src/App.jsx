@@ -310,11 +310,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   const [testMode, setTestMode] = useState("teacher"); 
   const [recording, setRecording] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [versesData, setVersesData] = useState([]); // Array of { verse_key, words: [{ text_uthmani, id }] }
-  const [revealedWords, setRevealedWords] = useState([]); // List of word objects revealed
+  const [surahInfo, setSurahInfo] = useState(null);
+  const [versesData, setVersesData] = useState([]); 
+  const [revealedWords, setRevealedWords] = useState([]); 
   const [audioGuidanceUrl, setAudioGuidanceUrl] = useState(null);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
-  const [mistakes, setMistakes] = useState([]); // Array of { type, wordId, wordText }
+  const [mistakes, setMistakes] = useState([]); 
   const [history, setHistory] = useState([]);
   const [student_id, setStudentId] = useState(studentProfile?.student_id || null);
 
@@ -356,47 +357,38 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     }
   };
 
-  const generateQuestion = async () => {
-    setLoadingQuestion(true);
-    setRevealedWords([]);
-    setAudioGuidanceUrl(null);
-    setVersesData([]);
-    
-    const pool = marhalaLibrary[selectedMarhalaName][difficulty];
-    const q = pool[Math.floor(Math.random() * pool.length)];
-    setCurrentQuestion(q);
-    setMistakes([]);
-
     try {
-      // Audio Logic: Sheikh Hussary (ID 12 - Muallim) for Self Mode only
-      if (testMode === "self") {
-        const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/12/by_page/${q.page}`);
-        const audioData = await audioRes.json();
-        if (audioData.audio_files?.length > 0) {
-          const url = audioData.audio_files[0].url;
-          setAudioGuidanceUrl(url);
-          const audio = new Audio(url);
-          audio.play().catch(e => console.log("Auto-play blocked"));
-        }
+      // Fetch Audio
+      const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/12/by_page/${q.page}`);
+      const audioData = await audioRes.json();
+      if (testMode === "self" && audioData.audio_files?.length > 0) {
+        const url = audioData.audio_files[0].url;
+        setAudioGuidanceUrl(url);
+        new Audio(url).play().catch(() => {});
       }
 
-      // Fetch Verses with Tajweed Words
-      const textRes = await fetch(`https://api.quran.com/api/v4/verses/by_page/${q.page}?words=true&word_fields=text_uthmani,text_tajweed`);
+      // Fetch Verses with full metadata
+      const textRes = await fetch(`https://api.quran.com/api/v4/verses/by_page/${q.page}?words=true&word_fields=text_uthmani,text_tajweed&fields=text_uthmani`);
       const textData = await textRes.json();
       
       const lineLimit = difficulty === 'easy' ? 7 : 15;
       const verses = textData.verses.slice(0, lineLimit);
       setVersesData(verses);
 
-      // Animation logic: Self mode reveals all, Teacher mode reveals only first verse
+      // Get Surah Info from first verse
+      const firstVerse = verses[0];
+      const surahRes = await fetch(`https://api.quran.com/api/v4/chapters/${firstVerse.verse_key.split(":")[0]}`);
+      const surahData = await surahRes.json();
+      setSurahInfo(surahData.chapter);
+
+      // Prepare words for animation
       let allWords = [];
       const versesToAnimate = testMode === "teacher" ? verses.slice(0, 1) : verses;
       
       versesToAnimate.forEach(v => {
         v.words.forEach(w => {
-          if (w.char_type_name !== 'end') allWords.push(w);
+          allWords.push(w);
         });
-        allWords.push({ text_uthmani: "۝", char_type_name: "end" });
       });
 
       let i = 0;
@@ -619,20 +611,23 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
             {currentQuestion && (
               <div className="question-display-lively mushaf-page card-appear">
-                <div className="q-label-badge" style={{ marginBottom: '15px' }}>
-                  {testMode === "self" ? "✨ Sheikh Hussary Guidance (Auto-Playing...)" : "📖 Teacher Prompt (First Verse):"}
-                </div>
-                
-                {testMode === "self" && audioGuidanceUrl && (
-                  <audio src={audioGuidanceUrl} controls autoPlay className="abdulbasit-audio" />
+                {surahInfo && (
+                  <div className="mushaf-header">
+                    <div className="s-name arabic-kanz">{surahInfo.name_arabic}</div>
+                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>}
+                  </div>
                 )}
+                
+                <div className="q-label-badge" style={{ marginBottom: '15px' }}>
+                  {testMode === "self" ? "✨ Sheikh Hussary Guidance (Auto-Playing...)" : "📖 Teacher Prompt (Start Reciting):"}
+                </div>
                 
                 <div className="mushaf-inner misri-font" style={{ minHeight: '150px' }}>
                   {revealedWords.map((w, idx) => (
                     w && (
                       <span 
                         key={idx} 
-                        className={`q-word ${mistakes.find(m => m && m.wordId === w.id) ? 'has-mistake' : ''}`}
+                        className={`q-word ${w.char_type_name} ${mistakes.find(m => m && m.wordId === w.id) ? 'has-mistake' : ''}`}
                         onClick={() => recording && logWordMistake(w, "Word")}
                         dangerouslySetInnerHTML={{ __html: w.text_tajweed || w.text_uthmani }}
                       />
@@ -640,7 +635,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                   ))}
                   {testMode === "teacher" && !loadingQuestion && revealedWords.length > 0 && (
                     <div className="continue-prompt-container">
-                      <span className="continue-prompt">Student continues from here...</span>
+                      <span className="continue-prompt">Continue recitation with full Ahkam...</span>
                     </div>
                   )}
                 </div>
