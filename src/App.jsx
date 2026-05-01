@@ -357,6 +357,18 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     }
   };
 
+  const generateQuestion = async () => {
+    setLoadingQuestion(true);
+    setRevealedWords([]);
+    setAudioGuidanceUrl(null);
+    setVersesData([]);
+    setSurahInfo(null);
+    
+    const pool = marhalaLibrary[selectedMarhalaName][difficulty];
+    const q = pool[Math.floor(Math.random() * pool.length)];
+    setCurrentQuestion(q);
+    setMistakes([]);
+
     try {
       // Fetch Audio
       const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/12/by_page/${q.page}`);
