@@ -2772,6 +2772,11 @@ body {
   box-shadow: 0 10px 30px rgba(61, 43, 31, 0.15);
   position: relative;
   z-index: 2;
+  /* High quality rendering hints */
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .avatar-ring {
