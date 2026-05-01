@@ -1280,6 +1280,7 @@ function AdminPortal({
   adminData,
   adminForms,
   menuOpen,
+  portalAccess,
   onAdminFormChange,
   onCreateAnnouncement,
   onCreateGroup,
