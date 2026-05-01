@@ -900,7 +900,7 @@ function ParentPortal({
 
       <aside className={`parent-drawer ${menuOpen ? 'open' : ''}`}>
         <SidebarHeader 
-          photoUrl={studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"} 
+          photoUrl={studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"} 
           name={studentProfile?.name || "Student"} 
           arabicName={studentProfile?.arabic_name}
           tag={`ITS: ${studentProfile?.its || "..."}`} 
@@ -1354,9 +1354,9 @@ function AdminPortal({
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
             <SidebarHeader 
-              photoUrl={user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
-              name={user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"} 
-              arabicName={user?.user_metadata?.arabic_name}
+              photoUrl={portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
+              name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"} 
+              arabicName={portalAccess?.arabic_name || user?.user_metadata?.arabic_name}
               tag="Management Portal" 
             />
             <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
@@ -4335,6 +4335,7 @@ export default function App() {
         setSelectedStudentId={setSelectedStudentId}
         setActivePage={setActivePage}
         user={user}
+        portalAccess={portalAccess}
         onAssignChild={handleAssignChild}
         adminTeacherFilter={adminTeacherFilter}
         setAdminTeacherFilter={setAdminTeacherFilter}
