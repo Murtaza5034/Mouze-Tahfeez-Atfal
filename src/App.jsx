@@ -318,6 +318,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   const [history, setHistory] = useState([]);
   const [student_id, setStudentId] = useState(studentProfile?.student_id || null);
 
+  useEffect(() => {
+    if (studentProfile?.student_id) {
+      setStudentId(studentProfile.student_id);
+    }
+  }, [studentProfile]);
+
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const silenceTimerRef = useRef(null);
@@ -329,13 +335,25 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   }, [student_id]);
 
   const fetchHistory = async () => {
-    if (!student_id) return;
+    if (!student_id) {
+      console.log("No student_id found for history fetch");
+      return;
+    }
+    
+    console.log("Fetching history for student:", student_id);
     const { data, error } = await supabase
       .from("quran_ikhtebar")
       .select("*")
       .eq("student_id", student_id)
       .order("created_at", { ascending: false });
-    if (data) setHistory(data);
+      
+    if (error) {
+      console.error("History fetch error:", error);
+    }
+    if (data) {
+      console.log("History records found:", data.length);
+      setHistory(data);
+    }
   };
 
   const generateQuestion = async () => {
