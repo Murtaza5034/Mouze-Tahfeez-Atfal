@@ -357,8 +357,8 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
         if (audioData.audio_files?.length > 0) setAudioGuidanceUrl(audioData.audio_files[0].url);
       }
 
-      // Fetch Verses with Words
-      const textRes = await fetch(`https://api.quran.com/api/v4/verses/by_page/${q.page}?words=true&word_fields=text_uthmani`);
+      // Fetch Verses with Tajweed Words
+      const textRes = await fetch(`https://api.quran.com/api/v4/verses/by_page/${q.page}?words=true&word_fields=text_uthmani,text_tajweed`);
       const textData = await textRes.json();
       
       const lineLimit = difficulty === 'easy' ? 7 : 15;
@@ -563,21 +563,22 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                   <audio src={audioGuidanceUrl} controls className="abdulbasit-audio" />
                 )}
                 
-                <div className="q-page-render misri-font">
-                  {revealedWords.map((w, idx) => (
-                    w && (
-                      <span 
-                        key={idx} 
-                        className={`q-word ${mistakes.find(m => m && m.wordId === w.id) ? 'has-mistake' : ''}`}
-                        onClick={() => recording && logWordMistake(w, "Word")}
-                      >
-                        {w.text_uthmani}
-                      </span>
-                    )
-                  ))}
-                  {testMode === "teacher" && !loadingQuestion && revealedWords.length > 0 && (
-                    <span className="continue-prompt">... Student continues recitation ...</span>
-                  )}
+                <div className="q-page-render misri-font mushaf-page">
+                  <div className="mushaf-inner">
+                    {revealedWords.map((w, idx) => (
+                      w && (
+                        <span 
+                          key={idx} 
+                          className={`q-word ${mistakes.find(m => m && m.wordId === w.id) ? 'has-mistake' : ''}`}
+                          onClick={() => recording && logWordMistake(w, "Word")}
+                          dangerouslySetInnerHTML={{ __html: w.text_tajweed || w.text_uthmani }}
+                        />
+                      )
+                    ))}
+                    {testMode === "teacher" && !loadingQuestion && revealedWords.length > 0 && (
+                      <span className="continue-prompt">... Student continues recitation ...</span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="q-meta-info">
@@ -631,7 +632,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                     <span className={`mode-badge ${entry.mode}`}>{entry.mode}</span>
                   </div>
 
-                  <div className="h-page-view misri-font">
+                  <div className="h-page-view misri-font mushaf-card-view">
                     {entry.verses_json?.map((v, vIdx) => (
                       <div key={vIdx} className="h-verse">
                         {v?.words?.map((w, wIdx) => {
@@ -641,9 +642,8 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                             <span 
                               key={wIdx} 
                               className={`h-word ${mistake ? (mistake.type === 'Word' ? 'mistake-blue' : 'mistake-yellow') : ''}`}
-                            >
-                              {w.text_uthmani}
-                            </span>
+                              dangerouslySetInnerHTML={{ __html: w.text_tajweed || w.text_uthmani }}
+                            />
                           );
                         })}
                       </div>

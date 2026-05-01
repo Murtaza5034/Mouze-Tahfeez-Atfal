@@ -943,6 +943,45 @@
   color: #854d0e;
 }
 
+/* Tajweed Color Coding (Al-Muhafiz Style) */
+tajweed.ghn { color: #ff0055 !important; font-weight: bold; } /* Ghunna */
+tajweed.m { color: #00aaff !important; } /* Mad */
+tajweed.ik { color: #ff8800 !important; } /* Ikhfa */
+tajweed.ql { color: #00aa00 !important; font-weight: bold; } /* Qalqala */
+tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
+
+.mushaf-page {
+  background: #fff9e6 !important; /* Cream paper color */
+  border: 12px double var(--primary-gold) !important;
+  padding: 30px !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.mushaf-page::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border: 2px solid var(--primary-gold);
+  margin: 5px;
+  pointer-events: none;
+}
+
+.mushaf-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+  max-width: 90%;
+  margin: 0 auto;
+}
+
+.mushaf-card-view {
+  background: #fdfaf0 !important;
+  border-left: 5px solid var(--primary-gold);
+  padding: 15px !important;
+}
+
 .continue-prompt {
   font-family: 'Inter', sans-serif;
   font-size: 0.9rem;
