@@ -134,6 +134,13 @@
   overflow-y: auto;
 }
 
+.sidebar-header {
+  padding: 0;
+  background: transparent;
+  border-bottom: none;
+  position: relative;
+}
+
 .sidebar-category {
   font-size: 0.75rem;
   font-weight: 800;

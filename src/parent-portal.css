@@ -106,12 +106,10 @@
 }
 
 .drawer-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 32px 24px;
-  border-bottom: 1px solid var(--glass-border);
-  background: var(--off-white);
+  padding: 0;
+  background: transparent;
+  border-bottom: none;
+  position: relative;
 }
 
 .drawer-avatar {

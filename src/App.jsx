@@ -899,19 +899,14 @@ function ParentPortal({
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
 
       <aside className={`parent-drawer ${menuOpen ? 'open' : ''}`}>
-        <div className="drawer-header">
-          <img src={studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"} alt="Profile" className="drawer-avatar" style={{ borderRadius: '50%' }} />
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 className="drawer-name">{studentProfile?.name || "Student"}</h3>
-            {studentProfile?.arabic_name && (
-              <h4 className="arabic-kanz" style={{ fontSize: '1.2rem', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 'bold' }}>
-                {studentProfile.arabic_name}
-              </h4>
-            )}
-            <p className="drawer-sub">ITS: {studentProfile?.its || "..."}</p>
-          </div>
-          <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
-        </div>
+        <SidebarHeader 
+          photoUrl={studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"} 
+          name={studentProfile?.name || "Student"} 
+          arabicName={studentProfile?.arabic_name}
+          tag={`ITS: ${studentProfile?.its || "..."}`} 
+        />
+        <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+
 
         {allProfiles.length > 1 && (
           <div className="drawer-nav" style={{ paddingBottom: 0 }}>
@@ -1250,18 +1245,30 @@ function ParentPortal({
   );
 }
 
-function SidebarHeader({ photoUrl, name, tag }) {
+function SidebarHeader({ photoUrl, name, arabicName, tag }) {
+  const isArabic = (text) => /[\u0600-\u06FF]/.test(text);
+  const nameIsArabic = isArabic(name);
+  
   return (
-    <div className="brand-header-flex">
-      <img 
-        src={photoUrl || "/logo.png"} 
-        alt="Profile" 
-        className="nav-logo" 
-        style={{ width: '40px', height: '40px', borderRadius: '12px', objectFit: 'cover' }} 
-      />
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <p className="brand-tag">{tag}</p>
-        <h2 className="brand-title">{name}</h2>
+    <div className="sidebar-profile-centered">
+      <div className="avatar-vessel-centered">
+        <img 
+          src={photoUrl || "/logo.png"} 
+          alt="Profile" 
+          className="sidebar-avatar-img" 
+        />
+        <div className="avatar-ring"></div>
+      </div>
+      <div className="profile-info-centered">
+        <p className="profile-tag-premium">{tag}</p>
+        <h2 className={`profile-name-premium ${nameIsArabic ? 'arabic-kanz' : ''}`}>
+          {name}
+        </h2>
+        {arabicName && (
+          <h3 className="profile-arabic-premium arabic-kanz">
+            {arabicName}
+          </h3>
+        )}
       </div>
     </div>
   );
@@ -1346,10 +1353,14 @@ function AdminPortal({
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)}></div>}
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
-           <div className="brand-header-flex">
-            <SidebarHeader photoUrl={user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} name={user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"} tag="Management Portal" />
+            <SidebarHeader 
+              photoUrl={user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
+              name={user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"} 
+              arabicName={user?.user_metadata?.arabic_name}
+              tag="Management Portal" 
+            />
             <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
-          </div>
+
         </div>
         <nav className="sidebar-nav">
           <p className="sidebar-category">Main Dashboard</p>
@@ -2638,14 +2649,14 @@ function TeacherPortal({
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)}></div>}
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
-           <div className="brand-header-flex">
             <SidebarHeader 
               photoUrl={portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
               name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Teacher"} 
+              arabicName={portalAccess?.arabic_name}
               tag="Teacher Portal" 
             />
             <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
-          </div>
+
         </div>
         <nav className="sidebar-nav">
           <p className="sidebar-category management-cat">Workplace</p>
