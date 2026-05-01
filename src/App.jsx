@@ -307,14 +307,14 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
   const [selectedMarhalaName, setSelectedMarhalaName] = useState("Marhala Ula");
   const [difficulty, setDifficulty] = useState("medium");
-  const [testMode, setTestMode] = useState("teacher"); // 'self' or 'teacher'
+  const [testMode, setTestMode] = useState("teacher"); 
   const [recording, setRecording] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [questionText, setQuestionText] = useState("");
-  const [revealedText, setRevealedText] = useState("");
+  const [versesData, setVersesData] = useState([]); // Array of { verse_key, words: [{ text_uthmani, id }] }
+  const [revealedWords, setRevealedWords] = useState([]); // List of word objects revealed
   const [audioGuidanceUrl, setAudioGuidanceUrl] = useState(null);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
-  const [mistakes, setMistakes] = useState([]);
+  const [mistakes, setMistakes] = useState([]); // Array of { type, wordId, wordText }
   const [history, setHistory] = useState([]);
   const [student_id, setStudentId] = useState(studentProfile?.student_id || null);
 
@@ -340,8 +340,9 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
   const generateQuestion = async () => {
     setLoadingQuestion(true);
-    setRevealedText("");
+    setRevealedWords([]);
     setAudioGuidanceUrl(null);
+    setVersesData([]);
     
     const pool = marhalaLibrary[selectedMarhalaName][difficulty];
     const q = pool[Math.floor(Math.random() * pool.length)];
@@ -349,41 +350,56 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     setMistakes([]);
 
     try {
-      // Fetch Abdulbasit Audio (Reciter ID 1)
+      // Fetch Abdulbasit Audio
       const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/1/by_page/${q.page}`);
       const audioData = await audioRes.json();
-      if (audioData.audio_files && audioData.audio_files.length > 0) {
-        setAudioGuidanceUrl(audioData.audio_files[0].url);
-      }
+      if (audioData.audio_files?.length > 0) setAudioGuidanceUrl(audioData.audio_files[0].url);
 
-      // Fetch Verses for the page
-      const textRes = await fetch(`https://api.quran.com/api/v4/quran/verses/uthmani?page_number=${q.page}`);
+      // Fetch Verses with Words
+      const textRes = await fetch(`https://api.quran.com/api/v4/verses/by_page/${q.page}?words=true&word_fields=text_uthmani`);
       const textData = await textRes.json();
       
-      // Determine line count: Easy (7 lines), Med/Hard (15 lines)
       const lineLimit = difficulty === 'easy' ? 7 : 15;
       const verses = textData.verses.slice(0, lineLimit);
-      const fullText = verses.map(v => v.text_uthmani).join(" ۝ ");
-      setQuestionText(fullText);
+      setVersesData(verses);
 
-      // Animate Reveal
+      // Animation: Reveal words sequentially
+      let allWords = [];
+      verses.forEach(v => {
+        v.words.forEach(w => {
+          if (w.char_type_name !== 'end') allWords.push(w);
+        });
+        allWords.push({ text_uthmani: "۝", char_type_name: "end" });
+      });
+
       let i = 0;
-      const words = fullText.split(" ");
       const interval = setInterval(() => {
-        if (i < words.length) {
-          setRevealedText(prev => prev + " " + words[i]);
+        if (i < allWords.length) {
+          setRevealedWords(prev => [...prev, allWords[i]]);
           i++;
         } else {
           clearInterval(interval);
         }
-      }, 50);
+      }, 80);
 
     } catch (err) {
       console.error("Error fetching Quran data:", err);
-      setQuestionText(q.text);
-      setRevealedText(q.text);
     }
     setLoadingQuestion(false);
+  };
+
+  const logWordMistake = (word, type) => {
+    setMistakes(prev => [...prev, { type, wordId: word.id, wordText: word.text_uthmani, time: new Date().toLocaleTimeString() }]);
+    playBeep();
+    if (testMode === "self") pauseAndRestartOnMistake();
+  };
+
+  const calculateStars = (mistakeCount) => {
+    if (mistakeCount === 0) return 5;
+    if (mistakeCount === 1) return 4;
+    if (mistakeCount <= 3) return 3;
+    if (mistakeCount <= 5) return 2;
+    return 1;
   };
 
   const playBeep = () => {
@@ -408,40 +424,6 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   };
 
   // Silence Detection for Self Mode
-  const startSilenceDetection = (stream) => {
-    if (testMode !== "self") return;
-    
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-    analyserRef.current = audioContextRef.current.createAnalyser();
-    const source = audioContextRef.current.createMediaStreamSource(stream);
-    source.connect(analyserRef.current);
-    
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    
-    const checkSilence = () => {
-      if (!recording) return;
-      analyserRef.current.getByteFrequencyData(dataArray);
-      const average = dataArray.reduce((a, b) => a + b) / bufferLength;
-      
-      if (average < 5) { // Threshold for silence
-        if (!silenceTimerRef.current) {
-          silenceTimerRef.current = setTimeout(() => {
-            logMistake("Silence/Pause");
-            silenceTimerRef.current = null;
-          }, 3000); // 3 seconds pause = beep
-        }
-      } else {
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-      }
-      requestAnimationFrame(checkSilence);
-    };
-    checkSilence();
-  };
-
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -453,21 +435,14 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const fileName = `${student_id}/${Date.now()}.webm`;
         
-        // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("ikhtebar_recordings")
-          .upload(fileName, blob);
+        const { error: uploadError } = await supabase.storage.from("ikhtebar_recordings").upload(fileName, blob);
+        if (uploadError) return;
 
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          return;
-        }
+        const { data: publicUrlData } = supabase.storage.from("ikhtebar_recordings").getPublicUrl(fileName);
 
-        const { data: publicUrlData } = supabase.storage
-          .from("ikhtebar_recordings")
-          .getPublicUrl(fileName);
+        // Calculate score/stars
+        const starCount = calculateStars(mistakes.length);
 
-        // Save to Database
         const entry = {
           student_id,
           marhala: selectedMarhalaName,
@@ -477,6 +452,8 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
           page_number: currentQuestion?.page,
           audio_url: publicUrlData.publicUrl,
           mistakes: mistakes,
+          score: starCount,
+          verses_json: versesData, // Save verses for highlighting in history
           created_at: new Date().toISOString()
         };
 
@@ -488,7 +465,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
       setRecording(true);
       startSilenceDetection(stream);
     } catch (err) {
-      alert("Microphone access denied or error: " + err.message);
+      alert("Microphone access denied: " + err.message);
     }
   };
 
@@ -576,45 +553,39 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
             {currentQuestion && (
               <div className="question-display-lively card-appear">
                 <div className="q-label-badge">Abdulbasit Voice Guidance:</div>
-                {audioGuidanceUrl && (
-                  <audio src={audioGuidanceUrl} controls className="abdulbasit-audio" />
-                )}
+                {audioGuidanceUrl && <audio src={audioGuidanceUrl} controls className="abdulbasit-audio" />}
                 
-                <div className="q-text-reveal-container">
-                  <h3 className="q-text-large arabic-kanz text-reveal">{revealedText || "..."}</h3>
+                <div className="q-page-render misri-font">
+                  {revealedWords.map((w, idx) => (
+                    <span 
+                      key={idx} 
+                      className={`q-word ${mistakes.find(m => m.wordId === w.id) ? 'has-mistake' : ''}`}
+                      onClick={() => recording && logWordMistake(w, "Word")}
+                    >
+                      {w.text_uthmani}
+                    </span>
+                  ))}
                 </div>
 
                 <div className="q-meta-info">
                   <span className="q-page-pill">Page {currentQuestion.page}</span>
-                  <span className={`q-diff-pill ${difficulty}`}>
-                    {difficulty} ({difficulty === 'easy' ? '7 Lines' : '15 Lines'})
-                  </span>
+                  <span className={`q-diff-pill ${difficulty}`}>{difficulty} ({difficulty === 'easy' ? '7 Lines' : '15 Lines'})</span>
                 </div>
                 
                 <div className="recording-controls-lively">
                   {!recording ? (
-                    <button className="rec-btn-lively start" onClick={startRecording}>
-                      <Mic size={24} /> Start Recitation
-                    </button>
+                    <button className="rec-btn-lively start" onClick={startRecording}><Mic size={24} /> Start Recitation</button>
                   ) : (
-                    <button className="rec-btn-lively stop" onClick={stopRecording}>
-                      <Square size={24} /> Finish & Save
-                    </button>
+                    <button className="rec-btn-lively stop" onClick={stopRecording}><Square size={24} /> Finish & Save</button>
                   )}
                 </div>
 
                 {recording && (
                   <div className="live-mistake-panel fade-in">
-                    <p className="live-label">LIVE FEEDBACK (TAP TO BEEP):</p>
+                    <p className="live-label">TAP A WORD TO MARK MISTAKE:</p>
                     <div className="mistake-btns-lively">
-                      <button onClick={() => logMistake("Word")}>Word</button>
-                      <button onClick={() => logMistake("Ahkam")}>Ahkam</button>
-                      <button onClick={() => logMistake("Makharij")}>Makharij</button>
-                    </div>
-                    <div className="mistake-stream">
-                      {mistakes.map((m, i) => (
-                        <span key={i} className="stream-pill">{m.type}</span>
-                      ))}
+                      <button onClick={() => playBeep()}>Manual Beep</button>
+                      <button onClick={() => logWordMistake({ id: 'general', text_uthmani: 'General' }, "Ahkam")}>Ahkam Mistake</button>
                     </div>
                   </div>
                 )}
@@ -639,19 +610,44 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 <div className="history-card-main">
                   <div className="h-marhala-row">
                     <h4 className="arabic-kanz">{entry.marhala}</h4>
-                    <span className={`mode-badge ${entry.mode}`}>{entry.mode === 'self' ? 'Self' : 'Teacher'}</span>
-                    <span className={`diff-badge ${entry.difficulty}`}>{entry.difficulty}</span>
+                    <div className="star-rating">
+                      {[...Array(5)].map((_, idx) => (
+                        <Sparkles key={idx} size={14} color={idx < (entry.score || 0) ? "var(--primary-gold)" : "#ccc"} fill={idx < (entry.score || 0) ? "var(--primary-gold)" : "transparent"} />
+                      ))}
+                    </div>
+                    <span className={`mode-badge ${entry.mode}`}>{entry.mode}</span>
                   </div>
-                  <p className="h-question arabic-kanz" style={{ fontSize: '0.9rem', opacity: 0.8 }}>{entry.question_text}</p>
+
+                  <div className="h-page-view misri-font">
+                    {entry.verses_json?.map((v, vIdx) => (
+                      <div key={vIdx} className="h-verse">
+                        {v.words.map((w, wIdx) => {
+                          const mistake = entry.mistakes?.find(m => m.wordId === w.id);
+                          return (
+                            <span 
+                              key={wIdx} 
+                              className={`h-word ${mistake ? (mistake.type === 'Word' ? 'mistake-blue' : 'mistake-yellow') : ''}`}
+                            >
+                              {w.text_uthmani}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
                   
                   <div className="history-mistake-feedback">
-                    <strong>Mistakes Noted:</strong>
+                    <strong>Feedback:</strong>
                     {entry.mistakes && entry.mistakes.length > 0 ? (
                       <div className="mistake-tag-row">
-                        {entry.mistakes.map((m, idx) => <span key={idx} className="mistake-dot">{m.type}</span>)}
+                        {entry.mistakes.map((m, idx) => (
+                          <span key={idx} className={`mistake-dot ${m.type === 'Word' ? 'blue' : 'yellow'}`}>
+                            {m.wordText || m.type}
+                          </span>
+                        ))}
                       </div>
                     ) : (
-                      <p className="perfect-score">Perfect Recitation! ⭐</p>
+                      <p className="perfect-score">Excellent! Perfect Recitation ⭐</p>
                     )}
                   </div>
                 </div>
