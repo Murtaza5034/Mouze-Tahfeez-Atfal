@@ -26,6 +26,9 @@ import {
   UserCheck,
   UserX,
   RotateCw,
+  Mic,
+  Square,
+  Download,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
@@ -3687,11 +3690,16 @@ export default function App() {
             supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
           ]);
 
-          if (attendanceResponse.error) throw attendanceResponse.error;
+          // Handle potential missing tables (404) or other fetch errors gracefully
+          if (attendanceResponse.error && attendanceResponse.error.code !== 'PGRST116' && attendanceResponse.error.status !== 404) {
+             console.error("Attendance fetch error:", attendanceResponse.error);
+          }
           if (scheduleResponse.error) throw scheduleResponse.error;
           if (resultsResponse.error) throw resultsResponse.error;
           if (announcementResponse.error) throw announcementResponse.error;
           if (teacherProfilesResponse.error) throw teacherProfilesResponse.error;
+
+          const attendanceData = attendanceResponse.data || [];
 
           const processedStudents = buildStudents(
             rawProfiles,
