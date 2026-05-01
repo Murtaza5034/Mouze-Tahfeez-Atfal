@@ -452,6 +452,41 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   };
 
   // Silence Detection for Self Mode
+  const startSilenceDetection = (stream) => {
+    if (testMode !== "self") return;
+    
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    analyserRef.current = audioContextRef.current.createAnalyser();
+    const source = audioContextRef.current.createMediaStreamSource(stream);
+    source.connect(analyserRef.current);
+    
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    const checkSilence = () => {
+      if (!recording) return;
+      analyserRef.current.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+      
+      if (average < 5) { // Threshold for silence
+        if (!silenceTimerRef.current) {
+          silenceTimerRef.current = setTimeout(() => {
+            logWordMistake({ id: 'pause', text_uthmani: 'Pause' }, "Silence/Pause");
+            silenceTimerRef.current = null;
+          }, 3000); // 3 seconds pause = beep
+        }
+      } else {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      }
+      requestAnimationFrame(checkSilence);
+    };
+    checkSilence();
+  };
+
+  // Silence Detection for Self Mode
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
