@@ -2397,14 +2397,15 @@ function AdminPortal({
                                   <input 
                                     type="number" 
                                     id={`mins-${profile.id}`} 
-                                    defaultValue="240" 
+                                    defaultValue="90" 
                                     className="p-minutes-input" 
                                     placeholder="Mins" 
                                   />
                                 </div>
 
-                                <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => {
-                                   const mins = document.getElementById(`mins-${profile.id}`).value || 240;
+                                <div className="p-action-row">
+                                  <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => {
+                                     const mins = document.getElementById(`mins-${profile.id}`).value || 90;
                                    onRecordTeacherAttendance(null, {
                                       teacher_name: profile.full_name,
                                       attendance_date: today,
@@ -2433,6 +2434,7 @@ function AdminPortal({
                                     <span>Mark for Today</span>
                                   </div>
                                 </button>
+                              </div>
                              </div>
                           </div>
                           

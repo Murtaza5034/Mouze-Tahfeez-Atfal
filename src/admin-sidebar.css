@@ -983,9 +983,15 @@
 }
 
 .p-attendance-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.p-action-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
 }
 
 .p-mark-btn {
@@ -1050,7 +1056,26 @@
 }
 
 @media (max-width: 640px) {
-  .p-attendance-controls { grid-template-columns: 1fr; }
+/* Mobile overrides removed for p-attendance-controls to keep buttons side-by-side */
+}
+
+@media (max-width: 480px) {
+  .p-mark-btn {
+    padding: 10px;
+    gap: 8px;
+    border-radius: 16px;
+  }
+  .btn-icon-vessel {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+  .btn-text-vessel strong {
+    font-size: 0.8rem;
+  }
+  .btn-text-vessel span {
+    display: none; /* Hide secondary text on very small screens to save space */
+  }
 }
 
 
