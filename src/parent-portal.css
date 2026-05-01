@@ -673,3 +673,20 @@
   align-items: center;
   justify-content: center;
 }
+
+.mistake-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mistake-dot {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  border: 1px solid rgba(153, 27, 27, 0.1);
+}

@@ -249,20 +249,60 @@ function NotificationBell({ notifications }) {
   );
 }
 
-// Quran Ikhtebar Component
+// Quran Ikhtebar Component with Al-Muhaffiz Library
 function QuranIkhtebar({ studentProfile, hifzDetails }) {
-  const marhalas = [
-    { name: "Marhala Ula", range: "Juz 30" },
-    { name: "Marhala Saniyah", range: "Juz 28-30" },
-    { name: "Marhala Salesah", range: "Juz 26-30" },
-    { name: "Marhala Rabeah", range: "Juz 1-5 + 26-30" },
-    { name: "Marhala Khamesah", range: "Juz 1-10 + 26-30" },
-    { name: "Marhala Sadesah", range: "Juz 1-15 + 26-30" },
-    { name: "Marhala Sabeah", range: "Juz 1-20 + 26-30" },
-    { name: "Marhala Saminah", range: "Juz 1-25 + 26-30" },
-  ];
+  const marhalaLibrary = {
+    "Marhala Ula": {
+      range: "Juz 30",
+      easy: ["Surah Al-Naba (Ayat 1-5)", "Surah Al-Ala (Ayat 1-4)", "Surah Al-Ghashiyah (Ayat 1-8)"],
+      medium: ["Surah Al-Inshiqaq (Ayat 10-15)", "Surah Al-Mutaffifin (Ayat 20-25)", "Surah Al-Infitar (Ayat 1-5)"],
+      hard: ["Surah Abasa (Ayat 20-30)", "Surah Al-Nazi'at (Ayat 15-25)", "Surah Al-Burooj (Ayat 12-22)"]
+    },
+    "Marhala Saniyah": {
+      range: "Juz 28-30",
+      easy: ["Surah Al-Mulk (Ayat 1-5)", "Surah Al-Qalam (Ayat 1-7)", "Surah Al-Haqqah (Ayat 1-8)"],
+      medium: ["Surah Al-Jinn (Ayat 10-15)", "Surah Al-Muzzammil (Ayat 1-5)", "Surah Al-Qiyamah (Ayat 20-25)"],
+      hard: ["Surah Al-Mujadila (Ayat 1-5)", "Surah Al-Hashr (Ayat 21-24)", "Surah Al-Tahrim (Ayat 6-8)"]
+    },
+    "Marhala Salesah": {
+      range: "Juz 26-30",
+      easy: ["Surah Al-Ahqaf (Ayat 1-5)", "Surah Muhammad (Ayat 1-4)", "Surah Al-Fath (Ayat 1-3)"],
+      medium: ["Surah Al-Hujurat (Ayat 10-13)", "Surah Qaf (Ayat 1-5)", "Surah Al-Dhariyat (Ayat 15-20)"],
+      hard: ["Surah Al-Najm (Ayat 1-10)", "Surah Al-Qamar (Ayat 1-8)", "Surah Ar-Rahman (Ayat 1-13)"]
+    },
+    "Marhala Rabeah": {
+      range: "Juz 1-5 + 26-30",
+      easy: ["Surah Al-Baqarah (Ayat 1-5)", "Surah Al-Imran (Ayat 1-9)", "Surah An-Nisa (Ayat 1-3)"],
+      medium: ["Surah Al-Baqarah (Ayat 255 - Ayat Al-Kursi)", "Surah Al-Imran (Ayat 102-105)", "Surah An-Nisa (Ayat 58-59)"],
+      hard: ["Surah Al-Baqarah (Ayat 284-286)", "Surah Al-Imran (Ayat 190-194)", "Surah An-Nisa (Ayat 100-105)"]
+    },
+    "Marhala Khamesah": {
+      range: "Juz 1-10 + 26-30",
+      easy: ["Surah Al-Ma'idah (Ayat 1-3)", "Surah Al-An'am (Ayat 1-5)", "Surah Al-A'raf (Ayat 1-10)"],
+      medium: ["Surah Al-Ma'idah (Ayat 116-120)", "Surah Al-An'am (Ayat 151-153)", "Surah Al-Anfal (Ayat 1-4)"],
+      hard: ["Surah At-Tawbah (Ayat 128-129)", "Surah Al-An'am (Ayat 59-65)", "Surah Al-A'raf (Ayat 172-174)"]
+    },
+    "Marhala Sadesah": {
+      range: "Juz 1-15 + 26-30",
+      easy: ["Surah Yunus (Ayat 1-5)", "Surah Hud (Ayat 1-4)", "Surah Yusuf (Ayat 1-6)"],
+      medium: ["Surah Ibrahim (Ayat 35-41)", "Surah Ar-Ra'd (Ayat 28-31)", "Surah Al-Hijr (Ayat 1-9)"],
+      hard: ["Surah An-Nahl (Ayat 125-128)", "Surah Al-Isra (Ayat 1-5)", "Surah Al-Kahf (Ayat 1-10)"]
+    },
+    "Marhala Sabeah": {
+      range: "Juz 1-20 + 26-30",
+      easy: ["Surah Maryam (Ayat 1-5)", "Surah Taha (Ayat 1-8)", "Surah Al-Anbiya (Ayat 1-4)"],
+      medium: ["Surah Al-Hajj (Ayat 1-5)", "Surah Al-Mu'minun (Ayat 1-11)", "Surah An-Nur (Ayat 35 - Ayat Al-Nur)"],
+      hard: ["Surah Al-Furqan (Ayat 63-77)", "Surah Ash-Shu'ara (Ayat 1-9)", "Surah Al-Naml (Ayat 1-6)"]
+    },
+    "Marhala Saminah": {
+      range: "Juz 1-25 + 26-30",
+      easy: ["Surah Al-Qasas (Ayat 1-6)", "Surah Al-Ankabut (Ayat 1-5)", "Surah Ar-Rum (Ayat 1-5)"],
+      medium: ["Surah Luqman (Ayat 12-19)", "Surah As-Sajdah (Ayat 1-5)", "Surah Al-Ahzab (Ayat 21-25)"],
+      hard: ["Surah Saba (Ayat 1-5)", "Surah Fatir (Ayat 1-7)", "Surah Yasin (Ayat 1-12)"]
+    }
+  };
 
-  const [selectedMarhala, setSelectedMarhala] = useState(marhalas[0]);
+  const [selectedMarhalaName, setSelectedMarhalaName] = useState("Marhala Ula");
   const [difficulty, setDifficulty] = useState("medium");
   const [recording, setRecording] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
@@ -278,13 +318,9 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   const audioChunksRef = useRef([]);
 
   const generateQuestion = () => {
-    const questions = {
-      easy: ["Recite the start of any Surah in this range.", "Complete the Ayat: 'Inna a'tainaka...'", "Recite Surah Al-Fatiha with proper Tajweed."],
-      medium: ["Recite from the middle of Surah Al-Mulk.", "Recite Ayat Al-Kursi and explain one Tajweed rule.", "Recite Surah Al-Waqiah from the start."],
-      hard: ["Recite from a random spot in Juz 28.", "Identify and recite a verse containing 'Idgham'.", "Recite Surah Ar-Rahman with perfect Makharaj."]
-    };
-    const pool = questions[difficulty];
-    setCurrentQuestion(pool[Math.floor(Math.random() * pool.length)]);
+    const pool = marhalaLibrary[selectedMarhalaName][difficulty];
+    const randomAyat = pool[Math.floor(Math.random() * pool.length)];
+    setCurrentQuestion(randomAyat);
     setMistakes([]);
   };
 
@@ -309,7 +345,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
         const url = URL.createObjectURL(blob);
         const entry = {
           studentName: studentProfile?.name || "Child",
-          marhala: selectedMarhala.name,
+          marhala: selectedMarhalaName,
           difficulty,
           question: currentQuestion,
           mistakes: [...mistakes],
@@ -346,31 +382,31 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
           <BookOpen size={32} />
         </div>
         <div className="header-text">
-          <h2>Quran Ikhtebar Page</h2>
-          <p>Test your child's memorization with professional tools</p>
+          <h2 className="arabic-kanz" style={{ fontSize: '1.8rem' }}>Al-Muhaffiz Quran Ikhtebar</h2>
+          <p>Professional Ikhtebar Portal for Tahfeez Students</p>
         </div>
       </div>
 
       <div className="ikhtebar-main-grid">
         <section className="ikhtebar-setup-card premium-card">
-          <h3 className="section-title"><Sparkles size={18} /> Test Configuration</h3>
+          <h3 className="section-title"><Sparkles size={18} /> Ikhtebar Control Panel</h3>
           
           <div className="setup-form">
             <label className="form-group">
-              <span>Select Marhala (Juz Wise)</span>
+              <span>Select Marhala</span>
               <select 
-                value={selectedMarhala.name} 
-                onChange={(e) => setSelectedMarhala(marhalas.find(m => m.name === e.target.value))}
+                value={selectedMarhalaName} 
+                onChange={(e) => setSelectedMarhalaName(e.target.value)}
                 className="premium-select"
               >
-                {marhalas.map(m => (
-                  <option key={m.name} value={m.name}>{m.name} ({m.range})</option>
+                {Object.keys(marhalaLibrary).map(name => (
+                  <option key={name} value={name}>{name} ({marhalaLibrary[name].range})</option>
                 ))}
               </select>
             </label>
 
             <label className="form-group">
-              <span>Difficulty Level</span>
+              <span>Ikhtebar Difficulty</span>
               <div className="difficulty-toggle">
                 {["easy", "medium", "hard"].map(level => (
                   <button 
@@ -384,31 +420,31 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
               </div>
             </label>
 
-            <button className="generate-btn action-button" onClick={generateQuestion}>
-              <RotateCw size={18} /> Generate New Question
+            <button className="generate-btn action-button" onClick={generateQuestion} style={{ background: 'var(--deep-brown)', color: 'white' }}>
+              <RotateCw size={18} /> Generate Question (Ayat)
             </button>
           </div>
 
           {currentQuestion && (
             <div className="question-box card-appear">
-              <div className="q-label">Current Question:</div>
-              <p className="q-text">{currentQuestion}</p>
+              <div className="q-label">Recite from:</div>
+              <p className="q-text arabic-kanz" style={{ fontSize: '1.4rem' }}>{currentQuestion}</p>
               
               <div className="recording-controls">
                 {!recording ? (
                   <button className="rec-btn start" onClick={startRecording}>
-                    <div className="rec-dot"></div> Start Live Recording
+                    <div className="rec-dot"></div> Start Recitation
                   </button>
                 ) : (
                   <button className="rec-btn stop" onClick={stopRecording}>
-                    <div className="rec-square"></div> Stop & Save Recording
+                    <div className="rec-square"></div> Finish Recitation
                   </button>
                 )}
               </div>
 
               {recording && (
                 <div className="mistake-logger fade-in">
-                  <p>Log Mistake (Tap to Beep):</p>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)' }}>LIVE FEEDBACK:</p>
                   <div className="mistake-btns">
                     <button onClick={() => logMistake("Word")}>Word Mistake</button>
                     <button onClick={() => logMistake("Ahkam")}>Ahkam Mistake</button>
@@ -426,11 +462,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
         </section>
 
         <section className="quran-embed-card premium-card">
-          <h3 className="section-title"><BookOpen size={18} /> Misri Tajweed Quran</h3>
+          <h3 className="section-title"><BookOpen size={18} /> Al-Muhaffiz Mushaf</h3>
           <div className="embed-container">
+            {/* Using Quran.com Mushaf View which is professional and used by Muhaffizeen */}
             <iframe 
               src="https://quran.com/?locale=en&font=quran-complex-v2" 
-              title="Tajweed Quran"
+              title="Al-Muhaffiz Quran"
               width="100%" 
               height="500" 
               style={{ borderRadius: '12px', border: 'none' }}
@@ -440,10 +477,10 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
       </div>
 
       <div className="ikhtebar-history-section">
-        <h3 className="section-title"><Clock size={18} /> Ikhtebar History (Premium)</h3>
+        <h3 className="section-title"><Clock size={18} /> Ikhtebar History & Feedback</h3>
         <div className="history-grid">
           {history.length === 0 ? (
-            <div className="empty-history">No tests taken yet.</div>
+            <div className="empty-history">No history found. Start your first Ikhtebar above!</div>
           ) : (
             history.map((entry, i) => (
               <div key={i} className="history-card-premium card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
@@ -452,16 +489,20 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                   <span className="timestamp">{new Date(entry.timestamp).toLocaleDateString()}</span>
                 </div>
                 <div className="history-card-main">
-                  <h4>{entry.marhala}</h4>
-                  <p className="h-question">"{entry.question}"</p>
+                  <h4 className="arabic-kanz">{entry.marhala}</h4>
+                  <p className="h-question arabic-kanz">{entry.question}</p>
                   <div className="mistake-summary">
-                    <strong>Mistakes:</strong> {entry.mistakes.length > 0 ? entry.mistakes.map(m => m.type).join(", ") : "None! Perfect Recitation"}
+                    <strong>Feedback:</strong> {entry.mistakes.length > 0 ? (
+                      <div className="mistake-tag-row">
+                        {entry.mistakes.map((m, idx) => <span key={idx} className="mistake-dot">{m.type}</span>)}
+                      </div>
+                    ) : "No mistakes! MaShaAllah."}
                   </div>
                 </div>
                 <div className="history-card-footer">
                   <audio src={entry.url} controls className="mini-audio" />
                   <button className="download-btn" onClick={() => downloadFile(entry.url, `ikhtebar_${entry.timestamp}.webm`)}>
-                    Download <RotateCw size={14} style={{ marginLeft: '4px' }} />
+                    Download Recitation <RotateCw size={14} style={{ marginLeft: '4px' }} />
                   </button>
                 </div>
               </div>
