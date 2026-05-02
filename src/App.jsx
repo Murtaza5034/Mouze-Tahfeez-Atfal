@@ -1318,11 +1318,11 @@ function TahfeezReportCard({ student, weeklyResult }) {
              <div className="target-box highlight-matrookah">
                 <div className="note-item-row">
                    <span className="note-val">{weeklyResult?.matrookah || "-"}</span>
-                   <span className="note-label arabic-kanz" style={arabicStyle}>:متروكة</span>
+                   <span className="note-label arabic-kanz" style={arabicStyle}>متروكة :</span>
                 </div>
                 <div className="note-item-row">
                    <span className="note-val">{weeklyResult?.daeefah || "-"}</span>
-                   <span className="note-label arabic-kanz" style={arabicStyle}>:ضعيفة</span>
+                   <span className="note-label arabic-kanz" style={arabicStyle}>ضعيفة :</span>
                 </div>
              </div>
              <div className="target-box">
