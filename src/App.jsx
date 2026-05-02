@@ -1312,8 +1312,8 @@ function TahfeezReportCard({ student, weeklyResult }) {
           <div className="result-footer-grid">
              <div className="target-box highlight-wusool">
                 <h5 className="arabic-kanz" style={{...arabicStyle, fontSize: '1.1rem'}}>وصول الى الاْن</h5>
-                <p>Juz: {weeklyResult?.wusool_juz || "-"}</p>
-                <p>Page: {weeklyResult?.wusool_page || "-"}</p>
+                <p><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.wusool_juz || "-"}</p>
+                <p><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.wusool_page || "-"}</p>
              </div>
              <div className="target-box highlight-matrookah">
                 <div className="note-item-row">
@@ -1327,14 +1327,14 @@ function TahfeezReportCard({ student, weeklyResult }) {
              </div>
              <div className="target-box">
                 <h5 className="kids-font">Next Week Target</h5>
-                <p>Juz: {weeklyResult?.next_week_juz || "-"}</p>
-                <p>Page: {weeklyResult?.next_week_page || "-"}</p>
-                <p>Total Jadeed: {weeklyResult?.total_jadeed_pages || "0"}</p>
+                <p><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.next_week_juz || "-"}</p>
+                <p><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.next_week_page || "-"}</p>
+                <p><span className="arabic-kanz" style={arabicStyle}>جديد صفحات :</span> {weeklyResult?.total_jadeed_pages || "0"}</p>
              </div>
              <div className="target-box highlight">
                 <h5 className="kids-font">Target Till Istifadah</h5>
-                <p>Juz: {weeklyResult?.istifadah_juz || "-"}</p>
-                <p>Page: {weeklyResult?.istifadah_page || "-"}</p>
+                <p><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.istifadah_juz || "-"}</p>
+                <p><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.istifadah_page || "-"}</p>
              </div>
           </div>
 
