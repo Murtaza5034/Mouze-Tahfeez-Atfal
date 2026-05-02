@@ -1600,6 +1600,7 @@ h1, h2, h3, h4, h5 {
 }
 
 .teacher-profile-card {
+  position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
@@ -2036,8 +2037,9 @@ h1, h2, h3, h4, h5 {
 
 .pin-badge {
   position: absolute;
-  top: -12px;
-  left: 20px;
+  top: -14px;
+  left: 24px;
+  z-index: 15;
   background: var(--accent-gold);
   color: white;
   padding: 4px 12px;
