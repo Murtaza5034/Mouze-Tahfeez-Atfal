@@ -67,11 +67,11 @@ function SidebarHeader({ photoUrl, name, arabicName, tag }) {
       </div>
       <div className="profile-info-centered">
         <p className="profile-tag-premium">{tag}</p>
-        <h2 className={`profile-name-premium ${nameIsArabic ? 'arabic-kanz' : ''}`}>
+        <h2 className="profile-name-premium">
           {name}
         </h2>
         {arabicName && (
-          <h3 className="profile-arabic-premium arabic-kanz">
+          <h3 className="profile-arabic-premium arabic-kanz" style={{ fontFamily: "'Kanz al Marjaan', serif" }}>
             {arabicName}
           </h3>
         )}
@@ -1661,7 +1661,7 @@ function ParentPortal({
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {currentPage.childInfo.name}
                   {studentProfile?.arabic_name && (
-                    <span className="arabic-kanz" style={{ fontSize: '1.2rem', opacity: 0.8 }}>{studentProfile.arabic_name}</span>
+                    <span className="arabic-kanz" style={{ fontSize: '1.2rem', opacity: 0.8, fontFamily: "'Kanz al Marjaan', serif" }}>{studentProfile.arabic_name}</span>
                   )}
                 </h3>
                 <p>
@@ -3194,6 +3194,7 @@ function TeacherPortal({
   loadPortalData,
   portalRole,
   setSelectedAnnouncement,
+  teacherProfiles = [],
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const selectedStudent =
@@ -3219,7 +3220,7 @@ function TeacherPortal({
       <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
             <SidebarHeader 
-              photoUrl={teacherData.teacherIdentity?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
+              photoUrl={teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(teacherIdentity))?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url} 
               name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Teacher"} 
               arabicName={portalAccess?.arabic_name}
               tag="Teacher Portal" 
@@ -4950,6 +4951,7 @@ export default function App() {
         teacherForms={teacherForms}
         user={user}
         portalAccess={portalAccess}
+        teacherProfiles={teacherProfiles}
       />
     </React.Fragment>
   );
