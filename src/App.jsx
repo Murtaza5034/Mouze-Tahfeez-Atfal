@@ -1239,8 +1239,8 @@ function JadeedPagesCard({ count }) {
         <BookOpen size={80} className="jadeed-icon-bg" />
         <span className="jadeed-count-overlay">{count || 0}</span>
       </div>
-      <h4 className="attendance-rating-text kids-font" style={{ fontSize: '1.1rem' }}>
-        Total Jadeed Pages
+      <h4 className="attendance-rating-text arabic-kanz" style={{ fontSize: '1.6rem', fontFamily: "'Kanz al Marjaan', serif", marginTop: '8px', color: 'var(--deep-brown)' }}>
+        جديد صفحات
       </h4>
       <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
         New pages memorized this week
