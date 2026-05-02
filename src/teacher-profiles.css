@@ -18,7 +18,8 @@
 
 .teacher-profile-card {
   padding: 0 !important; /* Premium card has internal padding */
-  overflow: hidden;
+  position: relative;
+  overflow: visible;
 }
 
 .teacher-card-inner {
@@ -68,8 +69,8 @@
 
 .pin-badge {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: -14px;
+  left: 24px;
   background: var(--accent-gold);
   color: white;
   padding: 6px 14px;
