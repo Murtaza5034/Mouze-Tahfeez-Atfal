@@ -1296,9 +1296,9 @@ function TahfeezReportCard({ student, weeklyResult }) {
                   { label: "تخطيط", val: weeklyResult?.takhteet, max: 20 },
                   { label: "جديد", val: weeklyResult?.jadeed, max: 20 }
                 ].map((item) => (
-                  <div key={item.label} className="score-row">
-                    <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label}</span>
-                    <span className="score-val">{item.val || "0"} / {item.max}</span>
+                  <div key={item.label} className="score-row" dir="rtl">
+                    <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label} :</span>
+                    <span className="score-val" dir="ltr">{item.val || "0"} / {item.max}</span>
                   </div>
                 ))}
              </div>
