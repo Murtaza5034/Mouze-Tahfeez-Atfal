@@ -1256,14 +1256,11 @@ function TahfeezReportCard({ student, weeklyResult }) {
   return (
     <div className="progress-overview">
        <div className="result-card-premium card-appear">
-          <div className="result-card-header">
-             <div className="school-logo"><img src="/logo.png" alt="Logo" /></div>
-             <div className="school-info">
-                <h4>RAWDAT TAHFEEZ UL ATFAAL</h4>
-                <p>{student?.groupName || "Tahfeez Group"}</p>
-             </div>
-             <div className="report-badge">
-                <span className="kids-font" style={{ fontSize: "20px" }}>TAHFEEZ REPORT 1447H</span>
+          <div className="result-card-header" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+             <div className="school-logo" style={{ marginBottom: '12px' }}><img src="/logo.png" alt="Logo" /></div>
+             <div className="school-info" style={{ textAlign: 'center' }}>
+                <h2 className="kids-font" style={{ fontSize: '2.5rem', color: 'var(--deep-brown)', margin: 0, textTransform: 'uppercase' }}>Rawdat Tahfeez al Atfal</h2>
+                <h4 className="kids-font" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', margin: '4px 0 0' }}>TAHFEEZ REPORT 1447H</h4>
              </div>
           </div>
 
