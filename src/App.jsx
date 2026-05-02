@@ -179,6 +179,38 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     redirect_page: redirectPage
   };
   await supabase.from("system_notifications").insert([dbPayload]);
+
+  try {
+    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+    const restApiKey = import.meta.env.VITE_ONESIGNAL_REST_API_KEY;
+    if (appId && restApiKey) {
+      const payload = {
+        app_id: appId,
+        headings: { en: title },
+        contents: { en: body },
+        url: window.location.origin
+      };
+
+      if (targetUser) {
+        payload.include_external_user_ids = [targetUser];
+      } else if (targetRole !== "all") {
+        payload.filters = [{ field: "tag", key: "role", relation: "=", value: targetRole }];
+      } else {
+        payload.included_segments = ["Total Subscriptions"];
+      }
+
+      fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Basic ${restApiKey}`
+        },
+        body: JSON.stringify(payload)
+      }).catch(err => console.error("OneSignal fetch error:", err));
+    }
+  } catch (err) {
+    console.error("OneSignal push error:", err);
+  }
 };
 
 function NotificationEnabler({ permission, onRequest }) {
@@ -3827,6 +3859,15 @@ export default function App() {
     link.rel = "stylesheet";
     document.head.appendChild(link);
 
+    if (typeof window !== "undefined") {
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      window.OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: import.meta.env.VITE_ONESIGNAL_APP_ID,
+        });
+      });
+    }
+
     return () => {
       document.head.removeChild(link);
     };
@@ -3880,6 +3921,17 @@ export default function App() {
 
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
+
+            if (typeof window !== "undefined" && window.OneSignalDeferred) {
+              window.OneSignalDeferred.push(async function(OneSignal) {
+                if (OneSignal.login) {
+                  await OneSignal.login(session.user.id);
+                }
+                if (OneSignal.User && OneSignal.User.addTags) {
+                  OneSignal.User.addTags({ role: access.role });
+                }
+              });
+            }
             await loadPortalData(access.role, session.user, access.parentProfile);
           }
         } catch (err) {
