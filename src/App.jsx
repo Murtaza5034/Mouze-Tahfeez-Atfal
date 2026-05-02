@@ -1670,13 +1670,15 @@ function ParentPortal({
                 <User size={32} />
               </div>
               <div className="header-text">
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: 0 }}>
                   {currentPage.childInfo.name}
-                  {studentProfile?.arabic_name && (
-                    <span className="arabic-kanz" style={{ fontSize: '1.2rem', opacity: 0.8, fontFamily: "'Kanz al Marjaan', serif" }}>{fixArabicScript(studentProfile.arabic_name)}</span>
-                  )}
                 </h3>
-                <p>
+                {studentProfile?.arabic_name && (
+                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', fontFamily: "'Kanz al Marjaan', serif", marginTop: '4px' }}>
+                    {fixArabicScript(studentProfile.arabic_name)}
+                  </div>
+                )}
+                <p style={{ marginTop: '8px' }}>
                   <Hash size={12} /> ITS: {currentPage.childInfo.its}
                 </p>
               </div>
