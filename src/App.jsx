@@ -48,6 +48,18 @@ const ASSETS = {
   LOGO: "/logo.png",
 };
 
+const fixArabicScript = (text) => {
+  if (!text) return "";
+  // Normalize Gaf (Persian/Urdu script)
+  // Some systems render Gaf as double kaaf or k-k-a
+  return text
+    .replace(/كك/g, "گ")      // Double Kaaf -> Gaf
+    .replace(/مرككا/g, "مرگا") // Murga (K-K-A) -> Murga (G-A)
+    .replace(/بهائي/g, "بھائی") // Bhai phonetic
+    .replace(/سي/g, "سی")      // Common character fixing
+    .replace(/في/g, "فی");     // Common character fixing
+};
+
 function SidebarHeader({ photoUrl, name, arabicName, tag }) {
   const isArabic = (text) => /[\u0600-\u06FF]/.test(text);
   const nameIsArabic = isArabic(name);
@@ -72,7 +84,7 @@ function SidebarHeader({ photoUrl, name, arabicName, tag }) {
         </h2>
         {arabicName && (
           <h3 className="profile-arabic-premium arabic-kanz" style={{ fontFamily: "'Kanz al Marjaan', serif" }}>
-            {arabicName}
+            {fixArabicScript(arabicName)}
           </h3>
         )}
       </div>
@@ -1096,7 +1108,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       ...profile,
       student_id: profile.student_id,
       name: profile.full_name,
-      arabic_name: profile.arabic_name,
+      arabic_name: fixArabicScript(profile.arabic_name),
       its: profile.its || "...",
       latestResult,
       teacherName: profile.teacher_name || teacherInProfiles?.full_name || "Unassigned teacher",
@@ -1661,7 +1673,7 @@ function ParentPortal({
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {currentPage.childInfo.name}
                   {studentProfile?.arabic_name && (
-                    <span className="arabic-kanz" style={{ fontSize: '1.2rem', opacity: 0.8, fontFamily: "'Kanz al Marjaan', serif" }}>{studentProfile.arabic_name}</span>
+                    <span className="arabic-kanz" style={{ fontSize: '1.2rem', opacity: 0.8, fontFamily: "'Kanz al Marjaan', serif" }}>{fixArabicScript(studentProfile.arabic_name)}</span>
                   )}
                 </h3>
                 <p>
@@ -2167,7 +2179,7 @@ function AdminPortal({
                           <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
                           <span className="mini-pill">Surah: {selectedStudent.hifz?.surat || "Pending"}</span>
                           {selectedStudent.arabic_name && (
-                            <span className="mini-pill arabic-kanz" style={{ fontSize: '1rem', color: 'var(--primary-gold)' }}>{selectedStudent.arabic_name}</span>
+                            <span className="mini-pill arabic-kanz" style={{ fontSize: '1rem', color: 'var(--primary-gold)' }}>{fixArabicScript(selectedStudent.arabic_name)}</span>
                           )}
                         </div>
                       </div>

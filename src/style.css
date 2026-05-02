@@ -10,12 +10,12 @@
 
 @font-face {
   font-family: 'Kanz al Marjaan';
-  src: url('/Kanz al Marjaan/kanz-al-marjaan-webfont.eot');
-  src: url('/Kanz al Marjaan/kanz-al-marjaan-webfont.eot?#iefix') format('embedded-opentype'),
-       url('/Kanz al Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
-       url('/Kanz al Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
-       url('/Kanz al Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype'),
-       url('/Kanz al Marjaan/kanz-al-marjaan-webfont.svg#KanzalMarjaanRegular') format('svg');
+  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.eot');
+  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.eot?#iefix') format('embedded-opentype'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.svg#KanzalMarjaanRegular') format('svg');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
