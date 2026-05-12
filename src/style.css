@@ -4249,3 +4249,252 @@ body {
   50% { transform: translateY(-15px) rotate(5deg); }
 }
 
+/* --- Premium Hifz Entry Card --- */
+.premium-hifz-card {
+  background: linear-gradient(135deg, #1a1a1a 0%, #3d2b1f 100%);
+  border-radius: 24px;
+  padding: 32px;
+  margin-bottom: 32px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25), 0 10px 20px rgba(138, 101, 21, 0.15);
+  border: 1px solid rgba(197, 160, 89, 0.3);
+  color: white;
+}
+
+.premium-hifz-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(197, 160, 89, 0.08) 0%, transparent 70%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.premium-hifz-card .card-content {
+  position: relative;
+  z-index: 1;
+}
+
+.premium-hifz-card .card-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.premium-hifz-card .header-text h2 {
+  font-family: 'Kanz al Marjaan', serif;
+  color: var(--primary-gold);
+  font-size: 2rem;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.premium-hifz-card .header-text p {
+  color: #d0d0d0;
+  line-height: 1.6;
+  margin: 0;
+  font-size: 1.05rem;
+  max-width: 600px;
+}
+
+.track-status-box {
+  background: rgba(197, 160, 89, 0.1);
+  border: 1px solid rgba(197, 160, 89, 0.3);
+  padding: 16px 24px;
+  border-radius: 20px;
+  text-align: center;
+  min-width: 120px;
+  backdrop-filter: blur(4px);
+}
+
+.track-number {
+  display: block;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--accent-gold);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.track-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--primary-gold);
+  font-weight: 700;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.golden-gradient-btn {
+  background: linear-gradient(90deg, #c5a059 0%, #d4af37 50%, #c5a059 100%);
+  background-size: 200% auto;
+  color: #1a1a1a;
+  border: none;
+  padding: 16px 32px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 8px 25px rgba(197, 160, 89, 0.3);
+}
+
+.golden-gradient-btn:hover {
+  background-position: right center;
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(197, 160, 89, 0.5);
+}
+
+.golden-gradient-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.status-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4caf50;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: rgba(76, 175, 80, 0.1);
+  padding: 8px 16px;
+  border-radius: 30px;
+}
+
+.sparkle-icon {
+  color: var(--accent-gold);
+  filter: drop-shadow(0 0 8px var(--accent-gold));
+}
+
+@media (max-width: 768px) {
+  .premium-hifz-card {
+    padding: 24px;
+  }
+  
+  .premium-hifz-card .card-header-flex {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .track-status-box {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+  }
+  
+  .track-number {
+    font-size: 1.8rem;
+    margin: 0;
+  }
+  
+  .card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .golden-gradient-btn {
+    justify-content: center;
+  }
+}
+
+/* --- E-Learning Modal --- */
+.elearning-modal {
+  width: 95vw !important;
+  height: 90vh !important;
+  max-width: 1400px !important;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 20px !important;
+}
+
+.elearning-iframe-container {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  background: white;
+}
+
+.elearning-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.elearning-footer {
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--light-gold);
+  border-top: 1px solid var(--glass-border);
+}
+
+.elearning-footer p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.elearning-footer a {
+  color: var(--dark-gold);
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid var(--primary-gold);
+}
+
+.iframe-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: white;
+  z-index: 10;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--light-gold);
+  border-top: 4px solid var(--primary-gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.iframe-loading p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

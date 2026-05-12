@@ -369,6 +369,128 @@ function AnnouncementDetailsModal({ announcement, onClose }) {
   );
 }
 
+function ELearningModal({ isOpen, onClose }) {
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  
+  if (!isOpen) return null;
+  
+  const handleIframeLoad = () => {
+    setIframeLoaded(true);
+    // Store credentials in localStorage for auto-login
+    const credentials = {
+      email: localStorage.getItem('elearning-email') || '',
+      password: localStorage.getItem('elearning-password') || '',
+      rememberMe: localStorage.getItem('elearning-remember-me') === 'true'
+    };
+    
+    // Send credentials to iframe for auto-login if remember me is enabled
+    if (credentials.rememberMe && credentials.email && credentials.password) {
+      setTimeout(() => {
+        const iframe = document.querySelector('.elearning-iframe');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            type: 'AUTO_LOGIN',
+            credentials: credentials
+          }, 'https://elearningquran.com');
+        }
+      }, 2000);
+    }
+  };
+  
+  return (
+    <div className="notifications-panel-overlay" onClick={onClose}>
+      <div className="notifications-panel elearning-modal" onClick={e => e.stopPropagation()}>
+        <div className="panel-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--glass-border)' }}>
+          <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>E-Learning Quran Portal</h3>
+          <button className="panel-close-btn" onClick={onClose}><X size={20} /></button>
+        </div>
+        <div className="elearning-iframe-container">
+          {!iframeLoaded && (
+            <div className="iframe-loading">
+              <div className="loading-spinner"></div>
+              <p>Loading E-Learning Portal...</p>
+            </div>
+          )}
+          <iframe 
+            src="https://elearningquran.com" 
+            title="E-Learning Quran"
+            className="elearning-iframe"
+            allow="clipboard-write; camera; microphone"
+            onLoad={handleIframeLoad}
+            style={{ display: iframeLoaded ? 'block' : 'none' }}
+          />
+        </div>
+        <div className="elearning-footer">
+          <p>This portal stays connected to your app sessions. Your login credentials are remembered for quick access.</p>
+          <a href="https://elearningquran.com" target="_blank" rel="noreferrer">
+            Open in browser <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PremiumHifzCard({ onOpenPortal }) {
+  const [trackCount, setTrackCount] = useState(() => {
+    return parseInt(localStorage.getItem('mauze-hifz-track-count') || '0');
+  });
+  const [lastTrackDate, setLastTrackDate] = useState(() => {
+    return localStorage.getItem('mauze-hifz-last-date') || '';
+  });
+
+  const handleTrackClick = () => {
+    const today = new Date().toISOString().split('T')[0];
+    if (lastTrackDate !== today) {
+      const newCount = trackCount + 1;
+      setTrackCount(newCount);
+      setLastTrackDate(today);
+      localStorage.setItem('mauze-hifz-track-count', newCount.toString());
+      localStorage.setItem('mauze-hifz-last-date', today);
+    }
+    onOpenPortal();
+  };
+
+  const isMarkedToday = lastTrackDate === new Date().toISOString().split('T')[0];
+
+  return (
+    <div className="premium-hifz-card card-appear">
+      <div className="card-content">
+        <div className="card-header-flex">
+          <div className="header-text">
+            <h2>
+              <Sparkles size={24} className="sparkle-icon" />
+              Child Hifz Entry of the Day
+            </h2>
+            <p>
+              Maintaining a consistent daily record is the cornerstone of your child's Hifz journey. 
+              Your active participation ensures their progress is tracked and celebrated.
+            </p>
+          </div>
+          <div className="track-status-box">
+            <span className="track-number">{trackCount}</span>
+            <span className="track-label">Total Days</span>
+          </div>
+        </div>
+        
+        <div className="card-actions">
+          <button className="golden-gradient-btn" onClick={handleTrackClick}>
+            <BookOpen size={20} />
+            Launch eLearning Quran
+            <ArrowRight size={18} />
+          </button>
+          {isMarkedToday && (
+            <span className="status-note">
+              <CheckCircle size={16} /> Today's entry marked
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function NotificationBell({ notifications }) {
   const [isOpen, setIsOpen] = useState(false);
   const unreadCount = notifications.length;
@@ -4991,6 +5113,8 @@ function TeacherPortal({
                 </section>
               )}
 
+              <PremiumHifzCard onOpenPortal={() => setIsELearningOpen(true)} />
+
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
                   <article key={student.student_id} className="student-card">
@@ -5379,6 +5503,8 @@ export default function App() {
   });
   const [activePage, setActivePage] = useState(DEFAULT_PAGE_BY_ROLE.parents);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isELearningOpen, setIsELearningOpen] = useState(false);
+
   useEffect(() => {
     // Cleanup old service workers (like OneSignal) to prevent conflicts with FCM
     if ('serviceWorker' in navigator) {
@@ -5524,6 +5650,21 @@ export default function App() {
     setMenuOpen(false);
     setActionMessage(null);
   }, [portalRole]);
+
+  useEffect(() => {
+    // Handle credential storage from eLearning site
+    const handleMessage = (event) => {
+      if (event.origin === 'https://elearningquran.com' && event.data.type === 'STORE_CREDENTIALS') {
+        const { email, password, rememberMe } = event.data.credentials;
+        localStorage.setItem('elearning-email', email);
+        localStorage.setItem('elearning-password', password);
+        localStorage.setItem('elearning-remember-me', rememberMe.toString());
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -6625,6 +6766,10 @@ export default function App() {
       <AnnouncementDetailsModal
         announcement={selectedAnnouncement}
         onClose={() => setSelectedAnnouncement(null)}
+      />
+      <ELearningModal
+        isOpen={isELearningOpen}
+        onClose={() => setIsELearningOpen(false)}
       />
     </React.Fragment>
   );
