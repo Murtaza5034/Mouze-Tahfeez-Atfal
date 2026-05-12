@@ -371,31 +371,59 @@ function AnnouncementDetailsModal({ announcement, onClose }) {
 
 function ELearningModal({ isOpen, onClose }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [iframeKey, setIframeKey] = useState(0);
   
   if (!isOpen) return null;
   
+  // Reset iframe when modal opens
+  useEffect(() => {
+    setIframeLoaded(false);
+    setIframeKey(prev => prev + 1);
+  }, [isOpen]);
+  
   const handleIframeLoad = () => {
     setIframeLoaded(true);
-    // Store credentials in localStorage for auto-login
+    console.log('eLearning iframe loaded successfully');
+    
+    // Try to auto-login with stored credentials
     const credentials = {
       email: localStorage.getItem('elearning-email') || '',
       password: localStorage.getItem('elearning-password') || '',
       rememberMe: localStorage.getItem('elearning-remember-me') === 'true'
     };
     
+    console.log('Stored credentials found:', !!credentials.email && !!credentials.password && credentials.rememberMe);
+    
     // Send credentials to iframe for auto-login if remember me is enabled
     if (credentials.rememberMe && credentials.email && credentials.password) {
       setTimeout(() => {
         const iframe = document.querySelector('.elearning-iframe');
         if (iframe && iframe.contentWindow) {
+          console.log('Sending auto-login credentials to iframe');
           iframe.contentWindow.postMessage({
             type: 'AUTO_LOGIN',
             credentials: credentials
           }, 'https://elearningquran.com');
         }
-      }, 2000);
+      }, 3000); // Increased delay to ensure site is fully loaded
     }
   };
+  
+  // Listen for credential storage from the eLearning site
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.origin === 'https://elearningquran.com' && event.data.type === 'STORE_CREDENTIALS') {
+        const { email, password, rememberMe } = event.data.credentials;
+        console.log('Storing credentials from eLearning site');
+        localStorage.setItem('elearning-email', email);
+        localStorage.setItem('elearning-password', password);
+        localStorage.setItem('elearning-remember-me', rememberMe.toString());
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
   
   return (
     <div className="notifications-panel-overlay" onClick={onClose}>
@@ -409,15 +437,20 @@ function ELearningModal({ isOpen, onClose }) {
             <div className="iframe-loading">
               <div className="loading-spinner"></div>
               <p>Loading E-Learning Portal...</p>
+              <small style={{ color: 'var(--text-muted)', marginTop: '8px', display: 'block' }}>
+                Please wait while we connect to the portal
+              </small>
             </div>
           )}
           <iframe 
+            key={iframeKey}
             src="https://elearningquran.com" 
             title="E-Learning Quran"
             className="elearning-iframe"
-            allow="clipboard-write; camera; microphone"
+            allow="clipboard-write; camera; microphone; autoplay; fullscreen; geolocation; microphone"
             onLoad={handleIframeLoad}
             style={{ display: iframeLoaded ? 'block' : 'none' }}
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation-by-user-activation"
           />
         </div>
         <div className="elearning-footer">
