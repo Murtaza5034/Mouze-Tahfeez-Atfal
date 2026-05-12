@@ -18,20 +18,33 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function(payload) {
   console.log('Received background message ', payload);
 
-  const notificationTitle = payload.notification.title || "New Update";
+  const notificationTitle = payload.notification.title || "Mauze Tahfeez Update";
   const notificationOptions = {
-    body: payload.notification.body || "Check your portal for details",
-    icon: payload.notification.image || payload.notification.icon || '/logo.png',
+    body: payload.notification.body || "Check your portal for important updates",
+    icon: '/logo.png',
     badge: '/logo.png',
+    image: payload.notification.image || null,
     vibrate: [200, 100, 200],
-    data: payload.data || {},
-    tag: 'mauze-tahfeez-notification', // Prevents duplicates
+    data: {
+      ...payload.data,
+      url: payload.data?.url || '/',
+      timestamp: new Date().toISOString()
+    },
+    tag: 'mauze-tahfeez-notification',
     renotify: true,
-    requireInteraction: true, // Professional behavior: stays until dismissed
+    requireInteraction: true,
+    silent: false,
+    dir: 'ltr',
+    lang: 'en-US',
     actions: [
       {
         action: 'open',
-        title: 'Open Portal'
+        title: 'Open Portal',
+        icon: '/logo.png'
+      },
+      {
+        action: 'dismiss',
+        title: 'Dismiss'
       }
     ]
   };
@@ -41,19 +54,36 @@ messaging.onBackgroundMessage(function(payload) {
 
 // Handle notification click
 self.addEventListener('notificationclick', function(event) {
-  console.log('Notification click received.');
+  console.log('Notification click received.', event);
 
   event.notification.close();
 
-  if (event.action === 'open') {
-    // Open your app
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  } else {
-    // Handle default click
-    event.waitUntil(
-      clients.openWindow('/')
-    );
+  const urlToOpen = event.notification.data?.url || '/';
+
+  if (event.action === 'dismiss') {
+    // Just close the notification
+    return;
   }
+
+  // Handle open action or default click
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Try to focus existing window first
+        for (const client of clientList) {
+          if (client.url === new URL(urlToOpen, self.location.origin).href && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // If no existing window, open new one
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
+      .catch((error) => {
+        console.error('Error handling notification click:', error);
+        // Fallback to opening new window
+        return clients.openWindow(urlToOpen);
+      })
+  );
 });

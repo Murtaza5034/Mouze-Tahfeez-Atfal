@@ -24,8 +24,31 @@ export const getFCMToken = async () => {
     
     // Explicitly register service worker for official PWA support
     if ('serviceWorker' in navigator) {
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      // Clean up existing service workers to prevent conflicts
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        if (registration.scope.includes('firebase-messaging-sw') || 
+            registration.scope.includes('messaging-sw')) {
+          await registration.unregister();
+          console.log('Cleaned up conflicting service worker:', registration.scope);
+        }
+      }
+      
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
       console.log('Service Worker registered with scope:', registration.scope);
+      
+      // Wait for service worker to be active
+      if (registration.installing) {
+        await new Promise((resolve) => {
+          registration.installing.addEventListener('statechange', (e) => {
+            if (e.target.state === 'activated') {
+              resolve();
+            }
+          });
+        });
+      }
       
       const currentToken = await getToken(messaging, { 
         vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || "BGrvEM2dyLW86HLnNNIDibzCT7NHZka42OFBlVxyA86wBieuXZ09vJldEnQazc9h3VQgBbikEh0oqfiG0xeeyfg",
@@ -47,6 +70,8 @@ export const getFCMToken = async () => {
     console.error('An error occurred while retrieving token: ', error);
     if (error.code === 'messaging/permission-blocked') {
       alert('Notification permission was blocked. Please reset permissions in your browser bar.');
+    } else if (error.code === 'messaging/unsupported-browser') {
+      console.error('This browser is not supported for FCM notifications.');
     }
     return null;
   }

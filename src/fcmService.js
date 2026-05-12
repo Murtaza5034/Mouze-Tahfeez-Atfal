@@ -142,20 +142,33 @@ class FCMService {
       console.log('Showing notification:', payload);
       const { notification, data } = payload;
       
-      // Create notification options
+      // Create notification options with official styling
       const options = {
         body: notification?.body || 'New notification from Mauze Tahfeez',
         icon: '/logo.png',
         badge: '/logo.png',
+        image: notification?.image || null,
         vibrate: [200, 100, 200],
-        data: data || {},
+        data: {
+          ...data,
+          url: data?.url || '/',
+          timestamp: new Date().toISOString()
+        },
         tag: 'mauze-tahfeez-notification',
         renotify: true,
         requireInteraction: true,
+        silent: false,
+        dir: 'ltr',
+        lang: 'en-US',
         actions: [
           {
             action: 'open',
-            title: 'Open Portal'
+            title: 'Open Portal',
+            icon: '/logo.png'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss'
           }
         ]
       };
@@ -165,31 +178,53 @@ class FCMService {
         // Use service worker if available
         navigator.serviceWorker.ready.then((registration) => {
           console.log('Using service worker to show notification');
-          registration.showNotification(notification?.title || 'Mauze Tahfeez Notification', options);
+          registration.showNotification(notification?.title || 'Mauze Tahfeez Update', options);
         }).catch((error) => {
           console.error('Service worker notification failed:', error);
           // Fallback to browser notification
-          new Notification(notification?.title || 'Mauze Tahfeez Notification', options);
+          this.showBrowserNotification(notification?.title || 'Mauze Tahfeez Update', options, data);
         });
       } else {
         // Fallback to browser notification
         console.log('Using browser notification');
-        new Notification(notification?.title || 'Mauze Tahfeez Notification', options);
+        this.showBrowserNotification(notification?.title || 'Mauze Tahfeez Update', options, data);
       }
-
-      // Handle notification click
-      this.handleNotificationClick(data);
     } catch (error) {
       console.error('Error showing notification:', error);
     }
   }
 
+  // Show browser notification with click handling
+  showBrowserNotification(title, options, data) {
+    const notification = new Notification(title, options);
+    
+    notification.onclick = (event) => {
+      event.preventDefault();
+      notification.close();
+      this.handleNotificationClick(data);
+    };
+    
+    return notification;
+  }
+
   // Handle notification click
   handleNotificationClick(data) {
-    if (data && data.redirectPage) {
-      // You can implement custom navigation logic here
-      console.log('Navigate to:', data.redirectPage);
-      // Example: window.location.href = `/${data.redirectPage}`;
+    try {
+      const url = data?.url || data?.redirectPage || '/';
+      console.log('Navigating to:', url);
+      
+      // Try to focus existing window first, then open new one
+      if (window.focus && !window.document.hidden) {
+        // Window is already focused, navigate within it
+        window.location.href = url;
+      } else {
+        // Open new window or focus existing one
+        window.open(url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error handling notification click:', error);
+      // Fallback to simple navigation
+      window.location.href = data?.url || data?.redirectPage || '/';
     }
   }
 
