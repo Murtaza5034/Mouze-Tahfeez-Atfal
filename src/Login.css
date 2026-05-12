@@ -1,0 +1,229 @@
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--cream-bg);
+  background-image: radial-gradient(circle at top right, rgba(197, 160, 89, 0.08), transparent),
+                    radial-gradient(circle at bottom left, rgba(61, 43, 31, 0.05), transparent);
+  padding: 24px;
+}
+
+.login-card {
+  background: var(--premium-white);
+  width: 100%;
+  max-width: 460px;
+  padding: 56px 48px;
+  border-radius: 40px;
+  box-shadow: 0 32px 64px rgba(61, 43, 31, 0.12);
+  text-align: center;
+  border: 1px solid var(--glass-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--primary-gold), var(--dark-gold));
+}
+
+.login-header {
+  margin-bottom: 40px;
+}
+
+.logo-wrapper {
+  height: 90px;
+  width: auto;
+  margin: 0 auto 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-logo {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(138, 101, 21, 0.15));
+}
+
+.login-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--deep-brown);
+  margin-bottom: 12px;
+  letter-spacing: -0.03em;
+}
+
+.login-header p {
+  color: var(--soft-brown);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.login-form {
+  text-align: left;
+}
+
+.input-group {
+  margin-bottom: 24px;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--primary-gold);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon svg {
+  position: absolute;
+  left: 18px;
+  color: var(--primary-gold);
+  transition: all 0.3s;
+}
+
+.input-with-icon input {
+  width: 100%;
+  padding: 16px 16px 16px 52px;
+  border: 1.5px solid var(--glass-border);
+  border-radius: 18px;
+  font-size: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  background: var(--off-white);
+  color: var(--deep-brown);
+}
+
+.input-with-icon input:focus {
+  border-color: var(--primary-gold);
+  background: white;
+  box-shadow: 0 0 0 5px rgba(197, 160, 89, 0.1);
+}
+
+.input-with-icon input:focus + svg {
+  color: var(--dark-gold);
+  transform: scale(1.1);
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fef2f2;
+  color: #b91c1c;
+  padding: 16px;
+  border-radius: 16px;
+  font-size: 15px;
+  margin-bottom: 28px;
+  border: 1px solid #fee2e2;
+  font-weight: 600;
+}
+
+.login-button {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent-gold) 0%, var(--dark-gold) 100%);
+  color: white;
+  border: none;
+  padding: 18px;
+  border-radius: 20px;
+  font-size: 17px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-gold);
+}
+
+.login-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 32px rgba(138, 101, 21, 0.3);
+}
+
+.login-button:active {
+  transform: translateY(-1px);
+}
+
+.login-button:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.login-footer {
+  margin-top: 40px;
+}
+
+.login-footer p {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.role-switcher {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+  background: var(--off-white);
+  padding: 8px;
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+}
+
+.role-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 14px;
+  padding: 12px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.role-tab.active {
+  background: white;
+  color: var(--dark-gold);
+  box-shadow: 0 4px 12px rgba(138, 101, 21, 0.1);
+}
+
+@media (max-width: 540px) {
+  .login-card {
+    padding: 40px 24px;
+    border-radius: 32px;
+  }
+  
+  .role-switcher {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .login-header h1 {
+    font-size: 24px;
+  }
+}

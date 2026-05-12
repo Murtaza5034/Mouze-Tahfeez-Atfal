@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Notification Test - Mauze Tahfeez</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 FCM Notification Test - Mauze Tahfeez</h1>
+        
+        <div id="status-container"></div>
+        
+        <div class="test-section">
+            <h3>1. Check Browser Support</h3>
+            <button onclick="checkSupport()">Check Support</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. Request Notification Permission</h3>
+            <button onclick="requestPermission()">Request Permission</button>
+            <div id="permission-status"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. Initialize FCM Service</h3>
+            <select id="userRole">
+                <option value="admin">Admin</option>
+                <option value="teacher">Teacher</option>
+                <option value="parent">Parent</option>
+                <option value="student">Student</option>
+            </select>
+            <button onclick="initializeFCM()">Initialize FCM</button>
+            <div id="fcm-status"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. Test Notification</h3>
+            <button onclick="testNotification()">Send Test Notification</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>5. Live Log</h3>
+            <div id="log" class="log"></div>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import the FCM service (adjust path as needed)
+        import fcmService from './src/fcmService.js';
+        
+        window.fcmService = fcmService;
+        
+        // Override console.log to show in our log
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        function addToLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.innerHTML = `<span style="color: #666">[${timestamp}]</span> ${message}`;
+            entry.style.color = type === 'error' ? '#dc3545' : type === 'warning' ? '#ffc107' : '#333';
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToLog(args.join(' '), 'info');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToLog(args.join(' '), 'error');
+        };
+        
+        window.checkSupport = function() {
+            const status = document.getElementById('status-container');
+            let html = '';
+            
+            if ('Notification' in window) {
+                html += '<div class="status success">✅ Notifications are supported</div>';
+            } else {
+                html += '<div class="status error">❌ Notifications are NOT supported</div>';
+            }
+            
+            if ('serviceWorker' in navigator) {
+                html += '<div class="status success">✅ Service Workers are supported</div>';
+            } else {
+                html += '<div class="status error">❌ Service Workers are NOT supported</div>';
+            }
+            
+            if ('PushManager' in window) {
+                html += '<div class="status success">✅ Push API is supported</div>';
+            } else {
+                html += '<div class="status error">❌ Push API is NOT supported</div>';
+            }
+            
+            status.innerHTML = html;
+        };
+        
+        window.requestPermission = function() {
+            const statusDiv = document.getElementById('permission-status');
+            
+            if (!('Notification' in window)) {
+                statusDiv.innerHTML = '<div class="status error">❌ Notifications not supported</div>';
+                return;
+            }
+            
+            Notification.requestPermission().then(permission => {
+                switch(permission) {
+                    case 'granted':
+                        statusDiv.innerHTML = '<div class="status success">✅ Permission granted</div>';
+                        break;
+                    case 'denied':
+                        statusDiv.innerHTML = '<div class="status error">❌ Permission denied</div>';
+                        break;
+                    case 'default':
+                        statusDiv.innerHTML = '<div class="status warning">⚠️ Permission not requested yet</div>';
+                        break;
+                }
+            });
+        };
+        
+        window.initializeFCM = async function() {
+            const statusDiv = document.getElementById('fcm-status');
+            const role = document.getElementById('userRole').value;
+            
+            statusDiv.innerHTML = '<div class="status info">🔄 Initializing FCM...</div>';
+            
+            try {
+                const success = await fcmService.initialize(role);
+                if (success) {
+                    statusDiv.innerHTML = '<div class="status success">✅ FCM initialized successfully</div>';
+                } else {
+                    statusDiv.innerHTML = '<div class="status error">❌ FCM initialization failed</div>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        };
+        
+        window.testNotification = async function() {
+            if (!fcmService.isInitialized()) {
+                alert('Please initialize FCM first!');
+                return;
+            }
+            
+            // Show a test notification directly
+            const notification = new Notification('Test Notification', {
+                body: 'This is a test notification from Mauze Tahfeez!',
+                icon: '/logo.png',
+                badge: '/logo.png',
+                tag: 'test-notification',
+                requireInteraction: true
+            });
+            
+            setTimeout(() => notification.close(), 5000);
+            
+            console.log('Test notification sent!');
+        };
+        
+        window.clearLog = function() {
+            document.getElementById('log').innerHTML = '';
+        };
+        
+        // Auto-check support on load
+        window.addEventListener('load', () => {
+            checkSupport();
+            console.log('FCM Test page loaded. Ready for testing!');
+        });
+    </script>
+</body>
+</html>

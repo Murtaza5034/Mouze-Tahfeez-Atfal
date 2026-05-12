@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "353078822685",
+    "project_id": "mawaid-b929a",
+    "storage_bucket": "mawaid-b929a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:353078822685:android:8f83b293733213472bc3f4",
+        "android_client_info": {
+          "package_name": "Mawaid_53.G"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxoLoIPRZum286Y0uXM3Vq98V3403L7Uo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
