@@ -56,7 +56,7 @@ import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
 
-const ELEARNING_URL = "https://teachers.elearningquran.com/teacher/Lite/teacher_student_manager_new.aspx";
+const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
 const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
 
 const getLocalDateKey = (date = new Date()) => {
@@ -491,7 +491,7 @@ function ELearningModal({ isOpen, onClose }) {
   );
 }
 
-function PremiumHifzCard() {
+function PremiumHifzCard({ onOpenPortal }) {
   const initialTrackedDays = loadTrackedDays();
   const [trackCount, setTrackCount] = useState(() => {
     const savedCount = parseInt(localStorage.getItem("mauze-hifz-track-count") || "0", 10);
@@ -515,6 +515,7 @@ function PremiumHifzCard() {
       localStorage.setItem("mauze-hifz-last-date", today);
       localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
     }
+    onOpenPortal();
   };
 
   const isMarkedToday = trackedDays.includes(getLocalDateKey());
@@ -5179,7 +5180,7 @@ function TeacherPortal({
                 </section>
               )}
 
-              <PremiumHifzCard />
+              <PremiumHifzCard onOpenPortal={() => setIsELearningOpen(true)} />
 
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
