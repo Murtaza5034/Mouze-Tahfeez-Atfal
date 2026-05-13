@@ -56,6 +56,8 @@ import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
 
+const ELEARNING_URL = "https://elearningquran.com/";
+
 const ROLE_LABELS = {
   parents: "Parents",
   admin: "Admin",
@@ -403,7 +405,7 @@ function ELearningModal({ isOpen, onClose }) {
           iframe.contentWindow.postMessage({
             type: 'AUTO_LOGIN',
             credentials: credentials
-          }, 'https://elearningquran.com');
+          }, ELEARNING_URL);
         }
       }, 3000); // Increased delay to ensure site is fully loaded
     }
@@ -412,7 +414,7 @@ function ELearningModal({ isOpen, onClose }) {
   // Listen for credential storage from the eLearning site
   useEffect(() => {
     const handleMessage = (event) => {
-      if (event.origin === 'https://elearningquran.com' && event.data.type === 'STORE_CREDENTIALS') {
+      if (event.origin === ELEARNING_URL && event.data.type === 'STORE_CREDENTIALS') {
         const { email, password, rememberMe } = event.data.credentials;
         console.log('Storing credentials from eLearning site');
         localStorage.setItem('elearning-email', email);
@@ -444,7 +446,7 @@ function ELearningModal({ isOpen, onClose }) {
           )}
           <iframe 
             key={iframeKey}
-            src="https://elearningquran.com" 
+            src={ELEARNING_URL} 
             title="E-Learning Quran"
             className="elearning-iframe"
             allow="clipboard-write; camera; microphone; autoplay; fullscreen; geolocation; microphone"
@@ -455,7 +457,7 @@ function ELearningModal({ isOpen, onClose }) {
         </div>
         <div className="elearning-footer">
           <p>This portal stays connected to your app sessions. Your login credentials are remembered for quick access.</p>
-          <a href="https://elearningquran.com" target="_blank" rel="noreferrer">
+          <a href={ELEARNING_URL} target="_blank" rel="noreferrer">
             Open in browser <ArrowRight size={14} style={{ marginLeft: '4px' }} />
           </a>
         </div>
@@ -464,7 +466,7 @@ function ELearningModal({ isOpen, onClose }) {
   );
 }
 
-function PremiumHifzCard({ onOpenPortal }) {
+function PremiumHifzCard() {
   const [trackCount, setTrackCount] = useState(() => {
     return parseInt(localStorage.getItem('mauze-hifz-track-count') || '0');
   });
@@ -481,7 +483,7 @@ function PremiumHifzCard({ onOpenPortal }) {
       localStorage.setItem('mauze-hifz-track-count', newCount.toString());
       localStorage.setItem('mauze-hifz-last-date', today);
     }
-    onOpenPortal();
+    window.location.assign(ELEARNING_URL);
   };
 
   const isMarkedToday = lastTrackDate === new Date().toISOString().split('T')[0];
@@ -509,7 +511,7 @@ function PremiumHifzCard({ onOpenPortal }) {
         <div className="card-actions">
           <button className="golden-gradient-btn" onClick={handleTrackClick}>
             <BookOpen size={20} />
-            Launch eLearning Quran
+            Elearning quran
             <ArrowRight size={18} />
           </button>
           {isMarkedToday && (
@@ -5146,7 +5148,7 @@ function TeacherPortal({
                 </section>
               )}
 
-              <PremiumHifzCard onOpenPortal={() => setIsELearningOpen(true)} />
+              <PremiumHifzCard />
 
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
@@ -5687,7 +5689,7 @@ export default function App() {
   useEffect(() => {
     // Handle credential storage from eLearning site
     const handleMessage = (event) => {
-      if (event.origin === 'https://elearningquran.com' && event.data.type === 'STORE_CREDENTIALS') {
+      if (event.origin === ELEARNING_URL && event.data.type === 'STORE_CREDENTIALS') {
         const { email, password, rememberMe } = event.data.credentials;
         localStorage.setItem('elearning-email', email);
         localStorage.setItem('elearning-password', password);
