@@ -399,11 +399,10 @@ function AnnouncementDetailsModal({ announcement, onClose }) {
 function ELearningModal({ isOpen, onClose }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
-  
-  if (!isOpen) return null;
-  
+
   // Reset iframe when modal opens
   useEffect(() => {
+    if (!isOpen) return;
     setIframeLoaded(false);
     setIframeKey(prev => prev + 1);
   }, [isOpen]);
@@ -451,7 +450,9 @@ function ELearningModal({ isOpen, onClose }) {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
-  
+
+  if (!isOpen) return null;
+
   return (
     <div className="notifications-panel-overlay" onClick={onClose}>
       <div className="notifications-panel elearning-modal" onClick={e => e.stopPropagation()}>
