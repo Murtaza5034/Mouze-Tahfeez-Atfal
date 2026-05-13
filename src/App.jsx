@@ -56,7 +56,32 @@ import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
 
-const ELEARNING_URL = "https://elearningquran.com/";
+const ELEARNING_URL = "https://teachers.elearningquran.com/teacher/Lite/teacher_student_manager_new.aspx";
+const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
+
+const getLocalDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const loadTrackedDays = () => {
+  const storedDays = localStorage.getItem("mauze-hifz-tracked-days");
+  if (storedDays) {
+    try {
+      const parsed = JSON.parse(storedDays);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((day) => typeof day === "string" && day.trim() !== "");
+      }
+    } catch {
+      // Fall through to the legacy single-date storage below.
+    }
+  }
+
+  const legacyLastDate = localStorage.getItem("mauze-hifz-last-date");
+  return legacyLastDate ? [legacyLastDate] : [];
+};
 
 const ROLE_LABELS = {
   parents: "Parents",
@@ -405,7 +430,7 @@ function ELearningModal({ isOpen, onClose }) {
           iframe.contentWindow.postMessage({
             type: 'AUTO_LOGIN',
             credentials: credentials
-          }, ELEARNING_URL);
+          }, ELEARNING_ORIGIN);
         }
       }, 3000); // Increased delay to ensure site is fully loaded
     }
@@ -414,7 +439,7 @@ function ELearningModal({ isOpen, onClose }) {
   // Listen for credential storage from the eLearning site
   useEffect(() => {
     const handleMessage = (event) => {
-      if (event.origin === ELEARNING_URL && event.data.type === 'STORE_CREDENTIALS') {
+      if (event.origin === ELEARNING_ORIGIN && event.data.type === 'STORE_CREDENTIALS') {
         const { email, password, rememberMe } = event.data.credentials;
         console.log('Storing credentials from eLearning site');
         localStorage.setItem('elearning-email', email);
@@ -466,27 +491,34 @@ function ELearningModal({ isOpen, onClose }) {
   );
 }
 
-function PremiumHifzCard() {
+function PremiumHifzCard({ onOpenPortal }) {
+  const initialTrackedDays = loadTrackedDays();
   const [trackCount, setTrackCount] = useState(() => {
-    return parseInt(localStorage.getItem('mauze-hifz-track-count') || '0');
+    const savedCount = parseInt(localStorage.getItem("mauze-hifz-track-count") || "0", 10);
+    if (!Number.isNaN(savedCount) && savedCount > 0) {
+      return Math.max(savedCount, initialTrackedDays.length);
+    }
+    return initialTrackedDays.length;
   });
-  const [lastTrackDate, setLastTrackDate] = useState(() => {
-    return localStorage.getItem('mauze-hifz-last-date') || '';
-  });
+  const [trackedDays, setTrackedDays] = useState(() => initialTrackedDays);
 
   const handleTrackClick = () => {
-    const today = new Date().toISOString().split('T')[0];
-    if (lastTrackDate !== today) {
+    const today = getLocalDateKey();
+    if (!trackedDays.includes(today)) {
+      const nextDays = [...trackedDays, today];
       const newCount = trackCount + 1;
+
+      setTrackedDays(nextDays);
       setTrackCount(newCount);
-      setLastTrackDate(today);
-      localStorage.setItem('mauze-hifz-track-count', newCount.toString());
-      localStorage.setItem('mauze-hifz-last-date', today);
+
+      localStorage.setItem("mauze-hifz-track-count", newCount.toString());
+      localStorage.setItem("mauze-hifz-last-date", today);
+      localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
     }
-    window.location.assign(ELEARNING_URL);
+    onOpenPortal();
   };
 
-  const isMarkedToday = lastTrackDate === new Date().toISOString().split('T')[0];
+  const isMarkedToday = trackedDays.includes(getLocalDateKey());
 
   return (
     <div className="premium-hifz-card card-appear">
@@ -5148,7 +5180,7 @@ function TeacherPortal({
                 </section>
               )}
 
-              <PremiumHifzCard />
+              <PremiumHifzCard onOpenPortal={() => setIsELearningOpen(true)} />
 
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
@@ -5689,7 +5721,7 @@ export default function App() {
   useEffect(() => {
     // Handle credential storage from eLearning site
     const handleMessage = (event) => {
-      if (event.origin === ELEARNING_URL && event.data.type === 'STORE_CREDENTIALS') {
+      if (event.origin === ELEARNING_ORIGIN && event.data.type === 'STORE_CREDENTIALS') {
         const { email, password, rememberMe } = event.data.credentials;
         localStorage.setItem('elearning-email', email);
         localStorage.setItem('elearning-password', password);
