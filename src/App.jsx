@@ -491,7 +491,7 @@ function ELearningModal({ isOpen, onClose }) {
   );
 }
 
-function PremiumHifzCard() {
+function PremiumHifzCard({ onOpenPortal }) {
   const initialTrackedDays = loadTrackedDays();
   const [trackCount, setTrackCount] = useState(() => {
     const savedCount = parseInt(localStorage.getItem("mauze-hifz-track-count") || "0", 10);
@@ -515,10 +515,7 @@ function PremiumHifzCard() {
       localStorage.setItem("mauze-hifz-last-date", today);
       localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
     }
-    const portalWindow = window.open(ELEARNING_URL, "_blank", "noopener,noreferrer");
-    if (!portalWindow) {
-      window.location.assign(ELEARNING_URL);
-    }
+    onOpenPortal();
   };
 
   const isMarkedToday = trackedDays.includes(getLocalDateKey());
@@ -5183,7 +5180,7 @@ function TeacherPortal({
                 </section>
               )}
 
-              <PremiumHifzCard />
+              <PremiumHifzCard onOpenPortal={() => setIsELearningOpen(true)} />
 
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
