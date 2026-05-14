@@ -56,8 +56,8 @@ import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
 
-const ELEARNING_URL = "/portal/Login.aspx";
-const ELEARNING_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
+const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
 
 const getLocalDateKey = (date = new Date()) => {
   const year = date.getFullYear();
@@ -492,7 +492,7 @@ function ELearningModal({ isOpen, onClose }) {
   );
 }
 
-function PremiumHifzCard({ onOpenPortal }) {
+function PremiumHifzCard() {
   const initialTrackedDays = loadTrackedDays();
   const [trackCount, setTrackCount] = useState(() => {
     const savedCount = parseInt(localStorage.getItem("mauze-hifz-track-count") || "0", 10);
@@ -516,7 +516,6 @@ function PremiumHifzCard({ onOpenPortal }) {
       localStorage.setItem("mauze-hifz-last-date", today);
       localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
     }
-    onOpenPortal();
   };
 
   const isMarkedToday = trackedDays.includes(getLocalDateKey());
@@ -542,11 +541,11 @@ function PremiumHifzCard({ onOpenPortal }) {
         </div>
         
         <div className="card-actions">
-          <button className="golden-gradient-btn" onClick={handleTrackClick}>
+          <a className="golden-gradient-btn" href={ELEARNING_URL} target="_blank" rel="noopener noreferrer" onClick={handleTrackClick}>
             <BookOpen size={20} />
             Elearning quran
             <ArrowRight size={18} />
-          </button>
+          </a>
           {isMarkedToday && (
             <span className="status-note">
               <CheckCircle size={16} /> Today's entry marked
@@ -5181,7 +5180,7 @@ function TeacherPortal({
                 </section>
               )}
 
-              <PremiumHifzCard onOpenPortal={() => setIsELearningOpen(true)} />
+              <PremiumHifzCard />
 
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
@@ -5571,7 +5570,6 @@ export default function App() {
   });
   const [activePage, setActivePage] = useState(DEFAULT_PAGE_BY_ROLE.parents);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isELearningOpen, setIsELearningOpen] = useState(false);
 
   useEffect(() => {
     // Cleanup old service workers (like OneSignal) to prevent conflicts with FCM
@@ -6829,22 +6827,12 @@ export default function App() {
 
 
 
-  const enablerUI = (
+  return (
     <React.Fragment>
       <AnnouncementDetailsModal
         announcement={selectedAnnouncement}
         onClose={() => setSelectedAnnouncement(null)}
       />
-      <ELearningModal
-        isOpen={isELearningOpen}
-        onClose={() => setIsELearningOpen(false)}
-      />
-    </React.Fragment>
-  );
-
-  return (
-    <React.Fragment>
-      {enablerUI}
       <div className="app-portal-wrapper">
         {portalRole === "parents" ? (
           <ParentPortal

@@ -4342,6 +4342,7 @@ body {
   background: linear-gradient(90deg, #c5a059 0%, #d4af37 50%, #c5a059 100%);
   background-size: 200% auto;
   color: #1a1a1a;
+  text-decoration: none;
   border: none;
   padding: 16px 32px;
   border-radius: 14px;
