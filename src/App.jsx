@@ -56,8 +56,8 @@ import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
 
-const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
-const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
+const ELEARNING_URL = "/portal/Login.aspx";
+const ELEARNING_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 
 const getLocalDateKey = (date = new Date()) => {
   const year = date.getFullYear();
