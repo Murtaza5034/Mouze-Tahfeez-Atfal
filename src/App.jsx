@@ -1632,6 +1632,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       ...profile,
       id: profile.id,
       student_id: numericId,
+      allIds: [profile.student_id, profile.its, profile.id].filter(Boolean).map(String),
       name: profile.full_name,
       arabic_name: fixArabicScript(profile.arabic_name),
       its: profile.its || "...",
@@ -3245,7 +3246,7 @@ function AdminLeaveManagement({ onShowAction, students }) {
 
   const updateStatus = async (id, newStatus) => {
     const leaveToUpdate = leaves.find(l => l.id === id);
-    const student = students.find(s => String(s.student_id) === String(leaveToUpdate?.student_id));
+    const student = students.find(s => s.allIds.includes(String(leaveToUpdate?.student_id)));
     
     const { error } = await supabase
       .from('student_leaves')
@@ -3309,7 +3310,7 @@ function AdminLeaveManagement({ onShowAction, students }) {
             <p>Loading requests...</p>
           </div>
         ) : filteredLeaves.map(leave => {
-          const student = students.find(s => String(s.student_id) === String(leave.student_id));
+          const student = students.find(s => s.allIds.includes(String(leave.student_id)));
           return (
             <div key={leave.id} className="premium-card leave-admin-card" style={{ padding: '20px', borderLeft: `4px solid ${leave.status === 'Approved' ? '#4caf50' : leave.status === 'Rejected' ? '#f44336' : '#ff9800'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -3518,7 +3519,7 @@ function AdminPortal({
   const navPages = ["Overview", "Announcements", "Schedule"];
 
   const selectedStudent =
-    students.find((student) => String(student.student_id) === String(selectedStudentId)) ||
+    students.find((student) => student.allIds.includes(String(selectedStudentId))) ||
     students[0] ||
     null;
 
@@ -4073,7 +4074,7 @@ function AdminPortal({
                 <div className="record-stack">
                   {schedule.slice(0, 12).map((item, index) => {
                     const student = students.find(
-                      (entry) => String(entry.student_id) === String(item.student_id)
+                      (entry) => entry.allIds.includes(String(item.student_id))
                     );
 
                     return (
@@ -4264,7 +4265,7 @@ function AdminPortal({
                           onChange={(e) => {
                             const val = e.target.value;
                             if (!val) return;
-                            const s = students.find(x => String(x.student_id) === String(val));
+                            const s = students.find(x => x.allIds.includes(String(val)));
                             if (s) {
                               const form = e.target.form;
                               if (form.full_name) form.full_name.value = s.name || '';
@@ -5036,7 +5037,7 @@ function TeacherPortal({
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const selectedStudent =
     filteredStudents.find(
-      (student) => String(student.student_id) === String(teacherForms.result.student_id)
+      (student) => student.allIds.includes(String(teacherForms.result.student_id))
     ) || filteredStudents[0] || null;
 
   const liveResult = useMemo(() => {
@@ -5858,7 +5859,7 @@ export default function App() {
 
           // Fetch necessary data for all potential students
           const studentIds = rawProfiles.map(p => p.student_id);
-          const studentQueryIds = rawProfiles.flatMap(p => [p.student_id, p.id].filter(Boolean));
+          const studentQueryIds = rawProfiles.flatMap(p => [p.student_id, p.its, p.id].filter(Boolean));
 
           const [
             attendanceResponse,
@@ -5871,9 +5872,9 @@ export default function App() {
             supabase
               .from("attendance")
               .select("*")
-              .in("student_id", studentIds)
+              .in("student_id", studentQueryIds)
               .order("attendance_date", { ascending: false }),
-            supabase.from("schedule").select("*").in("student_id", studentIds),
+            supabase.from("schedule").select("*").in("student_id", studentQueryIds).order("task_time", { ascending: true }),
             supabase
               .from("weekly_results")
               .select("*")
@@ -5907,8 +5908,8 @@ export default function App() {
           
           // Bulletproof search for activeResult using the already matched latestResult from buildStudents
           const activeResult = activeStudent.latestResult;
-          const activeAttendance = (attendanceResponse.data || []).find(a => String(a.student_id) === String(activeStudent.student_id));
-          const activeSchedule = (scheduleResponse.data || []).filter(s => String(s.student_id) === String(activeStudent.student_id));
+          const activeAttendance = (attendanceResponse.data || []).find(a => activeStudent.allIds.includes(String(a.student_id)));
+          const activeSchedule = (scheduleResponse.data || []).filter(s => activeStudent.allIds.includes(String(s.student_id)));
 
           nextParentState = {
             studentProfile: activeStudent,
@@ -6803,7 +6804,7 @@ export default function App() {
       },
     }));
     showAction("success", "Tahfeez report saved successfully.");
-    const targetStudent = schoolData.students.find(s => String(s.student_id) === String(numericId));
+    const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
     const parentId = targetStudent?.user_id || targetStudent?.parent_email;
 
     broadcastNotification(
