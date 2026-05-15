@@ -18,12 +18,14 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function(payload) {
   console.log('Received background message ', payload);
 
-  const notificationTitle = payload.notification.title || "Mauze Tahfeez Update";
+  const title = payload.notification?.title || payload.data?.title || "Mauze Tahfeez Update";
+  const body = payload.notification?.body || payload.data?.body || "Check your portal for important updates";
+  
   const notificationOptions = {
-    body: payload.notification.body || "Check your portal for important updates",
+    body: body,
     icon: '/logo.png',
     badge: '/logo.png',
-    image: payload.notification.image || null,
+    image: payload.notification?.image || payload.data?.image || null,
     vibrate: [200, 100, 200],
     data: {
       ...payload.data,
@@ -49,7 +51,7 @@ messaging.onBackgroundMessage(function(payload) {
     ]
   };
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  return self.registration.showNotification(title, notificationOptions);
 });
 
 // Handle notification click

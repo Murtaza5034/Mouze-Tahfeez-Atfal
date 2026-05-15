@@ -2520,6 +2520,7 @@ function ParentPortal({
   setAppTheme,
   showAction,
   schoolData,
+  notifications = [],
 }) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
@@ -2677,7 +2678,7 @@ function ParentPortal({
     { key: "Home", label: "Home", icon: Home },
     { key: "Child Summary", label: "Progress", icon: GraduationCap },
     { key: "Schedule", label: "Schedule", icon: Calendar },
-    { key: "Teachers", label: "Teachers", icon: Users },
+    { key: "Inbox", label: "Inbox", icon: Bell },
   ];
 
   return (
@@ -3198,6 +3199,32 @@ function ParentPortal({
 
 
 
+
+        {activePage === "Inbox" && (
+          <div className="inbox-container fade-in">
+            <h2 className="section-title" style={{ marginBottom: "20px" }}>Notifications Inbox</h2>
+            {notifications.length > 0 ? (
+              <div className="admin-list-container no-bg">
+                {notifications.map((n, i) => (
+                  <article key={n.id || i} className="admin-list-item" style={{ padding: "16px", borderRadius: "12px", border: "1px solid var(--border-color)", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                      <h4 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>{n.title}</h4>
+                      <span style={{ fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                        {new Date(n.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>{n.body}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <Bell size={48} opacity={0.2} />
+                <p>No notifications yet</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {currentPage?.highlights && activePage === "Profile" && <InfoHighlights items={currentPage.highlights} />}
       </main>
@@ -5006,6 +5033,32 @@ function AdminPortal({
                 </div>
               </section>
             </div>
+          ) : activePage === "Inbox" ? (
+            <div className="inbox-container fade-in">
+              <div className="admin-header">
+                <h2>Notifications Inbox</h2>
+              </div>
+              {notifications.length > 0 ? (
+                <div className="admin-list-container no-bg">
+                  {notifications.map((n, i) => (
+                    <article key={n.id || i} className="admin-list-item" style={{ padding: "16px", borderRadius: "12px", border: "1px solid var(--border-color)", marginBottom: "12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <h4 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>{n.title}</h4>
+                        <span style={{ fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                          {new Date(n.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>{n.body}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <Bell size={48} opacity={0.2} />
+                  <p>No notifications yet</p>
+                </div>
+              )}
+            </div>
           ) : null}
         </section>
       </main>
@@ -5077,6 +5130,7 @@ function TeacherPortal({
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
+            { id: "Inbox", label: "Inbox", icon: Bell },
           ].map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
               <page.icon size={18} /> {page.label}
@@ -6865,6 +6919,7 @@ export default function App() {
             teacherProfiles={teacherProfiles}
             user={user}
             schoolData={schoolData}
+            notifications={notificationsList}
           />
         ) : portalRole === "admin" ? (
           <AdminPortal

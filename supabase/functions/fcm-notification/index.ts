@@ -174,7 +174,11 @@ async function sendFCMNotifications(tokens: string[], title: string, body: strin
         icon: '/logo.png',
         badge: '/logo.png'
       },
-      data: data || {},
+      data: {
+        ...(data || {}),
+        title,
+        body
+      },
       registration_ids: batch,
       priority: 'high'
     }
