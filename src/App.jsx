@@ -180,9 +180,13 @@ const NotificationStatus = ({ role }) => {
               } else {
                 if (data?.message === 'NO_TOKENS_FOUND') {
                   alert("Server reached, but NO TOKEN FOUND for your user ID.\nPlease refresh the page and allow notifications to save your token.");
-                } else if (data?.success === false || (data?.summary && data.summary.failures > 0)) {
+                } else if (data?.success === false || (data?.summary && data.summary.failures > 0) || (data?.summary && data.summary.success === 0)) {
                   console.error("FCM Delivery Failed:", data);
-                  alert(`Test alert sent to Firebase, but delivery failed.\nSuccess: ${data?.summary?.success}\nFailures: ${data?.summary?.failures}\n\nCheck browser console for detailed Firebase error.`);
+                  let extraErr = "";
+                  if (data?.results && data.results[0]?.error) {
+                    extraErr = "\nReason: " + data.results[0].error;
+                  }
+                  alert(`Test alert sent to Firebase, but delivery failed.\nSuccess: ${data?.summary?.success}\nFailures: ${data?.summary?.failures}${extraErr}\n\nCheck browser console for details.`);
                 } else {
                   alert("Test alert successfully delivered to Firebase! Check your phone.");
                 }

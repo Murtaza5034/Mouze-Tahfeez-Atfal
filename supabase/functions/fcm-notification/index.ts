@@ -193,6 +193,11 @@ async function sendFCMNotifications(tokens: string[], title: string, body: strin
         body: JSON.stringify(message)
       })
 
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`FCM API Error (${response.status}): ${errText}`);
+      }
+
       const result = await response.json()
       results.push({
         batch: Math.floor(i / batchSize) + 1,
