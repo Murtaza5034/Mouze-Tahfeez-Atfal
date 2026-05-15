@@ -2678,7 +2678,7 @@ function ParentPortal({
     { key: "Home", label: "Home", icon: Home },
     { key: "Child Summary", label: "Progress", icon: GraduationCap },
     { key: "Schedule", label: "Schedule", icon: Calendar },
-    { key: "Inbox", label: "Inbox", icon: Bell },
+    { key: "Teachers", label: "Teachers", icon: Users },
   ];
 
   return (
@@ -2713,6 +2713,9 @@ function ParentPortal({
         )}
         <nav className="drawer-nav">
           <p className="drawer-section-label">More Pages</p>
+          <button className={`drawer-link ${activePage === "Inbox" ? "active" : ""}`} onClick={() => { setActivePage("Inbox"); setMenuOpen(false); }}>
+            <Bell size={18} /> Inbox
+          </button>
           <button className={`drawer-link ${activePage === "Announcements" ? "active" : ""}`} onClick={() => { setActivePage("Announcements"); setMenuOpen(false); }}>
             <Bell size={18} /> Announcements
           </button>
