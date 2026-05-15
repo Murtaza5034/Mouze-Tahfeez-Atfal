@@ -70,8 +70,9 @@ CREATE POLICY "Users can view relevant notifications"
   ON system_notifications FOR SELECT
   USING (
     target_role = 'all' OR 
-    target_role = auth.jwt()->>'user_role' OR 
-    target_user = auth.uid()::text
+    target_role = (auth.jwt() ->> 'user_role') OR 
+    target_user = auth.uid()::text OR
+    target_user = (auth.jwt() ->> 'email')
   );
 
 CREATE POLICY "Admins can insert notifications"

@@ -114,9 +114,10 @@ begin
 
   -- Link student to profile if provided
   if target_student_id is not null then
-    update public.profiles
-    set user_id = target_user_id
-    where student_id = target_student_id;
+    -- Try to update child_profiles first as it is the primary table
+    update public.child_profiles
+    set parent_user_id = target_user_id
+    where student_id::text = target_student_id;
   end if;
 end;
 $$;

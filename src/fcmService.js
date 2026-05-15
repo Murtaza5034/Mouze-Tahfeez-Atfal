@@ -127,13 +127,10 @@ class FCMService {
 
   // Set up message listener for foreground messages
   setupMessageListener() {
-    onMessageListener()
-      .then((payload) => {
-        this.showNotification(payload);
-      })
-      .catch((error) => {
-        console.error('Error setting up message listener:', error);
-      });
+    onMessageListener((payload) => {
+      console.log('Processing foreground message in fcmService');
+      this.showNotification(payload);
+    });
   }
 
   // Show notification

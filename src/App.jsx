@@ -170,7 +170,6 @@ const NotificationStatus = ({ role }) => {
               
               if (error) {
                 console.error("Diagnostic Error:", error);
-                // Try to extract JSON error if possible
                 let msg = error.message;
                 try {
                   const body = await error.context?.json();
@@ -179,10 +178,13 @@ const NotificationStatus = ({ role }) => {
                 } catch(e) {}
                 alert("Test failed: " + msg);
               } else {
-                if (data?.message === 'No tokens found') {
-                  alert("Server reached, but NO TOKEN FOUND. Please refresh and try again to save your token.");
+                if (data?.message === 'NO_TOKENS_FOUND') {
+                  alert("Server reached, but NO TOKEN FOUND for your user ID.\nPlease refresh the page and allow notifications to save your token.");
+                } else if (data?.success === false || (data?.summary && data.summary.failures > 0)) {
+                  console.error("FCM Delivery Failed:", data);
+                  alert(`Test alert sent to Firebase, but delivery failed.\nSuccess: ${data?.summary?.success}\nFailures: ${data?.summary?.failures}\n\nCheck browser console for detailed Firebase error.`);
                 } else {
-                  alert("Test alert sent! Check your phone.");
+                  alert("Test alert successfully delivered to Firebase! Check your phone.");
                 }
               }
             }}
@@ -341,7 +343,7 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
         title,
         body,
         targetRole: targetRole === "user" ? null : targetRole,
-        targetUser: targetRole === "user" ? targetUser : null,
+        targetUser: targetUser,
         data: {
           redirectPage,
           timestamp: new Date().toISOString()
@@ -1404,7 +1406,8 @@ async function findParentProfiles(userId, email = null) {
     .select("*");
 
   if (userId && email) {
-    query = query.or(`parent_user_id.eq.${userId},parent_email.ilike.${email.trim()}`);
+    // If we have both, use a more robust check. We use .or() with explicit casting hint for userId
+    query = query.or(`parent_user_id.eq.${userId},parent_email.ilike.%${email.trim()}%`);
   } else if (userId) {
     query = query.eq("parent_user_id", userId);
   } else if (email) {
@@ -5858,8 +5861,8 @@ export default function App() {
           }
 
           // Fetch necessary data for all potential students
-          const studentIds = rawProfiles.map(p => p.student_id);
-          const studentQueryIds = rawProfiles.flatMap(p => [p.student_id, p.its, p.id].filter(Boolean));
+          // Fetch necessary data for all potential students using their UUIDs to avoid SQL type errors (uuid = text)
+          const studentQueryIds = rawProfiles.map(p => p.student_id).filter(Boolean);
 
           const [
             attendanceResponse,
@@ -5908,8 +5911,12 @@ export default function App() {
           
           // Bulletproof search for activeResult using the already matched latestResult from buildStudents
           const activeResult = activeStudent.latestResult;
-          const activeAttendance = (attendanceResponse.data || []).find(a => activeStudent.allIds.includes(String(a.student_id)));
-          const activeSchedule = (scheduleResponse.data || []).filter(s => activeStudent.allIds.includes(String(s.student_id)));
+          const activeAttendance = (attendanceResponse.data || []).find(a => 
+            activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(a.student_id || "").trim().toLowerCase())
+          );
+          const activeSchedule = (scheduleResponse.data || []).filter(s => 
+            activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(s.student_id || "").trim().toLowerCase())
+          );
 
           nextParentState = {
             studentProfile: activeStudent,
@@ -6220,9 +6227,10 @@ export default function App() {
 
     // 4. Link child to parent if role is parents and student_id is provided
     if (payload.portal_role === "parents" && payload.student_id && finalUserId) {
+      // Try to link in child_profiles first
       await supabase
-        .from("profiles")
-        .update({ user_id: finalUserId })
+        .from("child_profiles")
+        .update({ parent_user_id: finalUserId })
         .eq("student_id", payload.student_id);
     }
 
@@ -6249,7 +6257,7 @@ export default function App() {
     }));
 
     showAction("success", "Portal access granted successfully!");
-    broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, targetEmail);
+    broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, finalUserId || targetEmail);
   };
 
   const [notificationsList, setNotificationsList] = useState([]);
@@ -6481,7 +6489,7 @@ export default function App() {
     event.preventDefault();
 
     const payload = {
-      student_id: adminForms.schedule.student_id,
+      student_id: String(adminForms.schedule.student_id || "").trim(),
       task_time: adminForms.schedule.task_time,
       task_name: adminForms.schedule.task_name,
       is_done: false,
@@ -6811,7 +6819,7 @@ export default function App() {
       "Tahfeez Report Submitted", 
       `A new progress report has been saved for ${targetStudent?.name || "the student"}.`, 
       "parents", 
-      parentId, 
+      targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email, 
       "Progress"
     );
   };

@@ -78,12 +78,10 @@ export const getFCMToken = async () => {
 };
 
 // Handle incoming messages
-export const onMessageListener = () => {
-  return new Promise((resolve) => {
-    onMessage(messaging, (payload) => {
-      console.log('Message received. ', payload);
-      resolve(payload);
-    });
+export const onMessageListener = (callback) => {
+  return onMessage(messaging, (payload) => {
+    console.log('Foreground message received: ', payload);
+    if (callback) callback(payload);
   });
 };
 
