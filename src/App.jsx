@@ -1983,7 +1983,7 @@ function SettingsPage({
         <h2 className="page-title">Portal Settings</h2>
         <p className="page-eyebrow">Personalize your experience</p>
       </div>
-
+      <div className="settings-tabs">
         {tabs.map(tab => (
           <button 
             key={tab} 
@@ -1999,7 +1999,7 @@ function SettingsPage({
             {tab}
           </button>
         ))}
-
+      </div>
       <div className="settings-content premium-card card-appear">
         {activeTab === "Dark mode" && (
           <div className="settings-tab-pane">
