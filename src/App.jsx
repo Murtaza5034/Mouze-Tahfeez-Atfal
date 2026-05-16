@@ -6386,8 +6386,31 @@ export default function App() {
       portalAccess: { email: "", full_name: "", portal_role: "parents", password: "", student_id: "" },
     }));
 
+    // SEND NOTIFICATION OF ASSIGNMENT
+    (async () => {
+      try {
+        let childName = "your child";
+        if (payload.student_id) {
+          const { data: stData } = await supabase
+            .from("child_profiles")
+            .select("name")
+            .eq("student_id", payload.student_id)
+            .maybeSingle();
+          if (stData?.name) childName = stData.name;
+        }
+
+        const notifTitle = payload.portal_role === "teacher" ? "New Student Assigned" : "Portal Access Granted";
+        const notifBody = payload.portal_role === "teacher" 
+          ? `${childName} has been assigned to your group.` 
+          : `Welcome! ${childName} has been successfully linked to your portal account.`;
+
+        broadcastNotification(notifTitle, notifBody, payload.portal_role, finalUserId || targetEmail);
+      } catch (e) {
+        console.warn("Assignment notification failed:", e);
+      }
+    })();
+
     showAction("success", "Portal access granted successfully!");
-    broadcastNotification("Access Granted", `Welcome ${payload.full_name}!`, payload.portal_role, finalUserId || targetEmail);
   };
 
   const [notificationsList, setNotificationsList] = useState([]);
