@@ -329,7 +329,7 @@ function writeLocalArray(key, value) {
 
 
 
-const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home") => {
+const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home", skipInbox = false) => {
   const dbPayload = {
     title,
     body,
@@ -338,8 +338,10 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     redirect_page: redirectPage
   };
   
-  // Store in database first
-  await supabase.from("system_notifications").insert([dbPayload]);
+  // Store in database first (Inbox)
+  if (!skipInbox) {
+    await supabase.from("system_notifications").insert([dbPayload]);
+  }
 
   // Send FCM notification via Edge Function
   try {
@@ -6638,7 +6640,8 @@ export default function App() {
       announcement: { title: "", type: "Update", target_role: "all", event_date: getToday() },
     }));
     showAction("success", "Announcement created successfully.");
-    broadcastNotification("New Update!", payload.title, payload.target_role || "all", null, "Announcements");
+    // skipInbox: true ensures it only goes to Announcement page + Push alert, not Inbox list
+    broadcastNotification("New Announcement!", payload.title, payload.target_role || "all", null, "Announcements", true);
   };
 
   const handleCreateSchedule = async (event) => {
