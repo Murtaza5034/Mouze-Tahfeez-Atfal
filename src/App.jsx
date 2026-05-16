@@ -2529,6 +2529,8 @@ function ParentPortal({
   showAction,
   schoolData,
   notifications = [],
+  selectedNotification,
+  setSelectedNotification,
 }) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
@@ -5166,6 +5168,8 @@ function TeacherPortal({
   reportSettings = [],
   schoolData,
   teacherProfiles = [],
+  selectedNotification,
+  setSelectedNotification,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const selectedStudent =
@@ -7020,6 +7024,8 @@ export default function App() {
             user={user}
             schoolData={schoolData}
             notifications={notificationsList}
+            selectedNotification={selectedNotification}
+            setSelectedNotification={setSelectedNotification}
           />
         ) : portalRole === "admin" ? (
           <AdminPortal
@@ -7086,6 +7092,8 @@ export default function App() {
             teacherForms={teacherForms}
             teacherProfiles={teacherProfiles}
             schoolData={schoolData}
+            selectedNotification={selectedNotification}
+            setSelectedNotification={setSelectedNotification}
           />
         )}
 
