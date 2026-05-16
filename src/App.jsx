@@ -5079,64 +5079,6 @@ function AdminPortal({
                 </div>
               </section>
             </div>
-          ) : activePage === "Inbox" ? (
-            <div className="inbox-container fade-in">
-              <div className="admin-header">
-                <h2>Notifications Inbox</h2>
-                <p>Track all system and direct alerts</p>
-              </div>
-              
-              {notifications.length > 0 ? (
-                <div className="premium-notifications-list">
-                  {notifications.map((n, i) => (
-                    <div key={n.id || i} className="premium-notif-card card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
-                      <div className="notif-card-icon">
-                        <Bell size={20} />
-                      </div>
-                      <div className="notif-card-content">
-                        <div className="notif-card-header">
-                          <span className="notif-date">{new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                          <h3>{n.title}</h3>
-                        </div>
-                        <p className="notif-excerpt">{n.body.length > 80 ? n.body.substring(0, 80) + "..." : n.body}</p>
-                        <button className="notif-view-btn" onClick={() => setSelectedNotification(n)}>
-                          VIEW <ChevronRight size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-icon-ring">
-                    <Bell size={40} />
-                  </div>
-                  <h3>Inbox is empty</h3>
-                  <p>System alerts and messages will appear here.</p>
-                </div>
-              )}
-
-              {selectedNotification && (
-                <div className="notif-overlay-backdrop fade-in" onClick={() => setSelectedNotification(null)}>
-                  <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
-                    <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
-                      <X size={20} />
-                    </button>
-                    <div className="notif-overlay-header">
-                      <div className="notif-badge">Notification Detail</div>
-                      <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
-                      <h2>{selectedNotification.title}</h2>
-                    </div>
-                    <div className="notif-overlay-body">
-                      <p>{selectedNotification.body}</p>
-                    </div>
-                    <div className="notif-overlay-footer">
-                      <button className="premium-btn gold" onClick={() => setSelectedNotification(null)}>Close</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
           ) : null}
         </section>
       </main>
@@ -5673,6 +5615,64 @@ function TeacherPortal({
                     {teacherData.attendances.filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity)).length === 0 && (
                       <div className="empty-state">No attendance records found.</div>
                     )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : activePage === "Inbox" ? (
+            <div className="inbox-container fade-in">
+              <div className="admin-header">
+                <h2>Notifications Inbox</h2>
+                <p>Track all system and direct alerts</p>
+              </div>
+              
+              {notifications.length > 0 ? (
+                <div className="premium-notifications-list">
+                  {notifications.map((n, i) => (
+                    <div key={n.id || i} className="premium-notif-card card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                      <div className="notif-card-icon">
+                        <Bell size={20} />
+                      </div>
+                      <div className="notif-card-content">
+                        <div className="notif-card-header">
+                          <span className="notif-date">{new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                          <h3>{n.title}</h3>
+                        </div>
+                        <p className="notif-excerpt">{n.body.length > 80 ? n.body.substring(0, 80) + "..." : n.body}</p>
+                        <button className="notif-view-btn" onClick={() => setSelectedNotification(n)}>
+                          VIEW <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-icon-ring">
+                    <Bell size={40} />
+                  </div>
+                  <h3>Inbox is empty</h3>
+                  <p>System alerts and messages will appear here.</p>
+                </div>
+              )}
+
+              {selectedNotification && (
+                <div className="notif-overlay-backdrop fade-in" onClick={() => setSelectedNotification(null)}>
+                  <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
+                    <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
+                      <X size={20} />
+                    </button>
+                    <div className="notif-overlay-header">
+                      <div className="notif-badge">Notification Detail</div>
+                      <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
+                      <h2>{selectedNotification.title}</h2>
+                    </div>
+                    <div className="notif-overlay-body">
+                      <p>{selectedNotification.body}</p>
+                    </div>
+                    <div className="notif-overlay-footer">
+                      <button className="premium-btn gold" onClick={() => setSelectedNotification(null)}>Close</button>
+                    </div>
                   </div>
                 </div>
               )}
