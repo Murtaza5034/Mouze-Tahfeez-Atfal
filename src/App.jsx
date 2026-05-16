@@ -501,29 +501,66 @@ function ELearningModal({ isOpen, onClose }) {
   );
 }
 
-function PremiumHifzCard() {
-  const initialTrackedDays = loadTrackedDays();
-  const [trackCount, setTrackCount] = useState(() => {
-    const savedCount = parseInt(localStorage.getItem("mauze-hifz-track-count") || "0", 10);
-    if (!Number.isNaN(savedCount) && savedCount > 0) {
-      return Math.max(savedCount, initialTrackedDays.length);
-    }
-    return initialTrackedDays.length;
-  });
-  const [trackedDays, setTrackedDays] = useState(() => initialTrackedDays);
+function PremiumHifzCard({ user }) {
+  const [trackCount, setTrackCount] = useState(0);
+  const [trackedDays, setTrackedDays] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleTrackClick = () => {
+  useEffect(() => {
+    if (user) {
+      fetchTrackingData();
+    }
+  }, [user]);
+
+  const fetchTrackingData = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('elearning_tracking')
+        .select('tracked_date')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      if (data) {
+        const dates = data.map(row => row.tracked_date);
+        setTrackedDays(dates);
+        setTrackCount(dates.length);
+      }
+    } catch (err) {
+      console.error("Error fetching tracking data:", err);
+      // Fallback to local storage if DB fails
+      const localDays = loadTrackedDays();
+      setTrackedDays(localDays);
+      setTrackCount(localDays.length);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTrackClick = async () => {
     const today = getLocalDateKey();
     if (!trackedDays.includes(today)) {
-      const nextDays = [...trackedDays, today];
-      const newCount = trackCount + 1;
+      try {
+        // Optimistic update
+        const nextDays = [...trackedDays, today];
+        setTrackedDays(nextDays);
+        setTrackCount(nextDays.length);
 
-      setTrackedDays(nextDays);
-      setTrackCount(newCount);
+        // Sync to backend
+        const { error } = await supabase
+          .from('elearning_tracking')
+          .insert([{ user_id: user.id, tracked_date: today }]);
 
-      localStorage.setItem("mauze-hifz-track-count", newCount.toString());
-      localStorage.setItem("mauze-hifz-last-date", today);
-      localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
+        if (error && error.code !== '23505') { // 23505 is unique violation
+          throw error;
+        }
+
+        // Local backup
+        localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
+      } catch (err) {
+        console.error("Error saving tracking data:", err);
+      }
     }
   };
 
@@ -544,7 +581,7 @@ function PremiumHifzCard() {
             </p>
           </div>
           <div className="track-status-box">
-            <span className="track-number">{trackCount}</span>
+            <span className="track-number">{loading ? "..." : trackCount}</span>
             <span className="track-label">Total Days</span>
           </div>
         </div>
@@ -5304,7 +5341,7 @@ function TeacherPortal({
                 </section>
               )}
 
-              <PremiumHifzCard />
+              <PremiumHifzCard user={user} />
 
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
