@@ -1218,3 +1218,217 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
 .ticket-footer { margin-top: 16px; display: flex; justify-content: flex-end; }
 .resolve-btn { background: #dcfce7; color: #166534; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; }
 .reopen-btn { background: #f1f5f9; color: #64748b; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+
+/* --- PREMIUM INBOX & NOTIFICATIONS --- */
+
+.premium-notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.premium-notif-card {
+  display: flex;
+  gap: 16px;
+  background: var(--premium-white);
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.premium-notif-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-premium);
+  border-color: var(--primary-gold);
+}
+
+.notif-card-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--light-gold);
+  color: var(--dark-gold);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notif-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notif-card-header {
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-date {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--primary-gold);
+  letter-spacing: 0.05em;
+}
+
+.notif-card-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--deep-brown);
+  font-weight: 800;
+}
+
+.notif-excerpt {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.notif-view-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--primary-gold);
+  font-size: 0.75rem;
+  font-weight: 900;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+
+.notif-view-btn:hover {
+  gap: 8px;
+  color: var(--dark-gold);
+}
+
+/* --- NOTIFICATION OVERLAY --- */
+
+.notif-overlay-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(44, 24, 16, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.notif-overlay-card {
+  background: white;
+  width: 100%;
+  max-width: 500px;
+  border-radius: 32px;
+  padding: 40px;
+  position: relative;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.dark-mode .notif-overlay-card {
+  background: var(--premium-white);
+}
+
+.notif-overlay-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--cream-bg);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.notif-overlay-close:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  transform: rotate(90deg);
+}
+
+.notif-overlay-header {
+  margin-bottom: 24px;
+}
+
+.notif-badge {
+  display: inline-block;
+  background: var(--light-gold);
+  color: var(--dark-gold);
+  padding: 4px 12px;
+  border-radius: 50px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.notif-full-date {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.notif-overlay-header h2 {
+  margin: 0;
+  font-size: 1.75rem;
+  color: var(--deep-brown);
+  line-height: 1.2;
+}
+
+.notif-overlay-body {
+  margin-bottom: 32px;
+}
+
+.notif-overlay-body p {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: var(--text-main);
+}
+
+.notif-overlay-footer {
+  display: flex;
+  justify-content: stretch;
+}
+
+.notif-overlay-footer button {
+  width: 100%;
+  padding: 16px;
+  font-size: 1rem;
+}
+
+.empty-icon-ring {
+  width: 80px;
+  height: 80px;
+  border: 2px dashed var(--primary-gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  color: var(--primary-gold);
+  opacity: 0.5;
+}
