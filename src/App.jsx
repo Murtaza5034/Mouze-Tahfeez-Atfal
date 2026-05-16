@@ -2905,6 +2905,7 @@ function ParentPortal({
 
         {activePage === "Home" ? (
           <div className="home-dashboard">
+            <PremiumHifzCard user={user} />
             <div className="hifz-stats-premium-strip">
               {[
                 { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
@@ -5304,10 +5305,9 @@ function TeacherPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
-          <PremiumHifzCard user={user} />
-
           {activePage === "My Group" ? (
             <div className="portal-content">
+              <PremiumHifzCard user={user} />
               <div className="portal-stats-strip teacher-stats">
                 <div className="pstat-card">
                   <span className="pstat-value">{filteredStudents.length}</span>
@@ -6609,7 +6609,7 @@ export default function App() {
         if (!isActive) return;
 
         notificationChannel = supabase
-          .channel('realtime-notifications')
+          .channel(`notif-sync-${user.id}-${Math.random().toString(36).substring(7)}`)
           .on(
             'postgres_changes',
             { event: 'INSERT', table: 'system_notifications', schema: 'public' },
@@ -6623,9 +6623,15 @@ export default function App() {
 
               if (isTargeted) {
                 setNotificationsList(prev => {
-                  // Prevent duplication if the message is received via multiple channels or overlaps with fetch
-                  if (prev.some(n => n.id === newNotif.id)) return prev;
-                  return [newNotif, ...prev];
+                  const combined = [newNotif, ...prev];
+                  // Strict unique-by-ID filtering to kill the "double card" bug
+                  const unique = combined.filter((n, idx, self) => 
+                    idx === self.findIndex(t => t.id === n.id)
+                  );
+                  if (unique.length === prev.length && !prev.some(n => n.id === newNotif.id)) {
+                     // This means it was filtered out or something weird happened
+                  }
+                  return unique;
                 });
               }
             }
