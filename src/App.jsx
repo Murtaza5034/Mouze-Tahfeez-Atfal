@@ -42,7 +42,8 @@ import {
   Lock,
   CalendarX,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  Trash2
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
@@ -539,6 +540,7 @@ function PremiumHifzCard({ user }) {
   };
 
   const handleTrackClick = async () => {
+    if (!user) return; // Prevent crash if user is not loaded
     const today = getLocalDateKey();
     if (!trackedDays.includes(today)) {
       try {
