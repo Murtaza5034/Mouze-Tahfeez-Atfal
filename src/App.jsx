@@ -788,9 +788,6 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [surahInfo, setSurahInfo] = useState(null);
   const [versesData, setVersesData] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [selectedNotification, setSelectedNotification] = useState(null);
-  const [showActionMsg, setShowActionMsg] = useState(false);
   const [revealedWords, setRevealedWords] = useState([]);
   const [audioGuidanceUrl, setAudioGuidanceUrl] = useState(null);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
@@ -5742,6 +5739,7 @@ export default function App() {
   const [adminTeacherFilter, setAdminTeacherFilter] = useState("All");
   const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [reportSettings, setReportSettings] = useState([]);
+  const [selectedNotification, setSelectedNotification] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem("mauze-dark-mode") === "true";
   });
