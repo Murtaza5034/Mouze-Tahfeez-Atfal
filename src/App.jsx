@@ -6622,7 +6622,11 @@ export default function App() {
                 newNotif.target_user === user.email;
 
               if (isTargeted) {
-                setNotificationsList(prev => [newNotif, ...prev]);
+                setNotificationsList(prev => {
+                  // Prevent duplication if the message is received via multiple channels or overlaps with fetch
+                  if (prev.some(n => n.id === newNotif.id)) return prev;
+                  return [newNotif, ...prev];
+                });
               }
             }
           )
