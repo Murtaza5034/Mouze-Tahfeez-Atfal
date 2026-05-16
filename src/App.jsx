@@ -1274,30 +1274,40 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 }
 
 
-function AnnouncementsPage({ announcements = [], setActivePage, setSelectedAnnouncement }) {
+function AnnouncementsPage({ announcements = [], setActivePage, setSelectedAnnouncement, onDismiss, onClearAll, dismissedIds = [] }) {
   const images = [
     "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=400&q=80",
     "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=400&q=80",
     "https://images.unsplash.com/photo-1577563908411-50cb98976ffe?auto=format&fit=crop&w=400&q=80"
   ];
 
+  const visibleAnnounces = announcements.filter(n => !dismissedIds.includes(n.id));
+
   return (
     <div className="announcements-page fade-in">
-      <div className="page-header" style={{ marginBottom: 0 }}>
+      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 className="premium-title">System Announcements</h2>
           <p className="subtitle">Important updates and schedules from the administration</p>
         </div>
+        {visibleAnnounces.length > 0 && (
+          <button className="clear-history-btn" onClick={() => onClearAll(visibleAnnounces.map(n => n.id))}>
+            <Trash2 size={16} /> Clear All
+          </button>
+        )}
       </div>
       <div className="announcements-grid">
-        {announcements.length === 0 ? (
+        {visibleAnnounces.length === 0 ? (
           <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
             <Bell size={48} style={{ opacity: 0.2 }} />
             <p>No system announcements available</p>
           </div>
         ) : (
-          announcements.map((n, i) => (
+          visibleAnnounces.map((n, i) => (
             <div key={n.id || i} className="announce-card">
+              <button className="card-dismiss-btn" onClick={() => onDismiss(n.id)} title="Clear from view">
+                <X size={16} />
+              </button>
               <img src={images[i % images.length]} alt="Announcement" className="announce-img" />
               <div className="announce-content">
                 <div className="announce-badge">{n.type || 'Update'}</div>
@@ -2530,6 +2540,12 @@ function ParentPortal({
   notifications = [],
   selectedNotification,
   setSelectedNotification,
+  dismissedNotifs = [],
+  dismissedAnnounces = [],
+  onDismissNotif,
+  onClearAllNotifs,
+  onDismissAnnounce,
+  onClearAllAnnounces,
 }) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
@@ -3039,6 +3055,9 @@ function ParentPortal({
             announcements={announcements}
             setActivePage={setActivePage}
             setSelectedAnnouncement={setSelectedAnnouncement}
+            onDismiss={onDismissAnnounce}
+            onClearAll={onClearAllAnnounces}
+            dismissedIds={dismissedAnnounces}
           />
         ) : null}
 
@@ -3214,15 +3233,25 @@ function ParentPortal({
 
         {activePage === "Inbox" && (
           <div className="inbox-container fade-in">
-            <div className="section-title-block">
-              <h2 className="page-title">Notifications</h2>
-              <p className="page-eyebrow">Stay updated with the latest news</p>
+            <div className="section-title-block" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 className="page-title">Notifications</h2>
+                <p className="page-eyebrow">Stay updated with the latest news</p>
+              </div>
+              {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 && (
+                <button className="clear-history-btn" onClick={() => onClearAllNotifs(notifications.filter(n => !dismissedNotifs.includes(n.id)).map(n => n.id))}>
+                  <Trash2 size={16} /> Clear All
+                </button>
+              )}
             </div>
             
-            {notifications.length > 0 ? (
+            {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 ? (
               <div className="premium-notifications-list">
-                {notifications.map((n, i) => (
+                {notifications.filter(n => !dismissedNotifs.includes(n.id)).map((n, i) => (
                   <div key={n.id || i} className="premium-notif-card card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                    <button className="card-dismiss-btn" onClick={() => onDismissNotif(n.id)} title="Clear from view">
+                      <X size={14} />
+                    </button>
                     <div className="notif-card-icon">
                       <Bell size={20} />
                     </div>
@@ -3244,8 +3273,8 @@ function ParentPortal({
                 <div className="empty-icon-ring">
                   <Bell size={40} />
                 </div>
-                <h3>No notifications</h3>
-                <p>We'll notify you when there's something new.</p>
+                <h3>Inbox is empty</h3>
+                <p>Personal alerts and messages will appear here.</p>
               </div>
             )}
 
@@ -3487,6 +3516,12 @@ function AdminPortal({
   setSelectedAnnouncement,
   reportSettings = [],
   onShowAction,
+  dismissedNotifs = [],
+  dismissedAnnounces = [],
+  onDismissNotif,
+  onClearAllNotifs,
+  onDismissAnnounce,
+  onClearAllAnnounces,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -4293,6 +4328,9 @@ function AdminPortal({
               announcements={announcements}
               setActivePage={setActivePage}
               setSelectedAnnouncement={setSelectedAnnouncement}
+              onDismiss={onDismissAnnounce}
+              onClearAll={onClearAllAnnounces}
+              dismissedIds={dismissedAnnounces}
             />
           ) : null}
 
@@ -5111,6 +5149,12 @@ function TeacherPortal({
   teacherProfiles = [],
   selectedNotification,
   setSelectedNotification,
+  dismissedNotifs = [],
+  dismissedAnnounces = [],
+  onDismissNotif,
+  onClearAllNotifs,
+  onDismissAnnounce,
+  onClearAllAnnounces,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const selectedStudent =
@@ -5621,15 +5665,25 @@ function TeacherPortal({
             </div>
           ) : activePage === "Inbox" ? (
             <div className="inbox-container fade-in">
-              <div className="admin-header">
-                <h2>Notifications Inbox</h2>
-                <p>Track all system and direct alerts</p>
+              <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2>Notifications Inbox</h2>
+                  <p>Track all system and direct alerts</p>
+                </div>
+                {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 && (
+                  <button className="clear-history-btn" onClick={() => onClearAllNotifs(notifications.filter(n => !dismissedNotifs.includes(n.id)).map(n => n.id))}>
+                    <Trash2 size={16} /> Clear All
+                  </button>
+                )}
               </div>
               
-              {notifications.length > 0 ? (
+              {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 ? (
                 <div className="premium-notifications-list">
-                  {notifications.map((n, i) => (
+                  {notifications.filter(n => !dismissedNotifs.includes(n.id)).map((n, i) => (
                     <div key={n.id || i} className="premium-notif-card card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                      <button className="card-dismiss-btn" onClick={() => onDismissNotif(n.id)} title="Clear from view">
+                        <X size={14} />
+                      </button>
                       <div className="notif-card-icon">
                         <Bell size={20} />
                       </div>
@@ -5684,6 +5738,9 @@ function TeacherPortal({
               announcements={schoolData.announcements}
               setActivePage={setActivePage}
               setSelectedAnnouncement={setSelectedAnnouncement}
+              onDismiss={onDismissAnnounce}
+              onClearAll={onClearAllAnnounces}
+              dismissedIds={dismissedAnnounces}
             />
           ) : null}
 
@@ -5742,6 +5799,42 @@ export default function App() {
   const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [reportSettings, setReportSettings] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  
+  // Local dismissal state (doesn't affect backend)
+  const [dismissedNotifs, setDismissedNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("mauze-dismissed-notifs") || "[]");
+    } catch (e) { return []; }
+  });
+  const [dismissedAnnounces, setDismissedAnnounces] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("mauze-dismissed-announces") || "[]");
+    } catch (e) { return []; }
+  });
+
+  const dismissNotification = (id) => {
+    const next = [...dismissedNotifs, id];
+    setDismissedNotifs(next);
+    localStorage.setItem("mauze-dismissed-notifs", JSON.stringify(next));
+  };
+
+  const clearAllNotifications = (currentIds) => {
+    const next = [...new Set([...dismissedNotifs, ...currentIds])];
+    setDismissedNotifs(next);
+    localStorage.setItem("mauze-dismissed-notifs", JSON.stringify(next));
+  };
+
+  const dismissAnnouncement = (id) => {
+    const next = [...dismissedAnnounces, id];
+    setDismissedAnnounces(next);
+    localStorage.setItem("mauze-dismissed-announces", JSON.stringify(next));
+  };
+
+  const clearAllAnnouncements = (currentIds) => {
+    const next = [...new Set([...dismissedAnnounces, ...currentIds])];
+    setDismissedAnnounces(next);
+    localStorage.setItem("mauze-dismissed-announces", JSON.stringify(next));
+  };
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem("mauze-dark-mode") === "true";
   });
@@ -7027,6 +7120,12 @@ export default function App() {
             notifications={notificationsList}
             selectedNotification={selectedNotification}
             setSelectedNotification={setSelectedNotification}
+            dismissedNotifs={dismissedNotifs}
+            dismissedAnnounces={dismissedAnnounces}
+            onDismissNotif={dismissNotification}
+            onClearAllNotifs={clearAllNotifications}
+            onDismissAnnounce={dismissAnnouncement}
+            onClearAllAnnounces={clearAllAnnouncements}
           />
         ) : portalRole === "admin" ? (
           <AdminPortal
@@ -7069,6 +7168,13 @@ export default function App() {
             setSelectedStudentId={setSelectedStudentId}
             teacherProfiles={teacherProfiles}
             user={user}
+            onShowAction={showAction}
+            dismissedNotifs={dismissedNotifs}
+            dismissedAnnounces={dismissedAnnounces}
+            onDismissNotif={dismissNotification}
+            onClearAllNotifs={clearAllNotifications}
+            onDismissAnnounce={dismissAnnouncement}
+            onClearAllAnnounces={clearAllAnnouncements}
           />
         ) : (
           <TeacherPortal
@@ -7095,6 +7201,12 @@ export default function App() {
             schoolData={schoolData}
             selectedNotification={selectedNotification}
             setSelectedNotification={setSelectedNotification}
+            dismissedNotifs={dismissedNotifs}
+            dismissedAnnounces={dismissedAnnounces}
+            onDismissNotif={dismissNotification}
+            onClearAllNotifs={clearAllNotifications}
+            onDismissAnnounce={dismissAnnouncement}
+            onClearAllAnnounces={clearAllAnnouncements}
           />
         )}
 
