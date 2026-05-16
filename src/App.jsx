@@ -507,13 +507,8 @@ function PremiumHifzCard({ user }) {
   const [trackedDays, setTrackedDays] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchTrackingData();
-    }
-  }, [user]);
-
   const fetchTrackingData = async () => {
+    if (!user) return;
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -521,16 +516,26 @@ function PremiumHifzCard({ user }) {
         .select('tracked_date')
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+          console.warn("Tracking table missing, falling back to local storage");
+          throw new Error("Table missing");
+        }
+        throw error;
+      }
 
       if (data) {
-        const dates = data.map(row => row.tracked_date);
-        setTrackedDays(dates);
-        setTrackCount(dates.length);
+        const dbDays = data.map(row => row.tracked_date);
+        const localDays = loadTrackedDays();
+        // Merge unique days
+        const mergedDays = Array.from(new Set([...dbDays, ...localDays]));
+        setTrackedDays(mergedDays);
+        setTrackCount(mergedDays.length);
+        // Sync local storage with DB state
+        localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(mergedDays));
       }
     } catch (err) {
       console.error("Error fetching tracking data:", err);
-      // Fallback to local storage if DB fails
       const localDays = loadTrackedDays();
       setTrackedDays(localDays);
       setTrackCount(localDays.length);
@@ -539,31 +544,37 @@ function PremiumHifzCard({ user }) {
     }
   };
 
-  const handleTrackClick = async () => {
-    if (!user) return; // Prevent crash if user is not loaded
-    const today = getLocalDateKey();
-    if (!trackedDays.includes(today)) {
-      try {
-        // Optimistic update
-        const nextDays = [...trackedDays, today];
-        setTrackedDays(nextDays);
-        setTrackCount(nextDays.length);
+  useEffect(() => {
+    fetchTrackingData();
+  }, [user]);
 
-        // Sync to backend
+  const handleTrackClick = async () => {
+    if (!user) return;
+    const today = getLocalDateKey();
+    
+    // Only increment and sync if not already tracked today
+    if (!trackedDays.includes(today)) {
+      const nextDays = [...trackedDays, today];
+      
+      // Optimistic update
+      setTrackedDays(nextDays);
+      setTrackCount(nextDays.length);
+      localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
+
+      try {
         const { error } = await supabase
           .from('elearning_tracking')
           .insert([{ user_id: user.id, tracked_date: today }]);
 
-        if (error && error.code !== '23505') { // 23505 is unique violation
-          throw error;
+        if (error && error.code !== '23505') {
+          console.error("Supabase sync failed:", error);
         }
-
-        // Local backup
-        localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
       } catch (err) {
-        console.error("Error saving tracking data:", err);
+        console.error("Backend tracking failed:", err);
       }
     }
+    
+    // The button link will still open the site regardless of tracking status
   };
 
   const isMarkedToday = trackedDays.includes(getLocalDateKey());
@@ -579,7 +590,7 @@ function PremiumHifzCard({ user }) {
             </h2>
             <p>
               Maintaining a consistent daily record is the cornerstone of your child's Hifz journey. 
-              Your active participation ensures their progress is tracked and celebrated.
+              Your participation ensures their progress is tracked.
             </p>
           </div>
           <div className="track-status-box">
@@ -589,14 +600,20 @@ function PremiumHifzCard({ user }) {
         </div>
         
         <div className="card-actions">
-          <a className="golden-gradient-btn" href={ELEARNING_URL} target="_blank" rel="noopener noreferrer" onClick={handleTrackClick}>
+          <a 
+            className={`golden-gradient-btn ${isMarkedToday ? 'marked' : ''}`} 
+            href={ELEARNING_URL} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            onClick={handleTrackClick}
+          >
             <BookOpen size={20} />
             Elearning quran
             <ArrowRight size={18} />
           </a>
           {isMarkedToday && (
-            <span className="status-note">
-              <CheckCircle size={16} /> Today's entry marked
+            <span className="status-note success">
+              <CheckCircle size={16} /> Today's entry locked & saved
             </span>
           )}
         </div>
@@ -5287,6 +5304,8 @@ function TeacherPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
+          <PremiumHifzCard user={user} />
+
           {activePage === "My Group" ? (
             <div className="portal-content">
               <div className="portal-stats-strip teacher-stats">
@@ -5343,7 +5362,7 @@ function TeacherPortal({
                 </section>
               )}
 
-              <PremiumHifzCard user={user} />
+
 
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
