@@ -1274,7 +1274,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 }
 
 
-function AnnouncementsPage({ notifications, setActivePage, setSelectedAnnouncement }) {
+function AnnouncementsPage({ announcements = [], setActivePage, setSelectedAnnouncement }) {
   const images = [
     "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=400&q=80",
     "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=400&q=80",
@@ -1286,25 +1286,25 @@ function AnnouncementsPage({ notifications, setActivePage, setSelectedAnnounceme
       <div className="page-header" style={{ marginBottom: 0 }}>
         <div>
           <h2 className="premium-title">System Announcements</h2>
-          <p className="subtitle">Important updates and notifications from the administration</p>
+          <p className="subtitle">Important updates and schedules from the administration</p>
         </div>
       </div>
       <div className="announcements-grid">
-        {notifications.length === 0 ? (
+        {announcements.length === 0 ? (
           <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
             <Bell size={48} style={{ opacity: 0.2 }} />
-            <p>No new announcements</p>
+            <p>No system announcements available</p>
           </div>
         ) : (
-          notifications.map((n, i) => (
-            <div key={n.id} className="announce-card">
+          announcements.map((n, i) => (
+            <div key={n.id || i} className="announce-card">
               <img src={images[i % images.length]} alt="Announcement" className="announce-img" />
               <div className="announce-content">
-                <div className="announce-badge">{n.target_role === 'all' ? 'Broadcast' : 'Targeted'}</div>
+                <div className="announce-badge">{n.type || 'Update'}</div>
                 <h4>{n.title}</h4>
-                <p>{n.body}</p>
+                <p>{n.description || n.title || "No description provided."}</p>
                 <div className="announce-footer">
-                  <span className="announce-time">{new Date(n.created_at).toLocaleDateString()}</span>
+                  <span className="announce-time">{n.event_date || new Date(n.created_at).toLocaleDateString()}</span>
                   <button className="announce-btn" onClick={() => {
                     setSelectedAnnouncement(n);
                   }}>
@@ -3035,8 +3035,8 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Announcements" ? (
-          <AnnouncementsPage
-            notifications={parentData.announcements}
+          <AnnouncementsPage 
+            announcements={announcements}
             setActivePage={setActivePage}
             setSelectedAnnouncement={setSelectedAnnouncement}
           />
@@ -4290,7 +4290,7 @@ function AdminPortal({
 
           {activePage === "Announcements" ? (
             <AnnouncementsPage
-              notifications={announcements}
+              announcements={announcements}
               setActivePage={setActivePage}
               setSelectedAnnouncement={setSelectedAnnouncement}
             />
@@ -5681,7 +5681,7 @@ function TeacherPortal({
 
           {activePage === "Announcements" ? (
             <AnnouncementsPage
-              notifications={notifications}
+              announcements={schoolData.announcements}
               setActivePage={setActivePage}
               setSelectedAnnouncement={setSelectedAnnouncement}
             />
