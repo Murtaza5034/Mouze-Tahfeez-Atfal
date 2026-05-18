@@ -6258,7 +6258,7 @@ export default function App() {
     if (user && portalRole === "parents" && selectedStudentId) {
       loadPortalData(portalRole, user);
     }
-  }, [selectedStudentId]);
+  }, [selectedStudentId, portalRole, user]);
 
   async function loadPortalData(role, currentUser, parentProfileOverride = null) {
     if (!currentUser) {
