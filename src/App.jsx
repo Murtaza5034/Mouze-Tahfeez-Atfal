@@ -2652,6 +2652,7 @@ function ParentPortal({
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
+  actionMessage,
 }) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [lastNotifId, setLastNotifId] = useState(null);
@@ -2921,6 +2922,9 @@ function ParentPortal({
       </header>
 
       <main className="parent-main">
+        {actionMessage && (
+          <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+        )}
         {activePage === "Home" && (
            <QuickSearch 
              pages={[
@@ -6605,6 +6609,16 @@ export default function App() {
 
   function showAction(type, text) {
     setActionMessage({ type, text });
+    if (type && text) {
+      setTimeout(() => {
+        setActionMessage(current => {
+          if (current?.type === type && current?.text === text) {
+            return null;
+          }
+          return current;
+        });
+      }, 4000);
+    }
   }
 
   const handleLoginSuccess = async (loggedInUser, selectedRole) => {
@@ -7471,7 +7485,8 @@ export default function App() {
             onDismissNotif={dismissNotification}
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
-            onClearAllAnnounces={clearAllAnnouncements}
+            onClearAllAnnounces={clearAllAnnounces}
+            actionMessage={actionMessage}
           />
         ) : portalRole === "admin" ? (
           <AdminPortal
