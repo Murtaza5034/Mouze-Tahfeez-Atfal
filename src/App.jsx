@@ -7485,7 +7485,7 @@ export default function App() {
             onDismissNotif={dismissNotification}
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
-            onClearAllAnnounces={clearAllAnnounces}
+            onClearAllAnnounces={clearAllAnnouncements}
             actionMessage={actionMessage}
           />
         ) : portalRole === "admin" ? (
