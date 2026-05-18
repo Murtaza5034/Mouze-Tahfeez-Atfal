@@ -6450,7 +6450,9 @@ export default function App() {
         });
 
         if (students.length > 0) {
-          setSelectedStudentId((current) => current || students[0].student_id);
+          if (role !== "admin") {
+            setSelectedStudentId((current) => current || students[0].student_id);
+          }
           setAdminForms((current) => ({
             ...current,
             schedule: {
