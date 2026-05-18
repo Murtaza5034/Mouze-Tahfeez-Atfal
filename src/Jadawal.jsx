@@ -82,8 +82,8 @@ export const JadawalTeacherView = ({ students, onShowAction }) => {
             className="premium-select"
           >
             <option value="">-- Select Student --</option>
-            {students.map(s => (
-              <option key={s.student_id} value={s.student_id}>{s.full_name}</option>
+            {(students || []).map(s => (
+              <option key={s.student_id} value={s.student_id}>{s.full_name || s.name}</option>
             ))}
           </select>
           {selectedStudentId && (

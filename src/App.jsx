@@ -5458,7 +5458,7 @@ function TeacherPortal({
           )}
 
           {activePage === "Jadawal" && (
-             <JadawalTeacherView students={students} onShowAction={onShowAction} />
+             <JadawalTeacherView students={filteredStudents} onShowAction={onShowAction} />
           )}
 
           {activePage === "My Group" ? (
