@@ -165,17 +165,6 @@ Deno.serve(async (req) => {
     // Send via FCM HTTP v1
     const fcmResults = await sendFCMv1Notifications(tokens, title, body, data)
 
-    // Store history
-    try {
-      await supabase.from('system_notifications').insert({
-        title,
-        body,
-        target_role: targetRole || 'all',
-        target_user: targetUser || null,
-        is_read: false
-      })
-    } catch (dbErr) {}
-
     const successCount = fcmResults.filter(r => r.success).length;
     const failureCount = fcmResults.filter(r => !r.success).length;
 

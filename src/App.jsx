@@ -43,6 +43,7 @@ import {
   CalendarX,
   AlertCircle,
   ChevronRight,
+  Paperclip,
   Trash2
 } from "lucide-react";
 import { jsPDF } from "jspdf";
@@ -305,6 +306,24 @@ function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isImageFile(url) {
+  if (!url) return false;
+  const cleanUrl = url.split('?')[0]; // Remove query params if any
+  return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(cleanUrl);
+}
+
+function getFileNameFromUrl(url) {
+  if (!url) return "";
+  try {
+    const decoded = decodeURIComponent(url);
+    const parts = decoded.split('/');
+    const lastPart = parts[parts.length - 1];
+    return lastPart.split('?')[0]; // Strip query parameters
+  } catch (e) {
+    return "Download Attachment";
+  }
+}
+
 function readLocalArray(key) {
   if (typeof window === "undefined") {
     return [];
@@ -330,13 +349,14 @@ function writeLocalArray(key, value) {
 
 
 
-const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home", skipInbox = false) => {
+const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home", skipInbox = false, fileUrl = null) => {
   const dbPayload = {
     title,
     body,
     target_role: targetRole,
     target_user: targetUser,
-    redirect_page: redirectPage
+    redirect_page: redirectPage,
+    file_url: fileUrl
   };
   
   // Store in database first (Inbox)
@@ -354,6 +374,7 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
         targetUser: targetUser,
         data: {
           redirectPage,
+          fileUrl: fileUrl || "",
           timestamp: new Date().toISOString()
         }
       }
@@ -646,12 +667,25 @@ function NotificationBell({ notifications }) {
               {notifications.map((n, i) => (
                 <div key={n.id || i} className="notification-item">
                   <div className="notif-item-header">
-                    <span className={`mini-pill ${n.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px' }}>
-                      {n.target_role?.toUpperCase()}
-                    </span>
                     <h4>{n.title}</h4>
                   </div>
                   <p>{n.body}</p>
+                  {n.file_url && (
+                    <div className="notif-bell-attachment-box" style={{ marginTop: '8px', padding: '8px', borderRadius: '8px', background: '#fcfaf5', border: '1px solid var(--glass-border)' }}>
+                      {isImageFile(n.file_url) ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <img src={n.file_url} alt="Attachment" style={{ maxWidth: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '4px' }} />
+                          <a href={n.file_url} target="_blank" rel="noreferrer" download style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none', color: 'var(--primary-gold)', fontWeight: 'bold' }}>
+                            <Download size={12} /> Download Image
+                          </a>
+                        </div>
+                      ) : (
+                        <a href={n.file_url} target="_blank" rel="noreferrer" download style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', color: 'var(--primary-gold)', fontWeight: 'bold' }}>
+                          <FileArchive size={14} /> Download {getFileNameFromUrl(n.file_url).substring(0, 20)}...
+                        </a>
+                      )}
+                    </div>
+                  )}
                   <span className="time">{new Date(n.created_at).toLocaleString()}</span>
                 </div>
               ))}
@@ -3318,6 +3352,11 @@ function ParentPortal({
                         <h3>{n.title}</h3>
                       </div>
                       <p className="notif-excerpt">{n.body.length > 80 ? n.body.substring(0, 80) + "..." : n.body}</p>
+                      {n.file_url && (
+                        <div className="notif-attachment-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#d4af37', background: 'rgba(212, 175, 55, 0.08)', padding: '4px 8px', borderRadius: '6px', marginTop: '6px', marginBottom: '8px', fontWeight: 'bold' }}>
+                          <Paperclip size={12} /> Attachment Included
+                        </div>
+                      )}
                       <button className="notif-view-btn" onClick={() => setSelectedNotification(n)}>
                         VIEW <ChevronRight size={14} />
                       </button>
@@ -3347,7 +3386,45 @@ function ParentPortal({
                     <h2>{selectedNotification.title}</h2>
                   </div>
                   <div className="notif-overlay-body">
-                    <p>{selectedNotification.body}</p>
+                    <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
+                    
+                    {selectedNotification.file_url && (
+                      <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                          <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
+                        </h4>
+                        {isImageFile(selectedNotification.file_url) ? (
+                          <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                            <img 
+                              src={selectedNotification.file_url} 
+                              alt="Attachment Preview" 
+                              style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                            <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <FileArchive size={24} />
+                            </div>
+                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {getFileNameFromUrl(selectedNotification.file_url)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <a 
+                          href={selectedNotification.file_url} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          download
+                          className="premium-btn gold" 
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
+                        >
+                          <Download size={16} /> Download File
+                        </a>
+                      </div>
+                    )}
                   </div>
                   <div className="notif-overlay-footer">
                     <button className="premium-btn gold" onClick={() => setSelectedNotification(null)}>Understood</button>
@@ -3565,6 +3642,9 @@ function AdminPortal({
   onDeleteRecord,
   onUpdateTeacherProfile,
   onSendCustomNotification,
+  attachedFileUrl,
+  uploadingFile,
+  onNotificationFileChange,
   onClearHistory,
   notifications,
   onUnassignChild,
@@ -4112,6 +4192,32 @@ function AdminPortal({
                       required
                       rows={4}
                     />
+                  </label>
+                  <label className="file-upload-label" style={{ display: 'block', marginTop: '15px', marginBottom: '15px' }}>
+                    <span style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Attach Image or File (PDF, Images, etc.)</span>
+                    <div className="custom-file-upload-box" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.8)', border: '1px dashed #d4af37', padding: '12px', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                      <input
+                        type="file"
+                        onChange={onNotificationFileChange}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip"
+                      />
+                      <Paperclip size={18} style={{ color: '#d4af37' }} />
+                      <span style={{ fontSize: '13px', color: '#5c4033' }}>
+                        {uploadingFile ? "Uploading attachment..." : attachedFileUrl ? "Attachment uploaded & linked!" : "Click to select a file to upload..."}
+                      </span>
+                      {uploadingFile && <span className="upload-spinner" style={{ border: '2px solid #f3f3f3', borderTop: '2px solid #d4af37', borderRadius: '50%', width: '14px', height: '14px', animation: 'spin 1s linear infinite', marginLeft: 'auto' }} />}
+                      {!uploadingFile && attachedFileUrl && (
+                        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#2e7d32', fontWeight: 'bold' }}>
+                          <CheckCircle size={16} /> Attached
+                        </span>
+                      )}
+                    </div>
+                    {attachedFileUrl && (
+                      <span style={{ display: 'block', fontSize: '11px', color: '#d4af37', marginTop: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        Linked URL: {attachedFileUrl}
+                      </span>
+                    )}
                   </label>
                   <div className="form-grid">
                     <label>
@@ -5751,6 +5857,11 @@ function TeacherPortal({
                           <h3>{n.title}</h3>
                         </div>
                         <p className="notif-excerpt">{n.body.length > 80 ? n.body.substring(0, 80) + "..." : n.body}</p>
+                        {n.file_url && (
+                          <div className="notif-attachment-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#d4af37', background: 'rgba(212, 175, 55, 0.08)', padding: '4px 8px', borderRadius: '6px', marginTop: '6px', marginBottom: '8px', fontWeight: 'bold' }}>
+                            <Paperclip size={12} /> Attachment Included
+                          </div>
+                        )}
                         <button className="notif-view-btn" onClick={() => setSelectedNotification(n)}>
                           VIEW <ChevronRight size={14} />
                         </button>
@@ -5780,7 +5891,45 @@ function TeacherPortal({
                       <h2>{selectedNotification.title}</h2>
                     </div>
                     <div className="notif-overlay-body">
-                      <p>{selectedNotification.body}</p>
+                      <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
+                      
+                      {selectedNotification.file_url && (
+                        <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
+                          <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                            <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
+                          </h4>
+                          {isImageFile(selectedNotification.file_url) ? (
+                            <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                              <img 
+                                src={selectedNotification.file_url} 
+                                alt="Attachment Preview" 
+                                style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                              <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <FileArchive size={24} />
+                              </div>
+                              <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {getFileNameFromUrl(selectedNotification.file_url)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          <a 
+                            href={selectedNotification.file_url} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            download
+                            className="premium-btn gold" 
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
+                          >
+                            <Download size={16} /> Download File
+                          </a>
+                        </div>
+                      )}
                     </div>
                     <div className="notif-overlay-footer">
                       <button className="premium-btn gold" onClick={() => setSelectedNotification(null)}>Close</button>
@@ -5841,6 +5990,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState(null);
   const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [attachedFileUrl, setAttachedFileUrl] = useState("");
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [parentData, setParentData] = useState(emptyParentData);
   const [schoolData, setSchoolData] = useState({
     students: [],
@@ -6593,6 +6744,7 @@ export default function App() {
 
         if (data) {
           const myNotifs = data.filter(notif =>
+            portalRole === "admin" ||
             notif.target_role === "all" ||
             notif.target_role === portalRole ||
             notif.target_user === user.id ||
@@ -6616,6 +6768,7 @@ export default function App() {
             (payload) => {
               const newNotif = payload.new;
               const isTargeted =
+                portalRole === "admin" ||
                 newNotif.target_role === "all" ||
                 newNotif.target_role === portalRole ||
                 newNotif.target_user === user.id ||
@@ -6754,14 +6907,43 @@ export default function App() {
     }
   };
 
+  const handleNotificationFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from("notification_files")
+        .upload(filePath, file);
+
+      if (error) {
+        throw error;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("notification_files")
+        .getPublicUrl(filePath);
+
+      setAttachedFileUrl(publicUrlData.publicUrl);
+      showAction("success", "File uploaded and attached successfully!");
+    } catch (error) {
+      console.error("Upload failed:", error);
+      showAction("error", `File upload failed: ${error.message}`);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
   const handleSendCustomNotification = async (event) => {
     event.preventDefault();
     const payload = adminForms.customNotification;
 
-    let notifTitle = `[${payload.target_audience.toUpperCase()}] ${payload.title}`;
-    if (payload.target_audience === "user" && payload.target_uuid) {
-      notifTitle = `[Direct] ${payload.title}`;
-    }
+    const notifTitle = payload.title;
 
     // Trigger Supabase notification via shared function
     await broadcastNotification(
@@ -6769,10 +6951,14 @@ export default function App() {
       payload.body,
       payload.target_audience === "user" ? "user" : payload.target_audience,
       payload.target_audience === "user" ? payload.target_uuid : null,
-      payload.redirect_page
+      payload.redirect_page,
+      false,
+      attachedFileUrl || null
     );
 
     showAction("success", "Custom Notification Dispatched!");
+
+    setAttachedFileUrl(""); // Clear the attached file URL
 
     setAdminForms((current) => ({
       ...current,
@@ -7222,6 +7408,9 @@ export default function App() {
             onRecordTeacherAttendance={handleRecordTeacherAttendance}
             onRoleChange={storeRole}
             onSendCustomNotification={handleSendCustomNotification}
+            attachedFileUrl={attachedFileUrl}
+            uploadingFile={uploadingFile}
+            onNotificationFileChange={handleNotificationFileChange}
             onShowAction={showAction}
             onUnassignChild={handleUnassignChild}
             onUpdateTeacherProfile={handleUpdateTeacherProfile}
@@ -7236,7 +7425,6 @@ export default function App() {
             setSelectedStudentId={setSelectedStudentId}
             teacherProfiles={teacherProfiles}
             user={user}
-            onShowAction={showAction}
             dismissedNotifs={dismissedNotifs}
             dismissedAnnounces={dismissedAnnounces}
             onDismissNotif={dismissNotification}
