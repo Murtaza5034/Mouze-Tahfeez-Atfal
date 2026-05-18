@@ -607,11 +607,11 @@ function PremiumHifzCard({ user }) {
           <div className="header-text">
             <h2>
               <Sparkles size={24} className="sparkle-icon" />
-              Child Hifz Entry of the Day
+              Daily Hifz Entry of the Day
             </h2>
             <p>
-              Maintaining a consistent daily record is the cornerstone of your child's Hifz journey. 
-              Your participation ensures their progress is tracked.
+              Maintaining a consistent daily record is the cornerstone of your students' Hifz journey. 
+              Your dedication ensures their progress is tracked.
             </p>
           </div>
           <div className="track-status-box">
@@ -2949,7 +2949,6 @@ function ParentPortal({
 
         {activePage === "Home" ? (
           <div className="home-dashboard">
-            <PremiumHifzCard user={user} />
             <div className="hifz-stats-premium-strip">
               {[
                 { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
@@ -5436,7 +5435,6 @@ function TeacherPortal({
 
           {activePage === "My Group" ? (
             <div className="portal-content">
-              <PremiumHifzCard user={user} />
               <div className="portal-stats-strip teacher-stats">
                 <div className="pstat-card">
                   <span className="pstat-value">{filteredStudents.length}</span>
@@ -5493,6 +5491,7 @@ function TeacherPortal({
 
 
 
+              <PremiumHifzCard user={user} />
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
                   <article key={student.student_id} className="student-card">
