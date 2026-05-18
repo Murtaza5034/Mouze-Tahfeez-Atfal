@@ -2638,6 +2638,16 @@ function ParentPortal({
   onClearAllAnnounces,
 }) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [lastNotifId, setLastNotifId] = useState(null);
+  const notifMountTimeRef = useRef(0);
+
+  if (selectedNotification && selectedNotification.id !== lastNotifId) {
+    setLastNotifId(selectedNotification.id);
+    notifMountTimeRef.current = Date.now();
+  } else if (!selectedNotification && lastNotifId !== null) {
+    setLastNotifId(null);
+  }
+
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
 
   const handleDownloadReport = async () => {
@@ -3375,7 +3385,12 @@ function ParentPortal({
             )}
 
             {selectedNotification && (
-              <div className="notif-overlay-backdrop fade-in" onClick={(e) => { if (e.target === e.currentTarget) setSelectedNotification(null); }}>
+              <div className="notif-overlay-backdrop fade-in" onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  const elapsed = Date.now() - notifMountTimeRef.current;
+                  if (elapsed > 300) setSelectedNotification(null);
+                }
+              }}>
                 <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
                   <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
                     <X size={20} />
@@ -5319,6 +5334,15 @@ function TeacherPortal({
   onClearAllAnnounces,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
+  const [lastNotifId, setLastNotifId] = useState(null);
+  const notifMountTimeRef = useRef(0);
+
+  if (selectedNotification && selectedNotification.id !== lastNotifId) {
+    setLastNotifId(selectedNotification.id);
+    notifMountTimeRef.current = Date.now();
+  } else if (!selectedNotification && lastNotifId !== null) {
+    setLastNotifId(null);
+  }
   const selectedStudent =
     filteredStudents.find(
       (student) => student.allIds.includes(String(teacherForms.result.student_id))
@@ -5879,7 +5903,12 @@ function TeacherPortal({
               )}
 
               {selectedNotification && (
-                <div className="notif-overlay-backdrop fade-in" onClick={(e) => { if (e.target === e.currentTarget) setSelectedNotification(null); }}>
+                <div className="notif-overlay-backdrop fade-in" onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    const elapsed = Date.now() - notifMountTimeRef.current;
+                    if (elapsed > 300) setSelectedNotification(null);
+                  }
+                }}>
                   <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
                     <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
                       <X size={20} />
