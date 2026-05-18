@@ -7512,6 +7512,7 @@ export default function App() {
           />
         ) : (
           <TeacherPortal
+            user={user}
             actionMessage={actionMessage}
             activePage={activePage}
             loadPortalData={loadPortalData}
