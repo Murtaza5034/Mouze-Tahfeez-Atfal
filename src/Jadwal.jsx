@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import './jadawal.css';
+import './jadwal.css';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 const DEFAULT_SCHEDULE = {};
@@ -8,7 +8,7 @@ DAYS.forEach(day => {
   DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', star: '' };
 });
 
-export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotification }) => {
+export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification }) => {
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [loading, setLoading] = useState(false);
@@ -16,13 +16,13 @@ export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotifica
 
   useEffect(() => {
     if (selectedStudentId) {
-      fetchJadawal();
+      fetchJadwal();
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
     }
   }, [selectedStudentId]);
 
-  const fetchJadawal = async () => {
+  const fetchJadwal = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('jadawal')
@@ -32,7 +32,7 @@ export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotifica
     
     if (error && error.code !== 'PGRST116') {
       console.error(error);
-      onShowAction('error', 'Failed to fetch Jadawal');
+      onShowAction('error', 'Failed to fetch Jadwal');
     } else if (data && data.schedule_data) {
       setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data });
     } else {
@@ -54,9 +54,9 @@ export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotifica
     
     if (error) {
       console.error(error);
-      onShowAction('error', 'Failed to save Jadawal. Make sure you ran the SQL setup script.');
+      onShowAction('error', 'Failed to save Jadwal. Make sure you ran the SQL setup script.');
     } else {
-      onShowAction('success', 'Jadawal saved successfully');
+      onShowAction('success', 'Jadwal saved successfully');
       if (onBroadcastNotification) {
         try {
           const targetStudent = (students || []).find(s => 
@@ -66,15 +66,15 @@ export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotifica
           const parentId = targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email;
           if (parentId) {
             await onBroadcastNotification(
-              "Jadawal Updated",
-              "THE JADAWAL IS UPDATED BY YOUR TEACHER",
+              "Jadwal Updated",
+              "THE JADWAL IS UPDATED BY YOUR TEACHER",
               "parents",
               parentId,
-              "Jadawal"
+              "Jadwal"
             );
           }
         } catch (e) {
-          console.warn("Jadawal notification failed:", e);
+          console.warn("Jadwal notification failed:", e);
         }
       }
     }
@@ -92,9 +92,9 @@ export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotifica
   };
 
   return (
-    <div className="jadawal-container">
-      <div className="jadawal-header">
-        <h2>Teacher Jadawal Editor</h2>
+    <div className="jadwal-container">
+      <div className="jadwal-header">
+        <h2>Teacher Jadwal Editor</h2>
         <div className="student-selector">
           <select 
             value={selectedStudentId} 
@@ -108,7 +108,7 @@ export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotifica
           </select>
           {selectedStudentId && (
             <button className="premium-btn gold" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Jadawal'}
+              {saving ? 'Saving...' : 'Save Jadwal'}
             </button>
           )}
         </div>
@@ -117,8 +117,8 @@ export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotifica
       {loading ? (
         <div className="loading-spinner">Loading...</div>
       ) : selectedStudentId ? (
-        <div className="jadawal-table-wrapper">
-          <table className="jadawal-table">
+        <div className="jadwal-table-wrapper">
+          <table className="jadwal-table">
             <thead>
               <tr>
                 <th>Days</th>
@@ -163,23 +163,23 @@ export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotifica
           </table>
         </div>
       ) : (
-        <div className="jadawal-empty">Please select a student from the dropdown to view and edit their Jadawal timetable.</div>
+        <div className="jadwal-empty">Please select a student from the dropdown to view and edit their Jadwal timetable.</div>
       )}
     </div>
   );
 };
 
-export const JadawalParentView = ({ studentId }) => {
+export const JadwalParentView = ({ studentId }) => {
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (studentId) {
-      fetchJadawal();
+      fetchJadwal();
     }
   }, [studentId]);
 
-  const fetchJadawal = async () => {
+  const fetchJadwal = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('jadawal')
@@ -197,15 +197,15 @@ export const JadawalParentView = ({ studentId }) => {
     setLoading(false);
   };
 
-  if (loading) return <div className="loading-spinner">Loading Jadawal...</div>;
+  if (loading) return <div className="loading-spinner">Loading Jadwal...</div>;
 
   return (
-    <div className="jadawal-container parent-view">
-      <div className="jadawal-header">
-        <h2>Weekly Jadawal Schedule</h2>
+    <div className="jadwal-container parent-view">
+      <div className="jadwal-header">
+        <h2>Weekly Jadwal Schedule</h2>
       </div>
-      <div className="jadawal-table-wrapper">
-        <table className="jadawal-table">
+      <div className="jadwal-table-wrapper">
+        <table className="jadwal-table">
           <thead>
             <tr>
               <th>Days</th>

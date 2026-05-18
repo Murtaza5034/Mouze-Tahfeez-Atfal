@@ -53,7 +53,7 @@ import { saveAs } from "file-saver";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
 import fcmService from "./fcmService";
-import { JadawalTeacherView, JadawalParentView } from "./Jadawal";
+import { JadwalTeacherView, JadwalParentView } from "./Jadwal";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -2873,8 +2873,8 @@ function ParentPortal({
           <button className={`drawer-link ${activePage === "Apply Leave" ? "active" : ""}`} onClick={() => { setActivePage("Apply Leave"); setMenuOpen(false); }}>
             <CalendarX size={18} /> Apply Leave
           </button>
-          <button className={`drawer-link ${activePage === "Jadawal" ? "active" : ""}`} onClick={() => { setActivePage("Jadawal"); setMenuOpen(false); }}>
-            <Calendar size={18} /> Jadawal
+          <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
+            <Calendar size={18} /> Jadwal
           </button>
           <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
             <Settings size={18} /> Settings
@@ -3184,8 +3184,8 @@ function ParentPortal({
           />
         ) : null}
 
-        {activePage === "Jadawal" ? (
-          <JadawalParentView studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} />
+        {activePage === "Jadwal" ? (
+          <JadwalParentView studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} />
         ) : null}
 
         {activePage === "Teachers" ? (
@@ -4291,13 +4291,13 @@ function AdminPortal({
                             <option value="Quran Ikhtebar">Quran Ikhtebar</option>
                             <option value="Hub Raqam">Hub Raqam</option>
                             <option value="Apply Leave">Apply Leave</option>
-                            <option value="Jadawal">Jadawal (Timetable)</option>
+                            <option value="Jadwal">Jadwal (Timetable)</option>
                             <option value="Settings">Settings</option>
                           </>
                         ) : adminForms.customNotification.target_audience === "teacher" ? (
                           <>
                             <option value="My Group">My Group</option>
-                            <option value="Jadawal">Jadawal Timetables</option>
+                            <option value="Jadwal">Jadwal Timetables</option>
                             <option value="Quran Ikhtebar">Quran Ikhtebar</option>
                             <option value="Inbox">Inbox</option>
                             <option value="Announcements">Announcements</option>
@@ -4322,7 +4322,7 @@ function AdminPortal({
                             <option value="Home">Home Screen</option>
                             <option value="Announcements">Announcements</option>
                             <option value="Inbox">Inbox</option>
-                            <option value="Jadawal">Jadawal (Timetable)</option>
+                            <option value="Jadwal">Jadwal (Timetable)</option>
                             <option value="Progress">Progress Reports</option>
                           </>
                         )}
@@ -5463,7 +5463,7 @@ function TeacherPortal({
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
-            { id: "Jadawal", label: "Jadawal", icon: Calendar },
+            { id: "Jadwal", label: "Jadwal", icon: Calendar },
             { id: "Inbox", label: "Inbox", icon: Bell },
           ].map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
@@ -5516,8 +5516,8 @@ function TeacherPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
-          {activePage === "Jadawal" && (
-             <JadawalTeacherView 
+          {activePage === "Jadwal" && (
+             <JadwalTeacherView 
                students={filteredStudents} 
                onShowAction={onShowAction} 
                onBroadcastNotification={broadcastNotification} 
