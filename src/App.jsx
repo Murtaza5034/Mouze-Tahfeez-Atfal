@@ -53,6 +53,7 @@ import { saveAs } from "file-saver";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
 import fcmService from "./fcmService";
+import { JadawalTeacherView, JadawalParentView } from "./Jadawal";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -2871,6 +2872,9 @@ function ParentPortal({
           <button className={`drawer-link ${activePage === "Apply Leave" ? "active" : ""}`} onClick={() => { setActivePage("Apply Leave"); setMenuOpen(false); }}>
             <CalendarX size={18} /> Apply Leave
           </button>
+          <button className={`drawer-link ${activePage === "Jadawal" ? "active" : ""}`} onClick={() => { setActivePage("Jadawal"); setMenuOpen(false); }}>
+            <Calendar size={18} /> Jadawal
+          </button>
           <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
             <Settings size={18} /> Settings
           </button>
@@ -3176,6 +3180,10 @@ function ParentPortal({
           />
         ) : null}
 
+        {activePage === "Jadawal" ? (
+          <JadawalParentView studentId={activeStudent?.allIds?.[0] || activeStudent?.student_id} />
+        ) : null}
+
         {activePage === "Teachers" ? (
           <div className="card-appear">
             <div className="section-title-block">
@@ -3402,7 +3410,7 @@ function ParentPortal({
               <div className="notif-overlay-backdrop fade-in" onClick={(e) => {
                 if (e.target === e.currentTarget) {
                   const elapsed = Date.now() - notifMountTimeRef.current;
-                  if (elapsed > 300) setSelectedNotification(null);
+                  if (elapsed > 1000) setSelectedNotification(null);
                 }
               }}>
                 <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
@@ -5396,6 +5404,7 @@ function TeacherPortal({
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
+            { id: "Jadawal", label: "Jadawal", icon: Calendar },
             { id: "Inbox", label: "Inbox", icon: Bell },
           ].map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
@@ -5446,6 +5455,10 @@ function TeacherPortal({
           )}
           {actionMessage && (
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+          )}
+
+          {activePage === "Jadawal" && (
+             <JadawalTeacherView students={students} onShowAction={onShowAction} />
           )}
 
           {activePage === "My Group" ? (
@@ -5920,7 +5933,7 @@ function TeacherPortal({
                 <div className="notif-overlay-backdrop fade-in" onClick={(e) => {
                   if (e.target === e.currentTarget) {
                     const elapsed = Date.now() - notifMountTimeRef.current;
-                    if (elapsed > 300) setSelectedNotification(null);
+                    if (elapsed > 1000) setSelectedNotification(null);
                   }
                 }}>
                   <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>

@@ -1,0 +1,202 @@
+.jadawal-container {
+  padding: 24px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  margin-top: 20px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.jadawal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.jadawal-header h2 {
+  font-size: 1.5rem;
+  color: var(--primary-dark);
+  margin: 0;
+  font-family: 'Cinzel', serif;
+}
+
+.student-selector {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.student-selector .premium-select {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  font-size: 14px;
+  outline: none;
+  min-width: 200px;
+  background: #fdfaf4;
+  color: var(--primary-dark);
+  font-family: 'Inter', sans-serif;
+  transition: all 0.3s ease;
+}
+
+.student-selector .premium-select:focus {
+  border-color: var(--dark-gold);
+  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.1);
+}
+
+.jadawal-table-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #eee;
+}
+
+.jadawal-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+
+.jadawal-table th, .jadawal-table td {
+  border: 1px solid #eee;
+  padding: 14px;
+  text-align: center;
+}
+
+.jadawal-table th {
+  background: var(--light-bg);
+  font-weight: 600;
+  color: var(--primary-dark);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.jadawal-table td.day-cell {
+  font-weight: 600;
+  text-align: left;
+  background: #fcfbfa;
+  color: var(--primary-dark);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.jadawal-table input {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: center;
+  outline: none;
+  font-size: 14px;
+  padding: 8px 4px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  color: #333;
+}
+
+.jadawal-table input:focus, .jadawal-table input:hover {
+  background: #fff;
+  border-color: var(--dark-gold);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.star-select {
+  border: 1px solid transparent;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.star-select:focus, .star-select:hover {
+  background: #fff;
+  border-color: var(--dark-gold);
+}
+
+.star-cell {
+  color: #FFD700;
+  letter-spacing: 2px;
+  font-size: 16px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.jadawal-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #888;
+  font-style: italic;
+  background: #f9f9f9;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+.loading-spinner {
+  text-align: center;
+  padding: 40px;
+  color: var(--dark-gold);
+  font-weight: 500;
+}
+
+/* Dark Mode Support */
+.dark-mode .jadawal-container {
+  background: var(--dark-bg);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.dark-mode .jadawal-header h2 {
+  color: var(--light-gold);
+}
+
+.dark-mode .student-selector .premium-select {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.dark-mode .jadawal-table-wrapper {
+  border-color: #333;
+}
+
+.dark-mode .jadawal-table th {
+  background: #1a1a1a;
+  color: #ccc;
+  border-color: #333;
+}
+
+.dark-mode .jadawal-table td {
+  border-color: #333;
+}
+
+.dark-mode .jadawal-table td.day-cell {
+  background: #222;
+  color: #e0e0e0;
+}
+
+.dark-mode .jadawal-table input {
+  color: #eee;
+}
+
+.dark-mode .jadawal-table input:focus, .dark-mode .jadawal-table input:hover {
+  background: #2a2a2a;
+  border-color: var(--light-gold);
+}
+
+.dark-mode .star-select {
+  color: #eee;
+}
+
+.dark-mode .star-select:focus, .dark-mode .star-select:hover {
+  background: #2a2a2a;
+  border-color: var(--light-gold);
+}
+
+.dark-mode .jadawal-empty {
+  background: #1a1a1a;
+  color: #aaa;
+}
