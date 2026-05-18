@@ -7114,6 +7114,11 @@ export default function App() {
 
     const parentRecord = schoolData.portalAccessList.find(a => String(a.user_id) === String(parent_id) || String(a.email) === String(parent_id));
 
+    // Detect if parent or teacher actually changed/is new
+    const existingStudent = schoolData.students.find(s => String(s.student_id) === String(student_id));
+    const isNewTeacher = teacherRecord && (!existingStudent || String(existingStudent.muhaffiz_id) !== String(teacherRecord.user_id));
+    const isNewParent = parentRecord && (!existingStudent || String(existingStudent.user_id) !== String(parentRecord.user_id));
+
     // Update child_profiles table directly
     const updatePayload = {
       teacher_name: teacherRecord?.full_name || null,
@@ -7144,6 +7149,35 @@ export default function App() {
     // Secondary Check: If we have an ID for parent but it wasn't set, force it
     if (parentRecord?.user_id && !updatePayload.parent_user_id) {
       await supabase.from("child_profiles").update({ parent_user_id: parentRecord.user_id }).eq("student_id", student_id);
+    }
+
+    // Push assignment notifications
+    const studentName = full_name || existingStudent?.name || "Child";
+
+    if (isNewTeacher) {
+      const targetTeacherUser = teacherRecord.user_id || teacherRecord.email || teacher_id;
+      if (targetTeacherUser) {
+        broadcastNotification(
+          "New Student Assigned",
+          `${studentName} has been assigned to your group by the Admin.`,
+          "user",
+          targetTeacherUser,
+          "My Group"
+        );
+      }
+    }
+
+    if (isNewParent) {
+      const targetParentUser = parentRecord.user_id || parentRecord.email || parent_id;
+      if (targetParentUser) {
+        broadcastNotification(
+          "Child Linked to Account",
+          `Your child, ${studentName}, has been assigned to you by the Admin.`,
+          "user",
+          targetParentUser,
+          "Home"
+        );
+      }
     }
 
     // Refresh school data locally
