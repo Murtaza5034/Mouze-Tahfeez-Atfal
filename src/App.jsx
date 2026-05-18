@@ -3766,10 +3766,9 @@ function AdminPortal({
   const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Global Settings"];
   const navPages = ["Overview", "Announcements", "Schedule"];
 
-  const selectedStudent =
-    students.find((student) => student.allIds.includes(String(selectedStudentId))) ||
-    students[0] ||
-    null;
+  const selectedStudent = selectedStudentId
+    ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
+    : null;
 
   const groupedStudents = students.reduce((accumulator, student) => {
     const key = student.groupName || "Ungrouped";
