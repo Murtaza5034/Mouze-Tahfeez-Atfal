@@ -3357,7 +3357,7 @@ function ParentPortal({
                           <Paperclip size={12} /> Attachment Included
                         </div>
                       )}
-                      <button className="notif-view-btn" onClick={() => setSelectedNotification(n)}>
+                      <button className="notif-view-btn" onClick={(e) => { e.stopPropagation(); setSelectedNotification(n); }}>
                         VIEW <ChevronRight size={14} />
                       </button>
                     </div>
@@ -3375,7 +3375,7 @@ function ParentPortal({
             )}
 
             {selectedNotification && (
-              <div className="notif-overlay-backdrop fade-in" onClick={() => setSelectedNotification(null)}>
+              <div className="notif-overlay-backdrop fade-in" onClick={(e) => { if (e.target === e.currentTarget) setSelectedNotification(null); }}>
                 <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
                   <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
                     <X size={20} />
@@ -5862,7 +5862,7 @@ function TeacherPortal({
                             <Paperclip size={12} /> Attachment Included
                           </div>
                         )}
-                        <button className="notif-view-btn" onClick={() => setSelectedNotification(n)}>
+                        <button className="notif-view-btn" onClick={(e) => { e.stopPropagation(); setSelectedNotification(n); }}>
                           VIEW <ChevronRight size={14} />
                         </button>
                       </div>
@@ -5880,7 +5880,7 @@ function TeacherPortal({
               )}
 
               {selectedNotification && (
-                <div className="notif-overlay-backdrop fade-in" onClick={() => setSelectedNotification(null)}>
+                <div className="notif-overlay-backdrop fade-in" onClick={(e) => { if (e.target === e.currentTarget) setSelectedNotification(null); }}>
                   <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
                     <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
                       <X size={20} />
