@@ -3185,7 +3185,7 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Jadawal" ? (
-          <JadawalParentView studentId={activeStudent?.allIds?.[0] || activeStudent?.student_id} />
+          <JadawalParentView studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} />
         ) : null}
 
         {activePage === "Teachers" ? (
