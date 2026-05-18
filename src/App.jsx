@@ -5354,6 +5354,7 @@ function TeacherPortal({
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
+  onShowAction,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const [lastNotifId, setLastNotifId] = useState(null);
@@ -7555,6 +7556,7 @@ export default function App() {
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
+            onShowAction={showAction}
           />
         )}
 
