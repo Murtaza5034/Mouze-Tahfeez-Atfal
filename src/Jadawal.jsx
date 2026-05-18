@@ -8,7 +8,7 @@ DAYS.forEach(day => {
   DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', star: '' };
 });
 
-export const JadawalTeacherView = ({ students, onShowAction }) => {
+export const JadawalTeacherView = ({ students, onShowAction, onBroadcastNotification }) => {
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [loading, setLoading] = useState(false);
@@ -57,6 +57,26 @@ export const JadawalTeacherView = ({ students, onShowAction }) => {
       onShowAction('error', 'Failed to save Jadawal. Make sure you ran the SQL setup script.');
     } else {
       onShowAction('success', 'Jadawal saved successfully');
+      if (onBroadcastNotification) {
+        try {
+          const targetStudent = (students || []).find(s => 
+            String(s.student_id) === String(selectedStudentId) || 
+            (s.allIds && s.allIds.includes(String(selectedStudentId)))
+          );
+          const parentId = targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email;
+          if (parentId) {
+            await onBroadcastNotification(
+              "Jadawal Updated",
+              "THE JADAWAL IS UPDATED BY YOUR TEACHER",
+              "parents",
+              parentId,
+              "Jadawal"
+            );
+          }
+        } catch (e) {
+          console.warn("Jadawal notification failed:", e);
+        }
+      }
     }
     setSaving(false);
   };
