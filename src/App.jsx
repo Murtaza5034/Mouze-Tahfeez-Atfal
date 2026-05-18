@@ -69,8 +69,17 @@ const getLocalDateKey = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-const loadTrackedDays = () => {
-  const storedDays = localStorage.getItem("mauze-hifz-tracked-days");
+const loadTrackedDays = (userId) => {
+  if (!userId) return [];
+  let storedDays = localStorage.getItem(`mauze-hifz-tracked-days-${userId}`);
+  if (!storedDays) {
+    // Fallback to legacy global key
+    storedDays = localStorage.getItem("mauze-hifz-tracked-days");
+    if (storedDays) {
+      // Migrate to user specific key
+      localStorage.setItem(`mauze-hifz-tracked-days-${userId}`, storedDays);
+    }
+  }
   if (storedDays) {
     try {
       const parsed = JSON.parse(storedDays);
@@ -82,7 +91,13 @@ const loadTrackedDays = () => {
     }
   }
 
-  const legacyLastDate = localStorage.getItem("mauze-hifz-last-date");
+  let legacyLastDate = localStorage.getItem(`mauze-hifz-last-date-${userId}`);
+  if (!legacyLastDate) {
+    legacyLastDate = localStorage.getItem("mauze-hifz-last-date");
+    if (legacyLastDate) {
+      localStorage.setItem(`mauze-hifz-last-date-${userId}`, legacyLastDate);
+    }
+  }
   return legacyLastDate ? [legacyLastDate] : [];
 };
 
@@ -547,17 +562,17 @@ function PremiumHifzCard({ user }) {
 
       if (data) {
         const dbDays = data.map(row => row.tracked_date);
-        const localDays = loadTrackedDays();
+        const localDays = loadTrackedDays(user.id);
         // Merge unique days
         const mergedDays = Array.from(new Set([...dbDays, ...localDays]));
         setTrackedDays(mergedDays);
         setTrackCount(mergedDays.length);
         // Sync local storage with DB state
-        localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(mergedDays));
+        localStorage.setItem(`mauze-hifz-tracked-days-${user.id}`, JSON.stringify(mergedDays));
       }
     } catch (err) {
       console.error("Error fetching tracking data:", err);
-      const localDays = loadTrackedDays();
+      const localDays = loadTrackedDays(user.id);
       setTrackedDays(localDays);
       setTrackCount(localDays.length);
     } finally {
@@ -580,7 +595,7 @@ function PremiumHifzCard({ user }) {
       // Optimistic update
       setTrackedDays(nextDays);
       setTrackCount(nextDays.length);
-      localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
+      localStorage.setItem(`mauze-hifz-tracked-days-${user.id}`, JSON.stringify(nextDays));
 
       try {
         const { error } = await supabase
