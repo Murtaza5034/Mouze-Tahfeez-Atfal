@@ -3467,8 +3467,19 @@ function ParentPortal({
                       </div>
                     )}
                   </div>
-                  <div className="notif-overlay-footer">
-                    <button className="premium-btn gold" onClick={() => setSelectedNotification(null)}>Understood</button>
+                  <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
+                      <button 
+                        className="premium-btn gold" 
+                        onClick={() => {
+                          setActivePage(selectedNotification.redirect_page);
+                          setSelectedNotification(null);
+                        }}
+                      >
+                        Go to {selectedNotification.redirect_page}
+                      </button>
+                    )}
+                    <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Understood</button>
                   </div>
                 </div>
               </div>
@@ -4268,10 +4279,53 @@ function AdminPortal({
                         onChange={onAdminFormChange("customNotification")}
                         className="premium-select"
                       >
-                        <option value="Home">Home Screen</option>
-                        <option value="Announcements">Announcements</option>
-                        <option value="Attendance">Attendance Page</option>
-                        <option value="Progress">Progress Reports</option>
+                        {adminForms.customNotification.target_audience === "parents" ? (
+                          <>
+                            <option value="Home">Home</option>
+                            <option value="Child Summary">Progress Reports</option>
+                            <option value="Schedule">Schedule Timetable</option>
+                            <option value="Teachers">Teachers list</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Profile">Profile</option>
+                            <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                            <option value="Hub Raqam">Hub Raqam</option>
+                            <option value="Apply Leave">Apply Leave</option>
+                            <option value="Jadawal">Jadawal (Timetable)</option>
+                            <option value="Settings">Settings</option>
+                          </>
+                        ) : adminForms.customNotification.target_audience === "teacher" ? (
+                          <>
+                            <option value="My Group">My Group</option>
+                            <option value="Jadawal">Jadawal Timetables</option>
+                            <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Reports">Submit Progress Reports</option>
+                            <option value="Settings">Settings</option>
+                          </>
+                        ) : adminForms.customNotification.target_audience === "admin" ? (
+                          <>
+                            <option value="Overview">Overview</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Schedule">Schedule</option>
+                            <option value="Teacher Attendance">Teacher Attendance</option>
+                            <option value="Custom Groups">Custom Groups</option>
+                            <option value="Portal Access">Portal Access</option>
+                            <option value="Assign Child">Assign Child</option>
+                            <option value="Leave Requests">Leave Requests</option>
+                            <option value="Support Tickets">Support Tickets</option>
+                            <option value="Report Settings">Report Settings</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Home">Home Screen</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Jadawal">Jadawal (Timetable)</option>
+                            <option value="Progress">Progress Reports</option>
+                          </>
+                        )}
                       </select>
                     </label>
                   </div>
@@ -5995,8 +6049,19 @@ function TeacherPortal({
                         </div>
                       )}
                     </div>
-                    <div className="notif-overlay-footer">
-                      <button className="premium-btn gold" onClick={() => setSelectedNotification(null)}>Close</button>
+                    <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                      {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
+                        <button 
+                          className="premium-btn gold" 
+                          onClick={() => {
+                            setActivePage(selectedNotification.redirect_page);
+                            setSelectedNotification(null);
+                          }}
+                        >
+                          Go to {selectedNotification.redirect_page}
+                        </button>
+                      )}
+                      <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Close</button>
                     </div>
                   </div>
                 </div>
@@ -6919,13 +6984,29 @@ export default function App() {
 
   const handleAdminFormChange = (formKey) => (event) => {
     const { name, value } = event.target;
-    setAdminForms((current) => ({
-      ...current,
-      [formKey]: {
+    setAdminForms((current) => {
+      const updatedForm = {
         ...current[formKey],
         [name]: value,
-      },
-    }));
+      };
+
+      if (formKey === "customNotification" && name === "target_audience") {
+        if (value === "parents") {
+          updatedForm.redirect_page = "Home";
+        } else if (value === "teacher") {
+          updatedForm.redirect_page = "My Group";
+        } else if (value === "admin") {
+          updatedForm.redirect_page = "Overview";
+        } else {
+          updatedForm.redirect_page = "Home";
+        }
+      }
+
+      return {
+        ...current,
+        [formKey]: updatedForm,
+      };
+    });
   };
 
   const handleTeacherFormChange = async (event) => {
