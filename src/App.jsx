@@ -5597,6 +5597,8 @@ function TeacherPortal({
   teacherProfiles = [],
   selectedNotification,
   setSelectedNotification,
+  activeStudentId,
+  setActiveStudentId,
   dismissedNotifs = [],
   dismissedAnnounces = [],
   dismissedHomeNotifs = [],
@@ -7965,6 +7967,8 @@ export default function App() {
             schoolData={schoolData}
             selectedNotification={selectedNotification}
             setSelectedNotification={setSelectedNotification}
+            activeStudentId={activeStudentId}
+            setActiveStudentId={setActiveStudentId}
             dismissedNotifs={dismissedNotifs}
             dismissedAnnounces={dismissedAnnounces}
             dismissedHomeNotifs={dismissedHomeNotifs}
