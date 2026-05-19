@@ -3433,80 +3433,81 @@ function ParentPortal({
               </div>
             )}
 
-            {selectedNotification && (
-              <div className="notif-overlay-backdrop fade-in" onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                  const elapsed = Date.now() - notifMountTimeRef.current;
-                  if (elapsed > 1000) setSelectedNotification(null);
-                }
-              }}>
-                <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
-                  <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
-                    <X size={20} />
-                  </button>
-                  <div className="notif-overlay-header">
-                    <div className="notif-badge">New Update</div>
-                    <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
-                    <h2>{selectedNotification.title}</h2>
-                  </div>
-                  <div className="notif-overlay-body">
-                    <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
-                    
-                    {selectedNotification.file_url && (
-                      <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-                          <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
-                        </h4>
-                        {isImageFile(selectedNotification.file_url) ? (
-                          <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
-                            <img 
-                              src={selectedNotification.file_url} 
-                              alt="Attachment Preview" 
-                              style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                            <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <FileArchive size={24} />
-                            </div>
-                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {getFileNameFromUrl(selectedNotification.file_url)}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        <a 
-                          href={selectedNotification.file_url} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          download
-                          className="premium-btn gold" 
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
-                        >
-                          <Download size={16} /> Download File
-                        </a>
+          </div>
+        )}
+
+        {selectedNotification && (
+          <div className="notif-overlay-backdrop fade-in" onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              const elapsed = Date.now() - notifMountTimeRef.current;
+              if (elapsed > 1000) setSelectedNotification(null);
+            }
+          }}>
+            <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
+              <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
+                <X size={20} />
+              </button>
+              <div className="notif-overlay-header">
+                <div className="notif-badge">New Update</div>
+                <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
+                <h2>{selectedNotification.title}</h2>
+              </div>
+              <div className="notif-overlay-body">
+                <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
+                
+                {selectedNotification.file_url && (
+                  <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
+                    <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                      <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
+                    </h4>
+                    {isImageFile(selectedNotification.file_url) ? (
+                      <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                        <img 
+                          src={selectedNotification.file_url} 
+                          alt="Attachment Preview" 
+                          style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                        <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <FileArchive size={24} />
+                        </div>
+                        <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {getFileNameFromUrl(selectedNotification.file_url)}
+                          </span>
+                        </div>
                       </div>
                     )}
+                    <a 
+                      href={selectedNotification.file_url} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      download
+                      className="premium-btn gold" 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
+                    >
+                      <Download size={16} /> Download File
+                    </a>
                   </div>
-                  <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                    {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
-                      <button 
-                        className="premium-btn gold" 
-                        onClick={() => {
-                          setActivePage(selectedNotification.redirect_page);
-                          setSelectedNotification(null);
-                        }}
-                      >
-                        Go to {selectedNotification.redirect_page}
-                      </button>
-                    )}
-                    <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Understood</button>
-                  </div>
-                </div>
+                )}
               </div>
-            )}
+              <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
+                  <button 
+                    className="premium-btn gold" 
+                    onClick={() => {
+                      setActivePage(selectedNotification.redirect_page);
+                      setSelectedNotification(null);
+                    }}
+                  >
+                    Go to {selectedNotification.redirect_page}
+                  </button>
+                )}
+                <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Understood</button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -5929,82 +5930,83 @@ function TeacherPortal({
                 </div>
               )}
 
-              {selectedNotification && (
-                <div className="notif-overlay-backdrop fade-in" onClick={(e) => {
-                  if (e.target === e.currentTarget) {
-                    const elapsed = Date.now() - notifMountTimeRef.current;
-                    if (elapsed > 1000) setSelectedNotification(null);
-                  }
-                }}>
-                  <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
-                    <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
-                      <X size={20} />
-                    </button>
-                    <div className="notif-overlay-header">
-                      <div className="notif-badge">Notification Detail</div>
-                      <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
-                      <h2>{selectedNotification.title}</h2>
-                    </div>
-                    <div className="notif-overlay-body">
-                      <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
-                      
-                      {selectedNotification.file_url && (
-                        <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
-                          <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-                            <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
-                          </h4>
-                          {isImageFile(selectedNotification.file_url) ? (
-                            <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
-                              <img 
-                                src={selectedNotification.file_url} 
-                                alt="Attachment Preview" 
-                                style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
-                              />
-                            </div>
-                          ) : (
-                            <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                              <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <FileArchive size={24} />
-                              </div>
-                              <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {getFileNameFromUrl(selectedNotification.file_url)}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                          <a 
-                            href={selectedNotification.file_url} 
-                            target="_blank" 
-                            rel="noreferrer" 
-                            download
-                            className="premium-btn gold" 
-                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
-                          >
-                            <Download size={16} /> Download File
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                    <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                      {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
-                        <button 
-                          className="premium-btn gold" 
-                          onClick={() => {
-                            setActivePage(selectedNotification.redirect_page);
-                            setSelectedNotification(null);
-                          }}
-                        >
-                          Go to {selectedNotification.redirect_page}
-                        </button>
-                      )}
-                      <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Close</button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           ) : null}
+
+          {selectedNotification && (
+            <div className="notif-overlay-backdrop fade-in" onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                const elapsed = Date.now() - notifMountTimeRef.current;
+                if (elapsed > 1000) setSelectedNotification(null);
+              }
+            }}>
+              <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
+                <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
+                  <X size={20} />
+                </button>
+                <div className="notif-overlay-header">
+                  <div className="notif-badge">Notification Detail</div>
+                  <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
+                  <h2>{selectedNotification.title}</h2>
+                </div>
+                <div className="notif-overlay-body">
+                  <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
+                  
+                  {selectedNotification.file_url && (
+                    <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                        <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
+                      </h4>
+                      {isImageFile(selectedNotification.file_url) ? (
+                        <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                          <img 
+                            src={selectedNotification.file_url} 
+                            alt="Attachment Preview" 
+                            style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                          <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <FileArchive size={24} />
+                          </div>
+                          <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {getFileNameFromUrl(selectedNotification.file_url)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      <a 
+                        href={selectedNotification.file_url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        download
+                        className="premium-btn gold" 
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
+                      >
+                        <Download size={16} /> Download File
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
+                    <button 
+                      className="premium-btn gold" 
+                      onClick={() => {
+                        setActivePage(selectedNotification.redirect_page);
+                        setSelectedNotification(null);
+                      }}
+                    >
+                      Go to {selectedNotification.redirect_page}
+                    </button>
+                  )}
+                  <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {activePage === "Settings" ? (
             <SettingsPage 
