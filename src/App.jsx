@@ -1906,7 +1906,7 @@ function JadeedPagesCard({ count }) {
   );
 }
 
-function TahfeezReportCard({ student, weeklyResult, settings, parentViewed }) {
+function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds }) {
   const arabicStyle = { fontFamily: "'Kanz al Marjaan', serif" };
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
 
@@ -1922,7 +1922,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed }) {
         {parentViewed !== undefined && (
           <div 
             className={`parent-view-status-dot ${parentViewed ? 'viewed' : 'not-viewed'}`}
-            title={parentViewed ? "Parent viewed this report (min. 1 minute)" : "Parent hasn't viewed this report yet"}
+            title={parentViewed ? "Parent viewed this report (min. 1 minute)" : "New result! Please view."}
             style={{
               position: 'absolute',
               top: '20px',
@@ -1930,15 +1930,32 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed }) {
               width: '14px',
               height: '14px',
               borderRadius: '50%',
-              backgroundColor: parentViewed ? '#2ec4b6' : '#e71d36',
+              backgroundColor: parentViewed ? '#e71d36' : '#2ec4b6',
               boxShadow: parentViewed 
-                ? '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)' 
-                : '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)',
+                ? '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)' 
+                : '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)',
               border: '2px solid #ffffff',
               zIndex: 10,
               cursor: 'help'
             }}
           />
+        )}
+        {parentViewed === false && timerSeconds !== undefined && timerSeconds < 60 && (
+          <svg width="34" height="34" style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 9 }}>
+            <circle cx="17" cy="17" r="15" fill="none" stroke="rgba(46, 196, 182, 0.2)" strokeWidth="3" />
+            <circle 
+              cx="17" 
+              cy="17" 
+              r="15" 
+              fill="none" 
+              stroke="#2ec4b6" 
+              strokeWidth="3" 
+              strokeDasharray="94.2" 
+              strokeDashoffset={94.2 - (94.2 * (timerSeconds / 60))}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dashoffset 1s linear', transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+            />
+          </svg>
         )}
         <div className="result-card-header" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div className="school-logo" style={{ marginBottom: '12px' }}><img src="/logo.png" alt="Logo" /></div>
@@ -3296,6 +3313,7 @@ function ParentPortal({
                   weeklyResult={weeklyResult || studentProfile?.latestResult}
                   settings={settings}
                   parentViewed={parentViewedStatus}
+                  timerSeconds={secondsSpent}
                 />
               );
             })()}
@@ -4336,12 +4354,12 @@ function AdminPortal({
                 </div>
                 <div className="headline-right" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)' }}></div>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
                     <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Viewed</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Not Viewed</span>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)' }}></div>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>New (Not Viewed)</span>
                   </div>
                 </div>
               </div>
@@ -4360,15 +4378,15 @@ function AdminPortal({
                           </div>
                         </div>
                         <div 
-                          title={isViewed ? "Parent viewed report" : "Parent has not viewed report"}
+                          title={isViewed ? "Parent viewed report" : "New result (Unseen by parent)"}
                           style={{
                             width: '16px',
                             height: '16px',
                             borderRadius: '50%',
-                            backgroundColor: isViewed ? '#2ec4b6' : '#e71d36',
+                            backgroundColor: isViewed ? '#e71d36' : '#2ec4b6',
                             boxShadow: isViewed 
-                              ? '0 0 12px rgba(46, 196, 182, 0.7)' 
-                              : '0 0 12px rgba(231, 29, 54, 0.7)',
+                              ? '0 0 12px rgba(231, 29, 54, 0.7)' 
+                              : '0 0 12px rgba(46, 196, 182, 0.7)',
                             border: '2px solid #ffffff',
                             flexShrink: 0
                           }}
