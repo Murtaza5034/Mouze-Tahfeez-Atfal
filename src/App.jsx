@@ -2037,7 +2037,8 @@ function SettingsPage({
   setAppTheme, 
   user, 
   studentProfile,
-  onShowAction 
+  onShowAction,
+  role = "parents"
 }) {
   const [activeTab, setActiveTab] = useState("Dark mode");
   const tabs = ["Dark mode", "App themes", "Notifications", "Security", "Support", "About"];
@@ -2079,14 +2080,15 @@ function SettingsPage({
     const page = formData.get("page_issue");
     const desc = formData.get("description");
 
+    const userRoleStr = role === "teacher" ? "Teacher" : "Parent";
     const userName = studentProfile?.guardian_name || 
                      user?.user_metadata?.full_name || 
                      user?.email?.split('@')[0] || 
-                     "User";
+                     `${userRoleStr} User`;
 
     const { error } = await supabase.from("portal_issues").insert([{
       user_id: user.id,
-      user_name: userName,
+      user_name: `${userName} (${userRoleStr})`,
       page_issue: page,
       description: desc,
       status: 'open'
@@ -2095,6 +2097,18 @@ function SettingsPage({
     if (error) {
       onShowAction("error", "Failed to send ticket: " + error.message);
     } else {
+      // Send FCM notification to admin
+      try {
+        await supabase.functions.invoke('fcm-notification', {
+          body: {
+            title: `New Support Issue (${userRoleStr})`,
+            body: `Issue from ${userName}: ${desc}`,
+            targetRole: 'admin'
+          }
+        });
+      } catch (fcmErr) {
+        console.error("FCM Notify Admin Error:", fcmErr);
+      }
       onShowAction("success", "Support ticket sent to Admin!");
       e.target.reset();
     }
@@ -2146,8 +2160,12 @@ function SettingsPage({
         {activeTab === "Notifications" && (
           <div className="settings-tab-pane">
             <h3>Notifications</h3>
-            <p>Control how you receive alerts about your child's progress.</p>
-            <NotificationStatus role="parents" />
+            {role === "parents" ? (
+              <p>Control how you receive alerts about your child's progress.</p>
+            ) : (
+              <p>Control how you receive alerts about students and schedules.</p>
+            )}
+            <NotificationStatus role={role} />
             <div className="hint-text" style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               <Info size={14} /> If you are still not receiving alerts after enabling, check your browser permissions for this site by clicking the lock icon in the address bar.
             </div>
@@ -2220,13 +2238,24 @@ function SettingsPage({
               <label>
                 <span>Which page has the issue?</span>
                 <select name="page_issue" className="premium-select" required>
-                  <option value="Home">Home Dashboard</option>
-                  <option value="Schedule">Daily Schedule</option>
-                  <option value="Progress">Progress Report</option>
-                  <option value="Announcements">Announcements</option>
-                  <option value="Teachers">Teacher Contacts</option>
-                  <option value="Quran Ikhtebar">Quran Ikhtebar</option>
-                  <option value="Hub Raqam">Hub Raqam (Fees)</option>
+                  {role === "parents" ? (
+                    <>
+                      <option value="Home">Home Dashboard</option>
+                      <option value="Schedule">Daily Schedule</option>
+                      <option value="Progress">Progress Report</option>
+                      <option value="Teachers">Teacher Contacts</option>
+                      <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                      <option value="Hub Raqam">Hub Raqam (Fees)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Students">Student List</option>
+                      <option value="Mark Progress">Mark Progress</option>
+                      <option value="Performance">Performance Overview</option>
+                      <option value="Jadwal">Jadwal</option>
+                      <option value="Inbox">Notifications Inbox</option>
+                    </>
+                  )}
                   <option value="Other">Other / General Issue</option>
                 </select>
               </label>
@@ -2720,13 +2749,12 @@ function ParentPortal({
   };
   parentData;
 
-  const pageNames = ["Home", "Schedule", "Progress", "Announcements", "Teachers", "Quran Ikhtebar", "Settings"];
+  const pageNames = ["Home", "Schedule", "Progress", "Teachers", "Quran Ikhtebar", "Settings"];
   const assignedRoles = getAssignedRoles(user);
 
   const navigationMap = {
     "Home": "Home",
     "Schedule": "Schedule",
-    "Announcements": "Announcements",
     "Teachers": "Teachers",
     "Progress": "Child Summary",
     "Profile": "Profile",
@@ -2857,9 +2885,6 @@ function ParentPortal({
           <p className="drawer-section-label">More Pages</p>
           <button className={`drawer-link ${activePage === "Inbox" ? "active" : ""}`} onClick={() => { setActivePage("Inbox"); setMenuOpen(false); }}>
             <Bell size={18} /> Inbox
-          </button>
-          <button className={`drawer-link ${activePage === "Announcements" ? "active" : ""}`} onClick={() => { setActivePage("Announcements"); setMenuOpen(false); }}>
-            <Bell size={18} /> Announcements
           </button>
           <button className={`drawer-link ${activePage === "Profile" ? "active" : ""}`} onClick={() => { setActivePage("Profile"); setMenuOpen(false); }}>
             <User size={18} /> My Profile
@@ -3019,22 +3044,29 @@ function ParentPortal({
             <div className="dashboard-section">
               <div className="section-header">
                 <Bell size={18} />
-                <h3>Announcements</h3>
+                <h3>Active Notifications</h3>
               </div>
               <div className="announcement-list">
-                {currentPage.announcements.map((news) => (
-                  <div key={news.id || news.title} className="news-card">
-                    <div>
-                      <div className="news-meta">
-                        <span className={`tag ${String(news.type || "update").toLowerCase()}`}>
-                          {news.type || "Update"}
-                        </span>
-                        <span className="date">{news.event_date}</span>
+                {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 ? (
+                  notifications.filter(n => !dismissedNotifs.includes(n.id)).slice(0, 3).map((news) => (
+                    <div key={news.id || news.title} className="news-card" onClick={() => setSelectedNotification(news)} style={{ cursor: 'pointer' }}>
+                      <div>
+                        <div className="news-meta">
+                          <span className="tag update">
+                            Alert
+                          </span>
+                          <span className="date">{new Date(news.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <h4>{news.title}</h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
+                        </p>
                       </div>
-                      <h4>{news.title}</h4>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
+                )}
               </div>
             </div>
           </div>
@@ -3173,16 +3205,7 @@ function ParentPortal({
           </div>
         ) : null}
 
-        {activePage === "Announcements" ? (
-          <AnnouncementsPage 
-            announcements={announcements}
-            setActivePage={setActivePage}
-            setSelectedAnnouncement={setSelectedAnnouncement}
-            onDismiss={onDismissAnnounce}
-            onClearAll={onClearAllAnnounces}
-            dismissedIds={dismissedAnnounces}
-          />
-        ) : null}
+
 
         {activePage === "Jadwal" ? (
           <JadwalParentView studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} />
@@ -3816,7 +3839,7 @@ function AdminPortal({
   };
 
   const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Global Settings"];
-  const navPages = ["Overview", "Announcements", "Schedule"];
+  const navPages = ["Overview", "Schedule"];
 
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
@@ -3850,7 +3873,6 @@ function AdminPortal({
   const stats = [
     { label: "Students", value: students.length, icon: Users },
     { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap },
-    { label: "Announcements", value: announcements.length, icon: Bell },
     { label: "Schedules", value: schedule.length, icon: Calendar },
   ];
 
@@ -3945,7 +3967,6 @@ function AdminPortal({
                  { label: "Portal Access", value: "Portal Access" },
                  { label: "Faculty Attendance", value: "Faculty" },
                  { label: "Notifications Hub", value: "Notifications" },
-                 { label: "Announcements", value: "Announcements" },
                  { label: "Master Schedule", value: "Schedule" },
                  { label: "Support Tickets", value: "User Issues" }
                ]} 
@@ -4471,125 +4492,7 @@ function AdminPortal({
             </div>
           ) : null}
 
-          {activePage === "Announcements" ? (
-            <div className="management-grid two-columns">
-              <section className="form-card">
-                <div className="card-headline">
-                  <Bell size={18} />
-                  <h3>Create Announcement</h3>
-                </div>
-                <form className="stack-form" onSubmit={onCreateAnnouncement}>
-                  <div className="form-grid">
-                    <label>
-                      <span>Title</span>
-                      <input
-                        type="text"
-                        name="title"
-                        value={adminForms.announcement.title}
-                        onChange={onAdminFormChange("announcement")}
-                        placeholder="Weekly parent meeting"
-                        required
-                      />
-                    </label>
 
-                    <label>
-                      <span>Type</span>
-                      <select
-                        name="type"
-                        value={adminForms.announcement.type}
-                        onChange={onAdminFormChange("announcement")}
-                      >
-                        <option value="Update">Update</option>
-                        <option value="Urgent">Urgent</option>
-                        <option value="Event">Event</option>
-                      </select>
-                    </label>
-
-                    <label>
-                      <span>Target Portal</span>
-                      <select
-                        name="target_role"
-                        value={adminForms.announcement.target_role || "all"}
-                        onChange={onAdminFormChange("announcement")}
-                      >
-                        <option value="all">Everyone</option>
-                        <option value="parents">Parents Only</option>
-                        <option value="teacher">Teachers Only</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <label>
-                    <span>Date</span>
-                    <input
-                      type="date"
-                      name="event_date"
-                      value={adminForms.announcement.event_date}
-                      onChange={onAdminFormChange("announcement")}
-                      required
-                    />
-                  </label>
-
-                  <button type="submit" className="action-button">
-                    Publish Announcement
-                  </button>
-                </form>
-              </section>
-
-              <section className="data-card">
-                <div className="card-headline headline-with-action">
-                  <div className="headline-left">
-                    <BookOpen size={18} />
-                    <h3>Latest Announcements</h3>
-                  </div>
-                  <button
-                    className="clear-history-btn"
-                    onClick={() => onClearHistory("events")()}
-                  >
-                    Clear All
-                  </button>
-                </div>
-                <div className="record-stack">
-                  {announcements.map((item) => (
-                    <article key={item.id || `${item.title}-${item.event_date}`} className="record-card flex-row-card">
-                      <div className="card-primary-info">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '10px' }}>
-                            {(item.target_role || 'ALL').toUpperCase()}
-                          </span>
-                          <strong>{item.title}</strong>
-                        </div>
-                        <span>
-                          {item.type || "Update"} · {item.event_date || "No date"}
-                        </span>
-                      </div>
-                      <button
-                        className="delete-icon-btn"
-                        onClick={() => onDeleteRecord("events", "id")(item.id)}
-                        aria-label="Delete announcement"
-                      >
-                        <Trash size={16} />
-                      </button>
-                    </article>
-                  ))}
-                  {announcements.length === 0 ? (
-                    <div className="empty-state">No announcements available yet.</div>
-                  ) : null}
-                </div>
-              </section>
-            </div>
-          ) : null}
-
-          {activePage === "Announcements" ? (
-            <AnnouncementsPage
-              announcements={announcements}
-              setActivePage={setActivePage}
-              setSelectedAnnouncement={setSelectedAnnouncement}
-              onDismiss={onDismissAnnounce}
-              onClearAll={onClearAllAnnounces}
-              dismissedIds={dismissedAnnounces}
-            />
-          ) : null}
 
           {activePage === "User Issues" ? (
             <SupportTicketsAdmin 
@@ -5413,6 +5316,10 @@ function TeacherPortal({
   onDismissAnnounce,
   onClearAllAnnounces,
   onShowAction,
+  isDarkMode,
+  setIsDarkMode,
+  appTheme,
+  setAppTheme,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const [lastNotifId, setLastNotifId] = useState(null);
@@ -5459,12 +5366,12 @@ function TeacherPortal({
         <nav className="sidebar-nav">
           <p className="sidebar-category management-cat">Workplace</p>
           {[
-            { id: "Announcements", label: "Announcements", icon: Bell },
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
             { id: "Jadwal", label: "Jadwal", icon: Calendar },
             { id: "Inbox", label: "Inbox", icon: Bell },
+            { id: "Settings", label: "Settings", icon: Settings },
           ].map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
               <page.icon size={18} /> {page.label}
@@ -5500,7 +5407,7 @@ function TeacherPortal({
         </header>
 
         <section className="admin-content-pad">
-          {activePage === "My Group" && (
+          {(activePage === "My Group" || activePage === "Fill Result" || activePage === "Overview") && (
              <QuickSearch 
                pages={[
                  { label: "Student List", value: "My Group" },
@@ -5583,6 +5490,36 @@ function TeacherPortal({
 
 
               <PremiumHifzCard user={user} />
+
+              <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
+                <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <Bell size={18} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--deep-brown)' }}>Active Notifications</h3>
+                </div>
+                <div className="announcement-list">
+                  {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 ? (
+                    notifications.filter(n => !dismissedNotifs.includes(n.id)).slice(0, 3).map((news) => (
+                      <div key={news.id || news.title} className="news-card" onClick={() => setSelectedNotification(news)} style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', padding: '16px', borderRadius: '12px', marginBottom: '12px' }}>
+                        <div>
+                          <div className="news-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
+                            <span className="tag update" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--primary-gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                              Alert
+                            </span>
+                            <span className="date" style={{ color: 'var(--text-muted)' }}>{new Date(news.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: 'var(--deep-brown)' }}>{news.title}</h4>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                            {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
+                  )}
+                </div>
+              </div>
+
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
                   <article key={student.student_id} className="student-card">
@@ -6069,14 +6006,16 @@ function TeacherPortal({
             </div>
           ) : null}
 
-          {activePage === "Announcements" ? (
-            <AnnouncementsPage
-              announcements={schoolData.announcements}
-              setActivePage={setActivePage}
-              setSelectedAnnouncement={setSelectedAnnouncement}
-              onDismiss={onDismissAnnounce}
-              onClearAll={onClearAllAnnounces}
-              dismissedIds={dismissedAnnounces}
+          {activePage === "Settings" ? (
+            <SettingsPage 
+              isDarkMode={isDarkMode}
+              setIsDarkMode={setIsDarkMode}
+              appTheme={appTheme}
+              setAppTheme={setAppTheme}
+              user={user}
+              studentProfile={null}
+              onShowAction={onShowAction}
+              role="teacher"
             />
           ) : null}
 
@@ -7657,6 +7596,10 @@ export default function App() {
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
             onShowAction={showAction}
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
+            appTheme={appTheme}
+            setAppTheme={setAppTheme}
           />
         )}
 
