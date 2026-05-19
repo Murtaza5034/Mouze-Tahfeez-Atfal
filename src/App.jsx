@@ -1906,7 +1906,7 @@ function JadeedPagesCard({ count }) {
   );
 }
 
-function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds }) {
+function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false }) {
   const arabicStyle = { fontFamily: "'Kanz al Marjaan', serif" };
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
 
@@ -1922,7 +1922,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         {parentViewed !== undefined && (
           <div 
             className={`parent-view-status-dot ${parentViewed ? 'viewed' : 'not-viewed'}`}
-            title={parentViewed ? "Parent viewed this report (min. 1 minute)" : "New result! Please view."}
+            title={parentViewed ? "Parent viewed this report" : "New result! Please view."}
             style={{
               position: 'absolute',
               top: '20px',
@@ -1930,17 +1930,23 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               width: '14px',
               height: '14px',
               borderRadius: '50%',
-              backgroundColor: parentViewed ? '#2ec4b6' : '#e71d36',
-              boxShadow: parentViewed 
-                ? '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)' 
-                : '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)',
+              backgroundColor: isParentPortal 
+                ? (parentViewed ? '#e71d36' : '#2ec4b6') // Parent Portal: Green when new, turns Red when viewed
+                : (parentViewed ? '#2ec4b6' : '#e71d36'), // Admin Portal/Others: Red when new, turns Green when viewed
+              boxShadow: isParentPortal
+                ? (parentViewed 
+                    ? '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)' 
+                    : '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)')
+                : (parentViewed
+                    ? '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)' 
+                    : '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)'),
               border: '2px solid #ffffff',
               zIndex: 10,
               cursor: 'help'
             }}
           />
         )}
-        {parentViewed === false && timerSeconds !== undefined && timerSeconds < 60 && (
+        {parentViewed === false && timerSeconds !== undefined && timerSeconds < 20 && (
           <svg width="34" height="34" style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 9 }}>
             <circle cx="17" cy="17" r="15" fill="none" stroke="rgba(46, 196, 182, 0.2)" strokeWidth="3" />
             <circle 
@@ -1951,7 +1957,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               stroke="#2ec4b6" 
               strokeWidth="3" 
               strokeDasharray="94.2" 
-              strokeDashoffset={94.2 - (94.2 * (timerSeconds / 60))}
+              strokeDashoffset={94.2 - (94.2 * (timerSeconds / 20))}
               strokeLinecap="round"
               style={{ transition: 'stroke-dashoffset 1s linear', transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
             />
@@ -3354,6 +3360,7 @@ function ParentPortal({
                   settings={settings}
                   parentViewed={parentViewedStatus}
                   timerSeconds={secondsSpent}
+                  isParentPortal={true}
                 />
               );
             })()}
@@ -3383,6 +3390,7 @@ function ParentPortal({
                     weeklyResult={weeklyResult || studentProfile?.latestResult}
                     settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
                     parentViewed={parentViewedStatus}
+                    isParentPortal={true}
                   />
                 </div>
               )}
