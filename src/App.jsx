@@ -5645,6 +5645,7 @@ function TeacherPortal({
                students={filteredStudents} 
                onShowAction={onShowAction} 
                onBroadcastNotification={broadcastNotification} 
+               initialStudentId={activeStudentId}
              />
           )}
 
@@ -6157,9 +6158,31 @@ function TeacherPortal({
                             <Paperclip size={12} /> Attachment Included
                           </div>
                         )}
-                        <button className="notif-view-btn" onClick={(e) => { e.stopPropagation(); setSelectedNotification(n); }}>
-                          VIEW <ChevronRight size={14} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="notif-view-btn" onClick={(e) => { e.stopPropagation(); setSelectedNotification(n); }}>
+                            VIEW <ChevronRight size={14} />
+                          </button>
+                          {n.redirect_page && (
+                            <button 
+                              className="notif-view-btn gold" 
+                              style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (n.redirect_page.startsWith("Jadwal")) {
+                                  const parts = n.redirect_page.split(":");
+                                  if (parts[1]) {
+                                    setActiveStudentId(parts[1]);
+                                  }
+                                  setActivePage("Jadwal");
+                                } else {
+                                  setActivePage(n.redirect_page);
+                                }
+                              }}
+                            >
+                              GO TO SCHEDULE <ChevronRight size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -6244,11 +6267,19 @@ function TeacherPortal({
                     <button 
                       className="premium-btn gold" 
                       onClick={() => {
-                        setActivePage(selectedNotification.redirect_page);
+                        if (selectedNotification.redirect_page.startsWith("Jadwal")) {
+                          const parts = selectedNotification.redirect_page.split(":");
+                          if (parts[1]) {
+                            setActiveStudentId(parts[1]);
+                          }
+                          setActivePage("Jadwal");
+                        } else {
+                          setActivePage(selectedNotification.redirect_page);
+                        }
                         setSelectedNotification(null);
                       }}
                     >
-                      Go to {selectedNotification.redirect_page}
+                      Go to Schedule
                     </button>
                   )}
                   <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Close</button>
@@ -6309,6 +6340,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState(null);
   const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [activeStudentId, setActiveStudentId] = useState(null);
   const [attachedFileUrl, setAttachedFileUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
   const [parentData, setParentData] = useState(emptyParentData);

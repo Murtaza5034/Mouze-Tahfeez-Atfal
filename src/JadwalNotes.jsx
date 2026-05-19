@@ -73,7 +73,7 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
           body: `A parent wrote: ${title.trim()}`,
           target_role: "teacher",
           target_user: teacher.email,
-          redirect_page: "Jadwal",
+          redirect_page: `Jadwal:${studentId}`,
           created_at: new Date().toISOString()
         };
         await supabase.from("system_notifications").insert([notifPayload]);

@@ -120,11 +120,17 @@ const handleDownloadPDF = async (studentName, scheduleData) => {
   }
 };
 
-export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification }) => {
-  const [selectedStudentId, setSelectedStudentId] = useState('');
+export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId }) => {
+  const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (initialStudentId) {
+      setSelectedStudentId(initialStudentId);
+    }
+  }, [initialStudentId]);
 
   useEffect(() => {
     if (selectedStudentId) {
