@@ -8,18 +8,6 @@ CREATE TABLE IF NOT EXISTS public.parent_report_views (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Enable Row Level Security (RLS)
-ALTER TABLE public.parent_report_views ENABLE ROW LEVEL SECURITY;
+-- Disable Row Level Security (RLS) to ensure any client can read/write tracking data
+ALTER TABLE public.parent_report_views DISABLE ROW LEVEL SECURITY;
 
--- Create policies to allow selecting, inserting, and updating views
-DROP POLICY IF EXISTS "Allow select for everyone" ON public.parent_report_views;
-DROP POLICY IF EXISTS "Allow insert/update for everyone" ON public.parent_report_views;
-
-CREATE POLICY "Allow select for everyone"
-  ON public.parent_report_views FOR SELECT
-  USING (true);
-
-CREATE POLICY "Allow insert/update for everyone"
-  ON public.parent_report_views FOR ALL
-  USING (true)
-  WITH CHECK (true);
