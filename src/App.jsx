@@ -1930,10 +1930,10 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               width: '14px',
               height: '14px',
               borderRadius: '50%',
-              backgroundColor: parentViewed ? '#e71d36' : '#2ec4b6',
+              backgroundColor: parentViewed ? '#2ec4b6' : '#e71d36',
               boxShadow: parentViewed 
-                ? '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)' 
-                : '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)',
+                ? '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)' 
+                : '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)',
               border: '2px solid #ffffff',
               zIndex: 10,
               cursor: 'help'
@@ -2771,8 +2771,11 @@ function ParentPortal({
 
   // Track parent viewing on Child Summary page
   useEffect(() => {
+    // Reset status on child/page change immediately
+    setParentViewedStatus(false);
+    setSecondsSpent(0);
+
     if (activePage !== "Child Summary" || !studentProfile?.student_id) {
-      setSecondsSpent(0);
       return;
     }
 
@@ -2781,7 +2784,7 @@ function ParentPortal({
     supabase
       .from('parent_report_views')
       .select('viewed')
-      .eq('student_id', studentProfile.student_id)
+      .eq('student_id', String(studentProfile.student_id))
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) {
@@ -2801,7 +2804,7 @@ function ParentPortal({
                 supabase
                   .from('parent_report_views')
                   .upsert({
-                    student_id: studentProfile.student_id,
+                    student_id: String(studentProfile.student_id),
                     viewed: true,
                     view_duration_seconds: 60,
                     updated_at: new Date().toISOString()
