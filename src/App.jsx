@@ -2690,6 +2690,44 @@ function ChildLeaveApply({ studentProfile, showAction }) {
   );
 }
 
+const resolveRedirectPage = (page, role) => {
+  if (!page) return "Home";
+  
+  if (role === "parents") {
+    const parentMap = {
+      "Announcements": "Home",
+      "Progress": "Child Summary",
+      "Child Summary": "Child Summary",
+      "Schedule": "Schedule",
+      "Teachers": "Teachers",
+      "Inbox": "Inbox",
+      "Profile": "Profile",
+      "Quran Ikhtebar": "Quran Ikhtebar",
+      "Hub Raqam": "Hub Raqam",
+      "Apply Leave": "Apply Leave",
+      "Settings": "Settings",
+      "Jadwal": "Jadwal",
+      "Home": "Home"
+    };
+    return parentMap[page] || "Home";
+  }
+  
+  if (role === "teacher") {
+    const teacherMap = {
+      "Announcements": "My Group",
+      "Reports": "Fill Result",
+      "My Group": "My Group",
+      "Jadwal": "Jadwal",
+      "Quran Ikhtebar": "Quran Ikhtebar",
+      "Inbox": "Inbox",
+      "Settings": "Settings"
+    };
+    return teacherMap[page] || "My Group";
+  }
+  
+  return page;
+};
+
 function ParentPortal({
   activePage,
   parentData,
@@ -3565,9 +3603,31 @@ function ParentPortal({
                           <Paperclip size={12} /> Attachment Included
                         </div>
                       )}
-                      <button className="notif-view-btn" onClick={(e) => { e.stopPropagation(); setSelectedNotification(n); }}>
-                        VIEW <ChevronRight size={14} />
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="notif-view-btn" onClick={(e) => { e.stopPropagation(); setSelectedNotification(n); }}>
+                          VIEW <ChevronRight size={14} />
+                        </button>
+                        {n.redirect_page && (
+                          <button 
+                            className="notif-view-btn gold" 
+                            style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              let targetPage = n.redirect_page;
+                              if (targetPage.startsWith("Jadwal")) {
+                                const parts = targetPage.split(":");
+                                if (parts[1]) {
+                                  setSelectedStudentId(parts[1]);
+                                }
+                                targetPage = "Jadwal";
+                              }
+                              setActivePage(resolveRedirectPage(targetPage, "parents"));
+                            }}
+                          >
+                            GO TO PAGE <ChevronRight size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -3588,11 +3648,8 @@ function ParentPortal({
         {selectedNotification && (
           <div 
             className="notif-overlay-backdrop fade-in" 
-            onMouseDown={(e) => {
-              backdropMouseDownRef.current = e.target === e.currentTarget;
-            }}
-            onMouseUp={(e) => {
-              if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
                 setSelectedNotification(null);
               }
             }}
@@ -3652,11 +3709,19 @@ function ParentPortal({
                   <button 
                     className="premium-btn gold" 
                     onClick={() => {
-                      setActivePage(selectedNotification.redirect_page);
+                      let targetPage = selectedNotification.redirect_page;
+                      if (targetPage.startsWith("Jadwal")) {
+                        const parts = targetPage.split(":");
+                        if (parts[1]) {
+                          setSelectedStudentId(parts[1]);
+                        }
+                        targetPage = "Jadwal";
+                      }
+                      setActivePage(resolveRedirectPage(targetPage, "parents"));
                       setSelectedNotification(null);
                     }}
                   >
-                    Go to {selectedNotification.redirect_page}
+                    Go to Page
                   </button>
                 )}
                 <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Understood</button>
@@ -6168,18 +6233,18 @@ function TeacherPortal({
                               style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (n.redirect_page.startsWith("Jadwal")) {
+                                let targetPage = n.redirect_page;
+                                if (targetPage.startsWith("Jadwal")) {
                                   const parts = n.redirect_page.split(":");
                                   if (parts[1]) {
                                     setActiveStudentId(parts[1]);
                                   }
-                                  setActivePage("Jadwal");
-                                } else {
-                                  setActivePage(n.redirect_page);
+                                  targetPage = "Jadwal";
                                 }
+                                setActivePage(resolveRedirectPage(targetPage, "teacher"));
                               }}
                             >
-                              GO TO SCHEDULE <ChevronRight size={14} />
+                              GO TO PAGE <ChevronRight size={14} />
                             </button>
                           )}
                         </div>
@@ -6203,11 +6268,8 @@ function TeacherPortal({
           {selectedNotification && (
             <div 
               className="notif-overlay-backdrop fade-in" 
-              onMouseDown={(e) => {
-                backdropMouseDownRef.current = e.target === e.currentTarget;
-              }}
-              onMouseUp={(e) => {
-                if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
                   setSelectedNotification(null);
                 }
               }}
@@ -6267,19 +6329,19 @@ function TeacherPortal({
                     <button 
                       className="premium-btn gold" 
                       onClick={() => {
-                        if (selectedNotification.redirect_page.startsWith("Jadwal")) {
-                          const parts = selectedNotification.redirect_page.split(":");
+                        let targetPage = selectedNotification.redirect_page;
+                        if (targetPage.startsWith("Jadwal")) {
+                          const parts = targetPage.split(":");
                           if (parts[1]) {
                             setActiveStudentId(parts[1]);
                           }
-                          setActivePage("Jadwal");
-                        } else {
-                          setActivePage(selectedNotification.redirect_page);
+                          targetPage = "Jadwal";
                         }
+                        setActivePage(resolveRedirectPage(targetPage, "teacher"));
                         setSelectedNotification(null);
                       }}
                     >
-                      Go to Schedule
+                      Go to Page
                     </button>
                   )}
                   <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Close</button>
