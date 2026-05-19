@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 import { Download, Save, Loader2 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
+import { JadwalNotes } from "./JadwalNotes";
 import './jadwal.css';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -297,11 +298,20 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
       ) : (
         <div className="jadwal-empty">Please select a student from the dropdown to view and edit their Jadwal timetable.</div>
       )}
+      
+      {selectedStudentId && (
+        <JadwalNotes 
+          role="teacher" 
+          studentId={selectedStudentId} 
+          studentName={studentName} 
+          showAction={onShowAction} 
+        />
+      )}
     </div>
   );
 };
 
-export const JadwalParentView = ({ studentId }) => {
+export const JadwalParentView = ({ studentId, teacherName, teacherProfiles, showAction }) => {
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [studentName, setStudentName] = useState('Student');
   const [loading, setLoading] = useState(true);
@@ -387,6 +397,15 @@ export const JadwalParentView = ({ studentId }) => {
           </tbody>
         </table>
       </div>
+      
+      <JadwalNotes 
+        role="parent" 
+        studentId={studentId} 
+        studentName={studentName}
+        teacherName={teacherName}
+        teacherProfiles={teacherProfiles}
+        showAction={showAction}
+      />
     </div>
   );
 };
