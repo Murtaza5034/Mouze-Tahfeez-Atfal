@@ -13,6 +13,7 @@ import {
   Menu,
   ShieldCheck,
   Send,
+  Eye,
   Sparkles,
   Trophy,
   Trash,
@@ -1905,7 +1906,7 @@ function JadeedPagesCard({ count }) {
   );
 }
 
-function TahfeezReportCard({ student, weeklyResult, settings }) {
+function TahfeezReportCard({ student, weeklyResult, settings, parentViewed }) {
   const arabicStyle = { fontFamily: "'Kanz al Marjaan', serif" };
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
 
@@ -1917,7 +1918,28 @@ function TahfeezReportCard({ student, weeklyResult, settings }) {
 
   return (
     <div className="progress-overview">
-      <div className="result-card-premium card-appear">
+      <div className="result-card-premium card-appear" style={{ position: 'relative' }}>
+        {parentViewed !== undefined && (
+          <div 
+            className={`parent-view-status-dot ${parentViewed ? 'viewed' : 'not-viewed'}`}
+            title={parentViewed ? "Parent viewed this report (min. 1 minute)" : "Parent hasn't viewed this report yet"}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              width: '14px',
+              height: '14px',
+              borderRadius: '50%',
+              backgroundColor: parentViewed ? '#2ec4b6' : '#e71d36',
+              boxShadow: parentViewed 
+                ? '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)' 
+                : '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)',
+              border: '2px solid #ffffff',
+              zIndex: 10,
+              cursor: 'help'
+            }}
+          />
+        )}
         <div className="result-card-header" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div className="school-logo" style={{ marginBottom: '12px' }}><img src="/logo.png" alt="Logo" /></div>
           <div className="school-info" style={{ textAlign: 'center' }}>
@@ -2687,8 +2709,69 @@ function ParentPortal({
 }) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const backdropMouseDownRef = useRef(false);
+  const [parentViewedStatus, setParentViewedStatus] = useState(false);
+  const [secondsSpent, setSecondsSpent] = useState(0);
 
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
+
+  // Track parent viewing on Child Summary page
+  useEffect(() => {
+    if (activePage !== "Child Summary" || !studentProfile?.student_id) {
+      setSecondsSpent(0);
+      return;
+    }
+
+    // First check database for existing viewed status
+    supabase
+      .from('parent_report_views')
+      .select('viewed')
+      .eq('student_id', studentProfile.student_id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("parent_report_views table not initialized or access error:", error.message);
+          return;
+        }
+        if (data?.viewed) {
+          setParentViewedStatus(true);
+        } else {
+          setParentViewedStatus(false);
+        }
+      });
+
+    // Start 1-minute (60 seconds) timer
+    const interval = setInterval(async () => {
+      setSecondsSpent(prev => {
+        const next = prev + 1;
+        if (next >= 60) {
+          clearInterval(interval);
+          // Mark as viewed in DB!
+          supabase
+            .from('parent_report_views')
+            .upsert({
+              student_id: studentProfile.student_id,
+              viewed: true,
+              view_duration_seconds: 60,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'student_id' })
+            .then(({ error }) => {
+              if (error) {
+                console.warn("Failed to update parent view in DB:", error.message);
+              } else {
+                setParentViewedStatus(true);
+                if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
+              }
+            });
+          return 60;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [activePage, studentProfile?.student_id]);
 
   const handleDownloadReport = async () => {
     if (!studentProfile) return;
@@ -3192,6 +3275,7 @@ function ParentPortal({
                   }}
                   weeklyResult={weeklyResult || studentProfile?.latestResult}
                   settings={settings}
+                  parentViewed={parentViewedStatus}
                 />
               );
             })()}
@@ -3220,6 +3304,7 @@ function ParentPortal({
                     }}
                     weeklyResult={weeklyResult || studentProfile?.latestResult}
                     settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                    parentViewed={parentViewedStatus}
                   />
                 </div>
               )}
@@ -3762,6 +3847,7 @@ function AdminPortal({
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
+  parentViews = [],
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -3898,10 +3984,12 @@ function AdminPortal({
     groups: Array.from(item.groups),
   }));
 
+  const viewedCount = (parentViews || []).filter(v => v.viewed).length;
   const stats = [
     { label: "Students", value: students.length, icon: Users },
     { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap },
     { label: "Schedules", value: schedule.length, icon: Calendar },
+    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye },
   ];
 
   return (
@@ -4202,6 +4290,7 @@ function AdminPortal({
                       student={selectedStudent}
                       weeklyResult={selectedStudent.latestResult}
                       settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                      parentViewed={(parentViews || []).find(v => String(v.student_id) === String(selectedStudent.student_id))?.viewed ?? false}
                     />
                   </div>
                 </div>
@@ -5230,6 +5319,15 @@ function AdminPortal({
                         
                         // Notify all parents if results made live
                         if (updates.reports_live) {
+                          // Reset parent viewed status for all students
+                          supabase
+                            .from("parent_report_views")
+                            .update({ viewed: false, view_duration_seconds: 0, updated_at: new Date().toISOString() })
+                            .neq("student_id", "")
+                            .then(({ error }) => {
+                              if (error) console.warn("Failed to reset parent views on live:", error.message);
+                            });
+
                           supabase.functions.invoke('fcm-notification', {
                             body: {
                               title: "Results are LIVE!",
@@ -6132,6 +6230,7 @@ export default function App() {
   const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [reportSettings, setReportSettings] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [parentViews, setParentViews] = useState([]);
   
   // Local dismissal state (doesn't affect backend)
   const [dismissedNotifs, setDismissedNotifs] = useState(() => {
@@ -6523,6 +6622,7 @@ export default function App() {
           teacherProfilesResponse,
           reportSettingsResponse,
           supportTicketsResponse,
+          parentViewsResponse,
         ] = await Promise.all([
           supabase.from("child_profiles").select("*").order("full_name", { ascending: true }),
           supabase.from("weekly_results").select("*").order("week_date", { ascending: false }),
@@ -6534,11 +6634,18 @@ export default function App() {
           supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
           supabase.from("report_settings").select("*"),
           supabase.from("portal_issues").select("*").order("created_at", { ascending: false }),
+          supabase.from("parent_report_views").select("*"),
         ]);
 
         if (supportTicketsResponse.data) setSupportTickets(supportTicketsResponse.data);
 
         if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
+
+        if (parentViewsResponse && parentViewsResponse.data) {
+          setParentViews(parentViewsResponse.data);
+        } else {
+          setParentViews([]);
+        }
 
         const dbErrors = [
           profilesResponse.error,
@@ -6946,6 +7053,14 @@ export default function App() {
                 showAction("success", "A new progress report has been submitted!");
               }
               
+              loadPortalData(portalRole, user);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', table: 'parent_report_views', schema: 'public' },
+            (payload) => {
+              console.log("Real-time parent view update:", payload.eventType, payload.new?.student_id);
               loadPortalData(portalRole, user);
             }
           );
@@ -7590,6 +7705,7 @@ export default function App() {
               teacherAttendance,
               supportTickets,
             }}
+            parentViews={parentViews}
             adminForms={adminForms}
             adminTeacherFilter={adminTeacherFilter}
             loadPortalData={loadPortalData}
