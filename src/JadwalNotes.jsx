@@ -101,7 +101,7 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
         <div className="card-appear" style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
             <FileText size={24} style={{ color: 'var(--primary-gold)' }} />
-            <h3 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '1.4rem', fontFamily: "'Cinzel', serif" }}>Write a Note to Muhaffiz</h3>
+            <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.4rem', fontFamily: "'Cinzel', serif" }}>Write a Note to Muhaffiz</h3>
           </div>
           <p style={{ color: 'var(--soft-brown)', marginBottom: '20px', fontSize: '0.95rem' }}>
             Share updates, preparation details, or ask questions regarding your child's Quran progress.
@@ -133,7 +133,7 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
               type="submit" 
               disabled={isSubmitting || !title.trim() || !body.trim()}
               style={{
-                background: 'var(--primary-dark)',
+                background: 'var(--deep-brown)',
                 color: 'white',
                 border: 'none',
                 padding: '12px 24px',
@@ -158,7 +158,7 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
 
       {history.length > 0 && (
         <div className="card-appear" style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-          <h3 style={{ margin: '0 0 20px 0', color: 'var(--primary-dark)', fontSize: '1.3rem', fontFamily: "'Cinzel', serif" }}>
+          <h3 style={{ margin: '0 0 20px 0', color: 'var(--deep-brown)', fontSize: '1.3rem', fontFamily: "'Cinzel', serif" }}>
             {role === "teacher" ? `Parent Notes for ${studentName}` : "Note History"}
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -171,7 +171,7 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
                 position: 'relative'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingRight: '20px' }}>
-                  <h4 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '1.1rem' }}>{note.title}</h4>
+                  <h4 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.1rem' }}>{note.title}</h4>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     {new Date(note.created_at).toLocaleString()}
                   </span>
