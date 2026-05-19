@@ -2677,7 +2677,9 @@ function ParentPortal({
   setSelectedNotification,
   dismissedNotifs = [],
   dismissedAnnounces = [],
+  dismissedHomeNotifs = [],
   onDismissNotif,
+  onDismissHomeNotif,
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
@@ -3039,10 +3041,38 @@ function ParentPortal({
                 <h3>Active Notifications</h3>
               </div>
               <div className="announcement-list">
-                {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 ? (
-                  notifications.filter(n => !dismissedNotifs.includes(n.id)).slice(0, 3).map((news) => (
-                    <div key={news.id || news.title} className="news-card" onClick={() => setSelectedNotification(news)} style={{ cursor: 'pointer' }}>
-                      <div>
+                {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
+                  const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
+                  return (
+                    <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => setSelectedNotification(news)}>
+                      <button 
+                        className="card-dismiss-btn" 
+                        title="Clear from home" 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          onDismissHomeNotif(news.id); 
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '12px',
+                          right: '12px',
+                          background: 'rgba(0,0,0,0.05)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: 'var(--text-muted)',
+                          zIndex: 2,
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                      <div style={{ paddingRight: '24px' }}>
                         <div className="news-meta">
                           <span className="tag update">
                             Alert
@@ -3055,8 +3085,8 @@ function ParentPortal({
                         </p>
                       </div>
                     </div>
-                  ))
-                ) : (
+                  );
+                })() : (
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
                 )}
               </div>
@@ -5309,7 +5339,9 @@ function TeacherPortal({
   setSelectedNotification,
   dismissedNotifs = [],
   dismissedAnnounces = [],
+  dismissedHomeNotifs = [],
   onDismissNotif,
+  onDismissHomeNotif,
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
@@ -5487,10 +5519,38 @@ function TeacherPortal({
                   <h3 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--deep-brown)' }}>Active Notifications</h3>
                 </div>
                 <div className="announcement-list">
-                  {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 ? (
-                    notifications.filter(n => !dismissedNotifs.includes(n.id)).slice(0, 3).map((news) => (
-                      <div key={news.id || news.title} className="news-card" onClick={() => setSelectedNotification(news)} style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', padding: '16px', borderRadius: '12px', marginBottom: '12px' }}>
-                        <div>
+                  {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
+                    const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
+                    return (
+                      <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', padding: '16px', borderRadius: '12px', marginBottom: '12px', position: 'relative' }} onClick={() => setSelectedNotification(news)}>
+                        <button 
+                          className="card-dismiss-btn" 
+                          title="Clear from home" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            onDismissHomeNotif(news.id); 
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            background: 'rgba(0,0,0,0.05)',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            zIndex: 2,
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                        <div style={{ paddingRight: '24px' }}>
                           <div className="news-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
                             <span className="tag update" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--primary-gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
                               Alert
@@ -5503,8 +5563,8 @@ function TeacherPortal({
                           </p>
                         </div>
                       </div>
-                    ))
-                  ) : (
+                    );
+                  })() : (
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
                   )}
                 </div>
@@ -6084,6 +6144,17 @@ export default function App() {
       return JSON.parse(localStorage.getItem("mauze-dismissed-announces") || "[]");
     } catch (e) { return []; }
   });
+  const [dismissedHomeNotifs, setDismissedHomeNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("mauze-dismissed-home-notifs") || "[]");
+    } catch (e) { return []; }
+  });
+
+  const dismissHomeNotification = (id) => {
+    const next = [...dismissedHomeNotifs, id];
+    setDismissedHomeNotifs(next);
+    localStorage.setItem("mauze-dismissed-home-notifs", JSON.stringify(next));
+  };
 
   const dismissNotification = (id) => {
     const next = [...dismissedNotifs, id];
@@ -7502,7 +7573,9 @@ export default function App() {
             setSelectedNotification={setSelectedNotification}
             dismissedNotifs={dismissedNotifs}
             dismissedAnnounces={dismissedAnnounces}
+            dismissedHomeNotifs={dismissedHomeNotifs}
             onDismissNotif={dismissNotification}
+            onDismissHomeNotif={dismissHomeNotification}
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
@@ -7587,7 +7660,9 @@ export default function App() {
             setSelectedNotification={setSelectedNotification}
             dismissedNotifs={dismissedNotifs}
             dismissedAnnounces={dismissedAnnounces}
+            dismissedHomeNotifs={dismissedHomeNotifs}
             onDismissNotif={dismissNotification}
+            onDismissHomeNotif={dismissHomeNotification}
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
