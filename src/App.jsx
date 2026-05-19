@@ -2738,6 +2738,7 @@ function ParentPortal({
       return;
     }
 
+    let interval;
     // First check database for existing viewed status
     supabase
       .from('parent_report_views')
@@ -2747,46 +2748,44 @@ function ParentPortal({
       .then(({ data, error }) => {
         if (error) {
           console.warn("parent_report_views table not initialized or access error:", error.message);
-          return;
         }
         if (data?.viewed) {
           setParentViewedStatus(true);
         } else {
           setParentViewedStatus(false);
-        }
-      });
-
-    // Start 1-minute (60 seconds) timer
-    const interval = setInterval(async () => {
-      setSecondsSpent(prev => {
-        const next = prev + 1;
-        if (next >= 60) {
-          clearInterval(interval);
-          // Mark as viewed in DB!
-          supabase
-            .from('parent_report_views')
-            .upsert({
-              student_id: studentProfile.student_id,
-              viewed: true,
-              view_duration_seconds: 60,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'student_id' })
-            .then(({ error }) => {
-              if (error) {
-                console.warn("Failed to update parent view in DB:", error.message);
-              } else {
-                setParentViewedStatus(true);
-                if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
+          // Start 1-minute (60 seconds) timer only if not viewed
+          interval = setInterval(async () => {
+            setSecondsSpent(prev => {
+              const next = prev + 1;
+              if (next >= 60) {
+                clearInterval(interval);
+                // Mark as viewed in DB!
+                supabase
+                  .from('parent_report_views')
+                  .upsert({
+                    student_id: studentProfile.student_id,
+                    viewed: true,
+                    view_duration_seconds: 60,
+                    updated_at: new Date().toISOString()
+                  }, { onConflict: 'student_id' })
+                  .then(({ error }) => {
+                    if (error) {
+                      console.warn("Failed to update parent view in DB:", error.message);
+                    } else {
+                      setParentViewedStatus(true);
+                      if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
+                    }
+                  });
+                return 60;
               }
+              return next;
             });
-          return 60;
+          }, 1000);
         }
-        return next;
       });
-    }, 1000);
 
     return () => {
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
   }, [activePage, studentProfile?.student_id]);
 
@@ -4354,12 +4353,12 @@ function AdminPortal({
                 </div>
                 <div className="headline-right" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)' }}></div>
                     <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Viewed</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)' }}></div>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>New (Not Viewed)</span>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Not Viewed</span>
                   </div>
                 </div>
               </div>
@@ -4378,15 +4377,15 @@ function AdminPortal({
                           </div>
                         </div>
                         <div 
-                          title={isViewed ? "Parent viewed report" : "New result (Unseen by parent)"}
+                          title={isViewed ? "Parent viewed report" : "Parent has not viewed report"}
                           style={{
                             width: '16px',
                             height: '16px',
                             borderRadius: '50%',
-                            backgroundColor: isViewed ? '#e71d36' : '#2ec4b6',
+                            backgroundColor: isViewed ? '#2ec4b6' : '#e71d36',
                             boxShadow: isViewed 
-                              ? '0 0 12px rgba(231, 29, 54, 0.7)' 
-                              : '0 0 12px rgba(46, 196, 182, 0.7)',
+                              ? '0 0 12px rgba(46, 196, 182, 0.7)' 
+                              : '0 0 12px rgba(231, 29, 54, 0.7)',
                             border: '2px solid #ffffff',
                             flexShrink: 0
                           }}
