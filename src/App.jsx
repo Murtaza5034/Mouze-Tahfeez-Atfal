@@ -3247,20 +3247,40 @@ function ParentPortal({
 
             {(() => {
               const settings = Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
-              const isLive = settings?.reports_live !== false;
-              const liveAt = settings?.live_at ? new Date(settings.live_at) : null;
+              const isLiveMode = settings?.reports_live !== false; // true = Live, false = Hidden
+              const actionTime = settings?.live_at ? new Date(settings.live_at) : null;
               const now = new Date();
-              const isScheduled = liveAt && liveAt > now;
+              
+              let isVisible = false;
+              let emptyMessage = "";
 
-              if (!isLive || isScheduled) {
+              if (isLiveMode) {
+                // Goal: Be LIVE.
+                if (actionTime && actionTime > now) {
+                  // Wait until actionTime to be live
+                  isVisible = false;
+                  emptyMessage = `This week's progress card will be live on ${actionTime.toLocaleDateString()} at ${actionTime.toLocaleTimeString()}.`;
+                } else {
+                  isVisible = true;
+                }
+              } else {
+                // Goal: Be HIDDEN.
+                if (actionTime && actionTime > now) {
+                  // Wait until actionTime to hide
+                  isVisible = true;
+                } else {
+                  isVisible = false;
+                  emptyMessage = "The results are currently hidden for maintenance at this time. Please check back shortly.";
+                }
+              }
+
+              if (!isVisible) {
                 return (
                   <div className="empty-state card-appear" style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--white-alpha)', borderRadius: '24px', border: '2px dashed var(--primary-gold)' }}>
                     <Clock size={48} style={{ color: 'var(--primary-gold)', marginBottom: '20px', opacity: 0.6 }} className="pulse" />
                     <h3 className="kids-font" style={{ fontSize: '1.8rem', color: 'var(--deep-brown)' }}>Report is being prepared!</h3>
                     <p style={{ color: 'var(--soft-brown)', maxWidth: '400px', margin: '10px auto' }}>
-                      {isScheduled 
-                        ? `This week's progress card will be live on ${liveAt.toLocaleDateString()} at ${liveAt.toLocaleTimeString()}.`
-                        : "The administration is currently finalizing the results. Please check back shortly."}
+                      {emptyMessage}
                     </p>
                     <div className="loading-spinner-mini" style={{ marginTop: '20px' }}></div>
                   </div>
@@ -5405,7 +5425,7 @@ function AdminPortal({
                       </select>
                     </label>
                     <label>
-                      <span>Schedule Live Time</span>
+                      <span>Schedule Action Time</span>
                       <input 
                         type="datetime-local" 
                         name="live_at" 
@@ -5415,7 +5435,7 @@ function AdminPortal({
                     </label>
                   </div>
                   <p className="hint-text" style={{ marginBottom: '20px' }}>
-                    If hidden or scheduled in the future, parents will see a "Coming Soon" message instead of the report.
+                    If "Live" is selected, the time schedules when the report will become visible. If "Hidden" is selected, the time schedules when the report will be hidden.
                   </p>
                   
                   <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
