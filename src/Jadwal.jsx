@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { Download } from 'lucide-react';
+import { Download, Save, Loader2 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import './jadwal.css';
@@ -221,13 +221,22 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             ))}
           </select>
           {selectedStudentId && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="premium-btn gold" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Jadwal'}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button className="jadwal-save-btn" onClick={handleSave} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    <span>Save Jadwal</span>
+                  </>
+                )}
               </button>
               <button 
-                className="premium-btn secondary" 
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#5d4037', color: '#ffffff', border: '1px solid #5d4037', cursor: 'pointer' }}
+                className="jadwal-download-btn" 
                 onClick={() => handleDownloadPDF(studentName, scheduleData)}
               >
                 <Download size={16} /> Download PDF
@@ -344,8 +353,7 @@ export const JadwalParentView = ({ studentId }) => {
       <div className="jadwal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Weekly Jadwal Schedule</h2>
         <button 
-          className="premium-btn gold" 
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+          className="jadwal-save-btn" 
           onClick={() => handleDownloadPDF(studentName, scheduleData)}
         >
           <Download size={16} /> Download PDF
