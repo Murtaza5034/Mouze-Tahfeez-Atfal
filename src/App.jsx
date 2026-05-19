@@ -3953,7 +3953,7 @@ function AdminPortal({
   };
 
   const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Global Settings"];
-  const navPages = ["Overview", "Schedule"];
+  const navPages = ["Overview", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
@@ -4306,6 +4306,61 @@ function AdminPortal({
               )}
             </div>
           ) : null}
+
+          {activePage === "Result Tracking" ? (
+            <div className="overview-container fade-in">
+              <div className="card-headline headline-with-action card-appear" style={{ marginBottom: '20px', backgroundColor: 'var(--white)', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+                <div className="headline-left">
+                  <Eye size={20} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 style={{ color: 'var(--deep-brown)', margin: 0 }}>Parent Report View Tracking</h3>
+                </div>
+                <div className="headline-right" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)' }}></div>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Viewed</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Not Viewed</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="assigned-list card-appear">
+                <div className="assigned-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
+                  {students.map(s => {
+                    const isViewed = (parentViews || []).find(v => String(v.student_id) === String(s.student_id))?.viewed ?? false;
+                    return (
+                      <div key={s.student_id} className="assigned-child-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', margin: 0 }}>
+                        <div className="child-info-header" style={{ margin: 0, gap: '12px' }}>
+                          <StudentAvatar student={s} size="small" />
+                          <div>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: 'var(--primary-dark)' }}>{s.name}</h4>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--soft-brown)' }}>{s.groupName || 'No Group'}</p>
+                          </div>
+                        </div>
+                        <div 
+                          title={isViewed ? "Parent viewed report" : "Parent has not viewed report"}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            backgroundColor: isViewed ? '#2ec4b6' : '#e71d36',
+                            boxShadow: isViewed 
+                              ? '0 0 12px rgba(46, 196, 182, 0.7)' 
+                              : '0 0 12px rgba(231, 29, 54, 0.7)',
+                            border: '2px solid #ffffff',
+                            flexShrink: 0
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
 
           {activePage === "Notifications" ? (
             <div className="management-grid two-columns">
