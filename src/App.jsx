@@ -1770,6 +1770,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       user_id: profile.parent_user_id || null,
       parent_email: profile.parent_email || null,
       photoUrl: profile.photo_url || "",
+      whatsapp_number: profile.whatsapp_number || "",
       hifz: {
         juz: profile.juz || "N-A",
         surat: profile.surat || "Pending",
@@ -3966,10 +3967,181 @@ function AdminPortal({
   onDismissAnnounce,
   onClearAllAnnounces,
   parentViews = [],
+  whatsappConfig,
+  onUpdateWhatsappConfig,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
+  const [whatsAppLogs, setWhatsAppLogs] = useState([]);
+
+  const parseTemplate = (template, student) => {
+    let msg = template || 'Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/';
+    msg = msg.replace(/\{\{child_name\}\}/g, student.name || student.full_name || '');
+    msg = msg.replace(/\{\{group_name\}\}/g, student.groupName || student.group_name || '');
+    msg = msg.replace(/\{\{juz\}\}/g, student.hifz?.juz || student.juz || '');
+    msg = msg.replace(/\{\{surat\}\}/g, student.hifz?.surat || student.surat || '');
+    msg = msg.replace(/\{\{portal_url\}\}/g, 'https://mouze-tahfeez-atfal.vercel.app/');
+    return msg;
+  };
+
+  const sendIndividualWhatsApp = async (config, phone, message, studentName) => {
+    const { provider, api_url, api_token, account_sid, from_number } = config;
+    
+    // Format phone number: keep only digits
+    const formattedPhone = (phone || "").split("").filter(c => "0123456789".includes(c)).join("");
+    
+    if (!formattedPhone) {
+      throw new Error("Invalid phone number");
+    }
+
+    if (provider === 'custom') {
+      if (!api_url) throw new Error("API URL is not configured for Custom Gateway");
+      
+      const response = await fetch(api_url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': api_token ? `Bearer ${api_token}` : undefined
+        },
+        body: JSON.stringify({
+          to: formattedPhone,
+          phone: formattedPhone,
+          number: formattedPhone,
+          message: message,
+          body: message,
+          msg: message,
+          token: api_token
+        })
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Custom Gateway Error (${response.status}): ${text.substring(0, 100)}`);
+      }
+      return true;
+    }
+    
+    if (provider === 'twilio') {
+      if (!account_sid || !api_token || !from_number) {
+        throw new Error("Twilio config incomplete (Account SID, Auth Token, or From Number missing)");
+      }
+      const url = `https://api.twilio.com/2010-04-01/Accounts/${account_sid}/Messages.json`;
+      const headers = {
+        'Authorization': 'Basic ' + btoa(`${account_sid}:${api_token}`),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      };
+      
+      const twilioFrom = from_number.startsWith('whatsapp:') ? from_number : `whatsapp:${from_number}`;
+      const twilioTo = `whatsapp:${formattedPhone.startsWith('+') ? formattedPhone : '+' + formattedPhone}`;
+      
+      const body = new URLSearchParams({
+        To: twilioTo,
+        From: twilioFrom,
+        Body: message
+      });
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: body.toString()
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || `Twilio Error (${response.status})`);
+      }
+      return true;
+    }
+    
+    if (provider === 'meta') {
+      if (!from_number || !api_token) {
+        throw new Error("Meta API config incomplete (Phone Number ID or Access Token missing)");
+      }
+      const url = `https://graph.facebook.com/v20.0/${from_number}/messages`;
+      const headers = {
+        'Authorization': `Bearer ${api_token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      const body = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: formattedPhone,
+        type: "text",
+        text: {
+          body: message
+        }
+      };
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      });
+      
+      if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error(errJson?.error?.message || `Meta Cloud API Error (${response.status})`);
+      }
+      return true;
+    }
+    
+    throw new Error(`Unsupported WhatsApp provider: ${provider}`);
+  };
+
+  const triggerWhatsAppNotifications = async () => {
+    if (!whatsappConfig || !whatsappConfig.enabled || whatsappConfig.provider === 'none') {
+      console.log("WhatsApp integration is disabled or provider is set to none.");
+      return;
+    }
+    
+    const targetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
+    
+    if (targetStudents.length === 0) {
+      if (onShowAction) onShowAction("info", "No parents with WhatsApp numbers found to notify.");
+      return;
+    }
+    
+    setSendingWhatsApp(true);
+    setWhatsAppProgress({ current: 0, total: targetStudents.length });
+    setWhatsAppLogs([{ time: new Date().toLocaleTimeString(), text: `Starting WhatsApp notifications for ${targetStudents.length} parents...`, type: 'info' }]);
+    
+    let sentCount = 0;
+    
+    for (let i = 0; i < targetStudents.length; i++) {
+      const student = targetStudents[i];
+      const phone = student.whatsapp_number;
+      const message = parseTemplate(whatsappConfig.message_template, student);
+      
+      setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Sending to ${student.name} (${phone})...`, type: 'sending' }]);
+      
+      try {
+        await sendIndividualWhatsApp(whatsappConfig, phone, message, student.name);
+        sentCount++;
+        setWhatsAppLogs(prev => [
+          ...prev.slice(0, -1),
+          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' }
+        ]);
+      } catch (err) {
+        console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
+        setWhatsAppLogs(prev => [
+          ...prev.slice(0, -1),
+          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} ❌`, type: 'error' }
+        ]);
+      }
+      
+      setWhatsAppProgress(prev => ({ ...prev, current: i + 1 }));
+      
+      if (i < targetStudents.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `WhatsApp notifications finished! Sent: ${sentCount}/${targetStudents.length} successfully.`, type: 'info' }]);
+  };
   const [generationProgress, setGenerationProgress] = useState(0);
   const [studentToRender, setStudentToRender] = useState(null);
 
@@ -4233,6 +4405,7 @@ function AdminPortal({
                     full_name,
                     arabic_name: formData.get("arabic_name"),
                     parent_email: formData.get("parent_email"),
+                    whatsapp_number: formData.get("whatsapp_number") ? String(formData.get("whatsapp_number")).trim() : null,
                     juz: formData.get("juz"),
                     surat: formData.get("surat"),
                     photo_url: formData.get("photo_url"),
@@ -4266,8 +4439,18 @@ function AdminPortal({
                       <input name="parent_email" type="email" placeholder="parent@example.com" className="premium-input" />
                     </label>
                     <label>
+                      <span>WhatsApp Number (Parents)</span>
+                      <input name="whatsapp_number" type="text" placeholder="e.g. 923001234567" className="premium-input" />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
                       <span>Photo URL</span>
                       <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                    </label>
+                    <label style={{ opacity: 0, pointerEvents: 'none' }}>
+                      <span>Spacer</span>
+                      <input type="text" className="premium-input" />
                     </label>
                   </div>
                   <div className="form-row">
@@ -4304,6 +4487,11 @@ function AdminPortal({
                         <div>
                           <h4>{s.name}</h4>
                           <p>{s.groupName || 'No Group'}</p>
+                          {s.whatsapp_number && (
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                              <MessageCircle size={12} style={{ color: '#25D366' }} /> {s.whatsapp_number}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <button
@@ -4816,6 +5004,7 @@ function AdminPortal({
                       photo_url: e.target.photo_url?.value,
                       group_name: e.target.group_name?.value,
                       its: e.target.its?.value,
+                      whatsapp_number: e.target.whatsapp_number?.value,
                     };
                     if (data.student_id) onAssignChild(data);
                   }}>
@@ -4839,6 +5028,7 @@ function AdminPortal({
                               if (form.surat) form.surat.value = s.surat || '';
                               if (form.photo_url) form.photo_url.value = s.photoUrl || '';
                               if (form.its) form.its.value = s.its === '...' ? '' : (s.its || '');
+                              if (form.whatsapp_number) form.whatsapp_number.value = s.whatsapp_number || '';
                               if (form.teacher_id) form.teacher_id.value = s.muhaffiz_id || '';
                               if (form.parent_id) form.parent_id.value = s.user_id || '';
                             }
@@ -4890,6 +5080,11 @@ function AdminPortal({
                       <label>
                         <span>ITS Number</span>
                         <input name="its" type="text" placeholder="ITS" className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>WhatsApp Number</span>
+                        <input name="whatsapp_number" type="text" placeholder="e.g. 923001234567" className="premium-input" />
                       </label>
 
                       <label>
@@ -5508,6 +5703,9 @@ function AdminPortal({
                               targetRole: 'parents'
                             }
                           });
+                          
+                          // Trigger WhatsApp notifications
+                          triggerWhatsAppNotifications();
                         }
                         
                         loadPortalData(portalRole, user);
@@ -5555,6 +5753,85 @@ function AdminPortal({
                 </form>
               </section>
 
+              {/* WhatsApp Integration Configuration Section */}
+              <section className="form-card card-appear" style={{ marginTop: '20px' }}>
+                <div className="card-headline">
+                  <MessageCircle size={18} />
+                  <h3>WhatsApp Integration</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = {
+                    enabled: formData.get("wa_enabled") === "true",
+                    provider: formData.get("wa_provider"),
+                    api_url: formData.get("wa_api_url"),
+                    api_token: formData.get("wa_api_token"),
+                    account_sid: formData.get("wa_account_sid"),
+                    from_number: formData.get("wa_from_number"),
+                    message_template: formData.get("wa_message_template")
+                  };
+                  onUpdateWhatsappConfig(updates);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable WhatsApp Notifications</span>
+                      <select name="wa_enabled" defaultValue={String(whatsappConfig?.enabled ?? false)} className="premium-select">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>WhatsApp Provider</span>
+                      <select name="wa_provider" defaultValue={whatsappConfig?.provider ?? "none"} className="premium-select">
+                        <option value="none">None / Disabled</option>
+                        <option value="custom">Custom HTTP Gateway</option>
+                        <option value="twilio">Twilio API</option>
+                        <option value="meta">Meta Cloud API</option>
+                      </select>
+                    </label>
+                  </div>
+                  
+                  <div className="form-grid">
+                    <label>
+                      <span>API URL (Custom Gateway only)</span>
+                      <input name="wa_api_url" type="text" defaultValue={whatsappConfig?.api_url || ""} placeholder="https://api.ultramsg.com/instanceXXXX/messages/chat" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>API Token / Auth Token / Access Token</span>
+                      <input name="wa_api_token" type="password" defaultValue={whatsappConfig?.api_token || ""} placeholder="Your secret token..." className="premium-input" />
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      <span>Account SID (Twilio only)</span>
+                      <input name="wa_account_sid" type="text" defaultValue={whatsappConfig?.account_sid || ""} placeholder="ACxxxxxxxxxxxxxx" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>From Number / Phone ID (Twilio/Meta/Custom)</span>
+                      <input name="wa_from_number" type="text" defaultValue={whatsappConfig?.from_number || ""} placeholder="e.g. +14155238886" className="premium-input" />
+                    </label>
+                  </div>
+
+                  <label>
+                    <span>Message Template</span>
+                    <textarea 
+                      name="wa_message_template" 
+                      rows={3} 
+                      defaultValue={whatsappConfig?.message_template || 'Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/'} 
+                      className="premium-input"
+                      style={{ resize: 'vertical' }}
+                    />
+                    <span className="hint-text">Placeholders: <code>{"{{child_name}}"}</code>, <code>{"{{group_name}}"}</code>, <code>{"{{juz}}"}</code>, <code>{"{{surat}}"}</code></span>
+                  </label>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '10px' }}>
+                    Save WhatsApp Settings
+                  </button>
+                </form>
+              </section>
+
               <section className="data-card card-appear">
                 <div className="card-headline">
                   <Info size={18} />
@@ -5578,6 +5855,72 @@ function AdminPortal({
             </div>
           ) : null}
         </section>
+
+        {/* WhatsApp Sending Progress Modal */}
+        {sendingWhatsApp && (
+          <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)' }}>
+            <div className="premium-modal-card card-appear" style={{ maxWidth: '600px', width: '90%', padding: '24px', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: '16px', boxShadow: 'var(--premium-shadow)', color: 'var(--text-main)' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--deep-brown)', margin: '0 0 16px' }}>
+                <MessageCircle style={{ color: 'var(--primary-gold)' }} />
+                Sending WhatsApp Notifications
+              </h3>
+              
+              <div className="progress-bar-container" style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
+                <div 
+                  className="progress-bar-fill" 
+                  style={{ 
+                    width: `${(whatsAppProgress.current / Math.max(whatsAppProgress.total, 1)) * 100}%`, 
+                    height: '100%', 
+                    background: 'var(--primary-gold)',
+                    transition: 'width 0.3s ease'
+                  }} 
+                />
+              </div>
+              
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Processing: <strong>{whatsAppProgress.current}</strong> of <strong>{whatsAppProgress.total}</strong> parents
+              </p>
+              
+              <div 
+                className="log-console" 
+                style={{ 
+                  height: '200px', 
+                  overflowY: 'auto', 
+                  background: 'rgba(0,0,0,0.03)', 
+                  border: '1px solid rgba(0,0,0,0.05)', 
+                  borderRadius: '8px', 
+                  padding: '12px', 
+                  fontSize: '0.8rem', 
+                  fontFamily: 'monospace',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}
+              >
+                {whatsAppLogs.map((log, idx) => (
+                  <div key={idx} style={{ 
+                    color: log.type === 'success' ? '#2e7d32' : log.type === 'error' ? '#c62828' : log.type === 'sending' ? '#1565c0' : 'var(--text-main)' 
+                  }}>
+                    [{log.time}] {log.text}
+                  </div>
+                ))}
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button 
+                  className="action-button" 
+                  disabled={whatsAppProgress.current < whatsAppProgress.total}
+                  onClick={() => {
+                    setSendingWhatsApp(false);
+                    setWhatsAppLogs([]);
+                  }}
+                >
+                  Close / Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -6433,6 +6776,7 @@ export default function App() {
   const [adminTeacherFilter, setAdminTeacherFilter] = useState("All");
   const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [reportSettings, setReportSettings] = useState([]);
+  const [whatsappConfig, setWhatsappConfig] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [parentViews, setParentViews] = useState([]);
   
@@ -6886,6 +7230,15 @@ export default function App() {
         setTeacherAttendance(attendanceResponse.data || []);
         setCustomGroups(groupsResponse.data || []);
 
+        if (role === "admin") {
+          const { data: waData, error: waError } = await supabase
+            .from("whatsapp_config")
+            .select("*")
+            .eq("id", 1)
+            .maybeSingle();
+          if (waData) setWhatsappConfig(waData);
+          else if (waError) console.warn("Failed to load whatsapp_config:", waError.message);
+        }
 
         setSchoolData({
           students,
@@ -7580,7 +7933,7 @@ export default function App() {
   };
 
   const handleAssignChild = async (data) => {
-    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its } = data;
+    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number } = data;
     if (!student_id) {
       showAction("error", "Please select a student first.");
       return;
@@ -7615,6 +7968,7 @@ export default function App() {
     if (surat && surat.trim()) updatePayload.surat = surat.trim();
     if (photo_url && photo_url.trim()) updatePayload.photo_url = photo_url.trim();
     if (its && its.trim()) updatePayload.its = its.trim();
+    if (whatsapp_number !== undefined) updatePayload.whatsapp_number = whatsapp_number ? whatsapp_number.trim() : null;
 
     const { error: profileError } = await supabase
       .from("child_profiles")
@@ -7937,6 +8291,8 @@ export default function App() {
             portalAccess={portalAccess}
             portalRole={portalRole}
             reportSettings={reportSettings}
+            whatsappConfig={whatsappConfig}
+            onUpdateWhatsappConfig={handleUpdateWhatsappConfig}
             selectedStudentId={selectedStudentId}
             setActivePage={setActivePage}
             setAdminForms={setAdminForms}
