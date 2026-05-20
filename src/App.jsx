@@ -8067,6 +8067,20 @@ export default function App() {
     showAction("success", "Student unassigned and unlinked from all accounts.");
   };
 
+  const handleUpdateWhatsappConfig = async (updates) => {
+    const { error } = await supabase
+      .from("whatsapp_config")
+      .upsert({ id: 1, ...updates });
+
+    if (error) {
+      showAction("error", `Failed to save WhatsApp settings: ${error.message}`);
+      return;
+    }
+
+    setWhatsappConfig(updates);
+    showAction("success", "WhatsApp settings saved successfully.");
+  };
+
   const handleDeleteRecord = (table, idField = "id") => async (id) => {
     if (!window.confirm("Are you sure you want to delete this record?")) return;
 
