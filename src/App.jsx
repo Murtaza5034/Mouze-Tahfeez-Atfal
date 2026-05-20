@@ -60,6 +60,7 @@ import "./salary.css";
 import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
+import IstifdahProgress from "./IstifdahProgress";
 
 const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
 const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
@@ -3157,6 +3158,9 @@ function ParentPortal({
                 </div>
               ))}
             </div>
+            
+            <IstifdahProgress weeklyResult={weeklyResult} />
+            
             <div className="dashboard-section">
               <div className="section-header">
                 <Calendar size={18} />
@@ -3997,6 +4001,35 @@ function AdminPortal({
       throw new Error("Invalid phone number");
     }
 
+    if (provider === 'mock') {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      console.log(`[SIMULATED WHATSAPP] To: ${formattedPhone}, Message: ${message}`);
+      return true;
+    }
+
+    if (provider === 'ultramsg') {
+      if (!api_url || !api_token) throw new Error("API URL or Token is not configured for UltraMsg");
+      
+      const body = new URLSearchParams();
+      body.append('token', api_token);
+      body.append('to', formattedPhone);
+      body.append('body', message);
+
+      const response = await fetch(api_url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString()
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`UltraMsg Error (${response.status}): ${text.substring(0, 100)}`);
+      }
+      return true;
+    }
+
     if (provider === 'custom') {
       if (!api_url) throw new Error("API URL is not configured for Custom Gateway");
       
@@ -4093,14 +4126,19 @@ function AdminPortal({
   };
 
   const triggerWhatsAppNotifications = async () => {
-    if (!whatsappConfig || !whatsappConfig.enabled || whatsappConfig.provider === 'none') {
-      console.log("WhatsApp integration is disabled or provider is set to none.");
+    if (!whatsappConfig) {
+      alert("WhatsApp Configuration is not loaded yet. Please wait a second and try again.");
+      return;
+    }
+    if (!whatsappConfig.enabled || whatsappConfig.provider === 'none') {
+      alert("WhatsApp notifications are disabled or the provider is set to None. Please configure them below.");
       return;
     }
     
     const targetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
     
     if (targetStudents.length === 0) {
+      alert("No students found with a WhatsApp number in their profile!");
       if (onShowAction) onShowAction("info", "No parents with WhatsApp numbers found to notify.");
       return;
     }
@@ -5785,6 +5823,7 @@ function AdminPortal({
                       <span>WhatsApp Provider</span>
                       <select name="wa_provider" defaultValue={whatsappConfig?.provider ?? "none"} className="premium-select">
                         <option value="none">None / Disabled</option>
+                        <option value="mock">Simulated / Testing Mode (Mock)</option>
                         <option value="custom">Custom HTTP Gateway</option>
                         <option value="twilio">Twilio API</option>
                         <option value="meta">Meta Cloud API</option>
