@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { Suspense, useEffect, useMemo, useState, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
   BookOpen,
@@ -47,20 +48,13 @@ import {
   Paperclip,
   Trash2
 } from "lucide-react";
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
-import JSZip from "jszip";
-import { saveAs } from "file-saver";
-import { supabase } from "./supabaseClient";
+import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
-import fcmService from "./fcmService";
-import { JadwalTeacherView, JadwalParentView } from "./Jadwal";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
-import IstifdahProgress from "./IstifdahProgress";
 
 const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
 const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
@@ -71,6 +65,88 @@ const getLocalDateKey = (date = new Date()) => {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
+
+const TEACHER_PROGRESS_EDIT_LIMIT = 3;
+
+const getReportSettingsObject = (reportSettings) =>
+  Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
+
+const REPORT_SETTING_DEFAULTS = {
+  main_heading: "Rawdat Tahfeez al Atfal",
+  sub_heading: "TAHFEEZ REPORT 1447H",
+  weekly_score_heading: "Total Weekly Score",
+  jumla_heading: "Jumla",
+  murajazah_heading: "Murajah",
+  juz_hali_heading: "Juz Hali",
+  takhteet_heading: "Takhteet",
+  jadeed_heading: "Jadeed",
+  jadeed_safahat_heading: "Jadeed Safahat",
+  attendance_heading: "Attendance",
+  matrookah_heading: "Matrookah",
+  daeefah_heading: "Zaeefah",
+  wusool_heading: "Wusool",
+  wusool_juz_heading: "Wusool Juz",
+  wusool_page_heading: "Wusool Page",
+  next_week_heading: "Next Week Target",
+  next_week_juz_heading: "Next Week Juz",
+  next_week_page_heading: "Next Week Page",
+  istifadah_heading: "Target Till",
+  istifadah_juz_heading: "Its Juz",
+  istifadah_page_heading: "Its Page",
+  progress_card_background_url: "",
+  progress_card_background_position: "center",
+  progress_card_overlay_opacity: 0.82,
+};
+
+const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
+const MAX_REPORT_BACKGROUND_SIZE = 5 * 1024 * 1024;
+
+const normalizeReportSettings = (reportSettings) => ({
+  ...REPORT_SETTING_DEFAULTS,
+  ...(getReportSettingsObject(reportSettings) || {}),
+});
+
+const createTeacherResultDraft = (overrides = {}) => ({
+  student_id: "",
+  week_date: getToday(),
+  murajazah: "",
+  juz_hali: "",
+  takhteet: "",
+  jadeed: "",
+  next_week_juz: "",
+  next_week_page: "",
+  total_jadeed_pages: "",
+  istifadah_juz: "",
+  istifadah_page: "",
+  wusool_juz: "",
+  wusool_page: "",
+  matrookah: "",
+  daeefah: "",
+  attendance_count: "",
+  attendance_note: "",
+  teacher_edit_count: 0,
+  teacher_locked: false,
+  teacher_locked_at: null,
+  ...overrides,
+});
+
+const getTeacherResultEditCount = (result) =>
+  Math.max(
+    0,
+    Number(
+      result?.teacher_edit_count ??
+        result?.edit_count ??
+        result?.save_count ??
+        (result?.id ? 1 : 0)
+    ) || 0
+  );
+
+const getTeacherResultRemainingEdits = (result) =>
+  Math.max(TEACHER_PROGRESS_EDIT_LIMIT - getTeacherResultEditCount(result), 0);
+
+const isTeacherResultLocked = (result) =>
+  Boolean(result?.teacher_locked ?? result?.is_locked) ||
+  getTeacherResultEditCount(result) >= TEACHER_PROGRESS_EDIT_LIMIT;
 
 const loadTrackedDays = (userId) => {
   if (!userId) return [];
@@ -114,6 +190,41 @@ const ASSETS = {
   LOGO: "/logo.png",
 };
 
+const loadFcmService = async () => {
+  const mod = await import("./fcmService");
+  return mod.default;
+};
+
+const loadHtml2Canvas = async () => {
+  const mod = await import("html2canvas");
+  return mod.default;
+};
+
+const loadJsPDF = async () => {
+  const mod = await import("jspdf");
+  return mod.jsPDF;
+};
+
+const loadJSZip = async () => {
+  const mod = await import("jszip");
+  return mod.default;
+};
+
+const loadSaveAs = async () => {
+  const mod = await import("file-saver");
+  return mod.saveAs;
+};
+
+const LazyJadwalTeacherView = React.lazy(() =>
+  import("./Jadwal").then((mod) => ({ default: mod.JadwalTeacherView }))
+);
+
+const LazyJadwalParentView = React.lazy(() =>
+  import("./Jadwal").then((mod) => ({ default: mod.JadwalParentView }))
+);
+
+const LazyIstifdahProgress = React.lazy(() => import("./IstifdahProgress"));
+
 const fixArabicScript = (text) => {
   if (!text) return "";
   // Normalize Gaf (Persian/Urdu script)
@@ -138,6 +249,7 @@ const NotificationStatus = ({ role }) => {
     
     setIsInitializing(true);
     try {
+      const fcmService = await loadFcmService();
       const result = await fcmService.initialize(role);
       setPermission(Notification.permission);
       if (result) {
@@ -300,6 +412,7 @@ const NAV_ICONS = {
   About: Info,
   "User Issues": LifeBuoy,
   "Leave Management": CalendarX,
+  "Report Settings": Palette,
   "Global Settings": Settings,
   "Messages": MessageCircle,
 };
@@ -1821,7 +1934,7 @@ function InfoHighlights({ items }) {
   );
 }
 
-function FatemiDateSelector({ value, onChange }) {
+function FatemiDateSelector({ value, onChange, disabled = false }) {
   const info = useMemo(() => getFatemiInfo(value), [value]);
   const years = [1445, 1446, 1447, 1448];
   const days = Array.from({ length: 30 }, (_, i) => i + 1);
@@ -1847,22 +1960,22 @@ function FatemiDateSelector({ value, onChange }) {
 
   return (
     <div className="fatemi-selector">
-      <select value={info.date} onChange={(e) => handleSelectChange('day', e.target.value)}>
+      <select value={info.date} onChange={(e) => handleSelectChange('day', e.target.value)} disabled={disabled}>
         {days.map(d => <option key={d} value={d}>{d}</option>)}
       </select>
-      <select value={info.month} onChange={(e) => handleSelectChange('month', e.target.value)}>
+      <select value={info.month} onChange={(e) => handleSelectChange('month', e.target.value)} disabled={disabled}>
         {ARABIC_MONTHS.map((name, i) => (
           <option key={name} value={i + 1} className="arabic-kanz" style={{ fontSize: '1.1rem' }}>{name}</option>
         ))}
       </select>
-      <select value={info.year} onChange={(e) => handleSelectChange('year', e.target.value)}>
+      <select value={info.year} onChange={(e) => handleSelectChange('year', e.target.value)} disabled={disabled}>
         {years.map(y => <option key={y} value={y}>{y}</option>)}
       </select>
     </div>
   );
 }
 
-function AttendanceCard({ count, total = 6 }) {
+function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
   const stars = Array.from({ length: total }, (_, i) => i < Number(count || 0));
 
   return (
@@ -1880,17 +1993,17 @@ function AttendanceCard({ count, total = 6 }) {
       </div>
       <div>
         <h4 className="attendance-rating-text kids-font">
-          {count || 0} out of {total} Presence
+          {heading}
         </h4>
         <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
-          Weekly student presence score
+          {count || 0} out of {total} Presence
         </p>
       </div>
     </div>
   );
 }
 
-function JadeedPagesCard({ count }) {
+function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
   return (
     <div className="jadeed-pages-card card-appear">
       <div className="attendance-lighting" />
@@ -1899,7 +2012,7 @@ function JadeedPagesCard({ count }) {
         <span className="jadeed-count-overlay">{count || 0}</span>
       </div>
       <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontSize: '1.6rem', fontFamily: "'Kanz al Marjaan', serif", marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
-        جديد صفحات
+        {heading}
       </h4>
       <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
         New pages memorized this week
@@ -1911,16 +2024,33 @@ function JadeedPagesCard({ count }) {
 function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false }) {
   const arabicStyle = { fontFamily: "'Kanz al Marjaan', serif" };
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
+  const report = normalizeReportSettings(settings);
 
-  const hMain = settings?.main_heading || "Rawdat Tahfeez al Atfal";
-  const hSub = settings?.sub_heading || "TAHFEEZ REPORT 1447H";
-  const hWusool = settings?.wusool_heading || "وصول الى الاْن";
-  const hNext = settings?.next_week_heading || "Next Week Target";
-  const hIstifadah = settings?.istifadah_heading || "Target Till Istifadah";
+  const hMain = report.main_heading;
+  const hSub = report.sub_heading;
+  const hWusool = report.wusool_heading;
+  const hNext = report.next_week_heading;
+  const hIstifadah = report.istifadah_heading;
+  const progressCardBackground = report.progress_card_background_url || "";
+  const progressCardOverlayOpacity = Math.min(
+    Math.max(Number(report.progress_card_overlay_opacity ?? 0.82), 0),
+    1
+  );
+  const progressCardStyle = progressCardBackground
+    ? {
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundColor: '#fffaf0',
+        backgroundImage: `linear-gradient(rgba(255, 250, 240, ${progressCardOverlayOpacity}), rgba(255, 250, 240, ${progressCardOverlayOpacity})), url(${progressCardBackground})`,
+        backgroundSize: 'cover',
+        backgroundPosition: report.progress_card_background_position || 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    : { position: 'relative' };
 
   return (
     <div className="progress-overview">
-      <div className="result-card-premium card-appear" style={{ position: 'relative' }}>
+      <div className="result-card-premium card-appear" style={progressCardStyle}>
         {parentViewed !== undefined && (
           <div 
             className={`parent-view-status-dot ${parentViewed ? 'viewed' : 'not-viewed'}`}
@@ -1933,8 +2063,8 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               height: '14px',
               borderRadius: '50%',
               backgroundColor: isParentPortal 
-                ? (parentViewed ? '#e71d36' : '#2ec4b6') // Parent Portal: Green when new, turns Red when viewed
-                : (parentViewed ? '#2ec4b6' : '#e71d36'), // Admin Portal/Others: Red when new, turns Green when viewed
+                ? (parentViewed ? '#e71d36' : '#2ec4b6')
+                : (parentViewed ? '#2ec4b6' : '#e71d36'),
               boxShadow: isParentPortal
                 ? (parentViewed 
                     ? '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)' 
@@ -1995,8 +2125,8 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
         <div className="result-main">
           <div className="total-score-block">
-            <span className="score-title kids-font">WEEKLY SCORE</span>
-            <span className="jumla-label arabic-kanz" style={arabicStyle}>جملة</span>
+            <span className="score-title kids-font">{report.weekly_score_heading}</span>
+            <span className="jumla-label arabic-kanz" style={arabicStyle}>{report.jumla_heading}</span>
             <div className="score-circle">
               {(weeklyResult?.total_score ?? 
                 (toNumber(weeklyResult?.murajazah) + 
@@ -2009,10 +2139,10 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
           <div className="score-details-box">
             {[
-              { label: "مراجعة", val: weeklyResult?.murajazah, max: 30 },
-              { label: "جزء حالي", val: weeklyResult?.juz_hali, max: 30 },
-              { label: "تخطيط", val: weeklyResult?.takhteet, max: 20 },
-              { label: "جديد", val: weeklyResult?.jadeed, max: 20 }
+              { label: report.murajazah_heading, val: weeklyResult?.murajazah, max: 30 },
+              { label: report.juz_hali_heading, val: weeklyResult?.juz_hali, max: 30 },
+              { label: report.takhteet_heading, val: weeklyResult?.takhteet, max: 20 },
+              { label: report.jadeed_heading, val: weeklyResult?.jadeed, max: 20 }
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
                 <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label} :</span>
@@ -2032,28 +2162,28 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         <div className="result-footer-grid">
           <div className="target-box highlight-wusool">
             <h5 className="arabic-kanz" dir="rtl" style={{ ...arabicStyle, fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.wusool_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.wusool_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_juz_heading} :</span> {weeklyResult?.wusool_juz || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_page_heading} :</span> {weeklyResult?.wusool_page || "-"}</p>
           </div>
           <div className="target-box highlight-matrookah">
             <div className="note-item-row">
               <span className="note-val">{weeklyResult?.matrookah || "-"}</span>
-              <span className="note-label arabic-kanz" style={arabicStyle}>متروكة :</span>
+              <span className="note-label arabic-kanz" style={arabicStyle}>{report.matrookah_heading} :</span>
             </div>
             <div className="note-item-row">
               <span className="note-val">{weeklyResult?.daeefah || "-"}</span>
-              <span className="note-label arabic-kanz" style={arabicStyle}>ضعيفة :</span>
+              <span className="note-label arabic-kanz" style={arabicStyle}>{report.daeefah_heading} :</span>
             </div>
           </div>
           <div className="target-box">
             <h5 className="kids-font">{hNext}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.next_week_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.next_week_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_juz_heading} :</span> {weeklyResult?.next_week_juz || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_page_heading} :</span> {weeklyResult?.next_week_page || "-"}</p>
           </div>
           <div className="target-box highlight">
             <h5 className="kids-font">{hIstifadah}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.istifadah_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.istifadah_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_juz_heading} :</span> {weeklyResult?.istifadah_juz || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_page_heading} :</span> {weeklyResult?.istifadah_page || "-"}</p>
           </div>
         </div>
 
@@ -2066,16 +2196,16 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         <AttendanceCard
           count={weeklyResult?.attendance_count}
           total={6}
+          heading={report.attendance_heading}
         />
         <JadeedPagesCard
           count={weeklyResult?.total_jadeed_pages}
+          heading={report.jadeed_safahat_heading}
         />
       </div>
     </div>
   );
 }
-
-// --- Premium Chat Components ---
 
 function SettingsPage({ 
   isDarkMode, 
@@ -2776,14 +2906,25 @@ function ParentPortal({
   const [secondsSpent, setSecondsSpent] = useState(0);
 
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
+  const reportSettingsObject = getReportSettingsObject(reportSettings);
 
   // Track parent viewing on Child Summary page
   useEffect(() => {
-    // Reset status on child/page change immediately
     setParentViewedStatus(false);
     setSecondsSpent(0);
 
     if (activePage !== "Child Summary" || !studentProfile?.student_id) {
+      return;
+    }
+
+    const now = new Date();
+    const isLiveMode = reportSettingsObject?.reports_live !== false;
+    const actionTime = reportSettingsObject?.live_at ? new Date(reportSettingsObject.live_at) : null;
+    const isReportVisible = isLiveMode
+      ? (!actionTime || actionTime <= now)
+      : Boolean(actionTime && actionTime > now);
+
+    if (!isReportVisible) {
       return;
     }
 
@@ -2802,11 +2943,11 @@ function ParentPortal({
           setParentViewedStatus(true);
         } else {
           setParentViewedStatus(false);
-          // Start 1-minute (60 seconds) timer only if not viewed
+          // Start 20-second timer only if not viewed
           interval = setInterval(async () => {
             setSecondsSpent(prev => {
               const next = prev + 1;
-              if (next >= 60) {
+              if (next >= 20) {
                 clearInterval(interval);
                 // Mark as viewed in DB!
                 supabase
@@ -2814,7 +2955,7 @@ function ParentPortal({
                   .upsert({
                     student_id: String(studentProfile.student_id),
                     viewed: true,
-                    view_duration_seconds: 60,
+                    view_duration_seconds: 20,
                     updated_at: new Date().toISOString()
                   }, { onConflict: 'student_id' })
                   .then(({ error }) => {
@@ -2836,7 +2977,12 @@ function ParentPortal({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [activePage, studentProfile?.student_id]);
+  }, [
+    activePage,
+    studentProfile?.student_id,
+    reportSettingsObject?.reports_live,
+    reportSettingsObject?.live_at,
+  ]);
 
   const handleDownloadReport = async () => {
     if (!studentProfile) return;
@@ -2855,6 +3001,10 @@ function ParentPortal({
     if (element) {
       try {
         await new Promise(resolve => setTimeout(resolve, 500));
+        const [html2canvas, jsPDF] = await Promise.all([
+          loadHtml2Canvas(),
+          loadJsPDF(),
+        ]);
         const canvas = await html2canvas(element, {
           scale: 2,
           useCORS: true,
@@ -3159,7 +3309,9 @@ function ParentPortal({
               ))}
             </div>
             
-            <IstifdahProgress weeklyResult={weeklyResult} />
+            <Suspense fallback={null}>
+              <LazyIstifdahProgress weeklyResult={weeklyResult} />
+            </Suspense>
             
             <div className="dashboard-section">
               <div className="section-header">
@@ -3314,7 +3466,7 @@ function ParentPortal({
             </div>
 
             {(() => {
-              const settings = Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
+              const settings = reportSettingsObject;
               const isLiveMode = settings?.reports_live !== false; // true = Live, false = Hidden
               const actionTime = settings?.live_at ? new Date(settings.live_at) : null;
               const now = new Date();
@@ -3393,7 +3545,7 @@ function ParentPortal({
                       groupName: studentProfile?.groupName || studentProfile?.class_level,
                     }}
                     weeklyResult={weeklyResult || studentProfile?.latestResult}
-                    settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                    settings={reportSettingsObject}
                     parentViewed={parentViewedStatus}
                     isParentPortal={true}
                   />
@@ -3406,12 +3558,14 @@ function ParentPortal({
 
 
         {activePage === "Jadwal" ? (
-          <JadwalParentView 
-            studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} 
-            teacherName={studentProfile?.teacherName}
-            teacherProfiles={teacherProfiles}
-            showAction={showAction}
-          />
+          <Suspense fallback={null}>
+            <LazyJadwalParentView 
+              studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} 
+              teacherName={studentProfile?.teacherName}
+              teacherProfiles={teacherProfiles}
+              showAction={showAction}
+            />
+          </Suspense>
         ) : null}
 
         {activePage === "Teachers" ? (
@@ -3927,6 +4081,79 @@ function AdminLeaveManagement({ onShowAction, students }) {
   );
 }
 
+function PortalAccessSuccessModal({ payload, onClose }) {
+  if (!payload) return null;
+
+  const roleLabel = payload.portal_role === "teacher"
+    ? "Teacher Portal"
+    : payload.portal_role === "admin"
+      ? "Admin Portal"
+      : "Parents Portal";
+
+  return (
+    <div className="portal-access-success-overlay" onClick={onClose} role="presentation">
+      <div
+        className="portal-access-success-card card-appear"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="portal-access-success-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="portal-access-success-close"
+          onClick={onClose}
+          aria-label="Close success popup"
+        >
+          ×
+        </button>
+
+        <div className="portal-access-success-badge">
+          <CheckCircle size={24} />
+        </div>
+
+        <p className="portal-access-success-kicker">Portal Access Granted</p>
+        <h3 id="portal-access-success-title" className="portal-access-success-title">
+          {payload.full_name || "User"} now has access
+        </h3>
+        <p className="portal-access-success-copy">
+          A premium portal account has been created and linked successfully.
+        </p>
+
+        <div className="portal-access-success-grid">
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Name</span>
+            <strong className="portal-access-success-value">{payload.full_name || "N/A"}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Email</span>
+            <strong className="portal-access-success-value">{payload.email || "N/A"}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Role</span>
+            <strong className="portal-access-success-value">{roleLabel}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Linked Student</span>
+            <strong className="portal-access-success-value">
+              {payload.linkedStudentName || "Not linked"}
+            </strong>
+          </div>
+        </div>
+
+        <div className="portal-access-success-footer">
+          <span className="portal-access-success-meta">
+            Saved at {payload.grantedAt || "just now"}
+          </span>
+          <button type="button" className="portal-access-success-button" onClick={onClose}>
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminPortal({
   activePage,
   actionMessage,
@@ -3973,9 +4200,17 @@ function AdminPortal({
   parentViews = [],
   whatsappConfig,
   onUpdateWhatsappConfig,
+  portalAccessSuccess,
+  onClosePortalAccessSuccess,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
+  const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
+  const [uploadingReportBackground, setUploadingReportBackground] = useState(false);
+
+  useEffect(() => {
+    setReportSettingsDraft(normalizeReportSettings(reportSettings));
+  }, [reportSettings]);
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
@@ -3991,138 +4226,30 @@ function AdminPortal({
     return msg;
   };
 
-  const sendIndividualWhatsApp = async (config, phone, message, studentName) => {
-    const { provider, api_url, api_token, account_sid, from_number } = config;
-    
-    // Format phone number: keep only digits
-    const formattedPhone = (phone || "").split("").filter(c => "0123456789".includes(c)).join("");
-    
+  const sendIndividualWhatsApp = async (phone, message, studentName) => {
+    const formattedPhone = (phone || "").split("").filter((c) => "0123456789".includes(c)).join("");
+
     if (!formattedPhone) {
       throw new Error("Invalid phone number");
     }
 
-    if (provider === 'mock') {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      console.log(`[SIMULATED WHATSAPP] To: ${formattedPhone}, Message: ${message}`);
-      return true;
+    const { data, error } = await supabase.functions.invoke("whatsapp-notification", {
+      body: {
+        phone: formattedPhone,
+        message,
+        studentName,
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || "Failed to send WhatsApp message");
     }
 
-    if (provider === 'ultramsg') {
-      if (!api_url || !api_token) throw new Error("API URL or Token is not configured for UltraMsg");
-      
-      const body = new URLSearchParams();
-      body.append('token', api_token);
-      body.append('to', formattedPhone);
-      body.append('body', message);
-
-      const response = await fetch(api_url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: body.toString()
-      });
-      
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`UltraMsg Error (${response.status}): ${text.substring(0, 100)}`);
-      }
-      return true;
+    if (!data?.success) {
+      throw new Error(data?.error || data?.message || "Failed to send WhatsApp message");
     }
 
-    if (provider === 'custom') {
-      if (!api_url) throw new Error("API URL is not configured for Custom Gateway");
-      
-      const response = await fetch(api_url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': api_token ? `Bearer ${api_token}` : undefined
-        },
-        body: JSON.stringify({
-          to: formattedPhone,
-          phone: formattedPhone,
-          number: formattedPhone,
-          message: message,
-          body: message,
-          msg: message,
-          token: api_token
-        })
-      });
-      
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Custom Gateway Error (${response.status}): ${text.substring(0, 100)}`);
-      }
-      return true;
-    }
-    
-    if (provider === 'twilio') {
-      if (!account_sid || !api_token || !from_number) {
-        throw new Error("Twilio config incomplete (Account SID, Auth Token, or From Number missing)");
-      }
-      const url = `https://api.twilio.com/2010-04-01/Accounts/${account_sid}/Messages.json`;
-      const headers = {
-        'Authorization': 'Basic ' + btoa(`${account_sid}:${api_token}`),
-        'Content-Type': 'application/x-www-form-urlencoded'
-      };
-      
-      const twilioFrom = from_number.startsWith('whatsapp:') ? from_number : `whatsapp:${from_number}`;
-      const twilioTo = `whatsapp:${formattedPhone.startsWith('+') ? formattedPhone : '+' + formattedPhone}`;
-      
-      const body = new URLSearchParams({
-        To: twilioTo,
-        From: twilioFrom,
-        Body: message
-      });
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: body.toString()
-      });
-      
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || `Twilio Error (${response.status})`);
-      }
-      return true;
-    }
-    
-    if (provider === 'meta') {
-      if (!from_number || !api_token) {
-        throw new Error("Meta API config incomplete (Phone Number ID or Access Token missing)");
-      }
-      const url = `https://graph.facebook.com/v20.0/${from_number}/messages`;
-      const headers = {
-        'Authorization': `Bearer ${api_token}`,
-        'Content-Type': 'application/json'
-      };
-      
-      const body = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: formattedPhone,
-        type: "text",
-        text: {
-          body: message
-        }
-      };
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body)
-      });
-      
-      if (!response.ok) {
-        const errJson = await response.json();
-        throw new Error(errJson?.error?.message || `Meta Cloud API Error (${response.status})`);
-      }
-      return true;
-    }
-    
-    throw new Error(`Unsupported WhatsApp provider: ${provider}`);
+    return true;
   };
 
   const triggerWhatsAppNotifications = async () => {
@@ -4157,7 +4284,7 @@ function AdminPortal({
       setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Sending to ${student.name} (${phone})...`, type: 'sending' }]);
       
       try {
-        await sendIndividualWhatsApp(whatsappConfig, phone, message, student.name);
+        await sendIndividualWhatsApp(phone, message, student.name);
         sentCount++;
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
@@ -4191,6 +4318,12 @@ function AdminPortal({
 
     setIsGeneratingReports(true);
     setGenerationProgress(0);
+    const [html2canvas, jsPDF, JSZip, saveAs] = await Promise.all([
+      loadHtml2Canvas(),
+      loadJsPDF(),
+      loadJSZip(),
+      loadSaveAs(),
+    ]);
     const zip = new JSZip();
 
     if (onShowAction) onShowAction("success", `Preparing ${students.length} reports... Please wait.`);
@@ -4280,12 +4413,14 @@ function AdminPortal({
     }
   };
 
-  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Global Settings"];
+  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings"];
   const navPages = ["Overview", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
     : null;
+  const reportSettingsObject = normalizeReportSettings(reportSettings);
+  const previewStudent = selectedStudent || students[0] || null;
 
   const groupedStudents = students.reduce((accumulator, student) => {
     const key = student.groupName || "Ungrouped";
@@ -4319,6 +4454,116 @@ function AdminPortal({
     { label: "Schedules", value: schedule.length, icon: Calendar },
     { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye },
   ];
+
+  const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
+    const settingsId = reportSettingsObject?.id || 1;
+    const { error } = await supabase
+      .from("report_settings")
+      .upsert({ id: settingsId, ...updates }, { onConflict: "id" })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      onShowAction("error", "Failed to update settings: " + error.message);
+      return;
+    }
+
+    onShowAction("success", "System settings updated successfully!");
+
+    if (notifyLive && updates.reports_live) {
+      supabase
+        .from("parent_report_views")
+        .update({ viewed: false, view_duration_seconds: 0, updated_at: new Date().toISOString() })
+        .neq("student_id", "")
+        .then(({ error: resetError }) => {
+          if (resetError) console.warn("Failed to reset parent views on live:", resetError.message);
+        });
+
+      supabase.functions.invoke("fcm-notification", {
+        body: {
+          title: "Results are LIVE!",
+          body: "The latest Tahfeez progress reports are now visible in your portal.",
+          targetRole: "parents",
+        },
+      });
+
+      triggerWhatsAppNotifications();
+    }
+
+    loadPortalData(portalRole, user);
+  };
+
+  const updateReportDraft = (field) => (event) => {
+    const value = event.target.value;
+    setReportSettingsDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleReportBackgroundUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      onShowAction("error", "Please upload an image file for the progress card background.");
+      return;
+    }
+
+    if (file.size > MAX_REPORT_BACKGROUND_SIZE) {
+      onShowAction("error", "Progress card background must be under 5MB.");
+      return;
+    }
+
+    setUploadingReportBackground(true);
+
+    try {
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "png";
+      const safeName = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-z0-9-_]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "progress-card-bg";
+      const filePath = `progress-card/${Date.now()}-${safeName}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .getPublicUrl(filePath);
+
+      const backgroundUrl = publicUrlData?.publicUrl;
+      if (!backgroundUrl) throw new Error("Background image URL was not returned.");
+
+      setReportSettingsDraft((current) => ({
+        ...current,
+        progress_card_background_url: backgroundUrl,
+      }));
+
+      await saveReportSettings({ progress_card_background_url: backgroundUrl });
+    } catch (error) {
+      console.error("Progress card background upload failed:", error);
+      onShowAction("error", `Background upload failed: ${error.message}`);
+    } finally {
+      setUploadingReportBackground(false);
+    }
+  };
+
+  const removeReportBackground = async () => {
+    setReportSettingsDraft((current) => ({
+      ...current,
+      progress_card_background_url: "",
+    }));
+
+    await saveReportSettings({ progress_card_background_url: "" });
+  };
 
   return (
     <div className="admin-shell">
@@ -4633,7 +4878,7 @@ function AdminPortal({
                     <TahfeezReportCard
                       student={selectedStudent}
                       weeklyResult={selectedStudent.latestResult}
-                      settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                      settings={reportSettingsObject}
                       parentViewed={(parentViews || []).find(v => String(v.student_id) === String(selectedStudent.student_id))?.viewed ?? false}
                     />
                   </div>
@@ -4720,6 +4965,7 @@ function AdminPortal({
                       className="btn-text-only" 
                       style={{ color: 'var(--primary-gold)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
                       onClick={async () => {
+                        const fcmService = await loadFcmService();
                         const result = await fcmService.initialize("admin");
                         if (result) alert("Notifications active for this device!");
                         else alert("Failed to activate. Check browser permissions.");
@@ -5291,19 +5537,21 @@ function AdminPortal({
                     <select
                       name="full_name"
                       value={adminForms.teacherProfile.full_name}
-                      onChange={(e) => {
-                        const selectedName = e.target.value;
-                        const existingProfile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(selectedName));
+                    onChange={(e) => {
+                      const selectedName = e.target.value;
+                      const existingProfile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(selectedName));
+                      const existingAccess = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(selectedName));
 
-                        setAdminForms(curr => ({
-                          ...curr,
-                          teacherProfile: {
-                            ...curr.teacherProfile,
-                            full_name: selectedName,
-                            phone_number: existingProfile?.phone_number || "",
-                            whatsapp_number: existingProfile?.whatsapp_number || "",
-                            photo_url: existingProfile?.photo_url || "",
-                            salary_per_minute: existingProfile?.salary_per_minute || "2.3",
+                      setAdminForms(curr => ({
+                        ...curr,
+                        teacherProfile: {
+                          ...curr.teacherProfile,
+                          user_id: existingProfile?.user_id || existingAccess?.user_id || "",
+                          full_name: selectedName,
+                          phone_number: existingProfile?.phone_number || "",
+                          whatsapp_number: existingProfile?.whatsapp_number || "",
+                          photo_url: existingProfile?.photo_url || "",
+                          salary_per_minute: existingProfile?.salary_per_minute || "2.3",
                             show_salary_card: existingProfile?.show_salary_card ?? true
                           }
                         }));
@@ -5689,7 +5937,7 @@ function AdminPortal({
                 <TahfeezReportCard
                   student={studentToRender}
                   weeklyResult={studentToRender.latestResult}
-                  settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                  settings={reportSettingsObject}
                 />
               </div>
             )}
@@ -5698,6 +5946,163 @@ function AdminPortal({
           {activePage === "Leave Management" && (
             <AdminLeaveManagement students={students} onShowAction={onShowAction} />
           )}
+          {portalAccessSuccess && (
+            <PortalAccessSuccessModal
+              payload={portalAccessSuccess}
+              onClose={onClosePortalAccessSuccess}
+            />
+          )}
+          {activePage === "Report Settings" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <Palette size={18} />
+                  <h3>Report Heading Settings</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  saveReportSettings(reportSettingsDraft);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Main Heading</span>
+                      <input name="main_heading" type="text" value={reportSettingsDraft.main_heading} onChange={updateReportDraft("main_heading")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Sub Heading</span>
+                      <input name="sub_heading" type="text" value={reportSettingsDraft.sub_heading} onChange={updateReportDraft("sub_heading")} className="premium-input" />
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Palette size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Progress Card Theme</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Background Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReportBackgroundUpload}
+                        className="premium-input"
+                        disabled={uploadingReportBackground}
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Upload JPG, PNG, or WebP under 5MB. It will appear behind the progress report card.
+                      </small>
+                    </label>
+                    <label>
+                      <span>Image Position</span>
+                      <select
+                        value={reportSettingsDraft.progress_card_background_position || "center"}
+                        onChange={updateReportDraft("progress_card_background_position")}
+                        className="premium-select"
+                      >
+                        <option value="center">Center</option>
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Text Readability Overlay</span>
+                      <input
+                        name="progress_card_overlay_opacity"
+                        type="range"
+                        min="0.35"
+                        max="0.95"
+                        step="0.05"
+                        value={reportSettingsDraft.progress_card_overlay_opacity ?? 0.82}
+                        onChange={updateReportDraft("progress_card_overlay_opacity")}
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)' }}>
+                        Higher value = cleaner text, softer image.
+                      </small>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+                      {reportSettingsDraft.progress_card_background_url ? (
+                        <button
+                          type="button"
+                          className="btn-text-only"
+                          onClick={removeReportBackground}
+                          disabled={uploadingReportBackground}
+                        >
+                          <Trash2 size={16} /> Remove Background
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--soft-brown)', fontSize: '0.9rem' }}>
+                          No custom background selected.
+                        </span>
+                      )}
+                      {uploadingReportBackground && (
+                        <span style={{ color: 'var(--primary-gold)', fontSize: '0.9rem', fontWeight: 700 }}>
+                          Uploading background...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '16px', padding: '0', border: 'none' }}>
+                    <MessageCircle size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Score Labels</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label><span>Weekly Score</span><input name="weekly_score_heading" type="text" value={reportSettingsDraft.weekly_score_heading} onChange={updateReportDraft("weekly_score_heading")} className="premium-input" /></label>
+                    <label><span>Jumla</span><input name="jumla_heading" type="text" value={reportSettingsDraft.jumla_heading} onChange={updateReportDraft("jumla_heading")} className="premium-input" /></label>
+                    <label><span>Murajah</span><input name="murajazah_heading" type="text" value={reportSettingsDraft.murajazah_heading} onChange={updateReportDraft("murajazah_heading")} className="premium-input" /></label>
+                    <label><span>Juz Hali</span><input name="juz_hali_heading" type="text" value={reportSettingsDraft.juz_hali_heading} onChange={updateReportDraft("juz_hali_heading")} className="premium-input" /></label>
+                    <label><span>Takhteet</span><input name="takhteet_heading" type="text" value={reportSettingsDraft.takhteet_heading} onChange={updateReportDraft("takhteet_heading")} className="premium-input" /></label>
+                    <label><span>Jadeed</span><input name="jadeed_heading" type="text" value={reportSettingsDraft.jadeed_heading} onChange={updateReportDraft("jadeed_heading")} className="premium-input" /></label>
+                    <label><span>Jadeed Safahat</span><input name="jadeed_safahat_heading" type="text" value={reportSettingsDraft.jadeed_safahat_heading} onChange={updateReportDraft("jadeed_safahat_heading")} className="premium-input" /></label>
+                    <label><span>Attendance</span><input name="attendance_heading" type="text" value={reportSettingsDraft.attendance_heading} onChange={updateReportDraft("attendance_heading")} className="premium-input" /></label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '16px', padding: '0', border: 'none' }}>
+                    <BookOpen size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Target Sections</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label><span>Matrookah</span><input name="matrookah_heading" type="text" value={reportSettingsDraft.matrookah_heading} onChange={updateReportDraft("matrookah_heading")} className="premium-input" /></label>
+                    <label><span>Zaeefah</span><input name="daeefah_heading" type="text" value={reportSettingsDraft.daeefah_heading} onChange={updateReportDraft("daeefah_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Section</span><input name="wusool_heading" type="text" value={reportSettingsDraft.wusool_heading} onChange={updateReportDraft("wusool_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Juz</span><input name="wusool_juz_heading" type="text" value={reportSettingsDraft.wusool_juz_heading} onChange={updateReportDraft("wusool_juz_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Page</span><input name="wusool_page_heading" type="text" value={reportSettingsDraft.wusool_page_heading} onChange={updateReportDraft("wusool_page_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Target</span><input name="next_week_heading" type="text" value={reportSettingsDraft.next_week_heading} onChange={updateReportDraft("next_week_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Juz</span><input name="next_week_juz_heading" type="text" value={reportSettingsDraft.next_week_juz_heading} onChange={updateReportDraft("next_week_juz_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Page</span><input name="next_week_page_heading" type="text" value={reportSettingsDraft.next_week_page_heading} onChange={updateReportDraft("next_week_page_heading")} className="premium-input" /></label>
+                    <label><span>Target Till</span><input name="istifadah_heading" type="text" value={reportSettingsDraft.istifadah_heading} onChange={updateReportDraft("istifadah_heading")} className="premium-input" /></label>
+                    <label><span>Its Juz</span><input name="istifadah_juz_heading" type="text" value={reportSettingsDraft.istifadah_juz_heading} onChange={updateReportDraft("istifadah_juz_heading")} className="premium-input" /></label>
+                    <label><span>Its Page</span><input name="istifadah_page_heading" type="text" value={reportSettingsDraft.istifadah_page_heading} onChange={updateReportDraft("istifadah_page_heading")} className="premium-input" /></label>
+                  </div>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
+                    Save Report Settings
+                  </button>
+                </form>
+              </section>
+
+              <section className="data-card card-appear">
+                <div className="card-headline">
+                  <Eye size={18} />
+                  <h3>Live Preview</h3>
+                </div>
+                {previewStudent ? (
+                  <TahfeezReportCard
+                    student={previewStudent}
+                    weeklyResult={previewStudent.latestResult}
+                    settings={reportSettingsDraft}
+                    parentViewed={(parentViews || []).find(v => String(v.student_id) === String(previewStudent.student_id))?.viewed ?? false}
+                  />
+                ) : (
+                  <div className="empty-state">
+                    Add students to preview the report headings.
+                  </div>
+                )}
+              </section>
+            </div>
+          ) : null}
           {activePage === "Global Settings" ? (
             <div className="management-grid two-columns">
               <section className="form-card card-appear">
@@ -5711,51 +6116,27 @@ function AdminPortal({
                   const updates = {
                     reports_live: formData.get("reports_live") === "true",
                     live_at: formData.get("live_at") ? new Date(formData.get("live_at")).toISOString() : null,
-                    main_heading: formData.get("main_heading"),
-                    sub_heading: formData.get("sub_heading"),
+                    allow_teacher_progress_entry: formData.get("allow_teacher_progress_entry") === "true",
                   };
-                  
-                  const settingsId = reportSettings[0]?.id || 1;
-                  supabase.from("report_settings")
-                    .upsert({ id: settingsId, ...updates })
-                    .then(({ error }) => {
-                      if (error) onShowAction("error", "Failed to update settings: " + error.message);
-                      else {
-                        onShowAction("success", "System settings updated successfully!");
-                        
-                        // Notify all parents if results made live
-                        if (updates.reports_live) {
-                          // Reset parent viewed status for all students
-                          supabase
-                            .from("parent_report_views")
-                            .update({ viewed: false, view_duration_seconds: 0, updated_at: new Date().toISOString() })
-                            .neq("student_id", "")
-                            .then(({ error }) => {
-                              if (error) console.warn("Failed to reset parent views on live:", error.message);
-                            });
-
-                          supabase.functions.invoke('fcm-notification', {
-                            body: {
-                              title: "Results are LIVE!",
-                              body: "The latest Tahfeez progress reports are now visible in your portal.",
-                              targetRole: 'parents'
-                            }
-                          });
-                          
-                          // Trigger WhatsApp notifications
-                          triggerWhatsAppNotifications();
-                        }
-                        
-                        loadPortalData(portalRole, user);
-                      }
-                    });
+                  saveReportSettings(updates, { notifyLive: true });
                 }}>
                   <div className="form-grid">
                     <label>
                       <span>Parent Access Mode</span>
-                      <select name="reports_live" defaultValue={String(reportSettings[0]?.reports_live ?? true)} className="premium-select">
+                      <select name="reports_live" defaultValue={String(reportSettingsObject?.reports_live ?? true)} className="premium-select">
                         <option value="true">Live (Visible to Parents)</option>
                         <option value="false">Hidden (Maintenance Mode)</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Teacher Progress Entry</span>
+                      <select
+                        name="allow_teacher_progress_entry"
+                        defaultValue={String(reportSettingsObject?.allow_teacher_progress_entry ?? true)}
+                        className="premium-select"
+                      >
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
                       </select>
                     </label>
                     <label>
@@ -5763,7 +6144,7 @@ function AdminPortal({
                       <input 
                         type="datetime-local" 
                         name="live_at" 
-                        defaultValue={reportSettings[0]?.live_at ? new Date(new Date(reportSettings[0].live_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                        defaultValue={reportSettingsObject?.live_at ? new Date(new Date(reportSettingsObject.live_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
                         className="premium-input"
                       />
                     </label>
@@ -5771,19 +6152,6 @@ function AdminPortal({
                   <p className="hint-text" style={{ marginBottom: '20px' }}>
                     If "Live" is selected, the time schedules when the report will become visible. If "Hidden" is selected, the time schedules when the report will be hidden.
                   </p>
-                  
-                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
-                    <Palette size={16} />
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Report Branding</h4>
-                  </div>
-                  <label>
-                    <span>Main Heading</span>
-                    <input name="main_heading" type="text" defaultValue={reportSettings[0]?.main_heading || "Rawdat Tahfeez al Atfal"} className="premium-input" />
-                  </label>
-                  <label>
-                    <span>Sub Heading</span>
-                    <input name="sub_heading" type="text" defaultValue={reportSettings[0]?.sub_heading || "TAHFEEZ REPORT 1447H"} className="premium-input" />
-                  </label>
 
                   <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
                     Save Global Settings
@@ -5849,7 +6217,7 @@ function AdminPortal({
                     </label>
                     <label>
                       <span>From Number / Phone ID (Twilio/Meta/Custom)</span>
-                      <input name="wa_from_number" type="text" defaultValue={whatsappConfig?.from_number || ""} placeholder="e.g. +14155238886" className="premium-input" />
+                      <input name="wa_from_number" type="text" defaultValue={whatsappConfig?.from_number || ""} placeholder="Meta Phone Number ID or sender number" className="premium-input" />
                     </label>
                   </div>
 
@@ -5877,13 +6245,16 @@ function AdminPortal({
                   <h3>Current Status</h3>
                 </div>
                 <div className="status-indicator-box" style={{ padding: '20px', textAlign: 'center', background: 'var(--brown-light)', borderRadius: '16px' }}>
-                   <div className={`status-dot-large ${reportSettings[0]?.reports_live !== false ? 'online' : 'offline'}`} />
-                   <h4 style={{ margin: '15px 0 5px' }}>Reports are currently {reportSettings[0]?.reports_live !== false ? 'LIVE' : 'HIDDEN'}</h4>
-                   {reportSettings[0]?.live_at && (
+                   <div className={`status-dot-large ${reportSettingsObject?.reports_live !== false ? 'online' : 'offline'}`} />
+                   <h4 style={{ margin: '15px 0 5px' }}>Reports are currently {reportSettingsObject?.reports_live !== false ? 'LIVE' : 'HIDDEN'}</h4>
+                   {reportSettingsObject?.live_at && (
                      <p style={{ fontSize: '0.9rem', opacity: 0.8 }}>
-                       Scheduled for: {new Date(reportSettings[0].live_at).toLocaleString()}
+                       Scheduled for: {new Date(reportSettingsObject.live_at).toLocaleString()}
                      </p>
                    )}
+                   <p style={{ fontSize: '0.85rem', marginTop: '10px', color: 'var(--soft-brown)' }}>
+                     Teacher progress entry is {reportSettingsObject?.allow_teacher_progress_entry === false ? 'DISABLED' : 'ENABLED'}
+                   </p>
                 </div>
                 <div style={{ marginTop: '20px' }}>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
@@ -6008,10 +6379,24 @@ function TeacherPortal({
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const backdropMouseDownRef = useRef(false);
+  const reportSettingsObject = getReportSettingsObject(reportSettings);
+  const canTeacherFillProgress = reportSettingsObject?.allow_teacher_progress_entry !== false;
   const selectedStudent =
     filteredStudents.find(
       (student) => student.allIds.includes(String(teacherForms.result.student_id))
     ) || filteredStudents[0] || null;
+  const selectedResultRecord = useMemo(() => (
+    schoolData.weeklyResults.find(
+      (result) =>
+        String(result.student_id) === String(teacherForms.result.student_id) &&
+        String(result.week_date) === String(teacherForms.result.week_date)
+    ) || null
+  ), [schoolData.weeklyResults, teacherForms.result.student_id, teacherForms.result.week_date]);
+  const selectedResultEditCount = getTeacherResultEditCount(selectedResultRecord || teacherForms.result);
+  const selectedResultRemainingEdits = getTeacherResultRemainingEdits(selectedResultRecord || teacherForms.result);
+  const selectedResultLocked = isTeacherResultLocked(selectedResultRecord || teacherForms.result);
+  const selectedResultIsExisting = Boolean(selectedResultRecord || teacherForms.result.id);
+  const canEditCurrentResult = canTeacherFillProgress && !selectedResultLocked;
 
   const liveResult = useMemo(() => {
     if (!selectedStudent) return null;
@@ -6101,12 +6486,14 @@ function TeacherPortal({
           )}
 
           {activePage === "Jadwal" && (
-             <JadwalTeacherView 
-               students={filteredStudents} 
-               onShowAction={onShowAction} 
-               onBroadcastNotification={broadcastNotification} 
-               initialStudentId={activeStudentId}
-             />
+             <Suspense fallback={null}>
+               <LazyJadwalTeacherView 
+                 students={filteredStudents} 
+                 onShowAction={onShowAction} 
+                 onBroadcastNotification={broadcastNotification} 
+                 initialStudentId={activeStudentId}
+               />
+             </Suspense>
           )}
 
           {activePage === "My Group" ? (
@@ -6260,6 +6647,18 @@ function TeacherPortal({
                   <BookOpen size={18} />
                   <h3>Fill Tahfeez Report</h3>
                 </div>
+                {!canTeacherFillProgress && (
+                  <div className="status-banner warning" style={{ marginBottom: "16px" }}>
+                    Admin has disabled teacher progress-card filling in Global Settings.
+                  </div>
+                )}
+                {canTeacherFillProgress && selectedResultIsExisting && (
+                  <div className="status-banner info" style={{ marginBottom: "16px" }}>
+                    {selectedResultLocked
+                      ? "This report is locked after 3 saves."
+                      : `${selectedResultEditCount}/${TEACHER_PROGRESS_EDIT_LIMIT} saves used. ${selectedResultRemainingEdits} edit${selectedResultRemainingEdits === 1 ? "" : "s"} left before auto-lock.`}
+                  </div>
+                )}
                 <form className="stack-form" onSubmit={onTeacherResultSubmit}>
                   <div className="form-grid">
                     <label>
@@ -6268,18 +6667,20 @@ function TeacherPortal({
                         name="student_id"
                         value={teacherForms.result.student_id}
                         onChange={onTeacherFormChange}
-                        disabled={!!teacherForms.result.id}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
                         required
                       >
                         <option value="">Select child</option>
                         {filteredStudents.map((student) => {
-                          const hasResultToday = (schoolData.weeklyResults || []).some(r => 
-                            String(r.student_id) === String(student.student_id) && 
+                          const existingResult = (schoolData.weeklyResults || []).find(r =>
+                            String(r.student_id) === String(student.student_id) &&
                             String(r.week_date) === String(teacherForms.result.week_date)
                           );
+                          const existingLocked = isTeacherResultLocked(existingResult);
+                          const remainingEdits = getTeacherResultRemainingEdits(existingResult);
                           return (
                             <option key={student.student_id} value={student.student_id}>
-                              {student.name} {hasResultToday ? "🔒 (Locked)" : ""} · {student.groupName}
+                              {student.name}{existingResult ? ` - ${existingLocked ? "Locked" : `${remainingEdits} edits left`}` : ""} - {student.groupName}
                             </option>
                           );
                         })}
@@ -6291,10 +6692,12 @@ function TeacherPortal({
                       <FatemiDateSelector
                         value={teacherForms.result.week_date}
                         onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
                   </div>
 
+                  <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
                   <div className="form-grid four-up">
                     <label>
                       <span>Murajazah</span>
@@ -6474,11 +6877,16 @@ function TeacherPortal({
 
                   <button 
                     type="submit" 
-                    className={`action-button ${teacherForms.result.id ? 'locked' : ''}`}
-                    disabled={!!teacherForms.result.id}
+                    className={`action-button ${selectedResultLocked || !canTeacherFillProgress ? 'locked' : ''}`}
+                    disabled={!canEditCurrentResult}
                   >
-                    {teacherForms.result.id ? 'Report Locked' : 'Save Result'}
+                    {selectedResultIsExisting
+                      ? (selectedResultLocked
+                          ? 'Report Locked'
+                          : `Save Changes (${selectedResultRemainingEdits} left)`)
+                      : 'Save Result'}
                   </button>
+                  </fieldset>
                 </form>
               </section>
 
@@ -6501,7 +6909,7 @@ function TeacherPortal({
                     <TahfeezReportCard
                       student={selectedStudent}
                       weeklyResult={liveResult}
-                      settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                      settings={reportSettingsObject}
                     />
                   </>
                 ) : (
@@ -6818,6 +7226,7 @@ export default function App() {
   const [whatsappConfig, setWhatsappConfig] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [parentViews, setParentViews] = useState([]);
+  const [portalAccessSuccess, setPortalAccessSuccess] = useState(null);
   
   // Local dismissal state (doesn't affect backend)
   const [dismissedNotifs, setDismissedNotifs] = useState(() => {
@@ -6865,6 +7274,12 @@ export default function App() {
     setDismissedAnnounces(next);
     localStorage.setItem("mauze-dismissed-announces", JSON.stringify(next));
   };
+
+  useEffect(() => {
+    if (!portalAccessSuccess) return;
+    const timer = setTimeout(() => setPortalAccessSuccess(null), 5000);
+    return () => clearTimeout(timer);
+  }, [portalAccessSuccess]);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem("mauze-dark-mode") === "true";
   });
@@ -6938,26 +7353,7 @@ export default function App() {
     },
   });
   const [teacherForms, setTeacherForms] = useState({
-    result: {
-      student_id: "",
-      week_date: getToday(),
-      murajazah: "",
-      juz_hali: "",
-      takhteet: "",
-      jadeed: "",
-
-      next_week_juz: "",
-      next_week_page: "",
-      total_jadeed_pages: "",
-      istifadah_juz: "",
-      istifadah_page: "",
-      wusool_juz: "",
-      wusool_page: "",
-      matrookah: "",
-      daeefah: "",
-      attendance_count: "",
-      attendance_note: "",
-    },
+    result: createTeacherResultDraft(),
   });
 
   useEffect(() => {
@@ -7040,6 +7436,7 @@ export default function App() {
             
             // Initialize FCM service
             try {
+              const fcmService = await loadFcmService();
               await fcmService.initialize(access.role);
             } catch (error) {
               console.error('FCM initialization failed:', error);
@@ -7455,30 +7852,32 @@ export default function App() {
     const payload = adminForms.portalAccess;
     const targetEmail = payload.email.trim().toLowerCase();
 
-    // 1. Create Auth User (if they don't exist)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const tempAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+
+    const { data: authData, error: authError } = await tempAuthClient.auth.signUp({
       email: targetEmail,
       password: payload.password,
       options: {
         data: {
           full_name: payload.full_name,
-          portal_role: payload.portal_role
-        }
-      }
+          portal_role: payload.portal_role,
+        },
+      },
     });
 
-    let userId = authData?.user?.id;
-
-    if (authError) {
-      if (!authError.message.toLowerCase().includes("already registered")) {
-        showAction("error", `Auth Error: ${authError.message}`);
-        return;
-      }
-      // If already registered, we should still try to grant access
-      // The RPC below will handle the heavy lifting
+    if (authError && !authError.message.toLowerCase().includes("already registered")) {
+      showAction("error", `Auth Error: ${authError.message}`);
+      return;
     }
 
-    // 2. Grant Portal Access via RPC (Most reliable way)
+    const createdUserId = authData?.user?.id || null;
+
     const { data: rpcData, error: rpcError } = await supabase.rpc("grant_portal_access", {
       target_email: targetEmail,
       target_role: payload.portal_role,
@@ -7490,38 +7889,50 @@ export default function App() {
       console.warn("RPC Grant Error (Expected if RPC missing):", rpcError);
     }
 
-    // 3. Robust Fallback: Manually upsert to user_portal_access
-    // If userId is missing (existing user), the RPC might have returned the record or we can fetch it
-    const { data: accessRecord, error: upsertError } = await supabase
-      .from("user_portal_access")
-      .upsert({
-        email: targetEmail,
-        user_id: userId || undefined,
-        full_name: payload.full_name,
-        portal_role: payload.portal_role,
-        is_active: true
-      }, { onConflict: 'email' })
-      .select()
-      .maybeSingle();
+    let accessRecord = null;
+    if (createdUserId) {
+      const { data, error: upsertError } = await supabase
+        .from("user_portal_access")
+        .upsert({
+          user_id: createdUserId,
+          email: targetEmail,
+          full_name: payload.full_name,
+          portal_role: payload.portal_role,
+          is_active: true
+        }, { onConflict: 'user_id' })
+        .select()
+        .maybeSingle();
 
-    if (upsertError) {
-      console.error("Portal access upsert failed:", upsertError);
-      showAction("error", `Portal access failed: ${upsertError.message}`);
-      return;
+      if (upsertError) {
+        console.error("Portal access upsert failed:", upsertError);
+        showAction("error", `Portal access failed: ${upsertError.message}`);
+        return;
+      }
+      accessRecord = data || null;
+    } else {
+      const { data, error: fetchError } = await supabase
+        .from("user_portal_access")
+        .select("*")
+        .eq("email", targetEmail)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Portal access lookup failed:", fetchError);
+        showAction("error", `Portal access lookup failed: ${fetchError.message}`);
+        return;
+      }
+      accessRecord = data || null;
     }
 
-    const finalUserId = userId || accessRecord?.user_id;
+    const finalUserId = accessRecord?.user_id || rpcData?.user_id || createdUserId || null;
 
-    // 4. Link child to parent if role is parents and student_id is provided
     if (payload.portal_role === "parents" && payload.student_id && finalUserId) {
-      // Try to link in child_profiles first
       await supabase
         .from("child_profiles")
         .update({ parent_user_id: finalUserId })
         .eq("student_id", payload.student_id);
     }
 
-    // Refresh school data locally
     const { data: freshList, error: refreshError } = await supabase
       .from("user_portal_access")
       .select("*")
@@ -7543,29 +7954,36 @@ export default function App() {
       portalAccess: { email: "", full_name: "", portal_role: "parents", password: "", student_id: "" },
     }));
 
-    // SEND NOTIFICATION OF ASSIGNMENT
+    let linkedStudentName = "Not linked";
+    if (payload.student_id) {
+      const { data: stData } = await supabase
+        .from("child_profiles")
+        .select("name")
+        .eq("student_id", payload.student_id)
+        .maybeSingle();
+      if (stData?.name) linkedStudentName = stData.name;
+    }
+
     (async () => {
       try {
-        let childName = "your child";
-        if (payload.student_id) {
-          const { data: stData } = await supabase
-            .from("child_profiles")
-            .select("name")
-            .eq("student_id", payload.student_id)
-            .maybeSingle();
-          if (stData?.name) childName = stData.name;
-        }
-
         const notifTitle = payload.portal_role === "teacher" ? "New Student Assigned" : "Portal Access Granted";
         const notifBody = payload.portal_role === "teacher" 
-          ? `${childName} has been assigned to your group.` 
-          : `Welcome! ${childName} has been successfully linked to your portal account.`;
+          ? `${linkedStudentName} has been assigned to your group.` 
+          : `Welcome! ${linkedStudentName} has been successfully linked to your portal account.`;
 
         broadcastNotification(notifTitle, notifBody, payload.portal_role, finalUserId || targetEmail);
       } catch (e) {
         console.warn("Assignment notification failed:", e);
       }
     })();
+
+    setPortalAccessSuccess({
+      full_name: payload.full_name,
+      email: targetEmail,
+      portal_role: payload.portal_role,
+      linkedStudentName,
+      grantedAt: new Date().toLocaleString(),
+    });
 
     showAction("success", "Portal access granted successfully!");
   };
@@ -7753,29 +8171,13 @@ export default function App() {
             result: { ...curr.result, ...existing, student_id: numericId, week_date: weekDate }
           }));
         } else {
-          const { data, error } = await supabase
-            .from("weekly_results")
-            .upsert({
+          setTeacherForms(curr => ({
+            ...curr,
+            result: createTeacherResultDraft({
               student_id: numericId,
               week_date: weekDate,
-              murajazah: 0,
-              juz_hali: 0,
-              takhteet: 0,
-              jadeed: 0
-            }, { onConflict: 'student_id,week_date' })
-            .select()
-            .maybeSingle();
-
-          if (data) {
-            setTeacherForms(curr => ({
-              ...curr,
-              result: { ...curr.result, ...data, student_id: numericId, week_date: weekDate }
-            }));
-            setSchoolData(prev => ({
-              ...prev,
-              weeklyResults: [data, ...prev.weeklyResults]
-            }));
-          }
+            }),
+          }));
         }
       }
     }
@@ -8116,7 +8518,7 @@ export default function App() {
       return;
     }
 
-    setWhatsappConfig(updates);
+    setWhatsappConfig((current) => ({ ...(current || {}), ...updates, id: 1 }));
     showAction("success", "WhatsApp settings saved successfully.");
   };
 
@@ -8157,18 +8559,30 @@ export default function App() {
   const handleUpdateTeacherProfile = async (event) => {
     event.preventDefault();
     const payload = adminForms.teacherProfile;
+    const selectedTeacher = portalAccessList.find(
+      (access) => normalizeText(access.full_name) === normalizeText(payload.full_name)
+    );
+    const resolvedUserId = payload.user_id || selectedTeacher?.user_id || null;
+
+    if (!resolvedUserId) {
+      showAction("error", "Please select a staff member that already has Supabase portal access.");
+      return;
+    }
 
     // Update the profile information
     const { error: profileError } = await supabase
       .from("teacher_profiles")
-      .upsert({
-        user_id: payload.user_id || undefined,
-        full_name: payload.full_name,
-        photo_url: payload.photo_url,
-        phone_number: payload.phone_number,
-        whatsapp_number: payload.whatsapp_number,
-        is_active: true,
-      });
+      .upsert(
+        {
+          user_id: resolvedUserId,
+          full_name: payload.full_name,
+          photo_url: payload.photo_url,
+          phone_number: payload.phone_number,
+          whatsapp_number: payload.whatsapp_number,
+          is_active: true,
+        },
+        { onConflict: "user_id" }
+      );
 
     // Update the portal access settings (salary/visibility) separately
     const { error: accessError } = await supabase
@@ -8177,7 +8591,7 @@ export default function App() {
         salary_per_minute: Number(payload.salary_per_minute || 2.3),
         show_salary_card: !!payload.show_salary_card,
       })
-      .eq("full_name", payload.full_name);
+      .eq("user_id", resolvedUserId);
 
     if (profileError || accessError) {
       showAction("error", profileError?.message || accessError?.message);
@@ -8185,12 +8599,17 @@ export default function App() {
     }
 
     await loadPortalData(portalRole, user, parentData.studentProfile);
-    setAdminForms(curr => ({ ...curr, teacherProfile: { full_name: "", photo_url: "", phone_number: "", whatsapp_number: "" } }));
+    setAdminForms(curr => ({ ...curr, teacherProfile: { user_id: "", full_name: "", photo_url: "", phone_number: "", whatsapp_number: "", salary_per_minute: "2.3", show_salary_card: true } }));
     showAction("success", "Teacher profile updated.");
   };
 
   const handleTeacherResultSubmit = async (event) => {
     event.preventDefault();
+
+    if (!canTeacherFillProgress) {
+      showAction("error", "Teacher progress-card filling is disabled in Global Settings.");
+      return;
+    }
 
     const totalScore = RESULT_NUMERIC_FIELDS.reduce(
       (sum, field) => sum + toNumber(teacherForms.result[field]),
@@ -8211,7 +8630,30 @@ export default function App() {
       jadeed: toNumber(teacherForms.result.jadeed),
     };
 
-    const { data, error } = await supabase.from("weekly_results").insert([payload]).select().single();
+    const existingResult = schoolData.weeklyResults.find(
+      (result) =>
+        String(result.student_id) === String(numericId) &&
+        String(result.week_date) === String(teacherForms.result.week_date)
+    );
+    const currentEditCount = getTeacherResultEditCount(existingResult || teacherForms.result);
+    const nextEditCount = Math.min(TEACHER_PROGRESS_EDIT_LIMIT, currentEditCount + 1);
+    const willLock = nextEditCount >= TEACHER_PROGRESS_EDIT_LIMIT;
+
+    if (isTeacherResultLocked(existingResult || teacherForms.result)) {
+      showAction("error", "This report is locked and cannot be edited anymore.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("weekly_results")
+      .upsert([{
+        ...payload,
+        teacher_edit_count: nextEditCount,
+        teacher_locked: willLock,
+        teacher_locked_at: willLock ? new Date().toISOString() : existingResult?.teacher_locked_at || null,
+      }], { onConflict: "student_id,week_date" })
+      .select()
+      .single();
 
     if (error) {
       showAction("error", error.message);
@@ -8219,7 +8661,15 @@ export default function App() {
     }
 
     setSchoolData((current) => {
-      const nextWeeklyResults = [data, ...current.weeklyResults];
+      const nextWeeklyResults = [
+        data,
+        ...current.weeklyResults.filter((result) =>
+          !(
+            String(result.student_id) === String(data.student_id) &&
+            String(result.week_date) === String(data.week_date)
+          )
+        ),
+      ];
       const refreshedStudents = current.students.map((student) =>
         String(student.student_id) === String(data.student_id)
           ? { ...student, latestResult: data }
@@ -8237,20 +8687,26 @@ export default function App() {
       ...current,
       result: {
         ...current.result,
-        // Values are preserved so they stay "locked" on the preview card
+        ...data,
       },
     }));
-    showAction("success", "Tahfeez report saved successfully.");
-    const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
-    const parentId = targetStudent?.user_id || targetStudent?.parent_email;
-
-    broadcastNotification(
-      "Tahfeez Report Submitted", 
-      `A new progress report has been saved for ${targetStudent?.name || "the student"}.`, 
-      "parents", 
-      targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email, 
-      "Progress"
+    showAction(
+      "success",
+      willLock
+        ? `Tahfeez report saved and locked after ${TEACHER_PROGRESS_EDIT_LIMIT} saves.`
+        : `Tahfeez report saved successfully. ${TEACHER_PROGRESS_EDIT_LIMIT - nextEditCount} edit${TEACHER_PROGRESS_EDIT_LIMIT - nextEditCount === 1 ? "" : "s"} left.`
     );
+    const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
+
+    if (currentEditCount === 0) {
+      broadcastNotification(
+        "Tahfeez Report Submitted",
+        `A new progress report has been saved for ${targetStudent?.name || "the student"}.`,
+        "parents",
+        targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email,
+        "Progress"
+      );
+    }
   };
 
 
@@ -8360,6 +8816,8 @@ export default function App() {
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
+            portalAccessSuccess={portalAccessSuccess}
+            onClosePortalAccessSuccess={() => setPortalAccessSuccess(null)}
           />
         ) : (
           <TeacherPortal
@@ -8409,4 +8867,5 @@ export default function App() {
     </React.Fragment>
   );
 }
+
 
