@@ -106,6 +106,21 @@ const normalizeReportSettings = (reportSettings) => ({
   ...(getReportSettingsObject(reportSettings) || {}),
 });
 
+const getReportActionTime = (settings) => {
+  if (!settings?.live_at) return null;
+  const actionTime = new Date(settings.live_at);
+  return Number.isNaN(actionTime.getTime()) ? null : actionTime;
+};
+
+const isReportVisibleNow = (settings, now = new Date()) => {
+  const normalizedSettings = normalizeReportSettings(settings);
+  const actionTime = getReportActionTime(normalizedSettings);
+
+  return normalizedSettings.reports_live !== false
+    ? (!actionTime || actionTime <= now)
+    : Boolean(actionTime && actionTime > now);
+};
+
 const createTeacherResultDraft = (overrides = {}) => ({
   student_id: "",
   week_date: getToday(),
@@ -501,9 +516,17 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     file_url: fileUrl
   };
   
+  let inboxError = null;
+  let fcmError = null;
+  let fcmData = null;
+
   // Store in database first (Inbox)
   if (!skipInbox) {
-    await supabase.from("system_notifications").insert([dbPayload]);
+    const { error } = await supabase.from("system_notifications").insert([dbPayload]);
+    if (error) {
+      inboxError = error;
+      console.error('Inbox notification error:', error);
+    }
   }
 
   // Send FCM notification via Edge Function
@@ -523,13 +546,18 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     });
 
     if (error) {
+      fcmError = error;
       console.error('FCM notification error:', error);
     } else {
+      fcmData = data;
       console.log('FCM notification sent successfully:', data);
     }
   } catch (err) {
+    fcmError = err;
     console.error('FCM notification error:', err);
   }
+
+  return { inboxError, fcmError, fcmData };
 };
 
 function NotificationEnabler({ permission, onRequest }) {
@@ -2928,14 +2956,7 @@ function ParentPortal({
       return;
     }
 
-    const now = new Date();
-    const isLiveMode = reportSettingsObject?.reports_live !== false;
-    const actionTime = reportSettingsObject?.live_at ? new Date(reportSettingsObject.live_at) : null;
-    const isReportVisible = isLiveMode
-      ? (!actionTime || actionTime <= now)
-      : Boolean(actionTime && actionTime > now);
-
-    if (!isReportVisible) {
+    if (!isReportVisibleNow(reportSettingsObject)) {
       return;
     }
 
@@ -4471,8 +4492,39 @@ function AdminPortal({
     { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye },
   ];
 
+  const resultLiveNotificationAlreadySent = async (since) => {
+    if (!since) return false;
+
+    const { data, error } = await supabase
+      .from("system_notifications")
+      .select("target_role")
+      .eq("title", "Results are LIVE!")
+      .in("target_role", ["parents", "teacher"])
+      .gte("created_at", since.toISOString());
+
+    if (error) {
+      console.warn("Could not check previous result-live notifications:", error.message);
+      return false;
+    }
+
+    const notifiedRoles = new Set((data || []).map((notification) => notification.target_role));
+    return notifiedRoles.has("parents") && notifiedRoles.has("teacher");
+  };
+
   const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
     const settingsId = reportSettingsObject?.id || 1;
+    const now = new Date();
+    const previousSettings = normalizeReportSettings(reportSettingsObject);
+    const nextSettings = normalizeReportSettings({ ...previousSettings, ...updates });
+    const nextActionTime = getReportActionTime(nextSettings);
+    const previousVisible = isReportVisibleNow(previousSettings, now);
+    const isPastScheduledLive = Boolean(nextActionTime && nextActionTime <= now);
+    const shouldSendResultLiveNotification =
+      notifyLive &&
+      updates.reports_live === true &&
+      isReportVisibleNow(nextSettings, now) &&
+      (!previousVisible || isPastScheduledLive);
+
     const { error } = await supabase
       .from("report_settings")
       .upsert({ id: settingsId, ...updates }, { onConflict: "id" })
@@ -4486,24 +4538,59 @@ function AdminPortal({
 
     onShowAction("success", "System settings updated successfully!");
 
-    if (notifyLive && updates.reports_live) {
-      supabase
+    if (shouldSendResultLiveNotification) {
+      const alreadyNotified = isPastScheduledLive && previousVisible
+        ? await resultLiveNotificationAlreadySent(nextActionTime)
+        : false;
+
+      if (alreadyNotified) {
+        onShowAction("success", "Reports are live. Parents and teachers were already notified for this live time.");
+        loadPortalData(portalRole, user);
+        return;
+      }
+
+      const { error: resetError } = await supabase
         .from("parent_report_views")
         .update({ viewed: false, view_duration_seconds: 0, updated_at: new Date().toISOString() })
-        .neq("student_id", "")
-        .then(({ error: resetError }) => {
-          if (resetError) console.warn("Failed to reset parent views on live:", resetError.message);
-        });
+        .neq("student_id", "");
 
-      supabase.functions.invoke("fcm-notification", {
-        body: {
-          title: "Results are LIVE!",
-          body: "The latest Tahfeez progress reports are now visible in your portal.",
-          targetRole: "all",
-        },
+      if (resetError) console.warn("Failed to reset parent views on live:", resetError.message);
+
+      const notificationResults = await Promise.all([
+        broadcastNotification(
+          "Results are LIVE!",
+          "The latest Tahfeez progress reports are now visible in the parent portal.",
+          "parents",
+          null,
+          "Progress"
+        ),
+        broadcastNotification(
+          "Results are LIVE!",
+          "The latest Tahfeez progress reports are now live for review.",
+          "teacher",
+          null,
+          "My Group"
+        ),
+      ]);
+
+      const notificationFailed = notificationResults.some(
+        (result) => result?.inboxError || result?.fcmError
+      );
+
+      if (notificationFailed) {
+        onShowAction("error", "Reports are live, but some notifications failed. Check console for details.");
+      } else {
+        onShowAction("success", "Reports are live. Parents and teachers have been notified.");
+      }
+
+      triggerWhatsAppNotifications(true).catch((err) => {
+        console.error("WhatsApp notifications failed after reports went live:", err);
       });
-
-      triggerWhatsAppNotifications(true);
+    } else if (notifyLive && updates.reports_live === true && !isReportVisibleNow(nextSettings, now)) {
+      const actionTime = getReportActionTime(nextSettings);
+      if (actionTime) {
+        onShowAction("success", `Reports are scheduled for ${actionTime.toLocaleString()}. Notifications were not sent early.`);
+      }
     }
 
     loadPortalData(portalRole, user);
@@ -8883,4 +8970,3 @@ export default function App() {
     </React.Fragment>
   );
 }
-
