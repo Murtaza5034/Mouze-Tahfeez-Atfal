@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { Suspense, useEffect, useMemo, useState, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
   BookOpen,
@@ -13,6 +14,7 @@ import {
   Menu,
   ShieldCheck,
   Send,
+  Eye,
   Sparkles,
   Trophy,
   Trash,
@@ -43,15 +45,11 @@ import {
   CalendarX,
   AlertCircle,
   ChevronRight,
+  Paperclip,
   Trash2
 } from "lucide-react";
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
-import JSZip from "jszip";
-import { saveAs } from "file-saver";
-import { supabase } from "./supabaseClient";
+import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
-import fcmService from "./fcmService";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -68,8 +66,99 @@ const getLocalDateKey = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-const loadTrackedDays = () => {
-  const storedDays = localStorage.getItem("mauze-hifz-tracked-days");
+const TEACHER_PROGRESS_EDIT_LIMIT = 3;
+
+const getReportSettingsObject = (reportSettings) =>
+  Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
+
+const REPORT_SETTING_DEFAULTS = {
+  main_heading: "Rawdat Tahfeez al Atfal",
+  sub_heading: "TAHFEEZ REPORT 1447H",
+  weekly_score_heading: "Total Weekly Score",
+  jumla_heading: "Jumla",
+  murajazah_heading: "Murajah",
+  juz_hali_heading: "Juz Hali",
+  takhteet_heading: "Takhteet",
+  jadeed_heading: "Jadeed",
+  jadeed_safahat_heading: "Jadeed Safahat",
+  attendance_heading: "Attendance",
+  matrookah_heading: "Matrookah",
+  daeefah_heading: "Zaeefah",
+  wusool_heading: "Wusool",
+  wusool_juz_heading: "Wusool Juz",
+  wusool_page_heading: "Wusool Page",
+  next_week_heading: "Next Week Target",
+  next_week_juz_heading: "Next Week Juz",
+  next_week_page_heading: "Next Week Page",
+  istifadah_heading: "Target Till",
+  istifadah_juz_heading: "Its Juz",
+  istifadah_page_heading: "Its Page",
+  progress_card_background_url: "",
+  progress_card_background_position: "center",
+  progress_card_overlay_opacity: 0.82,
+};
+
+const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
+const MAX_REPORT_BACKGROUND_SIZE = 5 * 1024 * 1024;
+
+const normalizeReportSettings = (reportSettings) => ({
+  ...REPORT_SETTING_DEFAULTS,
+  ...(getReportSettingsObject(reportSettings) || {}),
+});
+
+const createTeacherResultDraft = (overrides = {}) => ({
+  student_id: "",
+  week_date: getToday(),
+  murajazah: "",
+  juz_hali: "",
+  takhteet: "",
+  jadeed: "",
+  next_week_juz: "",
+  next_week_page: "",
+  total_jadeed_pages: "",
+  istifadah_juz: "",
+  istifadah_page: "",
+  wusool_juz: "",
+  wusool_page: "",
+  matrookah: "",
+  daeefah: "",
+  attendance_count: "",
+  attendance_note: "",
+  teacher_edit_count: 0,
+  teacher_locked: false,
+  teacher_locked_at: null,
+  ...overrides,
+});
+
+const getTeacherResultEditCount = (result) =>
+  Math.max(
+    0,
+    Number(
+      result?.teacher_edit_count ??
+        result?.edit_count ??
+        result?.save_count ??
+        (result?.id ? 1 : 0)
+    ) || 0
+  );
+
+const getTeacherResultRemainingEdits = (result) =>
+  Math.max(TEACHER_PROGRESS_EDIT_LIMIT - getTeacherResultEditCount(result), 0);
+
+const isTeacherResultLocked = (result) =>
+  Boolean(result?.teacher_locked ?? result?.is_locked) ||
+  getTeacherResultEditCount(result) >= TEACHER_PROGRESS_EDIT_LIMIT;
+
+const loadTrackedDays = (userId) => {
+  if (!userId) return [];
+  let storedDays = localStorage.getItem(`mauze-hifz-tracked-days-${userId}`);
+  if (!storedDays) {
+    // Fallback to legacy global key
+    storedDays = localStorage.getItem("mauze-hifz-tracked-days");
+    if (storedDays) {
+      // Migrate to user specific key
+      localStorage.setItem(`mauze-hifz-tracked-days-${userId}`, storedDays);
+    }
+  }
   if (storedDays) {
     try {
       const parsed = JSON.parse(storedDays);
@@ -81,7 +170,13 @@ const loadTrackedDays = () => {
     }
   }
 
-  const legacyLastDate = localStorage.getItem("mauze-hifz-last-date");
+  let legacyLastDate = localStorage.getItem(`mauze-hifz-last-date-${userId}`);
+  if (!legacyLastDate) {
+    legacyLastDate = localStorage.getItem("mauze-hifz-last-date");
+    if (legacyLastDate) {
+      localStorage.setItem(`mauze-hifz-last-date-${userId}`, legacyLastDate);
+    }
+  }
   return legacyLastDate ? [legacyLastDate] : [];
 };
 
@@ -94,6 +189,41 @@ const ROLE_LABELS = {
 const ASSETS = {
   LOGO: "/logo.png",
 };
+
+const loadFcmService = async () => {
+  const mod = await import("./fcmService");
+  return mod.default;
+};
+
+const loadHtml2Canvas = async () => {
+  const mod = await import("html2canvas");
+  return mod.default;
+};
+
+const loadJsPDF = async () => {
+  const mod = await import("jspdf");
+  return mod.jsPDF;
+};
+
+const loadJSZip = async () => {
+  const mod = await import("jszip");
+  return mod.default;
+};
+
+const loadSaveAs = async () => {
+  const mod = await import("file-saver");
+  return mod.saveAs;
+};
+
+const LazyJadwalTeacherView = React.lazy(() =>
+  import("./Jadwal").then((mod) => ({ default: mod.JadwalTeacherView }))
+);
+
+const LazyJadwalParentView = React.lazy(() =>
+  import("./Jadwal").then((mod) => ({ default: mod.JadwalParentView }))
+);
+
+const LazyIstifdahProgress = React.lazy(() => import("./IstifdahProgress"));
 
 const fixArabicScript = (text) => {
   if (!text) return "";
@@ -119,6 +249,7 @@ const NotificationStatus = ({ role }) => {
     
     setIsInitializing(true);
     try {
+      const fcmService = await loadFcmService();
       const result = await fcmService.initialize(role);
       setPermission(Notification.permission);
       if (result) {
@@ -281,6 +412,7 @@ const NAV_ICONS = {
   About: Info,
   "User Issues": LifeBuoy,
   "Leave Management": CalendarX,
+  "Report Settings": Palette,
   "Global Settings": Settings,
   "Messages": MessageCircle,
 };
@@ -303,6 +435,24 @@ const emptyPortalAccess = {
 
 function getToday() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function isImageFile(url) {
+  if (!url) return false;
+  const cleanUrl = url.split('?')[0]; // Remove query params if any
+  return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(cleanUrl);
+}
+
+function getFileNameFromUrl(url) {
+  if (!url) return "";
+  try {
+    const decoded = decodeURIComponent(url);
+    const parts = decoded.split('/');
+    const lastPart = parts[parts.length - 1];
+    return lastPart.split('?')[0]; // Strip query parameters
+  } catch (e) {
+    return "Download Attachment";
+  }
 }
 
 function readLocalArray(key) {
@@ -330,13 +480,14 @@ function writeLocalArray(key, value) {
 
 
 
-const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home", skipInbox = false) => {
+const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home", skipInbox = false, fileUrl = null) => {
   const dbPayload = {
     title,
     body,
     target_role: targetRole,
     target_user: targetUser,
-    redirect_page: redirectPage
+    redirect_page: redirectPage,
+    file_url: fileUrl
   };
   
   // Store in database first (Inbox)
@@ -354,6 +505,7 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
         targetUser: targetUser,
         data: {
           redirectPage,
+          fileUrl: fileUrl || "",
           timestamp: new Date().toISOString()
         }
       }
@@ -526,17 +678,17 @@ function PremiumHifzCard({ user }) {
 
       if (data) {
         const dbDays = data.map(row => row.tracked_date);
-        const localDays = loadTrackedDays();
+        const localDays = loadTrackedDays(user.id);
         // Merge unique days
         const mergedDays = Array.from(new Set([...dbDays, ...localDays]));
         setTrackedDays(mergedDays);
         setTrackCount(mergedDays.length);
         // Sync local storage with DB state
-        localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(mergedDays));
+        localStorage.setItem(`mauze-hifz-tracked-days-${user.id}`, JSON.stringify(mergedDays));
       }
     } catch (err) {
       console.error("Error fetching tracking data:", err);
-      const localDays = loadTrackedDays();
+      const localDays = loadTrackedDays(user.id);
       setTrackedDays(localDays);
       setTrackCount(localDays.length);
     } finally {
@@ -559,7 +711,7 @@ function PremiumHifzCard({ user }) {
       // Optimistic update
       setTrackedDays(nextDays);
       setTrackCount(nextDays.length);
-      localStorage.setItem("mauze-hifz-tracked-days", JSON.stringify(nextDays));
+      localStorage.setItem(`mauze-hifz-tracked-days-${user.id}`, JSON.stringify(nextDays));
 
       try {
         const { error } = await supabase
@@ -586,11 +738,11 @@ function PremiumHifzCard({ user }) {
           <div className="header-text">
             <h2>
               <Sparkles size={24} className="sparkle-icon" />
-              Child Hifz Entry of the Day
+              Daily Hifz Entry of the Day
             </h2>
             <p>
-              Maintaining a consistent daily record is the cornerstone of your child's Hifz journey. 
-              Your participation ensures their progress is tracked.
+              Maintaining a consistent daily record is the cornerstone of your students' Hifz journey. 
+              Your dedication ensures their progress is tracked.
             </p>
           </div>
           <div className="track-status-box">
@@ -646,12 +798,25 @@ function NotificationBell({ notifications }) {
               {notifications.map((n, i) => (
                 <div key={n.id || i} className="notification-item">
                   <div className="notif-item-header">
-                    <span className={`mini-pill ${n.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px' }}>
-                      {n.target_role?.toUpperCase()}
-                    </span>
                     <h4>{n.title}</h4>
                   </div>
                   <p>{n.body}</p>
+                  {n.file_url && (
+                    <div className="notif-bell-attachment-box" style={{ marginTop: '8px', padding: '8px', borderRadius: '8px', background: '#fcfaf5', border: '1px solid var(--glass-border)' }}>
+                      {isImageFile(n.file_url) ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <img src={n.file_url} alt="Attachment" style={{ maxWidth: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '4px' }} />
+                          <a href={n.file_url} target="_blank" rel="noreferrer" download style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none', color: 'var(--primary-gold)', fontWeight: 'bold' }}>
+                            <Download size={12} /> Download Image
+                          </a>
+                        </div>
+                      ) : (
+                        <a href={n.file_url} target="_blank" rel="noreferrer" download style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', color: 'var(--primary-gold)', fontWeight: 'bold' }}>
+                          <FileArchive size={14} /> Download {getFileNameFromUrl(n.file_url).substring(0, 20)}...
+                        </a>
+                      )}
+                    </div>
+                  )}
                   <span className="time">{new Date(n.created_at).toLocaleString()}</span>
                 </div>
               ))}
@@ -1719,6 +1884,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       user_id: profile.parent_user_id || null,
       parent_email: profile.parent_email || null,
       photoUrl: profile.photo_url || "",
+      whatsapp_number: profile.whatsapp_number || "",
       hifz: {
         juz: profile.juz || "N-A",
         surat: profile.surat || "Pending",
@@ -1768,7 +1934,7 @@ function InfoHighlights({ items }) {
   );
 }
 
-function FatemiDateSelector({ value, onChange }) {
+function FatemiDateSelector({ value, onChange, disabled = false }) {
   const info = useMemo(() => getFatemiInfo(value), [value]);
   const years = [1445, 1446, 1447, 1448];
   const days = Array.from({ length: 30 }, (_, i) => i + 1);
@@ -1794,22 +1960,22 @@ function FatemiDateSelector({ value, onChange }) {
 
   return (
     <div className="fatemi-selector">
-      <select value={info.date} onChange={(e) => handleSelectChange('day', e.target.value)}>
+      <select value={info.date} onChange={(e) => handleSelectChange('day', e.target.value)} disabled={disabled}>
         {days.map(d => <option key={d} value={d}>{d}</option>)}
       </select>
-      <select value={info.month} onChange={(e) => handleSelectChange('month', e.target.value)}>
+      <select value={info.month} onChange={(e) => handleSelectChange('month', e.target.value)} disabled={disabled}>
         {ARABIC_MONTHS.map((name, i) => (
           <option key={name} value={i + 1} className="arabic-kanz" style={{ fontSize: '1.1rem' }}>{name}</option>
         ))}
       </select>
-      <select value={info.year} onChange={(e) => handleSelectChange('year', e.target.value)}>
+      <select value={info.year} onChange={(e) => handleSelectChange('year', e.target.value)} disabled={disabled}>
         {years.map(y => <option key={y} value={y}>{y}</option>)}
       </select>
     </div>
   );
 }
 
-function AttendanceCard({ count, total = 6 }) {
+function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
   const stars = Array.from({ length: total }, (_, i) => i < Number(count || 0));
 
   return (
@@ -1827,17 +1993,17 @@ function AttendanceCard({ count, total = 6 }) {
       </div>
       <div>
         <h4 className="attendance-rating-text kids-font">
-          {count || 0} out of {total} Presence
+          {heading}
         </h4>
         <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
-          Weekly student presence score
+          {count || 0} out of {total} Presence
         </p>
       </div>
     </div>
   );
 }
 
-function JadeedPagesCard({ count }) {
+function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
   return (
     <div className="jadeed-pages-card card-appear">
       <div className="attendance-lighting" />
@@ -1846,7 +2012,7 @@ function JadeedPagesCard({ count }) {
         <span className="jadeed-count-overlay">{count || 0}</span>
       </div>
       <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontSize: '1.6rem', fontFamily: "'Kanz al Marjaan', serif", marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
-        جديد صفحات
+        {heading}
       </h4>
       <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
         New pages memorized this week
@@ -1855,19 +2021,80 @@ function JadeedPagesCard({ count }) {
   );
 }
 
-function TahfeezReportCard({ student, weeklyResult, settings }) {
+function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false }) {
   const arabicStyle = { fontFamily: "'Kanz al Marjaan', serif" };
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
+  const report = normalizeReportSettings(settings);
 
-  const hMain = settings?.main_heading || "Rawdat Tahfeez al Atfal";
-  const hSub = settings?.sub_heading || "TAHFEEZ REPORT 1447H";
-  const hWusool = settings?.wusool_heading || "وصول الى الاْن";
-  const hNext = settings?.next_week_heading || "Next Week Target";
-  const hIstifadah = settings?.istifadah_heading || "Target Till Istifadah";
+  const hMain = report.main_heading;
+  const hSub = report.sub_heading;
+  const hWusool = report.wusool_heading;
+  const hNext = report.next_week_heading;
+  const hIstifadah = report.istifadah_heading;
+  const progressCardBackground = report.progress_card_background_url || "";
+  const progressCardOverlayOpacity = Math.min(
+    Math.max(Number(report.progress_card_overlay_opacity ?? 0.82), 0),
+    1
+  );
+  const progressCardStyle = progressCardBackground
+    ? {
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundColor: '#fffaf0',
+        backgroundImage: `linear-gradient(rgba(255, 250, 240, ${progressCardOverlayOpacity}), rgba(255, 250, 240, ${progressCardOverlayOpacity})), url(${progressCardBackground})`,
+        backgroundSize: 'cover',
+        backgroundPosition: report.progress_card_background_position || 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    : { position: 'relative' };
 
   return (
     <div className="progress-overview">
-      <div className="result-card-premium card-appear">
+      <div className="result-card-premium card-appear" style={progressCardStyle}>
+        {parentViewed !== undefined && (
+          <div 
+            className={`parent-view-status-dot ${parentViewed ? 'viewed' : 'not-viewed'}`}
+            title={parentViewed ? "Parent viewed this report" : "New result! Please view."}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              width: '14px',
+              height: '14px',
+              borderRadius: '50%',
+              backgroundColor: isParentPortal 
+                ? (parentViewed ? '#e71d36' : '#2ec4b6')
+                : (parentViewed ? '#2ec4b6' : '#e71d36'),
+              boxShadow: isParentPortal
+                ? (parentViewed 
+                    ? '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)' 
+                    : '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)')
+                : (parentViewed
+                    ? '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)' 
+                    : '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)'),
+              border: '2px solid #ffffff',
+              zIndex: 10,
+              cursor: 'help'
+            }}
+          />
+        )}
+        {parentViewed === false && timerSeconds !== undefined && timerSeconds < 20 && (
+          <svg width="34" height="34" style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 9 }}>
+            <circle cx="17" cy="17" r="15" fill="none" stroke="rgba(46, 196, 182, 0.2)" strokeWidth="3" />
+            <circle 
+              cx="17" 
+              cy="17" 
+              r="15" 
+              fill="none" 
+              stroke="#2ec4b6" 
+              strokeWidth="3" 
+              strokeDasharray="94.2" 
+              strokeDashoffset={94.2 - (94.2 * (timerSeconds / 20))}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dashoffset 1s linear', transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+            />
+          </svg>
+        )}
         <div className="result-card-header" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div className="school-logo" style={{ marginBottom: '12px' }}><img src="/logo.png" alt="Logo" /></div>
           <div className="school-info" style={{ textAlign: 'center' }}>
@@ -1898,8 +2125,8 @@ function TahfeezReportCard({ student, weeklyResult, settings }) {
 
         <div className="result-main">
           <div className="total-score-block">
-            <span className="score-title kids-font">WEEKLY SCORE</span>
-            <span className="jumla-label arabic-kanz" style={arabicStyle}>جملة</span>
+            <span className="score-title kids-font">{report.weekly_score_heading}</span>
+            <span className="jumla-label arabic-kanz" style={arabicStyle}>{report.jumla_heading}</span>
             <div className="score-circle">
               {(weeklyResult?.total_score ?? 
                 (toNumber(weeklyResult?.murajazah) + 
@@ -1912,10 +2139,10 @@ function TahfeezReportCard({ student, weeklyResult, settings }) {
 
           <div className="score-details-box">
             {[
-              { label: "مراجعة", val: weeklyResult?.murajazah, max: 30 },
-              { label: "جزء حالي", val: weeklyResult?.juz_hali, max: 30 },
-              { label: "تخطيط", val: weeklyResult?.takhteet, max: 20 },
-              { label: "جديد", val: weeklyResult?.jadeed, max: 20 }
+              { label: report.murajazah_heading, val: weeklyResult?.murajazah, max: 30 },
+              { label: report.juz_hali_heading, val: weeklyResult?.juz_hali, max: 30 },
+              { label: report.takhteet_heading, val: weeklyResult?.takhteet, max: 20 },
+              { label: report.jadeed_heading, val: weeklyResult?.jadeed, max: 20 }
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
                 <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label} :</span>
@@ -1935,28 +2162,28 @@ function TahfeezReportCard({ student, weeklyResult, settings }) {
         <div className="result-footer-grid">
           <div className="target-box highlight-wusool">
             <h5 className="arabic-kanz" dir="rtl" style={{ ...arabicStyle, fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.wusool_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.wusool_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_juz_heading} :</span> {weeklyResult?.wusool_juz || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_page_heading} :</span> {weeklyResult?.wusool_page || "-"}</p>
           </div>
           <div className="target-box highlight-matrookah">
             <div className="note-item-row">
               <span className="note-val">{weeklyResult?.matrookah || "-"}</span>
-              <span className="note-label arabic-kanz" style={arabicStyle}>متروكة :</span>
+              <span className="note-label arabic-kanz" style={arabicStyle}>{report.matrookah_heading} :</span>
             </div>
             <div className="note-item-row">
               <span className="note-val">{weeklyResult?.daeefah || "-"}</span>
-              <span className="note-label arabic-kanz" style={arabicStyle}>ضعيفة :</span>
+              <span className="note-label arabic-kanz" style={arabicStyle}>{report.daeefah_heading} :</span>
             </div>
           </div>
           <div className="target-box">
             <h5 className="kids-font">{hNext}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.next_week_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.next_week_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_juz_heading} :</span> {weeklyResult?.next_week_juz || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_page_heading} :</span> {weeklyResult?.next_week_page || "-"}</p>
           </div>
           <div className="target-box highlight">
             <h5 className="kids-font">{hIstifadah}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>الجزء :</span> {weeklyResult?.istifadah_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>صــ :</span> {weeklyResult?.istifadah_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_juz_heading} :</span> {weeklyResult?.istifadah_juz || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_page_heading} :</span> {weeklyResult?.istifadah_page || "-"}</p>
           </div>
         </div>
 
@@ -1969,16 +2196,16 @@ function TahfeezReportCard({ student, weeklyResult, settings }) {
         <AttendanceCard
           count={weeklyResult?.attendance_count}
           total={6}
+          heading={report.attendance_heading}
         />
         <JadeedPagesCard
           count={weeklyResult?.total_jadeed_pages}
+          heading={report.jadeed_safahat_heading}
         />
       </div>
     </div>
   );
 }
-
-// --- Premium Chat Components ---
 
 function SettingsPage({ 
   isDarkMode, 
@@ -1987,7 +2214,8 @@ function SettingsPage({
   setAppTheme, 
   user, 
   studentProfile,
-  onShowAction 
+  onShowAction,
+  role = "parents"
 }) {
   const [activeTab, setActiveTab] = useState("Dark mode");
   const tabs = ["Dark mode", "App themes", "Notifications", "Security", "Support", "About"];
@@ -2029,14 +2257,15 @@ function SettingsPage({
     const page = formData.get("page_issue");
     const desc = formData.get("description");
 
+    const userRoleStr = role === "teacher" ? "Teacher" : "Parent";
     const userName = studentProfile?.guardian_name || 
                      user?.user_metadata?.full_name || 
                      user?.email?.split('@')[0] || 
-                     "User";
+                     `${userRoleStr} User`;
 
     const { error } = await supabase.from("portal_issues").insert([{
       user_id: user.id,
-      user_name: userName,
+      user_name: `${userName} (${userRoleStr})`,
       page_issue: page,
       description: desc,
       status: 'open'
@@ -2045,6 +2274,18 @@ function SettingsPage({
     if (error) {
       onShowAction("error", "Failed to send ticket: " + error.message);
     } else {
+      // Send FCM notification to admin
+      try {
+        await supabase.functions.invoke('fcm-notification', {
+          body: {
+            title: `New Support Issue (${userRoleStr})`,
+            body: `Issue from ${userName}: ${desc}`,
+            targetRole: 'admin'
+          }
+        });
+      } catch (fcmErr) {
+        console.error("FCM Notify Admin Error:", fcmErr);
+      }
       onShowAction("success", "Support ticket sent to Admin!");
       e.target.reset();
     }
@@ -2096,8 +2337,12 @@ function SettingsPage({
         {activeTab === "Notifications" && (
           <div className="settings-tab-pane">
             <h3>Notifications</h3>
-            <p>Control how you receive alerts about your child's progress.</p>
-            <NotificationStatus role="parents" />
+            {role === "parents" ? (
+              <p>Control how you receive alerts about your child's progress.</p>
+            ) : (
+              <p>Control how you receive alerts about students and schedules.</p>
+            )}
+            <NotificationStatus role={role} />
             <div className="hint-text" style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               <Info size={14} /> If you are still not receiving alerts after enabling, check your browser permissions for this site by clicking the lock icon in the address bar.
             </div>
@@ -2170,13 +2415,24 @@ function SettingsPage({
               <label>
                 <span>Which page has the issue?</span>
                 <select name="page_issue" className="premium-select" required>
-                  <option value="Home">Home Dashboard</option>
-                  <option value="Schedule">Daily Schedule</option>
-                  <option value="Progress">Progress Report</option>
-                  <option value="Announcements">Announcements</option>
-                  <option value="Teachers">Teacher Contacts</option>
-                  <option value="Quran Ikhtebar">Quran Ikhtebar</option>
-                  <option value="Hub Raqam">Hub Raqam (Fees)</option>
+                  {role === "parents" ? (
+                    <>
+                      <option value="Home">Home Dashboard</option>
+                      <option value="Schedule">Daily Schedule</option>
+                      <option value="Progress">Progress Report</option>
+                      <option value="Teachers">Teacher Contacts</option>
+                      <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                      <option value="Hub Raqam">Hub Raqam (Fees)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Students">Student List</option>
+                      <option value="Mark Progress">Mark Progress</option>
+                      <option value="Performance">Performance Overview</option>
+                      <option value="Jadwal">Jadwal</option>
+                      <option value="Inbox">Notifications Inbox</option>
+                    </>
+                  )}
                   <option value="Other">Other / General Issue</option>
                 </select>
               </label>
@@ -2572,6 +2828,44 @@ function ChildLeaveApply({ studentProfile, showAction }) {
   );
 }
 
+const resolveRedirectPage = (page, role) => {
+  if (!page) return "Home";
+  
+  if (role === "parents") {
+    const parentMap = {
+      "Announcements": "Home",
+      "Progress": "Child Summary",
+      "Child Summary": "Child Summary",
+      "Schedule": "Schedule",
+      "Teachers": "Teachers",
+      "Inbox": "Inbox",
+      "Profile": "Profile",
+      "Quran Ikhtebar": "Quran Ikhtebar",
+      "Hub Raqam": "Hub Raqam",
+      "Apply Leave": "Apply Leave",
+      "Settings": "Settings",
+      "Jadwal": "Jadwal",
+      "Home": "Home"
+    };
+    return parentMap[page] || "Home";
+  }
+  
+  if (role === "teacher") {
+    const teacherMap = {
+      "Announcements": "My Group",
+      "Reports": "Fill Result",
+      "My Group": "My Group",
+      "Jadwal": "Jadwal",
+      "Quran Ikhtebar": "Quran Ikhtebar",
+      "Inbox": "Inbox",
+      "Settings": "Settings"
+    };
+    return teacherMap[page] || "My Group";
+  }
+  
+  return page;
+};
+
 function ParentPortal({
   activePage,
   parentData,
@@ -2598,13 +2892,97 @@ function ParentPortal({
   setSelectedNotification,
   dismissedNotifs = [],
   dismissedAnnounces = [],
+  dismissedHomeNotifs = [],
   onDismissNotif,
+  onDismissHomeNotif,
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
+  actionMessage,
 }) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const backdropMouseDownRef = useRef(false);
+  const [parentViewedStatus, setParentViewedStatus] = useState(false);
+  const [secondsSpent, setSecondsSpent] = useState(0);
+
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
+  const reportSettingsObject = getReportSettingsObject(reportSettings);
+
+  // Track parent viewing on Child Summary page
+  useEffect(() => {
+    setParentViewedStatus(false);
+    setSecondsSpent(0);
+
+    if (activePage !== "Child Summary" || !studentProfile?.student_id) {
+      return;
+    }
+
+    const now = new Date();
+    const isLiveMode = reportSettingsObject?.reports_live !== false;
+    const actionTime = reportSettingsObject?.live_at ? new Date(reportSettingsObject.live_at) : null;
+    const isReportVisible = isLiveMode
+      ? (!actionTime || actionTime <= now)
+      : Boolean(actionTime && actionTime > now);
+
+    if (!isReportVisible) {
+      return;
+    }
+
+    let interval;
+    // First check database for existing viewed status
+    supabase
+      .from('parent_report_views')
+      .select('viewed')
+      .eq('student_id', String(studentProfile.student_id))
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("parent_report_views table not initialized or access error:", error.message);
+        }
+        if (data?.viewed) {
+          setParentViewedStatus(true);
+        } else {
+          setParentViewedStatus(false);
+          // Start 20-second timer only if not viewed
+          interval = setInterval(async () => {
+            setSecondsSpent(prev => {
+              const next = prev + 1;
+              if (next >= 20) {
+                clearInterval(interval);
+                // Mark as viewed in DB!
+                supabase
+                  .from('parent_report_views')
+                  .upsert({
+                    student_id: String(studentProfile.student_id),
+                    viewed: true,
+                    view_duration_seconds: 20,
+                    updated_at: new Date().toISOString()
+                  }, { onConflict: 'student_id' })
+                  .then(({ error }) => {
+                    if (error) {
+                      console.warn("Failed to update parent view in DB:", error.message);
+                    } else {
+                      setParentViewedStatus(true);
+                      if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
+                    }
+                  });
+                return 60;
+              }
+              return next;
+            });
+          }, 1000);
+        }
+      });
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [
+    activePage,
+    studentProfile?.student_id,
+    reportSettingsObject?.reports_live,
+    reportSettingsObject?.live_at,
+  ]);
 
   const handleDownloadReport = async () => {
     if (!studentProfile) return;
@@ -2623,6 +3001,10 @@ function ParentPortal({
     if (element) {
       try {
         await new Promise(resolve => setTimeout(resolve, 500));
+        const [html2canvas, jsPDF] = await Promise.all([
+          loadHtml2Canvas(),
+          loadJsPDF(),
+        ]);
         const canvas = await html2canvas(element, {
           scale: 2,
           useCORS: true,
@@ -2659,13 +3041,12 @@ function ParentPortal({
   };
   parentData;
 
-  const pageNames = ["Home", "Schedule", "Progress", "Announcements", "Teachers", "Quran Ikhtebar", "Settings"];
+  const pageNames = ["Home", "Schedule", "Progress", "Teachers", "Quran Ikhtebar", "Settings"];
   const assignedRoles = getAssignedRoles(user);
 
   const navigationMap = {
     "Home": "Home",
     "Schedule": "Schedule",
-    "Announcements": "Announcements",
     "Teachers": "Teachers",
     "Progress": "Child Summary",
     "Profile": "Profile",
@@ -2797,9 +3178,6 @@ function ParentPortal({
           <button className={`drawer-link ${activePage === "Inbox" ? "active" : ""}`} onClick={() => { setActivePage("Inbox"); setMenuOpen(false); }}>
             <Bell size={18} /> Inbox
           </button>
-          <button className={`drawer-link ${activePage === "Announcements" ? "active" : ""}`} onClick={() => { setActivePage("Announcements"); setMenuOpen(false); }}>
-            <Bell size={18} /> Announcements
-          </button>
           <button className={`drawer-link ${activePage === "Profile" ? "active" : ""}`} onClick={() => { setActivePage("Profile"); setMenuOpen(false); }}>
             <User size={18} /> My Profile
           </button>
@@ -2811,6 +3189,9 @@ function ParentPortal({
           </button>
           <button className={`drawer-link ${activePage === "Apply Leave" ? "active" : ""}`} onClick={() => { setActivePage("Apply Leave"); setMenuOpen(false); }}>
             <CalendarX size={18} /> Apply Leave
+          </button>
+          <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
+            <Calendar size={18} /> Jadwal
           </button>
           <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
             <Settings size={18} /> Settings
@@ -2858,6 +3239,9 @@ function ParentPortal({
       </header>
 
       <main className="parent-main">
+        {actionMessage && (
+          <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+        )}
         {activePage === "Home" && (
            <QuickSearch 
              pages={[
@@ -2905,7 +3289,6 @@ function ParentPortal({
 
         {activePage === "Home" ? (
           <div className="home-dashboard">
-            <PremiumHifzCard user={user} />
             <div className="hifz-stats-premium-strip">
               {[
                 { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
@@ -2925,6 +3308,11 @@ function ParentPortal({
                 </div>
               ))}
             </div>
+            
+            <Suspense fallback={null}>
+              <LazyIstifdahProgress weeklyResult={weeklyResult} />
+            </Suspense>
+            
             <div className="dashboard-section">
               <div className="section-header">
                 <Calendar size={18} />
@@ -2953,22 +3341,57 @@ function ParentPortal({
             <div className="dashboard-section">
               <div className="section-header">
                 <Bell size={18} />
-                <h3>Announcements</h3>
+                <h3>Active Notifications</h3>
               </div>
               <div className="announcement-list">
-                {currentPage.announcements.map((news) => (
-                  <div key={news.id || news.title} className="news-card">
-                    <div>
-                      <div className="news-meta">
-                        <span className={`tag ${String(news.type || "update").toLowerCase()}`}>
-                          {news.type || "Update"}
-                        </span>
-                        <span className="date">{news.event_date}</span>
+                {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
+                  const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
+                  return (
+                    <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => setSelectedNotification(news)}>
+                      <button 
+                        className="card-dismiss-btn" 
+                        title="Clear from home" 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          onDismissHomeNotif(news.id); 
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '12px',
+                          right: '12px',
+                          background: 'rgba(0,0,0,0.05)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: 'var(--text-muted)',
+                          zIndex: 2,
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                      <div style={{ paddingRight: '24px' }}>
+                        <div className="news-meta">
+                          <span className="tag update">
+                            Alert
+                          </span>
+                          <span className="date">{new Date(news.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <h4>{news.title}</h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
+                        </p>
                       </div>
-                      <h4>{news.title}</h4>
                     </div>
-                  </div>
-                ))}
+                  );
+                })() : (
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
+                )}
               </div>
             </div>
           </div>
@@ -3043,21 +3466,41 @@ function ParentPortal({
             </div>
 
             {(() => {
-              const settings = Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
-              const isLive = settings?.reports_live !== false;
-              const liveAt = settings?.live_at ? new Date(settings.live_at) : null;
+              const settings = reportSettingsObject;
+              const isLiveMode = settings?.reports_live !== false; // true = Live, false = Hidden
+              const actionTime = settings?.live_at ? new Date(settings.live_at) : null;
               const now = new Date();
-              const isScheduled = liveAt && liveAt > now;
+              
+              let isVisible = false;
+              let emptyMessage = "";
 
-              if (!isLive || isScheduled) {
+              if (isLiveMode) {
+                // Goal: Be LIVE.
+                if (actionTime && actionTime > now) {
+                  // Wait until actionTime to be live
+                  isVisible = false;
+                  emptyMessage = `This week's progress card will be live on ${actionTime.toLocaleDateString()} at ${actionTime.toLocaleTimeString()}.`;
+                } else {
+                  isVisible = true;
+                }
+              } else {
+                // Goal: Be HIDDEN.
+                if (actionTime && actionTime > now) {
+                  // Wait until actionTime to hide
+                  isVisible = true;
+                } else {
+                  isVisible = false;
+                  emptyMessage = "The results are currently hidden for maintenance at this time. Please check back shortly.";
+                }
+              }
+
+              if (!isVisible) {
                 return (
                   <div className="empty-state card-appear" style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--white-alpha)', borderRadius: '24px', border: '2px dashed var(--primary-gold)' }}>
                     <Clock size={48} style={{ color: 'var(--primary-gold)', marginBottom: '20px', opacity: 0.6 }} className="pulse" />
                     <h3 className="kids-font" style={{ fontSize: '1.8rem', color: 'var(--deep-brown)' }}>Report is being prepared!</h3>
                     <p style={{ color: 'var(--soft-brown)', maxWidth: '400px', margin: '10px auto' }}>
-                      {isScheduled 
-                        ? `This week's progress card will be live on ${liveAt.toLocaleDateString()} at ${liveAt.toLocaleTimeString()}.`
-                        : "The administration is currently finalizing the results. Please check back shortly."}
+                      {emptyMessage}
                     </p>
                     <div className="loading-spinner-mini" style={{ marginTop: '20px' }}></div>
                   </div>
@@ -3072,6 +3515,9 @@ function ParentPortal({
                   }}
                   weeklyResult={weeklyResult || studentProfile?.latestResult}
                   settings={settings}
+                  parentViewed={parentViewedStatus}
+                  timerSeconds={secondsSpent}
+                  isParentPortal={true}
                 />
               );
             })()}
@@ -3099,7 +3545,9 @@ function ParentPortal({
                       groupName: studentProfile?.groupName || studentProfile?.class_level,
                     }}
                     weeklyResult={weeklyResult || studentProfile?.latestResult}
-                    settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                    settings={reportSettingsObject}
+                    parentViewed={parentViewedStatus}
+                    isParentPortal={true}
                   />
                 </div>
               )}
@@ -3107,15 +3555,17 @@ function ParentPortal({
           </div>
         ) : null}
 
-        {activePage === "Announcements" ? (
-          <AnnouncementsPage 
-            announcements={announcements}
-            setActivePage={setActivePage}
-            setSelectedAnnouncement={setSelectedAnnouncement}
-            onDismiss={onDismissAnnounce}
-            onClearAll={onClearAllAnnounces}
-            dismissedIds={dismissedAnnounces}
-          />
+
+
+        {activePage === "Jadwal" ? (
+          <Suspense fallback={null}>
+            <LazyJadwalParentView 
+              studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} 
+              teacherName={studentProfile?.teacherName}
+              teacherProfiles={teacherProfiles}
+              showAction={showAction}
+            />
+          </Suspense>
         ) : null}
 
         {activePage === "Teachers" ? (
@@ -3318,9 +3768,36 @@ function ParentPortal({
                         <h3>{n.title}</h3>
                       </div>
                       <p className="notif-excerpt">{n.body.length > 80 ? n.body.substring(0, 80) + "..." : n.body}</p>
-                      <button className="notif-view-btn" onClick={() => setSelectedNotification(n)}>
-                        VIEW <ChevronRight size={14} />
-                      </button>
+                      {n.file_url && (
+                        <div className="notif-attachment-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#d4af37', background: 'rgba(212, 175, 55, 0.08)', padding: '4px 8px', borderRadius: '6px', marginTop: '6px', marginBottom: '8px', fontWeight: 'bold' }}>
+                          <Paperclip size={12} /> Attachment Included
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="notif-view-btn" onClick={(e) => { e.stopPropagation(); setSelectedNotification(n); }}>
+                          VIEW <ChevronRight size={14} />
+                        </button>
+                        {n.redirect_page && (
+                          <button 
+                            className="notif-view-btn gold" 
+                            style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              let targetPage = n.redirect_page;
+                              if (targetPage.startsWith("Jadwal")) {
+                                const parts = targetPage.split(":");
+                                if (parts[1]) {
+                                  setSelectedStudentId(parts[1]);
+                                }
+                                targetPage = "Jadwal";
+                              }
+                              setActivePage(resolveRedirectPage(targetPage, "parents"));
+                            }}
+                          >
+                            GO TO PAGE <ChevronRight size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -3335,26 +3812,91 @@ function ParentPortal({
               </div>
             )}
 
-            {selectedNotification && (
-              <div className="notif-overlay-backdrop fade-in" onClick={() => setSelectedNotification(null)}>
-                <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
-                  <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
-                    <X size={20} />
-                  </button>
-                  <div className="notif-overlay-header">
-                    <div className="notif-badge">New Update</div>
-                    <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
-                    <h2>{selectedNotification.title}</h2>
-                  </div>
-                  <div className="notif-overlay-body">
-                    <p>{selectedNotification.body}</p>
-                  </div>
-                  <div className="notif-overlay-footer">
-                    <button className="premium-btn gold" onClick={() => setSelectedNotification(null)}>Understood</button>
-                  </div>
-                </div>
+          </div>
+        )}
+
+        {selectedNotification && (
+          <div 
+            className="notif-overlay-backdrop fade-in" 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setSelectedNotification(null);
+              }
+            }}
+          >
+            <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
+              <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
+                <X size={20} />
+              </button>
+              <div className="notif-overlay-header">
+                <div className="notif-badge">New Update</div>
+                <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
+                <h2>{selectedNotification.title}</h2>
               </div>
-            )}
+              <div className="notif-overlay-body">
+                <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
+                
+                {selectedNotification.file_url && (
+                  <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
+                    <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                      <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
+                    </h4>
+                    {isImageFile(selectedNotification.file_url) ? (
+                      <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                        <img 
+                          src={selectedNotification.file_url} 
+                          alt="Attachment Preview" 
+                          style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                        <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <FileArchive size={24} />
+                        </div>
+                        <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {getFileNameFromUrl(selectedNotification.file_url)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    <a 
+                      href={selectedNotification.file_url} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      download
+                      className="premium-btn gold" 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
+                    >
+                      <Download size={16} /> Download File
+                    </a>
+                  </div>
+                )}
+              </div>
+              <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
+                  <button 
+                    className="premium-btn gold" 
+                    onClick={() => {
+                      let targetPage = selectedNotification.redirect_page;
+                      if (targetPage.startsWith("Jadwal")) {
+                        const parts = targetPage.split(":");
+                        if (parts[1]) {
+                          setSelectedStudentId(parts[1]);
+                        }
+                        targetPage = "Jadwal";
+                      }
+                      setActivePage(resolveRedirectPage(targetPage, "parents"));
+                      setSelectedNotification(null);
+                    }}
+                  >
+                    Go to Page
+                  </button>
+                )}
+                <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Understood</button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -3539,6 +4081,79 @@ function AdminLeaveManagement({ onShowAction, students }) {
   );
 }
 
+function PortalAccessSuccessModal({ payload, onClose }) {
+  if (!payload) return null;
+
+  const roleLabel = payload.portal_role === "teacher"
+    ? "Teacher Portal"
+    : payload.portal_role === "admin"
+      ? "Admin Portal"
+      : "Parents Portal";
+
+  return (
+    <div className="portal-access-success-overlay" onClick={onClose} role="presentation">
+      <div
+        className="portal-access-success-card card-appear"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="portal-access-success-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="portal-access-success-close"
+          onClick={onClose}
+          aria-label="Close success popup"
+        >
+          ×
+        </button>
+
+        <div className="portal-access-success-badge">
+          <CheckCircle size={24} />
+        </div>
+
+        <p className="portal-access-success-kicker">Portal Access Granted</p>
+        <h3 id="portal-access-success-title" className="portal-access-success-title">
+          {payload.full_name || "User"} now has access
+        </h3>
+        <p className="portal-access-success-copy">
+          A premium portal account has been created and linked successfully.
+        </p>
+
+        <div className="portal-access-success-grid">
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Name</span>
+            <strong className="portal-access-success-value">{payload.full_name || "N/A"}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Email</span>
+            <strong className="portal-access-success-value">{payload.email || "N/A"}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Role</span>
+            <strong className="portal-access-success-value">{roleLabel}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Linked Student</span>
+            <strong className="portal-access-success-value">
+              {payload.linkedStudentName || "Not linked"}
+            </strong>
+          </div>
+        </div>
+
+        <div className="portal-access-success-footer">
+          <span className="portal-access-success-meta">
+            Saved at {payload.grantedAt || "just now"}
+          </span>
+          <button type="button" className="portal-access-success-button" onClick={onClose}>
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminPortal({
   activePage,
   actionMessage,
@@ -3565,6 +4180,9 @@ function AdminPortal({
   onDeleteRecord,
   onUpdateTeacherProfile,
   onSendCustomNotification,
+  attachedFileUrl,
+  uploadingFile,
+  onNotificationFileChange,
   onClearHistory,
   notifications,
   onUnassignChild,
@@ -3579,10 +4197,116 @@ function AdminPortal({
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
+  parentViews = [],
+  whatsappConfig,
+  onUpdateWhatsappConfig,
+  portalAccessSuccess,
+  onClosePortalAccessSuccess,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
+  const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
+  const [uploadingReportBackground, setUploadingReportBackground] = useState(false);
+
+  useEffect(() => {
+    setReportSettingsDraft(normalizeReportSettings(reportSettings));
+  }, [reportSettings]);
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
+  const [whatsAppLogs, setWhatsAppLogs] = useState([]);
+
+  const parseTemplate = (template, student) => {
+    let msg = template || 'Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/';
+    msg = msg.replace(/\{\{child_name\}\}/g, student.name || student.full_name || '');
+    msg = msg.replace(/\{\{group_name\}\}/g, student.groupName || student.group_name || '');
+    msg = msg.replace(/\{\{juz\}\}/g, student.hifz?.juz || student.juz || '');
+    msg = msg.replace(/\{\{surat\}\}/g, student.hifz?.surat || student.surat || '');
+    msg = msg.replace(/\{\{portal_url\}\}/g, 'https://mouze-tahfeez-atfal.vercel.app/');
+    return msg;
+  };
+
+  const sendIndividualWhatsApp = async (phone, message, studentName) => {
+    const formattedPhone = (phone || "").split("").filter((c) => "0123456789".includes(c)).join("");
+
+    if (!formattedPhone) {
+      throw new Error("Invalid phone number");
+    }
+
+    const { data, error } = await supabase.functions.invoke("whatsapp-notification", {
+      body: {
+        phone: formattedPhone,
+        message,
+        studentName,
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || "Failed to send WhatsApp message");
+    }
+
+    if (!data?.success) {
+      throw new Error(data?.error || data?.message || "Failed to send WhatsApp message");
+    }
+
+    return true;
+  };
+
+  const triggerWhatsAppNotifications = async () => {
+    if (!whatsappConfig) {
+      alert("WhatsApp Configuration is not loaded yet. Please wait a second and try again.");
+      return;
+    }
+    if (!whatsappConfig.enabled || whatsappConfig.provider === 'none') {
+      alert("WhatsApp notifications are disabled or the provider is set to None. Please configure them below.");
+      return;
+    }
+    
+    const targetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
+    
+    if (targetStudents.length === 0) {
+      alert("No students found with a WhatsApp number in their profile!");
+      if (onShowAction) onShowAction("info", "No parents with WhatsApp numbers found to notify.");
+      return;
+    }
+    
+    setSendingWhatsApp(true);
+    setWhatsAppProgress({ current: 0, total: targetStudents.length });
+    setWhatsAppLogs([{ time: new Date().toLocaleTimeString(), text: `Starting WhatsApp notifications for ${targetStudents.length} parents...`, type: 'info' }]);
+    
+    let sentCount = 0;
+    
+    for (let i = 0; i < targetStudents.length; i++) {
+      const student = targetStudents[i];
+      const phone = student.whatsapp_number;
+      const message = parseTemplate(whatsappConfig.message_template, student);
+      
+      setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Sending to ${student.name} (${phone})...`, type: 'sending' }]);
+      
+      try {
+        await sendIndividualWhatsApp(phone, message, student.name);
+        sentCount++;
+        setWhatsAppLogs(prev => [
+          ...prev.slice(0, -1),
+          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' }
+        ]);
+      } catch (err) {
+        console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
+        setWhatsAppLogs(prev => [
+          ...prev.slice(0, -1),
+          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} ❌`, type: 'error' }
+        ]);
+      }
+      
+      setWhatsAppProgress(prev => ({ ...prev, current: i + 1 }));
+      
+      if (i < targetStudents.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `WhatsApp notifications finished! Sent: ${sentCount}/${targetStudents.length} successfully.`, type: 'info' }]);
+  };
   const [generationProgress, setGenerationProgress] = useState(0);
   const [studentToRender, setStudentToRender] = useState(null);
 
@@ -3594,6 +4318,12 @@ function AdminPortal({
 
     setIsGeneratingReports(true);
     setGenerationProgress(0);
+    const [html2canvas, jsPDF, JSZip, saveAs] = await Promise.all([
+      loadHtml2Canvas(),
+      loadJsPDF(),
+      loadJSZip(),
+      loadSaveAs(),
+    ]);
     const zip = new JSZip();
 
     if (onShowAction) onShowAction("success", `Preparing ${students.length} reports... Please wait.`);
@@ -3683,13 +4413,14 @@ function AdminPortal({
     }
   };
 
-  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Global Settings"];
-  const navPages = ["Overview", "Announcements", "Schedule"];
+  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings"];
+  const navPages = ["Overview", "Schedule", "Result Tracking"];
 
-  const selectedStudent =
-    students.find((student) => student.allIds.includes(String(selectedStudentId))) ||
-    students[0] ||
-    null;
+  const selectedStudent = selectedStudentId
+    ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
+    : null;
+  const reportSettingsObject = normalizeReportSettings(reportSettings);
+  const previewStudent = selectedStudent || students[0] || null;
 
   const groupedStudents = students.reduce((accumulator, student) => {
     const key = student.groupName || "Ungrouped";
@@ -3716,12 +4447,123 @@ function AdminPortal({
     groups: Array.from(item.groups),
   }));
 
+  const viewedCount = (parentViews || []).filter(v => v.viewed).length;
   const stats = [
     { label: "Students", value: students.length, icon: Users },
     { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap },
-    { label: "Announcements", value: announcements.length, icon: Bell },
     { label: "Schedules", value: schedule.length, icon: Calendar },
+    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye },
   ];
+
+  const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
+    const settingsId = reportSettingsObject?.id || 1;
+    const { error } = await supabase
+      .from("report_settings")
+      .upsert({ id: settingsId, ...updates }, { onConflict: "id" })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      onShowAction("error", "Failed to update settings: " + error.message);
+      return;
+    }
+
+    onShowAction("success", "System settings updated successfully!");
+
+    if (notifyLive && updates.reports_live) {
+      supabase
+        .from("parent_report_views")
+        .update({ viewed: false, view_duration_seconds: 0, updated_at: new Date().toISOString() })
+        .neq("student_id", "")
+        .then(({ error: resetError }) => {
+          if (resetError) console.warn("Failed to reset parent views on live:", resetError.message);
+        });
+
+      supabase.functions.invoke("fcm-notification", {
+        body: {
+          title: "Results are LIVE!",
+          body: "The latest Tahfeez progress reports are now visible in your portal.",
+          targetRole: "parents",
+        },
+      });
+
+      triggerWhatsAppNotifications();
+    }
+
+    loadPortalData(portalRole, user);
+  };
+
+  const updateReportDraft = (field) => (event) => {
+    const value = event.target.value;
+    setReportSettingsDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleReportBackgroundUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      onShowAction("error", "Please upload an image file for the progress card background.");
+      return;
+    }
+
+    if (file.size > MAX_REPORT_BACKGROUND_SIZE) {
+      onShowAction("error", "Progress card background must be under 5MB.");
+      return;
+    }
+
+    setUploadingReportBackground(true);
+
+    try {
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "png";
+      const safeName = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-z0-9-_]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "progress-card-bg";
+      const filePath = `progress-card/${Date.now()}-${safeName}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .getPublicUrl(filePath);
+
+      const backgroundUrl = publicUrlData?.publicUrl;
+      if (!backgroundUrl) throw new Error("Background image URL was not returned.");
+
+      setReportSettingsDraft((current) => ({
+        ...current,
+        progress_card_background_url: backgroundUrl,
+      }));
+
+      await saveReportSettings({ progress_card_background_url: backgroundUrl });
+    } catch (error) {
+      console.error("Progress card background upload failed:", error);
+      onShowAction("error", `Background upload failed: ${error.message}`);
+    } finally {
+      setUploadingReportBackground(false);
+    }
+  };
+
+  const removeReportBackground = async () => {
+    setReportSettingsDraft((current) => ({
+      ...current,
+      progress_card_background_url: "",
+    }));
+
+    await saveReportSettings({ progress_card_background_url: "" });
+  };
 
   return (
     <div className="admin-shell">
@@ -3814,7 +4656,6 @@ function AdminPortal({
                  { label: "Portal Access", value: "Portal Access" },
                  { label: "Faculty Attendance", value: "Faculty" },
                  { label: "Notifications Hub", value: "Notifications" },
-                 { label: "Announcements", value: "Announcements" },
                  { label: "Master Schedule", value: "Schedule" },
                  { label: "Support Tickets", value: "User Issues" }
                ]} 
@@ -3847,6 +4688,7 @@ function AdminPortal({
                     full_name,
                     arabic_name: formData.get("arabic_name"),
                     parent_email: formData.get("parent_email"),
+                    whatsapp_number: formData.get("whatsapp_number") ? String(formData.get("whatsapp_number")).trim() : null,
                     juz: formData.get("juz"),
                     surat: formData.get("surat"),
                     photo_url: formData.get("photo_url"),
@@ -3880,8 +4722,18 @@ function AdminPortal({
                       <input name="parent_email" type="email" placeholder="parent@example.com" className="premium-input" />
                     </label>
                     <label>
+                      <span>WhatsApp Number (Parents)</span>
+                      <input name="whatsapp_number" type="text" placeholder="e.g. 923001234567" className="premium-input" />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
                       <span>Photo URL</span>
                       <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                    </label>
+                    <label style={{ opacity: 0, pointerEvents: 'none' }}>
+                      <span>Spacer</span>
+                      <input type="text" className="premium-input" />
                     </label>
                   </div>
                   <div className="form-row">
@@ -3918,6 +4770,11 @@ function AdminPortal({
                         <div>
                           <h4>{s.name}</h4>
                           <p>{s.groupName || 'No Group'}</p>
+                          {s.whatsapp_number && (
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                              <MessageCircle size={12} style={{ color: '#25D366' }} /> {s.whatsapp_number}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <button
@@ -4021,7 +4878,8 @@ function AdminPortal({
                     <TahfeezReportCard
                       student={selectedStudent}
                       weeklyResult={selectedStudent.latestResult}
-                      settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                      settings={reportSettingsObject}
+                      parentViewed={(parentViews || []).find(v => String(v.student_id) === String(selectedStudent.student_id))?.viewed ?? false}
                     />
                   </div>
                 </div>
@@ -4038,6 +4896,61 @@ function AdminPortal({
             </div>
           ) : null}
 
+          {activePage === "Result Tracking" ? (
+            <div className="overview-container fade-in">
+              <div className="card-headline headline-with-action card-appear" style={{ marginBottom: '20px', backgroundColor: 'var(--white)', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+                <div className="headline-left">
+                  <Eye size={20} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 style={{ color: 'var(--deep-brown)', margin: 0 }}>Parent Report View Tracking</h3>
+                </div>
+                <div className="headline-right" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)' }}></div>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Viewed</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Not Viewed</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="assigned-list card-appear">
+                <div className="assigned-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
+                  {students.map(s => {
+                    const isViewed = (parentViews || []).find(v => String(v.student_id) === String(s.student_id))?.viewed ?? false;
+                    return (
+                      <div key={s.student_id} className="assigned-child-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', margin: 0 }}>
+                        <div className="child-info-header" style={{ margin: 0, gap: '12px' }}>
+                          <StudentAvatar student={s} size="small" />
+                          <div>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: 'var(--primary-dark)' }}>{s.name}</h4>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--soft-brown)' }}>{s.groupName || 'No Group'}</p>
+                          </div>
+                        </div>
+                        <div 
+                          title={isViewed ? "Parent viewed report" : "Parent has not viewed report"}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            backgroundColor: isViewed ? '#2ec4b6' : '#e71d36',
+                            boxShadow: isViewed 
+                              ? '0 0 12px rgba(46, 196, 182, 0.7)' 
+                              : '0 0 12px rgba(231, 29, 54, 0.7)',
+                            border: '2px solid #ffffff',
+                            flexShrink: 0
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+
           {activePage === "Notifications" ? (
             <div className="management-grid two-columns">
               <section className="form-card card-appear">
@@ -4052,6 +4965,7 @@ function AdminPortal({
                       className="btn-text-only" 
                       style={{ color: 'var(--primary-gold)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
                       onClick={async () => {
+                        const fcmService = await loadFcmService();
                         const result = await fcmService.initialize("admin");
                         if (result) alert("Notifications active for this device!");
                         else alert("Failed to activate. Check browser permissions.");
@@ -4113,6 +5027,32 @@ function AdminPortal({
                       rows={4}
                     />
                   </label>
+                  <label className="file-upload-label" style={{ display: 'block', marginTop: '15px', marginBottom: '15px' }}>
+                    <span style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Attach Image or File (PDF, Images, etc.)</span>
+                    <div className="custom-file-upload-box" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.8)', border: '1px dashed #d4af37', padding: '12px', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                      <input
+                        type="file"
+                        onChange={onNotificationFileChange}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip"
+                      />
+                      <Paperclip size={18} style={{ color: '#d4af37' }} />
+                      <span style={{ fontSize: '13px', color: '#5c4033' }}>
+                        {uploadingFile ? "Uploading attachment..." : attachedFileUrl ? "Attachment uploaded & linked!" : "Click to select a file to upload..."}
+                      </span>
+                      {uploadingFile && <span className="upload-spinner" style={{ border: '2px solid #f3f3f3', borderTop: '2px solid #d4af37', borderRadius: '50%', width: '14px', height: '14px', animation: 'spin 1s linear infinite', marginLeft: 'auto' }} />}
+                      {!uploadingFile && attachedFileUrl && (
+                        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#2e7d32', fontWeight: 'bold' }}>
+                          <CheckCircle size={16} /> Attached
+                        </span>
+                      )}
+                    </div>
+                    {attachedFileUrl && (
+                      <span style={{ display: 'block', fontSize: '11px', color: '#d4af37', marginTop: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        Linked URL: {attachedFileUrl}
+                      </span>
+                    )}
+                  </label>
                   <div className="form-grid">
                     <label>
                       <span>Destination Page</span>
@@ -4122,10 +5062,53 @@ function AdminPortal({
                         onChange={onAdminFormChange("customNotification")}
                         className="premium-select"
                       >
-                        <option value="Home">Home Screen</option>
-                        <option value="Announcements">Announcements</option>
-                        <option value="Attendance">Attendance Page</option>
-                        <option value="Progress">Progress Reports</option>
+                        {adminForms.customNotification.target_audience === "parents" ? (
+                          <>
+                            <option value="Home">Home</option>
+                            <option value="Child Summary">Progress Reports</option>
+                            <option value="Schedule">Schedule Timetable</option>
+                            <option value="Teachers">Teachers list</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Profile">Profile</option>
+                            <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                            <option value="Hub Raqam">Hub Raqam</option>
+                            <option value="Apply Leave">Apply Leave</option>
+                            <option value="Jadwal">Jadwal (Timetable)</option>
+                            <option value="Settings">Settings</option>
+                          </>
+                        ) : adminForms.customNotification.target_audience === "teacher" ? (
+                          <>
+                            <option value="My Group">My Group</option>
+                            <option value="Jadwal">Jadwal Timetables</option>
+                            <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Reports">Submit Progress Reports</option>
+                            <option value="Settings">Settings</option>
+                          </>
+                        ) : adminForms.customNotification.target_audience === "admin" ? (
+                          <>
+                            <option value="Overview">Overview</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Schedule">Schedule</option>
+                            <option value="Teacher Attendance">Teacher Attendance</option>
+                            <option value="Custom Groups">Custom Groups</option>
+                            <option value="Portal Access">Portal Access</option>
+                            <option value="Assign Child">Assign Child</option>
+                            <option value="Leave Requests">Leave Requests</option>
+                            <option value="Support Tickets">Support Tickets</option>
+                            <option value="Report Settings">Report Settings</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Home">Home Screen</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Jadwal">Jadwal (Timetable)</option>
+                            <option value="Progress">Progress Reports</option>
+                          </>
+                        )}
                       </select>
                     </label>
                   </div>
@@ -4271,125 +5254,7 @@ function AdminPortal({
             </div>
           ) : null}
 
-          {activePage === "Announcements" ? (
-            <div className="management-grid two-columns">
-              <section className="form-card">
-                <div className="card-headline">
-                  <Bell size={18} />
-                  <h3>Create Announcement</h3>
-                </div>
-                <form className="stack-form" onSubmit={onCreateAnnouncement}>
-                  <div className="form-grid">
-                    <label>
-                      <span>Title</span>
-                      <input
-                        type="text"
-                        name="title"
-                        value={adminForms.announcement.title}
-                        onChange={onAdminFormChange("announcement")}
-                        placeholder="Weekly parent meeting"
-                        required
-                      />
-                    </label>
 
-                    <label>
-                      <span>Type</span>
-                      <select
-                        name="type"
-                        value={adminForms.announcement.type}
-                        onChange={onAdminFormChange("announcement")}
-                      >
-                        <option value="Update">Update</option>
-                        <option value="Urgent">Urgent</option>
-                        <option value="Event">Event</option>
-                      </select>
-                    </label>
-
-                    <label>
-                      <span>Target Portal</span>
-                      <select
-                        name="target_role"
-                        value={adminForms.announcement.target_role || "all"}
-                        onChange={onAdminFormChange("announcement")}
-                      >
-                        <option value="all">Everyone</option>
-                        <option value="parents">Parents Only</option>
-                        <option value="teacher">Teachers Only</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <label>
-                    <span>Date</span>
-                    <input
-                      type="date"
-                      name="event_date"
-                      value={adminForms.announcement.event_date}
-                      onChange={onAdminFormChange("announcement")}
-                      required
-                    />
-                  </label>
-
-                  <button type="submit" className="action-button">
-                    Publish Announcement
-                  </button>
-                </form>
-              </section>
-
-              <section className="data-card">
-                <div className="card-headline headline-with-action">
-                  <div className="headline-left">
-                    <BookOpen size={18} />
-                    <h3>Latest Announcements</h3>
-                  </div>
-                  <button
-                    className="clear-history-btn"
-                    onClick={() => onClearHistory("events")()}
-                  >
-                    Clear All
-                  </button>
-                </div>
-                <div className="record-stack">
-                  {announcements.map((item) => (
-                    <article key={item.id || `${item.title}-${item.event_date}`} className="record-card flex-row-card">
-                      <div className="card-primary-info">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '10px' }}>
-                            {(item.target_role || 'ALL').toUpperCase()}
-                          </span>
-                          <strong>{item.title}</strong>
-                        </div>
-                        <span>
-                          {item.type || "Update"} · {item.event_date || "No date"}
-                        </span>
-                      </div>
-                      <button
-                        className="delete-icon-btn"
-                        onClick={() => onDeleteRecord("events", "id")(item.id)}
-                        aria-label="Delete announcement"
-                      >
-                        <Trash size={16} />
-                      </button>
-                    </article>
-                  ))}
-                  {announcements.length === 0 ? (
-                    <div className="empty-state">No announcements available yet.</div>
-                  ) : null}
-                </div>
-              </section>
-            </div>
-          ) : null}
-
-          {activePage === "Announcements" ? (
-            <AnnouncementsPage
-              announcements={announcements}
-              setActivePage={setActivePage}
-              setSelectedAnnouncement={setSelectedAnnouncement}
-              onDismiss={onDismissAnnounce}
-              onClearAll={onClearAllAnnounces}
-              dismissedIds={dismissedAnnounces}
-            />
-          ) : null}
 
           {activePage === "User Issues" ? (
             <SupportTicketsAdmin 
@@ -4423,6 +5288,7 @@ function AdminPortal({
                       photo_url: e.target.photo_url?.value,
                       group_name: e.target.group_name?.value,
                       its: e.target.its?.value,
+                      whatsapp_number: e.target.whatsapp_number?.value,
                     };
                     if (data.student_id) onAssignChild(data);
                   }}>
@@ -4446,6 +5312,7 @@ function AdminPortal({
                               if (form.surat) form.surat.value = s.surat || '';
                               if (form.photo_url) form.photo_url.value = s.photoUrl || '';
                               if (form.its) form.its.value = s.its === '...' ? '' : (s.its || '');
+                              if (form.whatsapp_number) form.whatsapp_number.value = s.whatsapp_number || '';
                               if (form.teacher_id) form.teacher_id.value = s.muhaffiz_id || '';
                               if (form.parent_id) form.parent_id.value = s.user_id || '';
                             }
@@ -4497,6 +5364,11 @@ function AdminPortal({
                       <label>
                         <span>ITS Number</span>
                         <input name="its" type="text" placeholder="ITS" className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>WhatsApp Number</span>
+                        <input name="whatsapp_number" type="text" placeholder="e.g. 923001234567" className="premium-input" />
                       </label>
 
                       <label>
@@ -4665,19 +5537,21 @@ function AdminPortal({
                     <select
                       name="full_name"
                       value={adminForms.teacherProfile.full_name}
-                      onChange={(e) => {
-                        const selectedName = e.target.value;
-                        const existingProfile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(selectedName));
+                    onChange={(e) => {
+                      const selectedName = e.target.value;
+                      const existingProfile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(selectedName));
+                      const existingAccess = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(selectedName));
 
-                        setAdminForms(curr => ({
-                          ...curr,
-                          teacherProfile: {
-                            ...curr.teacherProfile,
-                            full_name: selectedName,
-                            phone_number: existingProfile?.phone_number || "",
-                            whatsapp_number: existingProfile?.whatsapp_number || "",
-                            photo_url: existingProfile?.photo_url || "",
-                            salary_per_minute: existingProfile?.salary_per_minute || "2.3",
+                      setAdminForms(curr => ({
+                        ...curr,
+                        teacherProfile: {
+                          ...curr.teacherProfile,
+                          user_id: existingProfile?.user_id || existingAccess?.user_id || "",
+                          full_name: selectedName,
+                          phone_number: existingProfile?.phone_number || "",
+                          whatsapp_number: existingProfile?.whatsapp_number || "",
+                          photo_url: existingProfile?.photo_url || "",
+                          salary_per_minute: existingProfile?.salary_per_minute || "2.3",
                             show_salary_card: existingProfile?.show_salary_card ?? true
                           }
                         }));
@@ -5063,7 +5937,7 @@ function AdminPortal({
                 <TahfeezReportCard
                   student={studentToRender}
                   weeklyResult={studentToRender.latestResult}
-                  settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                  settings={reportSettingsObject}
                 />
               </div>
             )}
@@ -5072,6 +5946,163 @@ function AdminPortal({
           {activePage === "Leave Management" && (
             <AdminLeaveManagement students={students} onShowAction={onShowAction} />
           )}
+          {portalAccessSuccess && (
+            <PortalAccessSuccessModal
+              payload={portalAccessSuccess}
+              onClose={onClosePortalAccessSuccess}
+            />
+          )}
+          {activePage === "Report Settings" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <Palette size={18} />
+                  <h3>Report Heading Settings</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  saveReportSettings(reportSettingsDraft);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Main Heading</span>
+                      <input name="main_heading" type="text" value={reportSettingsDraft.main_heading} onChange={updateReportDraft("main_heading")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Sub Heading</span>
+                      <input name="sub_heading" type="text" value={reportSettingsDraft.sub_heading} onChange={updateReportDraft("sub_heading")} className="premium-input" />
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Palette size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Progress Card Theme</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Background Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReportBackgroundUpload}
+                        className="premium-input"
+                        disabled={uploadingReportBackground}
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Upload JPG, PNG, or WebP under 5MB. It will appear behind the progress report card.
+                      </small>
+                    </label>
+                    <label>
+                      <span>Image Position</span>
+                      <select
+                        value={reportSettingsDraft.progress_card_background_position || "center"}
+                        onChange={updateReportDraft("progress_card_background_position")}
+                        className="premium-select"
+                      >
+                        <option value="center">Center</option>
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Text Readability Overlay</span>
+                      <input
+                        name="progress_card_overlay_opacity"
+                        type="range"
+                        min="0.35"
+                        max="0.95"
+                        step="0.05"
+                        value={reportSettingsDraft.progress_card_overlay_opacity ?? 0.82}
+                        onChange={updateReportDraft("progress_card_overlay_opacity")}
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)' }}>
+                        Higher value = cleaner text, softer image.
+                      </small>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+                      {reportSettingsDraft.progress_card_background_url ? (
+                        <button
+                          type="button"
+                          className="btn-text-only"
+                          onClick={removeReportBackground}
+                          disabled={uploadingReportBackground}
+                        >
+                          <Trash2 size={16} /> Remove Background
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--soft-brown)', fontSize: '0.9rem' }}>
+                          No custom background selected.
+                        </span>
+                      )}
+                      {uploadingReportBackground && (
+                        <span style={{ color: 'var(--primary-gold)', fontSize: '0.9rem', fontWeight: 700 }}>
+                          Uploading background...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '16px', padding: '0', border: 'none' }}>
+                    <MessageCircle size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Score Labels</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label><span>Weekly Score</span><input name="weekly_score_heading" type="text" value={reportSettingsDraft.weekly_score_heading} onChange={updateReportDraft("weekly_score_heading")} className="premium-input" /></label>
+                    <label><span>Jumla</span><input name="jumla_heading" type="text" value={reportSettingsDraft.jumla_heading} onChange={updateReportDraft("jumla_heading")} className="premium-input" /></label>
+                    <label><span>Murajah</span><input name="murajazah_heading" type="text" value={reportSettingsDraft.murajazah_heading} onChange={updateReportDraft("murajazah_heading")} className="premium-input" /></label>
+                    <label><span>Juz Hali</span><input name="juz_hali_heading" type="text" value={reportSettingsDraft.juz_hali_heading} onChange={updateReportDraft("juz_hali_heading")} className="premium-input" /></label>
+                    <label><span>Takhteet</span><input name="takhteet_heading" type="text" value={reportSettingsDraft.takhteet_heading} onChange={updateReportDraft("takhteet_heading")} className="premium-input" /></label>
+                    <label><span>Jadeed</span><input name="jadeed_heading" type="text" value={reportSettingsDraft.jadeed_heading} onChange={updateReportDraft("jadeed_heading")} className="premium-input" /></label>
+                    <label><span>Jadeed Safahat</span><input name="jadeed_safahat_heading" type="text" value={reportSettingsDraft.jadeed_safahat_heading} onChange={updateReportDraft("jadeed_safahat_heading")} className="premium-input" /></label>
+                    <label><span>Attendance</span><input name="attendance_heading" type="text" value={reportSettingsDraft.attendance_heading} onChange={updateReportDraft("attendance_heading")} className="premium-input" /></label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '16px', padding: '0', border: 'none' }}>
+                    <BookOpen size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Target Sections</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label><span>Matrookah</span><input name="matrookah_heading" type="text" value={reportSettingsDraft.matrookah_heading} onChange={updateReportDraft("matrookah_heading")} className="premium-input" /></label>
+                    <label><span>Zaeefah</span><input name="daeefah_heading" type="text" value={reportSettingsDraft.daeefah_heading} onChange={updateReportDraft("daeefah_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Section</span><input name="wusool_heading" type="text" value={reportSettingsDraft.wusool_heading} onChange={updateReportDraft("wusool_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Juz</span><input name="wusool_juz_heading" type="text" value={reportSettingsDraft.wusool_juz_heading} onChange={updateReportDraft("wusool_juz_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Page</span><input name="wusool_page_heading" type="text" value={reportSettingsDraft.wusool_page_heading} onChange={updateReportDraft("wusool_page_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Target</span><input name="next_week_heading" type="text" value={reportSettingsDraft.next_week_heading} onChange={updateReportDraft("next_week_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Juz</span><input name="next_week_juz_heading" type="text" value={reportSettingsDraft.next_week_juz_heading} onChange={updateReportDraft("next_week_juz_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Page</span><input name="next_week_page_heading" type="text" value={reportSettingsDraft.next_week_page_heading} onChange={updateReportDraft("next_week_page_heading")} className="premium-input" /></label>
+                    <label><span>Target Till</span><input name="istifadah_heading" type="text" value={reportSettingsDraft.istifadah_heading} onChange={updateReportDraft("istifadah_heading")} className="premium-input" /></label>
+                    <label><span>Its Juz</span><input name="istifadah_juz_heading" type="text" value={reportSettingsDraft.istifadah_juz_heading} onChange={updateReportDraft("istifadah_juz_heading")} className="premium-input" /></label>
+                    <label><span>Its Page</span><input name="istifadah_page_heading" type="text" value={reportSettingsDraft.istifadah_page_heading} onChange={updateReportDraft("istifadah_page_heading")} className="premium-input" /></label>
+                  </div>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
+                    Save Report Settings
+                  </button>
+                </form>
+              </section>
+
+              <section className="data-card card-appear">
+                <div className="card-headline">
+                  <Eye size={18} />
+                  <h3>Live Preview</h3>
+                </div>
+                {previewStudent ? (
+                  <TahfeezReportCard
+                    student={previewStudent}
+                    weeklyResult={previewStudent.latestResult}
+                    settings={reportSettingsDraft}
+                    parentViewed={(parentViews || []).find(v => String(v.student_id) === String(previewStudent.student_id))?.viewed ?? false}
+                  />
+                ) : (
+                  <div className="empty-state">
+                    Add students to preview the report headings.
+                  </div>
+                )}
+              </section>
+            </div>
+          ) : null}
           {activePage === "Global Settings" ? (
             <div className="management-grid two-columns">
               <section className="form-card card-appear">
@@ -5085,70 +6116,125 @@ function AdminPortal({
                   const updates = {
                     reports_live: formData.get("reports_live") === "true",
                     live_at: formData.get("live_at") ? new Date(formData.get("live_at")).toISOString() : null,
-                    main_heading: formData.get("main_heading"),
-                    sub_heading: formData.get("sub_heading"),
+                    allow_teacher_progress_entry: formData.get("allow_teacher_progress_entry") === "true",
                   };
-                  
-                  const settingsId = reportSettings[0]?.id || 1;
-                  supabase.from("report_settings")
-                    .upsert({ id: settingsId, ...updates })
-                    .then(({ error }) => {
-                      if (error) onShowAction("error", "Failed to update settings: " + error.message);
-                      else {
-                        onShowAction("success", "System settings updated successfully!");
-                        
-                        // Notify all parents if results made live
-                        if (updates.reports_live) {
-                          supabase.functions.invoke('fcm-notification', {
-                            body: {
-                              title: "Results are LIVE!",
-                              body: "The latest Tahfeez progress reports are now visible in your portal.",
-                              targetRole: 'parents'
-                            }
-                          });
-                        }
-                        
-                        loadPortalData(portalRole, user);
-                      }
-                    });
+                  saveReportSettings(updates, { notifyLive: true });
                 }}>
                   <div className="form-grid">
                     <label>
                       <span>Parent Access Mode</span>
-                      <select name="reports_live" defaultValue={String(reportSettings[0]?.reports_live ?? true)} className="premium-select">
+                      <select name="reports_live" defaultValue={String(reportSettingsObject?.reports_live ?? true)} className="premium-select">
                         <option value="true">Live (Visible to Parents)</option>
                         <option value="false">Hidden (Maintenance Mode)</option>
                       </select>
                     </label>
                     <label>
-                      <span>Schedule Live Time</span>
+                      <span>Teacher Progress Entry</span>
+                      <select
+                        name="allow_teacher_progress_entry"
+                        defaultValue={String(reportSettingsObject?.allow_teacher_progress_entry ?? true)}
+                        className="premium-select"
+                      >
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Schedule Action Time</span>
                       <input 
                         type="datetime-local" 
                         name="live_at" 
-                        defaultValue={reportSettings[0]?.live_at ? new Date(new Date(reportSettings[0].live_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                        defaultValue={reportSettingsObject?.live_at ? new Date(new Date(reportSettingsObject.live_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
                         className="premium-input"
                       />
                     </label>
                   </div>
                   <p className="hint-text" style={{ marginBottom: '20px' }}>
-                    If hidden or scheduled in the future, parents will see a "Coming Soon" message instead of the report.
+                    If "Live" is selected, the time schedules when the report will become visible. If "Hidden" is selected, the time schedules when the report will be hidden.
                   </p>
-                  
-                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
-                    <Palette size={16} />
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Report Branding</h4>
-                  </div>
-                  <label>
-                    <span>Main Heading</span>
-                    <input name="main_heading" type="text" defaultValue={reportSettings[0]?.main_heading || "Rawdat Tahfeez al Atfal"} className="premium-input" />
-                  </label>
-                  <label>
-                    <span>Sub Heading</span>
-                    <input name="sub_heading" type="text" defaultValue={reportSettings[0]?.sub_heading || "TAHFEEZ REPORT 1447H"} className="premium-input" />
-                  </label>
 
                   <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
                     Save Global Settings
+                  </button>
+                </form>
+              </section>
+
+              {/* WhatsApp Integration Configuration Section */}
+              <section className="form-card card-appear" style={{ marginTop: '20px' }}>
+                <div className="card-headline">
+                  <MessageCircle size={18} />
+                  <h3>WhatsApp Integration</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = {
+                    enabled: formData.get("wa_enabled") === "true",
+                    provider: formData.get("wa_provider"),
+                    api_url: formData.get("wa_api_url"),
+                    api_token: formData.get("wa_api_token"),
+                    account_sid: formData.get("wa_account_sid"),
+                    from_number: formData.get("wa_from_number"),
+                    message_template: formData.get("wa_message_template")
+                  };
+                  onUpdateWhatsappConfig(updates);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable WhatsApp Notifications</span>
+                      <select name="wa_enabled" defaultValue={String(whatsappConfig?.enabled ?? false)} className="premium-select">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>WhatsApp Provider</span>
+                      <select name="wa_provider" defaultValue={whatsappConfig?.provider ?? "none"} className="premium-select">
+                        <option value="none">None / Disabled</option>
+                        <option value="mock">Simulated / Testing Mode (Mock)</option>
+                        <option value="custom">Custom HTTP Gateway</option>
+                        <option value="twilio">Twilio API</option>
+                        <option value="meta">Meta Cloud API</option>
+                      </select>
+                    </label>
+                  </div>
+                  
+                  <div className="form-grid">
+                    <label>
+                      <span>API URL (Custom Gateway only)</span>
+                      <input name="wa_api_url" type="text" defaultValue={whatsappConfig?.api_url || ""} placeholder="https://api.ultramsg.com/instanceXXXX/messages/chat" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>API Token / Auth Token / Access Token</span>
+                      <input name="wa_api_token" type="password" defaultValue={whatsappConfig?.api_token || ""} placeholder="Your secret token..." className="premium-input" />
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      <span>Account SID (Twilio only)</span>
+                      <input name="wa_account_sid" type="text" defaultValue={whatsappConfig?.account_sid || ""} placeholder="ACxxxxxxxxxxxxxx" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>From Number / Phone ID (Twilio/Meta/Custom)</span>
+                      <input name="wa_from_number" type="text" defaultValue={whatsappConfig?.from_number || ""} placeholder="Meta Phone Number ID or sender number" className="premium-input" />
+                    </label>
+                  </div>
+
+                  <label>
+                    <span>Message Template</span>
+                    <textarea 
+                      name="wa_message_template" 
+                      rows={3} 
+                      defaultValue={whatsappConfig?.message_template || 'Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/'} 
+                      className="premium-input"
+                      style={{ resize: 'vertical' }}
+                    />
+                    <span className="hint-text">Placeholders: <code>{"{{child_name}}"}</code>, <code>{"{{group_name}}"}</code>, <code>{"{{juz}}"}</code>, <code>{"{{surat}}"}</code></span>
+                  </label>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '10px' }}>
+                    Save WhatsApp Settings
                   </button>
                 </form>
               </section>
@@ -5159,13 +6245,16 @@ function AdminPortal({
                   <h3>Current Status</h3>
                 </div>
                 <div className="status-indicator-box" style={{ padding: '20px', textAlign: 'center', background: 'var(--brown-light)', borderRadius: '16px' }}>
-                   <div className={`status-dot-large ${reportSettings[0]?.reports_live !== false ? 'online' : 'offline'}`} />
-                   <h4 style={{ margin: '15px 0 5px' }}>Reports are currently {reportSettings[0]?.reports_live !== false ? 'LIVE' : 'HIDDEN'}</h4>
-                   {reportSettings[0]?.live_at && (
+                   <div className={`status-dot-large ${reportSettingsObject?.reports_live !== false ? 'online' : 'offline'}`} />
+                   <h4 style={{ margin: '15px 0 5px' }}>Reports are currently {reportSettingsObject?.reports_live !== false ? 'LIVE' : 'HIDDEN'}</h4>
+                   {reportSettingsObject?.live_at && (
                      <p style={{ fontSize: '0.9rem', opacity: 0.8 }}>
-                       Scheduled for: {new Date(reportSettings[0].live_at).toLocaleString()}
+                       Scheduled for: {new Date(reportSettingsObject.live_at).toLocaleString()}
                      </p>
                    )}
+                   <p style={{ fontSize: '0.85rem', marginTop: '10px', color: 'var(--soft-brown)' }}>
+                     Teacher progress entry is {reportSettingsObject?.allow_teacher_progress_entry === false ? 'DISABLED' : 'ENABLED'}
+                   </p>
                 </div>
                 <div style={{ marginTop: '20px' }}>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
@@ -5176,6 +6265,72 @@ function AdminPortal({
             </div>
           ) : null}
         </section>
+
+        {/* WhatsApp Sending Progress Modal */}
+        {sendingWhatsApp && (
+          <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)' }}>
+            <div className="premium-modal-card card-appear" style={{ maxWidth: '600px', width: '90%', padding: '24px', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: '16px', boxShadow: 'var(--premium-shadow)', color: 'var(--text-main)' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--deep-brown)', margin: '0 0 16px' }}>
+                <MessageCircle style={{ color: 'var(--primary-gold)' }} />
+                Sending WhatsApp Notifications
+              </h3>
+              
+              <div className="progress-bar-container" style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
+                <div 
+                  className="progress-bar-fill" 
+                  style={{ 
+                    width: `${(whatsAppProgress.current / Math.max(whatsAppProgress.total, 1)) * 100}%`, 
+                    height: '100%', 
+                    background: 'var(--primary-gold)',
+                    transition: 'width 0.3s ease'
+                  }} 
+                />
+              </div>
+              
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Processing: <strong>{whatsAppProgress.current}</strong> of <strong>{whatsAppProgress.total}</strong> parents
+              </p>
+              
+              <div 
+                className="log-console" 
+                style={{ 
+                  height: '200px', 
+                  overflowY: 'auto', 
+                  background: 'rgba(0,0,0,0.03)', 
+                  border: '1px solid rgba(0,0,0,0.05)', 
+                  borderRadius: '8px', 
+                  padding: '12px', 
+                  fontSize: '0.8rem', 
+                  fontFamily: 'monospace',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}
+              >
+                {whatsAppLogs.map((log, idx) => (
+                  <div key={idx} style={{ 
+                    color: log.type === 'success' ? '#2e7d32' : log.type === 'error' ? '#c62828' : log.type === 'sending' ? '#1565c0' : 'var(--text-main)' 
+                  }}>
+                    [{log.time}] {log.text}
+                  </div>
+                ))}
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button 
+                  className="action-button" 
+                  disabled={whatsAppProgress.current < whatsAppProgress.total}
+                  onClick={() => {
+                    setSendingWhatsApp(false);
+                    setWhatsAppLogs([]);
+                  }}
+                >
+                  Close / Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -5206,18 +6361,42 @@ function TeacherPortal({
   teacherProfiles = [],
   selectedNotification,
   setSelectedNotification,
+  activeStudentId,
+  setActiveStudentId,
   dismissedNotifs = [],
   dismissedAnnounces = [],
+  dismissedHomeNotifs = [],
   onDismissNotif,
+  onDismissHomeNotif,
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
+  onShowAction,
+  isDarkMode,
+  setIsDarkMode,
+  appTheme,
+  setAppTheme,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
+  const backdropMouseDownRef = useRef(false);
+  const reportSettingsObject = getReportSettingsObject(reportSettings);
+  const canTeacherFillProgress = reportSettingsObject?.allow_teacher_progress_entry !== false;
   const selectedStudent =
     filteredStudents.find(
       (student) => student.allIds.includes(String(teacherForms.result.student_id))
     ) || filteredStudents[0] || null;
+  const selectedResultRecord = useMemo(() => (
+    schoolData.weeklyResults.find(
+      (result) =>
+        String(result.student_id) === String(teacherForms.result.student_id) &&
+        String(result.week_date) === String(teacherForms.result.week_date)
+    ) || null
+  ), [schoolData.weeklyResults, teacherForms.result.student_id, teacherForms.result.week_date]);
+  const selectedResultEditCount = getTeacherResultEditCount(selectedResultRecord || teacherForms.result);
+  const selectedResultRemainingEdits = getTeacherResultRemainingEdits(selectedResultRecord || teacherForms.result);
+  const selectedResultLocked = isTeacherResultLocked(selectedResultRecord || teacherForms.result);
+  const selectedResultIsExisting = Boolean(selectedResultRecord || teacherForms.result.id);
+  const canEditCurrentResult = canTeacherFillProgress && !selectedResultLocked;
 
   const liveResult = useMemo(() => {
     if (!selectedStudent) return null;
@@ -5249,11 +6428,12 @@ function TeacherPortal({
         <nav className="sidebar-nav">
           <p className="sidebar-category management-cat">Workplace</p>
           {[
-            { id: "Announcements", label: "Announcements", icon: Bell },
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
+            { id: "Jadwal", label: "Jadwal", icon: Calendar },
             { id: "Inbox", label: "Inbox", icon: Bell },
+            { id: "Settings", label: "Settings", icon: Settings },
           ].map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
               <page.icon size={18} /> {page.label}
@@ -5289,7 +6469,7 @@ function TeacherPortal({
         </header>
 
         <section className="admin-content-pad">
-          {activePage === "My Group" && (
+          {(activePage === "My Group" || activePage === "Fill Result" || activePage === "Overview") && (
              <QuickSearch 
                pages={[
                  { label: "Student List", value: "My Group" },
@@ -5305,9 +6485,19 @@ function TeacherPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
+          {activePage === "Jadwal" && (
+             <Suspense fallback={null}>
+               <LazyJadwalTeacherView 
+                 students={filteredStudents} 
+                 onShowAction={onShowAction} 
+                 onBroadcastNotification={broadcastNotification} 
+                 initialStudentId={activeStudentId}
+               />
+             </Suspense>
+          )}
+
           {activePage === "My Group" ? (
             <div className="portal-content">
-              <PremiumHifzCard user={user} />
               <div className="portal-stats-strip teacher-stats">
                 <div className="pstat-card">
                   <span className="pstat-value">{filteredStudents.length}</span>
@@ -5364,6 +6554,65 @@ function TeacherPortal({
 
 
 
+              <PremiumHifzCard user={user} />
+
+              <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
+                <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <Bell size={18} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--deep-brown)' }}>Active Notifications</h3>
+                </div>
+                <div className="announcement-list">
+                  {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
+                    const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
+                    return (
+                      <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', padding: '16px', borderRadius: '12px', marginBottom: '12px', position: 'relative' }} onClick={() => setSelectedNotification(news)}>
+                        <button 
+                          className="card-dismiss-btn" 
+                          title="Clear from home" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            onDismissHomeNotif(news.id); 
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            background: 'rgba(0,0,0,0.05)',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            zIndex: 2,
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                        <div style={{ paddingRight: '24px' }}>
+                          <div className="news-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
+                            <span className="tag update" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--primary-gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                              Alert
+                            </span>
+                            <span className="date" style={{ color: 'var(--text-muted)' }}>{new Date(news.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: 'var(--deep-brown)' }}>{news.title}</h4>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                            {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })() : (
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
+                  )}
+                </div>
+              </div>
+
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
                   <article key={student.student_id} className="student-card">
@@ -5398,6 +6647,18 @@ function TeacherPortal({
                   <BookOpen size={18} />
                   <h3>Fill Tahfeez Report</h3>
                 </div>
+                {!canTeacherFillProgress && (
+                  <div className="status-banner warning" style={{ marginBottom: "16px" }}>
+                    Admin has disabled teacher progress-card filling in Global Settings.
+                  </div>
+                )}
+                {canTeacherFillProgress && selectedResultIsExisting && (
+                  <div className="status-banner info" style={{ marginBottom: "16px" }}>
+                    {selectedResultLocked
+                      ? "This report is locked after 3 saves."
+                      : `${selectedResultEditCount}/${TEACHER_PROGRESS_EDIT_LIMIT} saves used. ${selectedResultRemainingEdits} edit${selectedResultRemainingEdits === 1 ? "" : "s"} left before auto-lock.`}
+                  </div>
+                )}
                 <form className="stack-form" onSubmit={onTeacherResultSubmit}>
                   <div className="form-grid">
                     <label>
@@ -5406,18 +6667,20 @@ function TeacherPortal({
                         name="student_id"
                         value={teacherForms.result.student_id}
                         onChange={onTeacherFormChange}
-                        disabled={!!teacherForms.result.id}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
                         required
                       >
                         <option value="">Select child</option>
                         {filteredStudents.map((student) => {
-                          const hasResultToday = (schoolData.weeklyResults || []).some(r => 
-                            String(r.student_id) === String(student.student_id) && 
+                          const existingResult = (schoolData.weeklyResults || []).find(r =>
+                            String(r.student_id) === String(student.student_id) &&
                             String(r.week_date) === String(teacherForms.result.week_date)
                           );
+                          const existingLocked = isTeacherResultLocked(existingResult);
+                          const remainingEdits = getTeacherResultRemainingEdits(existingResult);
                           return (
                             <option key={student.student_id} value={student.student_id}>
-                              {student.name} {hasResultToday ? "🔒 (Locked)" : ""} · {student.groupName}
+                              {student.name}{existingResult ? ` - ${existingLocked ? "Locked" : `${remainingEdits} edits left`}` : ""} - {student.groupName}
                             </option>
                           );
                         })}
@@ -5429,10 +6692,12 @@ function TeacherPortal({
                       <FatemiDateSelector
                         value={teacherForms.result.week_date}
                         onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
                   </div>
 
+                  <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
                   <div className="form-grid four-up">
                     <label>
                       <span>Murajazah</span>
@@ -5612,11 +6877,16 @@ function TeacherPortal({
 
                   <button 
                     type="submit" 
-                    className={`action-button ${teacherForms.result.id ? 'locked' : ''}`}
-                    disabled={!!teacherForms.result.id}
+                    className={`action-button ${selectedResultLocked || !canTeacherFillProgress ? 'locked' : ''}`}
+                    disabled={!canEditCurrentResult}
                   >
-                    {teacherForms.result.id ? 'Report Locked' : 'Save Result'}
+                    {selectedResultIsExisting
+                      ? (selectedResultLocked
+                          ? 'Report Locked'
+                          : `Save Changes (${selectedResultRemainingEdits} left)`)
+                      : 'Save Result'}
                   </button>
+                  </fieldset>
                 </form>
               </section>
 
@@ -5639,7 +6909,7 @@ function TeacherPortal({
                     <TahfeezReportCard
                       student={selectedStudent}
                       weeklyResult={liveResult}
-                      settings={Array.isArray(reportSettings) ? reportSettings[0] : reportSettings}
+                      settings={reportSettingsObject}
                     />
                   </>
                 ) : (
@@ -5751,9 +7021,36 @@ function TeacherPortal({
                           <h3>{n.title}</h3>
                         </div>
                         <p className="notif-excerpt">{n.body.length > 80 ? n.body.substring(0, 80) + "..." : n.body}</p>
-                        <button className="notif-view-btn" onClick={() => setSelectedNotification(n)}>
-                          VIEW <ChevronRight size={14} />
-                        </button>
+                        {n.file_url && (
+                          <div className="notif-attachment-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#d4af37', background: 'rgba(212, 175, 55, 0.08)', padding: '4px 8px', borderRadius: '6px', marginTop: '6px', marginBottom: '8px', fontWeight: 'bold' }}>
+                            <Paperclip size={12} /> Attachment Included
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="notif-view-btn" onClick={(e) => { e.stopPropagation(); setSelectedNotification(n); }}>
+                            VIEW <ChevronRight size={14} />
+                          </button>
+                          {n.redirect_page && (
+                            <button 
+                              className="notif-view-btn gold" 
+                              style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                let targetPage = n.redirect_page;
+                                if (targetPage.startsWith("Jadwal")) {
+                                  const parts = n.redirect_page.split(":");
+                                  if (parts[1]) {
+                                    setActiveStudentId(parts[1]);
+                                  }
+                                  targetPage = "Jadwal";
+                                }
+                                setActivePage(resolveRedirectPage(targetPage, "teacher"));
+                              }}
+                            >
+                              GO TO PAGE <ChevronRight size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -5768,37 +7065,104 @@ function TeacherPortal({
                 </div>
               )}
 
-              {selectedNotification && (
-                <div className="notif-overlay-backdrop fade-in" onClick={() => setSelectedNotification(null)}>
-                  <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
-                    <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
-                      <X size={20} />
-                    </button>
-                    <div className="notif-overlay-header">
-                      <div className="notif-badge">Notification Detail</div>
-                      <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
-                      <h2>{selectedNotification.title}</h2>
-                    </div>
-                    <div className="notif-overlay-body">
-                      <p>{selectedNotification.body}</p>
-                    </div>
-                    <div className="notif-overlay-footer">
-                      <button className="premium-btn gold" onClick={() => setSelectedNotification(null)}>Close</button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           ) : null}
 
-          {activePage === "Announcements" ? (
-            <AnnouncementsPage
-              announcements={schoolData.announcements}
-              setActivePage={setActivePage}
-              setSelectedAnnouncement={setSelectedAnnouncement}
-              onDismiss={onDismissAnnounce}
-              onClearAll={onClearAllAnnounces}
-              dismissedIds={dismissedAnnounces}
+          {selectedNotification && (
+            <div 
+              className="notif-overlay-backdrop fade-in" 
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setSelectedNotification(null);
+                }
+              }}
+            >
+              <div className="notif-overlay-card card-appear" onClick={e => e.stopPropagation()}>
+                <button className="notif-overlay-close" onClick={() => setSelectedNotification(null)}>
+                  <X size={20} />
+                </button>
+                <div className="notif-overlay-header">
+                  <div className="notif-badge">Notification Detail</div>
+                  <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
+                  <h2>{selectedNotification.title}</h2>
+                </div>
+                <div className="notif-overlay-body">
+                  <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
+                  
+                  {selectedNotification.file_url && (
+                    <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                        <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
+                      </h4>
+                      {isImageFile(selectedNotification.file_url) ? (
+                        <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                          <img 
+                            src={selectedNotification.file_url} 
+                            alt="Attachment Preview" 
+                            style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                          <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <FileArchive size={24} />
+                          </div>
+                          <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {getFileNameFromUrl(selectedNotification.file_url)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      <a 
+                        href={selectedNotification.file_url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        download
+                        className="premium-btn gold" 
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
+                      >
+                        <Download size={16} /> Download File
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
+                    <button 
+                      className="premium-btn gold" 
+                      onClick={() => {
+                        let targetPage = selectedNotification.redirect_page;
+                        if (targetPage.startsWith("Jadwal")) {
+                          const parts = targetPage.split(":");
+                          if (parts[1]) {
+                            setActiveStudentId(parts[1]);
+                          }
+                          targetPage = "Jadwal";
+                        }
+                        setActivePage(resolveRedirectPage(targetPage, "teacher"));
+                        setSelectedNotification(null);
+                      }}
+                    >
+                      Go to Page
+                    </button>
+                  )}
+                  <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={() => setSelectedNotification(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePage === "Settings" ? (
+            <SettingsPage 
+              isDarkMode={isDarkMode}
+              setIsDarkMode={setIsDarkMode}
+              appTheme={appTheme}
+              setAppTheme={setAppTheme}
+              user={user}
+              studentProfile={null}
+              onShowAction={onShowAction}
+              role="teacher"
             />
           ) : null}
 
@@ -5841,6 +7205,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState(null);
   const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [activeStudentId, setActiveStudentId] = useState(null);
+  const [attachedFileUrl, setAttachedFileUrl] = useState("");
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [parentData, setParentData] = useState(emptyParentData);
   const [schoolData, setSchoolData] = useState({
     students: [],
@@ -5856,7 +7223,10 @@ export default function App() {
   const [adminTeacherFilter, setAdminTeacherFilter] = useState("All");
   const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [reportSettings, setReportSettings] = useState([]);
+  const [whatsappConfig, setWhatsappConfig] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [parentViews, setParentViews] = useState([]);
+  const [portalAccessSuccess, setPortalAccessSuccess] = useState(null);
   
   // Local dismissal state (doesn't affect backend)
   const [dismissedNotifs, setDismissedNotifs] = useState(() => {
@@ -5869,6 +7239,17 @@ export default function App() {
       return JSON.parse(localStorage.getItem("mauze-dismissed-announces") || "[]");
     } catch (e) { return []; }
   });
+  const [dismissedHomeNotifs, setDismissedHomeNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("mauze-dismissed-home-notifs") || "[]");
+    } catch (e) { return []; }
+  });
+
+  const dismissHomeNotification = (id) => {
+    const next = [...dismissedHomeNotifs, id];
+    setDismissedHomeNotifs(next);
+    localStorage.setItem("mauze-dismissed-home-notifs", JSON.stringify(next));
+  };
 
   const dismissNotification = (id) => {
     const next = [...dismissedNotifs, id];
@@ -5893,6 +7274,12 @@ export default function App() {
     setDismissedAnnounces(next);
     localStorage.setItem("mauze-dismissed-announces", JSON.stringify(next));
   };
+
+  useEffect(() => {
+    if (!portalAccessSuccess) return;
+    const timer = setTimeout(() => setPortalAccessSuccess(null), 5000);
+    return () => clearTimeout(timer);
+  }, [portalAccessSuccess]);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem("mauze-dark-mode") === "true";
   });
@@ -5966,26 +7353,7 @@ export default function App() {
     },
   });
   const [teacherForms, setTeacherForms] = useState({
-    result: {
-      student_id: "",
-      week_date: getToday(),
-      murajazah: "",
-      juz_hali: "",
-      takhteet: "",
-      jadeed: "",
-
-      next_week_juz: "",
-      next_week_page: "",
-      total_jadeed_pages: "",
-      istifadah_juz: "",
-      istifadah_page: "",
-      wusool_juz: "",
-      wusool_page: "",
-      matrookah: "",
-      daeefah: "",
-      attendance_count: "",
-      attendance_note: "",
-    },
+    result: createTeacherResultDraft(),
   });
 
   useEffect(() => {
@@ -6068,6 +7436,7 @@ export default function App() {
             
             // Initialize FCM service
             try {
+              const fcmService = await loadFcmService();
               await fcmService.initialize(access.role);
             } catch (error) {
               console.error('FCM initialization failed:', error);
@@ -6108,7 +7477,7 @@ export default function App() {
     if (user && portalRole === "parents" && selectedStudentId) {
       loadPortalData(portalRole, user);
     }
-  }, [selectedStudentId]);
+  }, [selectedStudentId, portalRole, user]);
 
   async function loadPortalData(role, currentUser, parentProfileOverride = null) {
     if (!currentUser) {
@@ -6237,6 +7606,7 @@ export default function App() {
           teacherProfilesResponse,
           reportSettingsResponse,
           supportTicketsResponse,
+          parentViewsResponse,
         ] = await Promise.all([
           supabase.from("child_profiles").select("*").order("full_name", { ascending: true }),
           supabase.from("weekly_results").select("*").order("week_date", { ascending: false }),
@@ -6248,11 +7618,18 @@ export default function App() {
           supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
           supabase.from("report_settings").select("*"),
           supabase.from("portal_issues").select("*").order("created_at", { ascending: false }),
+          supabase.from("parent_report_views").select("*"),
         ]);
 
         if (supportTicketsResponse.data) setSupportTickets(supportTicketsResponse.data);
 
         if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
+
+        if (parentViewsResponse && parentViewsResponse.data) {
+          setParentViews(parentViewsResponse.data);
+        } else {
+          setParentViews([]);
+        }
 
         const dbErrors = [
           profilesResponse.error,
@@ -6289,6 +7666,15 @@ export default function App() {
         setTeacherAttendance(attendanceResponse.data || []);
         setCustomGroups(groupsResponse.data || []);
 
+        if (role === "admin") {
+          const { data: waData, error: waError } = await supabase
+            .from("whatsapp_config")
+            .select("*")
+            .eq("id", 1)
+            .maybeSingle();
+          if (waData) setWhatsappConfig(waData);
+          else if (waError) console.warn("Failed to load whatsapp_config:", waError.message);
+        }
 
         setSchoolData({
           students,
@@ -6300,7 +7686,9 @@ export default function App() {
         });
 
         if (students.length > 0) {
-          setSelectedStudentId((current) => current || students[0].student_id);
+          if (role !== "admin") {
+            setSelectedStudentId((current) => current || students[0].student_id);
+          }
           setAdminForms((current) => ({
             ...current,
             schedule: {
@@ -6396,6 +7784,16 @@ export default function App() {
 
   function showAction(type, text) {
     setActionMessage({ type, text });
+    if (type && text) {
+      setTimeout(() => {
+        setActionMessage(current => {
+          if (current?.type === type && current?.text === text) {
+            return null;
+          }
+          return current;
+        });
+      }, 4000);
+    }
   }
 
   const handleLoginSuccess = async (loggedInUser, selectedRole) => {
@@ -6454,30 +7852,32 @@ export default function App() {
     const payload = adminForms.portalAccess;
     const targetEmail = payload.email.trim().toLowerCase();
 
-    // 1. Create Auth User (if they don't exist)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const tempAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+
+    const { data: authData, error: authError } = await tempAuthClient.auth.signUp({
       email: targetEmail,
       password: payload.password,
       options: {
         data: {
           full_name: payload.full_name,
-          portal_role: payload.portal_role
-        }
-      }
+          portal_role: payload.portal_role,
+        },
+      },
     });
 
-    let userId = authData?.user?.id;
-
-    if (authError) {
-      if (!authError.message.toLowerCase().includes("already registered")) {
-        showAction("error", `Auth Error: ${authError.message}`);
-        return;
-      }
-      // If already registered, we should still try to grant access
-      // The RPC below will handle the heavy lifting
+    if (authError && !authError.message.toLowerCase().includes("already registered")) {
+      showAction("error", `Auth Error: ${authError.message}`);
+      return;
     }
 
-    // 2. Grant Portal Access via RPC (Most reliable way)
+    const createdUserId = authData?.user?.id || null;
+
     const { data: rpcData, error: rpcError } = await supabase.rpc("grant_portal_access", {
       target_email: targetEmail,
       target_role: payload.portal_role,
@@ -6489,38 +7889,50 @@ export default function App() {
       console.warn("RPC Grant Error (Expected if RPC missing):", rpcError);
     }
 
-    // 3. Robust Fallback: Manually upsert to user_portal_access
-    // If userId is missing (existing user), the RPC might have returned the record or we can fetch it
-    const { data: accessRecord, error: upsertError } = await supabase
-      .from("user_portal_access")
-      .upsert({
-        email: targetEmail,
-        user_id: userId || undefined,
-        full_name: payload.full_name,
-        portal_role: payload.portal_role,
-        is_active: true
-      }, { onConflict: 'email' })
-      .select()
-      .maybeSingle();
+    let accessRecord = null;
+    if (createdUserId) {
+      const { data, error: upsertError } = await supabase
+        .from("user_portal_access")
+        .upsert({
+          user_id: createdUserId,
+          email: targetEmail,
+          full_name: payload.full_name,
+          portal_role: payload.portal_role,
+          is_active: true
+        }, { onConflict: 'user_id' })
+        .select()
+        .maybeSingle();
 
-    if (upsertError) {
-      console.error("Portal access upsert failed:", upsertError);
-      showAction("error", `Portal access failed: ${upsertError.message}`);
-      return;
+      if (upsertError) {
+        console.error("Portal access upsert failed:", upsertError);
+        showAction("error", `Portal access failed: ${upsertError.message}`);
+        return;
+      }
+      accessRecord = data || null;
+    } else {
+      const { data, error: fetchError } = await supabase
+        .from("user_portal_access")
+        .select("*")
+        .eq("email", targetEmail)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Portal access lookup failed:", fetchError);
+        showAction("error", `Portal access lookup failed: ${fetchError.message}`);
+        return;
+      }
+      accessRecord = data || null;
     }
 
-    const finalUserId = userId || accessRecord?.user_id;
+    const finalUserId = accessRecord?.user_id || rpcData?.user_id || createdUserId || null;
 
-    // 4. Link child to parent if role is parents and student_id is provided
     if (payload.portal_role === "parents" && payload.student_id && finalUserId) {
-      // Try to link in child_profiles first
       await supabase
         .from("child_profiles")
         .update({ parent_user_id: finalUserId })
         .eq("student_id", payload.student_id);
     }
 
-    // Refresh school data locally
     const { data: freshList, error: refreshError } = await supabase
       .from("user_portal_access")
       .select("*")
@@ -6542,29 +7954,36 @@ export default function App() {
       portalAccess: { email: "", full_name: "", portal_role: "parents", password: "", student_id: "" },
     }));
 
-    // SEND NOTIFICATION OF ASSIGNMENT
+    let linkedStudentName = "Not linked";
+    if (payload.student_id) {
+      const { data: stData } = await supabase
+        .from("child_profiles")
+        .select("name")
+        .eq("student_id", payload.student_id)
+        .maybeSingle();
+      if (stData?.name) linkedStudentName = stData.name;
+    }
+
     (async () => {
       try {
-        let childName = "your child";
-        if (payload.student_id) {
-          const { data: stData } = await supabase
-            .from("child_profiles")
-            .select("name")
-            .eq("student_id", payload.student_id)
-            .maybeSingle();
-          if (stData?.name) childName = stData.name;
-        }
-
         const notifTitle = payload.portal_role === "teacher" ? "New Student Assigned" : "Portal Access Granted";
         const notifBody = payload.portal_role === "teacher" 
-          ? `${childName} has been assigned to your group.` 
-          : `Welcome! ${childName} has been successfully linked to your portal account.`;
+          ? `${linkedStudentName} has been assigned to your group.` 
+          : `Welcome! ${linkedStudentName} has been successfully linked to your portal account.`;
 
         broadcastNotification(notifTitle, notifBody, payload.portal_role, finalUserId || targetEmail);
       } catch (e) {
         console.warn("Assignment notification failed:", e);
       }
     })();
+
+    setPortalAccessSuccess({
+      full_name: payload.full_name,
+      email: targetEmail,
+      portal_role: payload.portal_role,
+      linkedStudentName,
+      grantedAt: new Date().toLocaleString(),
+    });
 
     showAction("success", "Portal access granted successfully!");
   };
@@ -6593,6 +8012,7 @@ export default function App() {
 
         if (data) {
           const myNotifs = data.filter(notif =>
+            portalRole === "admin" ||
             notif.target_role === "all" ||
             notif.target_role === portalRole ||
             notif.target_user === user.id ||
@@ -6616,6 +8036,7 @@ export default function App() {
             (payload) => {
               const newNotif = payload.new;
               const isTargeted =
+                portalRole === "admin" ||
                 newNotif.target_role === "all" ||
                 newNotif.target_role === portalRole ||
                 newNotif.target_user === user.id ||
@@ -6646,6 +8067,14 @@ export default function App() {
                 showAction("success", "A new progress report has been submitted!");
               }
               
+              loadPortalData(portalRole, user);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', table: 'parent_report_views', schema: 'public' },
+            (payload) => {
+              console.log("Real-time parent view update:", payload.eventType, payload.new?.student_id);
               loadPortalData(portalRole, user);
             }
           );
@@ -6690,13 +8119,29 @@ export default function App() {
 
   const handleAdminFormChange = (formKey) => (event) => {
     const { name, value } = event.target;
-    setAdminForms((current) => ({
-      ...current,
-      [formKey]: {
+    setAdminForms((current) => {
+      const updatedForm = {
         ...current[formKey],
         [name]: value,
-      },
-    }));
+      };
+
+      if (formKey === "customNotification" && name === "target_audience") {
+        if (value === "parents") {
+          updatedForm.redirect_page = "Home";
+        } else if (value === "teacher") {
+          updatedForm.redirect_page = "My Group";
+        } else if (value === "admin") {
+          updatedForm.redirect_page = "Overview";
+        } else {
+          updatedForm.redirect_page = "Home";
+        }
+      }
+
+      return {
+        ...current,
+        [formKey]: updatedForm,
+      };
+    });
   };
 
   const handleTeacherFormChange = async (event) => {
@@ -6726,31 +8171,47 @@ export default function App() {
             result: { ...curr.result, ...existing, student_id: numericId, week_date: weekDate }
           }));
         } else {
-          const { data, error } = await supabase
-            .from("weekly_results")
-            .upsert({
+          setTeacherForms(curr => ({
+            ...curr,
+            result: createTeacherResultDraft({
               student_id: numericId,
               week_date: weekDate,
-              murajazah: 0,
-              juz_hali: 0,
-              takhteet: 0,
-              jadeed: 0
-            }, { onConflict: 'student_id,week_date' })
-            .select()
-            .maybeSingle();
-
-          if (data) {
-            setTeacherForms(curr => ({
-              ...curr,
-              result: { ...curr.result, ...data, student_id: numericId, week_date: weekDate }
-            }));
-            setSchoolData(prev => ({
-              ...prev,
-              weeklyResults: [data, ...prev.weeklyResults]
-            }));
-          }
+            }),
+          }));
         }
       }
+    }
+  };
+
+  const handleNotificationFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from("notification_files")
+        .upload(filePath, file);
+
+      if (error) {
+        throw error;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("notification_files")
+        .getPublicUrl(filePath);
+
+      setAttachedFileUrl(publicUrlData.publicUrl);
+      showAction("success", "File uploaded and attached successfully!");
+    } catch (error) {
+      console.error("Upload failed:", error);
+      showAction("error", `File upload failed: ${error.message}`);
+    } finally {
+      setUploadingFile(false);
     }
   };
 
@@ -6758,10 +8219,7 @@ export default function App() {
     event.preventDefault();
     const payload = adminForms.customNotification;
 
-    let notifTitle = `[${payload.target_audience.toUpperCase()}] ${payload.title}`;
-    if (payload.target_audience === "user" && payload.target_uuid) {
-      notifTitle = `[Direct] ${payload.title}`;
-    }
+    const notifTitle = payload.title;
 
     // Trigger Supabase notification via shared function
     await broadcastNotification(
@@ -6769,10 +8227,14 @@ export default function App() {
       payload.body,
       payload.target_audience === "user" ? "user" : payload.target_audience,
       payload.target_audience === "user" ? payload.target_uuid : null,
-      payload.redirect_page
+      payload.redirect_page,
+      false,
+      attachedFileUrl || null
     );
 
     showAction("success", "Custom Notification Dispatched!");
+
+    setAttachedFileUrl(""); // Clear the attached file URL
 
     setAdminForms((current) => ({
       ...current,
@@ -6912,7 +8374,7 @@ export default function App() {
   };
 
   const handleAssignChild = async (data) => {
-    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its } = data;
+    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number } = data;
     if (!student_id) {
       showAction("error", "Please select a student first.");
       return;
@@ -6926,6 +8388,11 @@ export default function App() {
       schoolData.teacherProfiles.find(p => String(p.user_id) === String(teacher_id));
 
     const parentRecord = schoolData.portalAccessList.find(a => String(a.user_id) === String(parent_id) || String(a.email) === String(parent_id));
+
+    // Detect if parent or teacher actually changed/is new
+    const existingStudent = schoolData.students.find(s => String(s.student_id) === String(student_id));
+    const isNewTeacher = teacherRecord && (!existingStudent || String(existingStudent.muhaffiz_id) !== String(teacherRecord.user_id));
+    const isNewParent = parentRecord && (!existingStudent || String(existingStudent.user_id) !== String(parentRecord.user_id));
 
     // Update child_profiles table directly
     const updatePayload = {
@@ -6942,6 +8409,7 @@ export default function App() {
     if (surat && surat.trim()) updatePayload.surat = surat.trim();
     if (photo_url && photo_url.trim()) updatePayload.photo_url = photo_url.trim();
     if (its && its.trim()) updatePayload.its = its.trim();
+    if (whatsapp_number !== undefined) updatePayload.whatsapp_number = whatsapp_number ? whatsapp_number.trim() : null;
 
     const { error: profileError } = await supabase
       .from("child_profiles")
@@ -6957,6 +8425,35 @@ export default function App() {
     // Secondary Check: If we have an ID for parent but it wasn't set, force it
     if (parentRecord?.user_id && !updatePayload.parent_user_id) {
       await supabase.from("child_profiles").update({ parent_user_id: parentRecord.user_id }).eq("student_id", student_id);
+    }
+
+    // Push assignment notifications
+    const studentName = full_name || existingStudent?.name || "Child";
+
+    if (isNewTeacher) {
+      const targetTeacherUser = teacherRecord.user_id || teacherRecord.email || teacher_id;
+      if (targetTeacherUser) {
+        broadcastNotification(
+          "New Student Assigned",
+          `${studentName} has been assigned to your group by the Admin.`,
+          "user",
+          targetTeacherUser,
+          "My Group"
+        );
+      }
+    }
+
+    if (isNewParent) {
+      const targetParentUser = parentRecord.user_id || parentRecord.email || parent_id;
+      if (targetParentUser) {
+        broadcastNotification(
+          "Child Linked to Account",
+          `Your child, ${studentName}, has been assigned to you by the Admin.`,
+          "user",
+          targetParentUser,
+          "Home"
+        );
+      }
     }
 
     // Refresh school data locally
@@ -7011,6 +8508,20 @@ export default function App() {
     showAction("success", "Student unassigned and unlinked from all accounts.");
   };
 
+  const handleUpdateWhatsappConfig = async (updates) => {
+    const { error } = await supabase
+      .from("whatsapp_config")
+      .upsert({ id: 1, ...updates });
+
+    if (error) {
+      showAction("error", `Failed to save WhatsApp settings: ${error.message}`);
+      return;
+    }
+
+    setWhatsappConfig((current) => ({ ...(current || {}), ...updates, id: 1 }));
+    showAction("success", "WhatsApp settings saved successfully.");
+  };
+
   const handleDeleteRecord = (table, idField = "id") => async (id) => {
     if (!window.confirm("Are you sure you want to delete this record?")) return;
 
@@ -7048,18 +8559,30 @@ export default function App() {
   const handleUpdateTeacherProfile = async (event) => {
     event.preventDefault();
     const payload = adminForms.teacherProfile;
+    const selectedTeacher = portalAccessList.find(
+      (access) => normalizeText(access.full_name) === normalizeText(payload.full_name)
+    );
+    const resolvedUserId = payload.user_id || selectedTeacher?.user_id || null;
+
+    if (!resolvedUserId) {
+      showAction("error", "Please select a staff member that already has Supabase portal access.");
+      return;
+    }
 
     // Update the profile information
     const { error: profileError } = await supabase
       .from("teacher_profiles")
-      .upsert({
-        user_id: payload.user_id || undefined,
-        full_name: payload.full_name,
-        photo_url: payload.photo_url,
-        phone_number: payload.phone_number,
-        whatsapp_number: payload.whatsapp_number,
-        is_active: true,
-      });
+      .upsert(
+        {
+          user_id: resolvedUserId,
+          full_name: payload.full_name,
+          photo_url: payload.photo_url,
+          phone_number: payload.phone_number,
+          whatsapp_number: payload.whatsapp_number,
+          is_active: true,
+        },
+        { onConflict: "user_id" }
+      );
 
     // Update the portal access settings (salary/visibility) separately
     const { error: accessError } = await supabase
@@ -7068,7 +8591,7 @@ export default function App() {
         salary_per_minute: Number(payload.salary_per_minute || 2.3),
         show_salary_card: !!payload.show_salary_card,
       })
-      .eq("full_name", payload.full_name);
+      .eq("user_id", resolvedUserId);
 
     if (profileError || accessError) {
       showAction("error", profileError?.message || accessError?.message);
@@ -7076,12 +8599,17 @@ export default function App() {
     }
 
     await loadPortalData(portalRole, user, parentData.studentProfile);
-    setAdminForms(curr => ({ ...curr, teacherProfile: { full_name: "", photo_url: "", phone_number: "", whatsapp_number: "" } }));
+    setAdminForms(curr => ({ ...curr, teacherProfile: { user_id: "", full_name: "", photo_url: "", phone_number: "", whatsapp_number: "", salary_per_minute: "2.3", show_salary_card: true } }));
     showAction("success", "Teacher profile updated.");
   };
 
   const handleTeacherResultSubmit = async (event) => {
     event.preventDefault();
+
+    if (!canTeacherFillProgress) {
+      showAction("error", "Teacher progress-card filling is disabled in Global Settings.");
+      return;
+    }
 
     const totalScore = RESULT_NUMERIC_FIELDS.reduce(
       (sum, field) => sum + toNumber(teacherForms.result[field]),
@@ -7102,7 +8630,30 @@ export default function App() {
       jadeed: toNumber(teacherForms.result.jadeed),
     };
 
-    const { data, error } = await supabase.from("weekly_results").insert([payload]).select().single();
+    const existingResult = schoolData.weeklyResults.find(
+      (result) =>
+        String(result.student_id) === String(numericId) &&
+        String(result.week_date) === String(teacherForms.result.week_date)
+    );
+    const currentEditCount = getTeacherResultEditCount(existingResult || teacherForms.result);
+    const nextEditCount = Math.min(TEACHER_PROGRESS_EDIT_LIMIT, currentEditCount + 1);
+    const willLock = nextEditCount >= TEACHER_PROGRESS_EDIT_LIMIT;
+
+    if (isTeacherResultLocked(existingResult || teacherForms.result)) {
+      showAction("error", "This report is locked and cannot be edited anymore.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("weekly_results")
+      .upsert([{
+        ...payload,
+        teacher_edit_count: nextEditCount,
+        teacher_locked: willLock,
+        teacher_locked_at: willLock ? new Date().toISOString() : existingResult?.teacher_locked_at || null,
+      }], { onConflict: "student_id,week_date" })
+      .select()
+      .single();
 
     if (error) {
       showAction("error", error.message);
@@ -7110,7 +8661,15 @@ export default function App() {
     }
 
     setSchoolData((current) => {
-      const nextWeeklyResults = [data, ...current.weeklyResults];
+      const nextWeeklyResults = [
+        data,
+        ...current.weeklyResults.filter((result) =>
+          !(
+            String(result.student_id) === String(data.student_id) &&
+            String(result.week_date) === String(data.week_date)
+          )
+        ),
+      ];
       const refreshedStudents = current.students.map((student) =>
         String(student.student_id) === String(data.student_id)
           ? { ...student, latestResult: data }
@@ -7128,20 +8687,26 @@ export default function App() {
       ...current,
       result: {
         ...current.result,
-        // Values are preserved so they stay "locked" on the preview card
+        ...data,
       },
     }));
-    showAction("success", "Tahfeez report saved successfully.");
-    const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
-    const parentId = targetStudent?.user_id || targetStudent?.parent_email;
-
-    broadcastNotification(
-      "Tahfeez Report Submitted", 
-      `A new progress report has been saved for ${targetStudent?.name || "the student"}.`, 
-      "parents", 
-      targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email, 
-      "Progress"
+    showAction(
+      "success",
+      willLock
+        ? `Tahfeez report saved and locked after ${TEACHER_PROGRESS_EDIT_LIMIT} saves.`
+        : `Tahfeez report saved successfully. ${TEACHER_PROGRESS_EDIT_LIMIT - nextEditCount} edit${TEACHER_PROGRESS_EDIT_LIMIT - nextEditCount === 1 ? "" : "s"} left.`
     );
+    const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
+
+    if (currentEditCount === 0) {
+      broadcastNotification(
+        "Tahfeez Report Submitted",
+        `A new progress report has been saved for ${targetStudent?.name || "the student"}.`,
+        "parents",
+        targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email,
+        "Progress"
+      );
+    }
   };
 
 
@@ -7190,10 +8755,13 @@ export default function App() {
             setSelectedNotification={setSelectedNotification}
             dismissedNotifs={dismissedNotifs}
             dismissedAnnounces={dismissedAnnounces}
+            dismissedHomeNotifs={dismissedHomeNotifs}
             onDismissNotif={dismissNotification}
+            onDismissHomeNotif={dismissHomeNotification}
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
+            actionMessage={actionMessage}
           />
         ) : portalRole === "admin" ? (
           <AdminPortal
@@ -7204,6 +8772,7 @@ export default function App() {
               teacherAttendance,
               supportTickets,
             }}
+            parentViews={parentViews}
             adminForms={adminForms}
             adminTeacherFilter={adminTeacherFilter}
             loadPortalData={loadPortalData}
@@ -7222,12 +8791,17 @@ export default function App() {
             onRecordTeacherAttendance={handleRecordTeacherAttendance}
             onRoleChange={storeRole}
             onSendCustomNotification={handleSendCustomNotification}
+            attachedFileUrl={attachedFileUrl}
+            uploadingFile={uploadingFile}
+            onNotificationFileChange={handleNotificationFileChange}
             onShowAction={showAction}
             onUnassignChild={handleUnassignChild}
             onUpdateTeacherProfile={handleUpdateTeacherProfile}
             portalAccess={portalAccess}
             portalRole={portalRole}
             reportSettings={reportSettings}
+            whatsappConfig={whatsappConfig}
+            onUpdateWhatsappConfig={handleUpdateWhatsappConfig}
             selectedStudentId={selectedStudentId}
             setActivePage={setActivePage}
             setAdminForms={setAdminForms}
@@ -7236,16 +8810,18 @@ export default function App() {
             setSelectedStudentId={setSelectedStudentId}
             teacherProfiles={teacherProfiles}
             user={user}
-            onShowAction={showAction}
             dismissedNotifs={dismissedNotifs}
             dismissedAnnounces={dismissedAnnounces}
             onDismissNotif={dismissNotification}
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
+            portalAccessSuccess={portalAccessSuccess}
+            onClosePortalAccessSuccess={() => setPortalAccessSuccess(null)}
           />
         ) : (
           <TeacherPortal
+            user={user}
             actionMessage={actionMessage}
             activePage={activePage}
             loadPortalData={loadPortalData}
@@ -7269,12 +8845,21 @@ export default function App() {
             schoolData={schoolData}
             selectedNotification={selectedNotification}
             setSelectedNotification={setSelectedNotification}
+            activeStudentId={activeStudentId}
+            setActiveStudentId={setActiveStudentId}
             dismissedNotifs={dismissedNotifs}
             dismissedAnnounces={dismissedAnnounces}
+            dismissedHomeNotifs={dismissedHomeNotifs}
             onDismissNotif={dismissNotification}
+            onDismissHomeNotif={dismissHomeNotification}
             onClearAllNotifs={clearAllNotifications}
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
+            onShowAction={showAction}
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
+            appTheme={appTheme}
+            setAppTheme={setAppTheme}
           />
         )}
 
@@ -7282,4 +8867,5 @@ export default function App() {
     </React.Fragment>
   );
 }
+
 
