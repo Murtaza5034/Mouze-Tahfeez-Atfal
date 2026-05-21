@@ -4227,7 +4227,12 @@ function AdminPortal({
   };
 
   const sendIndividualWhatsApp = async (phone, message, studentName) => {
-    const formattedPhone = (phone || "").split("").filter((c) => "0123456789".includes(c)).join("");
+    let formattedPhone = (phone || "").split("").filter((c) => "0123456789".includes(c)).join("");
+    
+    // Automatically convert local Pakistani numbers (03xx...) to international format (923xx...)
+    if (formattedPhone.length === 11 && formattedPhone.startsWith("0")) {
+      formattedPhone = "92" + formattedPhone.substring(1);
+    }
 
     if (!formattedPhone) {
       throw new Error("Invalid phone number");
@@ -4252,20 +4257,20 @@ function AdminPortal({
     return true;
   };
 
-  const triggerWhatsAppNotifications = async () => {
+  const triggerWhatsAppNotifications = async (silent = false) => {
     if (!whatsappConfig) {
-      alert("WhatsApp Configuration is not loaded yet. Please wait a second and try again.");
+      if (!silent) alert("WhatsApp Configuration is not loaded yet. Please wait a second and try again.");
       return;
     }
     if (!whatsappConfig.enabled || whatsappConfig.provider === 'none') {
-      alert("WhatsApp notifications are disabled or the provider is set to None. Please configure them below.");
+      if (!silent) alert("WhatsApp notifications are disabled or the provider is set to None. Please configure them below.");
       return;
     }
     
     const targetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
     
     if (targetStudents.length === 0) {
-      alert("No students found with a WhatsApp number in their profile!");
+      if (!silent) alert("No students found with a WhatsApp number in their profile!");
       if (onShowAction) onShowAction("info", "No parents with WhatsApp numbers found to notify.");
       return;
     }
@@ -4483,11 +4488,11 @@ function AdminPortal({
         body: {
           title: "Results are LIVE!",
           body: "The latest Tahfeez progress reports are now visible in your portal.",
-          targetRole: "parents",
+          targetRole: "all",
         },
       });
 
-      triggerWhatsAppNotifications();
+      triggerWhatsAppNotifications(true);
     }
 
     loadPortalData(portalRole, user);
