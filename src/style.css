@@ -4866,3 +4866,324 @@ body {
   color: var(--text-muted);
   margin: 0;
 }
+
+/* --- Mobile View Optimization for Progress Cards (One-Eye View) --- */
+@media (max-width: 768px) {
+  /* Scope all mobile rules to progress-overview not in capture zones */
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 2px !important;
+    margin-top: 8px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-card-premium {
+    padding: 10px 12px !important;
+    border-radius: 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin-bottom: 0 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .parent-view-status-dot {
+    top: 10px !important;
+    right: 10px !important;
+    width: 10px !important;
+    height: 10px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-card-premium > svg {
+    top: 4px !important;
+    right: 4px !important;
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-card-header {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    border-bottom: 1px dashed rgba(183, 137, 31, 0.15) !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-logo {
+    margin-bottom: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-logo img {
+    height: 38px !important;
+    width: auto !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-info {
+    text-align: left !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-info h2.kids-font {
+    font-size: 1.15rem !important;
+    line-height: 1.1 !important;
+    margin: 0 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-info h4.kids-font {
+    font-size: 0.7rem !important;
+    margin: 1px 0 0 0 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-info .report-student-name {
+    font-size: 0.82rem !important;
+    margin-top: 2px !important;
+    color: var(--primary-gold) !important;
+    font-weight: 700 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-week-meta {
+    background: transparent !important;
+    padding: 0 !important;
+    border-bottom: none !important;
+    margin-bottom: 2px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .week-meta-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: var(--cream-bg) !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+    gap: 6px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .meta-col {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 3px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .meta-label {
+    font-size: 0.62rem !important;
+    margin-bottom: 0 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .meta-val {
+    font-size: 0.72rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-main {
+    padding: 6px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: rgba(255, 255, 255, 0.4) !important;
+    border-radius: 10px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .total-score-block {
+    flex-shrink: 0 !important;
+    width: 60px !important;
+    align-items: center !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-title {
+    font-size: 0.52rem !important;
+    white-space: nowrap !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jumla-label {
+    font-size: 1.05rem !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-circle {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 1.2rem !important;
+    border-width: 2px !important;
+    margin-bottom: 2px !important;
+    box-shadow: 0 3px 8px rgba(138, 101, 21, 0.06) !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .max-score {
+    font-size: 0.6rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-details-box {
+    flex: 1 !important;
+    padding: 6px 8px !important;
+    gap: 3px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.75) !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-row {
+    padding-bottom: 3px !important;
+    margin-bottom: 0 !important;
+    border-bottom: 1px dashed rgba(183, 137, 31, 0.1) !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-row:last-child {
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .arabic-label {
+    font-size: 0.85rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-val {
+    font-size: 0.72rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .trophy-container {
+    flex-shrink: 0 !important;
+    width: 50px !important;
+    height: 50px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .trophy-icon {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .rank-text-overlay {
+    font-size: 15px !important;
+    top: 42% !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-footer-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    margin-top: 4px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box {
+    padding: 6px 8px !important;
+    border-radius: 8px !important;
+    min-height: 0 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box h5 {
+    margin: 0 0 2px 0 !important;
+    font-size: 0.6rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box h5.arabic-kanz {
+    font-size: 0.85rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box p {
+    margin: 1px 0 !important;
+    font-size: 0.68rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box p span.arabic-kanz {
+    font-size: 0.78rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .note-item-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    font-size: 0.68rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .note-label.arabic-kanz {
+    font-size: 0.78rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .note-val {
+    font-weight: 700 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-ribbon {
+    margin-top: 4px !important;
+    padding: 4px 6px !important;
+    border-radius: 6px !important;
+    font-size: 0.7rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .report-footer-cards {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    margin-top: 6px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-card-modern,
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-pages-card {
+    margin-top: 0 !important;
+    padding: 6px !important;
+    border-radius: 10px !important;
+    gap: 3px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 65px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-stars-container {
+    gap: 2px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-star {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-card-modern h4.attendance-rating-text {
+    font-size: 0.68rem !important;
+    margin: 1px 0 0 0 !important;
+    line-height: 1.1 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-card-modern .attendance-sub-label {
+    font-size: 0.6rem !important;
+    margin: 0 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-icon-container {
+    margin-bottom: 1px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-icon-bg {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-count-overlay {
+    font-size: 0.78rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-pages-card h4.attendance-rating-text {
+    font-size: 0.95rem !important;
+    margin: 1px 0 0 0 !important;
+    line-height: 1.1 !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-pages-card .attendance-sub-label {
+    font-size: 0.6rem !important;
+    margin: 0 !important;
+  }
+}
