@@ -2187,21 +2187,21 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           </div>
         </div>
 
+        <div className="report-footer-cards">
+          <AttendanceCard
+            count={weeklyResult?.attendance_count}
+            total={6}
+            heading={report.attendance_heading}
+          />
+          <JadeedPagesCard
+            count={weeklyResult?.total_jadeed_pages}
+            heading={report.jadeed_safahat_heading}
+          />
+        </div>
+
         {weeklyResult?.attendance_note && (
           <div className="attendance-ribbon">{weeklyResult.attendance_note}</div>
         )}
-      </div>
-
-      <div className="report-footer-cards">
-        <AttendanceCard
-          count={weeklyResult?.attendance_count}
-          total={6}
-          heading={report.attendance_heading}
-        />
-        <JadeedPagesCard
-          count={weeklyResult?.total_jadeed_pages}
-          heading={report.jadeed_safahat_heading}
-        />
       </div>
     </div>
   );
