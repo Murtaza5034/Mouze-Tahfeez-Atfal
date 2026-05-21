@@ -313,15 +313,26 @@ const NotificationStatus = ({ role }) => {
               } else {
                 if (data?.message === 'NO_TOKENS_FOUND') {
                   alert("Server reached, but NO TOKEN FOUND for your user ID.\nPlease refresh the page and allow notifications to save your token.");
-                } else if (data?.success === false || (data?.summary && data.summary.failures > 0) || (data?.summary && data.summary.success === 0)) {
-                  console.error("FCM Delivery Failed:", data);
-                  let extraErr = "";
-                  if (data?.results && data.results[0]?.error) {
-                    extraErr = "\nReason: " + data.results[0].error;
-                  }
-                  alert(`Test alert sent to Firebase, but delivery failed.\nSuccess: ${data?.summary?.success}\nFailures: ${data?.summary?.failures}${extraErr}\n\nCheck browser console for details.`);
                 } else {
-                  alert("Test alert successfully delivered to Firebase! Check your phone.");
+                  const deliveredCount = data?.summary?.delivered ?? data?.summary?.success ?? 0;
+                  const staleCount = data?.summary?.staleTokensRemoved ?? data?.summary?.stale ?? 0;
+                  const failureCount = data?.summary?.failures ?? 0;
+
+                  if (failureCount > 0) {
+                    console.error("FCM Delivery Failed:", data);
+                    let extraErr = "";
+                    if (data?.results && data.results[0]?.error) {
+                      extraErr = "\nReason: " + data.results[0].error;
+                    }
+                    alert(`Test alert sent to Firebase, but some deliveries still failed.\nDelivered: ${deliveredCount}\nFailures: ${failureCount}${extraErr}${staleCount > 0 ? `\nStale tokens cleaned: ${staleCount}` : ""}\n\nCheck browser console for details.`);
+                  } else if (deliveredCount > 0) {
+                    const cleanupNote = staleCount > 0 ? `\nStale tokens cleaned: ${staleCount}` : "";
+                    alert(`Test alert successfully delivered to ${deliveredCount} device${deliveredCount === 1 ? "" : "s"}!${cleanupNote}`);
+                  } else if (staleCount > 0) {
+                    alert(`No active devices were reachable, but ${staleCount} stale token${staleCount === 1 ? "" : "s"} were cleaned up.\nPlease reopen the app on a device and enable notifications again.`);
+                  } else {
+                    alert("Test alert completed, but no delivery details were returned.");
+                  }
                 }
               }
             }}
@@ -8872,5 +8883,4 @@ export default function App() {
     </React.Fragment>
   );
 }
-
 

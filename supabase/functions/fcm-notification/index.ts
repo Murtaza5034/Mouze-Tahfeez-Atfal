@@ -14,6 +14,22 @@ interface NotificationPayload {
   data?: Record<string, string>
 }
 
+interface FcmSendResult {
+  token: string
+  success: boolean
+  status: "delivered" | "stale" | "failed"
+  name?: string
+  error?: string
+}
+
+interface ParsedFcmError {
+  code?: number
+  status?: string
+  message?: string
+  errorCode?: string
+  raw: string
+}
+
 // Generate OAuth2 token using Service Account
 async function getAccessToken(serviceAccountJson: string) {
   try {
@@ -30,6 +46,71 @@ async function getAccessToken(serviceAccountJson: string) {
   }
 }
 
+function parseFcmError(errText: string): ParsedFcmError {
+  try {
+    const parsed = JSON.parse(errText);
+    const error = parsed?.error || parsed;
+    const details = Array.isArray(error?.details) ? error.details : [];
+    const fcmDetail = details.find((detail: { errorCode?: string }) => typeof detail?.errorCode === 'string');
+
+    return {
+      code: error?.code,
+      status: error?.status,
+      message: error?.message,
+      errorCode: fcmDetail?.errorCode,
+      raw: errText,
+    };
+  } catch {
+    return { raw: errText };
+  }
+}
+
+function isStaleTokenError(responseStatus: number, parsedError: ParsedFcmError) {
+  const haystack = [
+    String(responseStatus),
+    parsedError.code,
+    parsedError.status,
+    parsedError.message,
+    parsedError.errorCode,
+    parsedError.raw,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return (
+    haystack.includes('unregistered') ||
+    haystack.includes('notregistered') ||
+    haystack.includes('registration-token-not-registered') ||
+    (responseStatus === 404 && haystack.includes('requested entity was not found'))
+  );
+}
+
+async function pruneInvalidTokens(supabase: ReturnType<typeof createClient>, tokens: string[]) {
+  const uniqueTokens = [...new Set(tokens)];
+  if (uniqueTokens.length === 0) return 0;
+
+  const batchSize = 100;
+  let deletedCount = 0;
+
+  for (let i = 0; i < uniqueTokens.length; i += batchSize) {
+    const batch = uniqueTokens.slice(i, i + batchSize);
+    const { error } = await supabase
+      .from('user_fcm_tokens')
+      .delete()
+      .in('fcm_token', batch);
+
+    if (error) {
+      console.warn('Failed to prune stale FCM tokens:', error);
+      continue;
+    }
+
+    deletedCount += batch.length;
+  }
+
+  return deletedCount;
+}
+
 // Send FCM using HTTP v1 API
 async function sendFCMv1Notifications(tokens: string[], title: string, body: string, data?: Record<string, string>) {
   const serviceAccount = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY')
@@ -39,7 +120,8 @@ async function sendFCMv1Notifications(tokens: string[], title: string, body: str
   }
 
   const { token: accessToken, projectId } = await getAccessToken(serviceAccount);
-  const results = [];
+  const results: FcmSendResult[] = [];
+  const staleTokens: string[] = [];
 
   // V1 API requires sending one request per token
   // We'll run them in parallel batches of 50 to avoid overwhelming the network
@@ -81,13 +163,26 @@ async function sendFCMv1Notifications(tokens: string[], title: string, body: str
 
         if (!response.ok) {
           const errText = await response.text();
-          return { token, success: false, error: `FCM API Error (${response.status}): ${errText}` };
+          const parsedError = parseFcmError(errText);
+          const stale = isStaleTokenError(response.status, parsedError);
+
+          if (stale) {
+            staleTokens.push(token);
+            return {
+              token,
+              success: false,
+              status: 'stale',
+              error: `FCM token is no longer registered (${response.status}).`,
+            };
+          }
+
+          return { token, success: false, status: 'failed', error: `FCM API Error (${response.status}): ${errText}` };
         }
         
-        const result = await response.json();
-        return { token, success: true, name: result.name };
+        const result = await response.json().catch(() => ({}));
+        return { token, success: true, status: 'delivered', name: result?.name };
       } catch (err) {
-        return { token, success: false, error: err.message };
+        return { token, success: false, status: 'failed', error: err.message };
       }
     });
 
@@ -95,7 +190,7 @@ async function sendFCMv1Notifications(tokens: string[], title: string, body: str
     results.push(...batchResults);
   }
 
-  return results;
+  return { results, staleTokens };
 }
 
 Deno.serve(async (req) => {
@@ -163,19 +258,28 @@ Deno.serve(async (req) => {
     }
 
     // Send via FCM HTTP v1
-    const fcmResults = await sendFCMv1Notifications(tokens, title, body, data)
+    const { results: fcmResults, staleTokens } = await sendFCMv1Notifications(tokens, title, body, data)
 
-    const successCount = fcmResults.filter(r => r.success).length;
-    const failureCount = fcmResults.filter(r => !r.success).length;
+    const staleTokensRemoved = await pruneInvalidTokens(supabase, staleTokens)
+
+    const deliveredCount = fcmResults.filter(r => r.status === 'delivered').length;
+    const staleCount = fcmResults.filter(r => r.status === 'stale').length;
+    const failureCount = fcmResults.filter(r => r.status === 'failed').length;
 
     return new Response(
       JSON.stringify({ 
-        success: successCount > 0, 
-        message: successCount > 0 ? 'Notification process complete' : 'Notification delivery failed',
+        success: failureCount === 0,
+        message: deliveredCount > 0
+          ? 'Notification process complete'
+          : staleCount > 0 && failureCount === 0
+            ? 'No active tokens were available; stale tokens were cleaned up'
+            : 'Notification delivery failed',
         summary: {
           total: tokens.length,
-          success: successCount,
-          failures: failureCount
+          delivered: deliveredCount,
+          stale: staleCount,
+          failures: failureCount,
+          staleTokensRemoved
         },
         results: fcmResults,
         debug: {
