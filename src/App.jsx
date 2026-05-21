@@ -4556,26 +4556,39 @@ function AdminPortal({
 
       if (resetError) console.warn("Failed to reset parent views on live:", resetError.message);
 
-      const notificationResults = await Promise.all([
-        broadcastNotification(
-          "Results are LIVE!",
-          "The latest Tahfeez progress reports are now visible in the parent portal.",
-          "parents",
-          null,
-          "Progress"
-        ),
-        broadcastNotification(
-          "Results are LIVE!",
-          "The latest Tahfeez progress reports are now live for review.",
-          "teacher",
-          null,
-          "My Group"
-        ),
-      ]);
+      const { error: inboxError } = await supabase
+        .from("system_notifications")
+        .insert([
+          {
+            title: "Results are LIVE!",
+            body: "The latest Tahfeez progress reports are now visible in the parent portal.",
+            target_role: "parents",
+            target_user: null,
+            redirect_page: "Progress",
+          },
+          {
+            title: "Results are LIVE!",
+            body: "The latest Tahfeez progress reports are now live for review.",
+            target_role: "teacher",
+            target_user: null,
+            redirect_page: "My Group",
+          },
+        ]);
 
-      const notificationFailed = notificationResults.some(
-        (result) => result?.inboxError || result?.fcmError
+      if (inboxError) {
+        console.error("Result-live inbox notification error:", inboxError);
+      }
+
+      const pushResult = await broadcastNotification(
+        "Results are LIVE!",
+        "The latest Tahfeez progress reports are now visible in your portal.",
+        "all",
+        null,
+        "Progress",
+        true
       );
+
+      const notificationFailed = inboxError || pushResult?.fcmError;
 
       if (notificationFailed) {
         onShowAction("error", "Reports are live, but some notifications failed. Check console for details.");

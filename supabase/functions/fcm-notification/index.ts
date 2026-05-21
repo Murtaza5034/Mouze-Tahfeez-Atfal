@@ -86,6 +86,26 @@ function isStaleTokenError(responseStatus: number, parsedError: ParsedFcmError) 
   );
 }
 
+function getSiteUrl() {
+  return (
+    Deno.env.get('PUBLIC_SITE_URL') ||
+    Deno.env.get('SITE_URL') ||
+    Deno.env.get('VERCEL_PROJECT_PRODUCTION_URL') ||
+    'https://mouze-tahfeez-atfal-mu.vercel.app'
+  ).replace(/\/+$/, '');
+}
+
+function getNotificationUrl(data?: Record<string, string>) {
+  const siteUrl = getSiteUrl();
+  const rawUrl = data?.url || data?.link || '/';
+
+  try {
+    return new URL(rawUrl, `${siteUrl}/`).toString();
+  } catch {
+    return `${siteUrl}/`;
+  }
+}
+
 async function pruneInvalidTokens(supabase: ReturnType<typeof createClient>, tokens: string[]) {
   const uniqueTokens = [...new Set(tokens)];
   if (uniqueTokens.length === 0) return 0;
@@ -122,6 +142,13 @@ async function sendFCMv1Notifications(tokens: string[], title: string, body: str
   const { token: accessToken, projectId } = await getAccessToken(serviceAccount);
   const results: FcmSendResult[] = [];
   const staleTokens: string[] = [];
+  const notificationUrl = getNotificationUrl(data);
+  const messageData = {
+    ...(data || {}),
+    title,
+    body,
+    url: notificationUrl,
+  };
 
   // V1 API requires sending one request per token
   // We'll run them in parallel batches of 50 to avoid overwhelming the network
@@ -137,12 +164,36 @@ async function sendFCMv1Notifications(tokens: string[], title: string, body: str
             title,
             body,
           },
-          data: {
-            ...(data || {}),
-            title,
-            body
+          data: messageData,
+          webpush: {
+            headers: {
+              Urgency: 'high',
+            },
+            notification: {
+              title,
+              body,
+              icon: '/logo.png',
+              badge: '/logo.png',
+              tag: 'mauze-tahfeez-notification',
+              renotify: true,
+              requireInteraction: true,
+              data: messageData,
+              actions: [
+                { action: 'open', title: 'Open Portal' },
+                { action: 'dismiss', title: 'Dismiss' },
+              ],
+            },
+            fcm_options: {
+              link: notificationUrl,
+            },
           },
-          android: { priority: 'high' },
+          android: {
+            priority: 'high',
+            notification: {
+              sound: 'default',
+              channel_id: 'mauze-tahfeez-notifications',
+            },
+          },
           apns: {
             payload: {
               aps: { sound: 'default', 'content-available': 1 }

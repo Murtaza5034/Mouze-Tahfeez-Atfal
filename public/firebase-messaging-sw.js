@@ -21,15 +21,15 @@ messaging.onBackgroundMessage(function(payload) {
   const title = payload.notification?.title || payload.data?.title || "Mauze Tahfeez Update";
   const body = payload.notification?.body || payload.data?.body || "Check your portal for important updates";
   
+  const image = payload.notification?.image || payload.data?.image || "";
   const notificationOptions = {
     body: body,
     icon: '/logo.png',
     badge: '/logo.png',
-    image: payload.notification?.image || payload.data?.image || null,
     vibrate: [200, 100, 200],
     data: {
       ...payload.data,
-      url: payload.data?.url || '/',
+      url: payload.data?.url || payload.fcmOptions?.link || '/',
       timestamp: new Date().toISOString()
     },
     tag: 'mauze-tahfeez-notification',
@@ -50,6 +50,10 @@ messaging.onBackgroundMessage(function(payload) {
       }
     ]
   };
+
+  if (image) {
+    notificationOptions.image = image;
+  }
 
   return self.registration.showNotification(title, notificationOptions);
 });

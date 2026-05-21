@@ -138,17 +138,17 @@ class FCMService {
     try {
       console.log('Showing notification:', payload);
       const { notification, data } = payload;
+      const image = notification?.image || data?.image || "";
       
       // Create notification options with official styling
       const options = {
         body: notification?.body || 'New notification from Mauze Tahfeez',
         icon: '/main logo.jpg',
         badge: '/main logo.jpg',
-        image: notification?.image || null,
         vibrate: [200, 100, 200],
         data: {
           ...data,
-          url: data?.url || '/',
+          url: data?.url || payload.fcmOptions?.link || '/',
           timestamp: new Date().toISOString()
         },
         tag: 'mauze-tahfeez-notification',
@@ -169,6 +169,10 @@ class FCMService {
           }
         ]
       };
+
+      if (image) {
+        options.image = image;
+      }
 
       // Create and show notification
       if ('serviceWorker' in navigator && 'showNotification' in ServiceWorkerRegistration.prototype) {
