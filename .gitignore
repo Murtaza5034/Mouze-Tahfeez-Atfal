@@ -1,8 +1,38 @@
+# Dependencies
+node_modules/
 node_modules
+
+# Build output
+dist/
 dist
+
+# Vercel
+.vercel/
 .vercel
+
+# Environment variables
 .env
 .env.local
-.vscode
-*.log
 .env*.local
+.env.production
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Scratch/temp files
+scratch/
+*.cjs
+test-*.js
+test-*.html
+check-*.cjs
+verify-*.cjs
+verify-*.js
