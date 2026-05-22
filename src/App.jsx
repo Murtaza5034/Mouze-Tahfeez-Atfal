@@ -6473,6 +6473,7 @@ function TeacherPortal({
   portalRole,
   setSelectedAnnouncement,
   reportSettings = [],
+  parentViews = [],
   schoolData,
   teacherProfiles = [],
   selectedNotification,
@@ -6496,6 +6497,9 @@ function TeacherPortal({
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const backdropMouseDownRef = useRef(false);
   const reportSettingsObject = getReportSettingsObject(reportSettings);
+  const parentViewedCount = (parentViews || []).filter(v =>
+    v.viewed && filteredStudents.some(s => String(s.student_id) === String(v.student_id))
+  ).length;
   const canTeacherFillProgress = reportSettingsObject?.allow_teacher_progress_entry !== false;
   const selectedStudent =
     filteredStudents.find(
@@ -6635,6 +6639,13 @@ function TeacherPortal({
                   </span>
                   <span className="pstat-label">Avg Score</span>
                   <span className="pstat-sub">This week</span>
+                </div>
+                <div className="pstat-card">
+                  <span className="pstat-value">
+                    {parentViewedCount}/{filteredStudents.length || 0}
+                  </span>
+                  <span className="pstat-label">Parent Views</span>
+                  <span className="pstat-sub">Viewed reports</span>
                 </div>
                 {portalAccess?.show_salary_card && monthlySalary && (
                   <div className="pstat-card">
@@ -8952,6 +8963,7 @@ export default function App() {
             portalAccess={portalAccess}
             portalRole={portalRole}
             reportSettings={reportSettings}
+            parentViews={parentViews}
             setActivePage={setActivePage}
             setMenuOpen={setMenuOpen}
             setSelectedAnnouncement={setSelectedAnnouncement}
