@@ -6,6 +6,7 @@ class FCMService {
     this.isSupported = false;
     this.token = null;
     this.initialized = false;
+    this.initializingPromise = null;
   }
 
   // Initialize FCM service
@@ -14,72 +15,83 @@ class FCMService {
       console.log('FCM service already initialized');
       return true;
     }
-    
-    try {
-      console.log('Initializing FCM service for role:', userRole);
-      
-      // Check if FCM is supported
-      if (!('Notification' in window)) {
-        console.error('This browser does not support notifications');
-        return false;
-      }
-      
-      if (!('serviceWorker' in navigator)) {
-        console.error('Service workers are not supported in this browser');
-        return false;
-      }
 
-      // Check current permission status
-      const currentPermission = Notification.permission;
-      console.log('Current notification permission:', currentPermission);
-      
-      // Request notification permission if not granted
-      let permission = currentPermission;
-      if (permission === 'default') {
-        console.log('Requesting notification permission...');
-        permission = await Notification.requestPermission();
-        console.log('Notification permission status:', permission);
-      }
-      
-      if (permission !== 'granted') {
-        console.error('Notification permission denied. Please enable notifications in your browser settings.');
-        return false;
-      }
-
-      // Get FCM token
-      console.log('Retrieving FCM token...');
-      const token = await getFCMToken();
-      if (!token) {
-        console.error('Failed to get FCM token. Please refresh the page and try again.');
-        return false;
-      }
-
-      console.log('FCM token retrieved successfully:', token.substring(0, 20) + '...');
-      this.token = token;
-      this.isSupported = true;
-
-      // Store token in database
-      console.log('Storing FCM token in database...');
-      await this.storeToken(token, userRole);
-
-      // Set up message listener
-      this.setupMessageListener();
-
-      this.initialized = true;
-      console.log('FCM service initialized successfully for role:', userRole);
-      return true;
-
-    } catch (error) {
-      console.error('Error initializing FCM service:', error);
-      if (error.name === 'AbortError') {
-        console.error('FCM registration was aborted. This might be due to a service worker conflict or insecure context.');
-      } else if (error.code === 'messaging/permission-blocked') {
-        console.error('Notification permission was blocked by the user.');
-      } else if (error.code === 'messaging/unsupported-browser') {
-        console.error('This browser is not supported for FCM.');
-      }
-      return false;
+    if (this.initializingPromise) {
+      console.log('FCM service initialization already in progress, waiting...');
+      return this.initializingPromise;
     }
+
+    this.initializingPromise = (async () => {
+      try {
+        console.log('Initializing FCM service for role:', userRole);
+        
+        // Check if FCM is supported
+        if (!('Notification' in window)) {
+          console.error('This browser does not support notifications');
+          return false;
+        }
+        
+        if (!('serviceWorker' in navigator)) {
+          console.error('Service workers are not supported in this browser');
+          return false;
+        }
+
+        // Check current permission status
+        const currentPermission = Notification.permission;
+        console.log('Current notification permission:', currentPermission);
+        
+        // Request notification permission if not granted
+        let permission = currentPermission;
+        if (permission === 'default') {
+          console.log('Requesting notification permission...');
+          permission = await Notification.requestPermission();
+          console.log('Notification permission status:', permission);
+        }
+        
+        if (permission !== 'granted') {
+          console.error('Notification permission denied. Please enable notifications in your browser settings.');
+          return false;
+        }
+
+        // Get FCM token
+        console.log('Retrieving FCM token...');
+        const token = await getFCMToken();
+        if (!token) {
+          console.error('Failed to get FCM token. Please refresh the page and try again.');
+          return false;
+        }
+
+        console.log('FCM token retrieved successfully:', token.substring(0, 20) + '...');
+        this.token = token;
+        this.isSupported = true;
+
+        // Store token in database
+        console.log('Storing FCM token in database...');
+        await this.storeToken(token, userRole);
+
+        // Set up message listener
+        this.setupMessageListener();
+
+        this.initialized = true;
+        console.log('FCM service initialized successfully for role:', userRole);
+        return true;
+
+      } catch (error) {
+        console.error('Error initializing FCM service:', error);
+        if (error.name === 'AbortError') {
+          console.error('FCM registration was aborted. This might be due to a service worker conflict or insecure context.');
+        } else if (error.code === 'messaging/permission-blocked') {
+          console.error('Notification permission was blocked by the user.');
+        } else if (error.code === 'messaging/unsupported-browser') {
+          console.error('This browser is not supported for FCM.');
+        }
+        return false;
+      } finally {
+        this.initializingPromise = null;
+      }
+    })();
+
+    return this.initializingPromise;
   }
 
   // Store FCM token in database
