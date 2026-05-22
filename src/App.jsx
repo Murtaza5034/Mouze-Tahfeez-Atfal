@@ -6337,6 +6337,7 @@ function AdminPortal({
 }
 
 function TeacherPortal({
+  parentViews = [],
   actionMessage,
   activePage,
   menuOpen,
@@ -6409,6 +6410,14 @@ function TeacherPortal({
       total_score
     };
   }, [selectedStudent, teacherForms.result]);
+
+  const viewedCount = useMemo(() => {
+    return (parentViews || []).filter(v => {
+      const isViewed = v.viewed === true;
+      const belongsToMyGroup = filteredStudents.some(s => String(s.student_id) === String(v.student_id));
+      return isViewed && belongsToMyGroup;
+    }).length;
+  }, [parentViews, filteredStudents]);
 
   return (
     <div className="admin-shell">
@@ -6519,6 +6528,11 @@ function TeacherPortal({
                   </span>
                   <span className="pstat-label">Avg Score</span>
                   <span className="pstat-sub">This week</span>
+                </div>
+                <div className="pstat-card">
+                  <span className="pstat-value">{viewedCount}/{filteredStudents.length}</span>
+                  <span className="pstat-label">Parent Views</span>
+                  <span className="pstat-sub">Engagement</span>
                 </div>
                 {portalAccess?.show_salary_card && monthlySalary && (
                   <div className="pstat-card">
@@ -8821,6 +8835,7 @@ export default function App() {
           />
         ) : (
           <TeacherPortal
+            parentViews={parentViews}
             user={user}
             actionMessage={actionMessage}
             activePage={activePage}
