@@ -6498,7 +6498,7 @@ function TeacherPortal({
   const backdropMouseDownRef = useRef(false);
   const reportSettingsObject = getReportSettingsObject(reportSettings);
   const parentViewedCount = (parentViews || []).filter(v =>
-    v.viewed && filteredStudents.some(s => String(s.student_id) === String(v.student_id))
+    v.viewed && (filteredStudents || []).some(s => String(s?.student_id) === String(v?.student_id))
   ).length;
   const canTeacherFillProgress = reportSettingsObject?.allow_teacher_progress_entry !== false;
   const selectedStudent =
