@@ -4867,8 +4867,9 @@ body {
   margin: 0;
 }
 
-/* --- Mobile View Optimization for Progress Cards (One-Eye View) --- */
-@media (max-width: 768px) {
+/* --- Legacy compact progress-card mobile view disabled.
+   Keep the full report-card proportions while Attendance and Jadeed Safahat remain inside the card. --- */
+@media not all {
   /* Scope all mobile rules to progress-overview not in capture zones */
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) {
     display: flex !important;
