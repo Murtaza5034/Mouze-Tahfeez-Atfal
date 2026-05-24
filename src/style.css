@@ -1513,9 +1513,10 @@ h1, h2, h3, h4, h5 {
     grid-template-columns: 1fr;
     text-align: center;
   }
-  
+
   .result-footer-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
   }
   
   .medal-stack {
@@ -2088,50 +2089,86 @@ h1, h2, h3, h4, h5 {
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-.teacher-photo-square {
-  width: 90px;
-  height: 90px;
-  border-radius: 16px;
-  object-fit: cover;
-  background: #f1f5f9;
-}
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-card-premium {
+    padding: 10px 10px !important;
+  }
 
-.teacher-profile-card {
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-footer-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
 
-.teacher-profile-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.1);
-}
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box {
+    padding: 6px !important;
+  }
 
-.pinned {
-  border: 2px solid #fbbf24 !important;
-  background: #fffcf0 !important;
-}
-  
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box p {
+    font-size: 0.68rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-val {
+    font-size: 0.8rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-circle {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 1.2rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-card-modern,
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-pages-card {
+    padding: 8px 6px !important;
+    min-height: 70px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-star {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-stars-container {
+    gap: 3px !important;
+  }
+
+  .teacher-photo-square {
+    width: 90px;
+    height: 90px;
+    border-radius: 16px;
+    object-fit: cover;
+    background: #f1f5f9;
+  }
+
+  .teacher-profile-card {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .teacher-profile-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+  }
+
+  .pinned {
+    border: 2px solid #fbbf24 !important;
+    background: #fffcf0 !important;
+  }
+
   .flex-row-card {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-  
+
   .salary-flex {
     grid-template-columns: 1fr;
     gap: 12px;
   }
-  
+
   .sidebar {
     width: min(300px, 88vw);
     padding: 20px 16px;
   }
-}
-
-.flex-row-card {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .card-primary-info {
@@ -2352,13 +2389,13 @@ h1, h2, h3, h4, h5 {
 
 .attendance-star.filled {
   color: var(--accent-gold);
-  filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.4));
-  transform: scale(1.1);
+  filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.6));
+  transform: scale(1.15);
 }
 
 .attendance-star.empty {
-  color: var(--glass-border);
-  opacity: 0.5;
+  color: #d0d0d0;
+  opacity: 0.6;
 }
 
 /* --- Hub Raqam Page Styles --- */
@@ -4867,30 +4904,30 @@ body {
   margin: 0;
 }
 
-/* --- Legacy compact progress-card mobile view disabled.
-   Keep the full report-card proportions while Attendance and Jadeed Safahat remain inside the card. --- */
-@media not all {
-  /* Scope all mobile rules to progress-overview not in capture zones */
+/* --- Responsive Tahfeez report card for small screens (mobile) --- */
+@media (max-width: 640px) {
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) {
     display: flex !important;
     flex-direction: column !important;
     gap: 8px !important;
-    padding: 2px !important;
+    padding: 0 !important;
     margin-top: 8px !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-card-premium {
-    padding: 10px 12px !important;
+    padding: 14px !important;
     border-radius: 16px !important;
     display: flex !important;
     flex-direction: column !important;
     gap: 8px !important;
     margin-bottom: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .parent-view-status-dot {
-    top: 10px !important;
-    right: 10px !important;
+    top: 8px !important;
+    right: 8px !important;
     width: 10px !important;
     height: 10px !important;
   }
@@ -4904,12 +4941,12 @@ body {
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-card-header {
     display: flex !important;
-    flex-direction: row !important;
+    flex-direction: column !important;
     align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 10px !important;
+    justify-content: center !important;
+    gap: 6px !important;
     border-bottom: 1px dashed rgba(183, 137, 31, 0.15) !important;
-    padding-bottom: 6px !important;
+    padding-bottom: 8px !important;
     margin-bottom: 2px !important;
   }
 
@@ -4919,30 +4956,31 @@ body {
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-logo img {
-    height: 38px !important;
+    height: 42px !important;
     width: auto !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-info {
-    text-align: left !important;
+    text-align: center !important;
     display: flex !important;
     flex-direction: column !important;
+    align-items: center !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-info h2.kids-font {
-    font-size: 1.15rem !important;
-    line-height: 1.1 !important;
+    font-size: 1.1rem !important;
+    line-height: 1.2 !important;
     margin: 0 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-info h4.kids-font {
-    font-size: 0.7rem !important;
-    margin: 1px 0 0 0 !important;
+    font-size: 0.75rem !important;
+    margin: 2px 0 0 0 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .school-info .report-student-name {
-    font-size: 0.82rem !important;
-    margin-top: 2px !important;
+    font-size: 0.85rem !important;
+    margin-top: 4px !important;
     color: var(--primary-gold) !important;
     font-weight: 700 !important;
   }
@@ -4960,9 +4998,9 @@ body {
     justify-content: space-between !important;
     align-items: center !important;
     background: var(--cream-bg) !important;
-    padding: 4px 8px !important;
+    padding: 6px 10px !important;
     border-radius: 8px !important;
-    gap: 6px !important;
+    gap: 4px !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .meta-col {
@@ -4973,16 +5011,16 @@ body {
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .meta-label {
-    font-size: 0.62rem !important;
+    font-size: 0.65rem !important;
     margin-bottom: 0 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .meta-val {
-    font-size: 0.72rem !important;
+    font-size: 0.85rem !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-main {
-    padding: 6px !important;
+    padding: 8px 6px !important;
     display: flex !important;
     flex-direction: row !important;
     justify-content: space-between !important;
@@ -4990,36 +5028,38 @@ body {
     gap: 6px !important;
     background: rgba(255, 255, 255, 0.4) !important;
     border-radius: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .total-score-block {
     flex-shrink: 0 !important;
-    width: 60px !important;
+    width: auto !important;
     align-items: center !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-title {
-    font-size: 0.52rem !important;
+    font-size: 0.55rem !important;
     white-space: nowrap !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jumla-label {
-    font-size: 1.05rem !important;
+    font-size: 0.95rem !important;
     margin: 0 !important;
     line-height: 1 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-circle {
-    width: 42px !important;
-    height: 42px !important;
-    font-size: 1.2rem !important;
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 1.4rem !important;
     border-width: 2px !important;
     margin-bottom: 2px !important;
     box-shadow: 0 3px 8px rgba(138, 101, 21, 0.06) !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .max-score {
-    font-size: 0.6rem !important;
+    font-size: 0.7rem !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-details-box {
@@ -5028,6 +5068,7 @@ body {
     gap: 3px !important;
     border-radius: 8px !important;
     background: rgba(255, 255, 255, 0.75) !important;
+    min-width: 0 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-row {
@@ -5042,25 +5083,25 @@ body {
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .arabic-label {
-    font-size: 0.85rem !important;
+    font-size: 0.8rem !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-val {
-    font-size: 0.72rem !important;
+    font-size: 0.85rem !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .trophy-container {
     flex-shrink: 0 !important;
-    width: 50px !important;
-    height: 50px !important;
+    width: 44px !important;
+    height: 44px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .trophy-icon {
-    width: 40px !important;
-    height: 40px !important;
+    width: 34px !important;
+    height: 34px !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .rank-text-overlay {
@@ -5071,20 +5112,20 @@ body {
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-footer-grid {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 6px !important;
-    margin-top: 4px !important;
+    gap: 8px !important;
+    margin-top: 6px !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box {
-    padding: 6px 8px !important;
+    padding: 8px !important;
     border-radius: 8px !important;
     min-height: 0 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box h5 {
-    margin: 0 0 2px 0 !important;
-    font-size: 0.6rem !important;
-    line-height: 1.1 !important;
+    margin: 0 0 3px 0 !important;
+    font-size: 0.65rem !important;
+    line-height: 1.2 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box h5.arabic-kanz {
@@ -5092,24 +5133,24 @@ body {
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box p {
-    margin: 1px 0 !important;
-    font-size: 0.68rem !important;
-    line-height: 1.1 !important;
+    margin: 2px 0 !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box p span.arabic-kanz {
-    font-size: 0.78rem !important;
+    font-size: 0.8rem !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .note-item-row {
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
-    font-size: 0.68rem !important;
+    font-size: 0.72rem !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .note-label.arabic-kanz {
-    font-size: 0.78rem !important;
+    font-size: 0.8rem !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .note-val {
@@ -5120,47 +5161,51 @@ body {
     margin-top: 4px !important;
     padding: 4px 6px !important;
     border-radius: 6px !important;
-    font-size: 0.7rem !important;
-    line-height: 1.1 !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .report-footer-cards {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 6px !important;
+    gap: 8px !important;
     margin-top: 6px !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-card-modern,
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-pages-card {
     margin-top: 0 !important;
-    padding: 6px !important;
-    border-radius: 10px !important;
-    gap: 3px !important;
+    padding: 10px 8px !important;
+    border-radius: 12px !important;
+    gap: 4px !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    min-height: 65px !important;
+    min-height: 80px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-stars-container {
-    gap: 2px !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+    justify-content: center !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-star {
-    width: 12px !important;
-    height: 12px !important;
+    width: 16px !important;
+    height: 16px !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-card-modern h4.attendance-rating-text {
-    font-size: 0.68rem !important;
-    margin: 1px 0 0 0 !important;
-    line-height: 1.1 !important;
+    font-size: 0.72rem !important;
+    margin: 2px 0 0 0 !important;
+    line-height: 1.2 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-card-modern .attendance-sub-label {
-    font-size: 0.6rem !important;
+    font-size: 0.8rem !important;
     margin: 0 !important;
   }
 
@@ -5174,17 +5219,245 @@ body {
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-count-overlay {
-    font-size: 0.78rem !important;
+    font-size: 1rem !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-pages-card h4.attendance-rating-text {
-    font-size: 0.95rem !important;
-    margin: 1px 0 0 0 !important;
-    line-height: 1.1 !important;
+    font-size: 0.9rem !important;
+    margin: 2px 0 0 0 !important;
+    line-height: 1.2 !important;
   }
 
   .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-pages-card .attendance-sub-label {
-    font-size: 0.6rem !important;
+    font-size: 0.78rem !important;
     margin: 0 !important;
   }
+}
+
+/* --- Juz/Surat Selector Component --- */
+.juz-surat-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.juz-surat-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(197, 160, 89, 0.08);
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid rgba(197, 160, 89, 0.15);
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.toggle-btn:hover {
+  color: var(--deep-brown);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.toggle-btn.active {
+  background: var(--premium-white);
+  color: var(--deep-brown);
+  box-shadow: 0 2px 8px rgba(61, 43, 31, 0.08);
+  border: 1px solid var(--glass-border);
+}
+
+.juz-surat-selector .premium-select {
+  width: 100%;
+  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
+  font-size: 1rem;
+  letter-spacing: normal;
+}
+
+.juz-surat-selector .premium-select option {
+  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
+  font-size: 0.95rem;
+  padding: 8px 12px;
+}
+
+.juz-surat-selector .premium-select optgroup {
+  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
+}
+
+n/* --- Full Width Label Helper --- */
+.full-width {
+  grid-column: 1 / -1;
+}
+
+/* --- Kanz al Marjaan Font Helper (no RTL direction) --- */
+.kanz-font {
+  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+
+.juz-surat-selector .premium-select .arabic-kanz-option {
+  font-family: 'Kanz al Marjaan', serif;
+  font-size: 1.1rem;
+}
+
+/* --- Teacher Unlock Card --- */
+.teacher-unlock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.teacher-unlock-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.teacher-unlock-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.teacher-unlock-list::-webkit-scrollbar-thumb {
+  background: rgba(197, 160, 89, 0.3);
+  border-radius: 4px;
+}
+
+.teacher-unlock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(197, 160, 89, 0.12);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.teacher-unlock-row:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(197, 160, 89, 0.25);
+  box-shadow: 0 4px 16px rgba(61, 43, 31, 0.06);
+  transform: translateY(-1px);
+}
+
+.teacher-unlock-row.unlocked {
+  background: linear-gradient(135deg, rgba(46, 196, 182, 0.06), rgba(46, 196, 182, 0.12));
+  border-color: rgba(46, 196, 182, 0.35);
+  box-shadow: 0 0 20px rgba(46, 196, 182, 0.12);
+}
+
+.teacher-unlock-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.teacher-unlock-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--deep-brown, #2f2118);
+  letter-spacing: -0.01em;
+}
+
+.teacher-unlock-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted, #8a786a);
+}
+
+.unlock-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid rgba(197, 160, 89, 0.25);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(252, 248, 239, 0.9));
+  color: var(--deep-brown, #2f2118);
+  box-shadow: 0 4px 12px rgba(61, 43, 31, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.unlock-toggle-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(61, 43, 31, 0.1);
+  border-color: rgba(197, 160, 89, 0.45);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 1), rgba(252, 248, 239, 0.95));
+}
+
+.unlock-toggle-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.unlock-toggle-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Active (unlocked) state - Green Glow */
+.unlock-toggle-btn.active {
+  background: linear-gradient(135deg, #2ec4b6, #1a9e91);
+  color: #fff;
+  border-color: #2ec4b6;
+  box-shadow: 0 0 20px rgba(46, 196, 182, 0.35), 0 4px 16px rgba(46, 196, 182, 0.2);
+  animation: unlockGlowPulse 2s ease-in-out infinite;
+}
+
+.unlock-toggle-btn.active:hover:not(:disabled) {
+  box-shadow: 0 0 30px rgba(46, 196, 182, 0.5), 0 8px 24px rgba(46, 196, 182, 0.3);
+  background: linear-gradient(135deg, #3dd1c3, #26aea0);
+}
+
+/* Default (locked) state - Red Glow when hovering */
+.unlock-toggle-btn:not(.active):not(:disabled):hover {
+  border-color: rgba(231, 29, 54, 0.4);
+  box-shadow: 0 0 16px rgba(231, 29, 54, 0.15), 0 4px 12px rgba(231, 29, 54, 0.08);
+}
+
+@keyframes unlockGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(46, 196, 182, 0.35), 0 4px 16px rgba(46, 196, 182, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(46, 196, 182, 0.55), 0 8px 24px rgba(46, 196, 182, 0.35);
+  }
+}
+
+.teacher-unlock-error {
+  font-size: 0.75rem;
+  color: #e71d36;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(231, 29, 54, 0.08);
+  white-space: nowrap;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }

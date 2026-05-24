@@ -36,3 +36,18 @@ test-*.html
 check-*.cjs
 verify-*.cjs
 verify-*.js
+
+# Scratch/debug files
+_debug_*.txt
+_edit_*.py
+_extract_*.js
+_tp_*.txt
+_verify_*.txt
+
+# Supabase temp files
+supabase/.temp/
+
+# NUL device file
+nul
+
+.vercel

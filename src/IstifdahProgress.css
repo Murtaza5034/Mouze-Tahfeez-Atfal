@@ -1,3 +1,4 @@
+/* ===== IstifdahProgress Core Container ===== */
 .istifdah-progress-container {
   margin: 24px 0;
   display: flex;
@@ -14,7 +15,7 @@
   border-radius: 24px;
   padding: 32px;
   width: 100%;
-  max-width: 600px;
+  max-width: 720px;
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
   display: flex;
   flex-direction: column;
@@ -29,7 +30,6 @@
   box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15);
 }
 
-/* Subtle gradient background mesh for glass card */
 .glass-card::before {
   content: '';
   position: absolute;
@@ -43,6 +43,7 @@
   pointer-events: none;
 }
 
+/* ===== Card Header ===== */
 .card-header {
   text-align: center;
 }
@@ -64,6 +65,25 @@
   color: var(--text-muted, #757575);
 }
 
+/* Juz Badge for High Level */
+.juz-badge {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 4px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.08));
+  border: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.juz-badge-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary-gold, #d4af37);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ===== Progress Body ===== */
 .progress-body {
   display: flex;
   align-items: center;
@@ -72,11 +92,11 @@
   flex-wrap: wrap;
 }
 
-/* Liquid Circle */
+/* ===== Liquid Circle (unchanged) ===== */
 .liquid-container {
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: 140px;
+  height: 140px;
   flex-shrink: 0;
 }
 
@@ -148,66 +168,150 @@
   z-index: 10;
 }
 
-/* Stats */
-.stats-container {
+/* ===== Headings Grid ===== */
+.headings-grid {
   display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 16px;
-  padding: 16px 24px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-  gap: 16px;
+  gap: 12px;
+  flex: 1;
+  min-width: 240px;
 }
 
-.stat-box {
+.heading-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 16px;
+  padding: 14px 12px;
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.heading-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(61, 43, 31, 0.08);
+  border-color: rgba(212, 175, 55, 0.25);
+}
+
+.heading-card-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 90px;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.12);
 }
 
-.stat-label {
-  font-size: 0.8rem;
+.heading-label {
+  font-size: 0.75rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-muted, #757575);
-  margin-bottom: 4px;
+  letter-spacing: 0.08em;
+  color: var(--deep-brown, #3e2723);
 }
 
-.stat-val {
-  font-size: 1.1rem;
+.heading-label-arabic {
+  font-size: 1rem;
+  color: var(--primary-gold, #d4af37);
+  letter-spacing: normal;
+}
+
+/* ===== 3-Column Juz | Surah | Safa Layout ===== */
+.jss-row {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  gap: 4px;
+  align-items: start;
+}
+
+.jss-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.jss-cell-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #8a786a);
+}
+
+.jss-cell-value {
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--deep-brown, #3e2723);
-  margin-bottom: 2px;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
-.stat-sub {
-  font-size: 0.85rem;
-  color: var(--primary-gold, #d4af37);
-  font-weight: 600;
+.jss-cell-value.kanz-font {
+  letter-spacing: normal;
+  font-size: 1rem;
 }
 
-.stat-divider {
+.surah-cell .jss-cell-value {
+  font-size: 1.1rem;
+}
+
+/* ===== 2-Column Simple Layout (Juz|Safa) ===== */
+.simple-row {
   display: flex;
   flex-direction: column;
+  gap: 6px;
   align-items: center;
-  color: #ccc;
-  gap: 4px;
 }
 
-.stat-divider .line {
-  width: 1px;
-  height: 20px;
-  background-color: #ddd;
+.simple-main {
+  text-align: center;
 }
 
-.stat-divider .icon {
-  font-size: 1.2rem;
+.simple-juz {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--deep-brown, #3e2723);
 }
 
+.simple-surah {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--deep-brown, #3e2723);
+  letter-spacing: normal;
+}
+
+.simple-safa {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(212, 175, 55, 0.08);
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+
+.simple-safa-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #8a786a);
+}
+
+.simple-safa-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--primary-gold, #d4af37);
+}
+
+/* ===== Footer ===== */
 .footer-message {
   text-align: center;
-  margin-top: 8px;
+  margin-top: 4px;
   font-size: 1.05rem;
   color: var(--text-dark, #424242);
 }
@@ -216,7 +320,7 @@
   color: #2e7d32;
 }
 
-/* Animations */
+/* ===== Animations ===== */
 .card-appear {
   animation: cardAppear 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -226,13 +330,137 @@
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@media (max-width: 480px) {
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.heading-card {
+  animation: fadeInUp 0.4s ease both;
+}
+
+.heading-card:nth-child(1) { animation-delay: 0.1s; }
+.heading-card:nth-child(2) { animation-delay: 0.2s; }
+.heading-card:nth-child(3) { animation-delay: 0.3s; }
+
+/* ===== Kanz al Marjan Font Helper with proper Arabic fallbacks ===== */
+.kanz-font {
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  letter-spacing: normal;
+}
+
+/* ===== Responsive: Tablet ===== */
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 24px 20px;
+    max-width: 100%;
+  }
+
   .progress-body {
     flex-direction: column;
+    gap: 20px;
   }
-  
-  .stats-container {
+
+  .liquid-container {
+    width: 120px;
+    height: 120px;
+  }
+
+  .headings-grid {
     width: 100%;
-    justify-content: space-around;
+    gap: 10px;
+  }
+
+  .heading-card {
+    padding: 12px 10px;
+  }
+
+  .jss-row {
+    gap: 3px;
+  }
+
+  .jss-cell-value {
+    font-size: 0.85rem;
+  }
+
+  .surah-cell .jss-cell-value {
+    font-size: 0.95rem;
+  }
+
+  .card-title {
+    font-size: 1.3rem;
+  }
+}
+
+/* ===== Responsive: Mobile ===== */
+@media (max-width: 480px) {
+  .glass-card {
+    padding: 20px 16px;
+    border-radius: 20px;
+  }
+
+  .liquid-container {
+    width: 100px;
+    height: 100px;
+  }
+
+  .percentage-text {
+    font-size: 1.5rem;
+  }
+
+  .headings-grid {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .heading-card {
+    padding: 10px 12px;
+  }
+
+  .heading-card-header {
+    flex-direction: row;
+    justify-content: space-between;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  .heading-label {
+    font-size: 0.7rem;
+  }
+
+  .heading-label-arabic {
+    font-size: 0.9rem;
+  }
+
+  .jss-row {
+    gap: 4px;
+  }
+
+  .jss-cell-value {
+    font-size: 0.85rem;
+  }
+
+  .surah-cell .jss-cell-value {
+    font-size: 0.95rem;
+  }
+
+  .simple-juz {
+    font-size: 0.9rem;
+  }
+
+  .simple-surah {
+    font-size: 1rem;
+  }
+
+  .card-title {
+    font-size: 1.15rem;
+  }
+
+  .card-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .footer-message {
+    font-size: 0.95rem;
   }
 }

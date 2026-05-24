@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useState, useRef } from "react";
+﻿import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -42,6 +42,7 @@ import {
   FileArchive,
   Loader2,
   Lock,
+  Unlock,
   CalendarX,
   AlertCircle,
   ChevronRight,
@@ -68,7 +69,7 @@ const getLocalDateKey = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-const TEACHER_PROGRESS_EDIT_LIMIT = 3;
+const DAY_INDEX = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
 
 const getReportSettingsObject = (reportSettings) =>
   Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
@@ -98,6 +99,11 @@ const REPORT_SETTING_DEFAULTS = {
   progress_card_background_url: "",
   progress_card_background_position: "center",
   progress_card_overlay_opacity: 0.82,
+  auto_lock_enabled: true,
+  auto_lock_day: "Saturday",
+  auto_lock_time: "00:00",
+  auto_unlock_day: "Friday",
+  auto_unlock_time: "16:30",
 };
 
 const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
@@ -132,38 +138,52 @@ const createTeacherResultDraft = (overrides = {}) => ({
   jadeed: "",
   next_week_juz: "",
   next_week_page: "",
+  next_week_surah: "",
   total_jadeed_pages: "",
   istifadah_juz: "",
   istifadah_page: "",
+  istifadah_surah: "",
   wusool_juz: "",
   wusool_page: "",
+  wusool_surah: "",
   matrookah: "",
   daeefah: "",
   attendance_count: "",
   attendance_note: "",
-  teacher_edit_count: 0,
-  teacher_locked: false,
-  teacher_locked_at: null,
   ...overrides,
 });
 
-const getTeacherResultEditCount = (result) =>
-  Math.max(
-    0,
-    Number(
-      result?.teacher_edit_count ??
-        result?.edit_count ??
-        result?.save_count ??
-        (result?.id ? 1 : 0)
-    ) || 0
-  );
+const isTeacherResultLocked = (settings) => {
+  if (settings?.auto_lock_enabled === false) return false;
+  const now = new Date();
+  const day = now.getDay();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const unlockDay = DAY_INDEX[(settings?.auto_unlock_day || "Friday").toLowerCase()] ?? 5;
+  const lockDay = DAY_INDEX[(settings?.auto_lock_day || "Saturday").toLowerCase()] ?? 6;
+  const [unlockH, unlockM] = (settings?.auto_unlock_time || "16:30").split(":").map(Number);
+  const [lockH, lockM] = (settings?.auto_lock_time || "00:00").split(":").map(Number);
+  const unlockTotal = unlockDay * 1440 + unlockH * 60 + unlockM;
+  const lockTotal = lockDay * 1440 + lockH * 60 + lockM;
+  const current = day * 1440 + minutes;
+  return !(current >= unlockTotal && current < lockTotal);
+};
 
-const getTeacherResultRemainingEdits = (result) =>
-  Math.max(TEACHER_PROGRESS_EDIT_LIMIT - getTeacherResultEditCount(result), 0);
-
-const isTeacherResultLocked = (result) =>
-  Boolean(result?.teacher_locked ?? result?.is_locked) ||
-  getTeacherResultEditCount(result) >= TEACHER_PROGRESS_EDIT_LIMIT;
+const getNextWindowTime = (settings) => {
+  const now = new Date();
+  const day = now.getDay();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const current = day * 1440 + minutes;
+  const unlockDay = DAY_INDEX[(settings?.auto_unlock_day || "Friday").toLowerCase()] ?? 5;
+  const lockDay = DAY_INDEX[(settings?.auto_lock_day || "Saturday").toLowerCase()] ?? 6;
+  const [unlockH, unlockM] = (settings?.auto_unlock_time || "16:30").split(":").map(Number);
+  const [lockH, lockM] = (settings?.auto_lock_time || "00:00").split(":").map(Number);
+  const unlockTotal = unlockDay * 1440 + unlockH * 60 + unlockM;
+  const lockTotal = lockDay * 1440 + lockH * 60 + lockM;
+  const locked = isTeacherResultLocked(settings);
+  if (!locked) return { type: "lock", time: lockTotal > current ? lockTotal : lockTotal + 7 * 1440 };
+  const nextUnlock = unlockTotal > current ? unlockTotal : unlockTotal + 7 * 1440;
+  return { type: "unlock", time: nextUnlock };
+};
 
 const loadTrackedDays = (userId) => {
   if (!userId) return [];
@@ -506,11 +526,11 @@ const fixArabicScript = (text) => {
   // Normalize Gaf (Persian/Urdu script)
   // Some systems render Gaf as double kaaf or k-k-a
   return text
-    .replace(/كك/g, "گ")      // Double Kaaf -> Gaf
-    .replace(/مرككا/g, "مرگا") // Murga (K-K-A) -> Murga (G-A)
-    .replace(/بهائي/g, "بھائی") // Bhai phonetic
-    .replace(/سي/g, "سی")      // Common character fixing
-    .replace(/في/g, "فی");     // Common character fixing
+    .replace(/ظƒظƒ/g, "ع¯")      // Double Kaaf -> Gaf
+    .replace(/ظ…ط±ظƒظƒط§/g, "ظ…ط±ع¯ط§") // Murga (K-K-A) -> Murga (G-A)
+    .replace(/ط¨ظ‡ط§ط¦ظٹ/g, "ط¨ع¾ط§ط¦غŒ") // Bhai phonetic
+    .replace(/ط³ظٹ/g, "ط³غŒ")      // Common character fixing
+    .replace(/ظپظٹ/g, "ظپغŒ");     // Common character fixing
 };
 
 const NotificationStatus = ({ role }) => {
@@ -625,37 +645,6 @@ const NotificationStatus = ({ role }) => {
           >
             {isInitializing ? "Configuring..." : "Enable Push Alerts"}
           </button>
-        )}
-      </div>
-    </div>
-  );
-};
-function SidebarHeader({ photoUrl, name, arabicName, tag }) {
-  const isArabic = (text) => /[\u0600-\u06FF]/.test(text);
-  const nameIsArabic = isArabic(name);
-  const finalPhoto = (photoUrl && photoUrl !== "" && photoUrl !== "null" && photoUrl !== "undefined") ? photoUrl : "/logo.png";
-
-  return (
-    <div className="sidebar-profile-centered">
-      <div className="avatar-vessel-centered">
-        <img
-          src={finalPhoto}
-          alt="Profile"
-          className="sidebar-avatar-img"
-          onError={(e) => { e.target.src = "/logo.png"; }}
-          loading="eager"
-        />
-        <div className="avatar-ring"></div>
-      </div>
-      <div className="profile-info-centered">
-        <p className="profile-tag-premium">{tag}</p>
-        <h2 className="profile-name-premium">
-          {name}
-        </h2>
-        {arabicName && (
-          <h3 className="profile-arabic-premium arabic-kanz" style={{ fontFamily: "'Kanz al Marjaan', serif" }}>
-            {fixArabicScript(arabicName)}
-          </h3>
         )}
       </div>
     </div>
@@ -1646,12 +1635,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 {surahInfo && (
                   <div className="mushaf-header">
                     <div className="s-name arabic-kanz">{surahInfo.name_arabic}</div>
-                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>}
+                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">ط¨ظگط³ظ’ظ…ظگ ظ±ظ„ظ„ظ‘ظژظ‡ظگ ظ±ظ„ط±ظ‘ظژط­ظ’ظ…ظژظ°ظ†ظگ ظ±ظ„ط±ظ‘ظژط­ظگظٹظ…ظگ</div>}
                   </div>
                 )}
 
                 <div className="q-label-badge" style={{ marginBottom: '15px' }}>
-                  {testMode === "self" ? "✨ Sheikh Hussary Guidance (Auto-Playing...)" : "📖 Teacher Prompt (Start Reciting):"}
+                  {testMode === "self" ? "âœ¨ Sheikh Hussary Guidance (Auto-Playing...)" : "ًں“– Teacher Prompt (Start Reciting):"}
                 </div>
 
                 <div className="mushaf-inner quran-uthmani" style={{ minHeight: '150px' }}>
@@ -1693,7 +1682,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
                 {recording && (
                   <div className="live-mistake-panel fade-in">
-                    <p className="live-label">🔴 MARK MISTAKES LIVE:</p>
+                    <p className="live-label">ًں”´ MARK MISTAKES LIVE:</p>
                     <div className="mistake-btns-grid">
                       <button className="mistake-btn word" onClick={() => logWordMistake({ id: Date.now(), text_uthmani: 'Word' }, "Word")}>
                         Word Mistake
@@ -1706,13 +1695,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                       </button>
                     </div>
                     <p className="helper-text">You can also tap words in the Mushaf above to mark specific Word mistakes.</p>
-                  </div>
-                )}
               </div>
             )}
           </div>
-        </section>
+        )}
       </div>
+      </section>
 
       <div className="ikhtebar-history-section">
         <h3 className="section-title"><Clock size={18} /> Ikhtebar History & Quran References</h3>
@@ -1769,7 +1757,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                         ))}
                       </div>
                     ) : (
-                      <p className="perfect-score">Excellent! Perfect Recitation ⭐</p>
+                      <p className="perfect-score">Excellent! Perfect Recitation â­گ</p>
                     )}
                   </div>
                 </div>
@@ -1789,6 +1777,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
             ))
           )}
         </div>
+      </div>
       </div>
     </div>
   );
@@ -1861,10 +1850,15 @@ function toNumber(value) {
   return Number(value || 0);
 }
 
+const toArabicDigits = (str) => {
+  if (str == null) return str;
+  return String(str).replace(/\d/g, d => 'ظ ظ،ظ¢ظ£ظ¤ظ¥ظ¦ظ§ظ¨ظ©'[parseInt(d, 10)]);
+};
+
 const ARABIC_MONTHS = [
-  "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
-  "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
-  "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
+  "ظ…ط­ط±ظ… ط§ظ„ط­ط±ط§ظ…", "طµظپط± ط§ظ„ظ…ط¸ظپط±", "ط±ط¨ظٹط¹ ط§ظ„ط£ظˆظ„", "ط±ط¨ظٹط¹ ط§ظ„ط¢ط®ط±",
+  "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط£ظˆظ„ظ‰", "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط¢ط®ط±ط©", "ط±ط¬ط¨ ط§ظ„ط£طµط¨", "ط´ط¹ط¨ط§ظ† ط§ظ„ظƒط±ظٹظ…",
+  "ط±ظ…ط¶ط§ظ† ط§ظ„ظ…ط¹ط¸ظ…", "ط´ظˆط§ظ„ ط§ظ„ظ…ظƒط±ظ…", "ط°ظٹ ط§ظ„ظ‚ط¹ط¯ط© ط§ظ„ط­ط±ط§ظ…", "ط°ظٹ ط§ظ„ط­ط¬ط© ط§ظ„ط­ط±ط§ظ…"
 ];
 
 function getFatemiInfo(dateStr) {
@@ -2285,18 +2279,18 @@ function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
         {stars.map((isFilled, i) => (
           <Sparkles
             key={i}
-            size={20}
+            size={24}
             className={`attendance-star ${isFilled ? 'filled' : 'empty'}`}
             style={{ animationDelay: `${i * 0.1}s` }}
           />
         ))}
       </div>
       <div>
-        <h4 className="attendance-rating-text kids-font">
+        <h4 className="attendance-rating-text" style={{ fontFamily: "'Kanz al Marjaan', serif" }}>
           {heading}
         </h4>
-        <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
-          {count || 0} out of {total} Presence
+        <p className="attendance-sub-label kanz-font" style={{ textAlign: 'center', fontSize: '11px' }}>
+          {toArabicDigits(count || 0)} out of {toArabicDigits(total)} Presence
         </p>
       </div>
     </div>
@@ -2309,9 +2303,9 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
       <div className="attendance-lighting" />
       <div className="jadeed-icon-container">
         <BookOpen size={80} className="jadeed-icon-bg" />
-        <span className="jadeed-count-overlay">{count || 0}</span>
+        <span className="jadeed-count-overlay"><span className="kanz-font">{toArabicDigits(count || 0)}</span></span>
       </div>
-      <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontSize: '1.6rem', fontFamily: "'Kanz al Marjaan', serif", marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
+      <h4 className="attendance-rating-text" dir="rtl" style={{ fontSize: '1.6rem', fontFamily: "'Kanz al Marjaan', serif", marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
         {heading}
       </h4>
       <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
@@ -2336,6 +2330,8 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
     Math.max(Number(report.progress_card_overlay_opacity ?? 0.82), 0),
     1
   );
+  // Determine if child is in Juz 26-30 range (show Surah tracking)
+
   const progressCardStyle = progressCardBackground
     ? {
         position: 'relative',
@@ -2428,13 +2424,13 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             <span className="score-title kids-font">{report.weekly_score_heading}</span>
             <span className="jumla-label arabic-kanz" style={arabicStyle}>{report.jumla_heading}</span>
             <div className="score-circle">
-              {(weeklyResult?.total_score ?? 
+              <span className="kanz-font">{toArabicDigits((weeklyResult?.total_score ?? 
                 (toNumber(weeklyResult?.murajazah) + 
                  toNumber(weeklyResult?.juz_hali) + 
                  toNumber(weeklyResult?.takhteet) + 
-                 toNumber(weeklyResult?.jadeed))) || "0"}
+                 toNumber(weeklyResult?.jadeed))) || "0")}</span>
             </div>
-            <span className="max-score"> / 100</span>
+            <span className="max-score"><span className="kanz-font"> / {toArabicDigits(100)}</span></span>
           </div>
 
           <div className="score-details-box">
@@ -2446,7 +2442,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
                 <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label} :</span>
-                <span className="score-val" dir="ltr">{item.val || "0"} / {item.max}</span>
+                <span className="score-val" dir="ltr"><span className="kanz-font">{toArabicDigits(item.val || "0")}</span> / <span className="kanz-font">{toArabicDigits(item.max)}</span></span>
               </div>
             ))}
           </div>
@@ -2454,7 +2450,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="trophy-container">
             <Trophy size={100} className="trophy-icon trophyPulse" />
             <span className="rank-text-overlay rankPop rankCelebration" key={weeklyResult?.computedRank || weeklyResult?.rank}>
-              {weeklyResult?.computedRank || weeklyResult?.rank || "-"}
+              <span className="kanz-font">{toArabicDigits(weeklyResult?.computedRank || weeklyResult?.rank || "-")}</span>
             </span>
           </div>
         </div>
@@ -2462,28 +2458,31 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         <div className="result-footer-grid">
           <div className="target-box highlight-wusool">
             <h5 className="arabic-kanz" dir="rtl" style={{ ...arabicStyle, fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_juz_heading} :</span> {weeklyResult?.wusool_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_page_heading} :</span> {weeklyResult?.wusool_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
           </div>
           <div className="target-box highlight-matrookah">
             <div className="note-item-row">
-              <span className="note-val">{weeklyResult?.matrookah || "-"}</span>
+              <span className="note-val">{toArabicDigits(weeklyResult?.matrookah || "-")}</span>
               <span className="note-label arabic-kanz" style={arabicStyle}>{report.matrookah_heading} :</span>
             </div>
             <div className="note-item-row">
-              <span className="note-val">{weeklyResult?.daeefah || "-"}</span>
+              <span className="note-val">{toArabicDigits(weeklyResult?.daeefah || "-")}</span>
               <span className="note-label arabic-kanz" style={arabicStyle}>{report.daeefah_heading} :</span>
             </div>
           </div>
           <div className="target-box">
             <h5 className="kids-font">{hNext}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_juz_heading} :</span> {weeklyResult?.next_week_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_page_heading} :</span> {weeklyResult?.next_week_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
             <h5 className="kids-font">{hIstifadah}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_juz_heading} :</span> {weeklyResult?.istifadah_juz || "-"}</p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_page_heading} :</span> {weeklyResult?.istifadah_page || "-"}</p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
           </div>
         </div>
 
@@ -2515,6 +2514,8 @@ function SettingsPage({
   user, 
   studentProfile,
   onShowAction,
+  teacherUnlockStatus,
+  setTeacherUnlockStatus,
   role = "parents"
 }) {
   const [activeTab, setActiveTab] = useState("Dark mode");
@@ -3044,7 +3045,7 @@ function ChildLeaveApply({ studentProfile, showAction }) {
                 style={{ width: '100%' }}
                 required
               />
-              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>✓ Document attached successfully</p>}
+              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>âœ“ Document attached successfully</p>}
             </div>
           )}
 
@@ -3203,6 +3204,7 @@ function ParentPortal({
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const backdropMouseDownRef = useRef(false);
   const notificationOpenedAtRef = useRef(0);
+
   const [parentViewedStatus, setParentViewedStatus] = useState(false);
   const [secondsSpent, setSecondsSpent] = useState(0);
 
@@ -3414,7 +3416,7 @@ function ParentPortal({
       highlights: [
         `Attendance: ${attendance?.status || "Present"}`,
         `Lesson: ${studentProfile?.latestResult?.surat || studentProfile?.surat || hifzDetails?.surat || "Update pending"}`,
-        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} · Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
+        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} آ· Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
       ],
       announcements:
         announcements.length > 0
@@ -3631,7 +3633,7 @@ function ParentPortal({
             </div>
             
             <Suspense fallback={null}>
-              <LazyIstifdahProgress weeklyResult={weeklyResult} />
+              <LazyIstifdahProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
             </Suspense>
             
             <div className="dashboard-section">
@@ -4053,6 +4055,8 @@ function ParentPortal({
             user={user}
             studentProfile={studentProfile}
             onShowAction={showAction}
+            teacherUnlockStatus={teacherUnlockStatus}
+            setTeacherUnlockStatus={setTeacherUnlockStatus}
           />
         ) : null}
 
@@ -4424,7 +4428,7 @@ function PortalAccessSuccessModal({ payload, onClose }) {
           onClick={onClose}
           aria-label="Close success popup"
         >
-          ×
+          أ—
         </button>
 
         <div className="portal-access-success-badge">
@@ -4521,6 +4525,7 @@ function AdminPortal({
   onUpdateWhatsappConfig,
   portalAccessSuccess,
   onClosePortalAccessSuccess,
+  onTeacherUnlock,
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -4534,6 +4539,7 @@ function AdminPortal({
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
   const [whatsAppLogs, setWhatsAppLogs] = useState([]);
+  const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
 
   const parseTemplate = (template, student) => {
     let msg = template || 'Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/';
@@ -4612,13 +4618,13 @@ function AdminPortal({
         sentCount++;
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' }
+          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! âœ…`, type: 'success' }
         ]);
       } catch (err) {
         console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} ❌`, type: 'error' }
+          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} â‌Œ`, type: 'error' }
         ]);
       }
       
@@ -4743,6 +4749,7 @@ function AdminPortal({
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
     : null;
+
   const reportSettingsObject = normalizeReportSettings(reportSettings);
   const previewStudent = selectedStudent || students[0] || null;
 
@@ -5115,7 +5122,7 @@ function AdminPortal({
                       <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
                     </label>
                     <label>
-                      <span>Arabic Name (اسم الطالب)</span>
+                      <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
                       <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                     </label>
                   </div>
@@ -5267,7 +5274,7 @@ function AdminPortal({
                       <StudentAvatar student={selectedStudent} />
                       <div>
                         <h3>{selectedStudent.name}</h3>
-                        <p>{selectedStudent.groupName} · {selectedStudent.teacherName}</p>
+                        <p>{selectedStudent.groupName} آ· {selectedStudent.teacherName}</p>
                         <div className="pill-row">
                           <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
                           <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
@@ -5584,7 +5591,7 @@ function AdminPortal({
                         <option value="">Select child</option>
                         {students.map((student) => (
                           <option key={student.student_id} value={student.student_id}>
-                            {student.name} · {student.groupName}
+                            {student.name} آ· {student.groupName}
                           </option>
                         ))}
                       </select>
@@ -5620,57 +5627,73 @@ function AdminPortal({
                 </form>
               </section>
 
-              <section className="data-card">
+              <section className="form-card card-appear">
                 <div className="card-headline">
                   <Clock size={18} />
-                  <h3>Recent Schedule Entries</h3>
+                  <h3>Auto Lock Settings</h3>
                 </div>
-                <div className="record-stack">
-                  {schedule.slice(0, 12).map((item, index) => {
-                    const student = students.find(
-                      (entry) => entry.allIds.includes(String(item.student_id))
-                    );
-
-                    return (
-                      <article key={`${item.student_id}-${item.task_time}-${index}`} className="record-card flex-row-card">
-                        <div className="card-primary-info">
-                          <strong>{item.task_name}</strong>
-                          <span>
-                            {student?.name || "Unknown child"} · {item.task_time || "--:--"}
-                          </span>
-                        </div>
-                        <button
-                          className="delete-icon-btn"
-                          onClick={() => onDeleteRecord("schedule", "id")(item.id)}
-                          aria-label="Delete schedule"
-                        >
-                          <Trash size={16} />
-                        </button>
-                      </article>
-                    );
-                  })}
-                  {schedule.length === 0 ? (
-                    <div className="empty-state">No schedule entries available yet.</div>
-                  ) : null}
-                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = {
+                    auto_lock_enabled: formData.get("auto_lock_enabled") === "true",
+                    auto_lock_day: formData.get("auto_lock_day"),
+                    auto_lock_time: formData.get("auto_lock_time"),
+                    auto_unlock_day: formData.get("auto_unlock_day"),
+                    auto_unlock_time: formData.get("auto_unlock_time"),
+                  };
+                  saveReportSettings(updates);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable Auto Lock</span>
+                      <select name="auto_lock_enabled" defaultValue={String(reportSettingsDraft.auto_lock_enabled ?? true)} className="premium-select">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Lock Day</span>
+                      <select name="auto_lock_day" defaultValue={reportSettingsDraft.auto_lock_day || "Saturday"} className="premium-select">
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Lock Time</span>
+                      <input name="auto_lock_time" type="time" defaultValue={reportSettingsDraft.auto_lock_time || "00:00"} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Unlock Day</span>
+                      <select name="auto_unlock_day" defaultValue={reportSettingsDraft.auto_unlock_day || "Friday"} className="premium-select">
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Unlock Time</span>
+                      <input name="auto_unlock_time" type="time" defaultValue={reportSettingsDraft.auto_unlock_time || "16:30"} className="premium-input" />
+                    </label>
+                  </div>
+                  <p className="hint-text" style={{ marginBottom: '20px' }}>
+                    Teachers can fill progress reports during the unlock window (e.g., {reportSettingsDraft.auto_unlock_day || "Friday"} {reportSettingsDraft.auto_unlock_time || "4:30 PM"} to {reportSettingsDraft.auto_lock_day || "Saturday"} {reportSettingsDraft.auto_lock_time || "12:00 AM"}). Outside this window, progress entry is locked.
+                  </p>
+                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
+                    Save Auto Lock Settings
+                  </button>
+                </form>
               </section>
-            </div>
-          ) : null}
 
-
-
-          {activePage === "User Issues" ? (
-            <SupportTicketsAdmin 
-              tickets={supportTickets} 
-              onRefresh={() => loadPortalData(portalRole, user)} 
-            />
-          ) : null}
-
-
-
-
-          {activePage === "Assignments" ? (
-            <div className="management-grid">
               <section className="data-card card-appear">
                 <div className="card-headline">
                   <Users size={18} />
@@ -5740,7 +5763,7 @@ function AdminPortal({
                       </label>
 
                       <label>
-                        <span>Arabic Name (اسم الطالب)</span>
+                        <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
                         <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                       </label>
 
@@ -6656,7 +6679,10 @@ function AdminPortal({
                      </p>
                    )}
                    <p style={{ fontSize: '0.85rem', marginTop: '10px', color: 'var(--soft-brown)' }}>
-                     Teacher progress entry is {reportSettingsObject?.allow_teacher_progress_entry === false ? 'DISABLED' : 'ENABLED'}
+                      Teacher progress entry is {reportSettingsObject?.allow_teacher_progress_entry === false ? 'DISABLED' : 'ENABLED'}
+                   </p>
+                   <p style={{ fontSize: '0.85rem', marginTop: '6px', color: 'var(--soft-brown)' }}>
+                      Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} â†’ ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
                    </p>
                 </div>
                 <div style={{ marginTop: '20px' }}>
@@ -6668,6 +6694,58 @@ function AdminPortal({
             </div>
           ) : null}
         </section>
+
+          {/* --- Teacher Unlock Card --- */}
+          <section className="global-settings-section" style={{ marginTop: "24px" }}>
+            <div className="premium-card card-appear">
+              <div className="card-headline">
+                <Unlock size={18} />
+                <h3>Teacher Progress Unlock</h3>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px", lineHeight: "1.6" }}>
+                If a teacher needs to submit progress reports outside the scheduled window, you can manually unlock them. This bypasses the auto-lock schedule for all their students.
+              </p>
+              <div className="teacher-unlock-list">
+                {teacherProfiles.length === 0 ? (
+                  <p style={{ color: "var(--text-muted)", fontStyle: "italic", padding: "12px 0" }}>
+                    No teacher profiles found. Add teachers first in Staff Profiles.
+                  </p>
+                ) : (
+                  teacherProfiles.map((teacher) => {
+                    const isUnlocking = teacherUnlockStatus === `unlocking-${teacher.id}`;
+                    const isDone = teacherUnlockStatus === `done-${teacher.id}`;
+                    const isError = teacherUnlockStatus === `error-${teacher.id}`;
+                    const teacherName = teacher.full_name || teacher.name || "Unknown Teacher";
+                    return (
+                      <div key={teacher.id} className={`teacher-unlock-row ${isDone ? "unlocked" : ""}`}>
+                        <div className="teacher-unlock-info">
+                          <span className="teacher-unlock-name">{teacherName}</span>
+                          <span className="teacher-unlock-sub">{teacher.email || ""}</span>
+                        </div>
+                        <button
+                          className={`unlock-toggle-btn ${isDone ? "active" : ""}`}
+                          onClick={() => onTeacherUnlock(teacher)}
+                          disabled={isUnlocking || !!isDone}
+                          title={isDone ? "Teacher unlocked âœ“" : isUnlocking ? "Unlocking..." : "Click to unlock teacher"}
+                        >
+                          {isUnlocking ? (
+                            <><RotateCw size={16} className="spin" /> Unlocking...</>
+                          ) : isDone ? (
+                            <><Unlock size={16} /> Unlocked âœ“</>
+                          ) : (
+                            <><Lock size={16} /> Unlock</>
+                          )}
+                        </button>
+                        {isError && (
+                          <span className="teacher-unlock-error">Failed to unlock</span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </section>
 
         {/* WhatsApp Sending Progress Modal */}
         {sendingWhatsApp && (
@@ -6775,7 +6853,14 @@ function TeacherPortal({
   onClearAllNotifs,
   onDismissAnnounce,
   onClearAllAnnounces,
-  onShowAction,
+    autoSaveTimerRef,
+  performAutoSaveRef,
+  currentStudentIdRef,
+  saveStatus,
+  setSaveStatus,
+  saveErrorDetails,
+  setSaveErrorDetails,
+onShowAction,
   isDarkMode,
   setIsDarkMode,
   appTheme,
@@ -6817,17 +6902,18 @@ function TeacherPortal({
     filteredStudents.find(
       (student) => student.allIds.includes(String(teacherForms.result.student_id))
     ) || filteredStudents[0] || null;
-  const selectedResultRecord = useMemo(() => (
-    schoolData.weeklyResults.find(
-      (result) =>
-        String(result.student_id) === String(teacherForms.result.student_id) &&
-        String(result.week_date) === String(teacherForms.result.week_date)
-    ) || null
-  ), [schoolData.weeklyResults, teacherForms.result.student_id, teacherForms.result.week_date]);
-  const selectedResultEditCount = getTeacherResultEditCount(selectedResultRecord || teacherForms.result);
-  const selectedResultRemainingEdits = getTeacherResultRemainingEdits(selectedResultRecord || teacherForms.result);
-  const selectedResultLocked = isTeacherResultLocked(selectedResultRecord || teacherForms.result);
-  const selectedResultIsExisting = Boolean(selectedResultRecord || teacherForms.result.id);
+
+  // Determine if student is in Juz 26-30 range (show Surah tracking)
+
+  const selectedResultRecord = useMemo(() => {
+    const results = (schoolData.weeklyResults || []).filter(
+      (result) => String(result.student_id) === String(teacherForms.result.student_id)
+    );
+    return results.length > 0
+      ? results.sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0))[0]
+      : null;
+  }, [schoolData.weeklyResults, teacherForms.result.student_id]);
+  const selectedResultLocked = isTeacherResultLocked(reportSettingsObject);
   const canEditCurrentResult = canTeacherFillProgress && !selectedResultLocked;
 
   const liveResult = useMemo(() => {
@@ -6841,6 +6927,103 @@ function TeacherPortal({
       total_score
     };
   }, [selectedStudent, teacherForms.result]);
+  const performAutoSaveTeacherResult = useCallback(async () => {
+    if (!canTeacherFillProgress) return;
+    if (isTeacherResultLocked(reportSettingsObject)) return;
+    if (String(teacherForms.result.student_id) !== String(currentStudentIdRef.current)) return;
+
+    const sId = teacherForms.result.student_id;
+    if (!sId) return;
+    const numericId = sId && !isNaN(sId) ? Number(sId) : sId;
+
+    const f = teacherForms.result;
+    const sMurajazah = toNumber(f.murajazah);
+    const sJuzHali = toNumber(f.juz_hali);
+    const sTakhteet = toNumber(f.takhteet);
+    const sJadeed = toNumber(f.jadeed);
+    const payload = {
+      week_date: f.week_date || getToday(),
+      student_id: numericId,
+      attendance_count: toNumber(f.attendance_count),
+      total_jadeed_pages: toNumber(f.total_jadeed_pages),
+      murajazah: sMurajazah,
+      juz_hali: sJuzHali,
+      takhteet: sTakhteet,
+      jadeed: sJadeed,
+      wusool_juz: f.wusool_juz || null,
+      wusool_page: f.wusool_page || null,
+      wusool_surah: f.wusool_surah || null,
+      next_week_juz: f.next_week_juz || null,
+      next_week_page: f.next_week_page || null,
+      next_week_surah: f.next_week_surah || null,
+      istifadah_juz: f.istifadah_juz || null,
+      istifadah_page: f.istifadah_page || null,
+      istifadah_surah: f.istifadah_surah || null,
+      matrookah: f.matrookah || null,
+      daeefah: f.daeefah || null,
+      attendance_note: f.attendance_note || null,
+    };
+
+    if (isTeacherResultLocked(reportSettingsObject)) return;
+
+    setSaveStatus("saving");
+
+    const { data, error } = await supabase
+      .from("weekly_results")
+      .upsert([payload], { onConflict: "student_id,week_date" })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Auto-save error:", error);
+      setSaveErrorDetails("[" + (error.code || "UNKNOWN") + "] " + (error.message || "Unknown error") + " " + (error.details || ""));
+      setSaveStatus("error");
+      setTimeout(() => { setSaveErrorDetails(""); }, 8000);
+      return;
+    }
+
+    setSaveStatus("saved");
+    setTimeout(() => setSaveStatus(""), 2000);
+
+    setSchoolData((current) => {
+      const nextWeeklyResults = [
+        data,
+        ...current.weeklyResults.filter((result) =>
+          !(
+            String(result.student_id) === String(data.student_id) &&
+            String(result.week_date) === String(data.week_date)
+          )
+        ),
+      ];
+      const refreshedStudents = current.students.map((student) =>
+        String(student.student_id) === String(data.student_id)
+          ? { ...student, latestResult: data }
+          : student
+      );
+      return {
+        ...current,
+        weeklyResults: nextWeeklyResults,
+        students: refreshedStudents,
+      };
+    });
+  }, [canTeacherFillProgress, reportSettingsObject, teacherForms.result, schoolData]);
+
+  performAutoSaveRef.current = performAutoSaveTeacherResult;
+
+  // Track current student for stale-guard in auto-save
+  if (teacherForms.result.student_id) {
+    currentStudentIdRef.current = teacherForms.result.student_id;
+  }
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, []);
+
 
   const parentViewedCount = useMemo(() => {
     const visibleStudentIds = new Set(
@@ -6995,11 +7178,11 @@ function TeacherPortal({
                     </div>
                     <div className="salary-item">
                       <span className="salary-label">{"Rate - Min"}</span>
-                      <span className="salary-value">₹{monthlySalary.rate}</span>
+                      <span className="salary-value">â‚¹{monthlySalary.rate}</span>
                     </div>
                     <div className="salary-item total-item">
                       <span className="salary-label">Total Amount</span>
-                      <span className="salary-value highlight">₹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
+                      <span className="salary-value highlight">â‚¹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
                     </div>
                   </div>
                   <p className="hint-text">Calculated based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
@@ -7106,14 +7289,17 @@ function TeacherPortal({
                     Admin has disabled teacher progress-card filling in Global Settings.
                   </div>
                 )}
-                {canTeacherFillProgress && selectedResultIsExisting && (
-                  <div className="status-banner info" style={{ marginBottom: "16px" }}>
-                    {selectedResultLocked
-                      ? "This report is locked after 3 saves."
-                      : `${selectedResultEditCount}/${TEACHER_PROGRESS_EDIT_LIMIT} saves used. ${selectedResultRemainingEdits} edit${selectedResultRemainingEdits === 1 ? "" : "s"} left before auto-lock.`}
+                {canTeacherFillProgress && selectedResultLocked && (
+                  <div className="status-banner warning" style={{ marginBottom: "16px" }}>
+                    Progress entry is currently locked. Next open window: {reportSettingsObject?.auto_unlock_day || "Friday"} {reportSettingsObject?.auto_unlock_time || "4:30 PM"}.
                   </div>
                 )}
-                <form className="stack-form" onSubmit={onTeacherResultSubmit}>
+                {canTeacherFillProgress && !selectedResultLocked && (
+                  <div className="status-banner success" style={{ marginBottom: "16px" }}>
+                    Progress entry is open until {reportSettingsObject?.auto_lock_day || "Saturday"} {reportSettingsObject?.auto_lock_time || "12:00 AM"}.
+                  </div>
+                )}
+                <div className="stack-form">
                   <div className="form-grid">
                     <label>
                       <span>Child</span>
@@ -7130,25 +7316,16 @@ function TeacherPortal({
                             String(r.student_id) === String(student.student_id) &&
                             String(r.week_date) === String(teacherForms.result.week_date)
                           );
-                          const existingLocked = isTeacherResultLocked(existingResult);
-                          const remainingEdits = getTeacherResultRemainingEdits(existingResult);
                           return (
                             <option key={student.student_id} value={student.student_id}>
-                              {student.name}{existingResult ? ` - ${existingLocked ? "Locked" : `${remainingEdits} edits left`}` : ""} - {student.groupName}
+                              {student.name}{existingResult ? " - âœ“ Saved" : ""} - {student.groupName}
                             </option>
                           );
                         })}
                       </select>
                     </label>
 
-                    <label>
-                      <span>Fatemi (Misri) Calendar Date</span>
-                      <FatemiDateSelector
-                        value={teacherForms.result.week_date}
-                        onChange={onTeacherFormChange}
-                        disabled={selectedResultLocked || !canTeacherFillProgress}
-                      />
-                    </label>
+                    
                   </div>
 
                   <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
@@ -7208,8 +7385,7 @@ function TeacherPortal({
                     <label>
                       <span>Total Jadeed Pages</span>
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
                         name="total_jadeed_pages"
                         value={teacherForms.result.total_jadeed_pages}
                         onChange={onTeacherFormChange}
@@ -7217,15 +7393,36 @@ function TeacherPortal({
                     </label>
                   </div>
 
-                  <div className="form-grid">
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                     <label>
                       <span>Wusool Juz</span>
-                      <input
-                        type="text"
+                      <select
+                        className="premium-select kanz-font"
                         name="wusool_juz"
                         value={teacherForms.result.wusool_juz}
                         onChange={onTeacherFormChange}
-                      />
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Juz --</option>
+                        {Array.from({ length: 30 }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Wusool Surah</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="wusool_surah"
+                        value={teacherForms.result.wusool_surah}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Surah --</option>
+                        {SURAH_NAMES_AR.map((name, i) => (
+                          <option key={i + 1} value={name}>{i + 1}. {name}</option>
+                        ))}
+                      </select>
                     </label>
                     <label>
                       <span>Wusool Page</span>
@@ -7234,13 +7431,14 @@ function TeacherPortal({
                         name="wusool_page"
                         value={teacherForms.result.wusool_page}
                         onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
                   </div>
 
                   <div className="form-grid">
                     <label>
-                      <span>Matrookah (متروكة)</span>
+                      <span>Matrookah (ظ…طھط±ظˆظƒط©)</span>
                       <input
                         type="text"
                         name="matrookah"
@@ -7250,7 +7448,7 @@ function TeacherPortal({
                       />
                     </label>
                     <label>
-                      <span>Daeefah (ضعيفة)</span>
+                      <span>Daeefah (ط¶ط¹ظٹظپط©)</span>
                       <input
                         type="text"
                         name="daeefah"
@@ -7261,17 +7459,37 @@ function TeacherPortal({
                     </label>
                   </div>
 
-                  <div className="form-grid">
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                     <label>
                       <span>Next Week Juz</span>
-                      <input
-                        type="text"
+                      <select
+                        className="premium-select kanz-font"
                         name="next_week_juz"
                         value={teacherForms.result.next_week_juz}
                         onChange={onTeacherFormChange}
-                      />
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Juz --</option>
+                        {Array.from({ length: 30 }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+                        ))}
+                      </select>
                     </label>
-
+                    <label>
+                      <span>Next Week Surah</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="next_week_surah"
+                        value={teacherForms.result.next_week_surah}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Surah --</option>
+                        {SURAH_NAMES_AR.map((name, i) => (
+                          <option key={i + 1} value={name}>{i + 1}. {name}</option>
+                        ))}
+                      </select>
+                    </label>
                     <label>
                       <span>Next Week Page</span>
                       <input
@@ -7279,21 +7497,42 @@ function TeacherPortal({
                         name="next_week_page"
                         value={teacherForms.result.next_week_page}
                         onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
                   </div>
 
-                  <div className="form-grid">
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                     <label>
                       <span>Istifadah Juz</span>
-                      <input
-                        type="text"
+                      <select
+                        className="premium-select kanz-font"
                         name="istifadah_juz"
                         value={teacherForms.result.istifadah_juz}
                         onChange={onTeacherFormChange}
-                      />
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Juz --</option>
+                        {Array.from({ length: 30 }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+                        ))}
+                      </select>
                     </label>
-
+                    <label>
+                      <span>Istifadah Surah</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="istifadah_surah"
+                        value={teacherForms.result.istifadah_surah}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Surah --</option>
+                        {SURAH_NAMES_AR.map((name, i) => (
+                          <option key={i + 1} value={name}>{i + 1}. {name}</option>
+                        ))}
+                      </select>
+                    </label>
                     <label>
                       <span>Istifadah Page</span>
                       <input
@@ -7301,6 +7540,7 @@ function TeacherPortal({
                         name="istifadah_page"
                         value={teacherForms.result.istifadah_page}
                         onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
                   </div>
@@ -7329,19 +7569,19 @@ function TeacherPortal({
                     />
                   </label>
 
-                  <button 
-                    type="submit" 
-                    className={`action-button ${selectedResultLocked || !canTeacherFillProgress ? 'locked' : ''}`}
-                    disabled={!canEditCurrentResult}
-                  >
-                    {selectedResultIsExisting
-                      ? (selectedResultLocked
-                          ? 'Report Locked'
-                          : `Save Changes (${selectedResultRemainingEdits} left)`)
-                      : 'Save Result'}
-                  </button>
                   </fieldset>
-                </form>
+                  <div className="auto-save-status">
+                    {saveStatus === "validation" && <span className="save-status-validation">Fill all 4 score fields first</span>}
+                    {saveStatus === "saving" && <span className="save-status-saving">Saving...</span>}
+                    {saveStatus === "saved" && <span className="save-status-saved">Saved</span>}
+                    {saveStatus === "error" && (
+                      <div className="save-status-error">
+                        <span>Save failed</span>
+                        {saveErrorDetails && <small style={{ display: "block", fontSize: "10px", marginTop: "4px", opacity: 0.8 }}>{saveErrorDetails}</small>}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </section>
 
               <section className="data-card">
@@ -7356,7 +7596,7 @@ function TeacherPortal({
                       <div>
                         <h3>{selectedStudent.name}</h3>
                         <p>
-                          {selectedStudent.groupName} · {selectedStudent.teacherName}
+                          {selectedStudent.groupName} آ· {selectedStudent.teacherName}
                         </p>
                       </div>
                     </div>
@@ -7624,11 +7864,45 @@ function TeacherPortal({
   );
 }
 
+
+// --- Quran Surah Names (Arabic) ---
+const SURAH_NAMES_AR = [
+  "ط§ظ„ظپط§طھط­ط©","ط§ظ„ط¨ظ‚ط±ط©","ط¢ظ„ ط¹ظ…ط±ط§ظ†","ط§ظ„ظ†ط³ط§ط،","ط§ظ„ظ…ط§ط¦ط¯ط©",
+  "ط§ظ„ط£ظ†ط¹ط§ظ…","ط§ظ„ط£ط¹ط±ط§ظپ","ط§ظ„ط£ظ†ظپط§ظ„","ط§ظ„طھظˆط¨ط©","ظٹظˆظ†ط³",
+  "ظ‡ظˆط¯","ظٹظˆط³ظپ","ط§ظ„ط±ط¹ط¯","ط¥ط¨ط±ط§ظ‡ظٹظ…","ط§ظ„ط­ط¬ط±",
+  "ط§ظ„ظ†ط­ظ„","ط§ظ„ط¥ط³ط±ط§ط،","ط§ظ„ظƒظ‡ظپ","ظ…ط±ظٹظ…","ط·ظ‡",
+  "ط§ظ„ط£ظ†ط¨ظٹط§ط،","ط§ظ„ط­ط¬","ط§ظ„ظ…ط¤ظ…ظ†ظˆظ†","ط§ظ„ظ†ظˆط±","ط§ظ„ظپط±ظ‚ط§ظ†",
+  "ط§ظ„ط´ط¹ط±ط§ط،","ط§ظ„ظ†ظ…ظ„","ط§ظ„ظ‚طµطµ","ط§ظ„ط¹ظ†ظƒط¨ظˆطھ","ط§ظ„ط±ظˆظ…",
+  "ظ„ظ‚ظ…ط§ظ†","ط§ظ„ط³ط¬ط¯ط©","ط§ظ„ط£ط­ط²ط§ط¨","ط³ط¨ط£","ظپط§ط·ط±",
+  "ظٹط³","ط§ظ„طµط§ظپط§طھ","طµ","ط§ظ„ط²ظ…ط±","ط؛ط§ظپط±",
+  "ظپطµظ„طھ","ط§ظ„ط´ظˆط±ظ‰","ط§ظ„ط²ط®ط±ظپ","ط§ظ„ط¯ط®ط§ظ†","ط§ظ„ط¬ط§ط«ظٹط©",
+  "ط§ظ„ط£ط­ظ‚ط§ظپ","ظ…ط­ظ…ط¯","ط§ظ„ظپطھط­","ط§ظ„ط­ط¬ط±ط§طھ","ظ‚",
+  "ط§ظ„ط°ط§ط±ظٹط§طھ","ط§ظ„ط·ظˆط±","ط§ظ„ظ†ط¬ظ…","ط§ظ„ظ‚ظ…ط±","ط§ظ„ط±ط­ظ…ظ†",
+  "ط§ظ„ظˆط§ظ‚ط¹ط©","ط§ظ„ط­ط¯ظٹط¯","ط§ظ„ظ…ط¬ط§ط¯ظ„ط©","ط§ظ„ط­ط´ط±","ط§ظ„ظ…ظ…طھط­ظ†ط©",
+  "ط§ظ„طµظپ","ط§ظ„ط¬ظ…ط¹ط©","ط§ظ„ظ…ظ†ط§ظپظ‚ظˆظ†","ط§ظ„طھط؛ط§ط¨ظ†","ط§ظ„ط·ظ„ط§ظ‚",
+  "ط§ظ„طھط­ط±ظٹظ…","ط§ظ„ظ…ظ„ظƒ","ط§ظ„ظ‚ظ„ظ…","ط§ظ„ط­ط§ظ‚ط©","ط§ظ„ظ…ط¹ط§ط±ط¬",
+  "ظ†ظˆط­","ط§ظ„ط¬ظ†","ط§ظ„ظ…ط²ظ…ظ„","ط§ظ„ظ…ط¯ط«ط±","ط§ظ„ظ‚ظٹط§ظ…ط©",
+  "ط§ظ„ط¥ظ†ط³ط§ظ†","ط§ظ„ظ…ط±ط³ظ„ط§طھ","ط§ظ„ظ†ط¨ط£","ط§ظ„ظ†ط§ط²ط¹ط§طھ","ط¹ط¨ط³",
+  "ط§ظ„طھظƒظˆظٹط±","ط§ظ„ط§ظ†ظپط·ط§ط±","ط§ظ„ظ…ط·ظپظپظٹظ†","ط§ظ„ط§ظ†ط´ظ‚ط§ظ‚","ط§ظ„ط¨ط±ظˆط¬",
+  "ط§ظ„ط·ط§ط±ظ‚","ط§ظ„ط£ط¹ظ„ظ‰","ط§ظ„ط؛ط§ط´ظٹط©","ط§ظ„ظپط¬ط±","ط§ظ„ط¨ظ„ط¯",
+  "ط§ظ„ط´ظ…ط³","ط§ظ„ظ„ظٹظ„","ط§ظ„ط¶ط­ظ‰","ط§ظ„ط´ط±ط­","ط§ظ„طھظٹظ†",
+  "ط§ظ„ط¹ظ„ظ‚","ط§ظ„ظ‚ط¯ط±","ط§ظ„ط¨ظٹظ†ط©","ط§ظ„ط²ظ„ط²ظ„ط©","ط§ظ„ط¹ط§ط¯ظٹط§طھ",
+  "ط§ظ„ظ‚ط§ط±ط¹ط©","ط§ظ„طھظƒط§ط«ط±","ط§ظ„ط¹طµط±","ط§ظ„ظ‡ظ…ط²ط©","ط§ظ„ظپظٹظ„",
+  "ظ‚ط±ظٹط´","ط§ظ„ظ…ط§ط¹ظˆظ†","ط§ظ„ظƒظˆط«ط±","ط§ظ„ظƒط§ظپط±ظˆظ†","ط§ظ„ظ†طµط±",
+  "ط§ظ„ظ…ط³ط¯","ط§ظ„ط¥ط®ظ„ط§طµ","ط§ظ„ظپظ„ظ‚","ط§ظ„ظ†ط§ط³"
+];
+
+// --- Juz/Surat Selector Component ---
 export default function App() {
   const [notificationPermission, setNotificationPermission] = useState(
     "Notification" in window ? Notification.permission : "denied"
   );
   const fcmInitKeyRef = useRef(null);
+  const autoSaveTimerRef = useRef(null);
+  const performAutoSaveRef = useRef(null);
+  const currentStudentIdRef = useRef(null);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [saveErrorDetails, setSaveErrorDetails] = useState("");
   const [user, setUser] = useState(null);
   const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
   const [portalRole, setPortalRole] = useState(() => {
@@ -7676,6 +7950,7 @@ export default function App() {
   const [adminTeacherFilter, setAdminTeacherFilter] = useState("All");
   const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [reportSettings, setReportSettings] = useState([]);
+  const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
   const [whatsappConfig, setWhatsappConfig] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [parentViews, setParentViews] = useState([]);
@@ -7808,6 +8083,40 @@ export default function App() {
   const [teacherForms, setTeacherForms] = useState({
     result: createTeacherResultDraft(),
   });
+  // Auto-select first student for teacher portal on mount
+  const hasAutoSelectedTeacherRef = useRef(false);
+  
+  useEffect(() => {
+    if (portalRole !== "teacher") return;
+    if (!schoolData.students?.length) return;
+    if (hasAutoSelectedTeacherRef.current) return;
+    
+    hasAutoSelectedTeacherRef.current = true;
+    
+    const firstStudent = schoolData.students[0];
+    const studentId = firstStudent.student_id;
+    const numericId = studentId && !isNaN(studentId) ? Number(studentId) : studentId;
+    
+    if (!numericId) return;
+    
+    const studentResults = (schoolData.weeklyResults || [])
+      .filter(r => String(r.student_id) === String(numericId))
+      .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
+    
+    if (studentResults.length > 0) {
+      setTeacherForms(curr => ({
+        ...curr,
+        result: { ...curr.result, ...studentResults[0], student_id: numericId }
+      }));
+    } else {
+      setTeacherForms(curr => ({
+        ...curr,
+        result: createTeacherResultDraft({ student_id: numericId })
+      }));
+    }
+  }, [portalRole, schoolData.students, schoolData.weeklyResults]);
+  
+
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -8614,30 +8923,85 @@ export default function App() {
       },
     }));
 
-    if (name === "student_id" || name === "week_date") {
-      const studentId = name === "student_id" ? value : teacherForms.result.student_id;
-      const weekDate = name === "week_date" ? value : teacherForms.result.week_date;
-      const numericId = studentId && !isNaN(studentId) ? Number(studentId) : studentId;
+    if (name === "student_id") {
+      const numericId = value && !isNaN(value) ? Number(value) : value;
+      if (numericId) {
+        const today = getToday();
+        const studentResults = (schoolData.weeklyResults || [])
+          .filter(r => String(r.student_id) === String(numericId))
+          .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
 
-      if (numericId && weekDate) {
-        const existing = schoolData.weeklyResults.find(r =>
-          String(r.student_id) === String(numericId) && r.week_date === weekDate
-        );
-
-        if (existing) {
+        // Check if there's already a result for today
+        const todayResult = studentResults.find(r => r.week_date === today);
+        
+        if (todayResult) {
+          // Load today's existing result
           setTeacherForms(curr => ({
             ...curr,
-            result: { ...curr.result, ...existing, student_id: numericId, week_date: weekDate }
+            result: { ...curr.result, ...todayResult, student_id: numericId }
+          }));
+        } else if (studentResults.length > 0) {
+          // Load latest result as template but use today's week_date (new record)
+          setTeacherForms(curr => ({
+            ...curr,
+            result: {
+              ...curr.result,
+              ...studentResults[0],
+              student_id: numericId,
+              week_date: today,
+              teacher_edit_count: 0,
+              teacher_locked: false,
+              teacher_locked_at: null,
+            }
           }));
         } else {
+          // No results at all - fresh draft for today
           setTeacherForms(curr => ({
             ...curr,
             result: createTeacherResultDraft({
               student_id: numericId,
-              week_date: weekDate,
             }),
           }));
         }
+        // Clear any stale save status when switching students
+        setSaveStatus("");
+        setSaveErrorDetails("");
+      }
+    }
+    if (name === "student_id") {
+      currentStudentIdRef.current = value;
+      // Clear any pending auto-save when switching students
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      setSaveStatus("");
+
+      // Reset surah fields when switching to a low-Juz student (prevents stale data)
+      const newStudent = schoolData.students.find(
+        (s) => String(s.student_id) === String(value)
+      );
+      if (newStudent) {
+        const newJuz = Number(newStudent.hifz?.juz) || 0;
+        if (newJuz > 0 && newJuz < 26) {
+          // Clear surah fields since SurahDropdown is hidden for Juz 1-25
+          setTeacherForms((curr) => ({
+            ...curr,
+            result: {
+              ...curr.result,
+              wusool_surah: "",
+              next_week_surah: "",
+              istifadah_surah: "",
+            },
+          }));
+        }
+      }
+    } else if (name !== "student_id" && teacherForms.result.student_id) {
+      if (typeof performAutoSaveRef?.current === "function") {
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = setTimeout(() => {
+          performAutoSaveRef.current();
+        }, 1500);
       }
     }
   };
@@ -8980,6 +9344,62 @@ export default function App() {
     setWhatsappConfig((current) => ({ ...(current || {}), ...updates, id: 1 }));
     showAction("success", "WhatsApp settings saved successfully.");
   };
+  const handleTeacherUnlock = async (teacher) => {
+    if (!teacher || !teacher.id) {
+      showAction("error", "Invalid teacher selected.");
+      return;
+    }
+    if (!window.confirm(`Unlock progress entry for "${teacher.full_name || teacher.name}"? This will bypass the auto-lock schedule, allowing them to submit reports now.`)) return;
+
+    setTeacherUnlockStatus(`unlocking-${teacher.id}`);
+
+    try {
+      // Find all child profiles belonging to this teacher
+      const { data: childStudents, error: childError } = await supabase
+        .from("child_profiles")
+        .select("student_id")
+        .eq("teacher_id", teacher.user_id);
+
+      if (childError) throw childError;
+
+      const studentIds = (childStudents || []).map(s => s.student_id).filter(Boolean);
+
+      if (studentIds.length === 0) {
+        setTeacherUnlockStatus(`error-${teacher.id}`);
+        showAction("error", `No students found for this teacher.`);
+        setTimeout(() => setTeacherUnlockStatus(""), 3000);
+        return;
+      }
+
+      // Log the unlock action
+      const { error: logError } = await supabase
+        .from("teacher_unlock_logs")
+        .insert([{
+          teacher_id: teacher.id,
+          teacher_name: teacher.full_name || teacher.name || "Unknown",
+          teacher_user_id: teacher.user_id || null,
+          students_affected: studentIds.length,
+          results_affected: studentIds.length,
+          unlocked_by: user?.id || null,
+          unlocked_at: new Date().toISOString(),
+        }]);
+
+      if (logError) console.error("Unlock logging error:", logError);
+
+      // Refresh data
+      await loadPortalData(portalRole, user, null);
+
+      setTeacherUnlockStatus(`done-${teacher.id}`);
+      showAction("success", `Unlocked progress entry for ${teacher.full_name || teacher.name}. They can now submit reports.`);
+
+      setTimeout(() => setTeacherUnlockStatus(""), 3000);
+    } catch (err) {
+      console.error("Teacher unlock error:", err);
+      setTeacherUnlockStatus(`error-${teacher.id}`);
+      showAction("error", `Unlock failed: ${err.message}`);
+      setTimeout(() => setTeacherUnlockStatus(""), 4000);
+    }
+  };
 
   const handleDeleteRecord = (table, idField = "id") => async (id) => {
     if (!window.confirm("Are you sure you want to delete this record?")) return;
@@ -9089,28 +9509,14 @@ export default function App() {
       jadeed: toNumber(teacherForms.result.jadeed),
     };
 
-    const existingResult = schoolData.weeklyResults.find(
-      (result) =>
-        String(result.student_id) === String(numericId) &&
-        String(result.week_date) === String(teacherForms.result.week_date)
-    );
-    const currentEditCount = getTeacherResultEditCount(existingResult || teacherForms.result);
-    const nextEditCount = Math.min(TEACHER_PROGRESS_EDIT_LIMIT, currentEditCount + 1);
-    const willLock = nextEditCount >= TEACHER_PROGRESS_EDIT_LIMIT;
-
-    if (isTeacherResultLocked(existingResult || teacherForms.result)) {
-      showAction("error", "This report is locked and cannot be edited anymore.");
+    if (isTeacherResultLocked(reportSettingsObject)) {
+      showAction("error", "Progress entry is currently locked. Please wait until the next open window.");
       return;
     }
 
     const { data, error } = await supabase
       .from("weekly_results")
-      .upsert([{
-        ...payload,
-        teacher_edit_count: nextEditCount,
-        teacher_locked: willLock,
-        teacher_locked_at: willLock ? new Date().toISOString() : existingResult?.teacher_locked_at || null,
-      }], { onConflict: "student_id,week_date" })
+      .upsert([payload], { onConflict: "student_id,week_date" })
       .select()
       .single();
 
@@ -9149,15 +9555,10 @@ export default function App() {
         ...data,
       },
     }));
-    showAction(
-      "success",
-      willLock
-        ? `Tahfeez report saved and locked after ${TEACHER_PROGRESS_EDIT_LIMIT} saves.`
-        : `Tahfeez report saved successfully. ${TEACHER_PROGRESS_EDIT_LIMIT - nextEditCount} edit${TEACHER_PROGRESS_EDIT_LIMIT - nextEditCount === 1 ? "" : "s"} left.`
-    );
+    showAction("success", "Progress report saved successfully.");
     const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
 
-    if (currentEditCount === 0) {
+    if (targetStudent) {
       broadcastNotification(
         "Tahfeez Report Submitted",
         `A new progress report has been saved for ${targetStudent?.name || "the student"}.`,
@@ -9254,6 +9655,8 @@ export default function App() {
             uploadingFile={uploadingFile}
             onNotificationFileChange={handleNotificationFileChange}
             onShowAction={showAction}
+            teacherUnlockStatus={teacherUnlockStatus}
+            setTeacherUnlockStatus={setTeacherUnlockStatus}
             onUnassignChild={handleUnassignChild}
             onUpdateTeacherProfile={handleUpdateTeacherProfile}
             portalAccess={portalAccess}
@@ -9277,6 +9680,7 @@ export default function App() {
             onClearAllAnnounces={clearAllAnnouncements}
             portalAccessSuccess={portalAccessSuccess}
             onClosePortalAccessSuccess={() => setPortalAccessSuccess(null)}
+            onTeacherUnlock={handleTeacherUnlock}
           />
         ) : (
           <TeacherPortal
@@ -9316,10 +9720,19 @@ export default function App() {
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
             onShowAction={showAction}
+            teacherUnlockStatus={teacherUnlockStatus}
+            setTeacherUnlockStatus={setTeacherUnlockStatus}
             isDarkMode={isDarkMode}
             setIsDarkMode={setIsDarkMode}
             appTheme={appTheme}
-            setAppTheme={setAppTheme}
+                        autoSaveTimerRef={autoSaveTimerRef}
+            performAutoSaveRef={performAutoSaveRef}
+            currentStudentIdRef={currentStudentIdRef}
+            saveStatus={saveStatus}
+            setSaveStatus={setSaveStatus}
+            saveErrorDetails={saveErrorDetails}
+            setSaveErrorDetails={setSaveErrorDetails}
+setAppTheme={setAppTheme}
           />
         )}
 
