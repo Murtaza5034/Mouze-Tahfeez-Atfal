@@ -674,7 +674,7 @@ function SidebarHeader({ photoUrl, name, arabicName, tag }) {
           {name}
         </h2>
         {arabicName && (
-          <h3 className="profile-arabic-premium arabic-kanz" style={{ fontFamily: "'Kanz al Marjaan', serif" }}>
+          <h3 className="profile-arabic-premium arabic-kanz">
             {fixArabicScript(arabicName)}
           </h3>
         )}
@@ -2337,7 +2337,7 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
         <BookOpen size={80} className="jadeed-icon-bg" />
         <span className="jadeed-count-overlay"><span className="kanz-font">{toArabicDigits(count || 0)}</span></span>
       </div>
-      <h4 className="attendance-rating-text" dir="rtl" style={{ fontSize: '1.6rem', fontFamily: "'Kanz al Marjaan', serif", marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
+      <h4 className="attendance-rating-text" dir="rtl" style={{ fontSize: '1.6rem', marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
         {heading}
       </h4>
       <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
@@ -2348,34 +2348,6 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
 }
 
 function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false }) {
-  const arabicStyle = { fontFamily: "'Kanz al Marjaan', serif" };
-  const fatemi = getFatemiInfo(weeklyResult?.week_date);
-  const report = normalizeReportSettings(settings);
-
-  const hMain = report.main_heading;
-  const hSub = report.sub_heading;
-  const hWusool = report.wusool_heading;
-  const hNext = report.next_week_heading;
-  const hIstifadah = report.istifadah_heading;
-  const progressCardBackground = report.progress_card_background_url || "";
-  const progressCardOverlayOpacity = Math.min(
-    Math.max(Number(report.progress_card_overlay_opacity ?? 0.82), 0),
-    1
-  );
-  // Determine if child is in Juz 26-30 range (show Surah tracking)
-
-  const progressCardStyle = progressCardBackground
-    ? {
-        position: 'relative',
-        overflow: 'hidden',
-        backgroundColor: '#fffaf0',
-        backgroundImage: `linear-gradient(rgba(255, 250, 240, ${progressCardOverlayOpacity}), rgba(255, 250, 240, ${progressCardOverlayOpacity})), url(${progressCardBackground})`,
-        backgroundSize: 'cover',
-        backgroundPosition: report.progress_card_background_position || 'center',
-        backgroundRepeat: 'no-repeat',
-      }
-    : { position: 'relative' };
-
   return (
     <div className="progress-overview">
       <div className="result-card-premium card-appear" style={progressCardStyle}>
@@ -2446,7 +2418,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             </div>
             <div className="meta-col">
               <span className="meta-label kids-font">Month:</span>
-              <span className="meta-val arabic-kanz" style={arabicStyle}>{fatemi.monthName}</span>
+              <span className="meta-val arabic-kanz">{fatemi.monthName}</span>
             </div>
           </div>
         </div>
@@ -2454,7 +2426,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         <div className="result-main">
           <div className="total-score-block">
             <span className="score-title kids-font">{report.weekly_score_heading}</span>
-            <span className="jumla-label arabic-kanz" style={arabicStyle}>{report.jumla_heading}</span>
+            <span className="jumla-label arabic-kanz">{report.jumla_heading}</span>
             <div className="score-circle">
               <span className="kanz-font">{toArabicDigits((weeklyResult?.total_score ?? 
                 (toNumber(weeklyResult?.murajazah) + 
@@ -2473,7 +2445,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               { label: report.jadeed_heading, val: weeklyResult?.jadeed, max: 20 }
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
-                <span className="arabic-label arabic-kanz" style={arabicStyle}>{item.label} :</span>
+                <span className="arabic-label arabic-kanz">{item.label} :</span>
                 <span className="score-val" dir="ltr"><span className="kanz-font">{toArabicDigits(item.val || "0")}</span> / <span className="kanz-font">{toArabicDigits(item.max)}</span></span>
               </div>
             ))}
@@ -2489,32 +2461,32 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
         <div className="result-footer-grid">
           <div className="target-box highlight-wusool">
-            <h5 className="arabic-kanz" dir="rtl" style={{ ...arabicStyle, fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
+            <h5 className="arabic-kanz" dir="rtl" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
+            <p dir="rtl"><span className="arabic-kanz">{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
           </div>
           <div className="target-box highlight-matrookah">
             <div className="note-item-row">
               <span className="note-val">{toArabicDigits(weeklyResult?.matrookah || "-")}</span>
-              <span className="note-label arabic-kanz" style={arabicStyle}>{report.matrookah_heading} :</span>
+              <span className="note-label arabic-kanz">{report.matrookah_heading} :</span>
             </div>
             <div className="note-item-row">
               <span className="note-val">{toArabicDigits(weeklyResult?.daeefah || "-")}</span>
-              <span className="note-label arabic-kanz" style={arabicStyle}>{report.daeefah_heading} :</span>
+              <span className="note-label arabic-kanz">{report.daeefah_heading} :</span>
             </div>
           </div>
           <div className="target-box">
             <h5 className="kids-font">{hNext}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
             <h5 className="kids-font">{hIstifadah}</h5>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
-            <p dir="rtl"><span className="arabic-kanz" style={arabicStyle}>{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
           </div>
         </div>
 
@@ -3763,7 +3735,7 @@ function ParentPortal({
                   {currentPage.childInfo.name}
                 </h3>
                 {studentProfile?.arabic_name && (
-                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', fontFamily: "'Kanz al Marjaan', serif", marginTop: '4px' }}>
+                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', marginTop: '4px' }}>
                     {fixArabicScript(studentProfile.arabic_name)}
                   </div>
                 )}

@@ -99,6 +99,15 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf') format('truetype'),
+       url('/Al_Kanz_Fonts_For_Windows/Kanz-al-Marjaan.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -223,6 +232,10 @@ h1, h2, h3, h4, h5 {
   font-family: 'Kanz al Marjaan', serif;
   direction: rtl;
   color: var(--dark-gold);
+}
+
+.arabic-text {
+  font-family: 'Kanz al Marjaan', serif;
 }
 
 /* --- Premium Card System --- */
@@ -2241,7 +2254,7 @@ h1, h2, h3, h4, h5 {
   fill: none;
   stroke: #eee;
   stroke-width: 2;
-  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', serif;
 }
 
 .attendance-fill-text {
@@ -5279,19 +5292,19 @@ body {
 
 .juz-surat-selector .premium-select {
   width: 100%;
-  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Traditional Arabic', serif;
   font-size: 1rem;
   letter-spacing: normal;
 }
 
 .juz-surat-selector .premium-select option {
-  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Traditional Arabic', serif;
   font-size: 0.95rem;
   padding: 8px 12px;
 }
 
 .juz-surat-selector .premium-select optgroup {
-  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Traditional Arabic', serif;
 }
 
 n/* --- Full Width Label Helper --- */
@@ -5301,11 +5314,16 @@ n/* --- Full Width Label Helper --- */
 
 /* --- Kanz al Marjaan Font Helper (no RTL direction) --- */
 .kanz-font {
-  font-family: 'Kanz al Marjaan', 'Inter', sans-serif;
-  letter-spacing: 0.02em;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  letter-spacing: normal;
+}
+
+.arabic-text {
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 
+.premium-select option.arabic-text,
 .juz-surat-selector .premium-select .arabic-kanz-option {
   font-family: 'Kanz al Marjaan', serif;
   font-size: 1.1rem;

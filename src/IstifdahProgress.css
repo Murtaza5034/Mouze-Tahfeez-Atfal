@@ -345,7 +345,7 @@
 
 /* ===== Kanz al Marjan Font Helper with proper Arabic fallbacks ===== */
 .kanz-font {
-  font-family: 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   letter-spacing: normal;
 }
 
