@@ -2348,6 +2348,30 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
 }
 
 function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false }) {
+  const report = normalizeReportSettings(settings);
+  const fatemi = getFatemiInfo(weeklyResult?.week_date);
+  const hMain = report.main_heading;
+  const hSub = report.sub_heading;
+  const hWusool = report.wusool_heading;
+  const hNext = report.next_week_heading;
+  const hIstifadah = report.istifadah_heading;
+  const progressCardBackground = report.progress_card_background_url || "";
+  const progressCardOverlayOpacity = Math.min(
+    Math.max(Number(report.progress_card_overlay_opacity ?? 0.82), 0),
+    1
+  );
+  const progressCardStyle = progressCardBackground
+    ? {
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundColor: '#fffaf0',
+        backgroundImage: `linear-gradient(rgba(255, 250, 240, ${progressCardOverlayOpacity}), rgba(255, 250, 240, ${progressCardOverlayOpacity})), url(${progressCardBackground})`,
+        backgroundSize: 'cover',
+        backgroundPosition: report.progress_card_background_position || 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    : { position: 'relative' };
+
   return (
     <div className="progress-overview">
       <div className="result-card-premium card-appear" style={progressCardStyle}>
