@@ -1,4 +1,4 @@
-﻿import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -526,11 +526,11 @@ const fixArabicScript = (text) => {
   // Normalize Gaf (Persian/Urdu script)
   // Some systems render Gaf as double kaaf or k-k-a
   return text
-    .replace(/ظƒظƒ/g, "ع¯")      // Double Kaaf -> Gaf
-    .replace(/ظ…ط±ظƒظƒط§/g, "ظ…ط±ع¯ط§") // Murga (K-K-A) -> Murga (G-A)
-    .replace(/ط¨ظ‡ط§ط¦ظٹ/g, "ط¨ع¾ط§ط¦غŒ") // Bhai phonetic
-    .replace(/ط³ظٹ/g, "ط³غŒ")      // Common character fixing
-    .replace(/ظپظٹ/g, "ظپغŒ");     // Common character fixing
+    .replace(/كك/g, "گ")      // Double Kaaf -> Gaf
+    .replace(/مرككا/g, "مرگا") // Murga (K-K-A) -> Murga (G-A)
+    .replace(/بهائي/g, "بھائی") // Bhai phonetic
+    .replace(/سي/g, "سی")      // Common character fixing
+    .replace(/في/g, "فی");     // Common character fixing
 };
 
 const NotificationStatus = ({ role }) => {
@@ -1667,12 +1667,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 {surahInfo && (
                   <div className="mushaf-header">
                     <div className="s-name arabic-kanz">{surahInfo.name_arabic}</div>
-                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">ط¨ظگط³ظ’ظ…ظگ ظ±ظ„ظ„ظ‘ظژظ‡ظگ ظ±ظ„ط±ظ‘ظژط­ظ’ظ…ظژظ°ظ†ظگ ظ±ظ„ط±ظ‘ظژط­ظگظٹظ…ظگ</div>}
+                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>}
                   </div>
                 )}
 
                 <div className="q-label-badge" style={{ marginBottom: '15px' }}>
-                  {testMode === "self" ? "âœ¨ Sheikh Hussary Guidance (Auto-Playing...)" : "ًں“– Teacher Prompt (Start Reciting):"}
+                  {testMode === "self" ? "✨ Sheikh Hussary Guidance (Auto-Playing...)" : "📖 Teacher Prompt (Start Reciting):"}
                 </div>
 
                 <div className="mushaf-inner quran-uthmani" style={{ minHeight: '150px' }}>
@@ -1714,7 +1714,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
                 {recording && (
                   <div className="live-mistake-panel fade-in">
-                    <p className="live-label">ًں”´ MARK MISTAKES LIVE:</p>
+                    <p className="live-label">🔴 MARK MISTAKES LIVE:</p>
                     <div className="mistake-btns-grid">
                       <button className="mistake-btn word" onClick={() => logWordMistake({ id: Date.now(), text_uthmani: 'Word' }, "Word")}>
                         Word Mistake
@@ -1789,7 +1789,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                         ))}
                       </div>
                     ) : (
-                      <p className="perfect-score">Excellent! Perfect Recitation â­گ</p>
+                      <p className="perfect-score">Excellent! Perfect Recitation ⭐</p>
                     )}
                   </div>
                 </div>
@@ -1884,13 +1884,13 @@ function toNumber(value) {
 
 const toArabicDigits = (str) => {
   if (str == null) return str;
-  return String(str).replace(/\d/g, d => 'ظ ظ،ظ¢ظ£ظ¤ظ¥ظ¦ظ§ظ¨ظ©'[parseInt(d, 10)]);
+  return String(str).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d, 10)]);
 };
 
 const ARABIC_MONTHS = [
-  "ظ…ط­ط±ظ… ط§ظ„ط­ط±ط§ظ…", "طµظپط± ط§ظ„ظ…ط¸ظپط±", "ط±ط¨ظٹط¹ ط§ظ„ط£ظˆظ„", "ط±ط¨ظٹط¹ ط§ظ„ط¢ط®ط±",
-  "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط£ظˆظ„ظ‰", "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط¢ط®ط±ط©", "ط±ط¬ط¨ ط§ظ„ط£طµط¨", "ط´ط¹ط¨ط§ظ† ط§ظ„ظƒط±ظٹظ…",
-  "ط±ظ…ط¶ط§ظ† ط§ظ„ظ…ط¹ط¸ظ…", "ط´ظˆط§ظ„ ط§ظ„ظ…ظƒط±ظ…", "ط°ظٹ ط§ظ„ظ‚ط¹ط¯ط© ط§ظ„ط­ط±ط§ظ…", "ط°ظٹ ط§ظ„ط­ط¬ط© ط§ظ„ط­ط±ط§ظ…"
+  "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
+  "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
+  "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
 ];
 
 function getFatemiInfo(dateStr) {
@@ -2337,7 +2337,7 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
         <BookOpen size={80} className="jadeed-icon-bg" />
         <span className="jadeed-count-overlay"><span className="kanz-font">{toArabicDigits(count || 0)}</span></span>
       </div>
-      <h4 className="attendance-rating-text" dir="rtl" style={{ fontSize: '1.6rem', marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
+      <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontFamily: "'Kanz al Marjaan', serif", fontSize: '1.6rem', marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
         {heading}
       </h4>
       <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
@@ -2492,11 +2492,11 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           </div>
           <div className="target-box highlight-matrookah">
             <div className="note-item-row">
-              <span className="note-val">{toArabicDigits(weeklyResult?.matrookah || "-")}</span>
+              <span className="note-val kanz-font">{toArabicDigits(weeklyResult?.matrookah || "-")}</span>
               <span className="note-label arabic-kanz">{report.matrookah_heading} :</span>
             </div>
             <div className="note-item-row">
-              <span className="note-val">{toArabicDigits(weeklyResult?.daeefah || "-")}</span>
+              <span className="note-val kanz-font">{toArabicDigits(weeklyResult?.daeefah || "-")}</span>
               <span className="note-label arabic-kanz">{report.daeefah_heading} :</span>
             </div>
           </div>
@@ -3073,7 +3073,7 @@ function ChildLeaveApply({ studentProfile, showAction }) {
                 style={{ width: '100%' }}
                 required
               />
-              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>âœ“ Document attached successfully</p>}
+              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>✓ Document attached successfully</p>}
             </div>
           )}
 
@@ -3444,7 +3444,7 @@ function ParentPortal({
       highlights: [
         `Attendance: ${attendance?.status || "Present"}`,
         `Lesson: ${studentProfile?.latestResult?.surat || studentProfile?.surat || hifzDetails?.surat || "Update pending"}`,
-        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} آ· Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
+        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} · Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
       ],
       announcements:
         announcements.length > 0
@@ -4456,7 +4456,7 @@ function PortalAccessSuccessModal({ payload, onClose }) {
           onClick={onClose}
           aria-label="Close success popup"
         >
-          أ—
+          ×
         </button>
 
         <div className="portal-access-success-badge">
@@ -4646,13 +4646,13 @@ function AdminPortal({
         sentCount++;
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! âœ…`, type: 'success' }
+          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' }
         ]);
       } catch (err) {
         console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} â‌Œ`, type: 'error' }
+          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} ❌`, type: 'error' }
         ]);
       }
       
@@ -5150,7 +5150,7 @@ function AdminPortal({
                       <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
                     </label>
                     <label>
-                      <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
+                      <span>Arabic Name (اسم الطالب)</span>
                       <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                     </label>
                   </div>
@@ -5302,7 +5302,7 @@ function AdminPortal({
                       <StudentAvatar student={selectedStudent} />
                       <div>
                         <h3>{selectedStudent.name}</h3>
-                        <p>{selectedStudent.groupName} آ· {selectedStudent.teacherName}</p>
+                        <p>{selectedStudent.groupName} · {selectedStudent.teacherName}</p>
                         <div className="pill-row">
                           <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
                           <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
@@ -5619,7 +5619,7 @@ function AdminPortal({
                         <option value="">Select child</option>
                         {students.map((student) => (
                           <option key={student.student_id} value={student.student_id}>
-                            {student.name} آ· {student.groupName}
+                            {student.name} · {student.groupName}
                           </option>
                         ))}
                       </select>
@@ -5791,7 +5791,7 @@ function AdminPortal({
                       </label>
 
                       <label>
-                        <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
+                        <span>Arabic Name (اسم الطالب)</span>
                         <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                       </label>
 
@@ -6710,7 +6710,7 @@ function AdminPortal({
                       Teacher progress entry is {reportSettingsObject?.allow_teacher_progress_entry === false ? 'DISABLED' : 'ENABLED'}
                    </p>
                    <p style={{ fontSize: '0.85rem', marginTop: '6px', color: 'var(--soft-brown)' }}>
-                      Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} â†’ ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
+                      Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} → ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
                    </p>
                 </div>
                 <div style={{ marginTop: '20px' }}>
@@ -6754,12 +6754,12 @@ function AdminPortal({
                           className={`unlock-toggle-btn ${isDone ? "active" : ""}`}
                           onClick={() => onTeacherUnlock(teacher)}
                           disabled={isUnlocking || !!isDone}
-                          title={isDone ? "Teacher unlocked âœ“" : isUnlocking ? "Unlocking..." : "Click to unlock teacher"}
+                          title={isDone ? "Teacher unlocked ✓" : isUnlocking ? "Unlocking..." : "Click to unlock teacher"}
                         >
                           {isUnlocking ? (
                             <><RotateCw size={16} className="spin" /> Unlocking...</>
                           ) : isDone ? (
-                            <><Unlock size={16} /> Unlocked âœ“</>
+                            <><Unlock size={16} /> Unlocked ✓</>
                           ) : (
                             <><Lock size={16} /> Unlock</>
                           )}
@@ -7206,11 +7206,11 @@ onShowAction,
                     </div>
                     <div className="salary-item">
                       <span className="salary-label">{"Rate - Min"}</span>
-                      <span className="salary-value">â‚¹{monthlySalary.rate}</span>
+                      <span className="salary-value">₹{monthlySalary.rate}</span>
                     </div>
                     <div className="salary-item total-item">
                       <span className="salary-label">Total Amount</span>
-                      <span className="salary-value highlight">â‚¹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
+                      <span className="salary-value highlight">₹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
                     </div>
                   </div>
                   <p className="hint-text">Calculated based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
@@ -7346,7 +7346,7 @@ onShowAction,
                           );
                           return (
                             <option key={student.student_id} value={student.student_id}>
-                              {student.name}{existingResult ? " - âœ“ Saved" : ""} - {student.groupName}
+                              {student.name}{existingResult ? " - ✓ Saved" : ""} - {student.groupName}
                             </option>
                           );
                         })}
@@ -7466,7 +7466,7 @@ onShowAction,
 
                   <div className="form-grid">
                     <label>
-                      <span>Matrookah (ظ…طھط±ظˆظƒط©)</span>
+                      <span>Matrookah (متروكة)</span>
                       <input
                         type="text"
                         name="matrookah"
@@ -7476,7 +7476,7 @@ onShowAction,
                       />
                     </label>
                     <label>
-                      <span>Daeefah (ط¶ط¹ظٹظپط©)</span>
+                      <span>Daeefah (ضعيفة)</span>
                       <input
                         type="text"
                         name="daeefah"
@@ -7624,7 +7624,7 @@ onShowAction,
                       <div>
                         <h3>{selectedStudent.name}</h3>
                         <p>
-                          {selectedStudent.groupName} آ· {selectedStudent.teacherName}
+                          {selectedStudent.groupName} · {selectedStudent.teacherName}
                         </p>
                       </div>
                     </div>
@@ -7895,29 +7895,29 @@ onShowAction,
 
 // --- Quran Surah Names (Arabic) ---
 const SURAH_NAMES_AR = [
-  "ط§ظ„ظپط§طھط­ط©","ط§ظ„ط¨ظ‚ط±ط©","ط¢ظ„ ط¹ظ…ط±ط§ظ†","ط§ظ„ظ†ط³ط§ط،","ط§ظ„ظ…ط§ط¦ط¯ط©",
-  "ط§ظ„ط£ظ†ط¹ط§ظ…","ط§ظ„ط£ط¹ط±ط§ظپ","ط§ظ„ط£ظ†ظپط§ظ„","ط§ظ„طھظˆط¨ط©","ظٹظˆظ†ط³",
-  "ظ‡ظˆط¯","ظٹظˆط³ظپ","ط§ظ„ط±ط¹ط¯","ط¥ط¨ط±ط§ظ‡ظٹظ…","ط§ظ„ط­ط¬ط±",
-  "ط§ظ„ظ†ط­ظ„","ط§ظ„ط¥ط³ط±ط§ط،","ط§ظ„ظƒظ‡ظپ","ظ…ط±ظٹظ…","ط·ظ‡",
-  "ط§ظ„ط£ظ†ط¨ظٹط§ط،","ط§ظ„ط­ط¬","ط§ظ„ظ…ط¤ظ…ظ†ظˆظ†","ط§ظ„ظ†ظˆط±","ط§ظ„ظپط±ظ‚ط§ظ†",
-  "ط§ظ„ط´ط¹ط±ط§ط،","ط§ظ„ظ†ظ…ظ„","ط§ظ„ظ‚طµطµ","ط§ظ„ط¹ظ†ظƒط¨ظˆطھ","ط§ظ„ط±ظˆظ…",
-  "ظ„ظ‚ظ…ط§ظ†","ط§ظ„ط³ط¬ط¯ط©","ط§ظ„ط£ط­ط²ط§ط¨","ط³ط¨ط£","ظپط§ط·ط±",
-  "ظٹط³","ط§ظ„طµط§ظپط§طھ","طµ","ط§ظ„ط²ظ…ط±","ط؛ط§ظپط±",
-  "ظپطµظ„طھ","ط§ظ„ط´ظˆط±ظ‰","ط§ظ„ط²ط®ط±ظپ","ط§ظ„ط¯ط®ط§ظ†","ط§ظ„ط¬ط§ط«ظٹط©",
-  "ط§ظ„ط£ط­ظ‚ط§ظپ","ظ…ط­ظ…ط¯","ط§ظ„ظپطھط­","ط§ظ„ط­ط¬ط±ط§طھ","ظ‚",
-  "ط§ظ„ط°ط§ط±ظٹط§طھ","ط§ظ„ط·ظˆط±","ط§ظ„ظ†ط¬ظ…","ط§ظ„ظ‚ظ…ط±","ط§ظ„ط±ط­ظ…ظ†",
-  "ط§ظ„ظˆط§ظ‚ط¹ط©","ط§ظ„ط­ط¯ظٹط¯","ط§ظ„ظ…ط¬ط§ط¯ظ„ط©","ط§ظ„ط­ط´ط±","ط§ظ„ظ…ظ…طھط­ظ†ط©",
-  "ط§ظ„طµظپ","ط§ظ„ط¬ظ…ط¹ط©","ط§ظ„ظ…ظ†ط§ظپظ‚ظˆظ†","ط§ظ„طھط؛ط§ط¨ظ†","ط§ظ„ط·ظ„ط§ظ‚",
-  "ط§ظ„طھط­ط±ظٹظ…","ط§ظ„ظ…ظ„ظƒ","ط§ظ„ظ‚ظ„ظ…","ط§ظ„ط­ط§ظ‚ط©","ط§ظ„ظ…ط¹ط§ط±ط¬",
-  "ظ†ظˆط­","ط§ظ„ط¬ظ†","ط§ظ„ظ…ط²ظ…ظ„","ط§ظ„ظ…ط¯ط«ط±","ط§ظ„ظ‚ظٹط§ظ…ط©",
-  "ط§ظ„ط¥ظ†ط³ط§ظ†","ط§ظ„ظ…ط±ط³ظ„ط§طھ","ط§ظ„ظ†ط¨ط£","ط§ظ„ظ†ط§ط²ط¹ط§طھ","ط¹ط¨ط³",
-  "ط§ظ„طھظƒظˆظٹط±","ط§ظ„ط§ظ†ظپط·ط§ط±","ط§ظ„ظ…ط·ظپظپظٹظ†","ط§ظ„ط§ظ†ط´ظ‚ط§ظ‚","ط§ظ„ط¨ط±ظˆط¬",
-  "ط§ظ„ط·ط§ط±ظ‚","ط§ظ„ط£ط¹ظ„ظ‰","ط§ظ„ط؛ط§ط´ظٹط©","ط§ظ„ظپط¬ط±","ط§ظ„ط¨ظ„ط¯",
-  "ط§ظ„ط´ظ…ط³","ط§ظ„ظ„ظٹظ„","ط§ظ„ط¶ط­ظ‰","ط§ظ„ط´ط±ط­","ط§ظ„طھظٹظ†",
-  "ط§ظ„ط¹ظ„ظ‚","ط§ظ„ظ‚ط¯ط±","ط§ظ„ط¨ظٹظ†ط©","ط§ظ„ط²ظ„ط²ظ„ط©","ط§ظ„ط¹ط§ط¯ظٹط§طھ",
-  "ط§ظ„ظ‚ط§ط±ط¹ط©","ط§ظ„طھظƒط§ط«ط±","ط§ظ„ط¹طµط±","ط§ظ„ظ‡ظ…ط²ط©","ط§ظ„ظپظٹظ„",
-  "ظ‚ط±ظٹط´","ط§ظ„ظ…ط§ط¹ظˆظ†","ط§ظ„ظƒظˆط«ط±","ط§ظ„ظƒط§ظپط±ظˆظ†","ط§ظ„ظ†طµط±",
-  "ط§ظ„ظ…ط³ط¯","ط§ظ„ط¥ط®ظ„ط§طµ","ط§ظ„ظپظ„ظ‚","ط§ظ„ظ†ط§ط³"
+  "الفاتحة","البقرة","آل عمران","النساء","المائدة",
+  "الأنعام","الأعراف","الأنفال","التوبة","يونس",
+  "هود","يوسف","الرعد","إبراهيم","الحجر",
+  "النحل","الإسراء","الكهف","مريم","طه",
+  "الأنبياء","الحج","المؤمنون","النور","الفرقان",
+  "الشعراء","النمل","القصص","العنكبوت","الروم",
+  "لقمان","السجدة","الأحزاب","سبأ","فاطر",
+  "يس","الصافات","ص","الزمر","غافر",
+  "فصلت","الشورى","الزخرف","الدخان","الجاثية",
+  "الأحقاف","محمد","الفتح","الحجرات","ق",
+  "الذاريات","الطور","النجم","القمر","الرحمن",
+  "الواقعة","الحديد","المجادلة","الحشر","الممتحنة",
+  "الصف","الجمعة","المنافقون","التغابن","الطلاق",
+  "التحريم","الملك","القلم","الحاقة","المعارج",
+  "نوح","الجن","المزمل","المدثر","القيامة",
+  "الإنسان","المرسلات","النبأ","النازعات","عبس",
+  "التكوير","الانفطار","المطففين","الانشقاق","البروج",
+  "الطارق","الأعلى","الغاشية","الفجر","البلد",
+  "الشمس","الليل","الضحى","الشرح","التين",
+  "العلق","القدر","البينة","الزلزلة","العاديات",
+  "القارعة","التكاثر","العصر","الهمزة","الفيل",
+  "قريش","الماعون","الكوثر","الكافرون","النصر",
+  "المسد","الإخلاص","الفلق","الناس"
 ];
 
 // --- Juz/Surat Selector Component ---

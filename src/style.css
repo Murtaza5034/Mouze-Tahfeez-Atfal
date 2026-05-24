@@ -2309,6 +2309,10 @@ h1, h2, h3, h4, h5 {
   background: #fff5f5;
   border-color: #fed7d7;
 }
+.target-box.highlight-matrookah .note-item-row:last-child {
+  margin-bottom: 0;
+}
+
 
 .note-item-row {
   display: flex;

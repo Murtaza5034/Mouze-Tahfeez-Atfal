@@ -198,7 +198,7 @@ const IstifdahProgress = ({ weeklyResult, currentJuz }) => {
               <div key={f.key} className="heading-card">
                 <div className="heading-card-header">
                   <span className="heading-label">{f.heading.label}</span>
-                  <span className="heading-label-arabic kanz-font">{f.heading.labelAr}</span>
+                  <span className="heading-label-arabic arabic-text">{f.heading.labelAr}</span>
                 </div>
 
                 {/* 3-Column Layout: Juz | Surah | Safa */}
@@ -209,7 +209,7 @@ const IstifdahProgress = ({ weeklyResult, currentJuz }) => {
                     </div>
                     <div className="jss-cell surah-cell">
                       <span className="jss-cell-label">سورة</span>
-                      <span className="jss-cell-value kanz-font">{f.displaySurah}</span>
+                      <span className="jss-cell-value arabic-text">{f.displaySurah}</span>
                     </div>
                     <div className="jss-cell safa-cell">
                       <span className="jss-cell-label">Safa</span>
