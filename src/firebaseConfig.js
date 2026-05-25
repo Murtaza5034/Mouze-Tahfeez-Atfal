@@ -24,31 +24,26 @@ export const getFCMToken = async () => {
     
     // Explicitly register service worker for official PWA support
     if ('serviceWorker' in navigator) {
-      // Clean up existing service workers to prevent conflicts
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        if (registration.scope.includes('firebase-messaging-sw') || 
-            registration.scope.includes('messaging-sw')) {
-          await registration.unregister();
-          console.log('Cleaned up conflicting service worker:', registration.scope);
-        }
-      }
+      // Don't clean up existing service workers to prevent conflicts with PWA
+      // Just register the Firebase messaging SW if it's not already registered
+      let registration;
+      const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+      const existingFcmSw = existingRegistrations.find(r => 
+        r.active?.scriptURL?.includes('firebase-messaging-sw')
+      );
       
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/'
-      });
-      console.log('Service Worker registered with scope:', registration.scope);
-      
-      // Wait for service worker to be active
-      if (registration.installing) {
-        await new Promise((resolve) => {
-          registration.installing.addEventListener('statechange', (e) => {
-            if (e.target.state === 'activated') {
-              resolve();
-            }
-          });
+      if (existingFcmSw) {
+        registration = existingFcmSw;
+        console.log('Using existing Firebase SW registration');
+      } else {
+        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/'
         });
+        console.log('Service Worker registered with scope:', registration.scope);
       }
+      
+      // Wait for service worker to be ready
+      await navigator.serviceWorker.ready;
       
       const currentToken = await getToken(messaging, { 
         vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || "BGrvEM2dyLW86HLnNNIDibzCT7NHZka42OFBlVxyA86wBieuXZ09vJldEnQazc9h3VQgBbikEh0oqfiG0xeeyfg",
@@ -77,12 +72,24 @@ export const getFCMToken = async () => {
   }
 };
 
-// Handle incoming messages
+// Handle incoming messages - don't return the onMessage unsubscribe function
+// directly to prevent message channel issues
 export const onMessageListener = (callback) => {
-  return onMessage(messaging, (payload) => {
-    console.log('Foreground message received: ', payload);
-    if (callback) callback(payload);
-  });
+  try {
+    return onMessage(messaging, (payload) => {
+      try {
+        console.log('Foreground message received: ', payload);
+        if (callback) {
+          callback(payload);
+        }
+      } catch (callbackError) {
+        console.error('Error in onMessage callback:', callbackError);
+      }
+    });
+  } catch (error) {
+    console.error('Error setting up onMessage listener:', error);
+    return null;
+  }
 };
 
 export { messaging };

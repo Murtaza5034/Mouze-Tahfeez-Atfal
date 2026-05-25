@@ -9,5 +9,17 @@ export const supabaseAnonKey =
   import.meta.env.VITE_SUPABASE_ANON_KEY || fallbackSupabaseAnonKey
 
 // Supabase initialization with optional environment variables and built-in fallbacks.
+// Disable Realtime auto-connect to prevent WebSocket errors on page load
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
+  // Disable auto-connect to realtime channels to prevent WebSocket errors
+  // when auth is not yet established
+  db: {
+    schema: 'public',
+  },
+})

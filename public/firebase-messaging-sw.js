@@ -16,46 +16,54 @@ const messaging = firebase.messaging();
 
 // Handle background messages
 messaging.onBackgroundMessage(function(payload) {
-  console.log('Received background message ', payload);
+  try {
+    console.log('Received background message ', payload);
 
-  const title = payload.notification?.title || payload.data?.title || "Mauze Tahfeez Update";
-  const body = payload.notification?.body || payload.data?.body || "Check your portal for important updates";
-  
-  const image = payload.notification?.image || payload.data?.image || "";
-  const notificationOptions = {
-    body: body,
-    icon: '/logo.png',
-    badge: '/logo.png',
-    vibrate: [200, 100, 200],
-    data: {
-      ...payload.data,
-      url: payload.data?.url || payload.fcmOptions?.link || '/',
-      timestamp: new Date().toISOString()
-    },
-    tag: 'mauze-tahfeez-notification',
-    renotify: true,
-    requireInteraction: true,
-    silent: false,
-    dir: 'ltr',
-    lang: 'en-US',
-    actions: [
-      {
-        action: 'open',
-        title: 'Open Portal',
-        icon: '/logo.png'
+    const title = payload.notification?.title || payload.data?.title || "Mauze Tahfeez Update";
+    const body = payload.notification?.body || payload.data?.body || "Check your portal for important updates";
+    
+    const image = payload.notification?.image || payload.data?.image || "";
+    const notificationOptions = {
+      body: body,
+      icon: '/logo.png',
+      badge: '/logo.png',
+      vibrate: [200, 100, 200],
+      data: {
+        ...payload.data,
+        url: payload.data?.url || payload.fcmOptions?.link || '/',
+        timestamp: new Date().toISOString()
       },
-      {
-        action: 'dismiss',
-        title: 'Dismiss'
-      }
-    ]
-  };
+      tag: 'mauze-tahfeez-notification',
+      renotify: true,
+      requireInteraction: true,
+      silent: false,
+      dir: 'ltr',
+      lang: 'en-US',
+      actions: [
+        {
+          action: 'open',
+          title: 'Open Portal',
+          icon: '/logo.png'
+        },
+        {
+          action: 'dismiss',
+          title: 'Dismiss'
+        }
+      ]
+    };
 
-  if (image) {
-    notificationOptions.image = image;
+    if (image) {
+      notificationOptions.image = image;
+    }
+
+    // Use self.registration.showNotification directly without returning the promise
+    // to prevent "message channel closed" errors in Firebase SDK
+    self.registration.showNotification(title, notificationOptions).catch(function(err) {
+      console.error('Error showing notification:', err);
+    });
+  } catch (err) {
+    console.error('Error in onBackgroundMessage:', err);
   }
-
-  return self.registration.showNotification(title, notificationOptions);
 });
 
 // Handle notification click

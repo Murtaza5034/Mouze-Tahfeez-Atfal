@@ -6400,6 +6400,10 @@ function AdminPortal({
             )}
           </div>
 
+          {activePage === "User Issues" ? (
+            <SupportTicketsAdmin tickets={supportTickets} onRefresh={loadPortalData} />
+          ) : null}
+
           {activePage === "Leave Management" && (
             <AdminLeaveManagement students={students} onShowAction={onShowAction} />
           )}
