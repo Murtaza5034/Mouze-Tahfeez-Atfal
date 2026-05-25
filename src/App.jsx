@@ -5908,7 +5908,6 @@ function AdminPortal({
                     </p>
                   </form>
                 </div>
-              </section>
 
               <section className="data-card card-appear" style={{ marginTop: '20px' }}>
                 <div className="card-headline">
@@ -6727,8 +6726,6 @@ function AdminPortal({
           ) : null}
         </section>
 
-            </div>
-          </section>
 
         {/* WhatsApp Sending Progress Modal */}
         {sendingWhatsApp && (
