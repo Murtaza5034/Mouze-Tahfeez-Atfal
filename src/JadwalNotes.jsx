@@ -4,7 +4,7 @@ import { Send, FileText, Clock, Trash } from 'lucide-react';
 
 const normalizeText = (text) => text ? text.trim().toLowerCase() : "";
 
-export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacherProfiles, showAction }) => {
+export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacherId, teacherProfiles, showAction }) => {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,18 +65,58 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
     loadHistory();
 
     // Send notification to Teacher if we have their details
-    if (teacherName && teacherProfiles) {
-      const teacher = teacherProfiles.find(t => normalizeText(t.full_name) === normalizeText(teacherName));
-      if (teacher && teacher.email) {
-        const notifPayload = {
-          title: `New Parent Note: ${studentName}`,
-          body: `A parent wrote: ${title.trim()}`,
-          target_role: "teacher",
-          target_user: teacher.email,
-          redirect_page: `Jadwal:${studentId}`,
-          created_at: new Date().toISOString()
-        };
-        await supabase.from("system_notifications").insert([notifPayload]);
+    if (teacherProfiles) {
+      let teacher = null;
+      if (teacherId) {
+        teacher = teacherProfiles.find(t => t.id === teacherId || t.user_id === teacherId);
+      }
+      if (!teacher && teacherName) {
+        teacher = teacherProfiles.find(t => normalizeText(t.full_name) === normalizeText(teacherName));
+      }
+
+      if (teacher) {
+        const teacherTarget = teacher.user_id || teacher.id; // Prefer auth user_id UUID
+        if (teacherTarget) {
+          const notifTitle = `New Parent Note: ${studentName} 📝`;
+          const notifBody = `A parent wrote a note for ${studentName}: "${title.trim()}"`;
+          const notifPayload = {
+            title: notifTitle,
+            body: notifBody,
+            target_role: "teacher",
+            target_user: String(teacherTarget),
+            redirect_page: `Jadwal:${studentId}`,
+            created_at: new Date().toISOString()
+          };
+
+          // Insert in-app notification
+          const { error: dbErr } = await supabase.from("system_notifications").insert([notifPayload]);
+          if (dbErr) {
+            console.error("Failed to insert parent note notification into DB:", dbErr);
+          }
+
+          // Trigger out-of-app push notification via FCM
+          try {
+            const { data, error: fcmErr } = await supabase.functions.invoke('fcm-notification', {
+              body: {
+                title: notifTitle,
+                body: notifBody,
+                targetRole: "teacher",
+                targetUser: String(teacherTarget),
+                data: {
+                  redirectPage: `Jadwal:${studentId}`,
+                  timestamp: new Date().toISOString()
+                }
+              }
+            });
+            if (fcmErr) {
+              console.error("FCM invoke error for teacher parent note:", fcmErr);
+            } else {
+              console.log("FCM parent note notification sent to teacher:", data);
+            }
+          } catch (err) {
+            console.error("FCM parent note notification trigger failed:", err);
+          }
+        }
       }
     }
 

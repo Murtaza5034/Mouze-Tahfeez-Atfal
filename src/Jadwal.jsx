@@ -184,8 +184,8 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
           const parentId = targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email;
           if (parentId) {
             await onBroadcastNotification(
-              "Jadwal Updated",
-              "THE JADWAL IS UPDATED BY YOUR TEACHER",
+              "Jadwal Timetable Updated 📅",
+              `The weekly Quran study schedule (Jadwal) for ${studentName} has been updated by the teacher. Tap to view.`,
               "parents",
               parentId,
               "Jadwal"
@@ -317,7 +317,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   );
 };
 
-export const JadwalParentView = ({ studentId, teacherName, teacherProfiles, showAction }) => {
+export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherProfiles, showAction }) => {
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [studentName, setStudentName] = useState('Student');
   const [loading, setLoading] = useState(true);
@@ -409,6 +409,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherProfiles, show
         studentId={studentId} 
         studentName={studentName}
         teacherName={teacherName}
+        teacherId={teacherId}
         teacherProfiles={teacherProfiles}
         showAction={showAction}
       />

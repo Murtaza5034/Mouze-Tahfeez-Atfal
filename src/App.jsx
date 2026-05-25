@@ -2993,13 +2993,13 @@ function ChildLeaveApply({ studentProfile, showAction }) {
       });
       if (dbErr) throw dbErr;
 
-      await supabase.functions.invoke('fcm-notification', {
-        body: {
-          title: `Leave: ${leaveType}`,
-          body: `${studentProfile?.name} applied for leave (${leaveType}).`,
-          targetRole: 'admin'
-        }
-      });
+      await broadcastNotification(
+        `Leave Application 📅`,
+        `${studentProfile?.name} has applied for leave (${leaveType}). Reason: ${reason || 'Not provided'}`,
+        "admin",
+        null,
+        "Leave Management"
+      );
 
       showAction("success", "Leave applied successfully!");
       setLeaveType("");
@@ -3913,6 +3913,7 @@ function ParentPortal({
             <LazyJadwalParentView 
               studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} 
               teacherName={studentProfile?.teacherName}
+              teacherId={studentProfile?.muhaffiz_id}
               teacherProfiles={teacherProfiles}
               showAction={showAction}
             />
