@@ -6576,9 +6576,7 @@ function AdminPortal({
                   const formData = new FormData(e.target);
                   const updates = {
                     reports_live: formData.get("reports_live") === "true",
-                    live_at: formData.get("live_at") ? new Date(formData.get("live_at")).toISOString() : null,
-                    allow_teacher_progress_entry: formData.get("allow_teacher_progress_entry") === "true",
-                  };
+                    live_at: formData.get("live_at") ? new Date(formData.get("live_at")).toISOString() : null,                  };
                   saveReportSettings(updates, { notifyLive: true });
                 }}>
                   <div className="form-grid">
@@ -6587,17 +6585,6 @@ function AdminPortal({
                       <select name="reports_live" defaultValue={String(reportSettingsObject?.reports_live ?? true)} className="premium-select">
                         <option value="true">Live (Visible to Parents)</option>
                         <option value="false">Hidden (Maintenance Mode)</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Teacher Progress Entry</span>
-                      <select
-                        name="allow_teacher_progress_entry"
-                        defaultValue={String(reportSettingsObject?.allow_teacher_progress_entry ?? true)}
-                        className="premium-select"
-                      >
-                        <option value="true">Enabled</option>
-                        <option value="false">Disabled</option>
                       </select>
                     </label>
                     <label>
@@ -6713,9 +6700,6 @@ function AdminPortal({
                        Scheduled for: {new Date(reportSettingsObject.live_at).toLocaleString()}
                      </p>
                    )}
-                   <p style={{ fontSize: '0.85rem', marginTop: '10px', color: 'var(--soft-brown)' }}>
-                      Teacher progress entry is {reportSettingsObject?.allow_teacher_progress_entry === false ? 'DISABLED' : 'ENABLED'}
-                   </p>
                    <p style={{ fontSize: '0.85rem', marginTop: '6px', color: 'var(--soft-brown)' }}>
                       Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} → ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
                    </p>
