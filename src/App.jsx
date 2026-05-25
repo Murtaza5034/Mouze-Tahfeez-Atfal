@@ -2470,7 +2470,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
                 <span className="arabic-label arabic-kanz">{item.label} :</span>
-                <span className="score-val" dir="ltr"><span className="kanz-font">{toArabicDigits(item.val || "0")}</span> / <span className="kanz-font">{toArabicDigits(item.max)}</span></span>
+                <span className="score-val" style={{ direction: 'ltr', unicodeBidi: 'isolate' }}><span className="kanz-font">{toArabicDigits(item.val || "0")}</span> / <span className="kanz-font">{toArabicDigits(item.max)}</span></span>
               </div>
             ))}
           </div>
@@ -5722,7 +5722,12 @@ function AdminPortal({
                 </form>
               </section>
 
-              <section className="data-card card-appear">
+            </div>
+          ) : null}
+
+
+          {activePage === "Assignments" ? (
+            <div className="management-grid">
                 <div className="card-headline">
                   <Users size={18} />
                   <h3>Student Assignment Hub</h3>
@@ -5976,7 +5981,6 @@ function AdminPortal({
               </section>
             </div>
           ) : null}
-
 
           {activePage === "Staff Profiles" ? (
             <div className="management-grid two-columns">
@@ -6723,55 +6727,6 @@ function AdminPortal({
           ) : null}
         </section>
 
-          {/* --- Teacher Unlock Card --- */}
-          <section className="global-settings-section" style={{ marginTop: "24px" }}>
-            <div className="premium-card card-appear">
-              <div className="card-headline">
-                <Unlock size={18} />
-                <h3>Teacher Progress Unlock</h3>
-              </div>
-              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px", lineHeight: "1.6" }}>
-                If a teacher needs to submit progress reports outside the scheduled window, you can manually unlock them. This bypasses the auto-lock schedule for all their students.
-              </p>
-              <div className="teacher-unlock-list">
-                {teacherProfiles.length === 0 ? (
-                  <p style={{ color: "var(--text-muted)", fontStyle: "italic", padding: "12px 0" }}>
-                    No teacher profiles found. Add teachers first in Staff Profiles.
-                  </p>
-                ) : (
-                  teacherProfiles.map((teacher) => {
-                    const isUnlocking = teacherUnlockStatus === `unlocking-${teacher.id}`;
-                    const isDone = teacherUnlockStatus === `done-${teacher.id}`;
-                    const isError = teacherUnlockStatus === `error-${teacher.id}`;
-                    const teacherName = teacher.full_name || teacher.name || "Unknown Teacher";
-                    return (
-                      <div key={teacher.id} className={`teacher-unlock-row ${isDone ? "unlocked" : ""}`}>
-                        <div className="teacher-unlock-info">
-                          <span className="teacher-unlock-name">{teacherName}</span>
-                          <span className="teacher-unlock-sub">{teacher.email || ""}</span>
-                        </div>
-                        <button
-                          className={`unlock-toggle-btn ${isDone ? "active" : ""}`}
-                          onClick={() => onTeacherUnlock(teacher)}
-                          disabled={isUnlocking || !!isDone}
-                          title={isDone ? "Teacher unlocked ✓" : isUnlocking ? "Unlocking..." : "Click to unlock teacher"}
-                        >
-                          {isUnlocking ? (
-                            <><RotateCw size={16} className="spin" /> Unlocking...</>
-                          ) : isDone ? (
-                            <><Unlock size={16} /> Unlocked ✓</>
-                          ) : (
-                            <><Lock size={16} /> Unlock</>
-                          )}
-                        </button>
-                        {isError && (
-                          <span className="teacher-unlock-error">Failed to unlock</span>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
             </div>
           </section>
 
