@@ -2453,8 +2453,8 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
           <div className="trophy-container">
             <Trophy size={100} className="trophy-icon trophyPulse" />
-            <span className="rank-text-overlay rankPop rankCelebration" key={weeklyResult?.computedRank || weeklyResult?.rank}>
-              {weeklyResult?.computedRank || weeklyResult?.rank || "-"}
+            <span className="rank-text-overlay rankPop rankCelebration" key={weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank}>
+              {weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank || "-"}
             </span>
           </div>
         </div>
@@ -7138,7 +7138,7 @@ function TeacherPortal({
                   <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
                   <div className="form-grid four-up">
                     <label>
-                      <span>Murajazah</span>
+                      <span>Murajah</span>
                       <input
                         type="number"
                         min="0"
@@ -7374,7 +7374,7 @@ function TeacherPortal({
                         <span>{student.hifzStatus}</span>
                       </div>
                       <div className="performance-pill">
-                        Latest Result: {student.latestResult?.computedRank || "pending"}
+                        Latest Result: {student.latestResult?.weeklyRank || student.latestResult?.computedRank || "pending"}
                       </div>
                     </article>
                   ))}
