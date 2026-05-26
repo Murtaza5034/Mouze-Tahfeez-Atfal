@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './TakhteetProgress.css';
 
-// Surah names in Arabic (0-indexed: index 0 = Al-Fatihah, index 113 = An-Nas)
+// Surah names in Arabic
 const SURAH_NAMES_AR = [
   "الفاتحة","البقرة","آل عمران","النساء","المائدة",
   "الأنعام","الأعراف","الأنفال","التوبة","يونس",
@@ -28,63 +28,25 @@ const SURAH_NAMES_AR = [
   "المسد","الإخلاص","الفلق","الناس"
 ];
 
-// Each juz (1-30) maps to the index of the surah where it starts in SURAH_NAMES_AR
 const JUZ_START_SURAH_INDEX = [
-  0,   // Juz 1 → Al-Fatihah (index 0)
-  1,   // Juz 2 → Al-Baqarah (index 1)
-  1,   // Juz 3 → Al-Baqarah (index 1)
-  2,   // Juz 4 → Aal-e-Imran (index 2)
-  3,   // Juz 5 → An-Nisa (index 3)
-  3,   // Juz 6 → An-Nisa (index 3)
-  4,   // Juz 7 → Al-Ma'idah (index 4)
-  5,   // Juz 8 → Al-An'am (index 5)
-  6,   // Juz 9 → Al-A'raf (index 6)
-  7,   // Juz 10 → Al-Anfal (index 7)
-  8,   // Juz 11 → At-Tawbah (index 8)
-  10,  // Juz 12 → Hud (index 10)
-  11,  // Juz 13 → Yusuf (index 11)
-  14,  // Juz 14 → Al-Hijr (index 14)
-  16,  // Juz 15 → Al-Isra (index 16)
-  17,  // Juz 16 → Al-Kahf (index 17)
-  20,  // Juz 17 → Al-Anbiya (index 20)
-  22,  // Juz 18 → Al-Mu'minun (index 22)
-  24,  // Juz 19 → Al-Furqan (index 24)
-  26,  // Juz 20 → An-Naml (index 26)
-  28,  // Juz 21 → Al-Ankabut (index 28)
-  32,  // Juz 22 → Al-Ahzab (index 32)
-  35,  // Juz 23 → Ya-Sin (index 35)
-  38,  // Juz 24 → Az-Zumar (index 38)
-  40,  // Juz 25 → Fussilat (index 40)
-  45,  // Juz 26 → Al-Ahqaf (index 45)
-  50,  // Juz 27 → Adh-Dhariyat (index 50)
-  57,  // Juz 28 → Al-Mujadilah (index 57)
-  66,  // Juz 29 → Al-Mulk (index 66)
-  77,  // Juz 30 → An-Naba (index 77)
+  0,1,1,2,3,3,4,5,6,7,8,10,11,14,16,17,20,22,24,26,28,32,35,38,40,45,50,57,66,77
 ];
 
-/** Get the Arabic surah name for a given juz number (1-30) */
 const getSurahForJuz = (juzNum) => {
   const idx = JUZ_START_SURAH_INDEX[juzNum - 1];
   return idx !== undefined ? SURAH_NAMES_AR[idx] : "";
 };
 
-/** Convert Western digits to Arabic-Indic digits (0-9 → ٠-٩) */
 const toArabicDigits = (str) => {
   if (str == null) return str;
   return String(str).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d, 10)]);
 };
 
-/** Check if a value is a numeric juz number (not a surah name) */
 const isNumericVal = (v) => v && !isNaN(parseInt(v, 10)) && String(parseInt(v, 10)) === String(v).trim();
 
-/**
- * Parses a raw juz field and page field into display info.
- * Returns: { displayJuz, displaySurah, safa, juzNum, isNumeric }
- */
 const parseField = (rawJuz, rawPage, rawSurah) => {
   const numeric = isNumericVal(rawJuz);
   const juzNum = numeric ? parseInt(rawJuz, 10) : null;
-  // Use stored surah if available (for Juz 26-30 where multiple surahs per juz)
   const surahValue = rawSurah || (numeric ? getSurahForJuz(juzNum) : null);
   return {
     isNumeric: numeric,
@@ -95,142 +57,274 @@ const parseField = (rawJuz, rawPage, rawSurah) => {
   };
 };
 
-const HEADINGS = {
-  wusool: { label: "Wusool", labelAr: "وصول" },
-  nextWeek: { label: "Next Week", labelAr: "الأسبوع القادم" },
-  target: { label: "Target Till", labelAr: "الهدف حتى" },
+const calcPages = (juz, page) => {
+  if (!juz || juz === 0) return 0;
+  const safeJuz = Math.min(Math.max(juz, 1), 30);
+  return (30 - safeJuz) * 20 + (parseInt(page || "0", 10));
 };
 
-const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
-  const [percent, setPercent] = useState(0);
-
-  // Determine student juz level
-  const currentJuzNum = currentJuz ? parseInt(currentJuz, 10) : 0;
-  const isHighJuz = currentJuzNum >= 26;
-
-  // Also check weeklyResult fields as fallback (profile juz might not be set)
-  const resultJuzValues = [
-    weeklyResult?.wusool_juz,
-    weeklyResult?.next_week_juz,
-    weeklyResult?.istifadah_juz,
-  ].filter(v => isNumericVal(v)).map(v => parseInt(v, 10));
-  const maxResultJuz = resultJuzValues.length > 0 ? Math.max(...resultJuzValues) : 0;
-
-  // Best juz number for display badge
-
-  // Parse all three fields
-  const wusool = parseField(weeklyResult?.wusool_juz, weeklyResult?.wusool_page, weeklyResult?.wusool_surah);
-  const nextWeek = parseField(weeklyResult?.next_week_juz, weeklyResult?.next_week_page, weeklyResult?.next_week_surah);
-  const target = parseField(weeklyResult?.istifadah_juz, weeklyResult?.istifadah_page, weeklyResult?.istifadah_surah);
-
-  const fields = [
-    { ...wusool, key: "wusool", heading: HEADINGS.wusool },
-    { ...nextWeek, key: "nextWeek", heading: HEADINGS.nextWeek },
-    { ...target, key: "target", heading: HEADINGS.target },
-  ];
-
-  // Backwards juz logic (30 - juz) * 20 + page
-  const calcPages = (juz, page) => {
-    if (juz === 0 && page === 0) return 0;
-    const safeJuz = Math.min(Math.max(juz, 1), 30);
-    return (30 - safeJuz) * 20 + page;
-  };
-
-  const wusoolPages = calcPages(wusool.juzNum || 0, parseInt(weeklyResult?.wusool_page || "0", 10));
-  const targetPages = calcPages(target.juzNum || 0, parseInt(weeklyResult?.istifadah_page || "0", 10));
-
-  const remainingPages = Math.max(0, targetPages - wusoolPages);
-
-  let targetPercent = 0;
-  if (targetPages > 0) {
-    targetPercent = Math.min(100, Math.max(0, (wusoolPages / targetPages) * 100));
-  } else if (wusoolPages > 0) {
-    targetPercent = 100;
-  }
+const AnimatedProgressRing = ({ percent, size = 140, strokeWidth = 10 }) => {
+  const [animatedPercent, setAnimatedPercent] = useState(0);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (animatedPercent / 100) * circumference;
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setPercent(targetPercent);
+      setAnimatedPercent(Math.min(100, Math.max(0, percent)));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [percent]);
+
+  return (
+    <div className="progress-ring-container" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="progress-ring-svg">
+        {/* Background circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgba(212, 175, 55, 0.12)"
+          strokeWidth={strokeWidth}
+        />
+        {/* Progress circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="url(#goldGradient)"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="progress-ring-fill"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+        {/* Glow circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgba(212, 175, 55, 0.3)"
+          strokeWidth={strokeWidth + 4}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="progress-ring-glow"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          filter="url(#glow)"
+        />
+        <defs>
+          <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#d4af37" />
+            <stop offset="50%" stopColor="#f6dc88" />
+            <stop offset="100%" stopColor="#b88a1d" />
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
+      <div className="progress-ring-text">
+        <span className="progress-ring-value">{toArabicDigits(Math.round(animatedPercent))}</span>
+        <span className="progress-ring-unit">%</span>
+      </div>
+    </div>
+  );
+};
+
+const MetricCard = ({ label, labelAr, icon, children, accent = "gold" }) => (
+  <div className={`takhteet-metric-card metric-${accent}`}>
+    <div className="metric-header">
+      {icon && <span className="metric-icon">{icon}</span>}
+      <span className="metric-label">{label}</span>
+      <span className="metric-label-arabic">{labelAr}</span>
+    </div>
+    <div className="metric-body">
+      {children}
+    </div>
+  </div>
+);
+
+const JssDisplay = ({ juz, surah, safa, compact = false }) => (
+  <div className={`jss-display ${compact ? 'compact' : ''}`}>
+    <div className="jss-item">
+      <span className="jss-label">Juz</span>
+      <span className="jss-value">{juz}</span>
+    </div>
+    <div className="jss-divider" />
+    <div className="jss-item">
+      <span className="jss-label">سورة</span>
+      <span className="jss-value arabic-text">{surah}</span>
+    </div>
+    <div className="jss-divider" />
+    <div className="jss-item">
+      <span className="jss-label">Safa</span>
+      <span className="jss-value">{safa}</span>
+    </div>
+  </div>
+);
+
+const TakhteetProgress = ({ weeklyResult }) => {
+  const [percent, setPercent] = useState(0);
+
+  // Parse all three field sets
+  const target = parseField(weeklyResult?.istifadah_juz, weeklyResult?.istifadah_page, weeklyResult?.istifadah_surah);
+  const wusool = parseField(weeklyResult?.wusool_juz, weeklyResult?.wusool_page, weeklyResult?.wusool_surah);
+  const nextWeek = parseField(weeklyResult?.next_week_juz, weeklyResult?.next_week_page, weeklyResult?.next_week_surah);
+
+  // Calculate pages
+  const targetPages = calcPages(target.juzNum, weeklyResult?.istifadah_page);
+  const wusoolPages = calcPages(wusool.juzNum, weeklyResult?.wusool_page);
+  const nextWeekPages = calcPages(nextWeek.juzNum, weeklyResult?.next_week_page);
+
+  // Progress percentage
+  let progressPercent = 0;
+  if (targetPages > 0) {
+    progressPercent = Math.min(100, Math.max(0, (wusoolPages / targetPages) * 100));
+  } else if (wusoolPages > 0) {
+    progressPercent = 100;
+  }
+
+  // Next Week Target % of total target
+  let nextWeekPercent = 0;
+  if (targetPages > 0 && nextWeekPages > 0) {
+    nextWeekPercent = Math.min(100, Math.max(0, (nextWeekPages / targetPages) * 100));
+  }
+
+  // Animate progress on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPercent(progressPercent);
     }, 300);
     return () => clearTimeout(timer);
-  }, [targetPercent]);
+  }, [progressPercent]);
 
-  // Don't render if no data
-  const hasAnyData = fields.some(f => f.isNumeric || (f.displaySurah && f.displaySurah !== "\u2014"));
-  if (!hasAnyData && targetPages === 0 && wusoolPages === 0) {
+  const remainingPages = Math.max(0, targetPages - wusoolPages);
+
+  // Don't render if no data at all
+  const hasTarget = target.isNumeric || (target.displaySurah && target.displaySurah !== "\u2014");
+  const hasWusool = wusool.isNumeric || (wusool.displaySurah && wusool.displaySurah !== "\u2014");
+
+  if (!hasTarget && !hasWusool && targetPages === 0 && wusoolPages === 0) {
     return null;
   }
 
   return (
     <div className="takhteet-progress-container card-appear">
-      <div className="glass-card">
-        <div className="card-header">
-          <h3 className="card-title">
-            Juz | Surah | Safa
-          </h3>
-          <p className="card-subtitle">
-            Detailed progress tracking with juz, surah, and page indicators
+      <div className="takhteet-glass-card">
+        {/* Card Header */}
+        <div className="takhteet-card-header">
+          <div className="takhteet-title-row">
+            <h3 className="takhteet-card-title">
+              <span className="title-icon">📊</span>
+              Takhteet Progress Card
+            </h3>
+            <span className="takhteet-badge">
+              Juz | Surah | Safa
+            </span>
+          </div>
+          <p className="takhteet-card-subtitle">
+            Track your child's memorization journey — how much target was set, where they are now, and what's coming next.
           </p>
         </div>
 
-        <div className="progress-body">
-          <div className="liquid-container">
-            <div className="liquid-circle">
-              <div
-                className="liquid-wave"
-                style={{ top: `${100 - percent}%` }}
-              >
-                <svg viewBox="0 0 500 150" preserveAspectRatio="none">
-                  <path d="M0,100 C150,200 350,0 500,100 L500,150 L0,150 Z" className="wave wave1"></path>
-                  <path d="M0,100 C150,0 350,200 500,100 L500,150 L0,150 Z" className="wave wave2"></path>
-                </svg>
-                <div className="water-fill"></div>
+        {/* Main Progress Section */}
+        <div className="takhteet-main-section">
+          {/* Circular Progress */}
+          <div className="takhteet-progress-ring-wrap">
+            <AnimatedProgressRing percent={percent} size={130} strokeWidth={8} />
+            <div className="progress-stats-row">
+              <div className="progress-stat">
+                <span className="stat-label">Target</span>
+                <span className="stat-value">{toArabicDigits(targetPages)}</span>
               </div>
-              <div className="percentage-text">
-                <span className="count-up">{toArabicDigits(Math.round(percent))}</span>%
+              <div className="progress-stat-divider">/</div>
+              <div className="progress-stat">
+                <span className="stat-label">Done</span>
+                <span className="stat-value">{toArabicDigits(wusoolPages)}</span>
               </div>
             </div>
+            <p className="progress-remaining">
+              {remainingPages > 0 ? (
+                <><strong>{toArabicDigits(remainingPages)}</strong> pages remaining</>
+              ) : targetPages > 0 ? (
+                <span className="success-text">✓ Target Reached! MashaAllah!</span>
+              ) : wusoolPages > 0 ? (
+                <><strong>{toArabicDigits(wusoolPages)}</strong> pages covered</>
+              ) : null}
+            </p>
           </div>
 
-          {/* Three Heading Cards — dynamic columns based on juz level */}
-          <div className={`headings-grid ${isHighJuz ? "high-juz" : ""}`}>
-            {fields.map((f) => (
-              <div key={f.key} className="heading-card">
-                <div className="heading-card-header">
-                  <span className="heading-label">{f.heading.label}</span>
-                  <span className="heading-label-arabic arabic-text">{f.heading.labelAr}</span>
-                </div>
-
-                {/* 3-Column Layout: Juz | Surah | Safa */}
-                  <div className="jss-row">
-                    <div className="jss-cell juz-cell">
-                      <span className="jss-cell-label">Juz</span>
-                      <span className="jss-cell-value">{f.displayJuz}</span>
-                    </div>
-                    <div className="jss-cell surah-cell">
-                      <span className="jss-cell-label">سورة</span>
-                      <span className="jss-cell-value arabic-text">{f.displaySurah}</span>
-                    </div>
-                    <div className="jss-cell safa-cell">
-                      <span className="jss-cell-label">Safa</span>
-                      <span className="jss-cell-value">{f.safa}</span>
-                    </div>
-                  </div>
+          {/* 3 Metric Cards */}
+          <div className="takhteet-metrics-grid">
+            {/* Metric 1: Target Given */}
+            <MetricCard
+              label="Target Given"
+              labelAr="الهدف المعطى"
+              icon="🎯"
+              accent="gold"
+            >
+              <JssDisplay
+                juz={target.displayJuz}
+                surah={target.displaySurah}
+                safa={target.safa}
+              />
+              <div className="metric-footer">
+                <span className="metric-pages">{toArabicDigits(targetPages)} total pages</span>
               </div>
-            ))}
-          </div>
-        </div>
+            </MetricCard>
 
-        <div className="footer-message">
-          {remainingPages > 0 ? (
-            <p><strong>{toArabicDigits(remainingPages)} pages</strong> remaining to Takhteet. Keep going!</p>
-          ) : targetPages > 0 ? (
-            <p className="success-text"><strong>Takhteet Target Reached!</strong> MashaAllah!</p>
-          ) : wusoolPages > 0 ? (
-            <p><strong>{toArabicDigits(wusoolPages)} pages</strong> covered</p>
-          ) : (
-            <p>Target not fully set.</p>
-          )}
+            {/* Metric 2: Currently On (Wusool) */}
+            <MetricCard
+              label="Currently On"
+              labelAr="الوصول الحالي"
+              icon="📍"
+              accent="emerald"
+            >
+              <JssDisplay
+                juz={wusool.displayJuz}
+                surah={wusool.displaySurah}
+                safa={wusool.safa}
+              />
+              <div className="metric-footer">
+                <span className="metric-pages">{toArabicDigits(wusoolPages)} pages done</span>
+              </div>
+            </MetricCard>
+
+            {/* Metric 3: Next Week Target % */}
+            <MetricCard
+              label="Next Week Target"
+              labelAr="هدف الأسبوع القادم"
+              icon="📈"
+              accent="sapphire"
+            >
+              <JssDisplay
+                juz={nextWeek.displayJuz}
+                surah={nextWeek.displaySurah}
+                safa={nextWeek.safa}
+                compact
+              />
+              <div className="metric-footer">
+                {targetPages > 0 && nextWeekPages > 0 ? (
+                  <span className="metric-percent">
+                    <strong>{toArabicDigits(Math.round(nextWeekPercent))}%</strong> of total target
+                  </span>
+                ) : nextWeekPages > 0 ? (
+                  <span className="metric-pages">{toArabicDigits(nextWeekPages)} pages planned</span>
+                ) : (
+                  <span className="metric-pages muted">No target set</span>
+                )}
+              </div>
+            </MetricCard>
+          </div>
         </div>
       </div>
     </div>

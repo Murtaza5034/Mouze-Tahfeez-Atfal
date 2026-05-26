@@ -7660,6 +7660,9 @@ onShowAction,
                       <div className="performance-pill">
                         Latest Result: {student.latestResult?.weeklyRank || student.latestResult?.computedRank || "pending"}
                       </div>
+                      <Suspense fallback={null}>
+                        <LazyTakhteetProgress weeklyResult={student.latestResult} />
+                      </Suspense>
                     </article>
                   ))}
                   {filteredStudents.length === 0 && (

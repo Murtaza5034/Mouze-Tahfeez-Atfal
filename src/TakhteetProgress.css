@@ -1,466 +1,538 @@
-/* ===== TakhteetProgress Core Container ===== */
+/* ===== TakhteetProgress Card Container ===== */
 .takhteet-progress-container {
-  margin: 24px 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  margin: 20px 0;
   width: 100%;
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 24px;
-  padding: 32px;
-  width: 100%;
-  max-width: 720px;
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+.takhteet-glass-card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 28px;
+  padding: 28px 32px;
+  box-shadow:
+    0 8px 32px rgba(31, 38, 135, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+              box-shadow 0.3s ease;
   position: relative;
   overflow: hidden;
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.glass-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15);
-}
-
-.glass-card::before {
+.takhteet-glass-card::before {
   content: '';
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle at 20% 20%, rgba(212, 175, 55, 0.1) 0%, transparent 40%),
-              radial-gradient(circle at 80% 80%, rgba(46, 196, 182, 0.1) 0%, transparent 40%);
-  z-index: -1;
+  top: -60%;
+  left: -60%;
+  width: 220%;
+  height: 220%;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(212, 175, 55, 0.06) 0%, transparent 45%),
+    radial-gradient(circle at 80% 85%, rgba(46, 196, 182, 0.06) 0%, transparent 45%);
   pointer-events: none;
+  z-index: 0;
+}
+
+.takhteet-glass-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 40px rgba(31, 38, 135, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 /* ===== Card Header ===== */
-.card-header {
-  text-align: center;
+.takhteet-card-header {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 20px;
 }
 
-.card-title {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--deep-brown, #3e2723);
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--deep-brown, #3e2723) 0%, var(--primary-gold, #d4af37) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -0.5px;
-}
-
-.card-subtitle {
-  margin: 8px 0 0;
-  font-size: 0.95rem;
-  color: var(--text-muted, #757575);
-}
-
-/* Juz Badge for High Level */
-.juz-badge {
-  display: inline-flex;
-  margin-top: 10px;
-  padding: 4px 16px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.08));
-  border: 1px solid rgba(212, 175, 55, 0.25);
-}
-
-.juz-badge-text {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--primary-gold, #d4af37);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-/* ===== Progress Body ===== */
-.progress-body {
+.takhteet-title-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 32px;
+  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-/* ===== Liquid Circle (unchanged) ===== */
-.liquid-container {
+.takhteet-card-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #3e2723;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.3px;
+}
+
+.title-icon {
+  font-size: 1.3rem;
+}
+
+.takhteet-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.08));
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  color: #b8962e;
+  white-space: nowrap;
+}
+
+.takhteet-card-subtitle {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #8a786a;
+  line-height: 1.4;
+}
+
+/* ===== Main Section ===== */
+.takhteet-main-section {
+  display: flex;
+  align-items: center;
+  gap: 28px;
   position: relative;
-  width: 140px;
-  height: 140px;
+  z-index: 1;
+  flex-wrap: wrap;
+}
+
+/* ===== Progress Ring ===== */
+.takhteet-progress-ring-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 150px;
+}
+
+.progress-ring-container {
+  position: relative;
   flex-shrink: 0;
 }
 
-.liquid-circle {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: #f0f4f8;
-  border: 4px solid rgba(212, 175, 55, 0.3);
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.05),
-              0 10px 20px rgba(212, 175, 55, 0.15);
-  position: relative;
-  overflow: hidden;
+.progress-ring-svg {
+  display: block;
 }
 
-.liquid-wave {
-  position: absolute;
-  top: 100%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: transparent;
-  transition: top 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+.progress-ring-fill {
+  transition: stroke-dashoffset 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.liquid-wave svg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 40px;
+.progress-ring-glow {
+  opacity: 0.4;
+  transition: stroke-dashoffset 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.water-fill {
-  position: absolute;
-  top: 39px;
-  left: 0;
-  width: 100%;
-  height: calc(100% - 39px);
-  background: var(--primary-gold, #d4af37);
-  opacity: 0.8;
-}
-
-.wave {
-  fill: var(--primary-gold, #d4af37);
-  opacity: 0.8;
-  animation: moveWave 3s linear infinite;
-}
-
-.wave2 {
-  fill: rgba(212, 175, 55, 0.5);
-  animation: moveWave 4s linear infinite reverse;
-}
-
-@keyframes moveWave {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.percentage-text {
+.progress-ring-text {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--deep-brown, #3e2723);
-  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.8);
-  z-index: 10;
-}
-
-/* ===== Headings Grid ===== */
-.headings-grid {
-  display: flex;
-  gap: 12px;
-  flex: 1;
-  min-width: 240px;
-}
-
-.heading-card {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.55);
-  border-radius: 16px;
-  padding: 14px 12px;
-  border: 1px solid rgba(212, 175, 55, 0.12);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.heading-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(61, 43, 31, 0.08);
-  border-color: rgba(212, 175, 55, 0.25);
-}
-
-.heading-card-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  line-height: 1;
+}
+
+.progress-ring-value {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #3e2723;
+}
+
+.progress-ring-unit {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #b8962e;
+  margin-top: 2px;
+}
+
+/* Progress Stats Row */
+.progress-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.progress-stat .stat-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a786a;
+}
+
+.progress-stat .stat-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #3e2723;
+}
+
+.progress-stat-divider {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #d4af37;
+  padding-bottom: 12px;
+}
+
+.progress-remaining {
+  font-size: 0.85rem;
+  color: #5d4a3a;
+  margin: 0;
+  text-align: center;
+}
+
+.progress-remaining strong {
+  color: #3e2723;
+}
+
+/* ===== Metrics Grid ===== */
+.takhteet-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  flex: 1;
+  min-width: 360px;
+}
+
+/* ===== Metric Card ===== */
+.takhteet-metric-card {
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 18px;
+  padding: 16px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  animation: metricFadeIn 0.5s ease both;
+}
+
+.takhteet-metric-card:nth-child(1) { animation-delay: 0.1s; }
+.takhteet-metric-card:nth-child(2) { animation-delay: 0.2s; }
+.takhteet-metric-card:nth-child(3) { animation-delay: 0.3s; }
+
+.takhteet-metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Accent borders */
+.metric-gold {
+  border-top: 3px solid #d4af37;
+}
+
+.metric-emerald {
+  border-top: 3px solid #2ec4b6;
+}
+
+.metric-sapphire {
+  border-top: 3px solid #4a90d9;
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(212, 175, 55, 0.12);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  flex-wrap: wrap;
 }
 
-.heading-label {
-  font-size: 0.75rem;
+.metric-icon {
+  font-size: 1rem;
+}
+
+.metric-label {
+  font-size: 0.7rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--deep-brown, #3e2723);
+  letter-spacing: 0.06em;
+  color: #3e2723;
 }
 
-.heading-label-arabic {
-  font-size: 1rem;
-  color: var(--primary-gold, #d4af37);
-  letter-spacing: normal;
+.metric-label-arabic {
+  font-size: 0.8rem;
+  color: #b8962e;
+  margin-left: auto;
 }
 
-/* ===== 3-Column Juz | Surah | Safa Layout ===== */
-.jss-row {
-  display: grid;
-  grid-template-columns: 1fr 1.5fr 1fr;
-  gap: 4px;
-  align-items: start;
-}
-
-.jss-cell {
+.metric-body {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 2px;
-  border-radius: 8px;
+  gap: 8px;
+}
+
+/* ===== JSS Display (Juz | Surah | Safa) ===== */
+.jss-display {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
   background: rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
-.jss-cell-label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted, #8a786a);
-}
-
-.jss-cell-value {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--deep-brown, #3e2723);
-  text-align: center;
-  line-height: 1.2;
-  word-break: break-word;
-}
-
-.jss-cell-value.kanz-font {
-  letter-spacing: normal;
-  font-size: 1rem;
-}
-
-.surah-cell .jss-cell-value {
-  font-size: 1.1rem;
-}
-
-/* ===== 2-Column Simple Layout (Juz|Safa) ===== */
-.simple-row {
+.jss-item {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
   align-items: center;
+  padding: 6px 4px;
+  gap: 2px;
 }
 
-.simple-main {
-  text-align: center;
+.jss-divider {
+  width: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
 }
 
-.simple-juz {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--deep-brown, #3e2723);
-}
-
-.simple-surah {
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: var(--deep-brown, #3e2723);
-  letter-spacing: normal;
-}
-
-.simple-safa {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(212, 175, 55, 0.08);
-  padding: 3px 12px;
-  border-radius: 999px;
-}
-
-.simple-safa-label {
-  font-size: 0.6rem;
+.jss-label {
+  font-size: 0.5rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted, #8a786a);
+  color: #8a786a;
 }
 
-.simple-safa-value {
-  font-size: 0.95rem;
+.jss-value {
+  font-size: 0.85rem;
   font-weight: 700;
-  color: var(--primary-gold, #d4af37);
+  color: #3e2723;
+  line-height: 1.2;
+  text-align: center;
 }
 
-/* ===== Footer ===== */
-.footer-message {
+.jss-display.compact .jss-value {
+  font-size: 0.78rem;
+}
+
+.arabic-text {
+  font-size: 0.95rem !important;
+  letter-spacing: normal;
+}
+
+/* ===== Metric Footer ===== */
+.metric-footer {
+  margin-top: 2px;
   text-align: center;
-  margin-top: 4px;
-  font-size: 1.05rem;
-  color: var(--text-dark, #424242);
+}
+
+.metric-pages {
+  font-size: 0.7rem;
+  color: #8a786a;
+  font-weight: 600;
+}
+
+.metric-pages.muted {
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.metric-percent {
+  font-size: 0.75rem;
+  color: #3e2723;
+}
+
+.metric-percent strong {
+  color: #2ec4b6;
+  font-size: 0.85rem;
 }
 
 .success-text {
-  color: #2e7d32;
+  color: #2e7d32 !important;
+  font-weight: 700;
 }
 
 /* ===== Animations ===== */
 .card-appear {
-  animation: cardAppear 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: cardFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes cardAppear {
-  0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+@keyframes cardFadeIn {
+  0% { opacity: 0; transform: translateY(20px) scale(0.96); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes metricFadeIn {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
-.heading-card {
-  animation: fadeInUp 0.4s ease both;
+/* ===== Teacher Portal Specific ===== */
+.record-card .takhteet-progress-container {
+  margin: 12px 0 4px;
 }
 
-.heading-card:nth-child(1) { animation-delay: 0.1s; }
-.heading-card:nth-child(2) { animation-delay: 0.2s; }
-.heading-card:nth-child(3) { animation-delay: 0.3s; }
-
-/* ===== Kanz al Marjan Font Helper with proper Arabic fallbacks ===== */
-.kanz-font {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
-  letter-spacing: normal;
+.record-card .takhteet-glass-card {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.35);
 }
 
-/* ===== Responsive: Tablet ===== */
-@media (max-width: 768px) {
-  .glass-card {
-    padding: 24px 20px;
-    max-width: 100%;
-  }
+.record-card .takhteet-card-title {
+  font-size: 1rem;
+}
 
-  .progress-body {
+.record-card .takhteet-card-subtitle {
+  display: none;
+}
+
+.record-card .takhteet-badge {
+  font-size: 0.55rem;
+  padding: 2px 10px;
+}
+
+.record-card .takhteet-metrics-grid {
+  grid-template-columns: repeat(3, 1fr);
+  min-width: 180px;
+  gap: 8px;
+}
+
+.record-card .takhteet-metric-card {
+  padding: 10px 8px;
+  border-radius: 12px;
+}
+
+.record-card .metric-label {
+  font-size: 0.6rem;
+}
+
+.record-card .metric-label-arabic {
+  font-size: 0.65rem;
+}
+
+.record-card .metric-header {
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+}
+
+.record-card .jss-item {
+  padding: 4px 2px;
+}
+
+.record-card .jss-value {
+  font-size: 0.72rem;
+}
+
+.record-card .arabic-text {
+  font-size: 0.8rem !important;
+}
+
+.record-card .jss-label {
+  font-size: 0.45rem;
+}
+
+.record-card .progress-ring-value {
+  font-size: 1.4rem;
+}
+
+.record-card .takhteet-progress-ring-wrap {
+  min-width: 120px;
+}
+
+.record-card .metric-pages {
+  font-size: 0.6rem;
+}
+
+.record-card .metric-percent {
+  font-size: 0.65rem;
+}
+
+.record-card .metric-percent strong {
+  font-size: 0.72rem;
+}
+
+.record-card .progress-stat .stat-value {
+  font-size: 0.8rem;
+}
+
+.record-card .progress-remaining {
+  font-size: 0.75rem;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 900px) {
+  .takhteet-main-section {
     flex-direction: column;
-    gap: 20px;
+    align-items: center;
   }
 
-  .liquid-container {
-    width: 120px;
-    height: 120px;
-  }
-
-  .headings-grid {
+  .takhteet-metrics-grid {
     width: 100%;
+    min-width: unset;
+  }
+
+  .record-card .takhteet-metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .takhteet-glass-card {
+    padding: 20px 16px;
+    border-radius: 22px;
+  }
+
+  .takhteet-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .takhteet-card-title {
+    font-size: 1.1rem;
+  }
+
+  .takhteet-badge {
+    font-size: 0.6rem;
+  }
+
+  .takhteet-metrics-grid {
+    grid-template-columns: 1fr;
     gap: 10px;
   }
 
-  .heading-card {
+  .takhteet-metric-card {
     padding: 12px 10px;
   }
 
-  .jss-row {
-    gap: 3px;
+  .record-card .takhteet-metrics-grid {
+    grid-template-columns: 1fr;
   }
 
-  .jss-cell-value {
-    font-size: 0.85rem;
-  }
-
-  .surah-cell .jss-cell-value {
-    font-size: 0.95rem;
-  }
-
-  .card-title {
-    font-size: 1.3rem;
+  .record-card .takhteet-glass-card {
+    padding: 12px;
   }
 }
 
-/* ===== Responsive: Mobile ===== */
 @media (max-width: 480px) {
-  .glass-card {
-    padding: 20px 16px;
-    border-radius: 20px;
+  .takhteet-glass-card {
+    padding: 16px 12px;
   }
 
-  .liquid-container {
-    width: 100px;
-    height: 100px;
-  }
-
-  .percentage-text {
-    font-size: 1.5rem;
-  }
-
-  .headings-grid {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .heading-card {
-    padding: 10px 12px;
-  }
-
-  .heading-card-header {
-    flex-direction: row;
-    justify-content: space-between;
-    padding-bottom: 6px;
-    margin-bottom: 8px;
-  }
-
-  .heading-label {
-    font-size: 0.7rem;
-  }
-
-  .heading-label-arabic {
-    font-size: 0.9rem;
-  }
-
-  .jss-row {
-    gap: 4px;
-  }
-
-  .jss-cell-value {
-    font-size: 0.85rem;
-  }
-
-  .surah-cell .jss-cell-value {
-    font-size: 0.95rem;
-  }
-
-  .simple-juz {
-    font-size: 0.9rem;
-  }
-
-  .simple-surah {
+  .takhteet-card-title {
     font-size: 1rem;
   }
 
-  .card-title {
-    font-size: 1.15rem;
+  .takhteet-progress-ring-wrap {
+    min-width: 110px;
   }
 
-  .card-subtitle {
-    font-size: 0.85rem;
-  }
-
-  .footer-message {
-    font-size: 0.95rem;
+  .progress-ring-value {
+    font-size: 1.5rem;
   }
 }
