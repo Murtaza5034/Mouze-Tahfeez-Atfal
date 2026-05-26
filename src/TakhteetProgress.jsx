@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import './IstifdahProgress.css';
+import './TakhteetProgress.css';
 
 // Surah names in Arabic (0-indexed: index 0 = Al-Fatihah, index 113 = An-Nas)
 const SURAH_NAMES_AR = [
@@ -101,7 +101,7 @@ const HEADINGS = {
   target: { label: "Target Till", labelAr: "الهدف حتى" },
 };
 
-const IstifdahProgress = ({ weeklyResult, currentJuz }) => {
+const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
   const [percent, setPercent] = useState(0);
 
   // Determine student juz level
@@ -162,7 +162,7 @@ const IstifdahProgress = ({ weeklyResult, currentJuz }) => {
   }
 
   return (
-    <div className="istifdah-progress-container card-appear">
+    <div className="takhteet-progress-container card-appear">
       <div className="glass-card">
         <div className="card-header">
           <h3 className="card-title">
@@ -223,9 +223,9 @@ const IstifdahProgress = ({ weeklyResult, currentJuz }) => {
 
         <div className="footer-message">
           {remainingPages > 0 ? (
-            <p><strong>{toArabicDigits(remainingPages)} pages</strong> remaining to Istifdah. Keep going!</p>
+            <p><strong>{toArabicDigits(remainingPages)} pages</strong> remaining to Takhteet. Keep going!</p>
           ) : targetPages > 0 ? (
-            <p className="success-text"><strong>Istifdah Target Reached!</strong> MashaAllah!</p>
+            <p className="success-text"><strong>Takhteet Target Reached!</strong> MashaAllah!</p>
           ) : wusoolPages > 0 ? (
             <p><strong>{toArabicDigits(wusoolPages)} pages</strong> covered</p>
           ) : (
@@ -237,4 +237,4 @@ const IstifdahProgress = ({ weeklyResult, currentJuz }) => {
   );
 };
 
-export default IstifdahProgress;
+export default TakhteetProgress;

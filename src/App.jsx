@@ -519,7 +519,7 @@ const LazyJadwalParentView = React.lazy(() =>
   import("./Jadwal").then((mod) => ({ default: mod.JadwalParentView }))
 );
 
-const LazyIstifdahProgress = React.lazy(() => import("./IstifdahProgress"));
+const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
 
 const fixArabicScript = (text) => {
   if (!text) return "";
@@ -3693,7 +3693,7 @@ function ParentPortal({
             </div>
             
             <Suspense fallback={null}>
-              <LazyIstifdahProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
+              <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
             </Suspense>
             
             <div className="dashboard-section">
