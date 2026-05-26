@@ -7328,7 +7328,7 @@ function TeacherPortal({
 
                   <div className="form-grid">
                     <label>
-                      <span>Istifadah Juz</span>
+                      <span>Takhteet Juz</span>
                       <input
                         type="text"
                         name="istifadah_juz"
@@ -7338,7 +7338,7 @@ function TeacherPortal({
                     </label>
 
                     <label>
-                      <span>Istifadah Page</span>
+                      <span>Takhteet Page</span>
                       <input
                         type="text"
                         name="istifadah_page"
@@ -8091,7 +8091,7 @@ export default function App() {
             reportSettings: reportSettingsResponse.data || [],
           };
 
-          if (!selectedStudentId) { setSelectedStudentId(activeStudent.student_id); setCelebrationRank(null); }
+          if (!selectedStudentId) { setSelectedStudentId(activeStudent.student_id); }
         }
 
         setParentData(nextParentState);

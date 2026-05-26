@@ -7532,7 +7532,7 @@ onShowAction,
 
                   <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                     <label>
-                      <span>Istifadah Juz</span>
+                      <span>Takhteet Juz</span>
                       <select
                         className="premium-select kanz-font"
                         name="istifadah_juz"
@@ -7547,7 +7547,7 @@ onShowAction,
                       </select>
                     </label>
                     <label>
-                      <span>Istifadah Surah</span>
+                      <span>Takhteet Surah</span>
                       <select
                         className="premium-select kanz-font"
                         name="istifadah_surah"
@@ -7562,7 +7562,7 @@ onShowAction,
                       </select>
                     </label>
                     <label>
-                      <span>Istifadah Page</span>
+                      <span>Takhteet Page</span>
                       <input
                         type="text"
                         name="istifadah_page"
@@ -8385,7 +8385,7 @@ export default function App() {
             reportSettings: reportSettingsResponse.data || [],
           };
 
-          if (!selectedStudentId) { setSelectedStudentId(activeStudent.student_id); setCelebrationRank(null); }
+          if (!selectedStudentId) { setSelectedStudentId(activeStudent.student_id); }
         }
 
         setParentData(nextParentState);
