@@ -2354,7 +2354,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
   const hSub = report.sub_heading;
   const hWusool = report.wusool_heading;
   const hNext = report.next_week_heading;
-  const hIstifadah = report.istifadah_heading;
+  const hTakhteet = report.Takheet_heading;
   const progressCardBackground = report.progress_card_background_url || "";
   const progressCardOverlayOpacity = Math.min(
     Math.max(Number(report.progress_card_overlay_opacity ?? 0.82), 0),
@@ -2463,7 +2463,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
           <div className="score-details-box">
             {[
-              { label: report.murajazah_heading, val: weeklyResult?.murajazah, max: 30 },
+              { label: report.murajah_heading, val: weeklyResult?.murajah, max: 30 },
               { label: report.juz_hali_heading, val: weeklyResult?.juz_hali, max: 30 },
               { label: report.takhteet_heading, val: weeklyResult?.takhteet, max: 20 },
               { label: report.jadeed_heading, val: weeklyResult?.jadeed, max: 20 }
@@ -2507,10 +2507,10 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
-            <h5 className="kids-font">{hIstifadah}</h5>
-            <p dir="rtl"><span className="arabic-kanz">{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
+            <h5 className="kids-font">{hTakhteet}</h5>
+            <p dir="rtl"><span className="arabic-kanz">{report.Takhteet_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.Takhteeth_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.Takhteet_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.Takhteet_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.Takhteet_page || "-")}</span></p>
           </div>
         </div>
 
