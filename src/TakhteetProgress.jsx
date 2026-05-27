@@ -63,21 +63,22 @@ const calcPages = (juz, page) => {
   return (30 - safeJuz) * 20 + (parseInt(page || "0", 10));
 };
 
-const AnimatedProgressRing = ({ percent, size = 140, strokeWidth = 10 }) => {
+const AnimatedProgressRing = ({ percent, size = 140, strokeWidth = 10, isComplete = false }) => {
   const [animatedPercent, setAnimatedPercent] = useState(0);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (animatedPercent / 100) * circumference;
 
   useEffect(() => {
+    const safePercent = isNaN(percent) ? 0 : percent;
     const timer = setTimeout(() => {
-      setAnimatedPercent(Math.min(100, Math.max(0, percent)));
+      setAnimatedPercent(Math.min(100, Math.max(0, safePercent)));
     }, 400);
     return () => clearTimeout(timer);
   }, [percent]);
 
   return (
-    <div className="progress-ring-container" style={{ width: size, height: size }}>
+    <div className={`progress-ring-container ${isComplete ? 'ring-complete' : ''}`} style={{ width: size, height: size }}>
       <svg width={size} height={size} className="progress-ring-svg">
         {/* Background circle */}
         <circle
@@ -208,6 +209,7 @@ const TakhteetProgress = ({ weeklyResult }) => {
   }, [progressPercent]);
 
   const remainingPages = Math.max(0, targetPages - wusoolPages);
+  const isComplete = targetPages > 0 && remainingPages === 0;
 
   // Don't render if no data at all
   const hasTarget = target.isNumeric || (target.displaySurah && target.displaySurah !== "\u2014");
@@ -218,7 +220,7 @@ const TakhteetProgress = ({ weeklyResult }) => {
   }
 
   return (
-    <div className="takhteet-progress-container card-appear">
+    <div className={`takhteet-progress-container card-appear ${isComplete ? 'target-complete' : ''}`}>
       <div className="takhteet-glass-card">
         {/* Card Header */}
         <div className="takhteet-card-header">
@@ -240,7 +242,7 @@ const TakhteetProgress = ({ weeklyResult }) => {
         <div className="takhteet-main-section">
           {/* Circular Progress */}
           <div className="takhteet-progress-ring-wrap">
-            <AnimatedProgressRing percent={percent} size={130} strokeWidth={8} />
+            <AnimatedProgressRing percent={percent} size={130} strokeWidth={8} isComplete={isComplete} />
             <div className="progress-stats-row">
               <div className="progress-stat">
                 <span className="stat-label">Target</span>
@@ -253,10 +255,10 @@ const TakhteetProgress = ({ weeklyResult }) => {
               </div>
             </div>
             <p className="progress-remaining">
-              {remainingPages > 0 ? (
+              {              remainingPages > 0 ? (
                 <><strong>{toArabicDigits(remainingPages)}</strong> pages remaining</>
               ) : targetPages > 0 ? (
-                <span className="success-text">✓ Target Reached! MashaAllah!</span>
+                <span className="success-text celebration-text">🎉 Mubarak Mohanna! Target achieved 🎉</span>
               ) : wusoolPages > 0 ? (
                 <><strong>{toArabicDigits(wusoolPages)}</strong> pages covered</>
               ) : null}

@@ -511,6 +511,63 @@ const loadSaveAs = async () => {
   return mod.saveAs;
 };
 
+// @font-face CSS for injection into html2canvas cloned document (ensures Kanz al Marjaan renders in PDFs)
+const FONT_FACE_CSS = `
+@font-face {
+  font-family: 'Kanz al Marjaan';
+  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+`;
+
+const loadCustomFontsForCanvas = async () => {
+  try {
+    // Wait for any browser-triggered font loading to settle
+    await document.fonts.ready;
+
+    // Explicitly load Kanz al Marjaan via FontFace API
+    const fontUrls = [
+      {
+        family: "Kanz al Marjaan",
+        sources: [
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2) format('woff2')",
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff) format('woff')",
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf) format('truetype')",
+        ],
+      },
+      {
+        family: "Al-Kanz",
+        sources: [
+          "url(/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf) format('truetype')",
+        ],
+      },
+    ];
+
+    for (const { family, sources } of fontUrls) {
+      const testStr = "abcdefghijklmnopqrstuvwxyz0123456789";
+      if (!document.fonts.check(`1em "${family}"`, testStr)) {
+        const ff = new FontFace(family, sources.join(", "));
+        await ff.load();
+        document.fonts.add(ff);
+      }
+    }
+
+    // One final wait to ensure everything is settled
+    await document.fonts.ready;
+  } catch (err) {
+    console.warn("Custom font loading for canvas capture failed:", err);
+  }
+};
+
 const LazyJadwalTeacherView = React.lazy(() =>
   import("./Jadwal").then((mod) => ({ default: mod.JadwalTeacherView }))
 );
@@ -2316,7 +2373,7 @@ function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
           {heading}
         </h4>
         <p className="attendance-sub-label kanz-font" style={{ textAlign: 'center', fontSize: '11px' }}>
-          {toArabicDigits(count || 0)} out of {toArabicDigits(total)} Presence
+          {toArabicDigits(count || 0)} out of {toArabicDigits(total)} {heading}
         </p>
       </div>
     </div>
@@ -2620,6 +2677,7 @@ function SettingsPage({
         <h2 className="page-title">Portal Settings</h2>
         <p className="page-eyebrow">Personalize your experience</p>
       </div>
+      <div className="settings-layout">
       <div className="settings-tabs">
         {tabs.map(tab => (
           <button 
@@ -2627,13 +2685,16 @@ function SettingsPage({
             className={`settings-tab-btn ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === "Dark mode" && <Moon size={16} />}
-            {tab === "App themes" && <Palette size={16} />}
-            {tab === "Notifications" && <Bell size={16} />}
-            {tab === "Security" && <Lock size={16} />}
-            {tab === "Support" && <LifeBuoy size={16} />}
-            {tab === "About" && <Info size={16} />}
-            {tab}
+            <span className="tab-btn-icon">
+              {tab === "Dark mode" && <Moon size={18} />}
+              {tab === "App themes" && <Palette size={18} />}
+              {tab === "Notifications" && <Bell size={18} />}
+              {tab === "Security" && <Lock size={18} />}
+              {tab === "Support" && <LifeBuoy size={18} />}
+              {tab === "About" && <Info size={18} />}
+            </span>
+            <span className="tab-btn-label">{tab}</span>
+            <ChevronRight size={16} className="tab-btn-chevron" />
           </button>
         ))}
       </div>
@@ -2797,18 +2858,19 @@ function SettingsPage({
               <div className="registration-promo">
                 <p>Join our specialized memorization programs today.</p>
                 <a 
-                  href="https://mahahalzahra.org" 
+                  href="https://www.mahadalquran.com/quran-programs/" 
                   target="_blank" 
                   rel="noreferrer" 
                   className="register-btn"
                 >
-                  Register Now at Mahad al Zahra <ArrowRight size={16} />
+                  Register Now at Mahad al Quran <ArrowRight size={16} />
                 </a>
               </div>
             </div>
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
@@ -3383,6 +3445,10 @@ function ParentPortal({
     if (element) {
       try {
         await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Ensure custom fonts (Kanz al Marjaan, Al-Kanz) are fully loaded before canvas capture
+        await loadCustomFontsForCanvas();
+
         const [html2canvas, jsPDF] = await Promise.all([
           loadHtml2Canvas(),
           loadJsPDF(),
@@ -3392,6 +3458,12 @@ function ParentPortal({
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
+          onclone: async (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent = FONT_FACE_CSS;
+            clonedDoc.head.appendChild(style);
+            if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+          },
         });
 
         const imgData = canvas.toDataURL("image/png");
@@ -4143,8 +4215,6 @@ function ParentPortal({
             user={user}
             studentProfile={studentProfile}
             onShowAction={showAction}
-            teacherUnlockStatus={teacherUnlockStatus}
-            setTeacherUnlockStatus={setTeacherUnlockStatus}
           />
         ) : null}
 
@@ -4744,6 +4814,9 @@ function AdminPortal({
     ]);
     const zip = new JSZip();
 
+    // Pre-load custom fonts once before the batch loop
+    await loadCustomFontsForCanvas();
+
     if (onShowAction) onShowAction("success", `Preparing ${students.length} reports... Please wait.`);
 
     for (let i = 0; i < students.length; i++) {
@@ -4764,12 +4837,18 @@ function AdminPortal({
         try {
           // Extra small delay to ensure images inside the element are settled
           await new Promise(resolve => setTimeout(resolve, 500)); 
-          
+
           const canvas = await html2canvas(element, {
             scale: 2,
             useCORS: true,
             allowTaint: true,
             backgroundColor: "#ffffff",
+            onclone: async (clonedDoc) => {
+              const style = clonedDoc.createElement('style');
+              style.textContent = FONT_FACE_CSS;
+              clonedDoc.head.appendChild(style);
+              if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+            },
           });
           
           const imgData = canvas.toDataURL("image/png");

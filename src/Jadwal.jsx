@@ -12,6 +12,23 @@ DAYS.forEach(day => {
   DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', star: '' };
 });
 
+// @font-face CSS for injection into html2canvas cloned document
+const FONT_FACE_CSS = `
+@font-face {
+  font-family: 'Kanz al Marjaan';
+  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+`;
 const handleDownloadPDF = async (studentName, scheduleData) => {
   const printContainer = document.createElement("div");
   printContainer.style.position = "absolute";
@@ -92,11 +109,36 @@ const handleDownloadPDF = async (studentName, scheduleData) => {
   document.body.appendChild(printContainer);
 
   try {
+    // Ensure custom fonts (Kanz al Marjaan, Al-Kanz) are fully loaded before canvas capture
+    try {
+      await document.fonts.ready;
+      // Explicitly load Kanz al Marjaan font via FontFace API
+      const kanzFamily = ['Kanz al Marjaan', 'Al-Kanz'];
+      for (const family of kanzFamily) {
+        if (!document.fonts.check('1em "' + family + '"', 'abcdefghijklmnopqrstuvwxyz0123456789')) {
+          const fontSrc = family === 'Kanz al Marjaan'
+            ? "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2) format('woff2'),url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff) format('woff'),url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf) format('truetype')"
+            : "url(/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf) format('truetype')";
+          const ff = new FontFace(family, fontSrc);
+          await ff.load();
+          document.fonts.add(ff);
+        }
+      }
+      await document.fonts.ready;
+    } catch (e) {
+      console.warn('Custom font loading for Jadwal PDF failed:', e);
+    }
     const canvas = await html2canvas(printContainer, {
       scale: 3, // 100% HD Quality
       useCORS: true,
       allowTaint: true,
       backgroundColor: "#ffffff",
+      onclone: async (clonedDoc) => {
+        const style = clonedDoc.createElement('style');
+        style.textContent = FONT_FACE_CSS;
+        clonedDoc.head.appendChild(style);
+        if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+      },
     });
 
     const imgData = canvas.toDataURL("image/png");

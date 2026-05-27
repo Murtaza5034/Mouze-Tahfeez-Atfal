@@ -2591,6 +2591,7 @@ function SettingsPage({
         <h2 className="page-title">Portal Settings</h2>
         <p className="page-eyebrow">Personalize your experience</p>
       </div>
+      <div className="settings-layout">
       <div className="settings-tabs">
         {tabs.map(tab => (
           <button 
@@ -2598,13 +2599,16 @@ function SettingsPage({
             className={`settings-tab-btn ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === "Dark mode" && <Moon size={16} />}
-            {tab === "App themes" && <Palette size={16} />}
-            {tab === "Notifications" && <Bell size={16} />}
-            {tab === "Security" && <Lock size={16} />}
-            {tab === "Support" && <LifeBuoy size={16} />}
-            {tab === "About" && <Info size={16} />}
-            {tab}
+            <span className="tab-btn-icon">
+              {tab === "Dark mode" && <Moon size={18} />}
+              {tab === "App themes" && <Palette size={18} />}
+              {tab === "Notifications" && <Bell size={18} />}
+              {tab === "Security" && <Lock size={18} />}
+              {tab === "Support" && <LifeBuoy size={18} />}
+              {tab === "About" && <Info size={18} />}
+            </span>
+            <span className="tab-btn-label">{tab}</span>
+            <ChevronRight size={16} className="tab-btn-chevron" />
           </button>
         ))}
       </div>
@@ -2768,18 +2772,19 @@ function SettingsPage({
               <div className="registration-promo">
                 <p>Join our specialized memorization programs today.</p>
                 <a 
-                  href="https://mahahalzahra.org" 
+                  href="https://www.mahadalquran.com/quran-programs/" 
                   target="_blank" 
                   rel="noreferrer" 
                   className="register-btn"
                 >
-                  Register Now at Mahad al Zahra <ArrowRight size={16} />
+                  Register Now at Mahad al Quran <ArrowRight size={16} />
                 </a>
               </div>
             </div>
           </div>
         )}
-      </div>
+      
+    </div></div>
     </div>
   );
 }
@@ -2859,6 +2864,7 @@ function SupportTicketsAdmin({ tickets = [], onRefresh }) {
           </div>
         )}
       </div>
+    </div></div>
     </div>
   );
 }

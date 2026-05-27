@@ -358,6 +358,171 @@
   font-weight: 700;
 }
 
+/* ===== Celebration Styles ===== */
+.celebration-text {
+  font-size: 1rem !important;
+  animation: celebrationBounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.5) both,
+             celebrationGlow 2s ease-in-out infinite alternate;
+  display: inline-block;
+  background: linear-gradient(135deg, #d4af37, #f6dc88, #d4af37);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+}
+
+/* Target complete glow on the card */
+.target-complete .takhteet-glass-card {
+  border-color: rgba(212, 175, 55, 0.4);
+  box-shadow:
+    0 8px 32px rgba(212, 175, 55, 0.15),
+    0 0 60px rgba(212, 175, 55, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+  animation: cardCelebrationPulse 3s ease-in-out infinite;
+}
+
+.target-complete .takhteet-glass-card::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), transparent, rgba(212, 175, 55, 0.1), transparent);
+  z-index: -1;
+  animation: borderGlow 4s ease-in-out infinite;
+}
+
+/* Ring complete glow */
+.ring-complete .progress-ring-fill {
+  filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.6));
+  animation: ringPulse 2s ease-in-out infinite;
+}
+
+.ring-complete .progress-ring-glow {
+  opacity: 0.8 !important;
+  animation: ringPulse 2s ease-in-out infinite reverse;
+}
+
+.ring-complete .progress-ring-value {
+  color: #d4af37;
+  animation: celebrationBounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.5) 0.4s both;
+}
+
+.ring-complete .progress-ring-unit {
+  color: #b8962e;
+}
+
+/* Celebration sparkle particles via pseudo-elements */
+.target-complete .takhteet-progress-ring-wrap {
+  position: relative;
+}
+
+.target-complete .takhteet-progress-ring-wrap::before,
+.target-complete .takhteet-progress-ring-wrap::after {
+  content: '✨';
+  position: absolute;
+  font-size: 1.5rem;
+  animation: sparkleFloat 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.target-complete .takhteet-progress-ring-wrap::before {
+  top: -10px;
+  left: -15px;
+  animation-delay: 0s;
+}
+
+.target-complete .takhteet-progress-ring-wrap::after {
+  content: '🌟';
+  bottom: -10px;
+  right: -15px;
+  animation-delay: 1.5s;
+}
+
+/* More sparkles via the glass card */
+.target-complete .takhteet-glass-card .takhteet-title-row::after {
+  content: '🎉 🎊 🎉';
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  font-size: 1.2rem;
+  animation: sparkleFloat 4s ease-in-out infinite;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* Metric cards glow on complete */
+.target-complete .metric-gold {
+  border-top-color: #f6dc88;
+  background: rgba(212, 175, 55, 0.08) !important;
+}
+
+/* ===== Celebration Animations ===== */
+@keyframes celebrationBounce {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.15); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes celebrationGlow {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes cardCelebrationPulse {
+  0%, 100% { box-shadow: 0 8px 32px rgba(212, 175, 55, 0.15), 0 0 60px rgba(212, 175, 55, 0.06); }
+  50% { box-shadow: 0 8px 40px rgba(212, 175, 55, 0.25), 0 0 80px rgba(212, 175, 55, 0.12); }
+}
+
+@keyframes ringPulse {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.4)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 16px rgba(212, 175, 55, 0.8)); }
+}
+
+@keyframes borderGlow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes sparkleFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); opacity: 0.6; }
+  25% { transform: translateY(-8px) rotate(10deg) scale(1.2); opacity: 1; }
+  50% { transform: translateY(4px) rotate(-5deg) scale(0.9); opacity: 0.8; }
+  75% { transform: translateY(-4px) rotate(5deg) scale(1.1); opacity: 1; }
+}
+
+/* Teacher portal overrides */
+.record-card .celebration-text {
+  font-size: 0.85rem !important;
+}
+
+.record-card .target-complete .takhteet-glass-card::after {
+  border-radius: 20px;
+}
+
+.record-card .target-complete .takhteet-progress-ring-wrap::before {
+  font-size: 1rem;
+  top: -5px;
+  left: -5px;
+}
+
+.record-card .target-complete .takhteet-progress-ring-wrap::after {
+  font-size: 1rem;
+  bottom: -5px;
+  right: -5px;
+}
+
+.record-card .target-complete .takhteet-glass-card .takhteet-title-row::after {
+  font-size: 0.9rem;
+  top: -4px;
+  right: 5px;
+}
+
 /* ===== Animations ===== */
 .card-appear {
   animation: cardFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
