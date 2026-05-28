@@ -13,7 +13,6 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
-  Send,
   Eye,
   Sparkles,
   Trophy,
@@ -49,7 +48,9 @@ import {
   Paperclip,
   Trash2,
   Pause,
-  Play
+  Play,
+  Mail,
+  Send
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -780,6 +781,7 @@ const NAV_ICONS = {
   "Report Settings": Palette,
   "Global Settings": Settings,
   "Messages": MessageCircle,
+  "Email Settings": Mail,
 };
 
 const emptyParentData = {
@@ -2954,7 +2956,7 @@ function SupportTicketsAdmin({ tickets = [], onRefresh }) {
   );
 }
 
-function ChildLeaveApply({ studentProfile, showAction }) {
+function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
   const [attachment, setAttachment] = useState(null);
@@ -3057,8 +3059,30 @@ function ChildLeaveApply({ studentProfile, showAction }) {
         "Leave Management"
       );
 
-      showAction("success", "Leave applied successfully!");
-      setLeaveType("");
+      // Also notify the student's teacher
+      try {
+        const teacherIdField = studentProfile?.muhaffiz_id || studentProfile?.teacher_id;
+        if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
+          const teacherMatch = teacherProfiles.find(t =>
+            t.id === teacherIdField || t.user_id === teacherIdField ||
+            normalizeText(t.full_name) === normalizeText(studentProfile?.teacherName)
+          );
+          const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
+          if (teacherTarget) {
+            await broadcastNotification(
+              `Leave Application 📅`,
+              `${studentProfile?.name} (${leaveType}) has applied for leave. Reason: ${reason || 'Not provided'}`,
+              "user",
+              teacherTarget,
+              "Leave Management"
+            );
+          }
+        }
+      } catch (tErr) {
+        console.warn("Could not notify teacher about leave:", tErr);
+      }
+
+      showAction("success", "Leave applied successfully!");setLeaveType("");
       setReason("");
       setAttachment(null);
       fetchHistory();
@@ -3899,7 +3923,7 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Apply Leave" && (
-          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} />
+          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} />
         )}
 
         {activePage === "Child Summary" ? (
@@ -4663,6 +4687,8 @@ function AdminPortal({
   onSendCustomNotification,
   attachedFileUrl,
   uploadingFile,
+  onTeacherPhotoUpload,
+  uploadingTeacherPhoto,
   onNotificationFileChange,
   onClearHistory,
   notifications,
@@ -4684,6 +4710,17 @@ function AdminPortal({
   portalAccessSuccess,
   onClosePortalAccessSuccess,
   onTeacherUnlock,
+  emailSettings,
+  sendingEmail,
+  emailProgress,
+  emailLogs,
+  onUpdateEmailConfig,
+  onSendIndividualEmail,
+  onTriggerEmailNotifications,
+  onSetSendingEmail,
+  onSetEmailProgress,
+  onSetEmailLogs,
+
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -4795,10 +4832,7 @@ function AdminPortal({
     
     setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `WhatsApp notifications finished! Sent: ${sentCount}/${targetStudents.length} successfully.`, type: 'info' }]);
   };
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [studentToRender, setStudentToRender] = useState(null);
-
-  const handleDownloadAllReports = async () => {
+const handleDownloadAllReports = async () => {
     if (students.length === 0) {
       if (onShowAction) onShowAction("error", "No students available to download reports.");
       return;
@@ -4910,7 +4944,7 @@ function AdminPortal({
     }
   };
 
-  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings"];
+  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings", "Email Settings"];
   const navPages = ["Overview", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
@@ -5243,6 +5277,116 @@ function AdminPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
+          {activePage === "Email Settings" ? (
+            <section className="settings-section premium-card card-appear">
+              <div className="stack-form">
+                <div className="section-header">
+                  <Mail size={20} />
+                  <h3>Email Settings (Resend)</h3>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.target);
+                    const updates = {
+                      enabled: fd.get("em_enabled") === "true",
+                      from_email: fd.get("em_from_email") || "",
+                      subject_template: fd.get("em_subject_template") || "",
+                      message_template: fd.get("em_message_template") || "",
+                    };
+                    await onUpdateEmailConfig(updates);
+                  }}
+                >
+                  <label className="form-group">
+                    <span>Enable Email Notifications</span>
+                    <select name="em_enabled" defaultValue={String(emailSettings?.enabled ?? false)} className="premium-select">
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </label>
+
+                  <label className="form-group">
+                    <span>From Email Address</span>
+                    <input name="em_from_email" type="email" defaultValue={emailSettings?.from_email || ""} placeholder="your-domain@resend.dev" className="premium-input" />
+                  </label>
+
+                  <label className="form-group">
+                    <span>Subject Template</span>
+                    <input name="em_subject_template" type="text" defaultValue={emailSettings?.subject_template || "Tahfeez Progress Report for {{child_name}}"} placeholder="Subject line with placeholders" className="premium-input" />
+                  </label>
+
+                  <label className="form-group">
+                    <span>Message Template</span>
+                    <textarea name="em_message_template" rows="3" className="premium-input"
+                      defaultValue={emailSettings?.message_template || "Salam! Please find attached the weekly Tahfeez progress report for {{child_name}}."} 
+                    />
+                    <span className="hint-text">Placeholders: <code>{'{{child_name}}'}</code>, <code>{'{{group_name}}'}</code></span>
+                  </label>
+
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    <button type="submit" className="action-button" style={{ background: "var(--deep-brown)", color: "white" }}>
+                      <Mail size={16} /> Save Email Settings
+                    </button>
+
+                    <button
+                      type="button"
+                      className="action-button"
+                      onClick={() => onTriggerEmailNotifications(false)}
+                      disabled={sendingEmail}
+                      style={{ background: emailSettings?.enabled ? "var(--primary-gold)" : "#999", color: "white" }}
+                    >
+                      {sendingEmail ? "Sending..." : "Send Bulk Email to All Parents"}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Manual Email Send */}
+                <div style={{ marginTop: "30px", borderTop: "1px solid var(--glass-border)", paddingTop: "20px" }}>
+                  <h4 style={{ margin: "0 0 12px", color: "var(--deep-brown)", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Send size={18} /> Manual Email Send
+                  </h4>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.target);
+                      const to = fd.get("manual_to") || "";
+                      const subj = fd.get("manual_subject") || "";
+                      const msg = fd.get("manual_message") || "";
+                      if (!to || !subj || !msg) {
+                        alert("Please fill in To, Subject, and Message fields.");
+                        return;
+                      }
+                      const html = "<p>" + msg.replace(/\n/g, "<br>") + "</p>";
+                      try {
+                        await onSendIndividualEmail(to, subj, html, "", "", "");
+                        alert("Email sent successfully!");
+                        e.target.reset();
+                      } catch (err) {
+                        alert("Failed to send email: " + err.message);
+                      }
+                    }}
+                  >
+                    <label className="form-group">
+                      <span>To (Email)</span>
+                      <input name="manual_to" type="email" placeholder="parent@example.com" className="premium-input" required />
+                    </label>
+                    <label className="form-group">
+                      <span>Subject</span>
+                      <input name="manual_subject" type="text" placeholder="Email subject" className="premium-input" required />
+                    </label>
+                    <label className="form-group">
+                      <span>Message</span>
+                      <textarea name="manual_message" rows="4" className="premium-input" placeholder="Type your email message here..." required />
+                    </label>
+                    <button type="submit" className="action-button" style={{ background: "#007bff", color: "white" }}>
+                      <Send size={16} /> Send Email
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </section>
+          ) : null}
           {activePage === "Student Registry" && (
             <div className="admin-section fade-in">
               <div className="section-header">
@@ -6146,9 +6290,9 @@ function AdminPortal({
                           full_name: selectedName,
                           phone_number: existingProfile?.phone_number || "",
                           whatsapp_number: existingProfile?.whatsapp_number || "",
-                          photo_url: existingProfile?.photo_url || "",
-                          salary_per_minute: existingProfile?.salary_per_minute || "2.3",
-                            show_salary_card: existingProfile?.show_salary_card ?? true
+                          photo_url: existingProfile?.photo_url || existingAccess?.photo_url || "",
+                          salary_per_minute: existingProfile?.salary_per_minute || existingAccess?.salary_per_minute || "2.3",
+                            show_salary_card: existingProfile?.show_salary_card ?? existingAccess?.show_salary_card ?? true
                           }
                         }));
                       }}
@@ -6156,15 +6300,28 @@ function AdminPortal({
                       className="premium-select"
                     >
                       <option value="">-- Select Teacher --</option>
-                      {portalAccessList
-                        .filter(a =>
-                          normalizeText(a.portal_role).includes("teacher") ||
-                          normalizeText(a.portal_role).includes("muhaffiz")
-                        )
-                        .map(a => (
-                          <option key={a.id} value={a.full_name}>{a.full_name}</option>
-                        ))
-                      }
+                      {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
+                        <React.Fragment>
+                          {portalAccessList
+                            .filter(a =>
+                              normalizeText(a.portal_role).includes("teacher") ||
+                              normalizeText(a.portal_role).includes("muhaffiz")
+                            )
+                            .map(a => (
+                              <option key={`pa-${a.id}`} value={a.full_name}>{a.full_name}</option>
+                            ))
+                          }
+                          {teacherProfiles
+                            .filter(tp => !portalAccessList.some(pa =>
+                              pa.user_id === tp.user_id ||
+                              normalizeText(pa.full_name) === normalizeText(tp.full_name)
+                            ))
+                            .map(tp => (
+                              <option key={`profile-${tp.id}`} value={tp.full_name}>{tp.full_name}</option>
+                            ))
+                          }
+                        </React.Fragment>
+                      ) : null}
                     </select>
                   </label>
                   <div className="form-grid">
@@ -6190,13 +6347,62 @@ function AdminPortal({
                     </label>
                   </div>
                   <label>
-                    <span>Profile Photo URL</span>
+                    <span>Profile Photo</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <label style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        border: '1px dashed var(--glass-border)',
+                        background: 'rgba(255,255,255,0.6)',
+                        cursor: 'pointer',
+                        transition: 'border-color 0.2s',
+                        fontSize: '13px',
+                        color: 'var(--text-muted)'
+                      }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={onTeacherPhotoUpload}
+                          style={{ position: 'absolute', width: 0, height: 0, opacity: 0 }}
+                        />
+                        {uploadingTeacherPhoto ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span className="upload-spinner" style={{ border: '2px solid #f3f3f3', borderTop: '2px solid #d4af37', borderRadius: '50%', width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />
+                            Uploading...
+                          </span>
+                        ) : (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Upload Photo
+                          </span>
+                        )}
+                      </label>
+                      {adminForms.teacherProfile.photo_url && (
+                        <img
+                          src={adminForms.teacherProfile.photo_url}
+                          alt="Preview"
+                          style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            border: '2px solid var(--glass-border)'
+                          }}
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      )}
+                    </div>
                     <input
                       type="text"
                       name="photo_url"
                       value={adminForms.teacherProfile.photo_url}
                       onChange={onAdminFormChange("teacherProfile")}
                       placeholder="https://example.com/photo.jpg"
+                      style={{ marginTop: '8px' }}
                     />
                   </label>
                   <div className="form-grid">
@@ -6902,6 +7108,59 @@ function AdminPortal({
                     [{log.time}] {log.text}
                   </div>
                 ))}
+        {/* Email Sending Progress Modal */}
+        {sendingEmail && (
+          <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)' }}>
+            <div className="premium-card" style={{ width: '90%', maxWidth: '560px', padding: '24px', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>
+                  Sending Email Notifications
+                </h3>
+                {!sendingEmail && (
+                  <button className="panel-close-btn" onClick={() => { onSetSendingEmail(false); onSetEmailLogs([]); }}>
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+              <div className="progress-bar-container" style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
+                <div 
+                  className="progress-bar-fill" 
+                  style={{ 
+                    width: `${(emailProgress.current / Math.max(emailProgress.total, 1)) * 100}%`, 
+                    height: '100%', 
+                    background: 'linear-gradient(90deg, #007bff, #6610f2)',
+                    transition: 'width 0.3s ease'
+                  }} 
+                />
+              </div>
+              
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                {emailProgress.current} / {emailProgress.total} sent
+              </p>
+              
+              <div className="log-console" style={{ flex: 1, overflow: 'auto', background: '#faf8f4', borderRadius: '8px', padding: '12px', fontSize: '0.85rem', fontFamily: 'monospace', minHeight: '150px' }}>
+                {emailLogs.length === 0 && (
+                  <p style={{ color: '#999' }}>Starting...</p>
+                )}
+                {emailLogs.map((log, i) => (
+                  <div key={i} style={{ 
+                    color: log.type === 'error' ? '#e71d36' : log.type === 'success' ? '#007bff' : log.type === 'sending' ? '#3d2b1f' : '#999', 
+                    marginBottom: '4px', 
+                    lineHeight: 1.4 
+                  }}>
+                    <span style={{ color: '#bbb' }}>[{log.time}]</span> {log.text}
+                  </div>
+                ))}
+              </div>
+              
+              {!sendingEmail && emailLogs.length > 0 && (
+                <button className="action-button" style={{ marginTop: '12px', background: 'var(--deep-brown)', color: 'white' }} onClick={() => { setSendingEmail(false); setEmailLogs([]); }}>
+                  Done
+                </button>
+              )}
+            </div>
+          </div>
+        )}
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
@@ -8045,6 +8304,7 @@ export default function App() {
   const [activeStudentId, setActiveStudentId] = useState(null);
   const [attachedFileUrl, setAttachedFileUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadingTeacherPhoto, setUploadingTeacherPhoto] = useState(false);
   const [parentData, setParentData] = useState(emptyParentData);
   const [schoolData, setSchoolData] = useState({
     students: [],
@@ -8062,6 +8322,10 @@ export default function App() {
   const [reportSettings, setReportSettings] = useState([]);
   const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
   const [whatsappConfig, setWhatsappConfig] = useState(null);
+  const [emailSettings, setEmailSettings] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailProgress, setEmailProgress] = useState({ current: 0, total: 0 });
+  const [emailLogs, setEmailLogs] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [parentViews, setParentViews] = useState([]);
   const [portalAccessSuccess, setPortalAccessSuccess] = useState(null);
@@ -8245,6 +8509,23 @@ export default function App() {
     setActivePage(DEFAULT_PAGE_BY_ROLE[portalRole] || DEFAULT_PAGE_BY_ROLE.parents);
     setMenuOpen(false);
     setActionMessage(null);
+
+    // Check URL for redirectPage from notification click outside the app
+    const params = new URLSearchParams(window.location.search);
+    const redirectFromNotif = params.get('redirectPage');
+    if (redirectFromNotif) {
+      let targetPage = redirectFromNotif;
+      if (targetPage.startsWith("Jadwal:")) {
+        const parts = targetPage.split(":");
+        if (parts[1]) {
+          setSelectedStudentId(parts[1]);
+        }
+        targetPage = "Jadwal";
+      }
+      setActivePage(resolveRedirectPage(targetPage, portalRole));
+      // Clean URL without the redirect parameter
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, [portalRole]);
 
   useEffect(() => {
@@ -8553,6 +8834,15 @@ export default function App() {
           if (waData) setWhatsappConfig(waData);
           else if (waError) console.warn("Failed to load whatsapp_config:", waError.message);
         }
+
+        // Load email settings
+        const { data: emailData, error: emailError } = await supabase
+          .from("email_settings")
+          .select("*")
+          .eq("id", 1)
+          .maybeSingle();
+        if (emailData) setEmailSettings(emailData);
+        else if (emailError) console.warn("Failed to load email_settings:", emailError.message);
 
         setSchoolData({
           students,
@@ -8886,15 +9176,15 @@ export default function App() {
           .order("created_at", { ascending: false })
           .limit(20);
 
-        if (!isActive) return;
-
         if (data) {
           const myNotifs = data.filter(notif =>
             portalRole === "admin" ||
-            notif.target_role === "all" ||
-            notif.target_role === portalRole ||
             notif.target_user === user.id ||
-            notif.target_user === user.email
+            notif.target_user === user.email ||
+            (!notif.target_user && (
+              notif.target_role === "all" ||
+              notif.target_role === portalRole
+            ))
           );
           setNotificationsList(myNotifs);
           if (myNotifs.length > 0) latestNotifIdRef.current = myNotifs[0].id;
@@ -8902,7 +9192,9 @@ export default function App() {
 
         // 2. Real-time Subscription for Instant Alerts
         // Clean up any existing channel with the same name first
-        await supabase.removeChannel(supabase.channel('realtime-notifications'));
+        if (notificationChannel) {
+            await supabase.removeChannel(notificationChannel);
+          }
         
         if (!isActive) return;
 
@@ -8915,10 +9207,12 @@ export default function App() {
               const newNotif = payload.new;
               const isTargeted =
                 portalRole === "admin" ||
-                newNotif.target_role === "all" ||
-                newNotif.target_role === portalRole ||
                 newNotif.target_user === user.id ||
-                newNotif.target_user === user.email;
+                newNotif.target_user === user.email ||
+                (!newNotif.target_user && (
+                  newNotif.target_role === "all" ||
+                  newNotif.target_role === portalRole
+                ));
 
               if (isTargeted) {
                 setNotificationsList(prev => {
@@ -9148,6 +9442,42 @@ export default function App() {
     }
   };
 
+  const handleTeacherPhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingTeacherPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `teacher-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from("teacher_photos")
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("teacher_photos")
+        .getPublicUrl(fileName);
+
+      // Update the teacher profile form with the uploaded photo URL
+      setAdminForms(curr => ({
+        ...curr,
+        teacherProfile: {
+          ...curr.teacherProfile,
+          photo_url: publicUrlData.publicUrl
+        }
+      }));
+      showAction("success", "Photo uploaded successfully!");
+    } catch (error) {
+      console.error("Photo upload failed:", error);
+      showAction("error", `Photo upload failed: ${error.message}`);
+    } finally {
+      setUploadingTeacherPhoto(false);
+    }
+  };
+
   const handleSendCustomNotification = async (event) => {
     event.preventDefault();
     const payload = adminForms.customNotification;
@@ -9229,7 +9559,7 @@ export default function App() {
       },
     }));
     showAction("success", "Schedule created successfully.");
-    broadcastNotification("Schedule Updated", `New task added: ${payload.task_name}`, "parents", null, "Schedule");
+    broadcastNotification("Schedule Updated", `New task added: ${payload.task_name}`, "all", null, "Schedule");
   };
 
   const handleRecordTeacherAttendance = async (event, quickRecord = null) => {
@@ -9454,6 +9784,104 @@ export default function App() {
     setWhatsappConfig((current) => ({ ...(current || {}), ...updates, id: 1 }));
     showAction("success", "WhatsApp settings saved successfully.");
   };
+
+  const handleUpdateEmailConfig = async (updates) => {
+    const { error } = await supabase
+      .from("email_settings")
+      .upsert({ id: 1, ...updates });
+
+    if (error) {
+      showAction("error", `Failed to save email settings: ${error.message}`);
+      return;
+    }
+
+    setEmailSettings((current) => ({ ...(current || {}), ...updates, id: 1 }));
+    showAction("success", "Email settings saved successfully.");
+  };
+
+  const sendIndividualEmail = async (to, subject, htmlBody, pdfBase64, pdfFilename, studentName) => {
+    if (!to) {
+      throw new Error("Missing recipient email");
+    }
+    const { data, error } = await supabase.functions.invoke("send-email", {
+      body: {
+        to,
+        subject,
+        html: htmlBody,
+        pdfBase64: pdfBase64 || "",
+        pdfFilename: pdfFilename || "progress-report.pdf",
+        studentName: studentName || "",
+      },
+    });
+    if (error) {
+      // Extract actual error from the function response if available
+      const contextError = error.context?.error || (typeof error.context === "string" ? error.context : null);
+      throw new Error(contextError || error.message || "Failed to send email");
+    }
+    if (!data?.success) {
+      throw new Error(data?.error || data?.message || "Failed to send email");
+    }
+    return data;
+  };
+
+  const triggerEmailNotifications = async (silent = false) => {
+    if (!emailSettings) {
+      if (!silent) alert("Email Configuration is not loaded yet. Please wait a second and try again.");
+      return;
+    }
+    if (!emailSettings.enabled) {
+      if (!silent) alert("Email notifications are disabled. Please enable them in Email Settings below.");
+      return;
+    }
+
+    const targetStudents = schoolData.students.filter(s => s.parent_email && s.parent_email.trim() !== "");
+    if (targetStudents.length === 0) {
+      if (!silent) alert("No students found with a parent email address!");
+      showAction("info", "No parents with email addresses found to notify.");
+      return;
+    }
+
+    setSendingEmail(true);
+    setEmailProgress({ current: 0, total: targetStudents.length });
+    setEmailLogs([{ time: new Date().toLocaleTimeString(), text: "Starting email notifications for " + targetStudents.length + " parents...", type: 'info' }]);
+
+    let sentCount = 0;
+    for (let i = 0; i < targetStudents.length; i++) {
+      const student = targetStudents[i];
+      const parentEmail = student.parent_email;
+
+      const subject = (emailSettings.subject_template || "Tahfeez Progress Report for {{child_name}}")
+        .replace(/{{child_name}}/g, student.name || student.full_name || "")
+        .replace(/{{group_name}}/g, student.groupName || "");
+
+      const body = (emailSettings.message_template || "Salam! Please find attached the weekly Tahfeez progress report for {{child_name}}.")
+        .replace(/{{child_name}}/g, student.name || student.full_name || "")
+        .replace(/{{group_name}}/g, student.groupName || "");
+
+      const htmlBody = "<p>" + body.replace(/\\n/g, "<br>") + "</p>";
+
+      setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Sending to " + student.name + " (" + parentEmail + ")...", type: 'sending' }]);
+
+      try {
+        await sendIndividualEmail(parentEmail, subject, htmlBody, "", "progress-report.pdf", student.name);
+        sentCount++;
+        setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Sent to " + student.name + " successfully!", type: 'success' }]);
+      } catch (err) {
+        console.error("Email failed for " + student.name + ":", err.message);
+        setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Failed for " + student.name + ": " + err.message, type: 'error' }]);
+      }
+
+      setEmailProgress(prev => ({ ...prev, current: i + 1 }));
+
+      // Small delay to avoid overwhelming the API
+      if (i < targetStudents.length - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Email notifications finished! Sent: " + sentCount + "/" + targetStudents.length + " successfully.", type: 'info' }]);
+  };
+
   const handleTeacherUnlock = async (teacher) => {
     if (!teacher || !teacher.id) {
       showAction("error", "Invalid teacher selected.");
@@ -9568,15 +9996,18 @@ export default function App() {
           photo_url: payload.photo_url,
           phone_number: payload.phone_number,
           whatsapp_number: payload.whatsapp_number,
+          salary_per_minute: Number(payload.salary_per_minute || 2.3),
+          show_salary_card: !!payload.show_salary_card,
           is_active: true,
         },
         { onConflict: "user_id" }
       );
 
-    // Update the portal access settings (salary/visibility) separately
+    // Update the portal access settings (salary/visibility/photo) separately
     const { error: accessError } = await supabase
       .from("user_portal_access")
       .update({
+        photo_url: payload.photo_url,
         salary_per_minute: Number(payload.salary_per_minute || 2.3),
         show_salary_card: !!payload.show_salary_card,
       })
@@ -9764,6 +10195,8 @@ export default function App() {
             attachedFileUrl={attachedFileUrl}
             uploadingFile={uploadingFile}
             onNotificationFileChange={handleNotificationFileChange}
+            onTeacherPhotoUpload={handleTeacherPhotoUpload}
+            uploadingTeacherPhoto={uploadingTeacherPhoto}
             onShowAction={showAction}
             teacherUnlockStatus={teacherUnlockStatus}
             setTeacherUnlockStatus={setTeacherUnlockStatus}
@@ -9773,6 +10206,16 @@ export default function App() {
             portalRole={portalRole}
             reportSettings={reportSettings}
             whatsappConfig={whatsappConfig}
+            emailSettings={emailSettings}
+            onUpdateEmailConfig={handleUpdateEmailConfig}
+            onSendIndividualEmail={sendIndividualEmail}
+            sendingEmail={sendingEmail}
+            emailProgress={emailProgress}
+            emailLogs={emailLogs}
+            onTriggerEmailNotifications={triggerEmailNotifications}
+            onSetSendingEmail={setSendingEmail}
+            onSetEmailProgress={setEmailProgress}
+            onSetEmailLogs={setEmailLogs}
             onUpdateWhatsappConfig={handleUpdateWhatsappConfig}
             selectedStudentId={selectedStudentId}
             setActivePage={setActivePage}

@@ -8524,10 +8524,12 @@ export default function App() {
         if (data) {
           const myNotifs = data.filter(notif =>
             portalRole === "admin" ||
-            notif.target_role === "all" ||
-            notif.target_role === portalRole ||
             notif.target_user === user.id ||
-            notif.target_user === user.email
+            notif.target_user === user.email ||
+            (!notif.target_user && (
+              notif.target_role === "all" ||
+              notif.target_role === portalRole
+            ))
           );
           setNotificationsList(myNotifs);
           if (myNotifs.length > 0) latestNotifIdRef.current = myNotifs[0].id;
@@ -8548,10 +8550,12 @@ export default function App() {
               const newNotif = payload.new;
               const isTargeted =
                 portalRole === "admin" ||
-                newNotif.target_role === "all" ||
-                newNotif.target_role === portalRole ||
                 newNotif.target_user === user.id ||
-                newNotif.target_user === user.email;
+                newNotif.target_user === user.email ||
+                (!newNotif.target_user && (
+                  newNotif.target_role === "all" ||
+                  newNotif.target_role === portalRole
+                ));
 
               if (isTargeted) {
                 setNotificationsList(prev => {
