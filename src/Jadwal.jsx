@@ -9,7 +9,7 @@ import './jadwal.css';
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 const DEFAULT_SCHEDULE = {};
 DAYS.forEach(day => {
-  DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', star: '' };
+  DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', murajah: '', juzhali: '', jadeed: '', star: '' };
 });
 
 // @font-face CSS for injection into html2canvas cloned document
@@ -29,7 +29,7 @@ const FONT_FACE_CSS = `
   font-style: normal;
 }
 `;
-const handleDownloadPDF = async (studentName, scheduleData) => {
+const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise') => {
   const printContainer = document.createElement("div");
   printContainer.style.position = "absolute";
   printContainer.style.left = "-9999px";
@@ -40,72 +40,197 @@ const handleDownloadPDF = async (studentName, scheduleData) => {
   printContainer.style.fontFamily = "'Inter', 'Segoe UI', sans-serif";
   printContainer.style.color = "#2c1e11";
   
+  // Build table HTML for PDF (avoiding nested template literals)
+
+  const pdfHeaders = mode === 'juz-wise'
+
+    ? '<tr style="background: #5d4037; color: #ffffff;">'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 1</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 2</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 3</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 4</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>'
+
+      + '</tr>'
+
+    : '<tr style="background: #5d4037; color: #ffffff;">'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>'
+
+      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>'
+
+      + '</tr>';
+
+
+
+  // Build rows using helper function approach
+
+
+
+  const buildPdfRows = () => {
+
+    const rows = DAYS.map((day, idx) => {
+
+      const row = scheduleData[day] || {};
+
+      const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
+
+      const bg = idx % 2 === 0 ? '#ffffff' : '#fefbf7';
+
+      const dayTd = '<td style="padding: 14px; border: 1px solid #dfcbb5; font-weight: bold; font-size: 13px; color: #5d4037; text-align: left;">' + day + '</td>';
+
+      const starTd = '<td style="padding: 14px; border: 1px solid #dfcbb5; font-size: 16px; color: #FFD700; text-align: center; letter-spacing: 1px;">' + stars + '</td>';
+
+      const tdStyle = 'style="padding: 14px; border: 1px solid #dfcbb5; font-size: 13px; color: #333; text-align: center; font-weight: 500;"';
+
+
+
+      if (mode === 'juz-wise') {
+
+        return '<tr style="background: ' + bg + ';">' + dayTd
+
+          + '<td ' + tdStyle + '>' + (row.juz1 || '-') + '</td>'
+
+          + '<td ' + tdStyle + '>' + (row.juz2 || '-') + '</td>'
+
+          + '<td ' + tdStyle + '>' + (row.juz3 || '-') + '</td>'
+
+          + '<td ' + tdStyle + '>' + (row.juz4 || '-') + '</td>'
+
+          + '<td ' + tdStyle + '>' + (row.juzhali || '-') + '</td>'
+
+          + '<td ' + tdStyle + '>' + (row.jadeed || '-') + '</td>'
+
+          + starTd + '</tr>';
+
+      }
+
+      return '<tr style="background: ' + bg + ';">' + dayTd
+
+        + '<td ' + tdStyle + '>' + (row.murajah || '-') + '</td>'
+
+        + '<td ' + tdStyle + '>' + (row.juzhali || '-') + '</td>'
+
+        + '<td ' + tdStyle + '>' + (row.jadeed || '-') + '</td>'
+
+        + starTd + '</tr>';
+
+    });
+
+    return rows.join('');
+
+  };
+
+
+
+  const pdfRows = buildPdfRows();
+
+
+
   printContainer.innerHTML = `
+
     <div style="border: 2px solid #dfcbb5; border-radius: 16px; padding: 30px; background: #fffcf8; box-sizing: border-box;">
+
       <!-- Header -->
+
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #dfcbb5; padding-bottom: 20px; margin-bottom: 25px;">
+
         <div>
+
           <h1 style="margin: 0; font-size: 26px; color: #5d4037; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">MAUZE TAHFEEZ ATFAL</h1>
+
           <p style="margin: 5px 0 0 0; font-size: 14px; color: #8b6d31; font-weight: 600; letter-spacing: 0.5px;">Weekly Quran Jadwal (Timetable)</p>
+
         </div>
+
         <div style="text-align: right;">
+
           <div style="font-size: 12px; color: #888; font-weight: 500;">Generated on</div>
+
           <div style="font-size: 14px; color: #5d4037; font-weight: bold;">${new Date().toLocaleDateString()}</div>
+
         </div>
+
       </div>
+
+
 
       <!-- Student Info Details -->
+
       <div style="background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 18px 24px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
+
         <div>
+
           <span style="font-size: 11px; color: #8b6d31; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">STUDENT NAME</span>
+
           <span style="font-size: 20px; color: #5d4037; font-weight: 800;">${studentName}</span>
+
         </div>
+
         <div style="text-align: right;">
+
           <span style="font-size: 11px; color: #8b6d31; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">ACADEMIC PORTAL</span>
+
           <span style="font-size: 14px; color: #ffffff; font-weight: 700; background: #5d4037; padding: 4px 12px; border-radius: 20px;">Hifz Program</span>
+
         </div>
+
       </div>
+
+
 
       <!-- Jadwal Table -->
+
       <table style="width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(93, 64, 55, 0.03);">
+
         <thead>
-          <tr style="background: #5d4037; color: #ffffff;">
-            <th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>
-            <th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZ 1</th>
-            <th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZ 2</th>
-            <th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZ 3</th>
-            <th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZ 4</th>
-            <th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>
-          </tr>
+
+          ${pdfHeaders}
+
         </thead>
+
         <tbody>
-          ${DAYS.map((day, idx) => {
-            const row = scheduleData[day] || { juz1: '', juz2: '', juz3: '', juz4: '', star: '' };
-            const stars = row.star ? '⭐'.repeat(parseInt(row.star)) : '-';
-            const rowBg = idx % 2 === 0 ? '#ffffff' : '#fefbf7';
-            return `
-              <tr style="background: ${rowBg};">
-                <td style="padding: 14px; border: 1px solid #dfcbb5; font-weight: bold; font-size: 13px; color: #5d4037; text-align: left;">${day}</td>
-                <td style="padding: 14px; border: 1px solid #dfcbb5; font-size: 13px; color: #333; text-align: center; font-weight: 500;">${row.juz1 || '-'}</td>
-                <td style="padding: 14px; border: 1px solid #dfcbb5; font-size: 13px; color: #333; text-align: center; font-weight: 500;">${row.juz2 || '-'}</td>
-                <td style="padding: 14px; border: 1px solid #dfcbb5; font-size: 13px; color: #333; text-align: center; font-weight: 500;">${row.juz3 || '-'}</td>
-                <td style="padding: 14px; border: 1px solid #dfcbb5; font-size: 13px; color: #333; text-align: center; font-weight: 500;">${row.juz4 || '-'}</td>
-                <td style="padding: 14px; border: 1px solid #dfcbb5; font-size: 16px; color: #FFD700; text-align: center; letter-spacing: 1px;">${stars}</td>
-              </tr>
-            `;
-          }).join('')}
+
+          ${pdfRows}
+
         </tbody>
+
       </table>
 
-      <!-- Footer Note -->
-      <div style="margin-top: 35px; border-top: 1px dashed #dfcbb5; padding-top: 15px; text-align: center;">
-        <p style="margin: 0; font-size: 12px; color: #8b6d31; font-style: italic; font-weight: 600;">
-          "And We have indeed made the Quran easy to understand and remember..."
-        </p>
-      </div>
-    </div>
-  `;
 
+
+      <!-- Footer Note -->
+
+      <div style="margin-top: 35px; border-top: 1px dashed #dfcbb5; padding-top: 15px; text-align: center;">
+
+        <p style="margin: 0; font-size: 12px; color: #8b6d31; font-style: italic; font-weight: 600;">
+
+          "And We have indeed made the Quran easy to understand and remember..."
+
+        </p>
+
+      </div>
+
+    </div>
+
+  `;
   document.body.appendChild(printContainer);
 
   try {
@@ -164,7 +289,8 @@ const handleDownloadPDF = async (studentName, scheduleData) => {
 
 export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId }) => {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
-  const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
+  const [scheduleData, setScheduleData] = useState({ ...DEFAULT_SCHEDULE, _mode: 'juz-wise' });
+  const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -194,7 +320,9 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
       console.error(error);
       onShowAction('error', 'Failed to fetch Jadwal');
     } else if (data && data.schedule_data) {
-      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data });
+      const savedMode = data.schedule_data._mode || 'juz-wise';
+      setMode(savedMode);
+      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
     }
@@ -208,7 +336,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
       .from('jadawal')
       .upsert({ 
         student_id: selectedStudentId, 
-        schedule_data: scheduleData,
+        schedule_data: { ...scheduleData, _mode: mode },
         updated_at: new Date().toISOString()
       }, { onConflict: 'student_id' });
     
@@ -286,7 +414,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
               </button>
               <button 
                 className="jadwal-download-btn" 
-                onClick={() => handleDownloadPDF(studentName, scheduleData)}
+                onClick={() => handleDownloadPDF(studentName, scheduleData, mode)}
               >
                 <Download size={16} /> Download PDF
               </button>
@@ -298,52 +426,123 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
       {loading ? (
         <div className="loading-spinner">Loading...</div>
       ) : selectedStudentId ? (
-        <div className="jadwal-table-wrapper">
-          <table className="jadwal-table">
-            <thead>
-              <tr>
-                <th>Days</th>
-                <th>Juz 1</th>
-                <th>JUZ 2</th>
-                <th>JUZ 3</th>
-                <th>JUZ 4</th>
-                <th>Star</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DAYS.map(day => (
-                <tr key={day}>
-                  <td className="day-cell">{day}</td>
-                  {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => (
-                    <td key={juz}>
-                      <input 
-                        type="text" 
-                        value={scheduleData[day]?.[juz] || ''}
-                        onChange={(e) => handleCellChange(day, juz, e.target.value)}
-                        placeholder="-"
-                      />
+        <>
+          <div style={{ marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Schedule Mode:</label>
+            <select 
+              value={mode} 
+              onChange={(e) => setMode(e.target.value)}
+              className="premium-select"
+              style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
+            >
+              <option value="juz-wise">Juz Wise</option>
+              <option value="surah-wise">Surah Wise</option>
+            </select>
+            {mode === 'surah-wise' && (
+              <span style={{ fontSize: '12px', color: '#8b6d31', fontStyle: 'italic' }}>Free text: English or Arabic</span>
+            )}
+          </div>
+          <div className="jadwal-table-wrapper">
+            <table className="jadwal-table">
+              <thead>
+                {mode === 'juz-wise' ? (
+                  <React.Fragment>
+                    <tr>
+                      <th rowSpan="2">Days</th>
+                      <th colSpan="4" style={{ textAlign: 'center', borderBottom: 'none' }}>Murajah</th>
+                      <th rowSpan="2">Juzhali</th>
+                      <th rowSpan="2">Jadeed</th>
+                      <th rowSpan="2">Star</th>
+                    </tr>
+                    <tr>
+                      <th>1</th>
+                      <th>2</th>
+                      <th>3</th>
+                      <th>4</th>
+                    </tr>
+                  </React.Fragment>
+                ) : (
+                  <tr>
+                    <th>Days</th>
+                    <th>Murajah</th>
+                    <th>Juzhali</th>
+                    <th>Jadeed</th>
+                    <th>Star</th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {DAYS.map(day => (
+                  <tr key={day}>
+                    <td className="day-cell">{day}</td>
+                    {mode === 'juz-wise' ? (
+                      <React.Fragment>
+                        {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => (
+                          <td key={juz}>
+                            <input 
+                              type="text" 
+                              value={scheduleData[day]?.[juz] || ''}
+                              onChange={(e) => handleCellChange(day, juz, e.target.value)}
+                              placeholder="-"
+                            />
+                          </td>
+                        ))}
+                        <td>
+                          <input 
+                            type="text" 
+                            value={scheduleData[day]?.juzhali || ''}
+                            onChange={(e) => handleCellChange(day, 'juzhali', e.target.value)}
+                            placeholder="-"
+                            style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.juzhali || '') ? 'rtl' : 'ltr' }}
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            type="text" 
+                            value={scheduleData[day]?.jadeed || ''}
+                            onChange={(e) => handleCellChange(day, 'jadeed', e.target.value)}
+                            placeholder="-"
+                            style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.jadeed || '') ? 'rtl' : 'ltr' }}
+                          />
+                        </td>
+                      </React.Fragment>
+                    ) : (
+                      <React.Fragment>
+                        {['murajah', 'juzhali', 'jadeed'].map(field => (
+                          <td key={field}>
+                            <input 
+                              type="text" 
+                              value={scheduleData[day]?.[field] || ''}
+                              onChange={(e) => handleCellChange(day, field, e.target.value)}
+                              placeholder="-"
+                              style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.[field] || '') ? 'rtl' : 'ltr' }}
+                            />
+                          </td>
+                        ))}
+                      </React.Fragment>
+                    )}
+                    <td>
+                      <select 
+                        value={scheduleData[day]?.star || ''}
+                        onChange={(e) => handleCellChange(day, 'star', e.target.value)}
+                        className="star-select"
+                      >
+                        <option value="">-</option>
+                        <option value="1">⭐</option>
+                        <option value="2">⭐⭐</option>
+                        <option value="3">⭐⭐⭐</option>
+                        <option value="4">⭐⭐⭐⭐</option>
+                        <option value="5">⭐⭐⭐⭐⭐</option>
+                      </select>
                     </td>
-                  ))}
-                  <td>
-                    <select 
-                      value={scheduleData[day]?.star || ''}
-                      onChange={(e) => handleCellChange(day, 'star', e.target.value)}
-                      className="star-select"
-                    >
-                      <option value="">-</option>
-                      <option value="1">⭐</option>
-                      <option value="2">⭐⭐</option>
-                      <option value="3">⭐⭐⭐</option>
-                      <option value="4">⭐⭐⭐⭐</option>
-                      <option value="5">⭐⭐⭐⭐⭐</option>
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )
+      : (
         <div className="jadwal-empty">Please select a student from the dropdown to view and edit their Jadwal timetable.</div>
       )}
       
@@ -362,6 +561,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
 export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherProfiles, showAction }) => {
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [studentName, setStudentName] = useState('Student');
+  const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -397,7 +597,9 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
     if (error && error.code !== 'PGRST116') {
       console.error(error);
     } else if (data && data.schedule_data) {
-      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data });
+      const savedMode = data.schedule_data._mode || 'juz-wise';
+      setMode(savedMode);
+      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
     }
@@ -412,7 +614,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
         <h2>Weekly Jadwal Schedule</h2>
         <button 
           className="jadwal-save-btn" 
-          onClick={() => handleDownloadPDF(studentName, scheduleData)}
+          onClick={() => handleDownloadPDF(studentName, scheduleData, mode)}
         >
           <Download size={16} /> Download PDF
         </button>
@@ -420,23 +622,47 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
       <div className="jadwal-table-wrapper">
         <table className="jadwal-table">
           <thead>
-            <tr>
-              <th>Days</th>
-              <th>Juz 1</th>
-              <th>JUZ 2</th>
-              <th>JUZ 3</th>
-              <th>JUZ 4</th>
-              <th>Star</th>
-            </tr>
+            {scheduleData._mode === 'surah-wise' ? (
+              <tr>
+                <th>Days</th>
+                <th>Murajah</th>
+                <th>Juzhali</th>
+                <th>Jadeed</th>
+                <th>Star</th>
+              </tr>
+            ) : (
+              <tr>
+                <th>Days</th>
+                <th>Murajah 1</th>
+                <th>Murajah 2</th>
+                <th>Murajah 3</th>
+                <th>Murajah 4</th>
+                <th>Juzhali</th>
+                <th>Jadeed</th>
+                <th>Star</th>
+              </tr>
+            )}
           </thead>
           <tbody>
             {DAYS.map(day => (
               <tr key={day}>
                 <td className="day-cell">{day}</td>
-                <td>{scheduleData[day]?.juz1 || '-'}</td>
-                <td>{scheduleData[day]?.juz2 || '-'}</td>
-                <td>{scheduleData[day]?.juz3 || '-'}</td>
-                <td>{scheduleData[day]?.juz4 || '-'}</td>
+                {scheduleData._mode === 'surah-wise' ? (
+                  <>
+                    <td>{scheduleData[day]?.murajah || '-'}</td>
+                    <td>{scheduleData[day]?.juzhali || '-'}</td>
+                    <td>{scheduleData[day]?.jadeed || '-'}</td>
+                  </>
+                ) : (
+                  <>
+                    <td>{scheduleData[day]?.juz1 || '-'}</td>
+                    <td>{scheduleData[day]?.juz2 || '-'}</td>
+                    <td>{scheduleData[day]?.juz3 || '-'}</td>
+                    <td>{scheduleData[day]?.juz4 || '-'}</td>
+                    <td>{scheduleData[day]?.juzhali || '-'}</td>
+                    <td>{scheduleData[day]?.jadeed || '-'}</td>
+                  </>
+                )}
                 <td className="star-cell">
                   {scheduleData[day]?.star ? '⭐'.repeat(parseInt(scheduleData[day].star)) : '-'}
                 </td>

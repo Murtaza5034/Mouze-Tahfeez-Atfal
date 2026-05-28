@@ -57,10 +57,24 @@ const parseField = (rawJuz, rawPage, rawSurah) => {
   };
 };
 
-const calcPages = (juz, page) => {
-  if (!juz || juz === 0) return 0;
-  const safeJuz = Math.min(Math.max(juz, 1), 30);
-  return (30 - safeJuz) * 20 + (parseInt(page || "0", 10));
+// Calculate pages covered from target (istifadah) to current (wusool).
+// Both istifadah_page and wusool_page are absolute Quran page numbers (1-604).
+// pagesCovered = wusool_page - istifadah_page + 1 (inclusive).
+// For Juz 26-30, page range is from ~502 to ~604.
+const calcPagesCovered = (targetPage, currentPage) => {
+  const t = parseInt(targetPage, 10);
+  const c = parseInt(currentPage, 10);
+  if (isNaN(t) || isNaN(c)) return 0;
+  if (c < t) return 0; // Haven't reached target yet
+  return c - t + 1;
+};
+
+const calcPagesRemaining = (targetPage, currentPage) => {
+  const t = parseInt(targetPage, 10);
+  const c = parseInt(currentPage, 10);
+  if (isNaN(t) || isNaN(c)) return 0;
+  if (c >= t) return 0; // Target achieved
+  return t - c;
 };
 
 const AnimatedProgressRing = ({ percent, size = 140, strokeWidth = 10, isComplete = false }) => {
@@ -173,7 +187,7 @@ const JssDisplay = ({ juz, surah, safa, compact = false }) => (
   </div>
 );
 
-const TakhteetProgress = ({ weeklyResult }) => {
+const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
   const [percent, setPercent] = useState(0);
 
   // Parse all three field sets
@@ -181,41 +195,72 @@ const TakhteetProgress = ({ weeklyResult }) => {
   const wusool = parseField(weeklyResult?.wusool_juz, weeklyResult?.wusool_page, weeklyResult?.wusool_surah);
   const nextWeek = parseField(weeklyResult?.next_week_juz, weeklyResult?.next_week_page, weeklyResult?.next_week_surah);
 
-  // Calculate pages
-  const targetPages = calcPages(target.juzNum, weeklyResult?.istifadah_page);
-  const wusoolPages = calcPages(wusool.juzNum, weeklyResult?.wusool_page);
-  const nextWeekPages = calcPages(nextWeek.juzNum, weeklyResult?.next_week_page);
+  // Calculate pages covered from Target Till (istifadah) to Wusool (currently on).
+  // pagesCovered = wusool_page - istifadah_page + 1 (inclusive range).
+  // Example: target till page 542, current page 545 => 545-542+1 = 4 pages done.
+  const istifadahPage = weeklyResult?.istifadah_page;
+  const wusoolPage = weeklyResult?.wusool_page;
+  const nextWeekPage = weeklyResult?.next_week_page;
 
-  // Progress percentage
-  let progressPercent = 0;
-  if (targetPages > 0) {
-    progressPercent = Math.min(100, Math.max(0, (wusoolPages / targetPages) * 100));
-  } else if (wusoolPages > 0) {
-    progressPercent = 100;
-  }
+  const pagesCovered = calcPagesCovered(istifadahPage, wusoolPage);
+  const pagesRemaining = calcPagesRemaining(istifadahPage, wusoolPage);
+  const nextWeekPages = parseInt(nextWeekPage, 10) || 0;
 
-  // Next Week Target % of total target
+  // Determine if child is in Juz 1-25 range (page range 1-503).
+  // For these children, percentage is proportional: (wusool - istifadah) / (next_week - istifadah) * 100.
+  // For Juz 26-30, keep binary 0/100% behavior.
+  const currentJuzNum = currentJuz ? parseInt(String(currentJuz).trim(), 10) : NaN;
+  const isJuz1to25 = !isNaN(currentJuzNum) && currentJuzNum >= 1 && currentJuzNum <= 25;
+
+  // Compute progress percentage — proportional for Juz 1-25, binary for Juz 26-30
+  const calcProgressPercent = () => {
+    if (isJuz1to25) {
+      const start = parseInt(istifadahPage, 10);
+      const curr = parseInt(wusoolPage, 10);
+      const targetEnd = parseInt(nextWeekPage, 10);
+      if (!isNaN(start) && !isNaN(curr) && !isNaN(targetEnd) && targetEnd > start) {
+        const done = Math.max(0, curr - start);
+        const planned = targetEnd - start;
+        return Math.min(100, Math.max(0, Math.round((done / planned) * 100)));
+      }
+    }
+    // Binary for Juz 26-30 or when target data is incomplete
+    return pagesCovered > 0 ? 100 : 0;
+  };
+
+  const computedPercent = calcProgressPercent();
+
+  // Target is achieved when computed progress reaches 100%
+  const isComplete = computedPercent >= 100;
+
+  // Next Week Target percentage — reuse the main computed percent for Juz 1-25
   let nextWeekPercent = 0;
-  if (targetPages > 0 && nextWeekPages > 0) {
-    nextWeekPercent = Math.min(100, Math.max(0, (nextWeekPages / targetPages) * 100));
+  if (isJuz1to25) {
+    nextWeekPercent = computedPercent;
+  } else {
+    const tPage = parseInt(istifadahPage, 10);
+    const nPage = parseInt(nextWeekPage, 10);
+    if (!isNaN(tPage) && !isNaN(nPage) && tPage > 0 && nPage > 0) {
+      const nwPages = calcPagesCovered(String(tPage), String(nPage));
+      if (nwPages > 0) {
+        nextWeekPercent = computedPercent;
+      }
+    }
   }
 
   // Animate progress on mount
   useEffect(() => {
     const timer = setTimeout(() => {
-      setPercent(progressPercent);
+      setPercent(computedPercent);
     }, 300);
     return () => clearTimeout(timer);
-  }, [progressPercent]);
-
-  const remainingPages = Math.max(0, targetPages - wusoolPages);
-  const isComplete = targetPages > 0 && remainingPages === 0;
+  }, [computedPercent]);
 
   // Don't render if no data at all
   const hasTarget = target.isNumeric || (target.displaySurah && target.displaySurah !== "\u2014");
   const hasWusool = wusool.isNumeric || (wusool.displaySurah && wusool.displaySurah !== "\u2014");
 
-  if (!hasTarget && !hasWusool && targetPages === 0 && wusoolPages === 0) {
+  if (!hasTarget && !hasWusool) {
     return null;
   }
 
@@ -246,21 +291,19 @@ const TakhteetProgress = ({ weeklyResult }) => {
             <div className="progress-stats-row">
               <div className="progress-stat">
                 <span className="stat-label">Target</span>
-                <span className="stat-value">{toArabicDigits(targetPages)}</span>
+                <span className="stat-value">{toArabicDigits(istifadahPage || pagesCovered)}</span>
               </div>
               <div className="progress-stat-divider">/</div>
               <div className="progress-stat">
                 <span className="stat-label">Done</span>
-                <span className="stat-value">{toArabicDigits(wusoolPages)}</span>
+                <span className="stat-value">{toArabicDigits(pagesCovered)}</span>
               </div>
             </div>
             <p className="progress-remaining">
-              {              remainingPages > 0 ? (
-                <><strong>{toArabicDigits(remainingPages)}</strong> pages remaining</>
-              ) : targetPages > 0 ? (
+              {pagesRemaining > 0 ? (
+                <><strong>{toArabicDigits(pagesRemaining)}</strong> pages remaining</>
+              ) : pagesCovered > 0 ? (
                 <span className="success-text celebration-text">🎉 Mubarak Mohanna! Target achieved 🎉</span>
-              ) : wusoolPages > 0 ? (
-                <><strong>{toArabicDigits(wusoolPages)}</strong> pages covered</>
               ) : null}
             </p>
           </div>
@@ -280,7 +323,7 @@ const TakhteetProgress = ({ weeklyResult }) => {
                 safa={target.safa}
               />
               <div className="metric-footer">
-                <span className="metric-pages">{toArabicDigits(targetPages)} total pages</span>
+                <span className="metric-pages">Target till page {toArabicDigits(istifadahPage || '--')}</span>
               </div>
             </MetricCard>
 
@@ -297,7 +340,7 @@ const TakhteetProgress = ({ weeklyResult }) => {
                 safa={wusool.safa}
               />
               <div className="metric-footer">
-                <span className="metric-pages">{toArabicDigits(wusoolPages)} pages done</span>
+                <span className="metric-pages">{toArabicDigits(pagesCovered)} pages done</span>
               </div>
             </MetricCard>
 
@@ -315,7 +358,7 @@ const TakhteetProgress = ({ weeklyResult }) => {
                 compact
               />
               <div className="metric-footer">
-                {targetPages > 0 && nextWeekPages > 0 ? (
+                {pagesCovered > 0 && nextWeekPages > 0 ? (
                   <span className="metric-percent">
                     <strong>{toArabicDigits(Math.round(nextWeekPercent))}%</strong> of total target
                   </span>

@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
+﻿import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -50,7 +50,8 @@ import {
   Pause,
   Play,
   Mail,
-  Send
+  Send,
+  Heart
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -59,6 +60,7 @@ import "./salary.css";
 import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
+import "./marhala-posts.css";
 
 const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
 const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
@@ -577,18 +579,20 @@ const LazyJadwalParentView = React.lazy(() =>
   import("./Jadwal").then((mod) => ({ default: mod.JadwalParentView }))
 );
 
+const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
 const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
+const LazyMarhalaPosts = React.lazy(() => import("./MarhalaPosts"));
 
 const fixArabicScript = (text) => {
   if (!text) return "";
   // Normalize Gaf (Persian/Urdu script)
   // Some systems render Gaf as double kaaf or k-k-a
   return text
-    .replace(/كك/g, "گ")      // Double Kaaf -> Gaf
-    .replace(/مرككا/g, "مرگا") // Murga (K-K-A) -> Murga (G-A)
-    .replace(/بهائي/g, "بھائی") // Bhai phonetic
-    .replace(/سي/g, "سی")      // Common character fixing
-    .replace(/في/g, "فی");     // Common character fixing
+    .replace(/ظƒظƒ/g, "ع¯")      // Double Kaaf -> Gaf
+    .replace(/ظ…ط±ظƒظƒط§/g, "ظ…ط±ع¯ط§") // Murga (K-K-A) -> Murga (G-A)
+    .replace(/ط¨ظ‡ط§ط¦ظٹ/g, "ط¨ع¾ط§ط¦غŒ") // Bhai phonetic
+    .replace(/ط³ظٹ/g, "ط³غŒ")      // Common character fixing
+    .replace(/ظپظٹ/g, "ظپغŒ");     // Common character fixing
 };
 
 const NotificationStatus = ({ role }) => {
@@ -782,6 +786,7 @@ const NAV_ICONS = {
   "Global Settings": Settings,
   "Messages": MessageCircle,
   "Email Settings": Mail,
+  "Marhala Posts": Heart,
 };
 
 const emptyParentData = {
@@ -1626,6 +1631,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
         if (!dbError) {
           console.log("Ikhtebar: Record saved successfully:", savedData);
           await fetchHistory();
+
         } else {
           console.error("Ikhtebar: Database save error details:", dbError);
           alert("Error saving record: " + dbError.message);
@@ -1726,12 +1732,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 {surahInfo && (
                   <div className="mushaf-header">
                     <div className="s-name arabic-kanz">{surahInfo.name_arabic}</div>
-                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>}
+                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">ط¨ظگط³ظ’ظ…ظگ ظ±ظ„ظ„ظ‘ظژظ‡ظگ ظ±ظ„ط±ظ‘ظژط­ظ’ظ…ظژظ°ظ†ظگ ظ±ظ„ط±ظ‘ظژط­ظگظٹظ…ظگ</div>}
                   </div>
                 )}
 
                 <div className="q-label-badge" style={{ marginBottom: '15px' }}>
-                  {testMode === "self" ? "✨ Sheikh Hussary Guidance (Auto-Playing...)" : "📖 Teacher Prompt (Start Reciting):"}
+                  {testMode === "self" ? "âœ¨ Sheikh Hussary Guidance (Auto-Playing...)" : "ًں“– Teacher Prompt (Start Reciting):"}
                 </div>
 
                 <div className="mushaf-inner quran-uthmani" style={{ minHeight: '150px' }}>
@@ -1773,7 +1779,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
                 {recording && (
                   <div className="live-mistake-panel fade-in">
-                    <p className="live-label">🔴 MARK MISTAKES LIVE:</p>
+                    <p className="live-label">ًں”´ MARK MISTAKES LIVE:</p>
                     <div className="mistake-btns-grid">
                       <button className="mistake-btn word" onClick={() => logWordMistake({ id: Date.now(), text_uthmani: 'Word' }, "Word")}>
                         Word Mistake
@@ -1848,7 +1854,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                         ))}
                       </div>
                     ) : (
-                      <p className="perfect-score">Excellent! Perfect Recitation ⭐</p>
+                      <p className="perfect-score">Excellent! Perfect Recitation â­گ</p>
                     )}
                   </div>
                 </div>
@@ -1943,13 +1949,13 @@ function toNumber(value) {
 
 const toArabicDigits = (str) => {
   if (str == null) return str;
-  return String(str).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d, 10)]);
+  return String(str).replace(/\d/g, d => 'ظ ظ،ظ¢ظ£ظ¤ظ¥ظ¦ظ§ظ¨ظ©'[parseInt(d, 10)]);
 };
 
 const ARABIC_MONTHS = [
-  "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
-  "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
-  "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
+  "ظ…ط­ط±ظ… ط§ظ„ط­ط±ط§ظ…", "طµظپط± ط§ظ„ظ…ط¸ظپط±", "ط±ط¨ظٹط¹ ط§ظ„ط£ظˆظ„", "ط±ط¨ظٹط¹ ط§ظ„ط¢ط®ط±",
+  "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط£ظˆظ„ظ‰", "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط¢ط®ط±ط©", "ط±ط¬ط¨ ط§ظ„ط£طµط¨", "ط´ط¹ط¨ط§ظ† ط§ظ„ظƒط±ظٹظ…",
+  "ط±ظ…ط¶ط§ظ† ط§ظ„ظ…ط¹ط¸ظ…", "ط´ظˆط§ظ„ ط§ظ„ظ…ظƒط±ظ…", "ط°ظٹ ط§ظ„ظ‚ط¹ط¯ط© ط§ظ„ط­ط±ط§ظ…", "ط°ظٹ ط§ظ„ط­ط¬ط© ط§ظ„ط­ط±ط§ظ…"
 ];
 
 function getFatemiInfo(dateStr) {
@@ -2540,7 +2546,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="target-box highlight-wusool">
             <h5 className="arabic-kanz" dir="rtl" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
           </div>
           <div className="target-box highlight-matrookah">
@@ -2556,13 +2562,13 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="target-box">
             <h5 className="kids-font">{hNext}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
             <h5 className="kids-font">{hIstifadah}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
           </div>
         </div>
@@ -3052,7 +3058,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
       if (dbErr) throw dbErr;
 
       await broadcastNotification(
-        `Leave Application 📅`,
+        `Leave Application ًں“…`,
         `${studentProfile?.name} has applied for leave (${leaveType}). Reason: ${reason || 'Not provided'}`,
         "admin",
         null,
@@ -3070,7 +3076,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
           const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
           if (teacherTarget) {
             await broadcastNotification(
-              `Leave Application 📅`,
+              `Leave Application ًں“…`,
               `${studentProfile?.name} (${leaveType}) has applied for leave. Reason: ${reason || 'Not provided'}`,
               "user",
               teacherTarget,
@@ -3153,7 +3159,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
                 style={{ width: '100%' }}
                 required
               />
-              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>✓ Document attached successfully</p>}
+              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>âœ“ Document attached successfully</p>}
             </div>
           )}
 
@@ -3405,8 +3411,8 @@ function ParentPortal({
                         const childName = studentProfile?.name || studentProfile?.full_name || "Your child";
                         // Notify parent
                         broadcastNotification(
-                          "🎉 " + ordinal + " Place! Mubarak Mohanna!",
-                          "🎉 " + ordinal + " Place! Mubarak Mohanna!\n" + childName + " topped this week\'s Hifz result. Keep it up! 🤩",
+                          "ًںژ‰ " + ordinal + " Place! Mubarak Mohanna!",
+                          "ًںژ‰ " + ordinal + " Place! Mubarak Mohanna!\n" + childName + " topped this week\'s Hifz result. Keep it up! ًں¤©",
                           "user",
                           user?.id,
                           "Child Summary",
@@ -3422,8 +3428,8 @@ function ParentPortal({
                           const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
                           if (teacherTarget) {
                             broadcastNotification(
-                              "🎉 Student Achievement!",
-                              "Your student " + childName + " got " + ordinal + " place in this week\'s Hifz result! Mubarak Mohanna! 🤩",
+                              "ًںژ‰ Student Achievement!",
+                              "Your student " + childName + " got " + ordinal + " place in this week\'s Hifz result! Mubarak Mohanna! ًں¤©",
                               "user",
                               teacherTarget,
                               "My Group",
@@ -3572,7 +3578,7 @@ function ParentPortal({
       highlights: [
         `Attendance: ${attendance?.status || "Present"}`,
         `Lesson: ${studentProfile?.latestResult?.surat || studentProfile?.surat || hifzDetails?.surat || "Update pending"}`,
-        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} · Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
+        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} آ· Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
       ],
       announcements:
         announcements.length > 0
@@ -3671,6 +3677,9 @@ function ParentPortal({
           </button>
           <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
             <Calendar size={18} /> Jadwal
+          </button>
+          <button className={`drawer-link ${activePage === "Marhala Posts" ? "active" : ""}`} onClick={() => { setActivePage("Marhala Posts"); setMenuOpen(false); }}>
+            <Heart size={18} /> Marhala Posts
           </button>
           <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
             <Settings size={18} /> Settings
@@ -4040,11 +4049,11 @@ function ParentPortal({
             <div className="celebration-modal" onClick={e => e.stopPropagation()}>
               <div className="celebration-content">
                 <div className="celebration-emoji-row">
-                  <span className="celebration-emoji">🎉</span>
-                  <span className="celebration-emoji">🎉</span>
-                  <span className="celebration-emoji">🎉</span>
+                  <span className="celebration-emoji">ًںژ‰</span>
+                  <span className="celebration-emoji">ًںژ‰</span>
+                  <span className="celebration-emoji">ًںژ‰</span>
                 </div>
-                <h2 className="celebration-title">Mubarak Mohanna! 🎉</h2>
+                <h2 className="celebration-title">Mubarak Mohanna! ًںژ‰</h2>
                 <div className="celebration-rank-badge">
                   <span className="celebration-rank-number">
                     {celebrationRank}{celebrationRank === 1 ? 'st' : celebrationRank === 2 ? 'nd' : 'rd'}
@@ -4054,9 +4063,9 @@ function ParentPortal({
                 <p className="celebration-message">
                   Your child ranked <strong>{celebrationRank}{celebrationRank === 1 ? 'st' : celebrationRank === 2 ? 'nd' : 'rd'}</strong> in this week's Hifz result!
                 </p>
-                <p className="celebration-submessage">Keep it up! 🤩</p>
+                <p className="celebration-submessage">Keep it up! ًں¤©</p>
                 <button className="celebration-close-btn" onClick={() => setCelebrationRank(null)}>
-                  Awesome! 🎉
+                  Awesome! ًںژ‰
                 </button>
               </div>
             </div>
@@ -4228,6 +4237,14 @@ function ParentPortal({
             studentProfile={studentProfile}
             hifzDetails={hifzDetails}
           />
+        ) : null}
+
+        {activePage === "Marhala Posts" ? (
+          <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
+            <LazyMarhalaPosts
+              onShowAction={showAction}
+            />
+          </Suspense>
         ) : null}
 
         {activePage === "Settings" ? (
@@ -4610,7 +4627,7 @@ function PortalAccessSuccessModal({ payload, onClose }) {
           onClick={onClose}
           aria-label="Close success popup"
         >
-          ×
+          أ—
         </button>
 
         <div className="portal-access-success-badge">
@@ -4813,13 +4830,13 @@ function AdminPortal({
         sentCount++;
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' }
+          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! âœ…`, type: 'success' }
         ]);
       } catch (err) {
         console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} ❌`, type: 'error' }
+          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} â‌Œ`, type: 'error' }
         ]);
       }
       
@@ -4944,8 +4961,8 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings", "Email Settings"];
-  const navPages = ["Overview", "Schedule", "Result Tracking"];
+  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings", "Email Settings", "Marhala Posts"];
+  const navPages = ["Overview", "Quick Student Access", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
@@ -4981,10 +4998,11 @@ const handleDownloadAllReports = async () => {
 
   const viewedCount = (parentViews || []).filter(v => v.viewed).length;
   const stats = [
-    { label: "Students", value: students.length, icon: Users },
-    { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap },
-    { label: "Schedules", value: schedule.length, icon: Calendar },
+    { label: "Students", value: students.length, icon: Users, navigateTo: "Student Registry" },
+    { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap, navigateTo: "Staff Profiles" },
+    { label: "Schedules", value: schedule.length, icon: Calendar, navigateTo: "Schedule" },
     { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye },
+    { label: "Jadwal Tracking", value: teacherSummaries.length, icon: Calendar, navigateTo: "Jadwal Tracking" },
   ];
 
   const resultLiveNotificationAlreadySent = async (since) => {
@@ -5387,6 +5405,15 @@ const handleDownloadAllReports = async () => {
               </div>
             </section>
           ) : null}
+          {activePage === "Marhala Posts" ? (
+            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
+              <LazyMarhalaPosts
+                role="admin"
+                students={students}
+                onShowAction={onShowAction}
+              />
+            </Suspense>
+          ) : null}
           {activePage === "Student Registry" && (
             <div className="admin-section fade-in">
               <div className="section-header">
@@ -5433,7 +5460,7 @@ const handleDownloadAllReports = async () => {
                       <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
                     </label>
                     <label>
-                      <span>Arabic Name (اسم الطالب)</span>
+                      <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
                       <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                     </label>
                   </div>
@@ -5517,7 +5544,15 @@ const handleDownloadAllReports = async () => {
               {stats.map((stat) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={stat.label} className="pstat-card">
+                  <div
+                    key={stat.label}
+                    className={`pstat-card${stat.navigateTo ? ' clickable' : ''}`}
+                    onClick={() => stat.navigateTo && setActivePage(stat.navigateTo)}
+                    role={stat.navigateTo ? 'button' : undefined}
+                    tabIndex={stat.navigateTo ? 0 : undefined}
+                    onKeyDown={stat.navigateTo ? (e) => { if (e.key === 'Enter') setActivePage(stat.navigateTo); } : undefined}
+                    style={{ cursor: stat.navigateTo ? 'pointer' : 'default' }}
+                  >
                     <span className="pstat-value">{stat.value}</span>
                     <span className="pstat-label">{stat.label}</span>
                     <span className="pstat-sub"><Icon size={12} style={{ verticalAlign: 'middle' }} /></span>
@@ -5527,7 +5562,7 @@ const handleDownloadAllReports = async () => {
             </div>
           )}
 
-          {activePage === "Overview" ? (
+          {activePage === "Quick Student Access" ? (
             <div className="overview-container fade-in">
               <div className="overview-selection-header card-appear">
                 <div className="selection-box">
@@ -5585,7 +5620,7 @@ const handleDownloadAllReports = async () => {
                       <StudentAvatar student={selectedStudent} />
                       <div>
                         <h3>{selectedStudent.name}</h3>
-                        <p>{selectedStudent.groupName} · {selectedStudent.teacherName}</p>
+                        <p>{selectedStudent.groupName} آ· {selectedStudent.teacherName}</p>
                         <div className="pill-row">
                           <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
                           <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
@@ -5615,6 +5650,15 @@ const handleDownloadAllReports = async () => {
                 </div>
               )}
             </div>
+          ) : null}
+
+          {activePage === "Jadwal Tracking" ? (
+            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Jadwal Tracking...</p></div>}>
+              <LazyJadwalTrackingView
+                students={students}
+                onShowAction={onShowAction}
+              />
+            </Suspense>
           ) : null}
 
           {activePage === "Result Tracking" ? (
@@ -5902,7 +5946,7 @@ const handleDownloadAllReports = async () => {
                         <option value="">Select child</option>
                         {students.map((student) => (
                           <option key={student.student_id} value={student.student_id}>
-                            {student.name} · {student.groupName}
+                            {student.name} آ· {student.groupName}
                           </option>
                         ))}
                       </select>
@@ -6079,7 +6123,7 @@ const handleDownloadAllReports = async () => {
                       </label>
 
                       <label>
-                        <span>Arabic Name (اسم الطالب)</span>
+                        <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
                         <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                       </label>
 
@@ -7046,7 +7090,7 @@ const handleDownloadAllReports = async () => {
                      </p>
                    )}
                    <p style={{ fontSize: '0.85rem', marginTop: '6px', color: 'var(--soft-brown)' }}>
-                      Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} → ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
+                      Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} â†’ ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
                    </p>
                 </div>
                 <div style={{ marginTop: '20px' }}>
@@ -7351,6 +7395,33 @@ onShowAction,
     setSaveStatus("saved");
     setTimeout(() => setSaveStatus(""), 2000);
 
+    // Auto-update child's current Juz in child_profiles when wusool_juz is saved
+    const newWusoolJuz = data?.wusool_juz || teacherForms.result.wusool_juz;
+    if (newWusoolJuz && String(newWusoolJuz).trim() !== "" && numericId) {
+      const juzNum = parseInt(newWusoolJuz, 10);
+      if (!isNaN(juzNum) && juzNum >= 1 && juzNum <= 30) {
+        supabase
+          .from("child_profiles")
+          .update({ juz: String(juzNum) })
+          .eq("student_id", numericId)
+          .then(({ error: juzError }) => {
+            if (juzError) {
+              console.warn("Failed to update child juz:", juzError.message);
+            } else {
+              // Also update local state so parent portal reflects it immediately
+              setSchoolData(prev => ({
+                ...prev,
+                students: prev.students.map(s =>
+                  String(s.student_id) === String(numericId)
+                    ? { ...s, juz: String(juzNum) }
+                    : s
+                )
+              }));
+            }
+          });
+      }
+    }
+
     setSchoolData((current) => {
       const nextWeeklyResults = [
         data,
@@ -7544,11 +7615,11 @@ onShowAction,
                     </div>
                     <div className="salary-item">
                       <span className="salary-label">{"Rate - Min"}</span>
-                      <span className="salary-value">₹{monthlySalary.rate}</span>
+                      <span className="salary-value">â‚¹{monthlySalary.rate}</span>
                     </div>
                     <div className="salary-item total-item">
                       <span className="salary-label">Total Amount</span>
-                      <span className="salary-value highlight">₹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
+                      <span className="salary-value highlight">â‚¹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
                     </div>
                   </div>
                   <p className="hint-text">Calculated based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
@@ -7684,7 +7755,7 @@ onShowAction,
                           );
                           return (
                             <option key={student.student_id} value={student.student_id}>
-                              {student.name}{existingResult ? " - ✓ Saved" : ""} - {student.groupName}
+                              {student.name}{existingResult ? " - âœ“ Saved" : ""} - {student.groupName}
                             </option>
                           );
                         })}
@@ -7804,7 +7875,7 @@ onShowAction,
 
                   <div className="form-grid">
                     <label>
-                      <span>Matrookah (متروكة)</span>
+                      <span>Matrookah (ظ…طھط±ظˆظƒط©)</span>
                       <input
                         type="text"
                         name="matrookah"
@@ -7814,7 +7885,7 @@ onShowAction,
                       />
                     </label>
                     <label>
-                      <span>Daeefah (ضعيفة)</span>
+                      <span>Daeefah (ط¶ط¹ظٹظپط©)</span>
                       <input
                         type="text"
                         name="daeefah"
@@ -7962,7 +8033,7 @@ onShowAction,
                       <div>
                         <h3>{selectedStudent.name}</h3>
                         <p>
-                          {selectedStudent.groupName} · {selectedStudent.teacherName}
+                          {selectedStudent.groupName} آ· {selectedStudent.teacherName}
                         </p>
                       </div>
                     </div>
@@ -8236,29 +8307,29 @@ onShowAction,
 
 // --- Quran Surah Names (Arabic) ---
 const SURAH_NAMES_AR = [
-  "الفاتحة","البقرة","آل عمران","النساء","المائدة",
-  "الأنعام","الأعراف","الأنفال","التوبة","يونس",
-  "هود","يوسف","الرعد","إبراهيم","الحجر",
-  "النحل","الإسراء","الكهف","مريم","طه",
-  "الأنبياء","الحج","المؤمنون","النور","الفرقان",
-  "الشعراء","النمل","القصص","العنكبوت","الروم",
-  "لقمان","السجدة","الأحزاب","سبأ","فاطر",
-  "يس","الصافات","ص","الزمر","غافر",
-  "فصلت","الشورى","الزخرف","الدخان","الجاثية",
-  "الأحقاف","محمد","الفتح","الحجرات","ق",
-  "الذاريات","الطور","النجم","القمر","الرحمن",
-  "الواقعة","الحديد","المجادلة","الحشر","الممتحنة",
-  "الصف","الجمعة","المنافقون","التغابن","الطلاق",
-  "التحريم","الملك","القلم","الحاقة","المعارج",
-  "نوح","الجن","المزمل","المدثر","القيامة",
-  "الإنسان","المرسلات","النبأ","النازعات","عبس",
-  "التكوير","الانفطار","المطففين","الانشقاق","البروج",
-  "الطارق","الأعلى","الغاشية","الفجر","البلد",
-  "الشمس","الليل","الضحى","الشرح","التين",
-  "العلق","القدر","البينة","الزلزلة","العاديات",
-  "القارعة","التكاثر","العصر","الهمزة","الفيل",
-  "قريش","الماعون","الكوثر","الكافرون","النصر",
-  "المسد","الإخلاص","الفلق","الناس"
+  "ط§ظ„ظپط§طھط­ط©","ط§ظ„ط¨ظ‚ط±ط©","ط¢ظ„ ط¹ظ…ط±ط§ظ†","ط§ظ„ظ†ط³ط§ط،","ط§ظ„ظ…ط§ط¦ط¯ط©",
+  "ط§ظ„ط£ظ†ط¹ط§ظ…","ط§ظ„ط£ط¹ط±ط§ظپ","ط§ظ„ط£ظ†ظپط§ظ„","ط§ظ„طھظˆط¨ط©","ظٹظˆظ†ط³",
+  "ظ‡ظˆط¯","ظٹظˆط³ظپ","ط§ظ„ط±ط¹ط¯","ط¥ط¨ط±ط§ظ‡ظٹظ…","ط§ظ„ط­ط¬ط±",
+  "ط§ظ„ظ†ط­ظ„","ط§ظ„ط¥ط³ط±ط§ط،","ط§ظ„ظƒظ‡ظپ","ظ…ط±ظٹظ…","ط·ظ‡",
+  "ط§ظ„ط£ظ†ط¨ظٹط§ط،","ط§ظ„ط­ط¬","ط§ظ„ظ…ط¤ظ…ظ†ظˆظ†","ط§ظ„ظ†ظˆط±","ط§ظ„ظپط±ظ‚ط§ظ†",
+  "ط§ظ„ط´ط¹ط±ط§ط،","ط§ظ„ظ†ظ…ظ„","ط§ظ„ظ‚طµطµ","ط§ظ„ط¹ظ†ظƒط¨ظˆطھ","ط§ظ„ط±ظˆظ…",
+  "ظ„ظ‚ظ…ط§ظ†","ط§ظ„ط³ط¬ط¯ط©","ط§ظ„ط£ط­ط²ط§ط¨","ط³ط¨ط£","ظپط§ط·ط±",
+  "ظٹط³","ط§ظ„طµط§ظپط§طھ","طµ","ط§ظ„ط²ظ…ط±","ط؛ط§ظپط±",
+  "ظپطµظ„طھ","ط§ظ„ط´ظˆط±ظ‰","ط§ظ„ط²ط®ط±ظپ","ط§ظ„ط¯ط®ط§ظ†","ط§ظ„ط¬ط§ط«ظٹط©",
+  "ط§ظ„ط£ط­ظ‚ط§ظپ","ظ…ط­ظ…ط¯","ط§ظ„ظپطھط­","ط§ظ„ط­ط¬ط±ط§طھ","ظ‚",
+  "ط§ظ„ط°ط§ط±ظٹط§طھ","ط§ظ„ط·ظˆط±","ط§ظ„ظ†ط¬ظ…","ط§ظ„ظ‚ظ…ط±","ط§ظ„ط±ط­ظ…ظ†",
+  "ط§ظ„ظˆط§ظ‚ط¹ط©","ط§ظ„ط­ط¯ظٹط¯","ط§ظ„ظ…ط¬ط§ط¯ظ„ط©","ط§ظ„ط­ط´ط±","ط§ظ„ظ…ظ…طھط­ظ†ط©",
+  "ط§ظ„طµظپ","ط§ظ„ط¬ظ…ط¹ط©","ط§ظ„ظ…ظ†ط§ظپظ‚ظˆظ†","ط§ظ„طھط؛ط§ط¨ظ†","ط§ظ„ط·ظ„ط§ظ‚",
+  "ط§ظ„طھط­ط±ظٹظ…","ط§ظ„ظ…ظ„ظƒ","ط§ظ„ظ‚ظ„ظ…","ط§ظ„ط­ط§ظ‚ط©","ط§ظ„ظ…ط¹ط§ط±ط¬",
+  "ظ†ظˆط­","ط§ظ„ط¬ظ†","ط§ظ„ظ…ط²ظ…ظ„","ط§ظ„ظ…ط¯ط«ط±","ط§ظ„ظ‚ظٹط§ظ…ط©",
+  "ط§ظ„ط¥ظ†ط³ط§ظ†","ط§ظ„ظ…ط±ط³ظ„ط§طھ","ط§ظ„ظ†ط¨ط£","ط§ظ„ظ†ط§ط²ط¹ط§طھ","ط¹ط¨ط³",
+  "ط§ظ„طھظƒظˆظٹط±","ط§ظ„ط§ظ†ظپط·ط§ط±","ط§ظ„ظ…ط·ظپظپظٹظ†","ط§ظ„ط§ظ†ط´ظ‚ط§ظ‚","ط§ظ„ط¨ط±ظˆط¬",
+  "ط§ظ„ط·ط§ط±ظ‚","ط§ظ„ط£ط¹ظ„ظ‰","ط§ظ„ط؛ط§ط´ظٹط©","ط§ظ„ظپط¬ط±","ط§ظ„ط¨ظ„ط¯",
+  "ط§ظ„ط´ظ…ط³","ط§ظ„ظ„ظٹظ„","ط§ظ„ط¶ط­ظ‰","ط§ظ„ط´ط±ط­","ط§ظ„طھظٹظ†",
+  "ط§ظ„ط¹ظ„ظ‚","ط§ظ„ظ‚ط¯ط±","ط§ظ„ط¨ظٹظ†ط©","ط§ظ„ط²ظ„ط²ظ„ط©","ط§ظ„ط¹ط§ط¯ظٹط§طھ",
+  "ط§ظ„ظ‚ط§ط±ط¹ط©","ط§ظ„طھظƒط§ط«ط±","ط§ظ„ط¹طµط±","ط§ظ„ظ‡ظ…ط²ط©","ط§ظ„ظپظٹظ„",
+  "ظ‚ط±ظٹط´","ط§ظ„ظ…ط§ط¹ظˆظ†","ط§ظ„ظƒظˆط«ط±","ط§ظ„ظƒط§ظپط±ظˆظ†","ط§ظ„ظ†طµط±",
+  "ط§ظ„ظ…ط³ط¯","ط§ظ„ط¥ط®ظ„ط§طµ","ط§ظ„ظپظ„ظ‚","ط§ظ„ظ†ط§ط³"
 ];
 
 // --- Juz/Surat Selector Component ---
@@ -9976,13 +10047,18 @@ export default function App() {
   const handleUpdateTeacherProfile = async (event) => {
     event.preventDefault();
     const payload = adminForms.teacherProfile;
-    const selectedTeacher = portalAccessList.find(
+
+    // Search BOTH portalAccessList AND teacherProfiles for the selected teacher
+    const selectedAccess = portalAccessList.find(
       (access) => normalizeText(access.full_name) === normalizeText(payload.full_name)
     );
-    const resolvedUserId = payload.user_id || selectedTeacher?.user_id || null;
+    const selectedProfile = teacherProfiles.find(
+      (tp) => normalizeText(tp.full_name) === normalizeText(payload.full_name)
+    );
+    const resolvedUserId = payload.user_id || selectedAccess?.user_id || selectedProfile?.user_id || null;
 
     if (!resolvedUserId) {
-      showAction("error", "Please select a staff member that already has Supabase portal access.");
+      showAction("error", "Could not find a user ID for this staff member. Please ensure they have a Supabase Auth account linked.");
       return;
     }
 
@@ -10003,15 +10079,21 @@ export default function App() {
         { onConflict: "user_id" }
       );
 
-    // Update the portal access settings (salary/visibility/photo) separately
+    // Upsert the portal access settings (salary/visibility/photo) so it works even if the teacher
+    // has no portal access entry yet â€” also add full_name in case we're creating a new record
     const { error: accessError } = await supabase
       .from("user_portal_access")
-      .update({
-        photo_url: payload.photo_url,
-        salary_per_minute: Number(payload.salary_per_minute || 2.3),
-        show_salary_card: !!payload.show_salary_card,
-      })
-      .eq("user_id", resolvedUserId);
+      .upsert(
+        {
+          user_id: resolvedUserId,
+          full_name: payload.full_name,
+          photo_url: payload.photo_url,
+          salary_per_minute: Number(payload.salary_per_minute || 2.3),
+          show_salary_card: !!payload.show_salary_card,
+          is_active: true,
+        },
+        { onConflict: "user_id" }
+      );
 
     if (profileError || accessError) {
       showAction("error", profileError?.message || accessError?.message);
@@ -10293,3 +10375,6 @@ setAppTheme={setAppTheme}
     </React.Fragment>
   );
 }
+
+
+
