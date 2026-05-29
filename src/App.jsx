@@ -2414,7 +2414,6 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
   const hSub = report.sub_heading;
   const hWusool = report.wusool_heading;
   const hNext = report.next_week_heading;
-  const hTakhteet = report.Takheet_heading;
   const hIstifadah = report.istifadah_heading;
   const progressCardBackground = report.progress_card_background_url || "";
   const progressCardOverlayOpacity = Math.min(
@@ -2568,13 +2567,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
-            <h5 className="kanz-font">{hTakhteet}</h5>
-            <p dir="rtl"><span className="arabic-kanz">{report.Takhteet_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.Takhteeth_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.Takhteet_surah || "-"}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">{report.Takhteet_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.Takhteet_page || "-")}</span></p>
-          </div>
-          <div className="target-box highlight">
-            <h5 className="kanz-font">{hIstifadah}</h5>
+            <h5 className="kanz-font" style={{fontFamily:"Arial,sans-serif"}}>{hIstifadah}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
             <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
