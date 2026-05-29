@@ -101,8 +101,7 @@
 
 @font-face {
   font-family: 'Al-Kanz';
-  src: url('/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf') format('truetype'),
-       url('/Al_Kanz_Fonts_For_Windows/Kanz-al-Marjaan.ttf') format('truetype');
+  src: url('/fonts/al-kanz.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -1432,12 +1431,14 @@ h1, h2, h3, h4, h5 {
   margin-bottom: 8px;
   background: white;
   box-shadow: 0 8px 20px rgba(138, 101, 21, 0.1);
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .max-score {
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--text-muted);
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .score-details-box {
@@ -1472,6 +1473,7 @@ h1, h2, h3, h4, h5 {
   font-weight: 800;
   color: var(--text-main);
   font-size: 1.1rem;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .result-footer-grid {
@@ -2325,6 +2327,7 @@ h1, h2, h3, h4, h5 {
 .note-val {
   font-weight: 800;
   color: #c53030;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .note-label {
@@ -2775,6 +2778,7 @@ h1, h2, h3, h4, h5 {
   font-size: 1rem;
   font-weight: 900;
   color: var(--deep-brown);
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 /* --- Report Footer Cards Layout --- */

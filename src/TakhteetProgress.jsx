@@ -148,7 +148,7 @@ const AnimatedProgressRing = ({ percent, size = 140, strokeWidth = 10, isComplet
         </defs>
       </svg>
       <div className="progress-ring-text">
-        <span className="progress-ring-value">{toArabicDigits(Math.round(animatedPercent))}</span>
+        <span className="progress-ring-value kanz-font">{toArabicDigits(Math.round(animatedPercent))}</span>
         <span className="progress-ring-unit">%</span>
       </div>
     </div>
@@ -172,7 +172,7 @@ const JssDisplay = ({ juz, surah, safa, compact = false }) => (
   <div className={`jss-display ${compact ? 'compact' : ''}`}>
     <div className="jss-item">
       <span className="jss-label">Juz</span>
-      <span className="jss-value">{juz}</span>
+      <span className="jss-value kanz-font">{juz}</span>
     </div>
     <div className="jss-divider" />
     <div className="jss-item">
@@ -182,7 +182,7 @@ const JssDisplay = ({ juz, surah, safa, compact = false }) => (
     <div className="jss-divider" />
     <div className="jss-item">
       <span className="jss-label">Safa</span>
-      <span className="jss-value">{safa}</span>
+      <span className="jss-value kanz-font">{safa}</span>
     </div>
   </div>
 );
@@ -291,17 +291,17 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
             <div className="progress-stats-row">
               <div className="progress-stat">
                 <span className="stat-label">Target</span>
-                <span className="stat-value">{toArabicDigits(istifadahPage || pagesCovered)}</span>
+                <span className="stat-value kanz-font">{toArabicDigits(istifadahPage || pagesCovered)}</span>
               </div>
               <div className="progress-stat-divider">/</div>
               <div className="progress-stat">
                 <span className="stat-label">Done</span>
-                <span className="stat-value">{toArabicDigits(pagesCovered)}</span>
+                <span className="stat-value kanz-font">{toArabicDigits(pagesCovered)}</span>
               </div>
             </div>
             <p className="progress-remaining">
               {pagesRemaining > 0 ? (
-                <><strong>{toArabicDigits(pagesRemaining)}</strong> pages remaining</>
+                <><strong className="kanz-font">{toArabicDigits(pagesRemaining)}</strong> pages remaining</>
               ) : pagesCovered > 0 ? (
                 <span className="success-text celebration-text">🎉 Mubarak Mohanna! Target achieved 🎉</span>
               ) : null}
@@ -323,7 +323,7 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
                 safa={target.safa}
               />
               <div className="metric-footer">
-                <span className="metric-pages">Target till page {toArabicDigits(istifadahPage || '--')}</span>
+                <span className="metric-pages">Target till page <span className="kanz-font">{toArabicDigits(istifadahPage || '--')}</span></span>
               </div>
             </MetricCard>
 
@@ -340,7 +340,7 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
                 safa={wusool.safa}
               />
               <div className="metric-footer">
-                <span className="metric-pages">{toArabicDigits(pagesCovered)} pages done</span>
+                <span className="metric-pages"><span className="kanz-font">{toArabicDigits(pagesCovered)}</span> pages done</span>
               </div>
             </MetricCard>
 
@@ -360,10 +360,10 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
               <div className="metric-footer">
                 {pagesCovered > 0 && nextWeekPages > 0 ? (
                   <span className="metric-percent">
-                    <strong>{toArabicDigits(Math.round(nextWeekPercent))}%</strong> of total target
+                    <strong className="kanz-font">{toArabicDigits(Math.round(nextWeekPercent))}%</strong> of total target
                   </span>
                 ) : nextWeekPages > 0 ? (
-                  <span className="metric-pages">{toArabicDigits(nextWeekPages)} pages planned</span>
+                  <span className="metric-pages"><span className="kanz-font">{toArabicDigits(nextWeekPages)}</span> pages planned</span>
                 ) : (
                   <span className="metric-pages muted">No target set</span>
                 )}

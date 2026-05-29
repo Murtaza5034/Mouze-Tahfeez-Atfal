@@ -1,3 +1,16 @@
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/fonts/al-kanz.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.takhteet-progress-container .kanz-font {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  letter-spacing: normal;
+}
+
 /* ===== TakhteetProgress Card Container ===== */
 .takhteet-progress-container {
   margin: 20px 0;
@@ -141,6 +154,7 @@
 }
 
 .progress-ring-value {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   font-size: 1.9rem;
   font-weight: 800;
   color: #3e2723;
@@ -176,6 +190,7 @@
 }
 
 .progress-stat .stat-value {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   font-size: 0.95rem;
   font-weight: 700;
   color: #3e2723;
@@ -312,6 +327,7 @@
 }
 
 .jss-value {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   font-size: 0.85rem;
   font-weight: 700;
   color: #3e2723;
@@ -324,7 +340,7 @@
 }
 
 .arabic-text {
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   font-size: 0.95rem !important;
   letter-spacing: normal;
 }
@@ -598,7 +614,7 @@
 }
 
 .record-card .arabic-text {
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   font-size: 0.8rem !important;
 }
 
