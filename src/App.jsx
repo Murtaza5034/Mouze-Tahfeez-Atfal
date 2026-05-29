@@ -2484,8 +2484,17 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="school-info" style={{ textAlign: 'center' }}>
             <h2 className="qilka-bold-font" style={{ fontSize: '2.5rem', color: 'var(--deep-brown)', margin: 0, textTransform: 'uppercase' }}>{hMain}</h2>
             <h4 className="qilka-bold-font" style={{ fontSize: '1.2rem', color: 'var(--primary-gold)', margin: '4px 0 0' }}>{hSub.replace(/\b\w/g, c => c.toUpperCase()).replace(/(\b[A-Z])([A-Z]+)/g, (_, f, r) => f + r.toLowerCase())}</h4>
-            <div className="report-student-name child-hood-font" style={{ fontSize: '1.1rem', color: 'var(--soft-brown)', marginTop: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px' }}>
-              {student?.name}
+            <div className="report-student-name" style={{ marginTop: '28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', border: '3px solid var(--primary-gold)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8' }}>
+                {student?.photoUrl || student?.photo_url ? (
+                  <img src={student.photoUrl || student.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--soft-brown)" strokeWidth="1.5" style={{ width: '36px', height: '36px' }}>
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                  </svg>
+                )}
+              </div>
+              <span className="child-hood-font" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold', letterSpacing: '1px' }}>{student?.name}</span>
             </div>
           </div>
         </div>
