@@ -2518,7 +2518,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
                  toNumber(weeklyResult?.takhteet) + 
                  toNumber(weeklyResult?.jadeed))) || "0")}</span>
             </div>
-            <span className="max-score"><span className="kanz-font"> / {toArabicDigits(100)}</span></span>
+            <span className="max-score"><span className="kanz-font"><span style={{fontFamily:'Arial,sans-serif'}}> / </span>{toArabicDigits(100)}</span></span>
           </div>
 
           <div className="score-details-box">
@@ -2530,7 +2530,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
                 <span className="arabic-label arabic-kanz">{item.label} :</span>
-                <span className="score-val" style={{ direction: 'ltr', unicodeBidi: 'isolate' }}><span className="kanz-font">{toArabicDigits(item.val || "0")}</span> / <span className="kanz-font">{toArabicDigits(item.max)}</span></span>
+                <span className="score-val" style={{ direction: 'ltr', unicodeBidi: 'isolate' }}><span className="kanz-font">{toArabicDigits(item.val || "0")}</span><span style={{fontFamily:'Arial,sans-serif'}}> / </span><span className="kanz-font">{toArabicDigits(item.max)}</span></span>
               </div>
             ))}
           </div>
