@@ -2567,7 +2567,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
           <div className="score-details-box">
             {[
-              { label: report.murajah_heading, val: weeklyResult?.murajah, max: 30 },
+              { label: report.murajazah_heading, val: weeklyResult?.murajazah, max: 30 },
               { label: report.juz_hali_heading, val: weeklyResult?.juz_hali, max: 30 },
               { label: report.takhteet_heading, val: weeklyResult?.takhteet, max: 20 },
               { label: report.jadeed_heading, val: weeklyResult?.jadeed, max: 20 }
