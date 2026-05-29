@@ -531,6 +531,18 @@ const FONT_FACE_CSS = `
   font-weight: normal;
   font-style: normal;
 }
+@font-face {
+  font-family: 'Qilka-Bold';
+  src: url('/Qilka-Bold%20copy.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Child Hood';
+  src: url('/Child%20Hood.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
 `;
 
 const loadCustomFontsForCanvas = async () => {
@@ -552,6 +564,18 @@ const loadCustomFontsForCanvas = async () => {
         family: "Al-Kanz",
         sources: [
           "url(/fonts/al-kanz.ttf) format('truetype')",
+        ],
+      },
+      {
+        family: "Qilka-Bold",
+        sources: [
+          "url(/Qilka-Bold%20copy.otf) format('opentype')",
+        ],
+      },
+      {
+        family: "Child Hood",
+        sources: [
+          "url(/Child%20Hood.otf) format('opentype')",
         ],
       },
     ];
@@ -2487,11 +2511,9 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             <div className="report-student-name" style={{ marginTop: '28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', border: '3px solid var(--primary-gold)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8' }}>
                 {student?.photoUrl || student?.photo_url ? (
-                  <img src={student.photoUrl || student.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={student.photoUrl || student.photo_url} alt="" crossOrigin="anonymous" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--soft-brown)" strokeWidth="1.5" style={{ width: '36px', height: '36px' }}>
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-                  </svg>
+                  <span style={{ fontSize: '32px', lineHeight: '70px', color: 'var(--soft-brown)' }}>👤</span>
                 )}
               </div>
               <span className="child-hood-font" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold', letterSpacing: '1px' }}>{student?.name}</span>
@@ -4027,6 +4049,8 @@ function ParentPortal({
                   student={{
                     name: studentProfile?.name,
                     groupName: studentProfile?.groupName || studentProfile?.class_level,
+                    photoUrl: studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url,
+                    photo_url: studentProfile?.photo_url || studentProfile?.photoUrl || studentProfile?.avatar_url,
                   }}
                   weeklyResult={weeklyResult || studentProfile?.latestResult}
                   settings={settings}
@@ -4058,6 +4082,8 @@ function ParentPortal({
                     student={{
                       name: studentProfile?.name,
                       groupName: studentProfile?.groupName || studentProfile?.class_level,
+                      photoUrl: studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url,
+                      photo_url: studentProfile?.photo_url || studentProfile?.photoUrl || studentProfile?.avatar_url,
                     }}
                     weeklyResult={weeklyResult || studentProfile?.latestResult}
                     settings={reportSettingsObject}
