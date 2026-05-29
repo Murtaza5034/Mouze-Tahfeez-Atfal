@@ -24,7 +24,7 @@ const FONT_FACE_CSS = `
 }
 @font-face {
   font-family: 'Al-Kanz';
-  src: url('/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf') format('truetype');
+  src: url('/fonts/al-kanz.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
 }
@@ -243,7 +243,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise') =
         if (!document.fonts.check('1em "' + family + '"', 'abcdefghijklmnopqrstuvwxyz0123456789')) {
           const fontSrc = family === 'Kanz al Marjaan'
             ? "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2) format('woff2'),url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff) format('woff'),url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf) format('truetype')"
-            : "url(/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf) format('truetype')";
+            : "url(/fonts/al-kanz.ttf) format('truetype')";
           const ff = new FontFace(family, fontSrc);
           await ff.load();
           document.fonts.add(ff);

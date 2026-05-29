@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "./supabaseClient";
-import { Heart, Sparkles, User, Edit3, Save, X, Trash2, Plus, Upload, Camera } from "lucide-react";
+import { Heart, Sparkles, User, Edit3, Save, X, Trash2, Plus, Upload, Camera, MessageCircle, Instagram } from "lucide-react";
 import "./marhala-posts.css";
 
 const MARHALA_OPTIONS = [
@@ -13,6 +13,17 @@ const MARHALA_OPTIONS = [
   "Marhala Sabeah",
   "Marhala Saminah",
 ];
+
+const MARHALA_ARABIC_LABELS = {
+  "Marhala Ula": "المرحلة الاولى",
+  "Marhala Saniyah": "المرحلة الثانية",
+  "Marhala Salesah": "المرحلة الثالثة",
+  "Marhala Rabeah": "المرحلة الرابعة",
+  "Marhala Khamesah": "المرحلة الخامسة",
+  "Marhala Sadesah": "المرحلة السادسة",
+  "Marhala Sabeah": "المرحلة السابعة",
+  "Marhala Saminah": "المرحلة الثامنة",
+};
 
 const toArabicDigits = (str) => {
   if (str == null) return str;
@@ -31,6 +42,16 @@ const calculateAge = (dob) => {
   return age;
 };
 
+const withoutOptionalPostColumns = (payload) => {
+  const { age, arabic_name, ...safePayload } = payload;
+  return safePayload;
+};
+
+const isMissingOptionalColumnError = (error) => {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return error?.code === "PGRST204" || message.includes("age") || message.includes("arabic_name") || message.includes("schema cache");
+};
+
 function MarhalaPosts({
   role = "parents",
   students = [],
@@ -41,6 +62,7 @@ function MarhalaPosts({
   limit = null,
   hideHeader = false,
   hideEmpty = false,
+  homePreview = false,
   className = "",
 }) {
   const [posts, setPosts] = useState([]);
@@ -52,6 +74,7 @@ function MarhalaPosts({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPost, setSelectedPost] = useState(null);
 
   // Form state
   const [formStudent, setFormStudent] = useState(null);
@@ -83,7 +106,7 @@ function MarhalaPosts({
         .from("child_profiles")
         .select("full_name, arabic_name, date_of_birth, photo_url, student_id")
         .eq("student_id", studentId)
-        .single();
+        .maybeSingle();
       if (!error && data) {
         setStudentDetailsCache((prev) => ({
           ...prev,
@@ -222,6 +245,15 @@ function MarhalaPosts({
     }
   };
 
+  const openCreateForm = () => {
+    if (showForm) {
+      resetForm();
+      return;
+    }
+    resetForm();
+    setShowForm(true);
+  };
+
   // Admin: save post (create or update)
   const handleSavePost = async (e) => {
     e.preventDefault();
@@ -237,13 +269,17 @@ function MarhalaPosts({
     try {
       const studentId = String(formStudent.student_id || formStudent.id || "");
       const studentName = formStudent.full_name || formStudent.name || "Student";
+      const cachedStudent = studentDetailsCache[studentId] || {};
+
+      const computedAge = formAge || (cachedStudent?.date_of_birth ? String(calculateAge(cachedStudent.date_of_birth)) : "");
 
       const postData = {
         student_name: studentName,
+        arabic_name: cachedStudent.arabic_name || formStudent.arabic_name || formStudent.arabicName || "",
         marhala_name: formMarhala,
         title: formHeading,
         image_url: formPhotoUrl,
-        age: formAge,
+        description: computedAge,
         updated_at: new Date().toISOString(),
       };
 
@@ -255,21 +291,33 @@ function MarhalaPosts({
           .from("marhala_posts")
           .update(postData)
           .eq("id", editingPostId);
-        if (error) throw error;
+        if (error) {
+          if (!isMissingOptionalColumnError(error)) throw error;
+          const { error: retryError } = await supabase
+            .from("marhala_posts")
+            .update(withoutOptionalPostColumns(postData))
+            .eq("id", editingPostId);
+          if (retryError) throw retryError;
+        }
         if (onShowAction) onShowAction("success", "Post updated successfully!");
       } else {
         // Create new post
-        const { data, error } = await supabase.from("marhala_posts").insert([
-          {
-            ...postData,
-            student_id: studentId,
-            likes: [],
-          },
-        ]).select().single();
-        if (error) throw error;
+        const createdPost = {
+          ...postData,
+          student_id: studentId,
+          likes: [],
+        };
+        const { error } = await supabase.from("marhala_posts").insert([createdPost]);
+        if (error) {
+          if (!isMissingOptionalColumnError(error)) throw error;
+          const { error: retryError } = await supabase
+            .from("marhala_posts")
+            .insert([withoutOptionalPostColumns(createdPost)]);
+          if (retryError) throw retryError;
+        }
         if (onPostCreated) {
           try {
-            await onPostCreated(data || { ...postData, student_id: studentId });
+            await onPostCreated(createdPost);
           } catch (notifyError) {
             console.warn("Marhala post notification failed:", notifyError);
           }
@@ -292,7 +340,7 @@ function MarhalaPosts({
     setFormHeading(post.title || post.heading || "");
     setFormMarhala(post.marhala_name || "");
     setFormPhotoUrl(post.image_url || "");
-    setFormAge(post.age || "");
+    setFormAge(post.description || post.age || "");
     // Try to find the student
     const found = (students || []).find(
       (s) => String(s.student_id) === String(post.student_id) || String(s.id) === String(post.student_id)
@@ -374,12 +422,25 @@ function MarhalaPosts({
       marhala_name: formMarhala,
       title: formHeading || "Post heading will appear here",
       image_url: photo,
+      description: formAge,
       age: formAge,
       student_id: studentId,
       likes: [],
       created_at: new Date().toISOString(),
     };
   }, [formStudent, formHeading, formMarhala, formPhotoUrl, formAge, studentDetailsCache]);
+
+  const previewStudentInfo = useMemo(() => {
+    if (!formStudent) return null;
+    const studentId = String(formStudent.student_id || formStudent.id || "");
+    const cached = studentDetailsCache[studentId] || {};
+    return {
+      ...formStudent,
+      ...cached,
+      arabic_name: cached.arabic_name || formStudent.arabic_name || formStudent.arabicName || "",
+      photo_url: formPhotoUrl || cached.photo_url || formStudent.photo_url || formStudent.photoUrl || "",
+    };
+  }, [formStudent, formPhotoUrl, studentDetailsCache]);
 
   const visiblePosts = useMemo(() => {
     let nextPosts = posts;
@@ -392,6 +453,33 @@ function MarhalaPosts({
     }
     return limit ? nextPosts.slice(0, limit) : nextPosts;
   }, [posts, maxAgeHours, limit, now]);
+
+  const getShareText = (post, studentInfo) => {
+    const childName = studentInfo?.arabic_name || post?.arabic_name || post?.student_name || "Marhala student";
+    const marhalaName = MARHALA_ARABIC_LABELS[post?.marhala_name] || post?.marhala_name || "Marhala";
+    return `${childName} - ${marhalaName}`;
+  };
+
+  const shareUrl = () => (typeof window !== "undefined" ? window.location.origin : "");
+
+  const handleWhatsAppShare = (post, studentInfo) => {
+    const text = `${getShareText(post, studentInfo)} ${shareUrl()}`.trim();
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const handleInstagramShare = async (post, studentInfo) => {
+    const text = getShareText(post, studentInfo);
+    const url = shareUrl();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Marhala Post", text, url });
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+      }
+    }
+    window.open("https://www.instagram.com/", "_blank", "noopener,noreferrer");
+  };
 
   if (!loading && hideEmpty && visiblePosts.length === 0) {
     return null;
@@ -415,7 +503,7 @@ function MarhalaPosts({
           </div>
         </div>
         {isAdmin && (
-          <button className="mp-create-btn" onClick={() => { resetForm(); setShowForm(!showForm); }}>
+          <button type="button" className="mp-create-btn" onClick={openCreateForm}>
             <Plus size={18} /> {showForm ? "Close" : "New Post"}
           </button>
         )}
@@ -474,7 +562,11 @@ function MarhalaPosts({
                   </div>
                   <div className="mp-student-preview-info">
                     <span className="mp-student-preview-name">
-                      {formStudent.full_name || formStudent.name}
+                      {previewStudentInfo?.arabic_name ? (
+                        <span className="mp-arabic-text" dir="rtl">{previewStudentInfo.arabic_name}</span>
+                      ) : (
+                        formStudent.full_name || formStudent.name
+                      )}
                     </span>
                     <div className="mp-student-preview-meta">
                       <span className="mp-student-preview-age-label">
@@ -514,7 +606,7 @@ function MarhalaPosts({
                   >
                     <option value="">Select Marhala...</option>
                     {MARHALA_OPTIONS.map((m) => (
-                      <option key={m} value={m}>{m}</option>
+                      <option key={m} value={m}>{MARHALA_ARABIC_LABELS[m] || m}</option>
                     ))}
                   </select>
                 </div>
@@ -602,7 +694,7 @@ function MarhalaPosts({
               <div className="mp-preview-label">👁️ Live Preview</div>
               <PostCard
                 post={previewPost}
-                studentInfo={studentDetailsCache[previewPost.student_id] || null}
+                studentInfo={previewStudentInfo}
                 isPreview
               />
             </div>
@@ -632,6 +724,19 @@ function MarhalaPosts({
         ) : (
           visiblePosts.map((post) => {
             const studentInfo = getStudentInfo(post);
+            if (homePreview) {
+              return (
+                <CompactMarhalaPostCard
+                  key={post.id}
+                  post={post}
+                  studentInfo={studentInfo}
+                  hasLiked={hasLiked(post)}
+                  recentlyLiked={recentlyLiked[post.id]}
+                  onLike={handleLike}
+                  onOpen={() => setSelectedPost(post)}
+                />
+              );
+            }
             return (
               <PostCard
                 key={post.id}
@@ -649,6 +754,36 @@ function MarhalaPosts({
           })
         )}
       </div>
+
+      {homePreview && selectedPost && (() => {
+        const currentPost = posts.find((post) => post.id === selectedPost.id) || selectedPost;
+        const studentInfo = getStudentInfo(currentPost);
+        return (
+          <div className="mp-modal-backdrop" onClick={() => setSelectedPost(null)}>
+            <div className="mp-modal-card" onClick={(event) => event.stopPropagation()}>
+              <button className="mp-modal-close" onClick={() => setSelectedPost(null)} aria-label="Close Marhala post">
+                <X size={20} />
+              </button>
+              <PostCard
+                post={currentPost}
+                studentInfo={studentInfo}
+                currentUserId={currentUserId}
+                hasLiked={hasLiked(currentPost)}
+                recentlyLiked={recentlyLiked[currentPost.id]}
+                onLike={handleLike}
+              />
+              <div className="mp-share-actions">
+                <button className="mp-share-btn whatsapp" onClick={() => handleWhatsAppShare(currentPost, studentInfo)}>
+                  <MessageCircle size={18} /> WhatsApp Status
+                </button>
+                <button className="mp-share-btn instagram" onClick={() => handleInstagramShare(currentPost, studentInfo)}>
+                  <Instagram size={18} /> Instagram Story
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -668,6 +803,36 @@ const CornerOrnament = ({ className }) => (
   </div>
 );
 
+function CompactMarhalaPostCard({ post, studentInfo, hasLiked, recentlyLiked, onLike, onOpen }) {
+  const likeCount = (post.likes || []).length;
+  const postPhoto = post.image_url || studentInfo?.photo_url || studentInfo?.photoUrl || "";
+  const childName = studentInfo?.arabic_name || studentInfo?.arabicName || post.arabic_name || post.student_name || "Marhala Post";
+  const marhalaDisplay = MARHALA_ARABIC_LABELS[post.marhala_name] || post.marhala_name || "Marhala";
+
+  return (
+    <article className="mp-compact-card card-appear">
+      <button className="mp-compact-photo" onClick={onOpen} aria-label="Open Marhala post">
+        {postPhoto ? <img src={postPhoto} alt={post.student_name || "Marhala post"} /> : <User size={28} />}
+      </button>
+      <div className="mp-compact-info">
+        <span className="mp-compact-eyebrow mp-arabic-text" dir="rtl">{marhalaDisplay}</span>
+        <h3 className="mp-compact-name mp-arabic-text" dir={studentInfo?.arabic_name || studentInfo?.arabicName || post.arabic_name ? "rtl" : "auto"}>{childName}</h3>
+      </div>
+      <div className="mp-compact-actions">
+        <button
+          className={`mp-compact-like ${recentlyLiked ? "just-liked" : ""}`}
+          onClick={(event) => { event.stopPropagation(); onLike && onLike(post); }}
+          aria-label={hasLiked ? "Unlike" : "Like"}
+        >
+          <Heart size={18} fill={hasLiked ? "var(--like-red)" : "none"} color={hasLiked ? "var(--like-red)" : "var(--deep-brown)"} />
+          <span className="mp-like-count">{toArabicDigits(likeCount)}</span>
+        </button>
+        <button className="mp-compact-open" onClick={onOpen}>Open</button>
+      </div>
+    </article>
+  );
+}
+
 function PostCard({
   post,
   studentInfo = null,
@@ -682,10 +847,12 @@ function PostCard({
 }) {
   const likeCount = (post.likes || []).length;
   const postPhoto = post.image_url || studentInfo?.photo_url || studentInfo?.photoUrl || "";
-  const studentAge = post.age || (studentInfo?.date_of_birth ? calculateAge(studentInfo.date_of_birth) : null);
+  const studentAge = post.description || post.age || (studentInfo?.date_of_birth ? calculateAge(studentInfo.date_of_birth) : null);
   const postHeading = post.title || post.heading || "";
   const marhalaDisplay = post.marhala_name || "";
-  const studentArabicName = studentInfo?.arabic_name || post.arabic_name || "";
+  const marhalaArabicDisplay = MARHALA_ARABIC_LABELS[marhalaDisplay] || marhalaDisplay;
+  const studentArabicName = studentInfo?.arabic_name || studentInfo?.arabicName || post.arabic_name || "";
+  const displayStudentName = studentArabicName;
 
   return (
     <div className={`mp-post-card card-appear ${isPreview ? 'mp-preview-card' : ''}`}>
@@ -756,32 +923,9 @@ function PostCard({
         <div className="mp-cert-body">
           {/* Left: Text Info */}
           <div className="mp-cert-info">
-            {/* Achievement Heading */}
-            {postHeading && (
-              <p className="mp-cert-heading" dir="auto">{postHeading}</p>
+            {displayStudentName && (
+              <h2 className="mp-cert-student-name mp-arabic-text" dir="rtl">{displayStudentName}</h2>
             )}
-
-            {/* Student Name - Large Gold */}
-            <h2 className="mp-cert-student-name">{post.student_name}</h2>
-            {studentArabicName && (
-              <h3 className="mp-cert-student-arabic-name mp-arabic-text" dir="rtl">{studentArabicName}</h3>
-            )}
-
-            {/* Details: Age, Marhala */}
-            <div className="mp-cert-details">
-              {studentAge !== null && (
-                <div className="mp-cert-detail-item">
-                  <span className="mp-cert-detail-label">Age:</span>
-                  <span className="mp-cert-detail-value"><span className="mp-age-digits">{toArabicDigits(studentAge)}</span> years</span>
-                </div>
-              )}
-              {marhalaDisplay && (
-                <div className="mp-cert-marhala-badge">
-                  <Sparkles size={13} />
-                  {marhalaDisplay}
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Right: Student Photo */}
@@ -805,21 +949,31 @@ function PostCard({
                 <span>Photo</span>
               </div>
             )}
+            {studentAge !== null && (
+              <div className="mp-cert-photo-age">
+                <span className="mp-cert-detail-label">Age</span>
+                <span className="mp-cert-detail-value"><span className="mp-age-digits">{toArabicDigits(studentAge)}</span> years</span>
+              </div>
+            )}
+            <div className="mp-cert-blessing mp-arabic-text" dir="rtl">مبارك مهنّا</div>
           </div>
+        </div>
+
+        {/* Center Section: Marhala badge + Heading above decorative line */}
+        <div className="mp-cert-center-info">
+          {marhalaDisplay && (
+            <div className="mp-cert-marhala-badge mp-arabic-text" dir="rtl">
+              <Sparkles size={16} />
+              {marhalaArabicDisplay}
+            </div>
+          )}
+          {postHeading && (
+            <p className="mp-cert-heading" dir="auto">{postHeading}</p>
+          )}
         </div>
 
         {/* Decorative line */}
         <div className="mp-cert-deco-line-thick" />
-
-        {/* Congratulations Section */}
-        <div className="mp-cert-congrats">
-          <p className="mp-cert-congrats-text">
-            <span className="mp-arabic-text" dir="rtl">مبارك مهنّا!</span> <span className="mp-cert-congrats-student">{studentArabicName || post.student_name}</span>
-          </p>
-        </div>
-
-        {/* Decorative line */}
-        <div className="mp-cert-deco-line" />
 
         {/* Certificate Footer - Location */}
         <div className="mp-cert-footer">

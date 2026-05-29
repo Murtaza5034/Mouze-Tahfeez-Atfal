@@ -1,4 +1,5 @@
-﻿import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
+﻿import "./style.css";
+import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -526,7 +527,7 @@ const FONT_FACE_CSS = `
 }
 @font-face {
   font-family: 'Al-Kanz';
-  src: url('/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf') format('truetype');
+  src: url('/fonts/al-kanz.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
 }
@@ -550,7 +551,7 @@ const loadCustomFontsForCanvas = async () => {
       {
         family: "Al-Kanz",
         sources: [
-          "url(/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf) format('truetype')",
+          "url(/fonts/al-kanz.ttf) format('truetype')",
         ],
       },
     ];
@@ -2493,11 +2494,11 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="week-meta-grid">
             <div className="meta-col">
               <span className="meta-label kids-font">Week:</span>
-              <span className="meta-val">{fatemi.week}</span>
+              <span className="meta-val kanz-font">{fatemi.week}</span>
             </div>
             <div className="meta-col">
               <span className="meta-label kids-font">Date:</span>
-              <span className="meta-val">{fatemi.date}</span>
+              <span className="meta-val kanz-font">{fatemi.date}</span>
             </div>
             <div className="meta-col">
               <span className="meta-label kids-font">Month:</span>
@@ -3269,6 +3270,7 @@ const resolveRedirectPage = (page, role) => {
     const teacherMap = {
       "Announcements": "My Group",
       "Reports": "Fill Result",
+      "Home": "My Group",
       "My Group": "My Group",
       "Jadwal": "Jadwal",
       "Quran Ikhtebar": "Quran Ikhtebar",
@@ -3556,6 +3558,7 @@ function ParentPortal({
         maxAgeHours={24}
         limit={3}
         hideEmpty
+        homePreview
         className="mp-home-preview"
       />
     </Suspense>
@@ -4412,7 +4415,7 @@ function ParentPortal({
                 )}
               </div>
               <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
+                {selectedNotification.redirect_page && (
                   <button 
                     className="premium-btn gold" 
                     onClick={() => {
@@ -7502,6 +7505,7 @@ onShowAction,
         maxAgeHours={24}
         limit={3}
         hideEmpty
+        homePreview
         className="mp-home-preview"
       />
     </Suspense>
@@ -8292,7 +8296,7 @@ onShowAction,
                   )}
                 </div>
                 <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  {selectedNotification.redirect_page && selectedNotification.redirect_page !== "Home" && (
+                  {selectedNotification.redirect_page && (
                     <button 
                       className="premium-btn gold" 
                       onClick={() => {
@@ -10232,7 +10236,7 @@ export default function App() {
 
     const [parentResult, teacherResult] = await Promise.all([
       broadcastNotification(title, body, "parents", null, "Home"),
-      broadcastNotification(title, body, "teacher", null, "My Group"),
+      broadcastNotification(title, body, "teacher", null, "Home"),
     ]);
 
     if (parentResult?.inboxError || parentResult?.fcmError || teacherResult?.inboxError || teacherResult?.fcmError) {
