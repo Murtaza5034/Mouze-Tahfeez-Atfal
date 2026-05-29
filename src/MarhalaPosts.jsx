@@ -486,6 +486,27 @@ function MarhalaPosts({
     const element = document.querySelector(".mp-modal-card .mp-post-card");
     if (!element) return null;
     try {
+      // Preload fonts in the main document so they're cached for the clone
+      const fontUrls = [
+        { family: "Kanz al Marjaan", sources: [
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2) format('woff2')",
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff) format('woff')",
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf) format('truetype')",
+        ]},
+        { family: "Al-Kanz", sources: ["url(/fonts/al-kanz.ttf) format('truetype')"] },
+      ];
+      for (const { family, sources } of fontUrls) {
+        if (!document.fonts.check(`1em "${family}"`, "abcdefghijklmnopqrstuvwxyz0123456789")) {
+          const ff = new FontFace(family, sources.join(", "));
+          await ff.load();
+          document.fonts.add(ff);
+        }
+      }
+      await Promise.race([
+        document.fonts.ready,
+        new Promise(resolve => setTimeout(resolve, 2000)),
+      ]);
+
       const mod = await import("html2canvas");
       const h2c = mod.default || mod;
       const canvas = await h2c(element, {
