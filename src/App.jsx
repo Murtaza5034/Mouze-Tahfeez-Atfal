@@ -1950,13 +1950,13 @@ function toNumber(value) {
 
 const toArabicDigits = (str) => {
   if (str == null) return str;
-  return String(str).replace(/\d/g, d => 'ظ ظ،ظ¢ظ£ظ¤ظ¥ظ¦ظ§ظ¨ظ©'[parseInt(d, 10)]);
+  return String(str).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d, 10)]);
 };
 
 const ARABIC_MONTHS = [
-  "ظ…ط­ط±ظ… ط§ظ„ط­ط±ط§ظ…", "طµظپط± ط§ظ„ظ…ط¸ظپط±", "ط±ط¨ظٹط¹ ط§ظ„ط£ظˆظ„", "ط±ط¨ظٹط¹ ط§ظ„ط¢ط®ط±",
-  "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط£ظˆظ„ظ‰", "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط¢ط®ط±ط©", "ط±ط¬ط¨ ط§ظ„ط£طµط¨", "ط´ط¹ط¨ط§ظ† ط§ظ„ظƒط±ظٹظ…",
-  "ط±ظ…ط¶ط§ظ† ط§ظ„ظ…ط¹ط¸ظ…", "ط´ظˆط§ظ„ ط§ظ„ظ…ظƒط±ظ…", "ط°ظٹ ط§ظ„ظ‚ط¹ط¯ط© ط§ظ„ط­ط±ط§ظ…", "ط°ظٹ ط§ظ„ط­ط¬ط© ط§ظ„ط­ط±ط§ظ…"
+  "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
+  "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
+  "رمضان المعظم", "شوال المكرم", "ذو القعدة الحرام", "ذو الحجة الحرام"
 ];
 
 function getFatemiInfo(dateStr) {
@@ -2482,9 +2482,9 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         <div className="result-card-header" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div className="school-logo" style={{ marginBottom: '12px' }}><img src="/logo.png" alt="Logo" /></div>
           <div className="school-info" style={{ textAlign: 'center' }}>
-            <h2 className="kids-font" style={{ fontSize: '2.5rem', color: 'var(--deep-brown)', margin: 0, textTransform: 'uppercase' }}>{hMain}</h2>
-            <h4 className="kids-font" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', margin: '4px 0 0' }}>{hSub}</h4>
-            <div className="report-student-name" style={{ fontSize: '1.1rem', color: 'var(--soft-brown)', marginTop: '8px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+            <h2 className="kanz-font" style={{ fontSize: '2.5rem', color: 'var(--deep-brown)', margin: 0, textTransform: 'uppercase' }}>{hMain}</h2>
+            <h4 className="kanz-font" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', margin: '4px 0 0' }}>{hSub}</h4>
+            <div className="report-student-name kanz-font" style={{ fontSize: '1.1rem', color: 'var(--soft-brown)', marginTop: '8px', fontWeight: 'bold', textTransform: 'uppercase' }}>
               {student?.name}
             </div>
           </div>
@@ -2493,15 +2493,15 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         <div className="result-week-meta">
           <div className="week-meta-grid">
             <div className="meta-col">
-              <span className="meta-label kids-font">Week:</span>
+              <span className="meta-label kanz-font">Week:</span>
               <span className="meta-val kanz-font">{fatemi.week}</span>
             </div>
             <div className="meta-col">
-              <span className="meta-label kids-font">Date:</span>
+              <span className="meta-label kanz-font">Date:</span>
               <span className="meta-val kanz-font">{fatemi.date}</span>
             </div>
             <div className="meta-col">
-              <span className="meta-label kids-font">Month:</span>
+              <span className="meta-label kanz-font">Month:</span>
               <span className="meta-val arabic-kanz">{fatemi.monthName}</span>
             </div>
           </div>
@@ -2509,7 +2509,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
         <div className="result-main">
           <div className="total-score-block">
-            <span className="score-title kids-font">{report.weekly_score_heading}</span>
+            <span className="score-title kanz-font">{report.weekly_score_heading}</span>
             <span className="jumla-label arabic-kanz">{report.jumla_heading}</span>
             <div className="score-circle">
               <span className="kanz-font">{toArabicDigits((weeklyResult?.total_score ?? 
@@ -2518,7 +2518,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
                  toNumber(weeklyResult?.takhteet) + 
                  toNumber(weeklyResult?.jadeed))) || "0")}</span>
             </div>
-            <span className="max-score"><span className="kanz-font"> / {toArabicDigits(100)}</span></span>
+            <span className="max-score"><span className="kanz-font"><span style={{fontFamily:'Arial,sans-serif'}}> / </span>{toArabicDigits(100)}</span></span>
           </div>
 
           <div className="score-details-box">
@@ -2530,7 +2530,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
                 <span className="arabic-label arabic-kanz">{item.label} :</span>
-                <span className="score-val" style={{ direction: 'ltr', unicodeBidi: 'isolate' }}><span className="kanz-font">{toArabicDigits(item.val || "0")}</span> / <span className="kanz-font">{toArabicDigits(item.max)}</span></span>
+                <span className="score-val" style={{ direction: 'ltr', unicodeBidi: 'isolate' }}><span className="kanz-font">{toArabicDigits(item.val || "0")}</span><span style={{fontFamily:'Arial,sans-serif'}}> / </span><span className="kanz-font">{toArabicDigits(item.max)}</span></span>
               </div>
             ))}
           </div>
@@ -2547,7 +2547,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="target-box highlight-wusool">
             <h5 className="arabic-kanz" dir="rtl" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
           </div>
           <div className="target-box highlight-matrookah">
@@ -2561,13 +2561,13 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             </div>
           </div>
           <div className="target-box">
-            <h5 className="kids-font">{hNext}</h5>
+            <h5 className="kanz-font">{hNext}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
-            <h5 className="kids-font">{hTakhteet}</h5>
+            <h5 className="kanz-font">{hTakhteet}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.Takhteet_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.Takhteeth_juz || "-")}</span></p>
             <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.Takhteet_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.Takhteet_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.Takhteet_page || "-")}</span></p>

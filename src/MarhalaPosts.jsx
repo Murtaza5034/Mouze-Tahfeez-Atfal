@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import { Heart, Sparkles, User, Edit3, Save, X, Trash2, Plus, Upload, Camera, MessageCircle, Instagram } from "lucide-react";
 import "./marhala-posts.css";
@@ -75,6 +75,7 @@ function MarhalaPosts({
   const [uploading, setUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPost, setSelectedPost] = useState(null);
+  const postCardRef = useRef(null);
 
   // Form state
   const [formStudent, setFormStudent] = useState(null);
@@ -462,24 +463,60 @@ function MarhalaPosts({
 
   const shareUrl = () => (typeof window !== "undefined" ? window.location.origin : "");
 
-  const handleWhatsAppShare = (post, studentInfo) => {
-    const text = `${getShareText(post, studentInfo)} ${shareUrl()}`.trim();
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  const capturePostCard = async () => {
+    const element = document.querySelector(".mp-modal-card .mp-post-card");
+    if (!element) return null;
+    try {
+      const mod = await import("html2canvas");
+      const h2c = mod.default || mod;
+      const canvas = await h2c(element, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+      return canvas;
+    } catch {
+      return null;
+    }
   };
 
-  const handleInstagramShare = async (post, studentInfo) => {
-    const text = getShareText(post, studentInfo);
-    const url = shareUrl();
-    if (navigator.share) {
+  const canvasToFile = (canvas, filename) => {
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(null); return; }
+        resolve(new File([blob], filename, { type: "image/png" }));
+      }, "image/png");
+    });
+  };
+
+  const handleShareImage = async (post, studentInfo, source) => {
+    const canvas = await capturePostCard();
+    if (!canvas) {
+      const text = `${getShareText(post, studentInfo)} ${shareUrl()}`.trim();
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const file = await canvasToFile(canvas, `marhala-post-${post.id}.png`);
+    if (!file) return;
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ title: "Marhala Post", text, url });
+        await navigator.share({ files: [file], title: "Marhala Post" });
         return;
       } catch (error) {
         if (error?.name === "AbortError") return;
       }
     }
-    window.open("https://www.instagram.com/", "_blank", "noopener,noreferrer");
+    const link = document.createElement("a");
+    link.download = `marhala-post-${post.id}.png`;
+    link.href = URL.createObjectURL(file);
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
+
+  const handleWhatsAppShare = (post, studentInfo) => handleShareImage(post, studentInfo, "whatsapp");
+  const handleInstagramShare = (post, studentInfo) => handleShareImage(post, studentInfo, "instagram");
 
   if (!loading && hideEmpty && visiblePosts.length === 0) {
     return null;
@@ -760,7 +797,7 @@ function MarhalaPosts({
         const studentInfo = getStudentInfo(currentPost);
         return (
           <div className="mp-modal-backdrop" onClick={() => setSelectedPost(null)}>
-            <div className="mp-modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="mp-modal-card" ref={postCardRef} onClick={(event) => event.stopPropagation()}>
               <button className="mp-modal-close" onClick={() => setSelectedPost(null)} aria-label="Close Marhala post">
                 <X size={20} />
               </button>
