@@ -2493,15 +2493,15 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         <div className="result-week-meta">
           <div className="week-meta-grid">
             <div className="meta-col">
-              <span className="meta-label kanz-font">Week:</span>
+              <span className="meta-label child-hood-font">Week:</span>
               <span className="meta-val kanz-font">{fatemi.week}</span>
             </div>
             <div className="meta-col">
-              <span className="meta-label kanz-font">Date:</span>
+              <span className="meta-label child-hood-font">Date:</span>
               <span className="meta-val kanz-font">{fatemi.date}</span>
             </div>
             <div className="meta-col">
-              <span className="meta-label kanz-font">Month:</span>
+              <span className="meta-label child-hood-font">Month:</span>
               <span className="meta-val arabic-kanz">{fatemi.monthName}</span>
             </div>
           </div>
@@ -2509,7 +2509,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
         <div className="result-main">
           <div className="total-score-block">
-            <span className="score-title kanz-font">{report.weekly_score_heading}</span>
+            <span className="score-title child-hood-font">{report.weekly_score_heading}</span>
             <span className="jumla-label arabic-kanz">{report.jumla_heading}</span>
             <div className="score-circle">
               <span className="kanz-font">{toArabicDigits((weeklyResult?.total_score ?? 
@@ -2561,13 +2561,13 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             </div>
           </div>
           <div className="target-box">
-            <h5 className="kanz-font">{hNext}</h5>
+            <h5 className="child-hood-font">{hNext}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
             <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
-            <h5 className="kanz-font" style={{fontFamily:"Arial,sans-serif"}}>{hIstifadah}</h5>
+            <h5 className="child-hood-font">{hIstifadah}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
             <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
