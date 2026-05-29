@@ -62,13 +62,13 @@ const calculateAge = (dob) => {
 };
 
 const withoutOptionalPostColumns = (payload) => {
-  const { age, arabic_name, ...safePayload } = payload;
+  const { age, arabic_name, school_heading_ar, school_heading_en, ...safePayload } = payload;
   return safePayload;
 };
 
 const isMissingOptionalColumnError = (error) => {
   const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
-  return error?.code === "PGRST204" || message.includes("age") || message.includes("arabic_name") || message.includes("schema cache");
+  return error?.code === "PGRST204" || message.includes("age") || message.includes("arabic_name") || message.includes("school_heading") || message.includes("schema cache");
 };
 
 function MarhalaPosts({
@@ -102,6 +102,8 @@ function MarhalaPosts({
   const [formMarhala, setFormMarhala] = useState("");
   const [formPhotoUrl, setFormPhotoUrl] = useState("");
   const [formAge, setFormAge] = useState("");
+  const [formSchoolHeadingAr, setFormSchoolHeadingAr] = useState("");
+  const [formSchoolHeadingEn, setFormSchoolHeadingEn] = useState("");
 
   // Like animation state
   const [recentlyLiked, setRecentlyLiked] = useState({});
@@ -300,6 +302,8 @@ function MarhalaPosts({
         title: formHeading,
         image_url: formPhotoUrl,
         description: computedAge,
+        school_heading_ar: formSchoolHeadingAr,
+        school_heading_en: formSchoolHeadingEn,
         updated_at: new Date().toISOString(),
       };
 
@@ -361,6 +365,8 @@ function MarhalaPosts({
     setFormMarhala(post.marhala_name || "");
     setFormPhotoUrl(post.image_url || "");
     setFormAge(post.description || post.age || "");
+    setFormSchoolHeadingAr(post.school_heading_ar || "");
+    setFormSchoolHeadingEn(post.school_heading_en || "");
     // Try to find the student
     const found = (students || []).find(
       (s) => String(s.student_id) === String(post.student_id) || String(s.id) === String(post.student_id)
@@ -410,6 +416,8 @@ function MarhalaPosts({
     setFormMarhala("");
     setFormPhotoUrl("");
     setFormAge("");
+    setFormSchoolHeadingAr("");
+    setFormSchoolHeadingEn("");
   };
 
   // Get student details from cache or students prop
@@ -444,11 +452,13 @@ function MarhalaPosts({
       image_url: photo,
       description: formAge,
       age: formAge,
+      school_heading_ar: formSchoolHeadingAr,
+      school_heading_en: formSchoolHeadingEn,
       student_id: studentId,
       likes: [],
       created_at: new Date().toISOString(),
     };
-  }, [formStudent, formHeading, formMarhala, formPhotoUrl, formAge, studentDetailsCache]);
+  }, [formStudent, formHeading, formMarhala, formPhotoUrl, formAge, formSchoolHeadingAr, formSchoolHeadingEn, studentDetailsCache]);
 
   const previewStudentInfo = useMemo(() => {
     if (!formStudent) return null;
@@ -701,6 +711,27 @@ function MarhalaPosts({
               </div>
 
               {/* Heading */}
+              <div className="mp-form-group">
+                <label>🏫 Upper Heading (Arabic)</label>
+                <input
+                  type="text"
+                  placeholder="تحفيظ - روضة تحفيظ الأطفال"
+                  value={formSchoolHeadingAr}
+                  onChange={(e) => setFormSchoolHeadingAr(e.target.value)}
+                  className="mp-input"
+                  dir="rtl"
+                />
+              </div>
+              <div className="mp-form-group">
+                <label>🏫 Upper Heading (English)</label>
+                <input
+                  type="text"
+                  placeholder="Tahfeez • Rawdat Tahfeez al Atfal"
+                  value={formSchoolHeadingEn}
+                  onChange={(e) => setFormSchoolHeadingEn(e.target.value)}
+                  className="mp-input"
+                />
+              </div>
               <div className="mp-form-group">
                 <label>📝 Heading</label>
                 <input
@@ -997,8 +1028,8 @@ function PostCard({
 
         {/* Certificate Header - School Name */}
         <div className="mp-cert-header">
-          <h3 className="mp-cert-school-name mp-arabic-text" dir="rtl">تحفيظ - روضة تحفيظ الأطفال</h3>
-          <p className="mp-cert-school-name-sub">Tahfeez • Rawdat Tahfeez al Atfal</p>
+          <h3 className="mp-cert-school-name mp-arabic-text" dir="rtl">{post.school_heading_ar || "تحفيظ - روضة تحفيظ الأطفال"}</h3>
+          <p className="mp-cert-school-name-sub">{post.school_heading_en || "Tahfeez \u2022 Rawdat Tahfeez al Atfal"}</p>
           
           <div className="mp-cert-star-divider">
             <div className="mp-cert-deco-line" />

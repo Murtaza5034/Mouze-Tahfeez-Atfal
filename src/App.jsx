@@ -2415,7 +2415,7 @@ function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
         ))}
       </div>
       <div>
-        <h4 className="attendance-rating-text" style={{ fontFamily: "'Kanz al Marjaan', serif" }}>
+        <h4 className="attendance-rating-text" dir="rtl" style={{ fontFamily: "'Kanz al Marjaan', serif", letterSpacing: 'normal' }}>
           {heading}
         </h4>
         <p className="attendance-sub-label kanz-font" style={{ textAlign: 'center', fontSize: '11px' }}>
