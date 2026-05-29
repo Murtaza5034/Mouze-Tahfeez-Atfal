@@ -524,24 +524,28 @@ const FONT_FACE_CSS = `
        url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 @font-face {
   font-family: 'Al-Kanz';
   src: url('/fonts/al-kanz.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 @font-face {
   font-family: 'Qilka-Bold';
-  src: url('/Qilka-Bold%20copy.otf') format('opentype');
+  src: url('/Qilka-Bold.otf') format('opentype');
   font-weight: bold;
   font-style: normal;
+  font-display: swap;
 }
 @font-face {
   font-family: 'Child Hood';
-  src: url('/Child%20Hood.otf') format('opentype');
+  src: url('/Child-Hood.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 `;
 
@@ -573,13 +577,13 @@ const loadCustomFontsForCanvas = async () => {
       {
         family: "Qilka-Bold",
         sources: [
-          "url(/Qilka-Bold%20copy.otf) format('opentype')",
+          "url(/Qilka-Bold.otf) format('opentype')",
         ],
       },
       {
         family: "Child Hood",
         sources: [
-          "url(/Child%20Hood.otf) format('opentype')",
+          "url(/Child-Hood.otf) format('opentype')",
         ],
       },
     ];
@@ -3999,7 +4003,7 @@ function ParentPortal({
         )}
 
         {activePage === "Child Summary" ? (
-          <div className="card-appear">
+          <div className="card-appear zoomable-card">
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
               <button 
                 className="action-button premium" 
