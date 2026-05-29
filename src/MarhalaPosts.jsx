@@ -553,22 +553,40 @@ function MarhalaPosts({
   };
 
   const handleShareImage = async (post, studentInfo, source) => {
+    const shareText = `${getShareText(post, studentInfo)} ${shareUrl()}`.trim();
     const canvas = await capturePostCard();
     if (!canvas) {
-      const text = `${getShareText(post, studentInfo)} ${shareUrl()}`.trim();
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+      if (source === "whatsapp") {
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
+      } else if (source === "instagram") {
+        window.open(`https://instagram.com`, "_blank", "noopener,noreferrer");
+      }
       return;
     }
     const file = await canvasToFile(canvas, `marhala-post-${post.id}.png`);
     if (!file) return;
+
+    // 1) Native share sheet (mobile) — user picks WhatsApp/Instagram from sheet
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: "Marhala Post" });
+        const shareData = { files: [file], title: "Marhala Post", text: shareText };
+        await navigator.share(shareData);
         return;
       } catch (error) {
         if (error?.name === "AbortError") return;
       }
     }
+
+    // 2) Platform-specific deep links
+    if (source === "whatsapp") {
+      if (onShowAction) onShowAction("info", "Downloading image — open WhatsApp, tap Status, and upload the image.");
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
+    } else if (source === "instagram") {
+      if (onShowAction) onShowAction("info", "Downloading image — open Instagram, tap Story, and upload the image.");
+      window.open("https://instagram.com", "_blank", "noopener,noreferrer");
+    }
+
+    // 3) Final fallback — download image
     const link = document.createElement("a");
     link.download = `marhala-post-${post.id}.png`;
     link.href = URL.createObjectURL(file);
@@ -576,8 +594,14 @@ function MarhalaPosts({
     URL.revokeObjectURL(link.href);
   };
 
-  const handleWhatsAppShare = (post, studentInfo) => handleShareImage(post, studentInfo, "whatsapp");
-  const handleInstagramShare = (post, studentInfo) => handleShareImage(post, studentInfo, "instagram");
+  const handleWhatsAppShare = (post, studentInfo) => {
+    if (onShowAction) onShowAction("info", "Generating image for WhatsApp Status...");
+    handleShareImage(post, studentInfo, "whatsapp");
+  };
+  const handleInstagramShare = (post, studentInfo) => {
+    if (onShowAction) onShowAction("info", "Generating image for Instagram Story...");
+    handleShareImage(post, studentInfo, "instagram");
+  };
 
   if (!loading && hideEmpty && visiblePosts.length === 0) {
     return null;

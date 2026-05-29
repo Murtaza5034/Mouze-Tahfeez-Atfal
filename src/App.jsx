@@ -3863,10 +3863,11 @@ function ParentPortal({
               ))}
             </div>
             
+            {recentMarhalaPostPreview}
+            
             <Suspense fallback={null}>
               <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
             </Suspense>
-            {recentMarhalaPostPreview}
             
             <div className="dashboard-section">
               <div className="section-header">
@@ -7722,8 +7723,8 @@ onShowAction,
 
 
 
-              <PremiumHifzCard user={user} />
               {recentMarhalaPostPreview}
+              <PremiumHifzCard user={user} />
 
               <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
                 <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
