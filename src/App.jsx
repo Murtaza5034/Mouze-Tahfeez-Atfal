@@ -2538,7 +2538,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               { label: report.jadeed_heading, val: weeklyResult?.jadeed, max: 20 }
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
-                <span className="arabic-label arabic-kanz">{item.label} :</span>
+                <span className="arabic-label kanz-font">{item.label} :</span>
                 <span className="score-val" style={{ direction: 'ltr', unicodeBidi: 'isolate' }}><span className="kanz-font">{toArabicDigits(item.val || "0")}</span><span style={{fontFamily:'Arial,sans-serif'}}> / </span><span className="kanz-font">{toArabicDigits(item.max)}</span></span>
               </div>
             ))}
