@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
+﻿import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -13,7 +13,6 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
-  Send,
   Eye,
   Sparkles,
   Trophy,
@@ -49,7 +48,10 @@ import {
   Paperclip,
   Trash2,
   Pause,
-  Play
+  Play,
+  Mail,
+  Send,
+  Heart
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -58,6 +60,7 @@ import "./salary.css";
 import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
+import "./marhala-posts.css";
 
 const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
 const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
@@ -511,6 +514,63 @@ const loadSaveAs = async () => {
   return mod.saveAs;
 };
 
+// @font-face CSS for injection into html2canvas cloned document (ensures Kanz al Marjaan renders in PDFs)
+const FONT_FACE_CSS = `
+@font-face {
+  font-family: 'Kanz al Marjaan';
+  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+`;
+
+const loadCustomFontsForCanvas = async () => {
+  try {
+    // Wait for any browser-triggered font loading to settle
+    await document.fonts.ready;
+
+    // Explicitly load Kanz al Marjaan via FontFace API
+    const fontUrls = [
+      {
+        family: "Kanz al Marjaan",
+        sources: [
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2) format('woff2')",
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff) format('woff')",
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf) format('truetype')",
+        ],
+      },
+      {
+        family: "Al-Kanz",
+        sources: [
+          "url(/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf) format('truetype')",
+        ],
+      },
+    ];
+
+    for (const { family, sources } of fontUrls) {
+      const testStr = "abcdefghijklmnopqrstuvwxyz0123456789";
+      if (!document.fonts.check(`1em "${family}"`, testStr)) {
+        const ff = new FontFace(family, sources.join(", "));
+        await ff.load();
+        document.fonts.add(ff);
+      }
+    }
+
+    // One final wait to ensure everything is settled
+    await document.fonts.ready;
+  } catch (err) {
+    console.warn("Custom font loading for canvas capture failed:", err);
+  }
+};
+
 const LazyJadwalTeacherView = React.lazy(() =>
   import("./Jadwal").then((mod) => ({ default: mod.JadwalTeacherView }))
 );
@@ -519,18 +579,20 @@ const LazyJadwalParentView = React.lazy(() =>
   import("./Jadwal").then((mod) => ({ default: mod.JadwalParentView }))
 );
 
-const LazyIstifdahProgress = React.lazy(() => import("./IstifdahProgress"));
+const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
+const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
+const LazyMarhalaPosts = React.lazy(() => import("./MarhalaPosts"));
 
 const fixArabicScript = (text) => {
   if (!text) return "";
   // Normalize Gaf (Persian/Urdu script)
   // Some systems render Gaf as double kaaf or k-k-a
   return text
-    .replace(/كك/g, "گ")      // Double Kaaf -> Gaf
-    .replace(/مرككا/g, "مرگا") // Murga (K-K-A) -> Murga (G-A)
-    .replace(/بهائي/g, "بھائی") // Bhai phonetic
-    .replace(/سي/g, "سی")      // Common character fixing
-    .replace(/في/g, "فی");     // Common character fixing
+    .replace(/ظƒظƒ/g, "ع¯")      // Double Kaaf -> Gaf
+    .replace(/ظ…ط±ظƒظƒط§/g, "ظ…ط±ع¯ط§") // Murga (K-K-A) -> Murga (G-A)
+    .replace(/ط¨ظ‡ط§ط¦ظٹ/g, "ط¨ع¾ط§ط¦غŒ") // Bhai phonetic
+    .replace(/ط³ظٹ/g, "ط³غŒ")      // Common character fixing
+    .replace(/ظپظٹ/g, "ظپغŒ");     // Common character fixing
 };
 
 const NotificationStatus = ({ role }) => {
@@ -723,6 +785,8 @@ const NAV_ICONS = {
   "Report Settings": Palette,
   "Global Settings": Settings,
   "Messages": MessageCircle,
+  "Email Settings": Mail,
+  "Marhala Posts": Heart,
 };
 
 const emptyParentData = {
@@ -1567,6 +1631,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
         if (!dbError) {
           console.log("Ikhtebar: Record saved successfully:", savedData);
           await fetchHistory();
+
         } else {
           console.error("Ikhtebar: Database save error details:", dbError);
           alert("Error saving record: " + dbError.message);
@@ -1667,12 +1732,12 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 {surahInfo && (
                   <div className="mushaf-header">
                     <div className="s-name arabic-kanz">{surahInfo.name_arabic}</div>
-                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>}
+                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">ط¨ظگط³ظ’ظ…ظگ ظ±ظ„ظ„ظ‘ظژظ‡ظگ ظ±ظ„ط±ظ‘ظژط­ظ’ظ…ظژظ°ظ†ظگ ظ±ظ„ط±ظ‘ظژط­ظگظٹظ…ظگ</div>}
                   </div>
                 )}
 
                 <div className="q-label-badge" style={{ marginBottom: '15px' }}>
-                  {testMode === "self" ? "✨ Sheikh Hussary Guidance (Auto-Playing...)" : "📖 Teacher Prompt (Start Reciting):"}
+                  {testMode === "self" ? "âœ¨ Sheikh Hussary Guidance (Auto-Playing...)" : "ًں“– Teacher Prompt (Start Reciting):"}
                 </div>
 
                 <div className="mushaf-inner quran-uthmani" style={{ minHeight: '150px' }}>
@@ -1714,7 +1779,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
 
                 {recording && (
                   <div className="live-mistake-panel fade-in">
-                    <p className="live-label">🔴 MARK MISTAKES LIVE:</p>
+                    <p className="live-label">ًں”´ MARK MISTAKES LIVE:</p>
                     <div className="mistake-btns-grid">
                       <button className="mistake-btn word" onClick={() => logWordMistake({ id: Date.now(), text_uthmani: 'Word' }, "Word")}>
                         Word Mistake
@@ -1789,7 +1854,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                         ))}
                       </div>
                     ) : (
-                      <p className="perfect-score">Excellent! Perfect Recitation ⭐</p>
+                      <p className="perfect-score">Excellent! Perfect Recitation â­گ</p>
                     )}
                   </div>
                 </div>
@@ -1884,13 +1949,13 @@ function toNumber(value) {
 
 const toArabicDigits = (str) => {
   if (str == null) return str;
-  return String(str).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d, 10)]);
+  return String(str).replace(/\d/g, d => 'ظ ظ،ظ¢ظ£ظ¤ظ¥ظ¦ظ§ظ¨ظ©'[parseInt(d, 10)]);
 };
 
 const ARABIC_MONTHS = [
-  "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
-  "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
-  "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
+  "ظ…ط­ط±ظ… ط§ظ„ط­ط±ط§ظ…", "طµظپط± ط§ظ„ظ…ط¸ظپط±", "ط±ط¨ظٹط¹ ط§ظ„ط£ظˆظ„", "ط±ط¨ظٹط¹ ط§ظ„ط¢ط®ط±",
+  "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط£ظˆظ„ظ‰", "ط¬ظ…ط§ط¯ظ‰ ط§ظ„ط¢ط®ط±ط©", "ط±ط¬ط¨ ط§ظ„ط£طµط¨", "ط´ط¹ط¨ط§ظ† ط§ظ„ظƒط±ظٹظ…",
+  "ط±ظ…ط¶ط§ظ† ط§ظ„ظ…ط¹ط¸ظ…", "ط´ظˆط§ظ„ ط§ظ„ظ…ظƒط±ظ…", "ط°ظٹ ط§ظ„ظ‚ط¹ط¯ط© ط§ظ„ط­ط±ط§ظ…", "ط°ظٹ ط§ظ„ط­ط¬ط© ط§ظ„ط­ط±ط§ظ…"
 ];
 
 function getFatemiInfo(dateStr) {
@@ -2130,14 +2195,11 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     const weekResults = resultsByWeek[week];
     const sorted = [...weekResults].sort((a, b) => (Number(b.total_score) || 0) - (Number(a.total_score) || 0));
 
-    let currentRank = 1;
-    for (let i = 0; i < sorted.length; i++) {
-      if (i > 0 && (Number(sorted[i].total_score) || 0) < (Number(sorted[i - 1].total_score) || 0)) {
-        currentRank = i + 1;
-      }
-      const resId = String(sorted[i].student_id || "").trim().toLowerCase();
-      rankMap.set(`${resId}-${week}`, currentRank);
-    }
+    // Unique sequential ranks sorted by total_score descending (no ties)
+    sorted.forEach((result, idx) => {
+      const resId = String(result.student_id || "").trim().toLowerCase();
+      rankMap.set(`${resId}-${week}`, idx + 1);
+    });
   });
 
   const latestResultMap = new Map();
@@ -2162,17 +2224,14 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
   const latestResultsArray = Array.from(latestResultMap.values());
   latestResultsArray.sort((a, b) => b.effectiveScore - a.effectiveScore);
 
-  let currentGlobalRank = 1;
-  for (let i = 0; i < latestResultsArray.length; i++) {
-    if (i > 0 && latestResultsArray[i].effectiveScore < latestResultsArray[i - 1].effectiveScore) {
-      currentGlobalRank = i + 1;
-    }
-    const resId = String(latestResultsArray[i].student_id || "").trim().toLowerCase();
+  // Unique sequential global ranks (no ties)
+  latestResultsArray.forEach((result, idx) => {
+    const resId = String(result.student_id || "").trim().toLowerCase();
     const resultInMap = latestResultMap.get(resId);
     if (resultInMap) {
-      resultInMap.computedRank = currentGlobalRank;
+      resultInMap.computedRank = idx + 1;
     }
-  }
+  });
 
   return childProfiles.map((profile) => {
     const sId = profile.student_id || profile.its || profile.id;
@@ -2322,7 +2381,7 @@ function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
           {heading}
         </h4>
         <p className="attendance-sub-label kanz-font" style={{ textAlign: 'center', fontSize: '11px' }}>
-          {toArabicDigits(count || 0)} out of {toArabicDigits(total)} Presence
+          {toArabicDigits(count || 0)} out of {toArabicDigits(total)} {heading}
         </p>
       </div>
     </div>
@@ -2477,8 +2536,8 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
           <div className="trophy-container">
             <Trophy size={100} className="trophy-icon trophyPulse" />
-            <span className="rank-text-overlay rankPop rankCelebration" key={weeklyResult?.computedRank || weeklyResult?.rank}>
-              <span className="kanz-font">{toArabicDigits(weeklyResult?.computedRank || weeklyResult?.rank || "-")}</span>
+            <span className="rank-text-overlay rankPop rankCelebration" key={weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank}>
+              <span className="kanz-font">{toArabicDigits(weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank || "-")}</span>
             </span>
           </div>
         </div>
@@ -2487,7 +2546,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="target-box highlight-wusool">
             <h5 className="arabic-kanz" dir="rtl" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
           </div>
           <div className="target-box highlight-matrookah">
@@ -2503,7 +2562,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="target-box">
             <h5 className="kids-font">{hNext}</h5>
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">ط³ظˆط±ط© :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
             <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
@@ -2626,6 +2685,7 @@ function SettingsPage({
         <h2 className="page-title">Portal Settings</h2>
         <p className="page-eyebrow">Personalize your experience</p>
       </div>
+      <div className="settings-layout">
       <div className="settings-tabs">
         {tabs.map(tab => (
           <button 
@@ -2633,13 +2693,16 @@ function SettingsPage({
             className={`settings-tab-btn ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === "Dark mode" && <Moon size={16} />}
-            {tab === "App themes" && <Palette size={16} />}
-            {tab === "Notifications" && <Bell size={16} />}
-            {tab === "Security" && <Lock size={16} />}
-            {tab === "Support" && <LifeBuoy size={16} />}
-            {tab === "About" && <Info size={16} />}
-            {tab}
+            <span className="tab-btn-icon">
+              {tab === "Dark mode" && <Moon size={18} />}
+              {tab === "App themes" && <Palette size={18} />}
+              {tab === "Notifications" && <Bell size={18} />}
+              {tab === "Security" && <Lock size={18} />}
+              {tab === "Support" && <LifeBuoy size={18} />}
+              {tab === "About" && <Info size={18} />}
+            </span>
+            <span className="tab-btn-label">{tab}</span>
+            <ChevronRight size={16} className="tab-btn-chevron" />
           </button>
         ))}
       </div>
@@ -2803,18 +2866,19 @@ function SettingsPage({
               <div className="registration-promo">
                 <p>Join our specialized memorization programs today.</p>
                 <a 
-                  href="https://mahahalzahra.org" 
+                  href="https://www.mahadalquran.com/quran-programs/" 
                   target="_blank" 
                   rel="noreferrer" 
                   className="register-btn"
                 >
-                  Register Now at Mahad al Zahra <ArrowRight size={16} />
+                  Register Now at Mahad al Quran <ArrowRight size={16} />
                 </a>
               </div>
             </div>
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
@@ -2898,7 +2962,7 @@ function SupportTicketsAdmin({ tickets = [], onRefresh }) {
   );
 }
 
-function ChildLeaveApply({ studentProfile, showAction }) {
+function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
   const [attachment, setAttachment] = useState(null);
@@ -2994,15 +3058,37 @@ function ChildLeaveApply({ studentProfile, showAction }) {
       if (dbErr) throw dbErr;
 
       await broadcastNotification(
-        `Leave Application 📅`,
+        `Leave Application ًں“…`,
         `${studentProfile?.name} has applied for leave (${leaveType}). Reason: ${reason || 'Not provided'}`,
         "admin",
         null,
         "Leave Management"
       );
 
-      showAction("success", "Leave applied successfully!");
-      setLeaveType("");
+      // Also notify the student's teacher
+      try {
+        const teacherIdField = studentProfile?.muhaffiz_id || studentProfile?.teacher_id;
+        if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
+          const teacherMatch = teacherProfiles.find(t =>
+            t.id === teacherIdField || t.user_id === teacherIdField ||
+            normalizeText(t.full_name) === normalizeText(studentProfile?.teacherName)
+          );
+          const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
+          if (teacherTarget) {
+            await broadcastNotification(
+              `Leave Application ًں“…`,
+              `${studentProfile?.name} (${leaveType}) has applied for leave. Reason: ${reason || 'Not provided'}`,
+              "user",
+              teacherTarget,
+              "Leave Management"
+            );
+          }
+        }
+      } catch (tErr) {
+        console.warn("Could not notify teacher about leave:", tErr);
+      }
+
+      showAction("success", "Leave applied successfully!");setLeaveType("");
       setReason("");
       setAttachment(null);
       fetchHistory();
@@ -3073,7 +3159,7 @@ function ChildLeaveApply({ studentProfile, showAction }) {
                 style={{ width: '100%' }}
                 required
               />
-              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>✓ Document attached successfully</p>}
+              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>âœ“ Document attached successfully</p>}
             </div>
           )}
 
@@ -3234,6 +3320,7 @@ function ParentPortal({
   const notificationOpenedAtRef = useRef(0);
 
   const [parentViewedStatus, setParentViewedStatus] = useState(false);
+  const [celebrationRank, setCelebrationRank] = useState(null); // 1, 2, or 3 for celebration popup
   const [secondsSpent, setSecondsSpent] = useState(0);
 
   const openNotificationDetail = (event, notification) => {
@@ -3268,6 +3355,7 @@ function ParentPortal({
   // Track parent viewing on Child Summary page
   useEffect(() => {
     setParentViewedStatus(false);
+    setCelebrationRank(null);
     setSecondsSpent(0);
 
     if (activePage !== "Child Summary" || !studentProfile?.student_id) {
@@ -3314,6 +3402,42 @@ function ParentPortal({
                     } else {
                       setParentViewedStatus(true);
                       if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
+                      // Check if child ranked in top 3 and trigger celebration + notifications
+                      const rankForCelebration = studentProfile?.latestResult?.weeklyRank || studentProfile?.latestResult?.computedRank;
+                      if (rankForCelebration && rankForCelebration >= 1 && rankForCelebration <= 3) {
+                        setCelebrationRank(rankForCelebration);
+                        const ordinalMap = { 1: "1st", 2: "2nd", 3: "3rd" };
+                        const ordinal = ordinalMap[rankForCelebration];
+                        const childName = studentProfile?.name || studentProfile?.full_name || "Your child";
+                        // Notify parent
+                        broadcastNotification(
+                          "ًںژ‰ " + ordinal + " Place! Mubarak Mohanna!",
+                          "ًںژ‰ " + ordinal + " Place! Mubarak Mohanna!\n" + childName + " topped this week\'s Hifz result. Keep it up! ًں¤©",
+                          "user",
+                          user?.id,
+                          "Child Summary",
+                          true
+                        );
+                        // Notify teacher
+                        const teacherIdField = studentProfile?.muhaffiz_id;
+                        if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
+                          const teacherMatch = teacherProfiles.find(t =>
+                            t.id === teacherIdField || t.user_id === teacherIdField ||
+                            normalizeText(t.full_name) === normalizeText(studentProfile?.teacherName)
+                          );
+                          const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
+                          if (teacherTarget) {
+                            broadcastNotification(
+                              "ًںژ‰ Student Achievement!",
+                              "Your student " + childName + " got " + ordinal + " place in this week\'s Hifz result! Mubarak Mohanna! ًں¤©",
+                              "user",
+                              teacherTarget,
+                              "My Group",
+                              true
+                            );
+                          }
+                        }
+                      }
                     }
                   });
                 return 60;
@@ -3351,6 +3475,10 @@ function ParentPortal({
     if (element) {
       try {
         await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Ensure custom fonts (Kanz al Marjaan, Al-Kanz) are fully loaded before canvas capture
+        await loadCustomFontsForCanvas();
+
         const [html2canvas, jsPDF] = await Promise.all([
           loadHtml2Canvas(),
           loadJsPDF(),
@@ -3360,6 +3488,12 @@ function ParentPortal({
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
+          onclone: async (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent = FONT_FACE_CSS;
+            clonedDoc.head.appendChild(style);
+            if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+          },
         });
 
         const imgData = canvas.toDataURL("image/png");
@@ -3413,6 +3547,20 @@ function ParentPortal({
     return [myTeacher, ...teacherProfiles.filter(t => t.id !== myTeacher.id)];
   }, [teacherProfiles, myTeacher]);
 
+  const recentMarhalaPostPreview = (
+    <Suspense fallback={null}>
+      <LazyMarhalaPosts
+        role="parents"
+        studentProfile={studentProfile}
+        onShowAction={showAction}
+        maxAgeHours={24}
+        limit={3}
+        hideEmpty
+        className="mp-home-preview"
+      />
+    </Suspense>
+  );
+
   if (loading && !studentProfile && user) {
     return <LoadingScreen message="Fetching your child's data..." />;
   }
@@ -3444,7 +3592,7 @@ function ParentPortal({
       highlights: [
         `Attendance: ${attendance?.status || "Present"}`,
         `Lesson: ${studentProfile?.latestResult?.surat || studentProfile?.surat || hifzDetails?.surat || "Update pending"}`,
-        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} · Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
+        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} آ· Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
       ],
       announcements:
         announcements.length > 0
@@ -3543,6 +3691,9 @@ function ParentPortal({
           </button>
           <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
             <Calendar size={18} /> Jadwal
+          </button>
+          <button className={`drawer-link ${activePage === "Marhala Posts" ? "active" : ""}`} onClick={() => { setActivePage("Marhala Posts"); setMenuOpen(false); }}>
+            <Heart size={18} /> Marhala Posts
           </button>
           <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
             <Settings size={18} /> Settings
@@ -3661,8 +3812,9 @@ function ParentPortal({
             </div>
             
             <Suspense fallback={null}>
-              <LazyIstifdahProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
+              <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
             </Suspense>
+            {recentMarhalaPostPreview}
             
             <div className="dashboard-section">
               <div className="section-header">
@@ -3795,7 +3947,7 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Apply Leave" && (
-          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} />
+          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} />
         )}
 
         {activePage === "Child Summary" ? (
@@ -3906,9 +4058,36 @@ function ParentPortal({
           </div>
         ) : null}
 
+        {/* Celebration popup for top 3 rank */}
+        {celebrationRank && (
+          <div className="celebration-overlay" onClick={() => setCelebrationRank(null)}>
+            <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+              <div className="celebration-content">
+                <div className="celebration-emoji-row">
+                  <span className="celebration-emoji">ًںژ‰</span>
+                  <span className="celebration-emoji">ًںژ‰</span>
+                  <span className="celebration-emoji">ًںژ‰</span>
+                </div>
+                <h2 className="celebration-title">Mubarak Mohanna! ًںژ‰</h2>
+                <div className="celebration-rank-badge">
+                  <span className="celebration-rank-number">
+                    {celebrationRank}{celebrationRank === 1 ? 'st' : celebrationRank === 2 ? 'nd' : 'rd'}
+                  </span>
+                  <span className="celebration-rank-label">Place</span>
+                </div>
+                <p className="celebration-message">
+                  Your child ranked <strong>{celebrationRank}{celebrationRank === 1 ? 'st' : celebrationRank === 2 ? 'nd' : 'rd'}</strong> in this week's Hifz result!
+                </p>
+                <p className="celebration-submessage">Keep it up! ًں¤©</p>
+                <button className="celebration-close-btn" onClick={() => setCelebrationRank(null)}>
+                  Awesome! ًںژ‰
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-
-        {activePage === "Jadwal" ? (
+{activePage === "Jadwal" ? (
           <Suspense fallback={null}>
             <LazyJadwalParentView 
               studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} 
@@ -4075,6 +4254,14 @@ function ParentPortal({
           />
         ) : null}
 
+        {activePage === "Marhala Posts" ? (
+          <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
+            <LazyMarhalaPosts
+              onShowAction={showAction}
+            />
+          </Suspense>
+        ) : null}
+
         {activePage === "Settings" ? (
           <SettingsPage 
             isDarkMode={isDarkMode}
@@ -4084,8 +4271,6 @@ function ParentPortal({
             user={user}
             studentProfile={studentProfile}
             onShowAction={showAction}
-            teacherUnlockStatus={teacherUnlockStatus}
-            setTeacherUnlockStatus={setTeacherUnlockStatus}
           />
         ) : null}
 
@@ -4457,7 +4642,7 @@ function PortalAccessSuccessModal({ payload, onClose }) {
           onClick={onClose}
           aria-label="Close success popup"
         >
-          ×
+          أ—
         </button>
 
         <div className="portal-access-success-badge">
@@ -4534,6 +4719,8 @@ function AdminPortal({
   onSendCustomNotification,
   attachedFileUrl,
   uploadingFile,
+  onTeacherPhotoUpload,
+  uploadingTeacherPhoto,
   onNotificationFileChange,
   onClearHistory,
   notifications,
@@ -4555,6 +4742,18 @@ function AdminPortal({
   portalAccessSuccess,
   onClosePortalAccessSuccess,
   onTeacherUnlock,
+  emailSettings,
+  sendingEmail,
+  emailProgress,
+  emailLogs,
+  onUpdateEmailConfig,
+  onSendIndividualEmail,
+  onTriggerEmailNotifications,
+  onMarhalaPostCreated,
+  onSetSendingEmail,
+  onSetEmailProgress,
+  onSetEmailLogs,
+
 }) {
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -4647,13 +4846,13 @@ function AdminPortal({
         sentCount++;
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' }
+          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! âœ…`, type: 'success' }
         ]);
       } catch (err) {
         console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} ❌`, type: 'error' }
+          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} â‌Œ`, type: 'error' }
         ]);
       }
       
@@ -4666,10 +4865,7 @@ function AdminPortal({
     
     setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `WhatsApp notifications finished! Sent: ${sentCount}/${targetStudents.length} successfully.`, type: 'info' }]);
   };
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [studentToRender, setStudentToRender] = useState(null);
-
-  const handleDownloadAllReports = async () => {
+const handleDownloadAllReports = async () => {
     if (students.length === 0) {
       if (onShowAction) onShowAction("error", "No students available to download reports.");
       return;
@@ -4684,6 +4880,9 @@ function AdminPortal({
       loadSaveAs(),
     ]);
     const zip = new JSZip();
+
+    // Pre-load custom fonts once before the batch loop
+    await loadCustomFontsForCanvas();
 
     if (onShowAction) onShowAction("success", `Preparing ${students.length} reports... Please wait.`);
 
@@ -4705,12 +4904,18 @@ function AdminPortal({
         try {
           // Extra small delay to ensure images inside the element are settled
           await new Promise(resolve => setTimeout(resolve, 500)); 
-          
+
           const canvas = await html2canvas(element, {
             scale: 2,
             useCORS: true,
             allowTaint: true,
             backgroundColor: "#ffffff",
+            onclone: async (clonedDoc) => {
+              const style = clonedDoc.createElement('style');
+              style.textContent = FONT_FACE_CSS;
+              clonedDoc.head.appendChild(style);
+              if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+            },
           });
           
           const imgData = canvas.toDataURL("image/png");
@@ -4772,8 +4977,8 @@ function AdminPortal({
     }
   };
 
-  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings"];
-  const navPages = ["Overview", "Schedule", "Result Tracking"];
+  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings", "Email Settings", "Marhala Posts"];
+  const navPages = ["Overview", "Quick Student Access", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
@@ -4809,10 +5014,11 @@ function AdminPortal({
 
   const viewedCount = (parentViews || []).filter(v => v.viewed).length;
   const stats = [
-    { label: "Students", value: students.length, icon: Users },
-    { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap },
-    { label: "Schedules", value: schedule.length, icon: Calendar },
-    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye },
+    { label: "Students", value: students.length, icon: Users, navigateTo: "Student Registry" },
+    { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap, navigateTo: "Staff Profiles" },
+    { label: "Schedules", value: schedule.length, icon: Calendar, navigateTo: "Schedule" },
+    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye, navigateTo: "Result Tracking" },
+    { label: "Jadwal Tracking", value: teacherSummaries.length, icon: Calendar, navigateTo: "Jadwal Tracking" },
   ];
 
   const resultLiveNotificationAlreadySent = async (since) => {
@@ -5105,6 +5311,126 @@ function AdminPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
+          {activePage === "Email Settings" ? (
+            <section className="settings-section premium-card card-appear">
+              <div className="stack-form">
+                <div className="section-header">
+                  <Mail size={20} />
+                  <h3>Email Settings (Resend)</h3>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.target);
+                    const updates = {
+                      enabled: fd.get("em_enabled") === "true",
+                      from_email: fd.get("em_from_email") || "",
+                      subject_template: fd.get("em_subject_template") || "",
+                      message_template: fd.get("em_message_template") || "",
+                    };
+                    await onUpdateEmailConfig(updates);
+                  }}
+                >
+                  <label className="form-group">
+                    <span>Enable Email Notifications</span>
+                    <select name="em_enabled" defaultValue={String(emailSettings?.enabled ?? false)} className="premium-select">
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </label>
+
+                  <label className="form-group">
+                    <span>From Email Address</span>
+                    <input name="em_from_email" type="email" defaultValue={emailSettings?.from_email || ""} placeholder="your-domain@resend.dev" className="premium-input" />
+                  </label>
+
+                  <label className="form-group">
+                    <span>Subject Template</span>
+                    <input name="em_subject_template" type="text" defaultValue={emailSettings?.subject_template || "Tahfeez Progress Report for {{child_name}}"} placeholder="Subject line with placeholders" className="premium-input" />
+                  </label>
+
+                  <label className="form-group">
+                    <span>Message Template</span>
+                    <textarea name="em_message_template" rows="3" className="premium-input"
+                      defaultValue={emailSettings?.message_template || "Salam! Please find attached the weekly Tahfeez progress report for {{child_name}}."} 
+                    />
+                    <span className="hint-text">Placeholders: <code>{'{{child_name}}'}</code>, <code>{'{{group_name}}'}</code></span>
+                  </label>
+
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    <button type="submit" className="action-button" style={{ background: "var(--deep-brown)", color: "white" }}>
+                      <Mail size={16} /> Save Email Settings
+                    </button>
+
+                    <button
+                      type="button"
+                      className="action-button"
+                      onClick={() => onTriggerEmailNotifications(false)}
+                      disabled={sendingEmail}
+                      style={{ background: emailSettings?.enabled ? "var(--primary-gold)" : "#999", color: "white" }}
+                    >
+                      {sendingEmail ? "Sending..." : "Send Bulk Email to All Parents"}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Manual Email Send */}
+                <div style={{ marginTop: "30px", borderTop: "1px solid var(--glass-border)", paddingTop: "20px" }}>
+                  <h4 style={{ margin: "0 0 12px", color: "var(--deep-brown)", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Send size={18} /> Manual Email Send
+                  </h4>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.target);
+                      const to = fd.get("manual_to") || "";
+                      const subj = fd.get("manual_subject") || "";
+                      const msg = fd.get("manual_message") || "";
+                      if (!to || !subj || !msg) {
+                        alert("Please fill in To, Subject, and Message fields.");
+                        return;
+                      }
+                      const html = "<p>" + msg.replace(/\n/g, "<br>") + "</p>";
+                      try {
+                        await onSendIndividualEmail(to, subj, html, "", "", "");
+                        alert("Email sent successfully!");
+                        e.target.reset();
+                      } catch (err) {
+                        alert("Failed to send email: " + err.message);
+                      }
+                    }}
+                  >
+                    <label className="form-group">
+                      <span>To (Email)</span>
+                      <input name="manual_to" type="email" placeholder="parent@example.com" className="premium-input" required />
+                    </label>
+                    <label className="form-group">
+                      <span>Subject</span>
+                      <input name="manual_subject" type="text" placeholder="Email subject" className="premium-input" required />
+                    </label>
+                    <label className="form-group">
+                      <span>Message</span>
+                      <textarea name="manual_message" rows="4" className="premium-input" placeholder="Type your email message here..." required />
+                    </label>
+                    <button type="submit" className="action-button" style={{ background: "#007bff", color: "white" }}>
+                      <Send size={16} /> Send Email
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </section>
+          ) : null}
+          {activePage === "Marhala Posts" ? (
+            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
+              <LazyMarhalaPosts
+                role="admin"
+                students={students}
+                onShowAction={onShowAction}
+                onPostCreated={onMarhalaPostCreated}
+              />
+            </Suspense>
+          ) : null}
           {activePage === "Student Registry" && (
             <div className="admin-section fade-in">
               <div className="section-header">
@@ -5151,7 +5477,7 @@ function AdminPortal({
                       <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
                     </label>
                     <label>
-                      <span>Arabic Name (اسم الطالب)</span>
+                      <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
                       <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                     </label>
                   </div>
@@ -5235,7 +5561,15 @@ function AdminPortal({
               {stats.map((stat) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={stat.label} className="pstat-card">
+                  <div
+                    key={stat.label}
+                    className={`pstat-card${stat.navigateTo ? ' clickable' : ''}`}
+                    onClick={() => stat.navigateTo && setActivePage(stat.navigateTo)}
+                    role={stat.navigateTo ? 'button' : undefined}
+                    tabIndex={stat.navigateTo ? 0 : undefined}
+                    onKeyDown={stat.navigateTo ? (e) => { if (e.key === 'Enter') setActivePage(stat.navigateTo); } : undefined}
+                    style={{ cursor: stat.navigateTo ? 'pointer' : 'default' }}
+                  >
                     <span className="pstat-value">{stat.value}</span>
                     <span className="pstat-label">{stat.label}</span>
                     <span className="pstat-sub"><Icon size={12} style={{ verticalAlign: 'middle' }} /></span>
@@ -5245,7 +5579,7 @@ function AdminPortal({
             </div>
           )}
 
-          {activePage === "Overview" ? (
+          {activePage === "Quick Student Access" ? (
             <div className="overview-container fade-in">
               <div className="overview-selection-header card-appear">
                 <div className="selection-box">
@@ -5303,7 +5637,7 @@ function AdminPortal({
                       <StudentAvatar student={selectedStudent} />
                       <div>
                         <h3>{selectedStudent.name}</h3>
-                        <p>{selectedStudent.groupName} · {selectedStudent.teacherName}</p>
+                        <p>{selectedStudent.groupName} آ· {selectedStudent.teacherName}</p>
                         <div className="pill-row">
                           <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
                           <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
@@ -5333,6 +5667,15 @@ function AdminPortal({
                 </div>
               )}
             </div>
+          ) : null}
+
+          {activePage === "Jadwal Tracking" ? (
+            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Jadwal Tracking...</p></div>}>
+              <LazyJadwalTrackingView
+                students={students}
+                onShowAction={onShowAction}
+              />
+            </Suspense>
           ) : null}
 
           {activePage === "Result Tracking" ? (
@@ -5620,7 +5963,7 @@ function AdminPortal({
                         <option value="">Select child</option>
                         {students.map((student) => (
                           <option key={student.student_id} value={student.student_id}>
-                            {student.name} · {student.groupName}
+                            {student.name} آ· {student.groupName}
                           </option>
                         ))}
                       </select>
@@ -5797,7 +6140,7 @@ function AdminPortal({
                       </label>
 
                       <label>
-                        <span>Arabic Name (اسم الطالب)</span>
+                        <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
                         <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                       </label>
 
@@ -6008,9 +6351,9 @@ function AdminPortal({
                           full_name: selectedName,
                           phone_number: existingProfile?.phone_number || "",
                           whatsapp_number: existingProfile?.whatsapp_number || "",
-                          photo_url: existingProfile?.photo_url || "",
-                          salary_per_minute: existingProfile?.salary_per_minute || "2.3",
-                            show_salary_card: existingProfile?.show_salary_card ?? true
+                          photo_url: existingProfile?.photo_url || existingAccess?.photo_url || "",
+                          salary_per_minute: existingProfile?.salary_per_minute || existingAccess?.salary_per_minute || "2.3",
+                            show_salary_card: existingProfile?.show_salary_card ?? existingAccess?.show_salary_card ?? true
                           }
                         }));
                       }}
@@ -6018,15 +6361,28 @@ function AdminPortal({
                       className="premium-select"
                     >
                       <option value="">-- Select Teacher --</option>
-                      {portalAccessList
-                        .filter(a =>
-                          normalizeText(a.portal_role).includes("teacher") ||
-                          normalizeText(a.portal_role).includes("muhaffiz")
-                        )
-                        .map(a => (
-                          <option key={a.id} value={a.full_name}>{a.full_name}</option>
-                        ))
-                      }
+                      {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
+                        <React.Fragment>
+                          {portalAccessList
+                            .filter(a =>
+                              normalizeText(a.portal_role).includes("teacher") ||
+                              normalizeText(a.portal_role).includes("muhaffiz")
+                            )
+                            .map(a => (
+                              <option key={`pa-${a.id}`} value={a.full_name}>{a.full_name}</option>
+                            ))
+                          }
+                          {teacherProfiles
+                            .filter(tp => !portalAccessList.some(pa =>
+                              pa.user_id === tp.user_id ||
+                              normalizeText(pa.full_name) === normalizeText(tp.full_name)
+                            ))
+                            .map(tp => (
+                              <option key={`profile-${tp.id}`} value={tp.full_name}>{tp.full_name}</option>
+                            ))
+                          }
+                        </React.Fragment>
+                      ) : null}
                     </select>
                   </label>
                   <div className="form-grid">
@@ -6052,13 +6408,62 @@ function AdminPortal({
                     </label>
                   </div>
                   <label>
-                    <span>Profile Photo URL</span>
+                    <span>Profile Photo</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <label style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        border: '1px dashed var(--glass-border)',
+                        background: 'rgba(255,255,255,0.6)',
+                        cursor: 'pointer',
+                        transition: 'border-color 0.2s',
+                        fontSize: '13px',
+                        color: 'var(--text-muted)'
+                      }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={onTeacherPhotoUpload}
+                          style={{ position: 'absolute', width: 0, height: 0, opacity: 0 }}
+                        />
+                        {uploadingTeacherPhoto ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span className="upload-spinner" style={{ border: '2px solid #f3f3f3', borderTop: '2px solid #d4af37', borderRadius: '50%', width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />
+                            Uploading...
+                          </span>
+                        ) : (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Upload Photo
+                          </span>
+                        )}
+                      </label>
+                      {adminForms.teacherProfile.photo_url && (
+                        <img
+                          src={adminForms.teacherProfile.photo_url}
+                          alt="Preview"
+                          style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            border: '2px solid var(--glass-border)'
+                          }}
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      )}
+                    </div>
                     <input
                       type="text"
                       name="photo_url"
                       value={adminForms.teacherProfile.photo_url}
                       onChange={onAdminFormChange("teacherProfile")}
                       placeholder="https://example.com/photo.jpg"
+                      style={{ marginTop: '8px' }}
                     />
                   </label>
                   <div className="form-grid">
@@ -6702,7 +7107,7 @@ function AdminPortal({
                      </p>
                    )}
                    <p style={{ fontSize: '0.85rem', marginTop: '6px', color: 'var(--soft-brown)' }}>
-                      Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} → ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
+                      Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} â†’ ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
                    </p>
                 </div>
                 <div style={{ marginTop: '20px' }}>
@@ -6764,6 +7169,59 @@ function AdminPortal({
                     [{log.time}] {log.text}
                   </div>
                 ))}
+        {/* Email Sending Progress Modal */}
+        {sendingEmail && (
+          <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)' }}>
+            <div className="premium-card" style={{ width: '90%', maxWidth: '560px', padding: '24px', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>
+                  Sending Email Notifications
+                </h3>
+                {!sendingEmail && (
+                  <button className="panel-close-btn" onClick={() => { onSetSendingEmail(false); onSetEmailLogs([]); }}>
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+              <div className="progress-bar-container" style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
+                <div 
+                  className="progress-bar-fill" 
+                  style={{ 
+                    width: `${(emailProgress.current / Math.max(emailProgress.total, 1)) * 100}%`, 
+                    height: '100%', 
+                    background: 'linear-gradient(90deg, #007bff, #6610f2)',
+                    transition: 'width 0.3s ease'
+                  }} 
+                />
+              </div>
+              
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                {emailProgress.current} / {emailProgress.total} sent
+              </p>
+              
+              <div className="log-console" style={{ flex: 1, overflow: 'auto', background: '#faf8f4', borderRadius: '8px', padding: '12px', fontSize: '0.85rem', fontFamily: 'monospace', minHeight: '150px' }}>
+                {emailLogs.length === 0 && (
+                  <p style={{ color: '#999' }}>Starting...</p>
+                )}
+                {emailLogs.map((log, i) => (
+                  <div key={i} style={{ 
+                    color: log.type === 'error' ? '#e71d36' : log.type === 'success' ? '#007bff' : log.type === 'sending' ? '#3d2b1f' : '#999', 
+                    marginBottom: '4px', 
+                    lineHeight: 1.4 
+                  }}>
+                    <span style={{ color: '#bbb' }}>[{log.time}]</span> {log.text}
+                  </div>
+                ))}
+              </div>
+              
+              {!sendingEmail && emailLogs.length > 0 && (
+                <button className="action-button" style={{ marginTop: '12px', background: 'var(--deep-brown)', color: 'white' }} onClick={() => { setSendingEmail(false); setEmailLogs([]); }}>
+                  Done
+                </button>
+              )}
+            </div>
+          </div>
+        )}
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
@@ -6954,6 +7412,33 @@ onShowAction,
     setSaveStatus("saved");
     setTimeout(() => setSaveStatus(""), 2000);
 
+    // Auto-update child's current Juz in child_profiles when wusool_juz is saved
+    const newWusoolJuz = data?.wusool_juz || teacherForms.result.wusool_juz;
+    if (newWusoolJuz && String(newWusoolJuz).trim() !== "" && numericId) {
+      const juzNum = parseInt(newWusoolJuz, 10);
+      if (!isNaN(juzNum) && juzNum >= 1 && juzNum <= 30) {
+        supabase
+          .from("child_profiles")
+          .update({ juz: String(juzNum) })
+          .eq("student_id", numericId)
+          .then(({ error: juzError }) => {
+            if (juzError) {
+              console.warn("Failed to update child juz:", juzError.message);
+            } else {
+              // Also update local state so parent portal reflects it immediately
+              setSchoolData(prev => ({
+                ...prev,
+                students: prev.students.map(s =>
+                  String(s.student_id) === String(numericId)
+                    ? { ...s, juz: String(juzNum) }
+                    : s
+                )
+              }));
+            }
+          });
+      }
+    }
+
     setSchoolData((current) => {
       const nextWeeklyResults = [
         data,
@@ -7007,6 +7492,20 @@ onShowAction,
       (view) => view?.viewed && visibleStudentIds.has(String(view.student_id))
     ).length;
   }, [filteredStudents, parentViews]);
+
+  const recentMarhalaPostPreview = (
+    <Suspense fallback={null}>
+      <LazyMarhalaPosts
+        role="teacher"
+        students={filteredStudents}
+        onShowAction={onShowAction}
+        maxAgeHours={24}
+        limit={3}
+        hideEmpty
+        className="mp-home-preview"
+      />
+    </Suspense>
+  );
 
   return (
     <div className="admin-shell">
@@ -7147,11 +7646,11 @@ onShowAction,
                     </div>
                     <div className="salary-item">
                       <span className="salary-label">{"Rate - Min"}</span>
-                      <span className="salary-value">₹{monthlySalary.rate}</span>
+                      <span className="salary-value">â‚¹{monthlySalary.rate}</span>
                     </div>
                     <div className="salary-item total-item">
                       <span className="salary-label">Total Amount</span>
-                      <span className="salary-value highlight">₹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
+                      <span className="salary-value highlight">â‚¹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
                     </div>
                   </div>
                   <p className="hint-text">Calculated based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
@@ -7161,6 +7660,7 @@ onShowAction,
 
 
               <PremiumHifzCard user={user} />
+              {recentMarhalaPostPreview}
 
               <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
                 <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
@@ -7287,7 +7787,7 @@ onShowAction,
                           );
                           return (
                             <option key={student.student_id} value={student.student_id}>
-                              {student.name}{existingResult ? " - ✓ Saved" : ""} - {student.groupName}
+                              {student.name}{existingResult ? " - âœ“ Saved" : ""} - {student.groupName}
                             </option>
                           );
                         })}
@@ -7300,7 +7800,7 @@ onShowAction,
                   <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
                   <div className="form-grid four-up">
                     <label>
-                      <span>Murajazah</span>
+                      <span>Murajah</span>
                       <input
                         type="number"
                         min="0"
@@ -7407,7 +7907,7 @@ onShowAction,
 
                   <div className="form-grid">
                     <label>
-                      <span>Matrookah (متروكة)</span>
+                      <span>Matrookah (ظ…طھط±ظˆظƒط©)</span>
                       <input
                         type="text"
                         name="matrookah"
@@ -7417,7 +7917,7 @@ onShowAction,
                       />
                     </label>
                     <label>
-                      <span>Daeefah (ضعيفة)</span>
+                      <span>Daeefah (ط¶ط¹ظٹظپط©)</span>
                       <input
                         type="text"
                         name="daeefah"
@@ -7473,7 +7973,7 @@ onShowAction,
 
                   <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                     <label>
-                      <span>Istifadah Juz</span>
+                      <span>Takhteet Juz</span>
                       <select
                         className="premium-select kanz-font"
                         name="istifadah_juz"
@@ -7488,7 +7988,7 @@ onShowAction,
                       </select>
                     </label>
                     <label>
-                      <span>Istifadah Surah</span>
+                      <span>Takhteet Surah</span>
                       <select
                         className="premium-select kanz-font"
                         name="istifadah_surah"
@@ -7503,7 +8003,7 @@ onShowAction,
                       </select>
                     </label>
                     <label>
-                      <span>Istifadah Page</span>
+                      <span>Takhteet Page</span>
                       <input
                         type="text"
                         name="istifadah_page"
@@ -7565,7 +8065,7 @@ onShowAction,
                       <div>
                         <h3>{selectedStudent.name}</h3>
                         <p>
-                          {selectedStudent.groupName} · {selectedStudent.teacherName}
+                          {selectedStudent.groupName} آ· {selectedStudent.teacherName}
                         </p>
                       </div>
                     </div>
@@ -7599,8 +8099,11 @@ onShowAction,
                         <span>{student.hifzStatus}</span>
                       </div>
                       <div className="performance-pill">
-                        Latest Result: {student.latestResult?.computedRank || "pending"}
+                        Latest Result: {student.latestResult?.weeklyRank || student.latestResult?.computedRank || "pending"}
                       </div>
+                      <Suspense fallback={null}>
+                        <LazyTakhteetProgress weeklyResult={student.latestResult} />
+                      </Suspense>
                     </article>
                   ))}
                   {filteredStudents.length === 0 && (
@@ -7836,29 +8339,29 @@ onShowAction,
 
 // --- Quran Surah Names (Arabic) ---
 const SURAH_NAMES_AR = [
-  "الفاتحة","البقرة","آل عمران","النساء","المائدة",
-  "الأنعام","الأعراف","الأنفال","التوبة","يونس",
-  "هود","يوسف","الرعد","إبراهيم","الحجر",
-  "النحل","الإسراء","الكهف","مريم","طه",
-  "الأنبياء","الحج","المؤمنون","النور","الفرقان",
-  "الشعراء","النمل","القصص","العنكبوت","الروم",
-  "لقمان","السجدة","الأحزاب","سبأ","فاطر",
-  "يس","الصافات","ص","الزمر","غافر",
-  "فصلت","الشورى","الزخرف","الدخان","الجاثية",
-  "الأحقاف","محمد","الفتح","الحجرات","ق",
-  "الذاريات","الطور","النجم","القمر","الرحمن",
-  "الواقعة","الحديد","المجادلة","الحشر","الممتحنة",
-  "الصف","الجمعة","المنافقون","التغابن","الطلاق",
-  "التحريم","الملك","القلم","الحاقة","المعارج",
-  "نوح","الجن","المزمل","المدثر","القيامة",
-  "الإنسان","المرسلات","النبأ","النازعات","عبس",
-  "التكوير","الانفطار","المطففين","الانشقاق","البروج",
-  "الطارق","الأعلى","الغاشية","الفجر","البلد",
-  "الشمس","الليل","الضحى","الشرح","التين",
-  "العلق","القدر","البينة","الزلزلة","العاديات",
-  "القارعة","التكاثر","العصر","الهمزة","الفيل",
-  "قريش","الماعون","الكوثر","الكافرون","النصر",
-  "المسد","الإخلاص","الفلق","الناس"
+  "ط§ظ„ظپط§طھط­ط©","ط§ظ„ط¨ظ‚ط±ط©","ط¢ظ„ ط¹ظ…ط±ط§ظ†","ط§ظ„ظ†ط³ط§ط،","ط§ظ„ظ…ط§ط¦ط¯ط©",
+  "ط§ظ„ط£ظ†ط¹ط§ظ…","ط§ظ„ط£ط¹ط±ط§ظپ","ط§ظ„ط£ظ†ظپط§ظ„","ط§ظ„طھظˆط¨ط©","ظٹظˆظ†ط³",
+  "ظ‡ظˆط¯","ظٹظˆط³ظپ","ط§ظ„ط±ط¹ط¯","ط¥ط¨ط±ط§ظ‡ظٹظ…","ط§ظ„ط­ط¬ط±",
+  "ط§ظ„ظ†ط­ظ„","ط§ظ„ط¥ط³ط±ط§ط،","ط§ظ„ظƒظ‡ظپ","ظ…ط±ظٹظ…","ط·ظ‡",
+  "ط§ظ„ط£ظ†ط¨ظٹط§ط،","ط§ظ„ط­ط¬","ط§ظ„ظ…ط¤ظ…ظ†ظˆظ†","ط§ظ„ظ†ظˆط±","ط§ظ„ظپط±ظ‚ط§ظ†",
+  "ط§ظ„ط´ط¹ط±ط§ط،","ط§ظ„ظ†ظ…ظ„","ط§ظ„ظ‚طµطµ","ط§ظ„ط¹ظ†ظƒط¨ظˆطھ","ط§ظ„ط±ظˆظ…",
+  "ظ„ظ‚ظ…ط§ظ†","ط§ظ„ط³ط¬ط¯ط©","ط§ظ„ط£ط­ط²ط§ط¨","ط³ط¨ط£","ظپط§ط·ط±",
+  "ظٹط³","ط§ظ„طµط§ظپط§طھ","طµ","ط§ظ„ط²ظ…ط±","ط؛ط§ظپط±",
+  "ظپطµظ„طھ","ط§ظ„ط´ظˆط±ظ‰","ط§ظ„ط²ط®ط±ظپ","ط§ظ„ط¯ط®ط§ظ†","ط§ظ„ط¬ط§ط«ظٹط©",
+  "ط§ظ„ط£ط­ظ‚ط§ظپ","ظ…ط­ظ…ط¯","ط§ظ„ظپطھط­","ط§ظ„ط­ط¬ط±ط§طھ","ظ‚",
+  "ط§ظ„ط°ط§ط±ظٹط§طھ","ط§ظ„ط·ظˆط±","ط§ظ„ظ†ط¬ظ…","ط§ظ„ظ‚ظ…ط±","ط§ظ„ط±ط­ظ…ظ†",
+  "ط§ظ„ظˆط§ظ‚ط¹ط©","ط§ظ„ط­ط¯ظٹط¯","ط§ظ„ظ…ط¬ط§ط¯ظ„ط©","ط§ظ„ط­ط´ط±","ط§ظ„ظ…ظ…طھط­ظ†ط©",
+  "ط§ظ„طµظپ","ط§ظ„ط¬ظ…ط¹ط©","ط§ظ„ظ…ظ†ط§ظپظ‚ظˆظ†","ط§ظ„طھط؛ط§ط¨ظ†","ط§ظ„ط·ظ„ط§ظ‚",
+  "ط§ظ„طھط­ط±ظٹظ…","ط§ظ„ظ…ظ„ظƒ","ط§ظ„ظ‚ظ„ظ…","ط§ظ„ط­ط§ظ‚ط©","ط§ظ„ظ…ط¹ط§ط±ط¬",
+  "ظ†ظˆط­","ط§ظ„ط¬ظ†","ط§ظ„ظ…ط²ظ…ظ„","ط§ظ„ظ…ط¯ط«ط±","ط§ظ„ظ‚ظٹط§ظ…ط©",
+  "ط§ظ„ط¥ظ†ط³ط§ظ†","ط§ظ„ظ…ط±ط³ظ„ط§طھ","ط§ظ„ظ†ط¨ط£","ط§ظ„ظ†ط§ط²ط¹ط§طھ","ط¹ط¨ط³",
+  "ط§ظ„طھظƒظˆظٹط±","ط§ظ„ط§ظ†ظپط·ط§ط±","ط§ظ„ظ…ط·ظپظپظٹظ†","ط§ظ„ط§ظ†ط´ظ‚ط§ظ‚","ط§ظ„ط¨ط±ظˆط¬",
+  "ط§ظ„ط·ط§ط±ظ‚","ط§ظ„ط£ط¹ظ„ظ‰","ط§ظ„ط؛ط§ط´ظٹط©","ط§ظ„ظپط¬ط±","ط§ظ„ط¨ظ„ط¯",
+  "ط§ظ„ط´ظ…ط³","ط§ظ„ظ„ظٹظ„","ط§ظ„ط¶ط­ظ‰","ط§ظ„ط´ط±ط­","ط§ظ„طھظٹظ†",
+  "ط§ظ„ط¹ظ„ظ‚","ط§ظ„ظ‚ط¯ط±","ط§ظ„ط¨ظٹظ†ط©","ط§ظ„ط²ظ„ط²ظ„ط©","ط§ظ„ط¹ط§ط¯ظٹط§طھ",
+  "ط§ظ„ظ‚ط§ط±ط¹ط©","ط§ظ„طھظƒط§ط«ط±","ط§ظ„ط¹طµط±","ط§ظ„ظ‡ظ…ط²ط©","ط§ظ„ظپظٹظ„",
+  "ظ‚ط±ظٹط´","ط§ظ„ظ…ط§ط¹ظˆظ†","ط§ظ„ظƒظˆط«ط±","ط§ظ„ظƒط§ظپط±ظˆظ†","ط§ظ„ظ†طµط±",
+  "ط§ظ„ظ…ط³ط¯","ط§ظ„ط¥ط®ظ„ط§طµ","ط§ظ„ظپظ„ظ‚","ط§ظ„ظ†ط§ط³"
 ];
 
 // --- Juz/Surat Selector Component ---
@@ -7904,6 +8407,7 @@ export default function App() {
   const [activeStudentId, setActiveStudentId] = useState(null);
   const [attachedFileUrl, setAttachedFileUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadingTeacherPhoto, setUploadingTeacherPhoto] = useState(false);
   const [parentData, setParentData] = useState(emptyParentData);
   const [schoolData, setSchoolData] = useState({
     students: [],
@@ -7921,6 +8425,10 @@ export default function App() {
   const [reportSettings, setReportSettings] = useState([]);
   const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
   const [whatsappConfig, setWhatsappConfig] = useState(null);
+  const [emailSettings, setEmailSettings] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailProgress, setEmailProgress] = useState({ current: 0, total: 0 });
+  const [emailLogs, setEmailLogs] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [parentViews, setParentViews] = useState([]);
   const [portalAccessSuccess, setPortalAccessSuccess] = useState(null);
@@ -8104,6 +8612,23 @@ export default function App() {
     setActivePage(DEFAULT_PAGE_BY_ROLE[portalRole] || DEFAULT_PAGE_BY_ROLE.parents);
     setMenuOpen(false);
     setActionMessage(null);
+
+    // Check URL for redirectPage from notification click outside the app
+    const params = new URLSearchParams(window.location.search);
+    const redirectFromNotif = params.get('redirectPage');
+    if (redirectFromNotif) {
+      let targetPage = redirectFromNotif;
+      if (targetPage.startsWith("Jadwal:")) {
+        const parts = targetPage.split(":");
+        if (parts[1]) {
+          setSelectedStudentId(parts[1]);
+        }
+        targetPage = "Jadwal";
+      }
+      setActivePage(resolveRedirectPage(targetPage, portalRole));
+      // Clean URL without the redirect parameter
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, [portalRole]);
 
   useEffect(() => {
@@ -8326,7 +8851,7 @@ export default function App() {
             reportSettings: reportSettingsResponse.data || [],
           };
 
-          if (!selectedStudentId) setSelectedStudentId(activeStudent.student_id);
+          if (!selectedStudentId) { setSelectedStudentId(activeStudent.student_id); }
         }
 
         setParentData(nextParentState);
@@ -8412,6 +8937,15 @@ export default function App() {
           if (waData) setWhatsappConfig(waData);
           else if (waError) console.warn("Failed to load whatsapp_config:", waError.message);
         }
+
+        // Load email settings
+        const { data: emailData, error: emailError } = await supabase
+          .from("email_settings")
+          .select("*")
+          .eq("id", 1)
+          .maybeSingle();
+        if (emailData) setEmailSettings(emailData);
+        else if (emailError) console.warn("Failed to load email_settings:", emailError.message);
 
         setSchoolData({
           students,
@@ -8745,15 +9279,15 @@ export default function App() {
           .order("created_at", { ascending: false })
           .limit(20);
 
-        if (!isActive) return;
-
         if (data) {
           const myNotifs = data.filter(notif =>
             portalRole === "admin" ||
-            notif.target_role === "all" ||
-            notif.target_role === portalRole ||
             notif.target_user === user.id ||
-            notif.target_user === user.email
+            notif.target_user === user.email ||
+            (!notif.target_user && (
+              notif.target_role === "all" ||
+              notif.target_role === portalRole
+            ))
           );
           setNotificationsList(myNotifs);
           if (myNotifs.length > 0) latestNotifIdRef.current = myNotifs[0].id;
@@ -8761,7 +9295,9 @@ export default function App() {
 
         // 2. Real-time Subscription for Instant Alerts
         // Clean up any existing channel with the same name first
-        await supabase.removeChannel(supabase.channel('realtime-notifications'));
+        if (notificationChannel) {
+            await supabase.removeChannel(notificationChannel);
+          }
         
         if (!isActive) return;
 
@@ -8774,10 +9310,12 @@ export default function App() {
               const newNotif = payload.new;
               const isTargeted =
                 portalRole === "admin" ||
-                newNotif.target_role === "all" ||
-                newNotif.target_role === portalRole ||
                 newNotif.target_user === user.id ||
-                newNotif.target_user === user.email;
+                newNotif.target_user === user.email ||
+                (!newNotif.target_user && (
+                  newNotif.target_role === "all" ||
+                  newNotif.target_role === portalRole
+                ));
 
               if (isTargeted) {
                 setNotificationsList(prev => {
@@ -9007,6 +9545,42 @@ export default function App() {
     }
   };
 
+  const handleTeacherPhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingTeacherPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `teacher-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from("teacher_photos")
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("teacher_photos")
+        .getPublicUrl(fileName);
+
+      // Update the teacher profile form with the uploaded photo URL
+      setAdminForms(curr => ({
+        ...curr,
+        teacherProfile: {
+          ...curr.teacherProfile,
+          photo_url: publicUrlData.publicUrl
+        }
+      }));
+      showAction("success", "Photo uploaded successfully!");
+    } catch (error) {
+      console.error("Photo upload failed:", error);
+      showAction("error", `Photo upload failed: ${error.message}`);
+    } finally {
+      setUploadingTeacherPhoto(false);
+    }
+  };
+
   const handleSendCustomNotification = async (event) => {
     event.preventDefault();
     const payload = adminForms.customNotification;
@@ -9088,7 +9662,7 @@ export default function App() {
       },
     }));
     showAction("success", "Schedule created successfully.");
-    broadcastNotification("Schedule Updated", `New task added: ${payload.task_name}`, "parents", null, "Schedule");
+    broadcastNotification("Schedule Updated", `New task added: ${payload.task_name}`, "all", null, "Schedule");
   };
 
   const handleRecordTeacherAttendance = async (event, quickRecord = null) => {
@@ -9313,6 +9887,104 @@ export default function App() {
     setWhatsappConfig((current) => ({ ...(current || {}), ...updates, id: 1 }));
     showAction("success", "WhatsApp settings saved successfully.");
   };
+
+  const handleUpdateEmailConfig = async (updates) => {
+    const { error } = await supabase
+      .from("email_settings")
+      .upsert({ id: 1, ...updates });
+
+    if (error) {
+      showAction("error", `Failed to save email settings: ${error.message}`);
+      return;
+    }
+
+    setEmailSettings((current) => ({ ...(current || {}), ...updates, id: 1 }));
+    showAction("success", "Email settings saved successfully.");
+  };
+
+  const sendIndividualEmail = async (to, subject, htmlBody, pdfBase64, pdfFilename, studentName) => {
+    if (!to) {
+      throw new Error("Missing recipient email");
+    }
+    const { data, error } = await supabase.functions.invoke("send-email", {
+      body: {
+        to,
+        subject,
+        html: htmlBody,
+        pdfBase64: pdfBase64 || "",
+        pdfFilename: pdfFilename || "progress-report.pdf",
+        studentName: studentName || "",
+      },
+    });
+    if (error) {
+      // Extract actual error from the function response if available
+      const contextError = error.context?.error || (typeof error.context === "string" ? error.context : null);
+      throw new Error(contextError || error.message || "Failed to send email");
+    }
+    if (!data?.success) {
+      throw new Error(data?.error || data?.message || "Failed to send email");
+    }
+    return data;
+  };
+
+  const triggerEmailNotifications = async (silent = false) => {
+    if (!emailSettings) {
+      if (!silent) alert("Email Configuration is not loaded yet. Please wait a second and try again.");
+      return;
+    }
+    if (!emailSettings.enabled) {
+      if (!silent) alert("Email notifications are disabled. Please enable them in Email Settings below.");
+      return;
+    }
+
+    const targetStudents = schoolData.students.filter(s => s.parent_email && s.parent_email.trim() !== "");
+    if (targetStudents.length === 0) {
+      if (!silent) alert("No students found with a parent email address!");
+      showAction("info", "No parents with email addresses found to notify.");
+      return;
+    }
+
+    setSendingEmail(true);
+    setEmailProgress({ current: 0, total: targetStudents.length });
+    setEmailLogs([{ time: new Date().toLocaleTimeString(), text: "Starting email notifications for " + targetStudents.length + " parents...", type: 'info' }]);
+
+    let sentCount = 0;
+    for (let i = 0; i < targetStudents.length; i++) {
+      const student = targetStudents[i];
+      const parentEmail = student.parent_email;
+
+      const subject = (emailSettings.subject_template || "Tahfeez Progress Report for {{child_name}}")
+        .replace(/{{child_name}}/g, student.name || student.full_name || "")
+        .replace(/{{group_name}}/g, student.groupName || "");
+
+      const body = (emailSettings.message_template || "Salam! Please find attached the weekly Tahfeez progress report for {{child_name}}.")
+        .replace(/{{child_name}}/g, student.name || student.full_name || "")
+        .replace(/{{group_name}}/g, student.groupName || "");
+
+      const htmlBody = "<p>" + body.replace(/\\n/g, "<br>") + "</p>";
+
+      setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Sending to " + student.name + " (" + parentEmail + ")...", type: 'sending' }]);
+
+      try {
+        await sendIndividualEmail(parentEmail, subject, htmlBody, "", "progress-report.pdf", student.name);
+        sentCount++;
+        setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Sent to " + student.name + " successfully!", type: 'success' }]);
+      } catch (err) {
+        console.error("Email failed for " + student.name + ":", err.message);
+        setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Failed for " + student.name + ": " + err.message, type: 'error' }]);
+      }
+
+      setEmailProgress(prev => ({ ...prev, current: i + 1 }));
+
+      // Small delay to avoid overwhelming the API
+      if (i < targetStudents.length - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Email notifications finished! Sent: " + sentCount + "/" + targetStudents.length + " successfully.", type: 'info' }]);
+  };
+
   const handleTeacherUnlock = async (teacher) => {
     if (!teacher || !teacher.id) {
       showAction("error", "Invalid teacher selected.");
@@ -9407,13 +10079,18 @@ export default function App() {
   const handleUpdateTeacherProfile = async (event) => {
     event.preventDefault();
     const payload = adminForms.teacherProfile;
-    const selectedTeacher = portalAccessList.find(
+
+    // Search BOTH portalAccessList AND teacherProfiles for the selected teacher
+    const selectedAccess = portalAccessList.find(
       (access) => normalizeText(access.full_name) === normalizeText(payload.full_name)
     );
-    const resolvedUserId = payload.user_id || selectedTeacher?.user_id || null;
+    const selectedProfile = teacherProfiles.find(
+      (tp) => normalizeText(tp.full_name) === normalizeText(payload.full_name)
+    );
+    const resolvedUserId = payload.user_id || selectedAccess?.user_id || selectedProfile?.user_id || null;
 
     if (!resolvedUserId) {
-      showAction("error", "Please select a staff member that already has Supabase portal access.");
+      showAction("error", "Could not find a user ID for this staff member. Please ensure they have a Supabase Auth account linked.");
       return;
     }
 
@@ -9427,19 +10104,28 @@ export default function App() {
           photo_url: payload.photo_url,
           phone_number: payload.phone_number,
           whatsapp_number: payload.whatsapp_number,
+          salary_per_minute: Number(payload.salary_per_minute || 2.3),
+          show_salary_card: !!payload.show_salary_card,
           is_active: true,
         },
         { onConflict: "user_id" }
       );
 
-    // Update the portal access settings (salary/visibility) separately
+    // Upsert the portal access settings (salary/visibility/photo) so it works even if the teacher
+    // has no portal access entry yet â€” also add full_name in case we're creating a new record
     const { error: accessError } = await supabase
       .from("user_portal_access")
-      .update({
-        salary_per_minute: Number(payload.salary_per_minute || 2.3),
-        show_salary_card: !!payload.show_salary_card,
-      })
-      .eq("user_id", resolvedUserId);
+      .upsert(
+        {
+          user_id: resolvedUserId,
+          full_name: payload.full_name,
+          photo_url: payload.photo_url,
+          salary_per_minute: Number(payload.salary_per_minute || 2.3),
+          show_salary_card: !!payload.show_salary_card,
+          is_active: true,
+        },
+        { onConflict: "user_id" }
+      );
 
     if (profileError || accessError) {
       showAction("error", profileError?.message || accessError?.message);
@@ -9538,6 +10224,22 @@ export default function App() {
     }
   };
 
+  const handleMarhalaPostCreated = async (post) => {
+    const studentName = post?.student_name || "a student";
+    const marhalaName = post?.marhala_name ? ` for ${post.marhala_name}` : "";
+    const title = "New Marhala Post";
+    const body = `${studentName} has a new Marhala achievement post${marhalaName}. Open your home page to view and like it.`;
+
+    const [parentResult, teacherResult] = await Promise.all([
+      broadcastNotification(title, body, "parents", null, "Home"),
+      broadcastNotification(title, body, "teacher", null, "My Group"),
+    ]);
+
+    if (parentResult?.inboxError || parentResult?.fcmError || teacherResult?.inboxError || teacherResult?.fcmError) {
+      showAction("error", "Post saved, but some Marhala notifications failed.");
+    }
+  };
+
 
 
   if (loading) {
@@ -9623,6 +10325,8 @@ export default function App() {
             attachedFileUrl={attachedFileUrl}
             uploadingFile={uploadingFile}
             onNotificationFileChange={handleNotificationFileChange}
+            onTeacherPhotoUpload={handleTeacherPhotoUpload}
+            uploadingTeacherPhoto={uploadingTeacherPhoto}
             onShowAction={showAction}
             teacherUnlockStatus={teacherUnlockStatus}
             setTeacherUnlockStatus={setTeacherUnlockStatus}
@@ -9632,6 +10336,17 @@ export default function App() {
             portalRole={portalRole}
             reportSettings={reportSettings}
             whatsappConfig={whatsappConfig}
+            emailSettings={emailSettings}
+            onUpdateEmailConfig={handleUpdateEmailConfig}
+            onSendIndividualEmail={sendIndividualEmail}
+            sendingEmail={sendingEmail}
+            emailProgress={emailProgress}
+            emailLogs={emailLogs}
+            onTriggerEmailNotifications={triggerEmailNotifications}
+            onMarhalaPostCreated={handleMarhalaPostCreated}
+            onSetSendingEmail={setSendingEmail}
+            onSetEmailProgress={setEmailProgress}
+            onSetEmailLogs={setEmailLogs}
             onUpdateWhatsappConfig={handleUpdateWhatsappConfig}
             selectedStudentId={selectedStudentId}
             setActivePage={setActivePage}
@@ -9709,3 +10424,6 @@ setAppTheme={setAppTheme}
     </React.Fragment>
   );
 }
+
+
+

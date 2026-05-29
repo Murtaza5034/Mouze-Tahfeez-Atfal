@@ -499,7 +499,7 @@ const LazyJadwalParentView = React.lazy(() =>
   import("./Jadwal").then((mod) => ({ default: mod.JadwalParentView }))
 );
 
-const LazyIstifdahProgress = React.lazy(() => import("./IstifdahProgress"));
+const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
 
 const fixArabicScript = (text) => {
   if (!text) return "";
@@ -2104,14 +2104,11 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     const weekResults = resultsByWeek[week];
     const sorted = [...weekResults].sort((a, b) => (Number(b.total_score) || 0) - (Number(a.total_score) || 0));
 
-    let currentRank = 1;
-    for (let i = 0; i < sorted.length; i++) {
-      if (i > 0 && (Number(sorted[i].total_score) || 0) < (Number(sorted[i - 1].total_score) || 0)) {
-        currentRank = i + 1;
-      }
-      const resId = String(sorted[i].student_id || "").trim().toLowerCase();
-      rankMap.set(`${resId}-${week}`, currentRank);
-    }
+    // Unique sequential ranks sorted by total_score descending (no ties)
+    sorted.forEach((result, idx) => {
+      const resId = String(result.student_id || "").trim().toLowerCase();
+      rankMap.set(`${resId}-${week}`, idx + 1);
+    });
   });
 
   const latestResultMap = new Map();
@@ -2136,17 +2133,14 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
   const latestResultsArray = Array.from(latestResultMap.values());
   latestResultsArray.sort((a, b) => b.effectiveScore - a.effectiveScore);
 
-  let currentGlobalRank = 1;
-  for (let i = 0; i < latestResultsArray.length; i++) {
-    if (i > 0 && latestResultsArray[i].effectiveScore < latestResultsArray[i - 1].effectiveScore) {
-      currentGlobalRank = i + 1;
-    }
-    const resId = String(latestResultsArray[i].student_id || "").trim().toLowerCase();
+  // Unique sequential global ranks (no ties)
+  latestResultsArray.forEach((result, idx) => {
+    const resId = String(result.student_id || "").trim().toLowerCase();
     const resultInMap = latestResultMap.get(resId);
     if (resultInMap) {
-      resultInMap.computedRank = currentGlobalRank;
+      resultInMap.computedRank = idx + 1;
     }
-  }
+  });
 
   return childProfiles.map((profile) => {
     const sId = profile.student_id || profile.its || profile.id;
@@ -2453,8 +2447,8 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
           <div className="trophy-container">
             <Trophy size={100} className="trophy-icon trophyPulse" />
-            <span className="rank-text-overlay rankPop rankCelebration" key={weeklyResult?.computedRank || weeklyResult?.rank}>
-              {weeklyResult?.computedRank || weeklyResult?.rank || "-"}
+            <span className="rank-text-overlay rankPop rankCelebration" key={weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank}>
+              {weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank || "-"}
             </span>
           </div>
         </div>
@@ -2597,6 +2591,7 @@ function SettingsPage({
         <h2 className="page-title">Portal Settings</h2>
         <p className="page-eyebrow">Personalize your experience</p>
       </div>
+      <div className="settings-layout">
       <div className="settings-tabs">
         {tabs.map(tab => (
           <button 
@@ -2604,13 +2599,16 @@ function SettingsPage({
             className={`settings-tab-btn ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === "Dark mode" && <Moon size={16} />}
-            {tab === "App themes" && <Palette size={16} />}
-            {tab === "Notifications" && <Bell size={16} />}
-            {tab === "Security" && <Lock size={16} />}
-            {tab === "Support" && <LifeBuoy size={16} />}
-            {tab === "About" && <Info size={16} />}
-            {tab}
+            <span className="tab-btn-icon">
+              {tab === "Dark mode" && <Moon size={18} />}
+              {tab === "App themes" && <Palette size={18} />}
+              {tab === "Notifications" && <Bell size={18} />}
+              {tab === "Security" && <Lock size={18} />}
+              {tab === "Support" && <LifeBuoy size={18} />}
+              {tab === "About" && <Info size={18} />}
+            </span>
+            <span className="tab-btn-label">{tab}</span>
+            <ChevronRight size={16} className="tab-btn-chevron" />
           </button>
         ))}
       </div>
@@ -2774,18 +2772,19 @@ function SettingsPage({
               <div className="registration-promo">
                 <p>Join our specialized memorization programs today.</p>
                 <a 
-                  href="https://mahahalzahra.org" 
+                  href="https://www.mahadalquran.com/quran-programs/" 
                   target="_blank" 
                   rel="noreferrer" 
                   className="register-btn"
                 >
-                  Register Now at Mahad al Zahra <ArrowRight size={16} />
+                  Register Now at Mahad al Quran <ArrowRight size={16} />
                 </a>
               </div>
             </div>
           </div>
         )}
-      </div>
+      
+    </div></div>
     </div>
   );
 }
@@ -2865,6 +2864,7 @@ function SupportTicketsAdmin({ tickets = [], onRefresh }) {
           </div>
         )}
       </div>
+    </div></div>
     </div>
   );
 }
@@ -3204,6 +3204,7 @@ function ParentPortal({
   const backdropMouseDownRef = useRef(false);
   const notificationOpenedAtRef = useRef(0);
   const [parentViewedStatus, setParentViewedStatus] = useState(false);
+  const [celebrationRank, setCelebrationRank] = useState(null); // 1, 2, or 3 for celebration popup
   const [secondsSpent, setSecondsSpent] = useState(0);
 
   const openNotificationDetail = (event, notification) => {
@@ -3238,6 +3239,7 @@ function ParentPortal({
   // Track parent viewing on Child Summary page
   useEffect(() => {
     setParentViewedStatus(false);
+    setCelebrationRank(null);
     setSecondsSpent(0);
 
     if (activePage !== "Child Summary" || !studentProfile?.student_id) {
@@ -3284,6 +3286,42 @@ function ParentPortal({
                     } else {
                       setParentViewedStatus(true);
                       if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
+                      // Check if child ranked in top 3 and trigger celebration + notifications
+                      const rankForCelebration = studentProfile?.latestResult?.weeklyRank || studentProfile?.latestResult?.computedRank;
+                      if (rankForCelebration && rankForCelebration >= 1 && rankForCelebration <= 3) {
+                        setCelebrationRank(rankForCelebration);
+                        const ordinalMap = { 1: "1st", 2: "2nd", 3: "3rd" };
+                        const ordinal = ordinalMap[rankForCelebration];
+                        const childName = studentProfile?.name || studentProfile?.full_name || "Your child";
+                        // Notify parent
+                        broadcastNotification(
+                          "🎉 " + ordinal + " Place! Mubarak Mohanna!",
+                          "🎉 " + ordinal + " Place! Mubarak Mohanna!\n" + childName + " topped this week\'s Hifz result. Keep it up! 🤩",
+                          "user",
+                          user?.id,
+                          "Child Summary",
+                          true
+                        );
+                        // Notify teacher
+                        const teacherIdField = studentProfile?.muhaffiz_id;
+                        if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
+                          const teacherMatch = teacherProfiles.find(t =>
+                            t.id === teacherIdField || t.user_id === teacherIdField ||
+                            normalizeText(t.full_name) === normalizeText(studentProfile?.teacherName)
+                          );
+                          const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
+                          if (teacherTarget) {
+                            broadcastNotification(
+                              "🎉 Student Achievement!",
+                              "Your student " + childName + " got " + ordinal + " place in this week\'s Hifz result! Mubarak Mohanna! 🤩",
+                              "user",
+                              teacherTarget,
+                              "My Group",
+                              true
+                            );
+                          }
+                        }
+                      }
                     }
                   });
                 return 60;
@@ -3631,7 +3669,7 @@ function ParentPortal({
             </div>
             
             <Suspense fallback={null}>
-              <LazyIstifdahProgress weeklyResult={weeklyResult} />
+              <LazyTakhteetProgress weeklyResult={weeklyResult} />
             </Suspense>
             
             <div className="dashboard-section">
@@ -3876,9 +3914,36 @@ function ParentPortal({
           </div>
         ) : null}
 
+        {/* Celebration popup for top 3 rank */}
+        {celebrationRank && (
+          <div className="celebration-overlay" onClick={() => setCelebrationRank(null)}>
+            <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+              <div className="celebration-content">
+                <div className="celebration-emoji-row">
+                  <span className="celebration-emoji">🎉</span>
+                  <span className="celebration-emoji">🎉</span>
+                  <span className="celebration-emoji">🎉</span>
+                </div>
+                <h2 className="celebration-title">Mubarak Mohanna! 🎉</h2>
+                <div className="celebration-rank-badge">
+                  <span className="celebration-rank-number">
+                    {celebrationRank}{celebrationRank === 1 ? 'st' : celebrationRank === 2 ? 'nd' : 'rd'}
+                  </span>
+                  <span className="celebration-rank-label">Place</span>
+                </div>
+                <p className="celebration-message">
+                  Your child ranked <strong>{celebrationRank}{celebrationRank === 1 ? 'st' : celebrationRank === 2 ? 'nd' : 'rd'}</strong> in this week's Hifz result!
+                </p>
+                <p className="celebration-submessage">Keep it up! 🤩</p>
+                <button className="celebration-close-btn" onClick={() => setCelebrationRank(null)}>
+                  Awesome! 🎉
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-
-        {activePage === "Jadwal" ? (
+{activePage === "Jadwal" ? (
           <Suspense fallback={null}>
             <LazyJadwalParentView 
               studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} 
@@ -7138,7 +7203,7 @@ function TeacherPortal({
                   <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
                   <div className="form-grid four-up">
                     <label>
-                      <span>Murajazah</span>
+                      <span>Murajah</span>
                       <input
                         type="number"
                         min="0"
@@ -7269,7 +7334,7 @@ function TeacherPortal({
 
                   <div className="form-grid">
                     <label>
-                      <span>Istifadah Juz</span>
+                      <span>Takhteet Juz</span>
                       <input
                         type="text"
                         name="istifadah_juz"
@@ -7279,7 +7344,7 @@ function TeacherPortal({
                     </label>
 
                     <label>
-                      <span>Istifadah Page</span>
+                      <span>Takhteet Page</span>
                       <input
                         type="text"
                         name="istifadah_page"
@@ -7374,8 +7439,11 @@ function TeacherPortal({
                         <span>{student.hifzStatus}</span>
                       </div>
                       <div className="performance-pill">
-                        Latest Result: {student.latestResult?.computedRank || "pending"}
+                        Latest Result: {student.latestResult?.weeklyRank || student.latestResult?.computedRank || "pending"}
                       </div>
+                      <Suspense fallback={null}>
+                        <LazyTakhteetProgress weeklyResult={student.latestResult} />
+                      </Suspense>
                     </article>
                   ))}
                   {filteredStudents.length === 0 && (
@@ -8032,7 +8100,7 @@ export default function App() {
             reportSettings: reportSettingsResponse.data || [],
           };
 
-          if (!selectedStudentId) setSelectedStudentId(activeStudent.student_id);
+          if (!selectedStudentId) { setSelectedStudentId(activeStudent.student_id); }
         }
 
         setParentData(nextParentState);
@@ -8456,10 +8524,12 @@ export default function App() {
         if (data) {
           const myNotifs = data.filter(notif =>
             portalRole === "admin" ||
-            notif.target_role === "all" ||
-            notif.target_role === portalRole ||
             notif.target_user === user.id ||
-            notif.target_user === user.email
+            notif.target_user === user.email ||
+            (!notif.target_user && (
+              notif.target_role === "all" ||
+              notif.target_role === portalRole
+            ))
           );
           setNotificationsList(myNotifs);
           if (myNotifs.length > 0) latestNotifIdRef.current = myNotifs[0].id;
@@ -8480,10 +8550,12 @@ export default function App() {
               const newNotif = payload.new;
               const isTargeted =
                 portalRole === "admin" ||
-                newNotif.target_role === "all" ||
-                newNotif.target_role === portalRole ||
                 newNotif.target_user === user.id ||
-                newNotif.target_user === user.email;
+                newNotif.target_user === user.email ||
+                (!newNotif.target_user && (
+                  newNotif.target_role === "all" ||
+                  newNotif.target_role === portalRole
+                ));
 
               if (isTargeted) {
                 setNotificationsList(prev => {

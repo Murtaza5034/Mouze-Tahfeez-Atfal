@@ -9,6 +9,60 @@ class FCMService {
     this.initializingPromise = null;
   }
 
+  // Play premium notification chime using Web Audio API
+  playPremiumChime() {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+
+      // Create gain node for volume control (full volume = 1.0)
+      const masterGain = audioCtx.createGain();
+      masterGain.gain.value = 1.0;
+      masterGain.connect(audioCtx.destination);
+
+      // Note frequencies for a rich ascending chime (C5, E5, G5, C6)
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = i === 3 ? 'sine' : 'triangle'; // C6 sine for shimmer
+        osc.frequency.value = freq;
+
+        // Envelope: quick attack, medium decay, sustain, release
+        const startTime = now + i * 0.08;
+        const attack = 0.02;
+        const release = 0.6;
+
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.7, startTime + attack);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + release);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(startTime);
+        osc.stop(startTime + release);
+      });
+
+      // Add a soft sub-bass for fullness
+      const bassOsc = audioCtx.createOscillator();
+      const bassGain = audioCtx.createGain();
+      bassOsc.type = 'sine';
+      bassOsc.frequency.value = 261.63; // Middle C
+      bassGain.gain.setValueAtTime(0, now);
+      bassGain.gain.linearRampToValueAtTime(0.25, now + 0.05);
+      bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+      bassOsc.connect(bassGain);
+      bassGain.connect(masterGain);
+      bassOsc.start(now);
+      bassOsc.stop(now + 0.8);
+    } catch (err) {
+      console.warn('Premium notification chime could not play:', err);
+    }
+  }
+
   // Initialize FCM service
   async initialize(userRole) {
     if (this.initialized && this.token) {
@@ -149,6 +203,8 @@ class FCMService {
   showNotification(payload) {
     try {
       console.log('Showing notification:', payload);
+      // Play premium notification chime at full volume
+      this.playPremiumChime();
       const { notification, data } = payload;
       const image = notification?.image || data?.image || "";
       
