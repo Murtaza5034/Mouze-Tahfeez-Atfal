@@ -2483,7 +2483,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div className="school-logo" style={{ marginBottom: '12px' }}><img src="/logo.png" alt="Logo" /></div>
           <div className="school-info" style={{ textAlign: 'center' }}>
             <h2 className="qilka-bold-font" style={{ fontSize: '2.5rem', color: 'var(--deep-brown)', margin: 0, textTransform: 'uppercase' }}>{hMain}</h2>
-            <h4 className="kanz-font" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', margin: '4px 0 0' }}>{hSub}</h4>
+            <h4 className="qilka-bold-font" style={{ fontSize: '1.2rem', color: 'var(--primary-gold)', margin: '4px 0 0' }}>{hSub.replace(/\b\w/g, c => c.toUpperCase()).replace(/(\b[A-Z])([A-Z]+)/g, (_, f, r) => f + r.toLowerCase())}</h4>
             <div className="report-student-name child-hood-font" style={{ fontSize: '1.1rem', color: 'var(--soft-brown)', marginTop: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px' }}>
               {student?.name}
             </div>
