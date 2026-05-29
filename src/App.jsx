@@ -546,9 +546,13 @@ const FONT_FACE_CSS = `
 `;
 
 const loadCustomFontsForCanvas = async () => {
+  const timeout = setTimeout(() => { throw new Error("Font loading timed out"); }, 8000);
   try {
     // Wait for any browser-triggered font loading to settle
-    await document.fonts.ready;
+    await Promise.race([
+      document.fonts.ready,
+      new Promise(resolve => setTimeout(resolve, 2000)),
+    ]);
 
     // Explicitly load Kanz al Marjaan via FontFace API
     const fontUrls = [
@@ -590,8 +594,13 @@ const loadCustomFontsForCanvas = async () => {
     }
 
     // One final wait to ensure everything is settled
-    await document.fonts.ready;
+    await Promise.race([
+      document.fonts.ready,
+      new Promise(resolve => setTimeout(resolve, 3000)),
+    ]);
+    clearTimeout(timeout);
   } catch (err) {
+    clearTimeout(timeout);
     console.warn("Custom font loading for canvas capture failed:", err);
   }
 };
@@ -3525,7 +3534,12 @@ function ParentPortal({
             const style = clonedDoc.createElement('style');
             style.textContent = FONT_FACE_CSS;
             clonedDoc.head.appendChild(style);
-            if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+            if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+              await Promise.race([
+                clonedDoc.fonts.ready,
+                new Promise(resolve => setTimeout(resolve, 3000)),
+              ]);
+            }
           },
         });
 
@@ -4952,7 +4966,12 @@ const handleDownloadAllReports = async () => {
               const style = clonedDoc.createElement('style');
               style.textContent = FONT_FACE_CSS;
               clonedDoc.head.appendChild(style);
-              if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+              if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+                await Promise.race([
+                  clonedDoc.fonts.ready,
+                  new Promise(resolve => setTimeout(resolve, 3000)),
+                ]);
+              }
             },
           });
           
