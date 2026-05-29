@@ -21,12 +21,14 @@ const FONT_FACE_CSS = `
        url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 @font-face {
   font-family: 'Al-Kanz';
   src: url('/fonts/al-kanz.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 `;
 const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise') => {
@@ -262,7 +264,12 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise') =
         const style = clonedDoc.createElement('style');
         style.textContent = FONT_FACE_CSS;
         clonedDoc.head.appendChild(style);
-        if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+        if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+          await Promise.race([
+            clonedDoc.fonts.ready,
+            new Promise(resolve => setTimeout(resolve, 3000)),
+          ]);
+        }
       },
     });
 

@@ -3,6 +3,25 @@ import { supabase } from "./supabaseClient";
 import { Heart, Sparkles, User, Edit3, Save, X, Trash2, Plus, Upload, Camera, MessageCircle, Instagram } from "lucide-react";
 import "./marhala-posts.css";
 
+const FONT_FACE_CSS = `
+@font-face {
+  font-family: 'Kanz al Marjaan';
+  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/fonts/al-kanz.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+`;
+
 const MARHALA_OPTIONS = [
   "Marhala Ula",
   "Marhala Saniyah",
@@ -475,6 +494,17 @@ function MarhalaPosts({
         allowTaint: false,
         backgroundColor: "#ffffff",
         logging: false,
+        onclone: async (clonedDoc) => {
+          const style = clonedDoc.createElement('style');
+          style.textContent = FONT_FACE_CSS;
+          clonedDoc.head.appendChild(style);
+          if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+            await Promise.race([
+              clonedDoc.fonts.ready,
+              new Promise(resolve => setTimeout(resolve, 3000)),
+            ]);
+          }
+        },
       });
       return canvas;
     } catch {

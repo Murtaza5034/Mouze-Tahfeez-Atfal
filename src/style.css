@@ -3385,12 +3385,10 @@ body {
   min-height: calc(100vh - var(--safe-top) - var(--safe-bottom));
 }
 
-.parent-shell {
-  touch-action: pan-x pan-y;
-}
-
-.parent-shell .zoomable-card {
-  touch-action: auto;
+.parent-drawer,
+.parent-topbar,
+.parent-bottom-nav {
+  touch-action: manipulation;
 }
 
 .premium-status-alert {

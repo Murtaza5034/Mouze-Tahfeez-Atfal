@@ -4003,7 +4003,7 @@ function ParentPortal({
         )}
 
         {activePage === "Child Summary" ? (
-          <div className="card-appear zoomable-card">
+          <div className="card-appear">
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
               <button 
                 className="action-button premium" 
