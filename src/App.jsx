@@ -3547,6 +3547,20 @@ function ParentPortal({
     return [myTeacher, ...teacherProfiles.filter(t => t.id !== myTeacher.id)];
   }, [teacherProfiles, myTeacher]);
 
+  const recentMarhalaPostPreview = (
+    <Suspense fallback={null}>
+      <LazyMarhalaPosts
+        role="parents"
+        studentProfile={studentProfile}
+        onShowAction={showAction}
+        maxAgeHours={24}
+        limit={3}
+        hideEmpty
+        className="mp-home-preview"
+      />
+    </Suspense>
+  );
+
   if (loading && !studentProfile && user) {
     return <LoadingScreen message="Fetching your child's data..." />;
   }
@@ -3800,6 +3814,7 @@ function ParentPortal({
             <Suspense fallback={null}>
               <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
             </Suspense>
+            {recentMarhalaPostPreview}
             
             <div className="dashboard-section">
               <div className="section-header">
@@ -4734,6 +4749,7 @@ function AdminPortal({
   onUpdateEmailConfig,
   onSendIndividualEmail,
   onTriggerEmailNotifications,
+  onMarhalaPostCreated,
   onSetSendingEmail,
   onSetEmailProgress,
   onSetEmailLogs,
@@ -5001,7 +5017,7 @@ const handleDownloadAllReports = async () => {
     { label: "Students", value: students.length, icon: Users, navigateTo: "Student Registry" },
     { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap, navigateTo: "Staff Profiles" },
     { label: "Schedules", value: schedule.length, icon: Calendar, navigateTo: "Schedule" },
-    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye },
+    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye, navigateTo: "Result Tracking" },
     { label: "Jadwal Tracking", value: teacherSummaries.length, icon: Calendar, navigateTo: "Jadwal Tracking" },
   ];
 
@@ -5411,6 +5427,7 @@ const handleDownloadAllReports = async () => {
                 role="admin"
                 students={students}
                 onShowAction={onShowAction}
+                onPostCreated={onMarhalaPostCreated}
               />
             </Suspense>
           ) : null}
@@ -7476,6 +7493,20 @@ onShowAction,
     ).length;
   }, [filteredStudents, parentViews]);
 
+  const recentMarhalaPostPreview = (
+    <Suspense fallback={null}>
+      <LazyMarhalaPosts
+        role="teacher"
+        students={filteredStudents}
+        onShowAction={onShowAction}
+        maxAgeHours={24}
+        limit={3}
+        hideEmpty
+        className="mp-home-preview"
+      />
+    </Suspense>
+  );
+
   return (
     <div className="admin-shell">
       <style>{PREMIUM_NOTIFICATION_CSS}</style>
@@ -7629,6 +7660,7 @@ onShowAction,
 
 
               <PremiumHifzCard user={user} />
+              {recentMarhalaPostPreview}
 
               <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
                 <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
@@ -10192,6 +10224,22 @@ export default function App() {
     }
   };
 
+  const handleMarhalaPostCreated = async (post) => {
+    const studentName = post?.student_name || "a student";
+    const marhalaName = post?.marhala_name ? ` for ${post.marhala_name}` : "";
+    const title = "New Marhala Post";
+    const body = `${studentName} has a new Marhala achievement post${marhalaName}. Open your home page to view and like it.`;
+
+    const [parentResult, teacherResult] = await Promise.all([
+      broadcastNotification(title, body, "parents", null, "Home"),
+      broadcastNotification(title, body, "teacher", null, "My Group"),
+    ]);
+
+    if (parentResult?.inboxError || parentResult?.fcmError || teacherResult?.inboxError || teacherResult?.fcmError) {
+      showAction("error", "Post saved, but some Marhala notifications failed.");
+    }
+  };
+
 
 
   if (loading) {
@@ -10295,6 +10343,7 @@ export default function App() {
             emailProgress={emailProgress}
             emailLogs={emailLogs}
             onTriggerEmailNotifications={triggerEmailNotifications}
+            onMarhalaPostCreated={handleMarhalaPostCreated}
             onSetSendingEmail={setSendingEmail}
             onSetEmailProgress={setEmailProgress}
             onSetEmailLogs={setEmailLogs}

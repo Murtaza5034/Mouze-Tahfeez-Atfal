@@ -2,10 +2,64 @@
    Marhala Posts - Certificate-Style Premium Design
    ========================================== */
 
+@font-face {
+  font-family: 'Kanz al Marjaan';
+  src: url('/Al_Kanz_Fonts_For_Windows/Kanz-al-Marjaan.ttf') format('truetype'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/Al_Kanz_Fonts_For_Windows/Al-Kanz%20for%20Windows.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 .marhala-posts-container {
   max-width: 820px;
   margin: 0 auto;
   padding: 24px 16px 40px;
+  font-family: 'Kanz al Marjaan', serif;
+}
+
+.marhala-posts-container button,
+.marhala-posts-container input,
+.marhala-posts-container select,
+.marhala-posts-container textarea,
+.marhala-posts-container option {
+  font-family: 'Kanz al Marjaan', serif;
+}
+
+.mp-age-digits,
+.mp-age-input {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  letter-spacing: normal;
+}
+
+.mp-age-input::placeholder {
+  font-family: 'Kanz al Marjaan', serif;
+}
+
+.mp-arabic-text {
+  font-family: 'Kanz al Marjaan', 'Amiri', 'Traditional Arabic', serif;
+  letter-spacing: normal;
+  text-rendering: optimizeLegibility;
+  unicode-bidi: isolate;
+}
+
+.mp-home-preview {
+  max-width: 100%;
+  padding: 0;
+}
+
+.mp-home-preview .mp-feed {
+  gap: 20px;
 }
 
 /* ==========================================
@@ -794,6 +848,14 @@
   letter-spacing: 0.02em;
 }
 
+.mp-cert-student-arabic-name {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: var(--dark-gold);
+  margin: -4px 0 2px;
+  line-height: 1.4;
+}
+
 /* Age and Marhala details */
 .mp-cert-details {
   display: flex;
@@ -1124,6 +1186,10 @@
     font-size: 1.6rem;
   }
 
+  .mp-cert-student-arabic-name {
+    font-size: 1.25rem;
+  }
+
   .mp-cert-header {
     padding: 16px 16px 8px;
   }
@@ -1155,6 +1221,10 @@
 @media (max-width: 480px) {
   .mp-cert-student-name {
     font-size: 1.3rem;
+  }
+
+  .mp-cert-student-arabic-name {
+    font-size: 1.1rem;
   }
 
   .mp-cert-school-name {

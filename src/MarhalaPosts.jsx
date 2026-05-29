@@ -31,9 +31,21 @@ const calculateAge = (dob) => {
   return age;
 };
 
-function MarhalaPosts({ role = "parents", students = [], studentProfile = null, onShowAction }) {
+function MarhalaPosts({
+  role = "parents",
+  students = [],
+  studentProfile = null,
+  onShowAction,
+  onPostCreated,
+  maxAgeHours = null,
+  limit = null,
+  hideHeader = false,
+  hideEmpty = false,
+  className = "",
+}) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
   const [currentUserId, setCurrentUserId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingPostId, setEditingPostId] = useState(null);
@@ -110,6 +122,12 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
+
+  useEffect(() => {
+    if (!maxAgeHours) return;
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, [maxAgeHours]);
 
   // Check if current user liked a post
   const hasLiked = (post) => {
@@ -229,7 +247,9 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
         updated_at: new Date().toISOString(),
       };
 
-      if (editingPostId) {
+      const isEditing = Boolean(editingPostId);
+
+      if (isEditing) {
         // Update existing post
         const { error } = await supabase
           .from("marhala_posts")
@@ -239,14 +259,21 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
         if (onShowAction) onShowAction("success", "Post updated successfully!");
       } else {
         // Create new post
-        const { error } = await supabase.from("marhala_posts").insert([
+        const { data, error } = await supabase.from("marhala_posts").insert([
           {
             ...postData,
             student_id: studentId,
             likes: [],
           },
-        ]);
+        ]).select().single();
         if (error) throw error;
+        if (onPostCreated) {
+          try {
+            await onPostCreated(data || { ...postData, student_id: studentId });
+          } catch (notifyError) {
+            console.warn("Marhala post notification failed:", notifyError);
+          }
+        }
         if (onShowAction) onShowAction("success", "Post created successfully!");
       }
       resetForm();
@@ -354,10 +381,26 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
     };
   }, [formStudent, formHeading, formMarhala, formPhotoUrl, formAge, studentDetailsCache]);
 
+  const visiblePosts = useMemo(() => {
+    let nextPosts = posts;
+    if (maxAgeHours) {
+      const cutoff = now - maxAgeHours * 60 * 60 * 1000;
+      nextPosts = nextPosts.filter((post) => {
+        const createdAt = new Date(post.created_at).getTime();
+        return Number.isFinite(createdAt) && createdAt >= cutoff;
+      });
+    }
+    return limit ? nextPosts.slice(0, limit) : nextPosts;
+  }, [posts, maxAgeHours, limit, now]);
+
+  if (!loading && hideEmpty && visiblePosts.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="marhala-posts-container fade-in">
+    <div className={`marhala-posts-container fade-in ${className}`.trim()}>
       {/* Header */}
-      <div className="mp-header">
+      {!hideHeader && <div className="mp-header">
         <div className="mp-header-content">
           <div className="mp-header-icon-wrap">
             <Sparkles size={22} className="mp-header-icon" />
@@ -376,7 +419,7 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
             <Plus size={18} /> {showForm ? "Close" : "New Post"}
           </button>
         )}
-      </div>
+      </div>}
 
       {/* Admin Form */}
       {isAdmin && showForm && (
@@ -435,7 +478,7 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
                     </span>
                     <div className="mp-student-preview-meta">
                       <span className="mp-student-preview-age-label">
-                        🎂 Age: {formAge || "auto"}{formAge ? " yrs" : ""}
+                        🎂 Age: {formAge ? <><span className="mp-age-digits">{toArabicDigits(formAge)}</span> yrs</> : "auto"}
                       </span>
                       <span className="mp-student-preview-id">
                         ID: {formStudent.student_id || formStudent.id}
@@ -459,7 +502,7 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
                     placeholder="Auto-calculated or edit"
                     value={formAge}
                     onChange={(e) => setFormAge(e.target.value)}
-                    className="mp-input"
+                    className="mp-input mp-age-input"
                   />
                 </div>
                 <div className="mp-form-group" style={{ flex: 2 }}>
@@ -467,7 +510,7 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
                   <select
                     value={formMarhala}
                     onChange={(e) => setFormMarhala(e.target.value)}
-                    className="mp-input mp-select"
+                    className="mp-input mp-select mp-marhala-select"
                   >
                     <option value="">Select Marhala...</option>
                     {MARHALA_OPTIONS.map((m) => (
@@ -574,7 +617,7 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
             <div className="spinner" />
             <p>Loading posts...</p>
           </div>
-        ) : posts.length === 0 ? (
+        ) : visiblePosts.length === 0 ? (
           <div className="mp-empty">
             <div className="mp-empty-icon">
               <Sparkles size={48} />
@@ -587,7 +630,7 @@ function MarhalaPosts({ role = "parents", students = [], studentProfile = null, 
             </p>
           </div>
         ) : (
-          posts.map((post) => {
+          visiblePosts.map((post) => {
             const studentInfo = getStudentInfo(post);
             return (
               <PostCard
@@ -642,6 +685,7 @@ function PostCard({
   const studentAge = post.age || (studentInfo?.date_of_birth ? calculateAge(studentInfo.date_of_birth) : null);
   const postHeading = post.title || post.heading || "";
   const marhalaDisplay = post.marhala_name || "";
+  const studentArabicName = studentInfo?.arabic_name || post.arabic_name || "";
 
   return (
     <div className={`mp-post-card card-appear ${isPreview ? 'mp-preview-card' : ''}`}>
@@ -698,7 +742,7 @@ function PostCard({
 
         {/* Certificate Header - School Name */}
         <div className="mp-cert-header">
-          <h3 className="mp-cert-school-name">تحفيظ - روضة تحفيظ الأطفال</h3>
+          <h3 className="mp-cert-school-name mp-arabic-text" dir="rtl">تحفيظ - روضة تحفيظ الأطفال</h3>
           <p className="mp-cert-school-name-sub">Tahfeez • Rawdat Tahfeez al Atfal</p>
           
           <div className="mp-cert-star-divider">
@@ -714,18 +758,21 @@ function PostCard({
           <div className="mp-cert-info">
             {/* Achievement Heading */}
             {postHeading && (
-              <p className="mp-cert-heading">{postHeading}</p>
+              <p className="mp-cert-heading" dir="auto">{postHeading}</p>
             )}
 
             {/* Student Name - Large Gold */}
             <h2 className="mp-cert-student-name">{post.student_name}</h2>
+            {studentArabicName && (
+              <h3 className="mp-cert-student-arabic-name mp-arabic-text" dir="rtl">{studentArabicName}</h3>
+            )}
 
             {/* Details: Age, Marhala */}
             <div className="mp-cert-details">
               {studentAge !== null && (
                 <div className="mp-cert-detail-item">
                   <span className="mp-cert-detail-label">Age:</span>
-                  <span className="mp-cert-detail-value">{studentAge} years</span>
+                  <span className="mp-cert-detail-value"><span className="mp-age-digits">{toArabicDigits(studentAge)}</span> years</span>
                 </div>
               )}
               {marhalaDisplay && (
@@ -767,7 +814,7 @@ function PostCard({
         {/* Congratulations Section */}
         <div className="mp-cert-congrats">
           <p className="mp-cert-congrats-text">
-            مبارك مهنّا! <span className="mp-cert-congrats-student">{post.student_name}</span>
+            <span className="mp-arabic-text" dir="rtl">مبارك مهنّا!</span> <span className="mp-cert-congrats-student">{studentArabicName || post.student_name}</span>
           </p>
         </div>
 
