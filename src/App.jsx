@@ -5895,19 +5895,21 @@ const handleDownloadAllReports = async () => {
 
                   {/* Schedule Section */}
                   <div className="schedule-section" style={{ marginTop: '20px', padding: '16px', background: 'rgba(255,255,255,0.6)', borderRadius: '10px', border: '1px solid rgba(212,175,55,0.2)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
-                        <input
-                          type="checkbox"
-                          checked={adminForms.customNotification.schedule_enabled === "true"}
-                          onChange={(e) => {
-                            const fakeEvent = { target: { name: 'schedule_enabled', value: e.target.checked ? "true" : "false" } };
-                            handleAdminFormChange("customNotification")(fakeEvent);
-                          }}
-                          style={{ width: '18px', height: '18px', accentColor: '#d4af37' }}
-                        />
-                        <Clock size={16} /> Schedule Notification
-                      </label>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '700', color: 'var(--deep-brown)', fontSize: '14px' }}>
+                        <Clock size={18} /> Schedule Notification
+                      </span>
+                      <button 
+                        className={`toggle-switch ${adminForms.customNotification.schedule_enabled === "true" ? 'on' : 'off'}`}
+                        onClick={() => {
+                          const newVal = adminForms.customNotification.schedule_enabled === "true" ? "false" : "true";
+                          const fakeEvent = { target: { name: 'schedule_enabled', value: newVal } };
+                          handleAdminFormChange("customNotification")(fakeEvent);
+                        }}
+                        aria-label="Toggle schedule notification"
+                      >
+                        <div className="toggle-thumb" />
+                      </button>
                     </div>
 
                     {adminForms.customNotification.schedule_enabled === "true" && (
