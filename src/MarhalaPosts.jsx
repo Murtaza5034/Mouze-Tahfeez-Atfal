@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "./supabaseClient";
-import { Heart, Sparkles, User, Edit3, Save, X, Trash2, Plus, Upload, Camera, MessageCircle, Instagram } from "lucide-react";
+import { Heart, Sparkles, User, Edit3, Save, X, Trash2, Plus, Upload, Camera, MessageCircle, Instagram, Clock, Globe } from "lucide-react";
+import lottie from "lottie-web";
 import "./marhala-posts.css";
 
 const FONT_FACE_CSS = `
@@ -67,16 +68,10 @@ const isMissingColumnError = (error) => {
 };
 
 const runMigration = async () => {
-  try {
-    const response = await fetch("/api/run-migration", { method: "POST" });
-    const data = await response.json();
-    if (response.ok) return true;
-    console.warn("Migration API failed:", data);
-    return false;
-  } catch (e) {
-    console.warn("Migration API error:", e);
-    return false;
-  }
+  console.warn(
+    "Database needs migration. Open your Supabase SQL editor and run the SQL from 'run_marhala_migrations.sql'"
+  );
+  return false;
 };
 
 function MarhalaPosts({
@@ -105,7 +100,11 @@ function MarhalaPosts({
   const [selectedPost, setSelectedPost] = useState(null);
   const [postsHidden, setPostsHidden] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [showAnimation, setShowAnimation] = useState(false);
   const postCardRef = useRef(null);
+  const animCanvasRef = useRef(null);
+  const animInstanceRef = useRef(null);
+  const autoOpenedRef = useRef(new Set(JSON.parse(localStorage.getItem("mp_auto_opened") || "[]")));
 
   // Form state
   const [formStudent, setFormStudent] = useState(null);
@@ -116,6 +115,7 @@ function MarhalaPosts({
   const [formAge, setFormAge] = useState("");
   const [formSchoolHeadingAr, setFormSchoolHeadingAr] = useState("");
   const [formSchoolHeadingEn, setFormSchoolHeadingEn] = useState("");
+  const [formBackgroundOpacity, setFormBackgroundOpacity] = useState(0.3);
 
   // Like animation state
   const [recentlyLiked, setRecentlyLiked] = useState({});
@@ -212,6 +212,45 @@ function MarhalaPosts({
     })();
   }, []);
 
+  // Celebration animation when post is opened
+  useEffect(() => {
+    if (selectedPost) {
+      setShowAnimation(true);
+    } else {
+      setShowAnimation(false);
+      if (animInstanceRef.current) {
+        animInstanceRef.current.destroy();
+        animInstanceRef.current = null;
+      }
+    }
+  }, [selectedPost]);
+
+  // Load Lottie animation when overlay div is in DOM
+  useEffect(() => {
+    if (showAnimation && animCanvasRef.current) {
+      try {
+        if (animInstanceRef.current) {
+          animInstanceRef.current.destroy();
+        }
+        const container = animCanvasRef.current;
+        container.innerHTML = "";
+        animInstanceRef.current = lottie.loadAnimation({
+          container,
+          renderer: "svg",
+          loop: false,
+          autoplay: true,
+          path: "/673a734a-1181-11ee-bce5-1b8d20a549a4.json",
+        });
+        animInstanceRef.current.addEventListener("complete", () => {
+          setShowAnimation(false);
+        });
+      } catch (e) {
+        console.warn("Lottie animation failed to load:", e);
+        setShowAnimation(false);
+      }
+    }
+  }, [showAnimation]);
+
   const handleToggleVisibility = async () => {
     const newHidden = !postsHidden;
     setPostsHidden(newHidden);
@@ -226,6 +265,31 @@ function MarhalaPosts({
       setPostsHidden(!newHidden);
       if (onShowAction) onShowAction("error", "Failed to update visibility");
     }
+  };
+
+  const handleTogglePostLive = async (post) => {
+    const newIsLive = !post.is_live;
+    const updates = {
+      is_live: newIsLive,
+      live_at: newIsLive ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    };
+    setPosts((prev) =>
+      prev.map((p) => (p.id === post.id ? { ...p, ...updates } : p))
+    );
+    const { error } = await supabase
+      .from("marhala_posts")
+      .update(updates)
+      .eq("id", post.id);
+    if (error) {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === post.id ? post : p))
+      );
+      console.error("Error toggling post live status:", error);
+      if (onShowAction) onShowAction("error", "Failed to toggle live status: " + error.message);
+      return;
+    }
+    if (onShowAction) onShowAction("success", newIsLive ? "Post is now LIVE for 24 hours!" : "Post is now hidden from portals.");
   };
 
   useEffect(() => {
@@ -438,11 +502,13 @@ function MarhalaPosts({
         arabic_name: cachedStudent.arabic_name || formStudent.arabic_name || formStudent.arabicName || "",
         marhala_name: formMarhala,
         title: formHeading,
+        heading: formHeading,
         image_url: formPhotoUrl,
         background_url: formBackgroundUrl || null,
         description: computedAge,
         school_heading_ar: formSchoolHeadingAr,
         school_heading_en: formSchoolHeadingEn,
+        background_opacity: formBackgroundOpacity,
         updated_at: new Date().toISOString(),
       };
 
@@ -484,7 +550,12 @@ function MarhalaPosts({
       fetchPosts();
     } catch (err) {
       console.error("Error saving post:", err);
-      if (onShowAction) onShowAction("error", "Failed to save post: " + err.message);
+      const msg = err.message || "";
+      if (msg.includes("column") || msg.includes("does not exist") || msg.includes("schema") || msg.includes("PGRST204")) {
+        if (onShowAction) onShowAction("error", "Database needs migration. Please run the SQL from 'run_marhala_migrations.sql' in your Supabase SQL editor.");
+      } else {
+        if (onShowAction) onShowAction("error", "Failed to save post: " + msg);
+      }
     } finally {
       setSaving(false);
     }
@@ -497,6 +568,7 @@ function MarhalaPosts({
     setFormMarhala(post.marhala_name || "");
     setFormPhotoUrl(post.image_url || "");
     setFormBackgroundUrl(post.background_url || "");
+    setFormBackgroundOpacity(post.background_opacity != null ? post.background_opacity : 0.3);
     setFormAge(post.description || post.age || "");
     setFormSchoolHeadingAr(post.school_heading_ar || "");
     setFormSchoolHeadingEn(post.school_heading_en || "");
@@ -552,6 +624,7 @@ function MarhalaPosts({
     setFormAge("");
     setFormSchoolHeadingAr("");
     setFormSchoolHeadingEn("");
+    setFormBackgroundOpacity(0.3);
   };
 
   // Get student details from cache or students prop
@@ -609,6 +682,20 @@ function MarhalaPosts({
 
   const visiblePosts = useMemo(() => {
     let nextPosts = posts;
+    if (!isAdmin) {
+      const nowTime = now;
+      nextPosts = nextPosts.filter((post) => {
+        if (!post.is_live) return false;
+        if (post.live_at) {
+          const liveTime = new Date(post.live_at).getTime();
+          if (Number.isFinite(liveTime)) {
+            const hoursSinceLive = (nowTime - liveTime) / (1000 * 60 * 60);
+            if (hoursSinceLive > 24) return false;
+          }
+        }
+        return true;
+      });
+    }
     if (maxAgeHours) {
       const cutoff = now - maxAgeHours * 60 * 60 * 1000;
       nextPosts = nextPosts.filter((post) => {
@@ -617,7 +704,19 @@ function MarhalaPosts({
       });
     }
     return limit ? nextPosts.slice(0, limit) : nextPosts;
-  }, [posts, maxAgeHours, limit, now]);
+  }, [posts, maxAgeHours, limit, now, isAdmin]);
+
+  // Auto-open first live post on homePreview (teacher/parent portal) — once per post (persisted)
+  useEffect(() => {
+    if (homePreview && !isAdmin && !loading && !loadingSettings && !selectedPost) {
+      const unseenLivePost = visiblePosts.find((p) => p.is_live && !autoOpenedRef.current.has(p.id));
+      if (unseenLivePost) {
+        setSelectedPost(unseenLivePost);
+        autoOpenedRef.current.add(unseenLivePost.id);
+        localStorage.setItem("mp_auto_opened", JSON.stringify([...autoOpenedRef.current]));
+      }
+    }
+  }, [homePreview, isAdmin, loading, loadingSettings, visiblePosts, selectedPost]);
 
   const getShareText = (post, studentInfo) => {
     const childName = studentInfo?.arabic_name || post?.arabic_name || post?.student_name || "Marhala student";
@@ -662,7 +761,11 @@ function MarhalaPosts({
         logging: false,
         onclone: async (clonedDoc) => {
           const style = clonedDoc.createElement('style');
-          style.textContent = FONT_FACE_CSS;
+          style.textContent = FONT_FACE_CSS + `
+            .mp-post-actions { display: none !important; }
+            .mp-live-badge { display: none !important; }
+            .mp-animation-overlay { display: none !important; }
+          `;
           clonedDoc.head.appendChild(style);
           if (clonedDoc.fonts && clonedDoc.fonts.ready) {
             await Promise.race([
@@ -725,7 +828,13 @@ function MarhalaPosts({
     const link = document.createElement("a");
     link.download = `marhala-post-${post.id}.png`;
     link.href = URL.createObjectURL(file);
+    link.style.display = "none";
+    document.body.appendChild(link);
     link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    }, 100);
     URL.revokeObjectURL(link.href);
   };
 
@@ -1029,6 +1138,26 @@ function MarhalaPosts({
                 </div>
               </div>
 
+              {/* Background Opacity Control */}
+              {formBackgroundUrl && (
+                <div className="mp-form-group">
+                  <label>🎚️ Background Opacity: {Math.round(formBackgroundOpacity * 100)}%</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={formBackgroundOpacity}
+                    onChange={(e) => setFormBackgroundOpacity(parseFloat(e.target.value))}
+                    className="mp-range-slider"
+                  />
+                  <div className="mp-range-labels">
+                    <span>Subtle</span>
+                    <span>Bold</span>
+                  </div>
+                </div>
+              )}
+
               {/* Form Actions */}
               <div className="mp-form-actions">
                 <button type="button" className="mp-btn mp-btn-secondary" onClick={resetForm}>
@@ -1128,6 +1257,7 @@ function MarhalaPosts({
                 isAdmin={isAdmin}
                 onEdit={handleEditPost}
                 onDelete={handleDeletePost}
+                onLiveToggle={handleTogglePostLive}
               />
             );
           })
@@ -1139,6 +1269,7 @@ function MarhalaPosts({
         const studentInfo = getStudentInfo(currentPost);
         return (
           <div className="mp-modal-backdrop" onClick={() => setSelectedPost(null)}>
+            <div className={`mp-animation-overlay ${showAnimation ? "visible" : ""}`} ref={animCanvasRef} />
             <div className="mp-modal-card" ref={postCardRef} onClick={(event) => event.stopPropagation()}>
               <button className="mp-modal-close" onClick={() => setSelectedPost(null)} aria-label="Close Marhala post">
                 <X size={20} />
@@ -1195,6 +1326,11 @@ function CompactMarhalaPostCard({ post, studentInfo, hasLiked, recentlyLiked, on
       </button>
       <div className="mp-compact-info">
         <span className="mp-compact-eyebrow mp-arabic-text" dir="rtl">{marhalaDisplay}</span>
+        {post.is_live && (
+          <span className="mp-compact-live-badge">
+            <span className="mp-live-dot" /> LIVE
+          </span>
+        )}
         <h3 className="mp-compact-name mp-arabic-text" dir={studentInfo?.arabic_name || studentInfo?.arabicName || post.arabic_name ? "rtl" : "auto"}>{childName}</h3>
       </div>
       <div className="mp-compact-actions">
@@ -1222,11 +1358,13 @@ function PostCard({
   isAdmin,
   onEdit,
   onDelete,
+  onLiveToggle,
   isPreview = false,
 }) {
   const likeCount = (post.likes || []).length;
   const postPhoto = post.image_url || studentInfo?.photo_url || studentInfo?.photoUrl || "";
   const postBackground = post.background_url || "";
+  const backgroundOpacity = post.background_opacity != null ? post.background_opacity : 0.3;
   const studentAge = post.description || post.age || (studentInfo?.date_of_birth ? calculateAge(studentInfo.date_of_birth) : null);
   const postHeading = post.title || post.heading || "";
   const marhalaDisplay = post.marhala_name || "";
@@ -1236,14 +1374,23 @@ function PostCard({
 
   return (
     <div className={`mp-post-card card-appear ${isPreview ? 'mp-preview-card' : ''}`}
-      style={postBackground ? {
-        backgroundImage: `url(${postBackground})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      } : {}}
+      style={{}}
     >
       
+      {/* Background image with direct opacity control */}
+      {postBackground && (
+        <div
+          className="mp-bg-image-layer"
+          style={{
+            backgroundImage: `url(${postBackground})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: backgroundOpacity,
+          }}
+        />
+      )}
+
       {/* Ornate corner decorations */}
       <CornerOrnament className="mp-cert-corner mp-cert-corner-tl" />
       <CornerOrnament className="mp-cert-corner mp-cert-corner-tr" />
@@ -1278,8 +1425,21 @@ function PostCard({
             </span>
           </div>
 
+              {post.is_live && (
+            <div className="mp-live-badge" title={post.live_at ? "Live for 24 hours" : "Live"}>
+              <span className="mp-live-dot" /> LIVE
+            </div>
+          )}
+
           {isAdmin && !isPreview && (
             <div className="mp-post-admin-actions">
+              <button
+                className={`mp-icon-btn mp-live-toggle ${post.is_live ? "on" : ""}`}
+                onClick={(e) => { e.stopPropagation(); onLiveToggle && onLiveToggle(post); }}
+                title={post.is_live ? "Turn off live (hide from portals)" : "Turn on live (show for 24 hours)"}
+              >
+                <Globe size={14} />
+              </button>
               <button className="mp-icon-btn" onClick={() => onEdit && onEdit(post)} title="Edit post">
                 <Edit3 size={14} />
               </button>
@@ -1335,7 +1495,7 @@ function PostCard({
             {studentAge !== null && (
               <div className="mp-cert-photo-age">
                 <span className="mp-cert-detail-label">Age</span>
-                <span className="mp-cert-detail-value"><span className="mp-age-digits">{toArabicDigits(studentAge)}</span> years</span>
+                <span className="mp-cert-detail-value"><span className="mp-age-digits">{studentAge}</span> years</span>
               </div>
             )}
             <div className="mp-cert-blessing mp-arabic-text" dir="rtl">مبارك مهنّا</div>
@@ -1357,11 +1517,6 @@ function PostCard({
 
         {/* Decorative line */}
         <div className="mp-cert-deco-line-thick" />
-
-        {/* Certificate Footer - Location */}
-        <div className="mp-cert-footer">
-          <p className="mp-cert-footer-location">Pakhti Mubarak • Galiakot</p>
-        </div>
       </div>
     </div>
   );

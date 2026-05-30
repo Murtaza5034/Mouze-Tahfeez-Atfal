@@ -108,6 +108,13 @@ const REPORT_SETTING_DEFAULTS = {
   auto_lock_time: "00:00",
   auto_unlock_day: "Friday",
   auto_unlock_time: "16:30",
+  jadwal_style: 'table',
+  jadwal_teacher_style: 'default',
+  jadwal_pdf_primary_color: '#5d4037',
+  jadwal_pdf_accent_color: '#d4af37',
+  jadwal_pdf_background_color: '#ffffff',
+  jadwal_pdf_background_url: '',
+  jadwal_pdf_font_family: 'Inter',
 };
 
 const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
@@ -821,6 +828,7 @@ const NAV_ICONS = {
   "User Issues": LifeBuoy,
   "Leave Management": CalendarX,
   "Report Settings": Palette,
+  "Jadwal Settings": Calendar,
   "Global Settings": Settings,
   "Messages": MessageCircle,
   "Email Settings": Mail,
@@ -3341,6 +3349,7 @@ function ParentPortal({
   onLogout,
   loadPortalData,
   portalRole,
+  reportSettings: propReportSettings = [],
   setSelectedAnnouncement,
   isDarkMode,
   setIsDarkMode,
@@ -4150,6 +4159,7 @@ function ParentPortal({
               teacherId={studentProfile?.muhaffiz_id}
               teacherProfiles={teacherProfiles}
               showAction={showAction}
+              jadwalSettings={propReportSettings}
             />
           </Suspense>
         ) : null}
@@ -5043,7 +5053,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Global Settings", "Email Settings", "Marhala Posts"];
+  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Global Settings", "Email Settings", "Marhala Posts"];
   const navPages = ["Overview", "Quick Student Access", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
@@ -7408,6 +7418,131 @@ const handleDownloadAllReports = async () => {
               </section>
             </div>
           ) : null}
+          {activePage === "Jadwal Settings" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <Palette size={18} />
+                  <h3>Jadwal Display & Theme Settings</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = {
+                    jadwal_style: formData.get("jadwal_style"),
+                    jadwal_teacher_style: formData.get("jadwal_teacher_style"),
+                    jadwal_pdf_primary_color: formData.get("jadwal_pdf_primary_color"),
+                    jadwal_pdf_accent_color: formData.get("jadwal_pdf_accent_color"),
+                    jadwal_pdf_background_color: formData.get("jadwal_pdf_background_color"),
+                    jadwal_pdf_font_family: formData.get("jadwal_pdf_font_family"),
+                  };
+                  saveReportSettings(updates);
+                }}>
+                  <div className="card-headline" style={{ marginTop: '0', padding: '0', border: 'none' }}>
+                    <Calendar size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Jadwal Style</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Display Style</span>
+                      <select name="jadwal_style" defaultValue={reportSettingsDraft.jadwal_style || 'table'} className="premium-select">
+                        <option value="table">Table Style</option>
+                        <option value="calendar">Calendar Style</option>
+                        <option value="single_day_card">Single Day Card Style</option>
+                      </select>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Choose how Jadwal is displayed for teachers and parents.
+                      </small>
+                    </label>
+                    <label>
+                      <span>Teacher Input Style</span>
+                      <select name="jadwal_teacher_style" defaultValue={reportSettingsDraft.jadwal_teacher_style || 'default'} className="premium-select">
+                        <option value="default">Default (Full Table)</option>
+                        <option value="compact">Compact (Minimal Input)</option>
+                      </select>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Controls how teachers fill in the Jadwal.
+                      </small>
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Download size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>PDF Theme</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Primary Color</span>
+                      <input name="jadwal_pdf_primary_color" type="color" defaultValue={reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037'} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                    </label>
+                    <label>
+                      <span>Accent / Gold Color</span>
+                      <input name="jadwal_pdf_accent_color" type="color" defaultValue={reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                    </label>
+                    <label>
+                      <span>Page Background Color</span>
+                      <input name="jadwal_pdf_background_color" type="color" defaultValue={reportSettingsDraft.jadwal_pdf_background_color || '#ffffff'} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                    </label>
+                    <label>
+                      <span>Font Family</span>
+                      <select name="jadwal_pdf_font_family" defaultValue={reportSettingsDraft.jadwal_pdf_font_family || 'Inter'} className="premium-select">
+                        <option value="Inter">Inter</option>
+                        <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                        <option value="'Times New Roman', serif">Times New Roman</option>
+                        <option value="'Cinzel', serif">Cinzel</option>
+                        <option value="'Courier New', monospace">Courier New</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="form-grid" style={{ marginTop: '12px' }}>
+                    <label>
+                      <span>PDF Background Image URL</span>
+                      <input name="jadwal_pdf_background_url" type="text" defaultValue={reportSettingsDraft.jadwal_pdf_background_url || ''} placeholder="https://example.com/background.jpg" className="premium-input" />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Optional: Full URL to a background image for the PDF (JPG, PNG).
+                      </small>
+                    </label>
+                  </div>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
+                    Save Jadwal Settings
+                  </button>
+                </form>
+              </section>
+
+              <section className="data-card card-appear">
+                <div className="card-headline">
+                  <Eye size={18} />
+                  <h3>Style Preview</h3>
+                </div>
+                <div style={{ padding: '16px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', marginBottom: '12px' }}>
+                    Current Style: <strong>{(reportSettingsDraft.jadwal_style || 'table').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <div style={{
+                      padding: '16px', borderRadius: '12px',
+                      background: reportSettingsDraft.jadwal_pdf_background_color || '#ffffff',
+                      border: `2px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                      minWidth: '120px'
+                    }}>
+                      <div style={{
+                        height: '8px', borderRadius: '4px',
+                        background: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037',
+                        marginBottom: '8px'
+                      }} />
+                      <div style={{ height: '6px', borderRadius: '3px', background: '#eee', marginBottom: '4px' }} />
+                      <div style={{ height: '6px', borderRadius: '3px', background: '#eee' }} />
+                    </div>
+                  </div>
+                  <p className="hint-text" style={{ marginTop: '16px' }}>
+                    Colors and style settings apply to the downloaded Jadwal PDF. Select a style above to preview.
+                  </p>
+                </div>
+              </section>
+            </div>
+          ) : null}
           {activePage === "Global Settings" ? (
             <div className="management-grid two-columns">
               <section className="form-card card-appear">
@@ -8029,6 +8164,7 @@ onShowAction,
                  onShowAction={onShowAction} 
                  onBroadcastNotification={broadcastNotification} 
                  initialStudentId={activeStudentId}
+                 jadwalSettings={reportSettings}
                />
              </Suspense>
           )}
@@ -10954,6 +11090,7 @@ const handleSendCustomNotification = async (event) => {
             onRoleChange={storeRole}
             parentData={parentData}
             portalRole={portalRole}
+            reportSettings={reportSettings}
             setActivePage={setActivePage}
             setAppTheme={setAppTheme}
             setIsDarkMode={setIsDarkMode}

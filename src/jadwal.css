@@ -306,3 +306,274 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+.jadwal-style-badge {
+  font-size: 11px;
+  color: #fff;
+  background: var(--primary-gold, #d4af37);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.jadwal-calendar-container {
+  background: var(--card-bg, #fff);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.jadwal-calendar-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.jadwal-calendar-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--brown-light, #f5f0eb);
+  border: 1px solid var(--glass-border, #e0d5c8);
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-dark, #5d4037);
+  transition: all 0.2s ease;
+}
+
+.jadwal-calendar-nav-btn:hover {
+  background: var(--primary-gold, #d4af37);
+  color: #fff;
+  border-color: var(--primary-gold, #d4af37);
+}
+
+.jadwal-calendar-week-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-dark, #5d4037);
+  font-family: 'Cinzel', serif;
+}
+
+.jadwal-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.jadwal-calendar-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--glass-border, #e0d5c8);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.jadwal-calendar-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+
+.jadwal-calendar-card.today {
+  border-color: var(--primary-gold, #d4af37);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2), 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.jadwal-calendar-card-header {
+  background: var(--primary-dark, #5d4037);
+  color: #fff;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.jadwal-calendar-day-name {
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.jadwal-calendar-date {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.jadwal-calendar-card-body {
+  padding: 12px 16px;
+}
+
+.jadwal-calendar-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0ece6;
+}
+
+.jadwal-calendar-field:last-child {
+  border-bottom: none;
+}
+
+.jadwal-calendar-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--soft-brown, #8b6d31);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 80px;
+}
+
+.jadwal-calendar-field span {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main, #333);
+}
+
+.jadwal-calendar-field input,
+.jadwal-calendar-field select {
+  width: 120px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  background: var(--brown-light, #f5f0eb);
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.jadwal-calendar-field input:focus,
+.jadwal-calendar-field select:focus {
+  border-color: var(--dark-gold, #b8860b);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.jadwal-calendar-field .star-select {
+  width: 120px;
+}
+
+.jadwal-single-day-container {
+  background: var(--card-bg, #fff);
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.jadwal-single-day-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 12px;
+}
+
+.jadwal-single-day-title {
+  text-align: center;
+}
+
+.jadwal-single-day-title h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--primary-dark, #5d4037);
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase;
+}
+
+.jadwal-single-day-subtitle {
+  font-size: 11px;
+  color: var(--soft-brown, #8b6d31);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.jadwal-single-day-card {
+  background: var(--card-bg, #fff);
+  border: 2px solid var(--primary-gold, #d4af37);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 30px rgba(212, 175, 55, 0.15);
+}
+
+.jadwal-single-day-card-body .jadwal-calendar-field {
+  padding: 10px 0;
+}
+
+.jadwal-single-day-card-body .jadwal-calendar-field label {
+  font-size: 13px;
+  min-width: 100px;
+}
+
+.jadwal-single-day-card-body .jadwal-calendar-field input,
+.jadwal-single-day-card-body .jadwal-calendar-field select {
+  width: 160px;
+  padding: 8px 12px;
+}
+
+/* Dark mode support for new styles */
+.dark-mode .jadwal-calendar-container {
+  background: var(--dark-bg, #1a1a1a);
+}
+
+.dark-mode .jadwal-calendar-card {
+  background: #222;
+  border-color: #444;
+}
+
+.dark-mode .jadwal-calendar-card-header {
+  background: #333;
+}
+
+.dark-mode .jadwal-calendar-field {
+  border-bottom-color: #333;
+}
+
+.dark-mode .jadwal-calendar-field input,
+.dark-mode .jadwal-calendar-field select {
+  background: #2a2a2a;
+  color: #eee;
+}
+
+.dark-mode .jadwal-calendar-field input:focus,
+.dark-mode .jadwal-calendar-field select:focus {
+  background: #333;
+  border-color: var(--light-gold, #e5c07b);
+}
+
+.dark-mode .jadwal-single-day-container {
+  background: var(--dark-bg, #1a1a1a);
+}
+
+.dark-mode .jadwal-single-day-card {
+  background: #222;
+  border-color: var(--light-gold, #e5c07b);
+}
+
+.dark-mode .jadwal-single-day-title h3 {
+  color: var(--light-gold, #e5c07b);
+}
+
+.dark-mode .jadwal-calendar-nav-btn {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #ccc;
+}
+
+.dark-mode .jadwal-calendar-week-label {
+  color: var(--light-gold, #e5c07b);
+}
+
+.dark-mode .jadwal-style-badge {
+  background: var(--light-gold, #e5c07b);
+  color: #222;
+}

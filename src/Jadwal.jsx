@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { Download, Save, Loader2 } from 'lucide-react';
+import { Download, Save, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { JadwalNotes } from "./JadwalNotes";
@@ -12,7 +12,6 @@ DAYS.forEach(day => {
   DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', murajah: '', juzhali: '', jadeed: '', star: '' };
 });
 
-// @font-face CSS for injection into html2canvas cloned document
 const FONT_FACE_CSS = `
 @font-face {
   font-family: 'Kanz al Marjaan';
@@ -31,215 +30,121 @@ const FONT_FACE_CSS = `
   font-display: swap;
 }
 `;
-const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise') => {
+
+const getDefaultTheme = () => ({
+  primaryColor: '#5d4037',
+  accentColor: '#d4af37',
+  backgroundColor: '#ffffff',
+  backgroundUrl: '',
+  fontFamily: 'Inter',
+});
+
+const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', theme = {}) => {
+  const t = { ...getDefaultTheme(), ...theme };
   const printContainer = document.createElement("div");
   printContainer.style.position = "absolute";
   printContainer.style.left = "-9999px";
   printContainer.style.top = "-9999px";
   printContainer.style.width = "850px";
   printContainer.style.padding = "40px";
-  printContainer.style.background = "#ffffff";
-  printContainer.style.fontFamily = "'Inter', 'Segoe UI', sans-serif";
+  printContainer.style.background = t.backgroundColor;
+  printContainer.style.fontFamily = t.fontFamily.includes(',') ? t.fontFamily : `'${t.fontFamily}', 'Inter', 'Segoe UI', sans-serif`;
   printContainer.style.color = "#2c1e11";
-  
-  // Build table HTML for PDF (avoiding nested template literals)
+
+  const bgImageStyle = t.backgroundUrl
+    ? `background-image: url('${t.backgroundUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat;`
+    : '';
 
   const pdfHeaders = mode === 'juz-wise'
-
-    ? '<tr style="background: #5d4037; color: #ffffff;">'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 1</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 2</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 3</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 4</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>'
-
+    ? `<tr style="background: ${t.primaryColor}; color: #ffffff;">`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 1</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 2</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 3</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 4</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>`
       + '</tr>'
-
-    : '<tr style="background: #5d4037; color: #ffffff;">'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>'
-
-      + '<th style="padding: 14px; border: 1px solid #dfcbb5; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>'
-
+    : `<tr style="background: ${t.primaryColor}; color: #ffffff;">`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>`
       + '</tr>';
 
-
-
-  // Build rows using helper function approach
-
-
-
   const buildPdfRows = () => {
-
     const rows = DAYS.map((day, idx) => {
-
       const row = scheduleData[day] || {};
-
       const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
-
-      const bg = idx % 2 === 0 ? '#ffffff' : '#fefbf7';
-
-      const dayTd = '<td style="padding: 14px; border: 1px solid #dfcbb5; font-weight: bold; font-size: 13px; color: #5d4037; text-align: left;">' + day + '</td>';
-
-      const starTd = '<td style="padding: 14px; border: 1px solid #dfcbb5; font-size: 16px; color: #FFD700; text-align: center; letter-spacing: 1px;">' + stars + '</td>';
-
-      const tdStyle = 'style="padding: 14px; border: 1px solid #dfcbb5; font-size: 13px; color: #333; text-align: center; font-weight: 500;"';
-
-
+      const bg = idx % 2 === 0 ? t.backgroundColor : `${t.backgroundColor}f2`;
+      const dayTd = `<td style="padding: 14px; border: 1px solid ${t.accentColor}; font-weight: bold; font-size: 13px; color: ${t.primaryColor}; text-align: left;">${day}</td>`;
+      const starTd = `<td style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #FFD700; text-align: center; letter-spacing: 1px;">${stars}</td>`;
+      const tdStyle = `style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 13px; color: #333; text-align: center; font-weight: 500;"`;
 
       if (mode === 'juz-wise') {
-
-        return '<tr style="background: ' + bg + ';">' + dayTd
-
-          + '<td ' + tdStyle + '>' + (row.juz1 || '-') + '</td>'
-
-          + '<td ' + tdStyle + '>' + (row.juz2 || '-') + '</td>'
-
-          + '<td ' + tdStyle + '>' + (row.juz3 || '-') + '</td>'
-
-          + '<td ' + tdStyle + '>' + (row.juz4 || '-') + '</td>'
-
-          + '<td ' + tdStyle + '>' + (row.juzhali || '-') + '</td>'
-
-          + '<td ' + tdStyle + '>' + (row.jadeed || '-') + '</td>'
-
-          + starTd + '</tr>';
-
+        return `<tr style="background: ${bg};">${dayTd}`
+          + `<td ${tdStyle}>${row.juz1 || '-'}</td>`
+          + `<td ${tdStyle}>${row.juz2 || '-'}</td>`
+          + `<td ${tdStyle}>${row.juz3 || '-'}</td>`
+          + `<td ${tdStyle}>${row.juz4 || '-'}</td>`
+          + `<td ${tdStyle}>${row.juzhali || '-'}</td>`
+          + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
+          + `${starTd}</tr>`;
       }
-
-      return '<tr style="background: ' + bg + ';">' + dayTd
-
-        + '<td ' + tdStyle + '>' + (row.murajah || '-') + '</td>'
-
-        + '<td ' + tdStyle + '>' + (row.juzhali || '-') + '</td>'
-
-        + '<td ' + tdStyle + '>' + (row.jadeed || '-') + '</td>'
-
-        + starTd + '</tr>';
-
+      return `<tr style="background: ${bg};">${dayTd}`
+        + `<td ${tdStyle}>${row.murajah || '-'}</td>`
+        + `<td ${tdStyle}>${row.juzhali || '-'}</td>`
+        + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
+        + `${starTd}</tr>`;
     });
-
     return rows.join('');
-
   };
-
-
 
   const pdfRows = buildPdfRows();
 
-
-
   printContainer.innerHTML = `
-
-    <div style="border: 2px solid #dfcbb5; border-radius: 16px; padding: 30px; background: #fffcf8; box-sizing: border-box;">
-
-      <!-- Header -->
-
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #dfcbb5; padding-bottom: 20px; margin-bottom: 25px;">
-
+    <div style="border: 2px solid ${t.accentColor}; border-radius: 16px; padding: 30px; background: ${t.backgroundColor}; box-sizing: border-box; ${bgImageStyle}">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${t.accentColor}; padding-bottom: 20px; margin-bottom: 25px;">
         <div>
-
-          <h1 style="margin: 0; font-size: 26px; color: #5d4037; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">MAUZE TAHFEEZ ATFAL</h1>
-
-          <p style="margin: 5px 0 0 0; font-size: 14px; color: #8b6d31; font-weight: 600; letter-spacing: 0.5px;">Weekly Quran Jadwal (Timetable)</p>
-
+          <h1 style="margin: 0; font-size: 26px; color: ${t.primaryColor}; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">MAUZE TAHFEEZ ATFAL</h1>
+          <p style="margin: 5px 0 0 0; font-size: 14px; color: ${t.accentColor}; font-weight: 600; letter-spacing: 0.5px;">Weekly Quran Jadwal (Timetable)</p>
         </div>
-
         <div style="text-align: right;">
-
           <div style="font-size: 12px; color: #888; font-weight: 500;">Generated on</div>
-
-          <div style="font-size: 14px; color: #5d4037; font-weight: bold;">${new Date().toLocaleDateString()}</div>
-
+          <div style="font-size: 14px; color: ${t.primaryColor}; font-weight: bold;">${new Date().toLocaleDateString()}</div>
         </div>
-
       </div>
-
-
-
-      <!-- Student Info Details -->
 
       <div style="background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 18px 24px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
-
         <div>
-
-          <span style="font-size: 11px; color: #8b6d31; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">STUDENT NAME</span>
-
-          <span style="font-size: 20px; color: #5d4037; font-weight: 800;">${studentName}</span>
-
+          <span style="font-size: 11px; color: ${t.accentColor}; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">STUDENT NAME</span>
+          <span style="font-size: 20px; color: ${t.primaryColor}; font-weight: 800;">${studentName}</span>
         </div>
-
         <div style="text-align: right;">
-
-          <span style="font-size: 11px; color: #8b6d31; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">ACADEMIC PORTAL</span>
-
-          <span style="font-size: 14px; color: #ffffff; font-weight: 700; background: #5d4037; padding: 4px 12px; border-radius: 20px;">Hifz Program</span>
-
+          <span style="font-size: 11px; color: ${t.accentColor}; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">ACADEMIC PORTAL</span>
+          <span style="font-size: 14px; color: #ffffff; font-weight: 700; background: ${t.primaryColor}; padding: 4px 12px; border-radius: 20px;">Hifz Program</span>
         </div>
-
       </div>
-
-
-
-      <!-- Jadwal Table -->
 
       <table style="width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(93, 64, 55, 0.03);">
-
-        <thead>
-
-          ${pdfHeaders}
-
-        </thead>
-
-        <tbody>
-
-          ${pdfRows}
-
-        </tbody>
-
+        <thead>${pdfHeaders}</thead>
+        <tbody>${pdfRows}</tbody>
       </table>
 
-
-
-      <!-- Footer Note -->
-
-      <div style="margin-top: 35px; border-top: 1px dashed #dfcbb5; padding-top: 15px; text-align: center;">
-
-        <p style="margin: 0; font-size: 12px; color: #8b6d31; font-style: italic; font-weight: 600;">
-
+      <div style="margin-top: 35px; border-top: 1px dashed ${t.accentColor}; padding-top: 15px; text-align: center;">
+        <p style="margin: 0; font-size: 12px; color: ${t.accentColor}; font-style: italic; font-weight: 600;">
           "And We have indeed made the Quran easy to understand and remember..."
-
         </p>
-
       </div>
-
     </div>
-
   `;
   document.body.appendChild(printContainer);
 
   try {
-    // Ensure custom fonts (Kanz al Marjaan, Al-Kanz) are fully loaded before canvas capture
     try {
       await document.fonts.ready;
-      // Explicitly load Kanz al Marjaan font via FontFace API
       const kanzFamily = ['Kanz al Marjaan', 'Al-Kanz'];
       for (const family of kanzFamily) {
         if (!document.fonts.check('1em "' + family + '"', 'abcdefghijklmnopqrstuvwxyz0123456789')) {
@@ -256,10 +161,10 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise') =
       console.warn('Custom font loading for Jadwal PDF failed:', e);
     }
     const canvas = await html2canvas(printContainer, {
-      scale: 3, // 100% HD Quality
+      scale: 3,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: "#ffffff",
+      backgroundColor: t.backgroundColor,
       onclone: async (clonedDoc) => {
         const style = clonedDoc.createElement('style');
         style.textContent = FONT_FACE_CSS;
@@ -277,7 +182,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise') =
     const pdfWidth = 210;
     const imgProps = new jsPDF().getImageProperties(imgData);
     const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    
+
     const pdf = new jsPDF({
       orientation: "p",
       unit: "mm",
@@ -294,12 +199,352 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise') =
   }
 };
 
-export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId }) => {
+const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) => {
+  return (
+    <div className="jadwal-table-wrapper">
+      <table className="jadwal-table">
+        <thead>
+          {mode === 'juz-wise' ? (
+            <>
+              <tr>
+                <th rowSpan="2">Days</th>
+                <th colSpan="4" style={{ textAlign: 'center', borderBottom: 'none' }}>Murajah</th>
+                <th rowSpan="2">Juzhali</th>
+                <th rowSpan="2">Jadeed</th>
+                <th rowSpan="2">Star</th>
+              </tr>
+              <tr>
+                <th>1</th>
+                <th>2</th>
+                <th>3</th>
+                <th>4</th>
+              </tr>
+            </>
+          ) : (
+            <tr>
+              <th>Days</th>
+              <th>Murajah</th>
+              <th>Juzhali</th>
+              <th>Jadeed</th>
+              <th>Star</th>
+            </tr>
+          )}
+        </thead>
+        <tbody>
+          {DAYS.map(day => (
+            <tr key={day}>
+              <td className="day-cell">{day}</td>
+              {mode === 'juz-wise' ? (
+                <>
+                  {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => (
+                    <td key={juz}>
+                      {readOnly ? (
+                        <span>{scheduleData[day]?.[juz] || '-'}</span>
+                      ) : (
+                        <input
+                          type="text"
+                          value={scheduleData[day]?.[juz] || ''}
+                          onChange={(e) => onCellChange(day, juz, e.target.value)}
+                          placeholder="-"
+                        />
+                      )}
+                    </td>
+                  ))}
+                  <td>
+                    {readOnly ? (
+                      <span>{scheduleData[day]?.juzhali || '-'}</span>
+                    ) : (
+                      <input
+                        type="text"
+                        value={scheduleData[day]?.juzhali || ''}
+                        onChange={(e) => onCellChange(day, 'juzhali', e.target.value)}
+                        placeholder="-"
+                        style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.juzhali || '') ? 'rtl' : 'ltr' }}
+                      />
+                    )}
+                  </td>
+                  <td>
+                    {readOnly ? (
+                      <span>{scheduleData[day]?.jadeed || '-'}</span>
+                    ) : (
+                      <input
+                        type="text"
+                        value={scheduleData[day]?.jadeed || ''}
+                        onChange={(e) => onCellChange(day, 'jadeed', e.target.value)}
+                        placeholder="-"
+                        style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.jadeed || '') ? 'rtl' : 'ltr' }}
+                      />
+                    )}
+                  </td>
+                </>
+              ) : (
+                <>
+                  {['murajah', 'juzhali', 'jadeed'].map(field => (
+                    <td key={field}>
+                      {readOnly ? (
+                        <span>{scheduleData[day]?.[field] || '-'}</span>
+                      ) : (
+                        <input
+                          type="text"
+                          value={scheduleData[day]?.[field] || ''}
+                          onChange={(e) => onCellChange(day, field, e.target.value)}
+                          placeholder="-"
+                          style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.[field] || '') ? 'rtl' : 'ltr' }}
+                        />
+                      )}
+                    </td>
+                  ))}
+                </>
+              )}
+              <td className="star-cell">
+                {readOnly ? (
+                  <span>{scheduleData[day]?.star ? '⭐'.repeat(parseInt(scheduleData[day].star)) : '-'}</span>
+                ) : (
+                  <select
+                    value={scheduleData[day]?.star || ''}
+                    onChange={(e) => onCellChange(day, 'star', e.target.value)}
+                    className="star-select"
+                  >
+                    <option value="">-</option>
+                    <option value="1">⭐</option>
+                    <option value="2">⭐⭐</option>
+                    <option value="3">⭐⭐⭐</option>
+                    <option value="4">⭐⭐⭐⭐</option>
+                    <option value="5">⭐⭐⭐⭐⭐</option>
+                  </select>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compact }) => {
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
+
+  const getWeekDays = () => {
+    const now = new Date();
+    now.setDate(now.getDate() + currentWeekOffset * 7);
+    const day = now.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    return DAYS.map((_, idx) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() + mondayOffset + idx);
+      return d;
+    });
+  };
+
+  const weekDays = getWeekDays();
+
+  const renderDayCell = (day, dateObj) => {
+    const row = scheduleData[day] || {};
+    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const isToday = dateObj.toDateString() === new Date().toDateString();
+
+    const fields = mode === 'juz-wise'
+      ? ['juz1', 'juz2', 'juz3', 'juz4']
+      : ['murajah'];
+    const extraFields = ['juzhali', 'jadeed'];
+
+    return (
+      <div key={day} className={`jadwal-calendar-card ${isToday ? 'today' : ''}`}>
+        <div className="jadwal-calendar-card-header">
+          <span className="jadwal-calendar-day-name">{day}</span>
+          <span className="jadwal-calendar-date">{dateStr}</span>
+        </div>
+        <div className="jadwal-calendar-card-body">
+          {fields.map(field => (
+            <div className="jadwal-calendar-field" key={field}>
+              <label>{field.charAt(0).toUpperCase() + field.slice(1).replace(/\d/, ' $&')}</label>
+              {readOnly ? (
+                <span>{row[field] || '-'}</span>
+              ) : (
+                <input
+                  type="text"
+                  value={row[field] || ''}
+                  onChange={(e) => onCellChange(day, field, e.target.value)}
+                  placeholder="-"
+                />
+              )}
+            </div>
+          ))}
+          {extraFields.map(field => (
+            <div className="jadwal-calendar-field" key={field}>
+              <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+              {readOnly ? (
+                <span>{row[field] || '-'}</span>
+              ) : (
+                <input
+                  type="text"
+                  value={row[field] || ''}
+                  onChange={(e) => onCellChange(day, field, e.target.value)}
+                  placeholder="-"
+                  style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(row[field] || '') ? 'rtl' : 'ltr' }}
+                />
+              )}
+            </div>
+          ))}
+          <div className="jadwal-calendar-field">
+            <label>Star</label>
+            {readOnly ? (
+              <span className="star-cell">{row.star ? '⭐'.repeat(parseInt(row.star)) : '-'}</span>
+            ) : (
+              <select
+                value={row.star || ''}
+                onChange={(e) => onCellChange(day, 'star', e.target.value)}
+                className="star-select"
+              >
+                <option value="">-</option>
+                <option value="1">⭐</option>
+                <option value="2">⭐⭐</option>
+                <option value="3">⭐⭐⭐</option>
+                <option value="4">⭐⭐⭐⭐</option>
+                <option value="5">⭐⭐⭐⭐⭐</option>
+              </select>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="jadwal-calendar-container">
+      <div className="jadwal-calendar-nav">
+        <button className="jadwal-calendar-nav-btn" onClick={() => setCurrentWeekOffset(prev => prev - 1)}>
+          <ChevronLeft size={18} /> Previous Week
+        </button>
+        <span className="jadwal-calendar-week-label">
+          {weekDays[0]?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDays[6]?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </span>
+        <button className="jadwal-calendar-nav-btn" onClick={() => setCurrentWeekOffset(prev => prev + 1)}>
+          Next Week <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="jadwal-calendar-grid">
+        {DAYS.map((day, idx) => renderDayCell(day, weekDays[idx]))}
+      </div>
+    </div>
+  );
+};
+
+const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly }) => {
+  const [currentDayIndex, setCurrentDayIndex] = useState(() => {
+    const today = new Date().getDay();
+    return today === 0 ? 6 : today - 1;
+  });
+
+  const day = DAYS[currentDayIndex];
+  const row = scheduleData[day] || {};
+
+  const goToDay = (offset) => {
+    setCurrentDayIndex(prev => {
+      const next = prev + offset;
+      if (next < 0) return 6;
+      if (next > 6) return 0;
+      return next;
+    });
+  };
+
+  const fields = mode === 'juz-wise'
+    ? ['juz1', 'juz2', 'juz3', 'juz4']
+    : ['murajah'];
+  const extraFields = ['juzhali', 'jadeed'];
+
+  return (
+    <div className="jadwal-single-day-container">
+      <div className="jadwal-single-day-nav">
+        <button className="jadwal-calendar-nav-btn" onClick={() => goToDay(-1)}>
+          <ChevronLeft size={18} /> {DAYS[(currentDayIndex + 6) % 7]}
+        </button>
+        <div className="jadwal-single-day-title">
+          <h3>{day}</h3>
+          <span className="jadwal-single-day-subtitle">Current Day View</span>
+        </div>
+        <button className="jadwal-calendar-nav-btn" onClick={() => goToDay(1)}>
+          {DAYS[(currentDayIndex + 1) % 7]} <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="jadwal-single-day-card">
+        <div className="jadwal-single-day-card-body">
+          {fields.map(field => (
+            <div className="jadwal-calendar-field" key={field}>
+              <label>{field.charAt(0).toUpperCase() + field.slice(1).replace(/\d/, ' $&')}</label>
+              {readOnly ? (
+                <span>{row[field] || '-'}</span>
+              ) : (
+                <input
+                  type="text"
+                  value={row[field] || ''}
+                  onChange={(e) => onCellChange(day, field, e.target.value)}
+                  placeholder="-"
+                />
+              )}
+            </div>
+          ))}
+          {extraFields.map(field => (
+            <div className="jadwal-calendar-field" key={field}>
+              <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+              {readOnly ? (
+                <span>{row[field] || '-'}</span>
+              ) : (
+                <input
+                  type="text"
+                  value={row[field] || ''}
+                  onChange={(e) => onCellChange(day, field, e.target.value)}
+                  placeholder="-"
+                  style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(row[field] || '') ? 'rtl' : 'ltr' }}
+                />
+              )}
+            </div>
+          ))}
+          <div className="jadwal-calendar-field">
+            <label>Star</label>
+            {readOnly ? (
+              <span className="star-cell">{row.star ? '⭐'.repeat(parseInt(row.star)) : '-'}</span>
+            ) : (
+              <select
+                value={row.star || ''}
+                onChange={(e) => onCellChange(day, 'star', e.target.value)}
+                className="star-select"
+              >
+                <option value="">-</option>
+                <option value="1">⭐</option>
+                <option value="2">⭐⭐</option>
+                <option value="3">⭐⭐⭐</option>
+                <option value="4">⭐⭐⭐⭐</option>
+                <option value="5">⭐⭐⭐⭐⭐</option>
+              </select>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const getJadwalThemeFromSettings = (settings = {}) => ({
+  primaryColor: settings.jadwal_pdf_primary_color || '#5d4037',
+  accentColor: settings.jadwal_pdf_accent_color || '#d4af37',
+  backgroundColor: settings.jadwal_pdf_background_color || '#ffffff',
+  backgroundUrl: settings.jadwal_pdf_background_url || '',
+  fontFamily: settings.jadwal_pdf_font_family || 'Inter',
+});
+
+export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId, jadwalSettings }) => {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [scheduleData, setScheduleData] = useState({ ...DEFAULT_SCHEDULE, _mode: 'juz-wise' });
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const displayStyle = jadwalSettings?.jadwal_style || 'table';
+  const teacherStyle = jadwalSettings?.jadwal_teacher_style || 'default';
+  const isCompact = teacherStyle === 'compact';
+  const theme = getJadwalThemeFromSettings(jadwalSettings);
 
   useEffect(() => {
     if (initialStudentId) {
@@ -322,7 +567,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
       .select('schedule_data')
       .eq('student_id', selectedStudentId)
       .single();
-    
+
     if (error && error.code !== 'PGRST116') {
       console.error(error);
       onShowAction('error', 'Failed to fetch Jadwal');
@@ -341,12 +586,12 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
     setSaving(true);
     const { error } = await supabase
       .from('jadawal')
-      .upsert({ 
-        student_id: selectedStudentId, 
+      .upsert({
+        student_id: selectedStudentId,
         schedule_data: { ...scheduleData, _mode: mode },
         updated_at: new Date().toISOString()
       }, { onConflict: 'student_id' });
-    
+
     if (error) {
       console.error(error);
       onShowAction('error', 'Failed to save Jadwal. Make sure you ran the SQL setup script.');
@@ -354,8 +599,8 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
       onShowAction('success', 'Jadwal saved successfully');
       if (onBroadcastNotification) {
         try {
-          const targetStudent = (students || []).find(s => 
-            String(s.student_id) === String(selectedStudentId) || 
+          const targetStudent = (students || []).find(s =>
+            String(s.student_id) === String(selectedStudentId) ||
             (s.allIds && s.allIds.includes(String(selectedStudentId)))
           );
           const parentId = targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email;
@@ -389,13 +634,43 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const selectedStudentObj = (students || []).find(s => String(s.student_id) === String(selectedStudentId));
   const studentName = selectedStudentObj ? (selectedStudentObj.full_name || selectedStudentObj.name) : "Student";
 
+  const renderJadwalContent = () => {
+    switch (displayStyle) {
+      case 'calendar':
+        return (
+          <JadwalCalendarStyle
+            mode={mode}
+            scheduleData={scheduleData}
+            onCellChange={handleCellChange}
+            compact={isCompact}
+          />
+        );
+      case 'single_day_card':
+        return (
+          <JadwalSingleDayCardStyle
+            mode={mode}
+            scheduleData={scheduleData}
+            onCellChange={handleCellChange}
+          />
+        );
+      default:
+        return (
+          <JadwalTableStyle
+            mode={mode}
+            scheduleData={scheduleData}
+            onCellChange={handleCellChange}
+          />
+        );
+    }
+  };
+
   return (
     <div className="jadwal-container">
       <div className="jadwal-header">
         <h2>Teacher Jadwal Editor</h2>
         <div className="student-selector">
-          <select 
-            value={selectedStudentId} 
+          <select
+            value={selectedStudentId}
             onChange={(e) => setSelectedStudentId(e.target.value)}
             className="premium-select"
           >
@@ -419,9 +694,9 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
                   </>
                 )}
               </button>
-              <button 
-                className="jadwal-download-btn" 
-                onClick={() => handleDownloadPDF(studentName, scheduleData, mode)}
+              <button
+                className="jadwal-download-btn"
+                onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme)}
               >
                 <Download size={16} /> Download PDF
               </button>
@@ -436,8 +711,8 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
         <>
           <div style={{ marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
             <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Schedule Mode:</label>
-            <select 
-              value={mode} 
+            <select
+              value={mode}
               onChange={(e) => setMode(e.target.value)}
               className="premium-select"
               style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
@@ -448,128 +723,36 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             {mode === 'surah-wise' && (
               <span style={{ fontSize: '12px', color: '#8b6d31', fontStyle: 'italic' }}>Free text: English or Arabic</span>
             )}
+            <span className="jadwal-style-badge">
+              {displayStyle.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </span>
           </div>
-          <div className="jadwal-table-wrapper">
-            <table className="jadwal-table">
-              <thead>
-                {mode === 'juz-wise' ? (
-                  <React.Fragment>
-                    <tr>
-                      <th rowSpan="2">Days</th>
-                      <th colSpan="4" style={{ textAlign: 'center', borderBottom: 'none' }}>Murajah</th>
-                      <th rowSpan="2">Juzhali</th>
-                      <th rowSpan="2">Jadeed</th>
-                      <th rowSpan="2">Star</th>
-                    </tr>
-                    <tr>
-                      <th>1</th>
-                      <th>2</th>
-                      <th>3</th>
-                      <th>4</th>
-                    </tr>
-                  </React.Fragment>
-                ) : (
-                  <tr>
-                    <th>Days</th>
-                    <th>Murajah</th>
-                    <th>Juzhali</th>
-                    <th>Jadeed</th>
-                    <th>Star</th>
-                  </tr>
-                )}
-              </thead>
-              <tbody>
-                {DAYS.map(day => (
-                  <tr key={day}>
-                    <td className="day-cell">{day}</td>
-                    {mode === 'juz-wise' ? (
-                      <React.Fragment>
-                        {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => (
-                          <td key={juz}>
-                            <input 
-                              type="text" 
-                              value={scheduleData[day]?.[juz] || ''}
-                              onChange={(e) => handleCellChange(day, juz, e.target.value)}
-                              placeholder="-"
-                            />
-                          </td>
-                        ))}
-                        <td>
-                          <input 
-                            type="text" 
-                            value={scheduleData[day]?.juzhali || ''}
-                            onChange={(e) => handleCellChange(day, 'juzhali', e.target.value)}
-                            placeholder="-"
-                            style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.juzhali || '') ? 'rtl' : 'ltr' }}
-                          />
-                        </td>
-                        <td>
-                          <input 
-                            type="text" 
-                            value={scheduleData[day]?.jadeed || ''}
-                            onChange={(e) => handleCellChange(day, 'jadeed', e.target.value)}
-                            placeholder="-"
-                            style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.jadeed || '') ? 'rtl' : 'ltr' }}
-                          />
-                        </td>
-                      </React.Fragment>
-                    ) : (
-                      <React.Fragment>
-                        {['murajah', 'juzhali', 'jadeed'].map(field => (
-                          <td key={field}>
-                            <input 
-                              type="text" 
-                              value={scheduleData[day]?.[field] || ''}
-                              onChange={(e) => handleCellChange(day, field, e.target.value)}
-                              placeholder="-"
-                              style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.[field] || '') ? 'rtl' : 'ltr' }}
-                            />
-                          </td>
-                        ))}
-                      </React.Fragment>
-                    )}
-                    <td>
-                      <select 
-                        value={scheduleData[day]?.star || ''}
-                        onChange={(e) => handleCellChange(day, 'star', e.target.value)}
-                        className="star-select"
-                      >
-                        <option value="">-</option>
-                        <option value="1">⭐</option>
-                        <option value="2">⭐⭐</option>
-                        <option value="3">⭐⭐⭐</option>
-                        <option value="4">⭐⭐⭐⭐</option>
-                        <option value="5">⭐⭐⭐⭐⭐</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {renderJadwalContent()}
         </>
-      )
-      : (
+      ) : (
         <div className="jadwal-empty">Please select a student from the dropdown to view and edit their Jadwal timetable.</div>
       )}
-      
+
       {selectedStudentId && (
-        <JadwalNotes 
-          role="teacher" 
-          studentId={selectedStudentId} 
-          studentName={studentName} 
-          showAction={onShowAction} 
+        <JadwalNotes
+          role="teacher"
+          studentId={selectedStudentId}
+          studentName={studentName}
+          showAction={onShowAction}
         />
       )}
     </div>
   );
 };
 
-export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherProfiles, showAction }) => {
+export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherProfiles, showAction, jadwalSettings }) => {
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [studentName, setStudentName] = useState('Student');
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(true);
+
+  const displayStyle = jadwalSettings?.jadwal_style || 'table';
+  const theme = getJadwalThemeFromSettings(jadwalSettings);
 
   useEffect(() => {
     if (studentId) {
@@ -579,15 +762,14 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
 
   const fetchJadwal = async () => {
     setLoading(true);
-    
-    // Fetch student's name
+
     try {
       const { data: studentData } = await supabase
         .from('child_profiles')
         .select('full_name')
         .eq('student_id', studentId)
         .single();
-        
+
       if (studentData) {
         setStudentName(studentData.full_name);
       }
@@ -600,7 +782,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
       .select('schedule_data')
       .eq('student_id', studentId)
       .single();
-    
+
     if (error && error.code !== 'PGRST116') {
       console.error(error);
     } else if (data && data.schedule_data) {
@@ -613,75 +795,57 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
     setLoading(false);
   };
 
+  const renderJadwalContent = () => {
+    const noop = () => {};
+    switch (displayStyle) {
+      case 'calendar':
+        return (
+          <JadwalCalendarStyle
+            mode={mode}
+            scheduleData={scheduleData}
+            onCellChange={noop}
+            readOnly
+          />
+        );
+      case 'single_day_card':
+        return (
+          <JadwalSingleDayCardStyle
+            mode={mode}
+            scheduleData={scheduleData}
+            onCellChange={noop}
+            readOnly
+          />
+        );
+      default:
+        return (
+          <JadwalTableStyle
+            mode={mode}
+            scheduleData={scheduleData}
+            onCellChange={noop}
+            readOnly
+          />
+        );
+    }
+  };
+
   if (loading) return <div className="loading-spinner">Loading Jadwal...</div>;
 
   return (
     <div className="jadwal-container parent-view">
       <div className="jadwal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Weekly Jadwal Schedule</h2>
-        <button 
-          className="jadwal-save-btn" 
-          onClick={() => handleDownloadPDF(studentName, scheduleData, mode)}
+        <button
+          className="jadwal-save-btn"
+          onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme)}
         >
           <Download size={16} /> Download PDF
         </button>
       </div>
-      <div className="jadwal-table-wrapper">
-        <table className="jadwal-table">
-          <thead>
-            {scheduleData._mode === 'surah-wise' ? (
-              <tr>
-                <th>Days</th>
-                <th>Murajah</th>
-                <th>Juzhali</th>
-                <th>Jadeed</th>
-                <th>Star</th>
-              </tr>
-            ) : (
-              <tr>
-                <th>Days</th>
-                <th>Murajah 1</th>
-                <th>Murajah 2</th>
-                <th>Murajah 3</th>
-                <th>Murajah 4</th>
-                <th>Juzhali</th>
-                <th>Jadeed</th>
-                <th>Star</th>
-              </tr>
-            )}
-          </thead>
-          <tbody>
-            {DAYS.map(day => (
-              <tr key={day}>
-                <td className="day-cell">{day}</td>
-                {scheduleData._mode === 'surah-wise' ? (
-                  <>
-                    <td>{scheduleData[day]?.murajah || '-'}</td>
-                    <td>{scheduleData[day]?.juzhali || '-'}</td>
-                    <td>{scheduleData[day]?.jadeed || '-'}</td>
-                  </>
-                ) : (
-                  <>
-                    <td>{scheduleData[day]?.juz1 || '-'}</td>
-                    <td>{scheduleData[day]?.juz2 || '-'}</td>
-                    <td>{scheduleData[day]?.juz3 || '-'}</td>
-                    <td>{scheduleData[day]?.juz4 || '-'}</td>
-                    <td>{scheduleData[day]?.juzhali || '-'}</td>
-                    <td>{scheduleData[day]?.jadeed || '-'}</td>
-                  </>
-                )}
-                <td className="star-cell">
-                  {scheduleData[day]?.star ? '⭐'.repeat(parseInt(scheduleData[day].star)) : '-'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      
-      <JadwalNotes 
-        role="parent" 
-        studentId={studentId} 
+      {renderJadwalContent()}
+
+      <JadwalNotes
+        role="parent"
+        studentId={studentId}
         studentName={studentName}
         teacherName={teacherName}
         teacherId={teacherId}
