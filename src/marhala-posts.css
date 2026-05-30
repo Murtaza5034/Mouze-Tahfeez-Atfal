@@ -278,6 +278,71 @@
   font-size: 0.85rem;
 }
 
+.mp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mp-visibility-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 12px 6px 16px;
+  border-radius: 999px;
+  background: rgba(212,175,55,0.08);
+  border: 1px solid rgba(212,175,55,0.15);
+  transition: all 0.3s ease;
+  user-select: none;
+}
+.mp-visibility-toggle:hover {
+  background: rgba(212,175,55,0.15);
+  border-color: rgba(212,175,55,0.3);
+}
+.mp-visibility-toggle .toggle-switch {
+  width: 44px;
+  height: 26px;
+}
+.mp-visibility-toggle .toggle-thumb {
+  width: 20px;
+  height: 20px;
+  top: 3px;
+  left: 3px;
+}
+.mp-visibility-toggle .toggle-switch.on .toggle-thumb {
+  transform: translateX(18px);
+}
+.mp-visibility-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--deep-brown, #3d2b1f);
+}
+.mp-visibility-label svg {
+  flex-shrink: 0;
+}
+
+.mp-visibility-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: rgba(212,175,55,0.06);
+  border: 1px solid rgba(212,175,55,0.15);
+  color: #8b6d31;
+  font-size: 0.9rem;
+}
+.mp-visibility-banner svg {
+  flex-shrink: 0;
+  color: #d4af37;
+}
+
 .mp-create-btn {
   display: inline-flex;
   align-items: center;
@@ -820,21 +885,19 @@
 
 .mp-post-card {
   position: relative;
-  background: #fefcf5;
+  background: transparent;
   border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  /* Certificate border with gold ornate effect */
-  border: 3px solid var(--primary-gold);
-  outline: 1px solid rgba(197, 160, 89, 0.3);
-  outline-offset: -8px;
+  border: none;
+  outline: none;
   padding: 8px;
   margin-bottom: 0;
 }
 
 .mp-post-card:hover {
-  box-shadow: 0 12px 48px rgba(197, 160, 89, 0.12);
+  box-shadow: none;
   transform: translateY(-2px);
 }
 
@@ -842,8 +905,8 @@
 .mp-certificate-inner {
   position: relative;
   z-index: 1;
-  background: rgba(254, 252, 245, 0.95);
-  border: 1px solid rgba(197, 160, 89, 0.25);
+  background: transparent;
+  border: none;
   padding: 0;
   overflow: hidden;
 }

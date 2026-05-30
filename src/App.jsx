@@ -4781,6 +4781,9 @@ function AdminPortal({
   notifications,
   scheduledNotifs,
   fetchScheduledNotifs,
+  editingSchedule,
+  onEditSchedule,
+  onCancelEditSchedule,
   onUnassignChild,
   loadPortalData,
   portalRole,
@@ -4812,6 +4815,7 @@ function AdminPortal({
   onSetEmailLogs,
 
 }) {
+  const showAction = onShowAction;
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
   const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
@@ -5796,14 +5800,26 @@ const handleDownloadAllReports = async () => {
 
 
           {activePage === "Notifications" ? (
-            <div className="management-grid two-columns">
+            <div className="management-grid two-columns" style={{ alignItems: 'start' }}>
+              {/* Left column — Send / Schedule form */}
               <section className="form-card card-appear">
                 <div className="card-headline headline-with-action">
                   <div className="headline-left">
                     <Send size={18} />
-                    <h3>System Notifications</h3>
+                    <h3>{editingSchedule ? "Edit Scheduled Notification" : "System Notifications"}</h3>
                   </div>
-                  <div className="headline-right">
+                  <div className="headline-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {editingSchedule && (
+                      <button
+                        type="button"
+                        className="btn-text-only"
+                        onClick={onCancelEditSchedule}
+                        style={{ color: '#e57373', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Cancel Edit
+                      </button>
+                    )}
                     <button 
                       type="button"
                       className="btn-text-only" 
@@ -5893,87 +5909,169 @@ const handleDownloadAllReports = async () => {
                     </div>
                   </label>
 
-                  {/* Schedule Section */}
-                  <div className="schedule-section" style={{ marginTop: '20px', padding: '16px', background: 'rgba(255,255,255,0.6)', borderRadius: '10px', border: '1px solid rgba(212,175,55,0.2)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '700', color: 'var(--deep-brown)', fontSize: '14px' }}>
-                        <Clock size={18} /> Schedule Notification
+                  {/* Schedule Section — Premium */}
+                  <div className="schedule-section" style={{
+                    marginTop: '20px',
+                    padding: '20px',
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,248,230,0.7))',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(212,175,55,0.3)',
+                    boxShadow: '0 4px 20px rgba(212,175,55,0.08), inset 0 1px 0 rgba(255,255,255,0.8)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: adminForms.customNotification.schedule_enabled === "true" ? '16px' : '0'
+                    }}>
+                      <span style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontWeight: '700',
+                        color: '#4a3728',
+                        fontSize: '14px',
+                        letterSpacing: '0.3px'
+                      }}>
+                        <Clock size={18} style={{ color: 'var(--primary-gold)' }} />
+                        <span>Schedule Notification</span>
+                        <span style={{
+                          fontSize: '10px',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          background: adminForms.customNotification.schedule_enabled === "true"
+                            ? 'rgba(46,125,50,0.12)'
+                            : 'rgba(158,158,158,0.15)',
+                          color: adminForms.customNotification.schedule_enabled === "true"
+                            ? '#2e7d32'
+                            : '#757575',
+                          fontWeight: '600',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {adminForms.customNotification.schedule_enabled === "true" ? 'Active' : 'Off'}
+                        </span>
                       </span>
-                      <button 
+                      <button
                         className={`toggle-switch ${adminForms.customNotification.schedule_enabled === "true" ? 'on' : 'off'}`}
                         onClick={() => {
                           const newVal = adminForms.customNotification.schedule_enabled === "true" ? "false" : "true";
                           const fakeEvent = { target: { name: 'schedule_enabled', value: newVal } };
-                          handleAdminFormChange("customNotification")(fakeEvent);
+                          onAdminFormChange("customNotification")(fakeEvent);
                         }}
                         aria-label="Toggle schedule notification"
+                        style={{ flexShrink: 0 }}
                       >
                         <div className="toggle-thumb" />
                       </button>
                     </div>
 
                     {adminForms.customNotification.schedule_enabled === "true" && (
-                      <div className="form-grid" style={{ gap: '12px' }}>
-                        <label>
-                          <span>Repeat</span>
-                          <select
-                            name="schedule_type"
-                            value={adminForms.customNotification.schedule_type}
-                            onChange={handleAdminFormChange("customNotification")}
-                            className="premium-select"
-                          >
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                          </select>
-                        </label>
-
-                        {adminForms.customNotification.schedule_type === "weekly" ? (
+                      <>
+                        <div className="form-grid" style={{ gap: '14px' }}>
                           <label>
-                            <span>Day of Week</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#5c4033', marginBottom: '6px' }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                              Repeat
+                            </span>
                             <select
-                              name="schedule_day"
-                              value={adminForms.customNotification.schedule_day}
-                              onChange={handleAdminFormChange("customNotification")}
+                              name="schedule_type"
+                              value={adminForms.customNotification.schedule_type}
+                              onChange={onAdminFormChange("customNotification")}
                               className="premium-select"
                             >
-                              <option value="0">Sunday</option>
-                              <option value="1">Monday</option>
-                              <option value="2">Tuesday</option>
-                              <option value="3">Wednesday</option>
-                              <option value="4">Thursday</option>
-                              <option value="5">Friday</option>
-                              <option value="6">Saturday</option>
+                              <option value="daily">Daily</option>
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
                             </select>
                           </label>
-                        ) : adminForms.customNotification.schedule_type === "monthly" ? (
-                          <label>
-                            <span>Day of Month</span>
-                            <select
-                              name="schedule_day"
-                              value={adminForms.customNotification.schedule_day}
-                              onChange={handleAdminFormChange("customNotification")}
-                              className="premium-select"
-                            >
-                              {Array.from({ length: 28 }, (_, i) => (
-                                <option key={i + 1} value={i + 1}>{i + 1}</option>
-                              ))}
-                            </select>
-                          </label>
-                        ) : null}
 
-                        <label>
-                          <span>Time</span>
-                          <input
-                            type="time"
-                            name="schedule_time"
-                            value={adminForms.customNotification.schedule_time}
-                            onChange={handleAdminFormChange("customNotification")}
-                            className="premium-select"
-                            style={{ padding: '8px' }}
-                          />
-                        </label>
-                      </div>
+                          {adminForms.customNotification.schedule_type === "weekly" ? (
+                            <label>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#5c4033', marginBottom: '6px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+                                Day of Week
+                              </span>
+                              <select
+                                name="schedule_day"
+                                value={adminForms.customNotification.schedule_day}
+                                onChange={onAdminFormChange("customNotification")}
+                                className="premium-select"
+                              >
+                                <option value="0">Sunday</option>
+                                <option value="1">Monday</option>
+                                <option value="2">Tuesday</option>
+                                <option value="3">Wednesday</option>
+                                <option value="4">Thursday</option>
+                                <option value="5">Friday</option>
+                                <option value="6">Saturday</option>
+                              </select>
+                            </label>
+                          ) : adminForms.customNotification.schedule_type === "monthly" ? (
+                            <label>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#5c4033', marginBottom: '6px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+                                Day of Month
+                              </span>
+                              <select
+                                name="schedule_day"
+                                value={adminForms.customNotification.schedule_day}
+                                onChange={onAdminFormChange("customNotification")}
+                                className="premium-select"
+                              >
+                                {Array.from({ length: 28 }, (_, i) => (
+                                  <option key={i + 1} value={i + 1}>{i + 1}{i + 1 === 1 ? 'st' : i + 1 === 2 ? 'nd' : i + 1 === 3 ? 'rd' : 'th'}</option>
+                                ))}
+                              </select>
+                            </label>
+                          ) : null}
+
+                          <label>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#5c4033', marginBottom: '6px' }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                              Time
+                            </span>
+                            <input
+                              type="time"
+                              name="schedule_time"
+                              value={adminForms.customNotification.schedule_time}
+                              onChange={onAdminFormChange("customNotification")}
+                              className="premium-select"
+                              style={{ padding: '8px' }}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Schedule preview */}
+                        <div style={{
+                          marginTop: '14px',
+                          padding: '10px 14px',
+                          background: 'rgba(212,175,55,0.08)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(212,175,55,0.15)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '12px',
+                          color: '#5c4033'
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                          <span>
+                            Will send{' '}
+                            <strong style={{ color: '#4a3728' }}>
+                              {adminForms.customNotification.schedule_type === 'daily' ? 'every day' :
+                               adminForms.customNotification.schedule_type === 'weekly' ?
+                                `every ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][parseInt(adminForms.customNotification.schedule_day) || 0]}` :
+                                `every month on the ${adminForms.customNotification.schedule_day || '1'}${adminForms.customNotification.schedule_day === '1' ? 'st' : adminForms.customNotification.schedule_day === '2' ? 'nd' : adminForms.customNotification.schedule_day === '3' ? 'rd' : 'th'}`}
+                            </strong>{' '}
+                            at{' '}
+                            <strong style={{ color: '#4a3728' }}>
+                              {adminForms.customNotification.schedule_time || '09:00'}
+                            </strong>
+                          </span>
+                        </div>
+                      </>
                     )}
                   </div>
 
@@ -6036,121 +6134,247 @@ const handleDownloadAllReports = async () => {
                       </select>
                     </label>
                   </div>
-                  <button type="submit" className="action-button">
-                    <Send size={18} /> Dispatch Notification
+                  <button type="submit" className="action-button" style={{
+                    background: adminForms.customNotification.schedule_enabled === "true"
+                      ? 'linear-gradient(135deg, #d4af37, #b8962e)'
+                      : undefined
+                  }}>
+                    {adminForms.customNotification.schedule_enabled === "true" ? (
+                      <><Clock size={18} /> Schedule Notification</>
+                    ) : (
+                      <><Send size={18} /> Dispatch Notification</>
+                    )}
                   </button>
                 </form>
 
               </section>
-              <section className="data-card">
-                <div className="card-headline headline-with-action">
-                  <div className="headline-left">
-                    <Clock size={18} />
-                    <h3>Sent Alert History</h3>
+              {/* Right column — History + Scheduled */}
+              <div className="data-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid rgba(212,175,55,0.1)' }}>
+                  <div className="card-headline headline-with-action" style={{ margin: 0 }}>
+                    <div className="headline-left">
+                      <Clock size={18} />
+                      <h3>Sent Alert History</h3>
+                    </div>
+                    <button
+                      className="clear-history-btn"
+                      onClick={() => onClearHistory("system_notifications")()}
+                    >
+                      Clear History
+                    </button>
                   </div>
-                  <button
-                    className="clear-history-btn"
-                    onClick={() => onClearHistory("system_notifications")()}
-                  >
-                    Clear History
-                  </button>
                 </div>
-                <div className="record-stack">
+                <div className="record-stack" style={{ padding: '12px 24px 20px', maxHeight: '340px', overflowY: 'auto' }}>
                   {notifications.map((item, index) => (
-                    <article key={item.id || index} className="record-card flex-row-card">
+                    <article key={item.id || index} className="record-card flex-row-card" style={{ marginBottom: '8px', borderRadius: '10px', padding: '12px 14px' }}>
                       <div className="card-primary-info">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px', padding: '2px 8px' }}>
                             {item.target_role.toUpperCase()}
                           </span>
-                          <strong>{item.title}</strong>
+                          <strong style={{ fontSize: '13px' }}>{item.title}</strong>
                         </div>
-                        <span>{item.body.substring(0, 60)}{item.body.length > 60 ? '...' : ''}</span>
-                        <span className="record-date">{new Date(item.created_at).toLocaleString()}</span>
+                        <span style={{ fontSize: '12px', color: '#666', marginTop: '2px', display: 'block' }}>{item.body.substring(0, 60)}{item.body.length > 60 ? '...' : ''}</span>
+                        <span className="record-date" style={{ fontSize: '11px' }}>{new Date(item.created_at).toLocaleString()}</span>
                       </div>
                       <button
                         className="delete-icon-btn"
                         onClick={() => onDeleteRecord("system_notifications", "id")(item.id)}
                         aria-label="Delete notification"
                       >
-                        <Trash size={16} />
+                        <Trash size={15} />
                       </button>
                     </article>
                   ))}
                   {notifications.length === 0 && (
-                    <div className="empty-state">No notification history found.</div>
+                    <div className="empty-state" style={{ padding: '20px 0' }}>No notification history found.</div>
                   )}
                 </div>
-              </section>
 
-              {/* Scheduled Notifications List */}
-              <section className="data-card" style={{ marginTop: '16px' }}>
-                <div className="card-headline headline-with-action">
+              {/* Scheduled Notifications List — Premium */}
+              <div style={{
+                padding: '16px 24px 24px',
+                borderTop: '1px solid rgba(212,175,55,0.1)',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,248,230,0.8))'
+              }}>
+                <div className="card-headline headline-with-action" style={{ margin: '0 0 12px' }}>
                   <div className="headline-left">
-                    <Clock size={18} />
-                    <h3>Scheduled Notifications</h3>
+                    <Clock size={18} style={{ color: 'var(--primary-gold)' }} />
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>Scheduled Notifications</h3>
+                    {scheduledNotifs.length > 0 && (
+                      <span style={{
+                        fontSize: '11px',
+                        background: 'rgba(212,175,55,0.12)',
+                        color: '#8b6d31',
+                        padding: '2px 10px',
+                        borderRadius: '12px',
+                        fontWeight: '600'
+                      }}>
+                        {scheduledNotifs.length} active
+                      </span>
+                    )}
                   </div>
-                  <button
-                    className="clear-history-btn"
-                    onClick={() => onClearHistory("scheduled_notifications")()}
-                  >
-                    Clear All
-                  </button>
+                  {scheduledNotifs.length > 0 && (
+                    <button
+                      className="clear-history-btn"
+                      onClick={() => onClearHistory("scheduled_notifications")()}
+                      style={{ fontSize: '12px' }}
+                    >
+                      Clear All
+                    </button>
+                  )}
                 </div>
                 <div className="record-stack">
                   {scheduledNotifs.length === 0 ? (
-                    <div className="empty-state">No scheduled notifications.</div>
+                    <div className="empty-state" style={{ padding: '20px 0', textAlign: 'center' }}>
+                      <Clock size={28} style={{ color: 'rgba(212,175,55,0.3)', marginBottom: '8px' }} />
+                      <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>No scheduled notifications yet.</p>
+                      <p style={{ color: '#bbb', fontSize: '12px', margin: '4px 0 0' }}>Toggle the switch above to schedule one.</p>
+                    </div>
                   ) : (
-                    scheduledNotifs.map((item) => (
-                      <article key={item.id} className="record-card flex-row-card">
-                        <div className="card-primary-info">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '10px' }}>
-                              {item.target_role.toUpperCase()}
-                            </span>
-                            <strong>{item.title}</strong>
-                            <span style={{ fontSize: '10px', color: '#8b6d31', background: 'rgba(212,175,55,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-                              {item.schedule_type}
-                            </span>
-                            {!item.is_active && (
-                              <span style={{ fontSize: '10px', color: '#999', padding: '2px 6px' }}>
-                                PAUSED
+                    scheduledNotifs.map((item) => {
+                      const scheduleLabel =
+                        item.schedule_type === 'daily' ? 'Every day' :
+                        item.schedule_type === 'weekly' ?
+                          `Every ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][item.schedule_day] || 'week'}` :
+                          `Every month on day ${item.schedule_day}`;
+                      return (
+                        <article key={item.id} className="record-card flex-row-card" style={{
+                          marginBottom: '8px',
+                          borderRadius: '10px',
+                          border: item.is_active ? '1px solid rgba(212,175,55,0.15)' : '1px solid rgba(0,0,0,0.06)',
+                          background: item.is_active ? 'rgba(255,255,255,0.85)' : 'rgba(245,245,245,0.5)',
+                          opacity: item.is_active ? 1 : 0.6,
+                          padding: '12px 14px',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <div className="card-primary-info" style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                              <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px', padding: '2px 8px' }}>
+                                {item.target_role === 'all' ? 'All' : item.target_role.toUpperCase()}
                               </span>
-                            )}
+                              <strong style={{ fontSize: '13px', color: '#3d2b1f' }}>{item.title}</strong>
+                              <span style={{
+                                fontSize: '10px',
+                                color: '#8b6d31',
+                                background: 'rgba(212,175,55,0.1)',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                fontWeight: '600',
+                                textTransform: 'capitalize'
+                              }}>
+                                {item.schedule_type}
+                              </span>
+                              {!item.is_active && (
+                                <span style={{
+                                  fontSize: '9px',
+                                  color: '#999',
+                                  background: 'rgba(158,158,158,0.15)',
+                                  padding: '2px 8px',
+                                  borderRadius: '10px',
+                                  fontWeight: '700',
+                                  letterSpacing: '0.5px'
+                                }}>
+                                  PAUSED
+                                </span>
+                              )}
+                            </div>
+                            <span style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>
+                              {item.body.substring(0, 80)}{item.body.length > 80 ? '...' : ''}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: '#888' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                                {scheduleLabel} at {item.schedule_time?.substring(0, 5) || '—'}
+                              </span>
+                              {item.next_send_at && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                                  Next: {new Date(item.next_send_at).toLocaleDateString()} {new Date(item.next_send_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <span>{item.body.substring(0, 60)}{item.body.length > 60 ? '...' : ''}</span>
-                          <span className="record-date">
-                            Next: {item.next_send_at ? new Date(item.next_send_at).toLocaleString() : '—'} 
-                            {item.schedule_time ? ' at ' + item.schedule_time : ''}
-                          </span>
-                        </div>
-                        <button
-                          className="delete-icon-btn"
-                          onClick={async () => {
-                            await supabase.from("scheduled_notifications").update({ is_active: !item.is_active }).eq("id", item.id);
-                            fetchScheduledNotifs();
-                            showAction("success", item.is_active ? "Paused" : "Resumed");
-                          }}
-                          title={item.is_active ? "Pause" : "Resume"}
-                        >
-                          {item.is_active ? <Pause size={16} /> : <Play size={16} />}
-                        </button>
-                        <button
-                          className="delete-icon-btn"
-                          onClick={async () => {
-                            await supabase.from("scheduled_notifications").delete().eq("id", item.id);
-                            fetchScheduledNotifs();
-                            showAction("success", "Deleted");
-                          }}
-                          aria-label="Delete scheduled notification"
-                        >
-                          <Trash size={16} />
-                        </button>
-                      </article>
-                    ))
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0, marginLeft: '8px' }}>
+                            <button
+                              className="delete-icon-btn"
+                              onClick={() => onEditSchedule(item)}
+                              title="Edit schedule"
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: editingSchedule?.id === item.id ? 'rgba(212,175,55,0.15)' : 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                color: editingSchedule?.id === item.id ? '#d4af37' : '#aaa'
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button
+                              className="delete-icon-btn"
+                              onClick={async () => {
+                                await supabase.from("scheduled_notifications").update({ is_active: !item.is_active }).eq("id", item.id);
+                                fetchScheduledNotifs();
+                                showAction("success", item.is_active ? "Paused" : "Resumed");
+                              }}
+                              title={item.is_active ? "Pause" : "Resume"}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                color: item.is_active ? '#aaa' : '#2e7d32'
+                              }}
+                            >
+                              {item.is_active ? <Pause size={14} /> : <Play size={14} />}
+                            </button>
+                            <button
+                              className="delete-icon-btn"
+                              onClick={async () => {
+                                if (!window.confirm(`Delete scheduled notification "${item.title}"?`)) return;
+                                await supabase.from("scheduled_notifications").delete().eq("id", item.id);
+                                fetchScheduledNotifs();
+                                showAction("success", "Scheduled notification deleted");
+                              }}
+                              aria-label="Delete scheduled notification"
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                color: '#e57373'
+                              }}
+                            >
+                              <Trash size={14} />
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })
                   )}
                 </div>
-              </section>
+              </div>
+              </div>
+
+
             </div>
           ) : null}
 
@@ -9480,6 +9704,7 @@ export default function App() {
 
   const [notificationsList, setNotificationsList] = useState([]);
   const [scheduledNotifs, setScheduledNotifs] = useState([]);
+  const [editingSchedule, setEditingSchedule] = useState(null);
   const [activeStatusAlert, setActiveStatusAlert] = useState(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const latestNotifIdRef = useRef(null);
@@ -9594,6 +9819,67 @@ export default function App() {
       if (notificationChannel) {
         supabase.removeChannel(notificationChannel);
       }
+    };
+  }, [user, portalRole]);
+
+  // Client-side scheduler: process due scheduled notifications every 30s
+  // (falls back if pg_cron is not enabled on the Supabase project)
+  useEffect(() => {
+    if (!user || portalRole !== "admin") return;
+    let isActive = true;
+
+    const processDueNotifications = async () => {
+      try {
+        const { data: dueNotifs, error } = await supabase
+          .from("scheduled_notifications")
+          .select("*")
+          .eq("is_active", true)
+          .lte("next_send_at", new Date().toISOString())
+          .limit(10);
+
+        if (error || !dueNotifs?.length) return;
+
+        for (const notif of dueNotifs) {
+          if (!isActive) break;
+
+          await broadcastNotification(
+            notif.title,
+            notif.body,
+            notif.target_role === "user" ? notif.target_role : notif.target_role || "all",
+            notif.target_user || null,
+            notif.redirect_page || "Home",
+            false,
+            notif.file_url || null
+          );
+
+          const nextSend = calculateNextSendTime(
+            notif.schedule_type,
+            notif.schedule_time?.substring(0, 5) || "09:00",
+            notif.schedule_day
+          );
+
+          await supabase
+            .from("scheduled_notifications")
+            .update({
+              last_sent_at: new Date().toISOString(),
+              next_send_at: nextSend,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", notif.id);
+        }
+
+        fetchScheduledNotifs();
+      } catch (e) {
+        console.warn("Scheduled notification processor error:", e);
+      }
+    };
+
+    processDueNotifications();
+    const interval = setInterval(processDueNotifications, 30000);
+
+    return () => {
+      isActive = false;
+      clearInterval(interval);
     };
   }, [user, portalRole]);
 
@@ -9859,26 +10145,58 @@ const handleSendCustomNotification = async (event) => {
         scheduleDay
       );
 
-      const { error } = await supabase.from("scheduled_notifications").insert([{
-        title: notifTitle,
-        body: notifBody,
-        target_role: targetRole,
-        target_user: targetUser,
-        redirect_page: payload.redirect_page,
-        file_url: attachedFileUrl || null,
-        schedule_type: payload.schedule_type,
-        schedule_time: scheduleTime,
-        schedule_day: scheduleDay,
-        is_active: true,
-        next_send_at: initialNextSend,
-      }]);
+      if (editingSchedule) {
+        // UPDATE existing schedule
+        const { error } = await supabase
+          .from("scheduled_notifications")
+          .update({
+            title: notifTitle,
+            body: notifBody,
+            target_role: targetRole,
+            target_user: targetUser,
+            redirect_page: payload.redirect_page,
+            file_url: attachedFileUrl || null,
+            schedule_type: payload.schedule_type,
+            schedule_time: scheduleTime,
+            schedule_day: scheduleDay,
+            is_active: editingSchedule.is_active,
+            next_send_at: initialNextSend,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingSchedule.id);
 
-      if (error) {
-        showAction("error", "Failed to schedule notification: " + error.message);
-        return;
+        if (error) {
+          showAction("error", "Failed to update scheduled notification: " + error.message);
+          return;
+        }
+
+        showAction("success", "Scheduled notification updated!");
+        setEditingSchedule(null);
+      } else {
+        // INSERT new schedule
+        const { error } = await supabase.from("scheduled_notifications").insert([{
+          title: notifTitle,
+          body: notifBody,
+          target_role: targetRole,
+          target_user: targetUser,
+          redirect_page: payload.redirect_page,
+          file_url: attachedFileUrl || null,
+          schedule_type: payload.schedule_type,
+          schedule_time: scheduleTime,
+          schedule_day: scheduleDay,
+          is_active: true,
+          next_send_at: initialNextSend,
+        }]);
+
+        if (error) {
+          showAction("error", "Failed to schedule notification: " + error.message);
+          return;
+        }
+
+        showAction("success", "Notification scheduled (" + payload.schedule_type + ")!");
       }
 
-      showAction("success", "Notification scheduled (" + payload.schedule_type + ")!");
+      fetchScheduledNotifs();
     } else {
       // Send immediately (existing behavior)
       await broadcastNotification(
@@ -9896,6 +10214,42 @@ const handleSendCustomNotification = async (event) => {
 
     setAttachedFileUrl("");
 
+    setAdminForms((current) => ({
+      ...current,
+      customNotification: {
+        title: "",
+        body: "",
+        target_audience: "all",
+        target_uuid: "",
+        redirect_page: "Home",
+        schedule_enabled: "false",
+        schedule_type: "daily",
+        schedule_day: "1",
+        schedule_time: "09:00"
+      },
+    }));
+  };
+
+  const handleEditSchedule = (schedule) => {
+    setEditingSchedule(schedule);
+    setAdminForms((current) => ({
+      ...current,
+      customNotification: {
+        title: schedule.title || "",
+        body: schedule.body || "",
+        target_audience: schedule.target_role === "user" ? "user" : (schedule.target_role || "all"),
+        target_uuid: schedule.target_user || "",
+        redirect_page: schedule.redirect_page || "Home",
+        schedule_enabled: "true",
+        schedule_type: schedule.schedule_type || "daily",
+        schedule_day: String(schedule.schedule_day ?? 1),
+        schedule_time: schedule.schedule_time?.substring(0, 5) || "09:00",
+      },
+    }));
+  };
+
+  const handleCancelEditSchedule = () => {
+    setEditingSchedule(null);
     setAdminForms((current) => ({
       ...current,
       customNotification: {
@@ -10640,6 +10994,9 @@ const handleSendCustomNotification = async (event) => {
             notifications={notificationsList}
             scheduledNotifs={scheduledNotifs}
             fetchScheduledNotifs={fetchScheduledNotifs}
+            editingSchedule={editingSchedule}
+            onEditSchedule={handleEditSchedule}
+            onCancelEditSchedule={handleCancelEditSchedule}
             onAdminFormChange={handleAdminFormChange}
             onAdminTeacherFilterChange={handleAdminTeacherFilterChange}
             onAssignChild={handleAssignChild}

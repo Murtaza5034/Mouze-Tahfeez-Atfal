@@ -61,14 +61,22 @@ const calculateAge = (dob) => {
   return age;
 };
 
-const withoutOptionalPostColumns = (payload) => {
-  const { age, arabic_name, school_heading_ar, school_heading_en, ...safePayload } = payload;
-  return safePayload;
+const isMissingColumnError = (error) => {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return error?.code === "PGRST204" || message.includes("schema cache") || message.includes("does not exist") || message.includes("column") || message.includes("background_url") || message.includes("school_heading") || message.includes("date_of_birth");
 };
 
-const isMissingOptionalColumnError = (error) => {
-  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
-  return error?.code === "PGRST204" || message.includes("age") || message.includes("arabic_name") || message.includes("school_heading") || message.includes("schema cache");
+const runMigration = async () => {
+  try {
+    const response = await fetch("/api/run-migration", { method: "POST" });
+    const data = await response.json();
+    if (response.ok) return true;
+    console.warn("Migration API failed:", data);
+    return false;
+  } catch (e) {
+    console.warn("Migration API error:", e);
+    return false;
+  }
 };
 
 function MarhalaPosts({
@@ -92,8 +100,11 @@ function MarhalaPosts({
   const [editingPostId, setEditingPostId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingBackground, setUploadingBackground] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPost, setSelectedPost] = useState(null);
+  const [postsHidden, setPostsHidden] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(true);
   const postCardRef = useRef(null);
 
   // Form state
@@ -101,6 +112,7 @@ function MarhalaPosts({
   const [formHeading, setFormHeading] = useState("");
   const [formMarhala, setFormMarhala] = useState("");
   const [formPhotoUrl, setFormPhotoUrl] = useState("");
+  const [formBackgroundUrl, setFormBackgroundUrl] = useState("");
   const [formAge, setFormAge] = useState("");
   const [formSchoolHeadingAr, setFormSchoolHeadingAr] = useState("");
   const [formSchoolHeadingEn, setFormSchoolHeadingEn] = useState("");
@@ -129,7 +141,21 @@ function MarhalaPosts({
         .select("full_name, arabic_name, date_of_birth, photo_url, student_id")
         .eq("student_id", studentId)
         .maybeSingle();
-      if (!error && data) {
+      if (error) {
+        if (isMissingColumnError(error)) {
+          await runMigration();
+          const { data: retry, error: retryErr } = await supabase
+            .from("child_profiles")
+            .select("full_name, arabic_name, date_of_birth, photo_url, student_id")
+            .eq("student_id", studentId)
+            .maybeSingle();
+          if (!retryErr && retry) {
+            setStudentDetailsCache((prev) => ({ ...prev, [studentId]: retry }));
+          }
+        }
+        return;
+      }
+      if (data) {
         setStudentDetailsCache((prev) => ({
           ...prev,
           [studentId]: data,
@@ -167,6 +193,40 @@ function MarhalaPosts({
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
+
+  // Fetch global visibility setting
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("marhala_settings")
+          .select("posts_hidden")
+          .eq("id", 1)
+          .maybeSingle();
+        if (data) setPostsHidden(data.posts_hidden === true);
+      } catch (e) {
+        // Table may not exist yet; default to visible
+      } finally {
+        setLoadingSettings(false);
+      }
+    })();
+  }, []);
+
+  const handleToggleVisibility = async () => {
+    const newHidden = !postsHidden;
+    setPostsHidden(newHidden);
+    try {
+      const { error } = await supabase
+        .from("marhala_settings")
+        .upsert({ id: 1, posts_hidden: newHidden, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      if (onShowAction) onShowAction("success", newHidden ? "Marhala posts hidden from all portals" : "Marhala posts visible to all portals");
+    } catch (err) {
+      console.error("Failed to update visibility:", err);
+      setPostsHidden(!newHidden);
+      if (onShowAction) onShowAction("error", "Failed to update visibility");
+    }
+  };
 
   useEffect(() => {
     if (!maxAgeHours) return;
@@ -218,6 +278,19 @@ function MarhalaPosts({
     }
   };
 
+  // Ensure the storage bucket exists before uploading
+  const ensureBucketExists = async () => {
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      if (buckets?.some((b) => b.id === "marhala_post_photos")) return true;
+      const response = await fetch("/api/create-bucket", { method: "POST" });
+      if (response.ok) return true;
+    } catch (e) {
+      console.warn("Could not verify/create bucket:", e);
+    }
+    return false;
+  };
+
   // Upload photo to Supabase storage
   const handlePhotoUpload = async (file) => {
     if (!file) return;
@@ -225,12 +298,21 @@ function MarhalaPosts({
     try {
       const ext = file.name.split(".").pop();
       const fileName = `post_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage
+      let { error: uploadError } = await supabase.storage
         .from("marhala_post_photos")
         .upload(fileName, file, {
           cacheControl: "3600",
           upsert: false,
         });
+      if (uploadError?.message?.includes("Bucket not found")) {
+        await ensureBucketExists();
+        uploadError = (await supabase.storage
+          .from("marhala_post_photos")
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+          })).error;
+      }
       if (uploadError) throw uploadError;
       const { data: publicUrlData } = supabase.storage
         .from("marhala_post_photos")
@@ -244,6 +326,62 @@ function MarhalaPosts({
       if (onShowAction) onShowAction("error", "Failed to upload photo: " + err.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Upload background image to Supabase storage
+  const handleBackgroundUpload = async (file) => {
+    if (!file) return;
+    setUploadingBackground(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fileName = `bg_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      let { error: uploadError } = await supabase.storage
+        .from("marhala_post_photos")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+      if (uploadError?.message?.includes("Bucket not found")) {
+        await ensureBucketExists();
+        uploadError = (await supabase.storage
+          .from("marhala_post_photos")
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+          })).error;
+      }
+      if (uploadError) {
+        console.error("Background upload to Supabase failed:", uploadError);
+        // Try signed URL as fallback for private buckets
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from("marhala_post_photos")
+          .createSignedUrl(fileName, 31536000);
+        if (!signedError && signedData?.signedUrl) {
+          setFormBackgroundUrl(signedData.signedUrl);
+          if (onShowAction) onShowAction("success", "Background uploaded (signed URL)");
+          return;
+        }
+        throw uploadError;
+      }
+      const { data: publicUrlData } = supabase.storage
+        .from("marhala_post_photos")
+        .getPublicUrl(fileName);
+      const publicUrl = publicUrlData?.publicUrl || "";
+      if (publicUrl) {
+        setFormBackgroundUrl(publicUrl);
+      } else {
+        // Fallback: try signed URL
+        const { data: signedData } = await supabase.storage
+          .from("marhala_post_photos")
+          .createSignedUrl(fileName, 31536000);
+        if (signedData?.signedUrl) setFormBackgroundUrl(signedData.signedUrl);
+      }
+    } catch (err) {
+      console.error("Background upload error:", err);
+      if (onShowAction) onShowAction("error", "Background upload failed: " + err.message);
+    } finally {
+      setUploadingBackground(false);
     }
   };
 
@@ -301,6 +439,7 @@ function MarhalaPosts({
         marhala_name: formMarhala,
         title: formHeading,
         image_url: formPhotoUrl,
+        background_url: formBackgroundUrl || null,
         description: computedAge,
         school_heading_ar: formSchoolHeadingAr,
         school_heading_en: formSchoolHeadingEn,
@@ -309,36 +448,29 @@ function MarhalaPosts({
 
       const isEditing = Boolean(editingPostId);
 
-      if (isEditing) {
-        // Update existing post
-        const { error } = await supabase
-          .from("marhala_posts")
-          .update(postData)
-          .eq("id", editingPostId);
-        if (error) {
-          if (!isMissingOptionalColumnError(error)) throw error;
-          const { error: retryError } = await supabase
-            .from("marhala_posts")
-            .update(withoutOptionalPostColumns(postData))
-            .eq("id", editingPostId);
-          if (retryError) throw retryError;
+      const doSave = async (data, isUpdate) => {
+        let { error } = isUpdate
+          ? await supabase.from("marhala_posts").update(data).eq("id", editingPostId)
+          : await supabase.from("marhala_posts").insert([data]);
+        if (error && isMissingColumnError(error)) {
+          const migrated = await runMigration();
+          if (migrated) {
+            error = isUpdate
+              ? (await supabase.from("marhala_posts").update(data).eq("id", editingPostId)).error
+              : (await supabase.from("marhala_posts").insert([data])).error;
+          }
         }
+        return error;
+      };
+
+      if (isEditing) {
+        const error = await doSave(postData, true);
+        if (error) throw error;
         if (onShowAction) onShowAction("success", "Post updated successfully!");
       } else {
-        // Create new post
-        const createdPost = {
-          ...postData,
-          student_id: studentId,
-          likes: [],
-        };
-        const { error } = await supabase.from("marhala_posts").insert([createdPost]);
-        if (error) {
-          if (!isMissingOptionalColumnError(error)) throw error;
-          const { error: retryError } = await supabase
-            .from("marhala_posts")
-            .insert([withoutOptionalPostColumns(createdPost)]);
-          if (retryError) throw retryError;
-        }
+        const createdPost = { ...postData, student_id: studentId, likes: [] };
+        const error = await doSave(createdPost, false);
+        if (error) throw error;
         if (onPostCreated) {
           try {
             await onPostCreated(createdPost);
@@ -364,6 +496,7 @@ function MarhalaPosts({
     setFormHeading(post.title || post.heading || "");
     setFormMarhala(post.marhala_name || "");
     setFormPhotoUrl(post.image_url || "");
+    setFormBackgroundUrl(post.background_url || "");
     setFormAge(post.description || post.age || "");
     setFormSchoolHeadingAr(post.school_heading_ar || "");
     setFormSchoolHeadingEn(post.school_heading_en || "");
@@ -415,6 +548,7 @@ function MarhalaPosts({
     setFormHeading("");
     setFormMarhala("");
     setFormPhotoUrl("");
+    setFormBackgroundUrl("");
     setFormAge("");
     setFormSchoolHeadingAr("");
     setFormSchoolHeadingEn("");
@@ -450,6 +584,7 @@ function MarhalaPosts({
       marhala_name: formMarhala,
       title: formHeading || "Post heading will appear here",
       image_url: photo,
+      background_url: formBackgroundUrl,
       description: formAge,
       age: formAge,
       school_heading_ar: formSchoolHeadingAr,
@@ -603,12 +738,22 @@ function MarhalaPosts({
     handleShareImage(post, studentInfo, "instagram");
   };
 
-  if (!loading && hideEmpty && visiblePosts.length === 0) {
+  if (!loading && !loadingSettings && hideEmpty && visiblePosts.length === 0 && !postsHidden) {
     return null;
   }
 
+  const showPosts = !postsHidden;
+
   return (
     <div className={`marhala-posts-container fade-in ${className}`.trim()}>
+      {/* Visibility Banner */}
+      {!showPosts && (
+        <div className="mp-visibility-banner fade-in">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          <span>Marhala Posts are currently <strong>hidden</strong> from all portals</span>
+        </div>
+      )}
+
       {/* Header */}
       {!hideHeader && <div className="mp-header">
         <div className="mp-header-content">
@@ -625,9 +770,23 @@ function MarhalaPosts({
           </div>
         </div>
         {isAdmin && (
-          <button type="button" className="mp-create-btn" onClick={openCreateForm}>
-            <Plus size={18} /> {showForm ? "Close" : "New Post"}
-          </button>
+          <div className="mp-header-actions">
+            <div className="mp-visibility-toggle" onClick={handleToggleVisibility} title={showPosts ? "Click to hide posts from all portals" : "Click to show posts to all portals"}>
+              <span className="mp-visibility-label">
+                {showPosts ? (
+                  <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Live</>
+                ) : (
+                  <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg> Off</>
+                )}
+              </span>
+              <div className={`toggle-switch ${showPosts ? "on" : ""}`}>
+                <div className="toggle-thumb" />
+              </div>
+            </div>
+            <button type="button" className="mp-create-btn" onClick={openCreateForm}>
+              <Plus size={18} /> {showForm ? "Close" : "New Post"}
+            </button>
+          </div>
         )}
       </div>}
 
@@ -797,7 +956,7 @@ function MarhalaPosts({
                       <input
                         type="file"
                         accept="image/*"
-                        hidden
+                        style={{ display: 'none' }}
                         disabled={uploading}
                         onChange={(e) => {
                           if (e.target.files?.[0]) handlePhotoUpload(e.target.files[0]);
@@ -812,6 +971,57 @@ function MarhalaPosts({
                         placeholder="https://..."
                         value={formPhotoUrl}
                         onChange={(e) => setFormPhotoUrl(e.target.value)}
+                        className="mp-input mp-url-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Background Upload */}
+              <div className="mp-form-group">
+                <label>🖼️ Certificate Background</label>
+                <div className="mp-photo-upload-wrapper">
+                  <div className="mp-photo-upload-area">
+                    {formBackgroundUrl ? (
+                      <div className="mp-photo-preview" style={{ width: '120px', height: '80px' }}>
+                        <img src={formBackgroundUrl} alt="Certificate background" style={{ objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          className="mp-photo-remove"
+                          onClick={() => setFormBackgroundUrl("")}
+                          title="Remove background"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mp-photo-placeholder" style={{ width: '120px', height: '80px' }}>
+                        <Camera size={24} />
+                        <span>Background</span>
+                      </div>
+                    )}
+                    <label className="mp-photo-upload-btn">
+                      <Upload size={16} />
+                      {uploadingBackground ? "Uploading..." : "Upload Image"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        disabled={uploadingBackground}
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) handleBackgroundUpload(e.target.files[0]);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <div className="mp-photo-or-url">
+                      <span>or URL:</span>
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={formBackgroundUrl}
+                        onChange={(e) => setFormBackgroundUrl(e.target.value)}
                         className="mp-input mp-url-input"
                       />
                     </div>
@@ -840,6 +1050,24 @@ function MarhalaPosts({
                 studentInfo={previewStudentInfo}
                 isPreview
               />
+              <div style={{
+                marginTop: '8px',
+                padding: '6px 12px',
+                background: 'rgba(212,175,55,0.08)',
+                borderRadius: '8px',
+                border: '1px solid rgba(212,175,55,0.15)',
+                fontSize: '12px',
+                color: '#8b6d31',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                <span>
+                  Canvas size: <strong>~21.7 × 30.3 cm</strong>
+                  <span style={{ opacity: 0.6, marginLeft: '6px' }}>(820 × 1145 px at 96 DPI)</span>
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -847,7 +1075,15 @@ function MarhalaPosts({
 
       {/* Feed */}
       <div className="mp-feed">
-        {loading ? (
+        {!showPosts ? (
+          <div className="mp-empty">
+            <div className="mp-empty-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </div>
+            <h3>Marhala Posts Hidden</h3>
+            <p>An admin has hidden posts from view. They will reappear when turned back on.</p>
+          </div>
+        ) : loading ? (
           <div className="mp-loading">
             <div className="spinner" />
             <p>Loading posts...</p>
@@ -990,6 +1226,7 @@ function PostCard({
 }) {
   const likeCount = (post.likes || []).length;
   const postPhoto = post.image_url || studentInfo?.photo_url || studentInfo?.photoUrl || "";
+  const postBackground = post.background_url || "";
   const studentAge = post.description || post.age || (studentInfo?.date_of_birth ? calculateAge(studentInfo.date_of_birth) : null);
   const postHeading = post.title || post.heading || "";
   const marhalaDisplay = post.marhala_name || "";
@@ -998,15 +1235,18 @@ function PostCard({
   const displayStudentName = studentArabicName;
 
   return (
-    <div className={`mp-post-card card-appear ${isPreview ? 'mp-preview-card' : ''}`}>
-      {/* Subtle geometric pattern background */}
-      <div className="mp-certificate-bg-pattern" />
+    <div className={`mp-post-card card-appear ${isPreview ? 'mp-preview-card' : ''}`}
+      style={postBackground ? {
+        backgroundImage: `url(${postBackground})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      } : {}}
+    >
       
       {/* Ornate corner decorations */}
       <CornerOrnament className="mp-cert-corner mp-cert-corner-tl" />
       <CornerOrnament className="mp-cert-corner mp-cert-corner-tr" />
-      <CornerOrnament className="mp-cert-corner mp-cert-corner-bl" />
-      <CornerOrnament className="mp-cert-corner mp-cert-corner-br" />
 
       {/* Ornament frame overlay */}
       <div className="mp-cert-ornament-frame" aria-hidden="true">

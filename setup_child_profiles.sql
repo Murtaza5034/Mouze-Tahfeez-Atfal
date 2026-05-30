@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.child_profiles (
   student_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT NOT NULL,
   arabic_name TEXT,
+  date_of_birth DATE,
   its TEXT,
   parent_email TEXT,
   parent_user_id UUID,
