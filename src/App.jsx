@@ -4779,6 +4779,8 @@ function AdminPortal({
   onNotificationFileChange,
   onClearHistory,
   notifications,
+  scheduledNotifs,
+  fetchScheduledNotifs,
   onUnassignChild,
   loadPortalData,
   portalRole,
@@ -5889,12 +5891,90 @@ const handleDownloadAllReports = async () => {
                         </span>
                       )}
                     </div>
-                    {attachedFileUrl && (
-                      <span style={{ display: 'block', fontSize: '11px', color: '#d4af37', marginTop: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        Linked URL: {attachedFileUrl}
-                      </span>
-                    )}
                   </label>
+
+                  {/* Schedule Section */}
+                  <div className="schedule-section" style={{ marginTop: '20px', padding: '16px', background: 'rgba(255,255,255,0.6)', borderRadius: '10px', border: '1px solid rgba(212,175,55,0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+                        <input
+                          type="checkbox"
+                          checked={adminForms.customNotification.schedule_enabled === "true"}
+                          onChange={(e) => {
+                            const fakeEvent = { target: { name: 'schedule_enabled', value: e.target.checked ? "true" : "false" } };
+                            handleAdminFormChange("customNotification")(fakeEvent);
+                          }}
+                          style={{ width: '18px', height: '18px', accentColor: '#d4af37' }}
+                        />
+                        <Clock size={16} /> Schedule Notification
+                      </label>
+                    </div>
+
+                    {adminForms.customNotification.schedule_enabled === "true" && (
+                      <div className="form-grid" style={{ gap: '12px' }}>
+                        <label>
+                          <span>Repeat</span>
+                          <select
+                            name="schedule_type"
+                            value={adminForms.customNotification.schedule_type}
+                            onChange={handleAdminFormChange("customNotification")}
+                            className="premium-select"
+                          >
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
+
+                        {adminForms.customNotification.schedule_type === "weekly" ? (
+                          <label>
+                            <span>Day of Week</span>
+                            <select
+                              name="schedule_day"
+                              value={adminForms.customNotification.schedule_day}
+                              onChange={handleAdminFormChange("customNotification")}
+                              className="premium-select"
+                            >
+                              <option value="0">Sunday</option>
+                              <option value="1">Monday</option>
+                              <option value="2">Tuesday</option>
+                              <option value="3">Wednesday</option>
+                              <option value="4">Thursday</option>
+                              <option value="5">Friday</option>
+                              <option value="6">Saturday</option>
+                            </select>
+                          </label>
+                        ) : adminForms.customNotification.schedule_type === "monthly" ? (
+                          <label>
+                            <span>Day of Month</span>
+                            <select
+                              name="schedule_day"
+                              value={adminForms.customNotification.schedule_day}
+                              onChange={handleAdminFormChange("customNotification")}
+                              className="premium-select"
+                            >
+                              {Array.from({ length: 28 }, (_, i) => (
+                                <option key={i + 1} value={i + 1}>{i + 1}</option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : null}
+
+                        <label>
+                          <span>Time</span>
+                          <input
+                            type="time"
+                            name="schedule_time"
+                            value={adminForms.customNotification.schedule_time}
+                            onChange={handleAdminFormChange("customNotification")}
+                            className="premium-select"
+                            style={{ padding: '8px' }}
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="form-grid">
                     <label>
                       <span>Destination Page</span>
@@ -5997,6 +6077,75 @@ const handleDownloadAllReports = async () => {
                   ))}
                   {notifications.length === 0 && (
                     <div className="empty-state">No notification history found.</div>
+                  )}
+                </div>
+              </section>
+
+              {/* Scheduled Notifications List */}
+              <section className="data-card" style={{ marginTop: '16px' }}>
+                <div className="card-headline headline-with-action">
+                  <div className="headline-left">
+                    <Clock size={18} />
+                    <h3>Scheduled Notifications</h3>
+                  </div>
+                  <button
+                    className="clear-history-btn"
+                    onClick={() => onClearHistory("scheduled_notifications")()}
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div className="record-stack">
+                  {scheduledNotifs.length === 0 ? (
+                    <div className="empty-state">No scheduled notifications.</div>
+                  ) : (
+                    scheduledNotifs.map((item) => (
+                      <article key={item.id} className="record-card flex-row-card">
+                        <div className="card-primary-info">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '10px' }}>
+                              {item.target_role.toUpperCase()}
+                            </span>
+                            <strong>{item.title}</strong>
+                            <span style={{ fontSize: '10px', color: '#8b6d31', background: 'rgba(212,175,55,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                              {item.schedule_type}
+                            </span>
+                            {!item.is_active && (
+                              <span style={{ fontSize: '10px', color: '#999', padding: '2px 6px' }}>
+                                PAUSED
+                              </span>
+                            )}
+                          </div>
+                          <span>{item.body.substring(0, 60)}{item.body.length > 60 ? '...' : ''}</span>
+                          <span className="record-date">
+                            Next: {item.next_send_at ? new Date(item.next_send_at).toLocaleString() : '—'} 
+                            {item.schedule_time ? ' at ' + item.schedule_time : ''}
+                          </span>
+                        </div>
+                        <button
+                          className="delete-icon-btn"
+                          onClick={async () => {
+                            await supabase.from("scheduled_notifications").update({ is_active: !item.is_active }).eq("id", item.id);
+                            fetchScheduledNotifs();
+                            showAction("success", item.is_active ? "Paused" : "Resumed");
+                          }}
+                          title={item.is_active ? "Pause" : "Resume"}
+                        >
+                          {item.is_active ? <Pause size={16} /> : <Play size={16} />}
+                        </button>
+                        <button
+                          className="delete-icon-btn"
+                          onClick={async () => {
+                            await supabase.from("scheduled_notifications").delete().eq("id", item.id);
+                            fetchScheduledNotifs();
+                            showAction("success", "Deleted");
+                          }}
+                          aria-label="Delete scheduled notification"
+                        >
+                          <Trash size={16} />
+                        </button>
+                      </article>
+                    ))
                   )}
                 </div>
               </section>
@@ -8579,7 +8728,11 @@ export default function App() {
       body: "",
       target_audience: "all",
       target_uuid: "",
-      redirect_page: "Home"
+      redirect_page: "Home",
+      schedule_enabled: "false",
+      schedule_type: "daily",
+      schedule_day: "1",
+      schedule_time: "09:00"
     },
     schedule: {
       student_id: "",
@@ -9324,12 +9477,16 @@ export default function App() {
   };
 
   const [notificationsList, setNotificationsList] = useState([]);
+  const [scheduledNotifs, setScheduledNotifs] = useState([]);
   const [activeStatusAlert, setActiveStatusAlert] = useState(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const latestNotifIdRef = useRef(null);
 
   useEffect(() => {
     if (!user) return;
+
+    // Fetch both notification history and scheduled
+    fetchScheduledNotifs();
 
     let notificationChannel;
     let isActive = true;
@@ -9645,32 +9802,125 @@ export default function App() {
     }
   };
 
-  const handleSendCustomNotification = async (event) => {
+  
+// Calculate the next occurrence time for a scheduled notification
+const calculateNextSendTime = (scheduleType, scheduleTime, scheduleDay) => {
+  const now = new Date();
+  const [hours, minutes] = scheduleTime.split(":").map(Number);
+  let candidate = new Date(now);
+  candidate.setHours(hours, minutes, 0, 0);
+
+  if (scheduleType === "weekly") {
+    const targetDay = parseInt(scheduleDay || "0", 10);
+    while (candidate.getDay() !== targetDay) {
+      candidate.setDate(candidate.getDate() + 1);
+    }
+  } else if (scheduleType === "monthly") {
+    const targetDate = Math.min(parseInt(scheduleDay || "1", 10), 28);
+    while (candidate.getDate() !== targetDate) {
+      candidate.setDate(candidate.getDate() + 1);
+    }
+  }
+
+  // If candidate is in the past, advance to next period
+  if (candidate <= now) {
+    if (scheduleType === "daily") {
+      candidate.setDate(candidate.getDate() + 1);
+    } else if (scheduleType === "weekly") {
+      candidate.setDate(candidate.getDate() + 7);
+    } else if (scheduleType === "monthly") {
+      candidate.setMonth(candidate.getMonth() + 1);
+    }
+  }
+
+  return candidate.toISOString();
+};
+
+const handleSendCustomNotification = async (event) => {
     event.preventDefault();
     const payload = adminForms.customNotification;
 
     const notifTitle = payload.title;
+    const notifBody = payload.body;
+    const targetRole = payload.target_audience === "user" ? "user" : payload.target_audience;
+    const targetUser = payload.target_audience === "user" ? payload.target_uuid : null;
 
-    // Trigger Supabase notification via shared function
-    await broadcastNotification(
-      notifTitle,
-      payload.body,
-      payload.target_audience === "user" ? "user" : payload.target_audience,
-      payload.target_audience === "user" ? payload.target_uuid : null,
-      payload.redirect_page,
-      false,
-      attachedFileUrl || null
-    );
+    if (payload.schedule_enabled === "true") {
+      // Save as scheduled notification
+      const scheduleTime = payload.schedule_time || "09:00";
+      const scheduleDay = payload.schedule_type === "daily" ? null : parseInt(payload.schedule_day || "1", 10);
 
-    showAction("success", "Custom Notification Dispatched!");
+      // Calculate the initial next_send_at so it doesn't fire immediately
+      const initialNextSend = calculateNextSendTime(
+        payload.schedule_type,
+        scheduleTime,
+        scheduleDay
+      );
 
-    setAttachedFileUrl(""); // Clear the attached file URL
+      const { error } = await supabase.from("scheduled_notifications").insert([{
+        title: notifTitle,
+        body: notifBody,
+        target_role: targetRole,
+        target_user: targetUser,
+        redirect_page: payload.redirect_page,
+        file_url: attachedFileUrl || null,
+        schedule_type: payload.schedule_type,
+        schedule_time: scheduleTime,
+        schedule_day: scheduleDay,
+        is_active: true,
+        next_send_at: initialNextSend,
+      }]);
+
+      if (error) {
+        showAction("error", "Failed to schedule notification: " + error.message);
+        return;
+      }
+
+      showAction("success", "Notification scheduled (" + payload.schedule_type + ")!");
+    } else {
+      // Send immediately (existing behavior)
+      await broadcastNotification(
+        notifTitle,
+        notifBody,
+        targetRole,
+        targetUser,
+        payload.redirect_page,
+        false,
+        attachedFileUrl || null
+      );
+
+      showAction("success", "Custom Notification Dispatched!");
+    }
+
+    setAttachedFileUrl("");
 
     setAdminForms((current) => ({
       ...current,
-      customNotification: { title: "", body: "", target_audience: "all", target_uuid: "", redirect_page: "Home" },
+      customNotification: {
+        title: "",
+        body: "",
+        target_audience: "all",
+        target_uuid: "",
+        redirect_page: "Home",
+        schedule_enabled: "false",
+        schedule_type: "daily",
+        schedule_day: "1",
+        schedule_time: "09:00"
+      },
     }));
   };
+
+  const fetchScheduledNotifs = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("scheduled_notifications")
+        .select("*")
+        .order("next_send_at", { ascending: true });
+      if (data) setScheduledNotifs(data);
+    } catch (e) {
+      console.warn("Failed to fetch scheduled notifications:", e);
+    }
+  }, []);
 
   const handleCreateAnnouncement = async (event) => {
     event.preventDefault();
@@ -10122,7 +10372,14 @@ export default function App() {
   };
 
   const handleClearHistory = (table) => async () => {
-    const tableLabel = table === "events" ? "Announcements" : "Notifications";
+    let tableLabel;
+    if (table === "events") {
+      tableLabel = "Announcements";
+    } else if (table === "scheduled_notifications") {
+      tableLabel = "Scheduled Notifications";
+    } else {
+      tableLabel = "Notifications";
+    }
     if (!window.confirm(`Are you sure you want to clear all ${tableLabel}? This action is irreversible.`)) return;
 
     // Use a filter that is guaranteed to match all rows without causing type mismatch errors
@@ -10136,7 +10393,13 @@ export default function App() {
       return;
     }
 
-    await loadPortalData(portalRole, user, parentData.studentProfile);
+    // Reload appropriate data
+    if (table === "scheduled_notifications") {
+      await fetchScheduledNotifs();
+    } else {
+      await loadPortalData(portalRole, user, parentData.studentProfile);
+    }
+
     showAction("success", `${tableLabel} history cleared.`);
   };
 
@@ -10373,6 +10636,8 @@ export default function App() {
             loadPortalData={loadPortalData}
             menuOpen={menuOpen}
             notifications={notificationsList}
+            scheduledNotifs={scheduledNotifs}
+            fetchScheduledNotifs={fetchScheduledNotifs}
             onAdminFormChange={handleAdminFormChange}
             onAdminTeacherFilterChange={handleAdminTeacherFilterChange}
             onAssignChild={handleAssignChild}
