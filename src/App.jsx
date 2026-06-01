@@ -55,7 +55,10 @@ import {
   Heart,
   Upload,
   Image,
-  XCircle
+  XCircle,
+  FileText,
+  TrendingUp,
+  DollarSign
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -5706,21 +5709,63 @@ const handleDownloadAllReports = async () => {
 
           {activePage === "Overview" && (
             <div className="portal-stats-strip admin-stats">
-              {stats.map((stat) => {
+              {stats.map((stat, idx) => {
                 const Icon = stat.icon;
+                const colors = [
+                  { bg: '#1a1a2e', cardBg: 'linear-gradient(135deg, #1a1a2e, #16213e)', accent: '#e94560', glow: 'rgba(233,69,96,0.3)' },
+                  { bg: '#2d1b00', cardBg: 'linear-gradient(135deg, #2d1b00, #4a2c0a)', accent: '#d4af37', glow: 'rgba(212,175,55,0.3)' },
+                  { bg: '#002626', cardBg: 'linear-gradient(135deg, #002626, #003d3d)', accent: '#00d9a6', glow: 'rgba(0,217,166,0.3)' },
+                  { bg: '#1e0a3c', cardBg: 'linear-gradient(135deg, #1e0a3c, #2d1b69)', accent: '#c084fc', glow: 'rgba(192,132,252,0.3)' },
+                  { bg: '#1a1a2e', cardBg: 'linear-gradient(135deg, #2d1810, #4a2c1a)', accent: '#f59e0b', glow: 'rgba(245,158,11,0.3)' },
+                ];
+                const c = colors[idx % colors.length];
+                const isParentViews = stat.label === "Parent Views";
+                const [numStr, denStr] = isParentViews ? String(stat.value).split('/') : [];
+                const pct = isParentViews ? (parseInt(numStr) / Math.max(parseInt(denStr), 1) * 100) : null;
                 return (
                   <div
                     key={stat.label}
-                    className={`pstat-card${stat.navigateTo ? ' clickable' : ''}`}
+                    className="infographic-card"
                     onClick={() => stat.navigateTo && setActivePage(stat.navigateTo)}
                     role={stat.navigateTo ? 'button' : undefined}
                     tabIndex={stat.navigateTo ? 0 : undefined}
                     onKeyDown={stat.navigateTo ? (e) => { if (e.key === 'Enter') setActivePage(stat.navigateTo); } : undefined}
-                    style={{ cursor: stat.navigateTo ? 'pointer' : 'default' }}
+                    style={{ cursor: stat.navigateTo ? 'pointer' : 'default', background: c.cardBg, boxShadow: `0 8px 32px ${c.glow}` }}
                   >
-                    <span className="pstat-value">{stat.value}</span>
-                    <span className="pstat-label">{stat.label}</span>
-                    <span className="pstat-sub"><Icon size={12} style={{ verticalAlign: 'middle' }} /></span>
+                    <div className="ig-bg-pattern" style={{ color: c.accent }}>
+                      {['▣', '◈', '◆', '◇', '⬟'][idx % 5]}
+                    </div>
+                    <div className="ig-top-row">
+                      <div className="ig-icon-wrap" style={{ background: `${c.accent}20`, color: c.accent }}>
+                        <Icon size={18} />
+                      </div>
+                      {isParentViews && pct !== null && (
+                        <span className="ig-trend" style={{ background: `${c.accent}15`, color: c.accent }}>
+                          {pct >= 50 ? '↑' : '↓'} {Math.round(pct)}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="ig-value" style={{ color: c.accent }}>
+                      {isParentViews ? (
+                        <>
+                          <span className="ig-count-anim">{numStr}</span>
+                          <span style={{ fontSize: '1rem', opacity: 0.5, margin: '0 2px' }}>/</span>
+                          <span style={{ fontSize: '1.2rem', opacity: 0.7 }}>{denStr}</span>
+                        </>
+                      ) : (
+                        <span className="ig-count-anim">{stat.value}</span>
+                      )}
+                    </div>
+                    <span className="ig-label" style={{ color: '#fff' }}>{stat.label}</span>
+                    <span className="ig-sub" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      <Icon size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                      {stat.navigateTo || 'Overview'}
+                    </span>
+                    {isParentViews && pct !== null && (
+                      <div className="ig-bar-track" style={{ background: `${c.accent}15` }}>
+                        <div className="ig-bar-fill" style={{ width: `${pct}%`, background: c.accent, boxShadow: `0 0 8px ${c.glow}` }} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -8390,41 +8435,69 @@ onShowAction,
           {activePage === "My Group" ? (
             <div className="portal-content">
               <div className="portal-stats-strip teacher-stats">
-                <div className="pstat-card">
-                  <span className="pstat-value">{filteredStudents.length}</span>
-                  <span className="pstat-label">Students</span>
-                  <span className="pstat-sub">In my group</span>
-                </div>
-                <div className="pstat-card">
-                  <span className="pstat-value">
-                    {Math.round((filteredStudents.filter(s => s.latestResult).length / Math.max(filteredStudents.length, 1)) * 100) || 0}%
-                  </span>
-                  <span className="pstat-label">Results</span>
-                  <span className="pstat-sub">Submitted</span>
-                </div>
-                <div className="pstat-card">
-                  <span className="pstat-value">
-                    {filteredStudents.length > 0
-                      ? Math.round(filteredStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / filteredStudents.length)
-                      : "--"}
-                  </span>
-                  <span className="pstat-label">Avg Score</span>
-                  <span className="pstat-sub">This week</span>
-                </div>
-                <div className="pstat-card">
-                  <span className="pstat-value">
-                    {parentViewedCount}/{filteredStudents.length || 0}
-                  </span>
-                  <span className="pstat-label">Parent Views</span>
-                  <span className="pstat-sub">Viewed reports</span>
-                </div>
-                {portalAccess?.show_salary_card && monthlySalary && (
-                  <div className="pstat-card">
-                    <span className="pstat-value" style={{ fontSize: '0.9rem' }}>Rs. {monthlySalary.amount?.toFixed(0) || "0"}</span>
-                    <span className="pstat-label">Salary</span>
-                    <span className="pstat-sub">This month</span>
-                  </div>
-                )}
+                {[
+                  { label: "Students", value: filteredStudents.length, sub: "In my group", icon: 'Users', pct: 100 },
+                  { label: "Results", value: `${Math.round((filteredStudents.filter(s => s.latestResult).length / Math.max(filteredStudents.length, 1)) * 100) || 0}%`, sub: "Submitted", icon: 'FileText', pct: Math.round((filteredStudents.filter(s => s.latestResult).length / Math.max(filteredStudents.length, 1)) * 100) || 0 },
+                  { label: "Avg Score", value: filteredStudents.length > 0 ? Math.round(filteredStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / filteredStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: filteredStudents.length > 0 ? Math.min(Math.round(filteredStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / filteredStudents.length), 100) : 0 },
+                  { label: "Parent Views", value: `${parentViewedCount}/${filteredStudents.length || 0}`, sub: "Viewed reports", icon: 'Eye', pct: filteredStudents.length ? Math.round((parentViewedCount / filteredStudents.length) * 100) : 0 },
+                  ...(portalAccess?.show_salary_card && monthlySalary ? [{
+                    label: "Salary", value: `Rs. ${monthlySalary.amount?.toFixed(0) || "0"}`, sub: "This month", icon: 'DollarSign', pct: 100
+                  }] : []),
+                ].map((stat, i) => {
+                  const colors = [
+                    { cardBg: 'linear-gradient(135deg, #0f2b1d, #1a3d2a)', accent: '#4ade80', glow: 'rgba(74,222,128,0.25)' },
+                    { cardBg: 'linear-gradient(135deg, #2d1b00, #4a2c0a)', accent: '#fbbf24', glow: 'rgba(251,191,36,0.25)' },
+                    { cardBg: 'linear-gradient(135deg, #1a1a2e, #16213e)', accent: '#60a5fa', glow: 'rgba(96,165,250,0.25)' },
+                    { cardBg: 'linear-gradient(135deg, #2d0a2d, #4a1a4a)', accent: '#e879f9', glow: 'rgba(232,121,249,0.25)' },
+                    { cardBg: 'linear-gradient(135deg, #1e0a3c, #2d1b69)', accent: '#c084fc', glow: 'rgba(192,132,252,0.25)' },
+                  ];
+                  const c = colors[i % colors.length];
+                  const isPct = stat.label === "Results";
+                  const isFrac = stat.label === "Parent Views";
+                  const [numStr, denStr] = isFrac ? String(stat.value).split('/') : [];
+                  return (
+                    <div key={stat.label} className="infographic-card" style={{ background: c.cardBg, boxShadow: `0 8px 32px ${c.glow}` }}>
+                      <div className="ig-bg-pattern" style={{ color: c.accent }}>
+                        {['✦', '◆', '⬢', '◈', '◇'][i % 5]}
+                      </div>
+                      <div className="ig-top-row">
+                        <div className="ig-icon-wrap" style={{ background: `${c.accent}20`, color: c.accent }}>
+                          {stat.icon === 'Users' && <Users size={18} />}
+                          {stat.icon === 'FileText' && <FileText size={18} />}
+                          {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
+                          {stat.icon === 'Eye' && <Eye size={18} />}
+                          {stat.icon === 'DollarSign' && <DollarSign size={18} />}
+                        </div>
+                        {isPct && (
+                          <span className="ig-trend" style={{ background: `${c.accent}15`, color: c.accent }}>
+                            {stat.pct >= 50 ? '↑' : '↓'} {stat.pct}%
+                          </span>
+                        )}
+                        {isFrac && (
+                          <span className="ig-trend" style={{ background: `${c.accent}15`, color: c.accent }}>
+                            ↑ {stat.pct}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="ig-value" style={{ color: c.accent }}>
+                        {isFrac ? (
+                          <>
+                            <span className="ig-count-anim">{numStr}</span>
+                            <span style={{ fontSize: '1rem', opacity: 0.5, margin: '0 2px' }}>/</span>
+                            <span style={{ fontSize: '1.2rem', opacity: 0.7 }}>{denStr}</span>
+                          </>
+                        ) : (
+                          <span className="ig-count-anim">{stat.value}</span>
+                        )}
+                      </div>
+                      <span className="ig-label" style={{ color: '#fff' }}>{stat.label}</span>
+                      <span className="ig-sub" style={{ color: 'rgba(255,255,255,0.5)' }}>{stat.sub}</span>
+                      <div className="ig-bar-track" style={{ background: `${c.accent}15` }}>
+                        <div className="ig-bar-fill" style={{ width: `${stat.pct}%`, background: c.accent, boxShadow: `0 0 8px ${c.glow}` }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               {portalAccess?.show_salary_card && monthlySalary && (
                 <section className="data-card salary-callout">
