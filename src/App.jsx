@@ -5711,14 +5711,14 @@ const handleDownloadAllReports = async () => {
             <div className="portal-stats-strip admin-stats">
               {stats.map((stat, idx) => {
                 const Icon = stat.icon;
-                const colors = [
-                  { bg: '#1a1a2e', cardBg: 'linear-gradient(135deg, #1a1a2e, #16213e)', accent: '#e94560', glow: 'rgba(233,69,96,0.3)' },
-                  { bg: '#2d1b00', cardBg: 'linear-gradient(135deg, #2d1b00, #4a2c0a)', accent: '#d4af37', glow: 'rgba(212,175,55,0.3)' },
-                  { bg: '#002626', cardBg: 'linear-gradient(135deg, #002626, #003d3d)', accent: '#00d9a6', glow: 'rgba(0,217,166,0.3)' },
-                  { bg: '#1e0a3c', cardBg: 'linear-gradient(135deg, #1e0a3c, #2d1b69)', accent: '#c084fc', glow: 'rgba(192,132,252,0.3)' },
-                  { bg: '#1a1a2e', cardBg: 'linear-gradient(135deg, #2d1810, #4a2c1a)', accent: '#f59e0b', glow: 'rgba(245,158,11,0.3)' },
+                const accentColors = [
+                  { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
+                  { icon: 'var(--deep-brown)', bar: '#3d2b1f', glow: 'rgba(61, 43, 31, 0.15)' },
+                  { icon: '#b8860b', bar: '#b8860b', glow: 'rgba(184, 134, 11, 0.2)' },
+                  { icon: '#8b6d31', bar: '#8b6d31', glow: 'rgba(139, 109, 49, 0.15)' },
+                  { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
                 ];
-                const c = colors[idx % colors.length];
+                const c = accentColors[idx % accentColors.length];
                 const isParentViews = stat.label === "Parent Views";
                 const [numStr, denStr] = isParentViews ? String(stat.value).split('/') : [];
                 const pct = isParentViews ? (parseInt(numStr) / Math.max(parseInt(denStr), 1) * 100) : null;
@@ -5730,40 +5730,39 @@ const handleDownloadAllReports = async () => {
                     role={stat.navigateTo ? 'button' : undefined}
                     tabIndex={stat.navigateTo ? 0 : undefined}
                     onKeyDown={stat.navigateTo ? (e) => { if (e.key === 'Enter') setActivePage(stat.navigateTo); } : undefined}
-                    style={{ cursor: stat.navigateTo ? 'pointer' : 'default', background: c.cardBg, boxShadow: `0 8px 32px ${c.glow}` }}
+                    style={{ cursor: stat.navigateTo ? 'pointer' : 'default' }}
                   >
-                    <div className="ig-bg-pattern" style={{ color: c.accent }}>
-                      {['▣', '◈', '◆', '◇', '⬟'][idx % 5]}
+                    <div className="ig-bg-pattern">
+                      {['✦', '◈', '◆', '◇', '⬟'][idx % 5]}
                     </div>
                     <div className="ig-top-row">
-                      <div className="ig-icon-wrap" style={{ background: `${c.accent}20`, color: c.accent }}>
+                      <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
                         <Icon size={18} />
                       </div>
                       {isParentViews && pct !== null && (
-                        <span className="ig-trend" style={{ background: `${c.accent}15`, color: c.accent }}>
+                        <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
                           {pct >= 50 ? '↑' : '↓'} {Math.round(pct)}%
                         </span>
                       )}
                     </div>
-                    <div className="ig-value" style={{ color: c.accent }}>
+                    <div className="ig-value">
                       {isParentViews ? (
                         <>
                           <span className="ig-count-anim">{numStr}</span>
-                          <span style={{ fontSize: '1rem', opacity: 0.5, margin: '0 2px' }}>/</span>
-                          <span style={{ fontSize: '1.2rem', opacity: 0.7 }}>{denStr}</span>
+                          <span style={{ fontSize: '1rem', opacity: 0.4, margin: '0 2px', color: 'var(--soft-brown)' }}>/</span>
+                          <span style={{ fontSize: '1.2rem', opacity: 0.5, color: 'var(--soft-brown)' }}>{denStr}</span>
                         </>
                       ) : (
                         <span className="ig-count-anim">{stat.value}</span>
                       )}
                     </div>
-                    <span className="ig-label" style={{ color: '#fff' }}>{stat.label}</span>
-                    <span className="ig-sub" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      <Icon size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                    <span className="ig-label">{stat.label}</span>
+                    <span className="ig-sub">
                       {stat.navigateTo || 'Overview'}
                     </span>
                     {isParentViews && pct !== null && (
-                      <div className="ig-bar-track" style={{ background: `${c.accent}15` }}>
-                        <div className="ig-bar-fill" style={{ width: `${pct}%`, background: c.accent, boxShadow: `0 0 8px ${c.glow}` }} />
+                      <div className="ig-bar-track" style={{ background: `rgba(197, 160, 89, 0.12)` }}>
+                        <div className="ig-bar-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${c.bar}, ${c.bar}dd)`, boxShadow: `0 0 6px ${c.glow}` }} />
                       </div>
                     )}
                   </div>
@@ -8444,56 +8443,51 @@ onShowAction,
                     label: "Salary", value: `Rs. ${monthlySalary.amount?.toFixed(0) || "0"}`, sub: "This month", icon: 'DollarSign', pct: 100
                   }] : []),
                 ].map((stat, i) => {
-                  const colors = [
-                    { cardBg: 'linear-gradient(135deg, #0f2b1d, #1a3d2a)', accent: '#4ade80', glow: 'rgba(74,222,128,0.25)' },
-                    { cardBg: 'linear-gradient(135deg, #2d1b00, #4a2c0a)', accent: '#fbbf24', glow: 'rgba(251,191,36,0.25)' },
-                    { cardBg: 'linear-gradient(135deg, #1a1a2e, #16213e)', accent: '#60a5fa', glow: 'rgba(96,165,250,0.25)' },
-                    { cardBg: 'linear-gradient(135deg, #2d0a2d, #4a1a4a)', accent: '#e879f9', glow: 'rgba(232,121,249,0.25)' },
-                    { cardBg: 'linear-gradient(135deg, #1e0a3c, #2d1b69)', accent: '#c084fc', glow: 'rgba(192,132,252,0.25)' },
+                  const accentColors = [
+                    { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
+                    { icon: 'var(--deep-brown)', bar: '#3d2b1f', glow: 'rgba(61, 43, 31, 0.12)' },
+                    { icon: '#b8860b', bar: '#b8860b', glow: 'rgba(184, 134, 11, 0.18)' },
+                    { icon: '#8b6d31', bar: '#8b6d31', glow: 'rgba(139, 109, 49, 0.12)' },
+                    { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
                   ];
-                  const c = colors[i % colors.length];
+                  const c = accentColors[i % accentColors.length];
                   const isPct = stat.label === "Results";
                   const isFrac = stat.label === "Parent Views";
                   const [numStr, denStr] = isFrac ? String(stat.value).split('/') : [];
                   return (
-                    <div key={stat.label} className="infographic-card" style={{ background: c.cardBg, boxShadow: `0 8px 32px ${c.glow}` }}>
-                      <div className="ig-bg-pattern" style={{ color: c.accent }}>
-                        {['✦', '◆', '⬢', '◈', '◇'][i % 5]}
+                    <div key={stat.label} className="infographic-card">
+                      <div className="ig-bg-pattern">
+                        {['✦', '◈', '◆', '⬢', '◇'][i % 5]}
                       </div>
                       <div className="ig-top-row">
-                        <div className="ig-icon-wrap" style={{ background: `${c.accent}20`, color: c.accent }}>
+                        <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
                           {stat.icon === 'Users' && <Users size={18} />}
                           {stat.icon === 'FileText' && <FileText size={18} />}
                           {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
                           {stat.icon === 'Eye' && <Eye size={18} />}
                           {stat.icon === 'DollarSign' && <DollarSign size={18} />}
                         </div>
-                        {isPct && (
-                          <span className="ig-trend" style={{ background: `${c.accent}15`, color: c.accent }}>
+                        {(isPct || isFrac) && (
+                          <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
                             {stat.pct >= 50 ? '↑' : '↓'} {stat.pct}%
                           </span>
                         )}
-                        {isFrac && (
-                          <span className="ig-trend" style={{ background: `${c.accent}15`, color: c.accent }}>
-                            ↑ {stat.pct}%
-                          </span>
-                        )}
                       </div>
-                      <div className="ig-value" style={{ color: c.accent }}>
+                      <div className="ig-value">
                         {isFrac ? (
                           <>
                             <span className="ig-count-anim">{numStr}</span>
-                            <span style={{ fontSize: '1rem', opacity: 0.5, margin: '0 2px' }}>/</span>
-                            <span style={{ fontSize: '1.2rem', opacity: 0.7 }}>{denStr}</span>
+                            <span style={{ fontSize: '1rem', opacity: 0.4, margin: '0 2px', color: 'var(--soft-brown)' }}>/</span>
+                            <span style={{ fontSize: '1.2rem', opacity: 0.5, color: 'var(--soft-brown)' }}>{denStr}</span>
                           </>
                         ) : (
                           <span className="ig-count-anim">{stat.value}</span>
                         )}
                       </div>
-                      <span className="ig-label" style={{ color: '#fff' }}>{stat.label}</span>
-                      <span className="ig-sub" style={{ color: 'rgba(255,255,255,0.5)' }}>{stat.sub}</span>
-                      <div className="ig-bar-track" style={{ background: `${c.accent}15` }}>
-                        <div className="ig-bar-fill" style={{ width: `${stat.pct}%`, background: c.accent, boxShadow: `0 0 8px ${c.glow}` }} />
+                      <span className="ig-label">{stat.label}</span>
+                      <span className="ig-sub">{stat.sub}</span>
+                      <div className="ig-bar-track" style={{ background: `rgba(197, 160, 89, 0.12)` }}>
+                        <div className="ig-bar-fill" style={{ width: `${stat.pct}%`, background: `linear-gradient(90deg, ${c.bar}, ${c.bar}dd)`, boxShadow: `0 0 6px ${c.glow}` }} />
                       </div>
                     </div>
                   );
