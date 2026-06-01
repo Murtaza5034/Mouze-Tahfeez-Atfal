@@ -853,6 +853,8 @@ function MarhalaPosts({
 
   const showPosts = !postsHidden;
 
+  if (homePreview && !showPosts) return null;
+
   return (
     <div className={`marhala-posts-container fade-in ${className}`.trim()}>
       {/* Visibility Banner */}
