@@ -2540,7 +2540,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
                   <span style={{ fontSize: '32px', lineHeight: '70px', color: 'var(--soft-brown)' }}>👤</span>
                 )}
               </div>
-              <span className="child-hood-font" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold', letterSpacing: '1px' }}>{student?.name}</span>
+              <span style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold', letterSpacing: '1px', fontFamily: "'Kanz al Marjaan', serif" }}>{student?.name}</span>
             </div>
           </div>
         </div>
