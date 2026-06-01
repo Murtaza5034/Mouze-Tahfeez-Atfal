@@ -1,0 +1,3 @@
+ALTER TABLE public.parent_notes
+ADD COLUMN IF NOT EXISTS teacher_reply TEXT,
+ADD COLUMN IF NOT EXISTS teacher_replied_at TIMESTAMP WITH TIME ZONE;

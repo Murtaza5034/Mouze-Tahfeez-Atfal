@@ -52,7 +52,10 @@ import {
   Play,
   Mail,
   Send,
-  Heart
+  Heart,
+  Upload,
+  Image,
+  XCircle
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -4830,6 +4833,7 @@ function AdminPortal({
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
   const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
   const [uploadingReportBackground, setUploadingReportBackground] = useState(false);
+  const [uploadingJadwalBg, setUploadingJadwalBg] = useState(false);
 
   useEffect(() => {
     setReportSettingsDraft(normalizeReportSettings(reportSettings));
@@ -5284,6 +5288,72 @@ const handleDownloadAllReports = async () => {
     }));
 
     await saveReportSettings({ progress_card_background_url: "" });
+  };
+
+  const handleJadwalBgUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      onShowAction("error", "Please upload an image file for the Jadwal PDF background.");
+      return;
+    }
+
+    if (file.size > MAX_REPORT_BACKGROUND_SIZE) {
+      onShowAction("error", "Jadwal background must be under 5MB.");
+      return;
+    }
+
+    setUploadingJadwalBg(true);
+
+    try {
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "png";
+      const safeName = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-z0-9-_]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "jadwal-bg";
+      const filePath = `jadwal-bg/${Date.now()}-${safeName}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .getPublicUrl(filePath);
+
+      const backgroundUrl = publicUrlData?.publicUrl;
+      if (!backgroundUrl) throw new Error("Background image URL was not returned.");
+
+      setReportSettingsDraft((current) => ({
+        ...current,
+        jadwal_pdf_background_url: backgroundUrl,
+      }));
+
+      await saveReportSettings({ jadwal_pdf_background_url: backgroundUrl });
+    } catch (error) {
+      console.error("Jadwal background upload failed:", error);
+      onShowAction("error", `Jadwal background upload failed: ${error.message}`);
+    } finally {
+      setUploadingJadwalBg(false);
+    }
+  };
+
+  const removeJadwalBg = async () => {
+    setReportSettingsDraft((current) => ({
+      ...current,
+      jadwal_pdf_background_url: "",
+    }));
+    await saveReportSettings({ jadwal_pdf_background_url: "" });
   };
 
   return (
@@ -7425,18 +7495,17 @@ const handleDownloadAllReports = async () => {
                   <Palette size={18} />
                   <h3>Jadwal Display & Theme Settings</h3>
                 </div>
-                <form className="stack-form" onSubmit={(e) => {
+                  <form className="stack-form" onSubmit={(e) => {
                   e.preventDefault();
-                  const formData = new FormData(e.target);
-                  const updates = {
-                    jadwal_style: formData.get("jadwal_style"),
-                    jadwal_teacher_style: formData.get("jadwal_teacher_style"),
-                    jadwal_pdf_primary_color: formData.get("jadwal_pdf_primary_color"),
-                    jadwal_pdf_accent_color: formData.get("jadwal_pdf_accent_color"),
-                    jadwal_pdf_background_color: formData.get("jadwal_pdf_background_color"),
-                    jadwal_pdf_font_family: formData.get("jadwal_pdf_font_family"),
-                  };
-                  saveReportSettings(updates);
+                  saveReportSettings({
+                    jadwal_style: reportSettingsDraft.jadwal_style,
+                    jadwal_teacher_style: reportSettingsDraft.jadwal_teacher_style,
+                    jadwal_pdf_primary_color: reportSettingsDraft.jadwal_pdf_primary_color,
+                    jadwal_pdf_accent_color: reportSettingsDraft.jadwal_pdf_accent_color,
+                    jadwal_pdf_background_color: reportSettingsDraft.jadwal_pdf_background_color,
+                    jadwal_pdf_background_url: reportSettingsDraft.jadwal_pdf_background_url,
+                    jadwal_pdf_font_family: reportSettingsDraft.jadwal_pdf_font_family,
+                  });
                 }}>
                   <div className="card-headline" style={{ marginTop: '0', padding: '0', border: 'none' }}>
                     <Calendar size={16} />
@@ -7445,7 +7514,7 @@ const handleDownloadAllReports = async () => {
                   <div className="form-grid">
                     <label>
                       <span>Display Style</span>
-                      <select name="jadwal_style" defaultValue={reportSettingsDraft.jadwal_style || 'table'} className="premium-select">
+                      <select name="jadwal_style" value={reportSettingsDraft.jadwal_style || 'table'} onChange={updateReportDraft("jadwal_style")} className="premium-select">
                         <option value="table">Table Style</option>
                         <option value="calendar">Calendar Style</option>
                         <option value="single_day_card">Single Day Card Style</option>
@@ -7456,7 +7525,7 @@ const handleDownloadAllReports = async () => {
                     </label>
                     <label>
                       <span>Teacher Input Style</span>
-                      <select name="jadwal_teacher_style" defaultValue={reportSettingsDraft.jadwal_teacher_style || 'default'} className="premium-select">
+                      <select name="jadwal_teacher_style" value={reportSettingsDraft.jadwal_teacher_style || 'default'} onChange={updateReportDraft("jadwal_teacher_style")} className="premium-select">
                         <option value="default">Default (Full Table)</option>
                         <option value="compact">Compact (Minimal Input)</option>
                       </select>
@@ -7473,19 +7542,19 @@ const handleDownloadAllReports = async () => {
                   <div className="form-grid">
                     <label>
                       <span>Primary Color</span>
-                      <input name="jadwal_pdf_primary_color" type="color" defaultValue={reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037'} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                      <input name="jadwal_pdf_primary_color" type="color" value={reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037'} onChange={updateReportDraft("jadwal_pdf_primary_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
                     </label>
                     <label>
                       <span>Accent / Gold Color</span>
-                      <input name="jadwal_pdf_accent_color" type="color" defaultValue={reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                      <input name="jadwal_pdf_accent_color" type="color" value={reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'} onChange={updateReportDraft("jadwal_pdf_accent_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
                     </label>
                     <label>
                       <span>Page Background Color</span>
-                      <input name="jadwal_pdf_background_color" type="color" defaultValue={reportSettingsDraft.jadwal_pdf_background_color || '#ffffff'} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                      <input name="jadwal_pdf_background_color" type="color" value={reportSettingsDraft.jadwal_pdf_background_color || '#ffffff'} onChange={updateReportDraft("jadwal_pdf_background_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
                     </label>
                     <label>
                       <span>Font Family</span>
-                      <select name="jadwal_pdf_font_family" defaultValue={reportSettingsDraft.jadwal_pdf_font_family || 'Inter'} className="premium-select">
+                      <select name="jadwal_pdf_font_family" value={reportSettingsDraft.jadwal_pdf_font_family || 'Inter'} onChange={updateReportDraft("jadwal_pdf_font_family")} className="premium-select">
                         <option value="Inter">Inter</option>
                         <option value="'Segoe UI', sans-serif">Segoe UI</option>
                         <option value="'Times New Roman', serif">Times New Roman</option>
@@ -7495,13 +7564,42 @@ const handleDownloadAllReports = async () => {
                     </label>
                   </div>
 
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Image size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>PDF Background Image</h4>
+                  </div>
                   <div className="form-grid" style={{ marginTop: '12px' }}>
                     <label>
-                      <span>PDF Background Image URL</span>
-                      <input name="jadwal_pdf_background_url" type="text" defaultValue={reportSettingsDraft.jadwal_pdf_background_url || ''} placeholder="https://example.com/background.jpg" className="premium-input" />
+                      <span>Background Image</span>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label className="premium-input" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '10px 16px', border: '1px dashed var(--primary-gold)', background: '#fdfaf4', borderRadius: '8px', transition: 'all 0.2s' }}>
+                          <Upload size={18} style={{ color: 'var(--primary-gold)' }} />
+                          <span style={{ color: 'var(--deep-brown)', fontWeight: 500, fontSize: '0.9rem' }}>
+                            {uploadingJadwalBg ? "Uploading..." : "Choose Image"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleJadwalBgUpload}
+                            disabled={uploadingJadwalBg}
+                            style={{ display: 'none' }}
+                          />
+                          {uploadingJadwalBg && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary-gold)' }} />}
+                        </label>
+                        {reportSettingsDraft.jadwal_pdf_background_url && (
+                          <button type="button" onClick={removeJadwalBg} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, padding: '6px 10px', borderRadius: '6px' }}>
+                            <XCircle size={16} /> Remove
+                          </button>
+                        )}
+                      </div>
                       <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
-                        Optional: Full URL to a background image for the PDF (JPG, PNG).
+                        Upload a background image for the Jadwal PDF. Accepted formats: JPG, PNG, GIF, WebP (max 5MB).
                       </small>
+                      {reportSettingsDraft.jadwal_pdf_background_url && (
+                        <div style={{ marginTop: '10px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dfcbb5', maxWidth: '200px' }}>
+                          <img src={reportSettingsDraft.jadwal_pdf_background_url} alt="Jadwal background preview" style={{ width: '100%', height: '80px', objectFit: 'cover', display: 'block' }} />
+                        </div>
+                      )}
                     </label>
                   </div>
 
@@ -7514,30 +7612,147 @@ const handleDownloadAllReports = async () => {
               <section className="data-card card-appear">
                 <div className="card-headline">
                   <Eye size={18} />
-                  <h3>Style Preview</h3>
+                  <h3>Jadwal PDF Preview</h3>
                 </div>
-                <div style={{ padding: '16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', marginBottom: '12px' }}>
-                    Current Style: <strong>{(reportSettingsDraft.jadwal_style || 'table').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <div style={{
-                      padding: '16px', borderRadius: '12px',
-                      background: reportSettingsDraft.jadwal_pdf_background_color || '#ffffff',
-                      border: `2px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
-                      minWidth: '120px'
-                    }}>
+                <div style={{
+                  padding: '20px',
+                  fontFamily: (reportSettingsDraft.jadwal_pdf_font_family || 'Inter').includes(',') ? reportSettingsDraft.jadwal_pdf_font_family : `'${reportSettingsDraft.jadwal_pdf_font_family || 'Inter'}', 'Inter', sans-serif`,
+                }}>
+                  {/* Mini PDF Preview Card */}
+                  <div style={{
+                    border: `2px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    background: reportSettingsDraft.jadwal_pdf_background_color || '#ffffff',
+                    position: 'relative',
+                    minHeight: '320px'
+                  }}>
+                    {/* Background Image Layer */}
+                    {reportSettingsDraft.jadwal_pdf_background_url && (
                       <div style={{
-                        height: '8px', borderRadius: '4px',
-                        background: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037',
-                        marginBottom: '8px'
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundImage: `url(${reportSettingsDraft.jadwal_pdf_background_url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        opacity: 0.25,
+                        pointerEvents: 'none'
                       }} />
-                      <div style={{ height: '6px', borderRadius: '3px', background: '#eee', marginBottom: '4px' }} />
-                      <div style={{ height: '6px', borderRadius: '3px', background: '#eee' }} />
+                    )}
+                    
+                    {/* Content */}
+                    <div style={{ position: 'relative', zIndex: 1, padding: '16px' }}>
+                      {/* Header */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderBottom: `2px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                        paddingBottom: '12px',
+                        marginBottom: '14px'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037', letterSpacing: '0.5px' }}>
+                            MAUZE TAHFEEZ ATFAL
+                          </div>
+                          <div style={{ fontSize: '0.6rem', color: reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 600, marginTop: '2px' }}>
+                            Weekly Quran Jadwal
+                          </div>
+                        </div>
+                        <div style={{
+                          fontSize: '0.55rem',
+                          color: '#888',
+                          textAlign: 'right'
+                        }}>
+                          <div>Generated on</div>
+                          <div style={{ fontWeight: 700, color: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{new Date().toLocaleDateString()}</div>
+                        </div>
+                      </div>
+
+                      {/* Student Info Badge */}
+                      <div style={{
+                        background: `rgba(212, 175, 55, 0.05)`,
+                        border: `1px solid rgba(212, 175, 55, 0.2)`,
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        marginBottom: '14px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.5rem', color: reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>STUDENT NAME</div>
+                          <div style={{ fontSize: '0.75rem', color: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037', fontWeight: 800 }}>Abdullah Ahmad</div>
+                        </div>
+                        <div style={{
+                          fontSize: '0.55rem',
+                          fontWeight: 700,
+                          color: '#ffffff',
+                          background: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037',
+                          padding: '3px 10px',
+                          borderRadius: '12px'
+                        }}>
+                          Hifz Program
+                        </div>
+                      </div>
+
+                      {/* Mini Table */}
+                      <div style={{ overflow: 'hidden', borderRadius: '6px', border: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.55rem' }}>
+                          <thead>
+                            <tr style={{ background: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#ffffff' }}>
+                              <th style={{ padding: '6px 8px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'left', fontWeight: 700, textTransform: 'uppercase' }}>DAYS</th>
+                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 1</th>
+                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 2</th>
+                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JUZHALI</th>
+                              <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JADEED</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              { day: 'MONDAY', cells: ['1-5', '6-10', '1-3', '1-8'] },
+                              { day: 'TUESDAY', cells: ['11-15', '16-20', '4-6', '9-16'] },
+                              { day: 'WEDNESDAY', cells: ['21-25', '26-30', '7-9', '17-24'] },
+                            ].map((row, idx) => (
+                              <tr key={row.day} style={{ background: idx % 2 === 0 ? (reportSettingsDraft.jadwal_pdf_background_color || '#ffffff') : `${reportSettingsDraft.jadwal_pdf_background_color || '#ffffff'}f2` }}>
+                                <td style={{ padding: '5px 8px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, borderBottom: idx < 2 ? `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', fontWeight: 700, color: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{row.day}</td>
+                                {row.cells.map((cell, ci) => (
+                                  <td key={ci} style={{ padding: '5px 4px', borderRight: ci < 4 ? `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', borderBottom: idx < 2 ? `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', textAlign: 'center', color: '#333' }}>{cell}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Footer */}
+                      <div style={{ marginTop: '12px', borderTop: `1px dashed ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, paddingTop: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.5rem', color: reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontStyle: 'italic', fontWeight: 600 }}>
+                          "And We have indeed made the Quran easy to understand and remember..."
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <p className="hint-text" style={{ marginTop: '16px' }}>
-                    Colors and style settings apply to the downloaded Jadwal PDF. Select a style above to preview.
+
+                  <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#fff' }}>
+                        Primary
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37', color: '#2c1e11' }}>
+                        Accent
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: reportSettingsDraft.jadwal_pdf_background_color || '#fff', border: '1px solid #ddd', color: '#666' }}>
+                        Background
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: '#f0f0f0', color: '#555' }}>
+                        {(reportSettingsDraft.jadwal_pdf_font_family || 'Inter').replace(/'/g, '')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="hint-text" style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.75rem' }}>
+                    Preview updates in real-time as you change settings above. Save to apply permanently.
                   </p>
                 </div>
               </section>

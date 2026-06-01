@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { Send, FileText, Clock, Trash } from 'lucide-react';
+import { Send, FileText, Clock, Trash, Reply, CheckCircle } from 'lucide-react';
 
 const normalizeText = (text) => text ? text.trim().toLowerCase() : "";
 
@@ -10,6 +10,9 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [replyTexts, setReplyTexts] = useState({});
+  const [replyingId, setReplyingId] = useState(null);
+  const [submittingReply, setSubmittingReply] = useState(false);
 
   useEffect(() => {
     if (!studentId) {
@@ -75,9 +78,9 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
       }
 
       if (teacher) {
-        const teacherTarget = teacher.user_id || teacher.id; // Prefer auth user_id UUID
+        const teacherTarget = teacher.user_id || teacher.id;
         if (teacherTarget) {
-          const notifTitle = `New Parent Note: ${studentName} 📝`;
+          const notifTitle = `New Parent Note: ${studentName}`;
           const notifBody = `A parent wrote a note for ${studentName}: "${title.trim()}"`;
           const notifPayload = {
             title: notifTitle,
@@ -88,15 +91,13 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
             created_at: new Date().toISOString()
           };
 
-          // Insert in-app notification
           const { error: dbErr } = await supabase.from("system_notifications").insert([notifPayload]);
           if (dbErr) {
             console.error("Failed to insert parent note notification into DB:", dbErr);
           }
 
-          // Trigger out-of-app push notification via FCM
           try {
-            const { data, error: fcmErr } = await supabase.functions.invoke('fcm-notification', {
+            await supabase.functions.invoke('fcm-notification', {
               body: {
                 title: notifTitle,
                 body: notifBody,
@@ -108,11 +109,6 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
                 }
               }
             });
-            if (fcmErr) {
-              console.error("FCM invoke error for teacher parent note:", fcmErr);
-            } else {
-              console.log("FCM parent note notification sent to teacher:", data);
-            }
           } catch (err) {
             console.error("FCM parent note notification trigger failed:", err);
           }
@@ -130,6 +126,31 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
       loadHistory();
       if (showAction) showAction("success", "Note deleted successfully.");
     }
+  };
+
+  const handleReplySubmit = async (noteId) => {
+    const reply = replyTexts[noteId];
+    if (!reply || !reply.trim()) return;
+
+    setSubmittingReply(true);
+    const { error } = await supabase
+      .from('parent_notes')
+      .update({
+        teacher_reply: reply.trim(),
+        teacher_replied_at: new Date().toISOString()
+      })
+      .eq('id', noteId);
+
+    if (error) {
+      console.error("Failed to submit reply:", error);
+      if (showAction) showAction("error", "Failed to send reply. Please try again.");
+    } else {
+      if (showAction) showAction("success", "Your reply has been sent to the parent.");
+      setReplyTexts(prev => ({ ...prev, [noteId]: '' }));
+      setReplyingId(null);
+      loadHistory();
+    }
+    setSubmittingReply(false);
   };
 
   if (!studentId) return null;
@@ -198,9 +219,12 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
 
       {history.length > 0 && (
         <div className="card-appear" style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-          <h3 style={{ margin: '0 0 20px 0', color: 'var(--deep-brown)', fontSize: '1.3rem', fontFamily: "'Cinzel', serif" }}>
-            {role === "teacher" ? `Parent Notes for ${studentName}` : "Note History"}
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            {role === "teacher" ? <Reply size={22} style={{ color: 'var(--primary-gold)' }} /> : <FileText size={22} style={{ color: 'var(--primary-gold)' }} />}
+            <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.3rem', fontFamily: "'Cinzel', serif" }}>
+              {role === "teacher" ? `Parent Notes & Replies` : "Note History"}
+            </h3>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {history.map(note => (
               <div key={note.id} style={{ 
@@ -219,6 +243,105 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
                 <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--soft-brown)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
                   {note.body}
                 </p>
+
+                {/* Teacher Reply Section */}
+                {role === "teacher" && !note.teacher_reply && replyingId !== note.id && (
+                  <button
+                    onClick={() => setReplyingId(note.id)}
+                    style={{
+                      marginTop: '12px',
+                      background: 'none',
+                      border: '1px solid var(--primary-gold)',
+                      color: 'var(--deep-brown)',
+                      padding: '6px 16px',
+                      borderRadius: '20px',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={e => { e.target.style.background = 'var(--primary-gold)'; e.target.style.color = '#fff'; }}
+                    onMouseOut={e => { e.target.style.background = 'none'; e.target.style.color = 'var(--deep-brown)'; }}
+                  >
+                    <Reply size={14} /> Quick Reply
+                  </button>
+                )}
+
+                {role === "teacher" && replyingId === note.id && (
+                  <div style={{ marginTop: '12px', padding: '12px', background: '#faf6ef', borderRadius: '10px', border: '1px solid rgba(212,175,55,0.3)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      <Reply size={14} style={{ color: 'var(--primary-gold)' }} />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--deep-brown)' }}>Your Reply</span>
+                    </div>
+                    <textarea
+                      className="premium-input"
+                      value={replyTexts[note.id] || ''}
+                      onChange={e => setReplyTexts(prev => ({ ...prev, [note.id]: e.target.value }))}
+                      placeholder="Type your reply to the parent..."
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #dfcbb5', boxSizing: 'border-box', minHeight: '70px', resize: 'vertical', fontSize: '0.9rem' }}
+                    />
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => { setReplyingId(null); setReplyTexts(prev => ({ ...prev, [note.id]: '' })); }}
+                        style={{ background: 'none', border: '1px solid #ccc', color: '#888', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleReplySubmit(note.id)}
+                        disabled={submittingReply || !replyTexts[note.id]?.trim()}
+                        style={{
+                          background: 'var(--deep-brown)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '6px 16px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          opacity: (submittingReply || !replyTexts[note.id]?.trim()) ? 0.7 : 1,
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {submittingReply ? <Clock size={14} className="animate-spin" /> : <Send size={14} />}
+                        {submittingReply ? "Sending..." : "Send Reply"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {note.teacher_reply && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '12px 16px',
+                    background: 'linear-gradient(135deg, #f7f3eb 0%, #f0e8d8 100%)',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(212,175,55,0.25)',
+                    borderLeft: '3px solid var(--primary-gold)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <CheckCircle size={14} style={{ color: 'var(--primary-gold)' }} />
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--deep-brown)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Teacher Reply
+                      </span>
+                      {note.teacher_replied_at && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                          {new Date(note.teacher_replied_at).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#3d2e22', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                      {note.teacher_reply}
+                    </p>
+                  </div>
+                )}
+
                 {role === "parent" && (
                   <button 
                     onClick={() => handleDelete(note.id)}
@@ -236,7 +359,16 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
       
       {history.length === 0 && role === "teacher" && (
         <div className="card-appear" style={{ background: 'white', padding: '30px', borderRadius: '16px', textAlign: 'center', border: '2px dashed #dfcbb5', marginTop: '20px' }}>
-          <p style={{ color: 'var(--soft-brown)', margin: 0 }}>No notes from parents for this student.</p>
+          <FileText size={32} style={{ color: '#dfcbb5', marginBottom: '12px' }} />
+          <p style={{ color: 'var(--soft-brown)', margin: 0, fontSize: '1rem' }}>No notes from parents for this student yet.</p>
+          <p style={{ color: '#b8a088', marginTop: '6px', fontSize: '0.85rem' }}>When parents submit notes, they will appear here and you can reply directly.</p>
+        </div>
+      )}
+
+      {history.length === 0 && role === "parent" && (
+        <div className="card-appear" style={{ background: 'white', padding: '30px', borderRadius: '16px', textAlign: 'center', border: '2px dashed #dfcbb5', marginTop: '20px' }}>
+          <FileText size={32} style={{ color: '#dfcbb5', marginBottom: '12px' }} />
+          <p style={{ color: 'var(--soft-brown)', margin: 0 }}>No notes submitted yet.</p>
         </div>
       )}
     </div>

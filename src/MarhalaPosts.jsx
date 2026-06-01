@@ -1515,8 +1515,6 @@ function PostCard({
           )}
         </div>
 
-        {/* Decorative line */}
-        <div className="mp-cert-deco-line-thick" />
       </div>
     </div>
   );
