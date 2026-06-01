@@ -2540,7 +2540,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
                   <span style={{ fontSize: '32px', lineHeight: '70px', color: 'var(--soft-brown)' }}>👤</span>
                 )}
               </div>
-              <span style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold', letterSpacing: '1px', fontFamily: "'Kanz al Marjaan', serif" }}>{student?.name}</span>
+              <span style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold', letterSpacing: '1px', fontFamily: "'Kanz al Marjaan', serif" }}>{student?.arabic_name ? fixArabicScript(student.arabic_name) : student?.name}</span>
             </div>
           </div>
         </div>
@@ -4079,6 +4079,7 @@ function ParentPortal({
                 <TahfeezReportCard
                   student={{
                     name: studentProfile?.name,
+                    arabic_name: studentProfile?.arabic_name,
                     groupName: studentProfile?.groupName || studentProfile?.class_level,
                     photoUrl: studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url,
                     photo_url: studentProfile?.photo_url || studentProfile?.photoUrl || studentProfile?.avatar_url,
@@ -4112,6 +4113,7 @@ function ParentPortal({
                   <TahfeezReportCard
                     student={{
                       name: studentProfile?.name,
+                      arabic_name: studentProfile?.arabic_name,
                       groupName: studentProfile?.groupName || studentProfile?.class_level,
                     }}
                     weeklyResult={weeklyResult || studentProfile?.latestResult}
@@ -7315,6 +7317,7 @@ const handleDownloadAllReports = async () => {
                 <TahfeezReportCard
                   student={{
                     name: studentToRender.name,
+                    arabic_name: studentToRender.arabic_name,
                     groupName: studentToRender.groupName || studentToRender.class_level,
                   }}
                   weeklyResult={studentToRender.latestResult}
