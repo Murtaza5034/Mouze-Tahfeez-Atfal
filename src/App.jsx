@@ -2381,69 +2381,24 @@ function InfoHighlights({ items }) {
   );
 }
 
-function FatemiDateSelector({ value, onChange, disabled = false }) {
-  const toLocalStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const resolvedDate = value || toLocalStr(new Date());
-
-  const fmt = useMemo(() => new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
-    day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'UTC'
-  }), []);
-
-  const hijriFromUTC = useCallback((utcDate) => {
-    if (!utcDate || isNaN(utcDate.getTime())) return { date: '...', month: '...', year: '...' };
-    const parts = fmt.formatToParts(utcDate);
-    let dd, mm, yy;
-    for (const p of parts) {
-      if (p.type === 'day') dd = parseInt(p.value);
-      else if (p.type === 'month') mm = parseInt(p.value);
-      else if (p.type === 'year') yy = p.value;
-    }
-    return { date: dd, month: mm, year: yy };
-  }, [fmt]);
-
-  const info = useMemo(() => {
-    if (!resolvedDate || typeof resolvedDate !== 'string') return { date: '...', month: '...', year: '...' };
-    const parts = resolvedDate.split('-');
-    if (parts.length !== 3) return { date: '...', month: '...', year: '...' };
-    const [y, m, d] = parts.map(Number);
-    if (isNaN(y) || isNaN(m) || isNaN(d)) return { date: '...', month: '...', year: '...' };
-    return hijriFromUTC(new Date(Date.UTC(y, m - 1, d)));
-  }, [resolvedDate, hijriFromUTC]);
-
-  const years = [1445, 1446, 1447, 1448];
-  const days = Array.from({ length: 30 }, (_, i) => i + 1);
-
-  const handleSelectChange = (type, newVal) => {
-    const targetDay = parseInt(type === 'day' ? newVal : info.date);
-    const targetMonth = parseInt(type === 'month' ? newVal : info.month);
-    const targetYear = String(type === 'year' ? newVal : info.year);
-
-    const gregYear = Math.floor(622 + parseInt(targetYear) * 0.97);
-    const start = new Date(Date.UTC(gregYear, 0, 1));
-
-    for (let i = 0; i < 730; i++) {
-      const testDate = new Date(start.getTime() + i * 86400000);
-      const h = hijriFromUTC(testDate);
-      if (h.date === targetDay && h.month === targetMonth && String(h.year) === targetYear) {
-        onChange({ target: { name: 'week_date', value: toLocalStr(testDate) } });
-        return;
-      }
-    }
-  };
+function DatePicker({ value, onChange, disabled = false }) {
+  const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const info = value ? getFatemiInfo(value) : null;
+  const dayName = value ? dayNames[new Date(value + 'T00:00:00').getDay()] : '';
 
   return (
-    <div className="fatemi-selector">
-      <select value={info.date} onChange={(e) => handleSelectChange('day', e.target.value)} disabled={disabled}>
-        {days.map(d => <option key={d} value={d}>{d}</option>)}
-      </select>
-      <select value={info.month} onChange={(e) => handleSelectChange('month', e.target.value)} disabled={disabled}>
-        {ARABIC_MONTHS.map((name, i) => (
-          <option key={name} value={i + 1} className="arabic-kanz" style={{ fontSize: '1.1rem' }}>{name}</option>
-        ))}
-      </select>
-      <select value={info.year} onChange={(e) => handleSelectChange('year', e.target.value)} disabled={disabled}>
-        {years.map(y => <option key={y} value={y}>{y}</option>)}
-      </select>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <input type="date" value={value || ''} onChange={(e) => {
+        if (e.target.value) onChange({ target: { name: 'week_date', value: e.target.value } });
+      }} disabled={disabled} className="premium-input" style={{ padding: '8px 12px', fontSize: '0.9rem' }} />
+      {value && info && info.date !== '...' ? (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '2px' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{dayName}</span>
+          <span style={{ fontSize: '1rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
+            {info.date} {info.monthName} {info.year}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -7708,7 +7663,7 @@ const handleDownloadAllReports = async () => {
                     <label style={{ flex: '1', minWidth: '200px' }}>
                       <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>From (Start Date)</span>
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <FatemiDateSelector
+                        <DatePicker
                           value={jadwalSettingsDraft.jadwal_week_start || ''}
                           onChange={(e) => updateJadwalDraft('jadwal_week_start')(e)}
                         />
@@ -7730,7 +7685,7 @@ const handleDownloadAllReports = async () => {
                     <label style={{ flex: '1', minWidth: '200px' }}>
                       <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>To (End Date)</span>
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <FatemiDateSelector
+                        <DatePicker
                           value={jadwalSettingsDraft.jadwal_week_end || ''}
                           onChange={(e) => updateJadwalDraft('jadwal_week_end')(e)}
                         />
