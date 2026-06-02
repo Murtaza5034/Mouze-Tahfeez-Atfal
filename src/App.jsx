@@ -2382,7 +2382,8 @@ function InfoHighlights({ items }) {
 }
 
 function FatemiDateSelector({ value, onChange, disabled = false }) {
-  const info = useMemo(() => getFatemiInfo(value), [value]);
+  const resolvedDate = value || new Date().toISOString().split('T')[0];
+  const info = useMemo(() => getFatemiInfo(resolvedDate), [resolvedDate]);
   const years = [1445, 1446, 1447, 1448];
   const days = Array.from({ length: 30 }, (_, i) => i + 1);
 
