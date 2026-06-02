@@ -554,6 +554,7 @@ const getJadwalThemeFromSettings = (settings = {}) => ({
   backgroundColor: settings.jadwal_pdf_background_color || '#ffffff',
   backgroundUrl: settings.jadwal_pdf_background_url || '',
   fontFamily: settings.jadwal_pdf_font_family || 'Inter',
+  jadwalType: settings.jadwal_type || 'weekly',
   weekStart: settings.jadwal_week_start || '',
   weekEnd: settings.jadwal_week_end || '',
 });
@@ -617,7 +618,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const isCompact = teacherStyle === 'compact';
   const theme = getJadwalThemeFromSettings(settings);
   const dayDates = theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : [];
-  const customDays = getDaysFromRange(theme.weekStart, theme.weekEnd);
+  const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd) : null;
 
   useEffect(() => {
     if (initialStudentId) {

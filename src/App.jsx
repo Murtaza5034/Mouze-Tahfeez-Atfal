@@ -124,6 +124,7 @@ const JADWAL_SETTING_DEFAULTS = {
   jadwal_pdf_background_color: '#ffffff',
   jadwal_pdf_background_url: '',
   jadwal_pdf_font_family: 'Inter',
+  jadwal_type: 'weekly',
   jadwal_week_start: '',
   jadwal_week_end: '',
 };
@@ -7556,6 +7557,7 @@ const handleDownloadAllReports = async () => {
                     jadwal_pdf_background_color: jadwalSettingsDraft.jadwal_pdf_background_color,
                     jadwal_pdf_background_url: jadwalSettingsDraft.jadwal_pdf_background_url,
                     jadwal_pdf_font_family: jadwalSettingsDraft.jadwal_pdf_font_family,
+                    jadwal_type: jadwalSettingsDraft.jadwal_type,
                     jadwal_week_start: jadwalSettingsDraft.jadwal_week_start,
                     jadwal_week_end: jadwalSettingsDraft.jadwal_week_end,
                   });
@@ -7587,6 +7589,81 @@ const handleDownloadAllReports = async () => {
                       </small>
                     </label>
                   </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Calendar size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Jadwal Type</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Schedule Type</span>
+                      <select name="jadwal_type" value={jadwalSettingsDraft.jadwal_type || 'weekly'} onChange={updateJadwalDraft("jadwal_type")} className="premium-select">
+                        <option value="weekly">Weekly (Fixed 7 Days)</option>
+                        <option value="miqaat">Miqaāt (Custom Date Range)</option>
+                      </select>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Weekly = teacher sees all 7 days (Mon–Sun). Miqaāt = teacher sees only the days in the custom range you set below.
+                      </small>
+                    </label>
+                  </div>
+
+                  {jadwalSettingsDraft.jadwal_type === 'miqaat' ? (
+                  <>
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Calendar size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Miqaāt Date Range</h4>
+                  </div>
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                    <label style={{ flex: '1', minWidth: '200px' }}>
+                      <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>From (Start Date)</span>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <DatePicker
+                          value={jadwalSettingsDraft.jadwal_week_start || ''}
+                          onChange={(e) => updateJadwalDraft('jadwal_week_start')(e)}
+                        />
+                        {jadwalSettingsDraft.jadwal_week_start && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {new Date(jadwalSettingsDraft.jadwal_week_start).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      {jadwalSettingsDraft.jadwal_week_start && (() => {
+                        const fi = getFatemiInfo(jadwalSettingsDraft.jadwal_week_start);
+                        return (
+                          <div style={{ marginTop: '4px', fontSize: '1.2rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
+                            {fi.date} {fi.monthName} {fi.year}
+                          </div>
+                        );
+                      })()}
+                    </label>
+                    <label style={{ flex: '1', minWidth: '200px' }}>
+                      <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>To (End Date)</span>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <DatePicker
+                          value={jadwalSettingsDraft.jadwal_week_end || ''}
+                          onChange={(e) => updateJadwalDraft('jadwal_week_end')(e)}
+                        />
+                        {jadwalSettingsDraft.jadwal_week_end && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {new Date(jadwalSettingsDraft.jadwal_week_end).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      {jadwalSettingsDraft.jadwal_week_end && (() => {
+                        const fi = getFatemiInfo(jadwalSettingsDraft.jadwal_week_end);
+                        return (
+                          <div style={{ marginTop: '4px', fontSize: '1.2rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
+                            {fi.date} {fi.monthName} {fi.year}
+                          </div>
+                        );
+                      })()}
+                    </label>
+                  </div>
+                  <small style={{ display: 'block', marginTop: '4px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                    The selected date range will appear in Al Kanz font below each day name on the Jadwal.
+                  </small>
+                  </>
+                  ) : null}
 
                   <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
                     <Download size={16} />
@@ -7655,60 +7732,6 @@ const handleDownloadAllReports = async () => {
                       )}
                     </label>
                   </div>
-
-                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
-                    <Calendar size={16} />
-                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Jadwal Week Date Range</h4>
-                  </div>
-                  <div style={{ marginTop: '12px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                    <label style={{ flex: '1', minWidth: '200px' }}>
-                      <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>From (Start Date)</span>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <DatePicker
-                          value={jadwalSettingsDraft.jadwal_week_start || ''}
-                          onChange={(e) => updateJadwalDraft('jadwal_week_start')(e)}
-                        />
-                        {jadwalSettingsDraft.jadwal_week_start && (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {new Date(jadwalSettingsDraft.jadwal_week_start).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                      {jadwalSettingsDraft.jadwal_week_start && (() => {
-                        const fi = getFatemiInfo(jadwalSettingsDraft.jadwal_week_start);
-                        return (
-                          <div style={{ marginTop: '4px', fontSize: '1.2rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
-                            {fi.date} {fi.monthName} {fi.year}
-                          </div>
-                        );
-                      })()}
-                    </label>
-                    <label style={{ flex: '1', minWidth: '200px' }}>
-                      <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>To (End Date)</span>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <DatePicker
-                          value={jadwalSettingsDraft.jadwal_week_end || ''}
-                          onChange={(e) => updateJadwalDraft('jadwal_week_end')(e)}
-                        />
-                        {jadwalSettingsDraft.jadwal_week_end && (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {new Date(jadwalSettingsDraft.jadwal_week_end).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                      {jadwalSettingsDraft.jadwal_week_end && (() => {
-                        const fi = getFatemiInfo(jadwalSettingsDraft.jadwal_week_end);
-                        return (
-                          <div style={{ marginTop: '4px', fontSize: '1.2rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
-                            {fi.date} {fi.monthName} {fi.year}
-                          </div>
-                        );
-                      })()}
-                    </label>
-                  </div>
-                  <small style={{ display: 'block', marginTop: '4px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
-                    The selected date range will appear in Al Kanz font below each day name on the Jadwal.
-                  </small>
 
                   <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
                     Save Jadwal Settings

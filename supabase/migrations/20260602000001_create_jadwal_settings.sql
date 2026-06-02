@@ -7,6 +7,7 @@ create table if not exists public.jadwal_settings (
   jadwal_pdf_background_color text default '#ffffff',
   jadwal_pdf_background_url text default '',
   jadwal_pdf_font_family text default 'Inter',
+  jadwal_type text default 'weekly',
   jadwal_week_start text default '',
   jadwal_week_end text default ''
 );
