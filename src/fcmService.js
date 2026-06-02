@@ -7,6 +7,28 @@ class FCMService {
     this.token = null;
     this.initialized = false;
     this.initializingPromise = null;
+    this.refreshInterval = null;
+  }
+
+  // Refresh token periodically (every 2 hours) to keep it valid
+  startTokenRefresh(userRole) {
+    this.stopTokenRefresh();
+    this.refreshInterval = setInterval(async () => {
+      console.log('FCM: Periodic token refresh...');
+      const freshToken = await getFCMToken();
+      if (freshToken && freshToken !== this.token) {
+        this.token = freshToken;
+        await this.storeToken(freshToken, userRole);
+        console.log('FCM: Token refreshed');
+      }
+    }, 2 * 60 * 60 * 1000);
+  }
+
+  stopTokenRefresh() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
   }
 
   // Play premium notification chime using Web Audio API
@@ -128,6 +150,10 @@ class FCMService {
 
         this.initialized = true;
         console.log('FCM service initialized successfully for role:', userRole);
+
+        // Start periodic token refresh
+        this.startTokenRefresh(userRole);
+
         return true;
 
       } catch (error) {
@@ -313,6 +339,7 @@ class FCMService {
 
       this.token = null;
       this.initialized = false;
+      this.stopTokenRefresh();
       console.log('FCM token removed successfully');
     } catch (error) {
       console.error('Error removing FCM token:', error);

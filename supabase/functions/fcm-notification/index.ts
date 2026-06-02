@@ -196,7 +196,7 @@ async function sendFCMv1Notifications(tokens: string[], title: string, body: str
           },
           apns: {
             payload: {
-              aps: { aps: { sound: 'default', 'content-available': 1 }, 'content-available': 1 }
+              aps: { sound: 'default', 'content-available': 1 }
             }
           }
         }

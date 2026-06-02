@@ -17,59 +17,69 @@ const firebaseApp = initializeApp(firebaseConfig);
 // Initialize Firebase Cloud Messaging
 const messaging = getMessaging(firebaseApp);
 
-// Get registration token
-export const getFCMToken = async () => {
-  try {
-    console.log('Requesting FCM Token...');
-    
-    // Explicitly register service worker for official PWA support
-    if ('serviceWorker' in navigator) {
-      // Don't clean up existing service workers to prevent conflicts with PWA
-      // Just register the Firebase messaging SW if it's not already registered
-      let registration;
-      const existingRegistrations = await navigator.serviceWorker.getRegistrations();
-      const existingFcmSw = existingRegistrations.find(r => 
-        r.active?.scriptURL?.includes('firebase-messaging-sw')
-      );
+// Get registration token with retry
+export const getFCMToken = async (retries = 3) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`Requesting FCM Token (attempt ${attempt}/${retries})...`);
       
-      if (existingFcmSw) {
-        registration = existingFcmSw;
-        console.log('Using existing Firebase SW registration');
-      } else {
-        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-          scope: '/'
+      // Explicitly register service worker for official PWA support
+      if ('serviceWorker' in navigator) {
+        // Don't clean up existing service workers to prevent conflicts with PWA
+        // Just register the Firebase messaging SW if it's not already registered
+        let registration;
+        const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+        const existingFcmSw = existingRegistrations.find(r => 
+          r.active?.scriptURL?.includes('firebase-messaging-sw')
+        );
+        
+        if (existingFcmSw) {
+          registration = existingFcmSw;
+          console.log('Using existing Firebase SW registration');
+        } else {
+          registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+            scope: '/'
+          });
+          console.log('Service Worker registered with scope:', registration.scope);
+        }
+        
+        // Wait for service worker to be ready
+        await navigator.serviceWorker.ready;
+        
+        const currentToken = await getToken(messaging, { 
+          vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || "BGrvEM2dyLW86HLnNNIDibzCT7NHZka42OFBlVxyA86wBieuXZ09vJldEnQazc9h3VQgBbikEh0oqfiG0xeeyfg",
+          serviceWorkerRegistration: registration
         });
-        console.log('Service Worker registered with scope:', registration.scope);
-      }
-      
-      // Wait for service worker to be ready
-      await navigator.serviceWorker.ready;
-      
-      const currentToken = await getToken(messaging, { 
-        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || "BGrvEM2dyLW86HLnNNIDibzCT7NHZka42OFBlVxyA86wBieuXZ09vJldEnQazc9h3VQgBbikEh0oqfiG0xeeyfg",
-        serviceWorkerRegistration: registration
-      });
-      
-      if (currentToken) {
-        console.log('Official FCM Token retrieved:', currentToken);
-        return currentToken;
+        
+        if (currentToken) {
+          console.log('Official FCM Token retrieved:', currentToken.substring(0, 20) + '...');
+          return currentToken;
+        } else {
+          console.log('No registration token available. Permission might be needed.');
+          return null;
+        }
       } else {
-        console.log('No registration token available. Permission might be needed.');
+        console.error('Service workers are not supported in this browser.');
         return null;
       }
-    } else {
-      console.error('Service workers are not supported in this browser.');
-      return null;
+    } catch (error) {
+      console.error(`An error occurred while retrieving token (attempt ${attempt}/${retries}): `, error);
+      if (error.code === 'messaging/permission-blocked') {
+        alert('Notification permission was blocked. Please reset permissions in your browser bar.');
+        return null;
+      } else if (error.code === 'messaging/unsupported-browser') {
+        console.error('This browser is not supported for FCM notifications.');
+        return null;
+      }
+      if (attempt < retries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
     }
-  } catch (error) {
-    console.error('An error occurred while retrieving token: ', error);
-    if (error.code === 'messaging/permission-blocked') {
-      alert('Notification permission was blocked. Please reset permissions in your browser bar.');
-    } else if (error.code === 'messaging/unsupported-browser') {
-      console.error('This browser is not supported for FCM notifications.');
-    }
-    return null;
   }
+  console.error('Failed to get FCM token after', retries, 'attempts');
+  return null;
 };
 
 // Handle incoming messages - don't return the onMessage unsubscribe function

@@ -14,6 +14,15 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Activate immediately — don't wait for page reload
+self.addEventListener('install', function() {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(event) {
+  event.waitUntil(clients.claim());
+});
+
 // Handle background messages
 messaging.onBackgroundMessage(function(payload) {
   try {
