@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { Download, Save, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { JadwalNotes } from "./JadwalNotes";
@@ -326,7 +326,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
   );
 };
 
-const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compact }) => {
+const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compact, customDays }) => {
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
 
   const getWeekDays = () => {
@@ -344,10 +344,13 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   const weekDays = getWeekDays();
   const fatemiDates = weekDays.map(d => getFatemiDateStr(d.toISOString().split('T')[0]));
 
-  const renderDayCell = (day, dateObj) => {
+  const renderDayCell = (day, dateObj, customFatemi) => {
     const row = scheduleData[day] || {};
-    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const isToday = dateObj.toDateString() === new Date().toDateString();
+    const dateStr = customDays
+      ? dateObj?.date || ''
+      : dateObj?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const isToday = customDays ? false : dateObj?.toDateString() === new Date().toDateString();
+    const fatemi = customFatemi || (customDays ? '' : fatemiDates[DAYS.indexOf(day)]);
 
     const fields = mode === 'juz-wise'
       ? ['juz1', 'juz2', 'juz3', 'juz4']
@@ -358,13 +361,13 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
       <div key={day} className={`jadwal-calendar-card ${isToday ? 'today' : ''}`}>
         <div className="jadwal-calendar-card-header">
           <span className="jadwal-calendar-day-name">{day}</span>
-          <span className="jadwal-calendar-date">{dateStr}</span>
+          {dateStr ? <span className="jadwal-calendar-date">{dateStr}</span> : null}
         </div>
-        {fatemiDates[DAYS.indexOf(day)] && (
+        {fatemi ? (
           <div style={{ textAlign: 'center', fontSize: '0.7rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', padding: '2px 0 4px', lineHeight: 1.2, direction: 'rtl' }}>
-            {fatemiDates[DAYS.indexOf(day)]}
+            {fatemi}
           </div>
-        )}
+        ) : null}
         <div className="jadwal-calendar-card-body">
           {fields.map(field => (
             <div className="jadwal-calendar-field" key={field}>
@@ -420,6 +423,20 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
       </div>
     );
   };
+
+  if (customDays) {
+    return (
+      <div className="jadwal-calendar-container">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>
+          <Calendar size={16} />
+          <span>Showing <strong>{customDays.length}</strong> day{customDays.length !== 1 ? 's' : ''} — {customDays[0]?.date} to {customDays[customDays.length - 1]?.date}</span>
+        </div>
+        <div className="jadwal-calendar-grid">
+          {customDays.map(d => renderDayCell(d.dayName, d, d.fatemiDate))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="jadwal-calendar-container">
@@ -718,6 +735,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             onCellChange={handleCellChange}
             compact={isCompact}
             dayDates={dayDates}
+            customDays={customDays}
           />
         );
       case 'single_day_card':
