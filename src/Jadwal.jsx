@@ -535,16 +535,17 @@ const getJadwalThemeFromSettings = (settings = {}) => ({
 });
 
 export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId, jadwalSettings }) => {
+  const settings = Array.isArray(jadwalSettings) ? jadwalSettings[0] : jadwalSettings;
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [scheduleData, setScheduleData] = useState({ ...DEFAULT_SCHEDULE, _mode: 'juz-wise' });
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const displayStyle = jadwalSettings?.jadwal_style || 'table';
-  const teacherStyle = jadwalSettings?.jadwal_teacher_style || 'default';
+  const displayStyle = settings?.jadwal_style || 'table';
+  const teacherStyle = settings?.jadwal_teacher_style || 'default';
   const isCompact = teacherStyle === 'compact';
-  const theme = getJadwalThemeFromSettings(jadwalSettings);
+  const theme = getJadwalThemeFromSettings(settings);
 
   useEffect(() => {
     if (initialStudentId) {
@@ -746,13 +747,14 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
 };
 
 export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherProfiles, showAction, jadwalSettings }) => {
+  const settings = Array.isArray(jadwalSettings) ? jadwalSettings[0] : jadwalSettings;
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [studentName, setStudentName] = useState('Student');
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(true);
 
-  const displayStyle = jadwalSettings?.jadwal_style || 'table';
-  const theme = getJadwalThemeFromSettings(jadwalSettings);
+  const displayStyle = settings?.jadwal_style || 'table';
+  const theme = getJadwalThemeFromSettings(settings);
 
   useEffect(() => {
     if (studentId) {
