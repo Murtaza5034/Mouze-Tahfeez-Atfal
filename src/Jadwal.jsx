@@ -199,7 +199,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   }
 };
 
-const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) => {
+const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates }) => {
   return (
     <div className="jadwal-table-wrapper">
       <table className="jadwal-table">
@@ -231,9 +231,9 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) => {
           )}
         </thead>
         <tbody>
-          {DAYS.map(day => (
+          {DAYS.map((day, idx) => (
             <tr key={day}>
-              <td className="day-cell">{day}</td>
+              <td className="day-cell">{day}{dayDates?.[idx] ? <div className="day-fatemi-date">{dayDates[idx]}</div> : null}</td>
               {mode === 'juz-wise' ? (
                 <>
                   {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => (
@@ -338,6 +338,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   };
 
   const weekDays = getWeekDays();
+  const fatemiDates = weekDays.map(d => getFatemiDateStr(d.toISOString().split('T')[0]));
 
   const renderDayCell = (day, dateObj) => {
     const row = scheduleData[day] || {};
@@ -355,6 +356,11 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
           <span className="jadwal-calendar-day-name">{day}</span>
           <span className="jadwal-calendar-date">{dateStr}</span>
         </div>
+        {fatemiDates[DAYS.indexOf(day)] && (
+          <div style={{ textAlign: 'center', fontSize: '0.7rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', padding: '2px 0 4px', lineHeight: 1.2, direction: 'rtl' }}>
+            {fatemiDates[DAYS.indexOf(day)]}
+          </div>
+        )}
         <div className="jadwal-calendar-card-body">
           {fields.map(field => (
             <div className="jadwal-calendar-field" key={field}>
@@ -431,7 +437,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   );
 };
 
-const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly }) => {
+const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates }) => {
   const [currentDayIndex, setCurrentDayIndex] = useState(() => {
     const today = new Date().getDay();
     return today === 0 ? 6 : today - 1;
@@ -439,6 +445,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly }
 
   const day = DAYS[currentDayIndex];
   const row = scheduleData[day] || {};
+  const fatemiDate = dayDates?.[currentDayIndex] || '';
 
   const goToDay = (offset) => {
     setCurrentDayIndex(prev => {
@@ -462,6 +469,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly }
         </button>
         <div className="jadwal-single-day-title">
           <h3>{day}</h3>
+          {fatemiDate && <span style={{ fontSize: '0.75rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl', display: 'block', marginTop: '2px' }}>{fatemiDate}</span>}
           <span className="jadwal-single-day-subtitle">Current Day View</span>
         </div>
         <button className="jadwal-calendar-nav-btn" onClick={() => goToDay(1)}>
@@ -532,7 +540,34 @@ const getJadwalThemeFromSettings = (settings = {}) => ({
   backgroundColor: settings.jadwal_pdf_background_color || '#ffffff',
   backgroundUrl: settings.jadwal_pdf_background_url || '',
   fontFamily: settings.jadwal_pdf_font_family || 'Inter',
+  weekStart: settings.jadwal_week_start || '',
 });
+
+const getFatemiDateStr = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
+      day: 'numeric', month: 'numeric', year: 'numeric'
+    }).formatToParts(date);
+    const d = parts.find(p => p.type === 'day').value;
+    const m = parseInt(parts.find(p => p.type === 'month').value);
+    const y = parts.find(p => p.type === 'year').value;
+    const arabicMonths = [
+      "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
+      "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
+      "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
+    ];
+    return `${d} ${arabicMonths[m - 1] || ''} ${y}`;
+  } catch { return ''; }
+};
+
+const getDayDate = (weekStart, dayIndex) => {
+  if (!weekStart) return '';
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + dayIndex);
+  return getFatemiDateStr(d.toISOString().split('T')[0]);
+};
 
 export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId, jadwalSettings }) => {
   const settings = Array.isArray(jadwalSettings) ? jadwalSettings[0] : jadwalSettings;
@@ -546,6 +581,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const teacherStyle = settings?.jadwal_teacher_style || 'default';
   const isCompact = teacherStyle === 'compact';
   const theme = getJadwalThemeFromSettings(settings);
+  const dayDates = theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : [];
 
   useEffect(() => {
     if (initialStudentId) {
@@ -644,6 +680,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             scheduleData={scheduleData}
             onCellChange={handleCellChange}
             compact={isCompact}
+            dayDates={dayDates}
           />
         );
       case 'single_day_card':
@@ -652,6 +689,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             mode={mode}
             scheduleData={scheduleData}
             onCellChange={handleCellChange}
+            dayDates={dayDates}
           />
         );
       default:
@@ -660,6 +698,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             mode={mode}
             scheduleData={scheduleData}
             onCellChange={handleCellChange}
+            dayDates={dayDates}
           />
         );
     }
@@ -755,6 +794,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
 
   const displayStyle = settings?.jadwal_style || 'table';
   const theme = getJadwalThemeFromSettings(settings);
+  const dayDates = theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : [];
 
   useEffect(() => {
     if (studentId) {
@@ -807,6 +847,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             scheduleData={scheduleData}
             onCellChange={noop}
             readOnly
+            dayDates={dayDates}
           />
         );
       case 'single_day_card':
@@ -816,6 +857,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             scheduleData={scheduleData}
             onCellChange={noop}
             readOnly
+            dayDates={dayDates}
           />
         );
       default:
@@ -825,6 +867,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             scheduleData={scheduleData}
             onCellChange={noop}
             readOnly
+            dayDates={dayDates}
           />
         );
     }

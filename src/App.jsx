@@ -121,6 +121,7 @@ const REPORT_SETTING_DEFAULTS = {
   jadwal_pdf_background_color: '#ffffff',
   jadwal_pdf_background_url: '',
   jadwal_pdf_font_family: 'Inter',
+  jadwal_week_start: '',
 };
 
 const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
@@ -7552,6 +7553,7 @@ const handleDownloadAllReports = async () => {
                     jadwal_pdf_background_color: reportSettingsDraft.jadwal_pdf_background_color,
                     jadwal_pdf_background_url: reportSettingsDraft.jadwal_pdf_background_url,
                     jadwal_pdf_font_family: reportSettingsDraft.jadwal_pdf_font_family,
+                    jadwal_week_start: reportSettingsDraft.jadwal_week_start,
                   });
                 }}>
                   <div className="card-headline" style={{ marginTop: '0', padding: '0', border: 'none' }}>
@@ -7647,6 +7649,38 @@ const handleDownloadAllReports = async () => {
                           <img src={reportSettingsDraft.jadwal_pdf_background_url} alt="Jadwal background preview" style={{ width: '100%', height: '80px', objectFit: 'cover', display: 'block' }} />
                         </div>
                       )}
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Calendar size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Jadwal Week Start Date</h4>
+                  </div>
+                  <div style={{ marginTop: '12px' }}>
+                    <label>
+                      <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>Select the week start date (Fatemi calendar):</span>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <FatemiDateSelector
+                          value={reportSettingsDraft.jadwal_week_start || ''}
+                          onChange={(e) => updateReportDraft('jadwal_week_start')(e)}
+                        />
+                        {reportSettingsDraft.jadwal_week_start && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            Gregorian: {new Date(reportSettingsDraft.jadwal_week_start).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      {reportSettingsDraft.jadwal_week_start && (() => {
+                        const fi = getFatemiInfo(reportSettingsDraft.jadwal_week_start);
+                        return (
+                          <div style={{ marginTop: '8px', fontSize: '1.3rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
+                            {fi.date} {fi.monthName} {fi.year}
+                          </div>
+                        );
+                      })()}
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        The selected date will appear in Al Kanz font below each day name on the Jadwal.
+                      </small>
                     </label>
                   </div>
 

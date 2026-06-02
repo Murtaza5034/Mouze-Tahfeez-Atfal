@@ -84,6 +84,17 @@
   letter-spacing: 0.5px;
 }
 
+.jadwal-table td.day-cell .day-fatemi-date {
+  font-size: 0.6rem;
+  font-weight: 400;
+  font-family: 'Kanz al Marjaan', serif;
+  color: var(--primary-gold, #c5a059);
+  direction: rtl;
+  line-height: 1.3;
+  margin-top: 2px;
+  letter-spacing: 0;
+}
+
 .jadwal-table input {
   width: 100%;
   border: 1px solid transparent;
