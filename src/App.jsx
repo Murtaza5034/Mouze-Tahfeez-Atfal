@@ -2028,7 +2028,8 @@ function getFatemiInfo(dateStr) {
     const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
       day: 'numeric',
       month: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC'
     }).formatToParts(date);
 
     const d = parseInt(parts.find(p => p.type === 'day').value);
@@ -2384,7 +2385,7 @@ function InfoHighlights({ items }) {
 function DatePicker({ value, onChange, disabled = false }) {
   const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const info = value ? getFatemiInfo(value) : null;
-  const dayName = value ? dayNames[new Date(value + 'T00:00:00').getDay()] : '';
+  const dayName = value ? dayNames[new Date(value + 'T00:00:00Z').getUTCDay()] : '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
