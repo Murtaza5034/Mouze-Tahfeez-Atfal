@@ -855,6 +855,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const [saving, setSaving] = useState(false);
 
   const displayStyle = settings?.jadwal_style || 'table';
+  const [teacherDisplayStyle, setTeacherDisplayStyle] = useState(displayStyle);
   const teacherStyle = settings?.jadwal_teacher_style || 'default';
   const isCompact = teacherStyle === 'compact';
   const theme = getJadwalThemeFromSettings(settings);
@@ -950,7 +951,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const studentName = selectedStudentObj ? (selectedStudentObj.full_name || selectedStudentObj.name) : "Student";
 
   const renderJadwalContent = () => {
-    switch (displayStyle) {
+    switch (teacherDisplayStyle) {
       case 'calendar':
         return (
           <JadwalCalendarStyle
@@ -1044,9 +1045,15 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             {mode === 'surah-wise' && (
               <span style={{ fontSize: '12px', color: '#8b6d31', fontStyle: 'italic' }}>Free text: English or Arabic</span>
             )}
-            <span className="jadwal-style-badge">
-              {displayStyle.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            </span>
+            <select
+              value={teacherDisplayStyle}
+              onChange={(e) => setTeacherDisplayStyle(e.target.value)}
+              className="jadwal-style-select"
+            >
+              <option value="table">Table</option>
+              <option value="calendar">Calendar</option>
+              <option value="single_day_card">Single Day Card</option>
+            </select>
           </div>
           {renderJadwalContent()}
         </>

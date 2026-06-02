@@ -318,7 +318,8 @@
   to { transform: rotate(360deg); }
 }
 
-.jadwal-style-badge {
+.jadwal-style-badge,
+.jadwal-style-select {
   font-size: 11px;
   color: #fff;
   background: var(--primary-gold, #d4af37);
@@ -327,6 +328,30 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.jadwal-style-select {
+  border: 1px solid rgba(255,255,255,0.3);
+  cursor: pointer;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s ease;
+  appearance: auto;
+  -webkit-appearance: auto;
+}
+
+.jadwal-style-select:hover {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+}
+
+.jadwal-style-select:focus {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
+}
+
+.jadwal-style-select option {
+  background: #fff;
+  color: #333;
+  text-transform: none;
 }
 
 .jadwal-calendar-container {
@@ -584,7 +609,13 @@
   color: var(--light-gold, #e5c07b);
 }
 
-.dark-mode .jadwal-style-badge {
+.dark-mode .jadwal-style-badge,
+.dark-mode .jadwal-style-select {
   background: var(--light-gold, #e5c07b);
   color: #222;
+}
+
+.dark-mode .jadwal-style-select option {
+  background: #222;
+  color: #eee;
 }
