@@ -1,5 +1,3 @@
-begin;
-
 create table if not exists public.jadwal_settings (
   id integer primary key default 1,
   jadwal_style text default 'table',
@@ -29,5 +27,3 @@ drop policy if exists "Anyone can read jadwal_settings" on public.jadwal_setting
 create policy "Anyone can read jadwal_settings"
   on public.jadwal_settings for select
   using (true);
-
-commit;

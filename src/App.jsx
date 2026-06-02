@@ -114,6 +114,9 @@ const REPORT_SETTING_DEFAULTS = {
   auto_lock_time: "00:00",
   auto_unlock_day: "Friday",
   auto_unlock_time: "16:30",
+};
+
+const JADWAL_SETTING_DEFAULTS = {
   jadwal_style: 'table',
   jadwal_teacher_style: 'default',
   jadwal_pdf_primary_color: '#5d4037',
@@ -131,6 +134,11 @@ const MAX_REPORT_BACKGROUND_SIZE = 5 * 1024 * 1024;
 const normalizeReportSettings = (reportSettings) => ({
   ...REPORT_SETTING_DEFAULTS,
   ...(getReportSettingsObject(reportSettings) || {}),
+});
+
+const normalizeJadwalSettings = (settings) => ({
+  ...JADWAL_SETTING_DEFAULTS,
+  ...(Array.isArray(settings) ? settings[0] : settings || {}),
 });
 
 const getReportActionTime = (settings) => {
@@ -3358,6 +3366,7 @@ function ParentPortal({
   loadPortalData,
   portalRole,
   reportSettings: propReportSettings = [],
+  jadwalSettings: propJadwalSettings = [],
   setSelectedAnnouncement,
   isDarkMode,
   setIsDarkMode,
@@ -4169,7 +4178,7 @@ function ParentPortal({
               teacherId={studentProfile?.muhaffiz_id}
               teacherProfiles={teacherProfiles}
               showAction={showAction}
-              jadwalSettings={propReportSettings}
+               jadwalSettings={propJadwalSettings}
             />
           </Suspense>
         ) : null}
@@ -4809,6 +4818,8 @@ function AdminPortal({
   portalRole,
   setSelectedAnnouncement,
   reportSettings = [],
+  jadwalSettings = [],
+  onSaveJadwalSettings,
   onShowAction,
   dismissedNotifs = [],
   dismissedAnnounces = [],
@@ -4839,12 +4850,16 @@ function AdminPortal({
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
   const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
+  const [jadwalSettingsDraft, setJadwalSettingsDraft] = useState(() => normalizeJadwalSettings(jadwalSettings));
   const [uploadingReportBackground, setUploadingReportBackground] = useState(false);
   const [uploadingJadwalBg, setUploadingJadwalBg] = useState(false);
 
   useEffect(() => {
     setReportSettingsDraft(normalizeReportSettings(reportSettings));
   }, [reportSettings]);
+  useEffect(() => {
+    setJadwalSettingsDraft(normalizeJadwalSettings(jadwalSettings));
+  }, [jadwalSettings]);
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
@@ -5225,9 +5240,30 @@ const handleDownloadAllReports = async () => {
     loadPortalData(portalRole, user);
   };
 
+  const saveJadwalSettings = async (updates) => {
+    const { error } = await supabase
+      .from("jadwal_settings")
+      .upsert({ id: 1, ...updates }, { onConflict: "id" })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      onShowAction("error", "Failed to update Jadwal settings: " + error.message);
+      return;
+    }
+
+    onShowAction("success", "Jadwal settings saved successfully!");
+    loadPortalData(portalRole, user);
+  };
+
   const updateReportDraft = (field) => (event) => {
     const value = event.target.value;
     setReportSettingsDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateJadwalDraft = (field) => (event) => {
+    const value = event.target.value;
+    setJadwalSettingsDraft((current) => ({ ...current, [field]: value }));
   };
 
   const handleReportBackgroundUpload = async (event) => {
@@ -5341,12 +5377,12 @@ const handleDownloadAllReports = async () => {
       const backgroundUrl = publicUrlData?.publicUrl;
       if (!backgroundUrl) throw new Error("Background image URL was not returned.");
 
-      setReportSettingsDraft((current) => ({
+      setJadwalSettingsDraft((current) => ({
         ...current,
         jadwal_pdf_background_url: backgroundUrl,
       }));
 
-      await saveReportSettings({ jadwal_pdf_background_url: backgroundUrl });
+      await onSaveJadwalSettings({ jadwal_pdf_background_url: backgroundUrl });
     } catch (error) {
       console.error("Jadwal background upload failed:", error);
       onShowAction("error", `Jadwal background upload failed: ${error.message}`);
@@ -5356,11 +5392,11 @@ const handleDownloadAllReports = async () => {
   };
 
   const removeJadwalBg = async () => {
-    setReportSettingsDraft((current) => ({
+    setJadwalSettingsDraft((current) => ({
       ...current,
       jadwal_pdf_background_url: "",
     }));
-    await saveReportSettings({ jadwal_pdf_background_url: "" });
+    await onSaveJadwalSettings({ jadwal_pdf_background_url: "" });
   };
 
   return (
@@ -7546,16 +7582,16 @@ const handleDownloadAllReports = async () => {
                 </div>
                   <form className="stack-form" onSubmit={(e) => {
                   e.preventDefault();
-                  saveReportSettings({
-                    jadwal_style: reportSettingsDraft.jadwal_style,
-                    jadwal_teacher_style: reportSettingsDraft.jadwal_teacher_style,
-                    jadwal_pdf_primary_color: reportSettingsDraft.jadwal_pdf_primary_color,
-                    jadwal_pdf_accent_color: reportSettingsDraft.jadwal_pdf_accent_color,
-                    jadwal_pdf_background_color: reportSettingsDraft.jadwal_pdf_background_color,
-                    jadwal_pdf_background_url: reportSettingsDraft.jadwal_pdf_background_url,
-                    jadwal_pdf_font_family: reportSettingsDraft.jadwal_pdf_font_family,
-                    jadwal_week_start: reportSettingsDraft.jadwal_week_start,
-                    jadwal_week_end: reportSettingsDraft.jadwal_week_end,
+                  onSaveJadwalSettings({
+                    jadwal_style: jadwalSettingsDraft.jadwal_style,
+                    jadwal_teacher_style: jadwalSettingsDraft.jadwal_teacher_style,
+                    jadwal_pdf_primary_color: jadwalSettingsDraft.jadwal_pdf_primary_color,
+                    jadwal_pdf_accent_color: jadwalSettingsDraft.jadwal_pdf_accent_color,
+                    jadwal_pdf_background_color: jadwalSettingsDraft.jadwal_pdf_background_color,
+                    jadwal_pdf_background_url: jadwalSettingsDraft.jadwal_pdf_background_url,
+                    jadwal_pdf_font_family: jadwalSettingsDraft.jadwal_pdf_font_family,
+                    jadwal_week_start: jadwalSettingsDraft.jadwal_week_start,
+                    jadwal_week_end: jadwalSettingsDraft.jadwal_week_end,
                   });
                 }}>
                   <div className="card-headline" style={{ marginTop: '0', padding: '0', border: 'none' }}>
@@ -7565,7 +7601,7 @@ const handleDownloadAllReports = async () => {
                   <div className="form-grid">
                     <label>
                       <span>Display Style</span>
-                      <select name="jadwal_style" value={reportSettingsDraft.jadwal_style || 'table'} onChange={updateReportDraft("jadwal_style")} className="premium-select">
+                      <select name="jadwal_style" value={jadwalSettingsDraft.jadwal_style || 'table'} onChange={updateJadwalDraft("jadwal_style")} className="premium-select">
                         <option value="table">Table Style</option>
                         <option value="calendar">Calendar Style</option>
                         <option value="single_day_card">Single Day Card Style</option>
@@ -7576,7 +7612,7 @@ const handleDownloadAllReports = async () => {
                     </label>
                     <label>
                       <span>Teacher Input Style</span>
-                      <select name="jadwal_teacher_style" value={reportSettingsDraft.jadwal_teacher_style || 'default'} onChange={updateReportDraft("jadwal_teacher_style")} className="premium-select">
+                      <select name="jadwal_teacher_style" value={jadwalSettingsDraft.jadwal_teacher_style || 'default'} onChange={updateJadwalDraft("jadwal_teacher_style")} className="premium-select">
                         <option value="default">Default (Full Table)</option>
                         <option value="compact">Compact (Minimal Input)</option>
                       </select>
@@ -7593,19 +7629,19 @@ const handleDownloadAllReports = async () => {
                   <div className="form-grid">
                     <label>
                       <span>Primary Color</span>
-                      <input name="jadwal_pdf_primary_color" type="color" value={reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037'} onChange={updateReportDraft("jadwal_pdf_primary_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                      <input name="jadwal_pdf_primary_color" type="color" value={jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037'} onChange={updateJadwalDraft("jadwal_pdf_primary_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
                     </label>
                     <label>
                       <span>Accent / Gold Color</span>
-                      <input name="jadwal_pdf_accent_color" type="color" value={reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'} onChange={updateReportDraft("jadwal_pdf_accent_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                      <input name="jadwal_pdf_accent_color" type="color" value={jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'} onChange={updateJadwalDraft("jadwal_pdf_accent_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
                     </label>
                     <label>
                       <span>Page Background Color</span>
-                      <input name="jadwal_pdf_background_color" type="color" value={reportSettingsDraft.jadwal_pdf_background_color || '#ffffff'} onChange={updateReportDraft("jadwal_pdf_background_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                      <input name="jadwal_pdf_background_color" type="color" value={jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff'} onChange={updateJadwalDraft("jadwal_pdf_background_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
                     </label>
                     <label>
                       <span>Font Family</span>
-                      <select name="jadwal_pdf_font_family" value={reportSettingsDraft.jadwal_pdf_font_family || 'Inter'} onChange={updateReportDraft("jadwal_pdf_font_family")} className="premium-select">
+                      <select name="jadwal_pdf_font_family" value={jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter'} onChange={updateJadwalDraft("jadwal_pdf_font_family")} className="premium-select">
                         <option value="Inter">Inter</option>
                         <option value="'Segoe UI', sans-serif">Segoe UI</option>
                         <option value="'Times New Roman', serif">Times New Roman</option>
@@ -7637,7 +7673,7 @@ const handleDownloadAllReports = async () => {
                           />
                           {uploadingJadwalBg && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary-gold)' }} />}
                         </label>
-                        {reportSettingsDraft.jadwal_pdf_background_url && (
+                        {jadwalSettingsDraft.jadwal_pdf_background_url && (
                           <button type="button" onClick={removeJadwalBg} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, padding: '6px 10px', borderRadius: '6px' }}>
                             <XCircle size={16} /> Remove
                           </button>
@@ -7646,9 +7682,9 @@ const handleDownloadAllReports = async () => {
                       <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
                         Upload a background image for the Jadwal PDF. Accepted formats: JPG, PNG, GIF, WebP (max 5MB).
                       </small>
-                      {reportSettingsDraft.jadwal_pdf_background_url && (
+                      {jadwalSettingsDraft.jadwal_pdf_background_url && (
                         <div style={{ marginTop: '10px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dfcbb5', maxWidth: '200px' }}>
-                          <img src={reportSettingsDraft.jadwal_pdf_background_url} alt="Jadwal background preview" style={{ width: '100%', height: '80px', objectFit: 'cover', display: 'block' }} />
+                          <img src={jadwalSettingsDraft.jadwal_pdf_background_url} alt="Jadwal background preview" style={{ width: '100%', height: '80px', objectFit: 'cover', display: 'block' }} />
                         </div>
                       )}
                     </label>
@@ -7663,17 +7699,17 @@ const handleDownloadAllReports = async () => {
                       <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>From (Start Date)</span>
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <FatemiDateSelector
-                          value={reportSettingsDraft.jadwal_week_start || ''}
-                          onChange={(e) => updateReportDraft('jadwal_week_start')(e)}
+                          value={jadwalSettingsDraft.jadwal_week_start || ''}
+                          onChange={(e) => updateJadwalDraft('jadwal_week_start')(e)}
                         />
-                        {reportSettingsDraft.jadwal_week_start && (
+                        {jadwalSettingsDraft.jadwal_week_start && (
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {new Date(reportSettingsDraft.jadwal_week_start).toLocaleDateString()}
+                            {new Date(jadwalSettingsDraft.jadwal_week_start).toLocaleDateString()}
                           </span>
                         )}
                       </div>
-                      {reportSettingsDraft.jadwal_week_start && (() => {
-                        const fi = getFatemiInfo(reportSettingsDraft.jadwal_week_start);
+                      {jadwalSettingsDraft.jadwal_week_start && (() => {
+                        const fi = getFatemiInfo(jadwalSettingsDraft.jadwal_week_start);
                         return (
                           <div style={{ marginTop: '4px', fontSize: '1.2rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
                             {fi.date} {fi.monthName} {fi.year}
@@ -7685,17 +7721,17 @@ const handleDownloadAllReports = async () => {
                       <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>To (End Date)</span>
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <FatemiDateSelector
-                          value={reportSettingsDraft.jadwal_week_end || ''}
-                          onChange={(e) => updateReportDraft('jadwal_week_end')(e)}
+                          value={jadwalSettingsDraft.jadwal_week_end || ''}
+                          onChange={(e) => updateJadwalDraft('jadwal_week_end')(e)}
                         />
-                        {reportSettingsDraft.jadwal_week_end && (
+                        {jadwalSettingsDraft.jadwal_week_end && (
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {new Date(reportSettingsDraft.jadwal_week_end).toLocaleDateString()}
+                            {new Date(jadwalSettingsDraft.jadwal_week_end).toLocaleDateString()}
                           </span>
                         )}
                       </div>
-                      {reportSettingsDraft.jadwal_week_end && (() => {
-                        const fi = getFatemiInfo(reportSettingsDraft.jadwal_week_end);
+                      {jadwalSettingsDraft.jadwal_week_end && (() => {
+                        const fi = getFatemiInfo(jadwalSettingsDraft.jadwal_week_end);
                         return (
                           <div style={{ marginTop: '4px', fontSize: '1.2rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
                             {fi.date} {fi.monthName} {fi.year}
@@ -7721,23 +7757,23 @@ const handleDownloadAllReports = async () => {
                 </div>
                 <div style={{
                   padding: '20px',
-                  fontFamily: (reportSettingsDraft.jadwal_pdf_font_family || 'Inter').includes(',') ? reportSettingsDraft.jadwal_pdf_font_family : `'${reportSettingsDraft.jadwal_pdf_font_family || 'Inter'}', 'Inter', sans-serif`,
+                  fontFamily: (jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter').includes(',') ? jadwalSettingsDraft.jadwal_pdf_font_family : `'${jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter'}', 'Inter', sans-serif`,
                 }}>
                   {/* Mini PDF Preview Card */}
                   <div style={{
-                    border: `2px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                    border: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
                     borderRadius: '12px',
                     overflow: 'hidden',
-                    background: reportSettingsDraft.jadwal_pdf_background_color || '#ffffff',
+                    background: jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff',
                     position: 'relative',
                     minHeight: '320px'
                   }}>
                     {/* Background Image Layer */}
-                    {reportSettingsDraft.jadwal_pdf_background_url && (
+                    {jadwalSettingsDraft.jadwal_pdf_background_url && (
                       <div style={{
                         position: 'absolute',
                         inset: 0,
-                        backgroundImage: `url(${reportSettingsDraft.jadwal_pdf_background_url})`,
+                        backgroundImage: `url(${jadwalSettingsDraft.jadwal_pdf_background_url})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         opacity: 0.25,
@@ -7752,15 +7788,15 @@ const handleDownloadAllReports = async () => {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        borderBottom: `2px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                        borderBottom: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
                         paddingBottom: '12px',
                         marginBottom: '14px'
                       }}>
                         <div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037', letterSpacing: '0.5px' }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', letterSpacing: '0.5px' }}>
                             MAUZE TAHFEEZ ATFAL
                           </div>
-                          <div style={{ fontSize: '0.6rem', color: reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 600, marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.6rem', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 600, marginTop: '2px' }}>
                             Weekly Quran Jadwal
                           </div>
                         </div>
@@ -7770,7 +7806,7 @@ const handleDownloadAllReports = async () => {
                           textAlign: 'right'
                         }}>
                           <div>Generated on</div>
-                          <div style={{ fontWeight: 700, color: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{new Date().toLocaleDateString()}</div>
+                          <div style={{ fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{new Date().toLocaleDateString()}</div>
                         </div>
                       </div>
 
@@ -7786,14 +7822,14 @@ const handleDownloadAllReports = async () => {
                         alignItems: 'center'
                       }}>
                         <div>
-                          <div style={{ fontSize: '0.5rem', color: reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>STUDENT NAME</div>
-                          <div style={{ fontSize: '0.75rem', color: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037', fontWeight: 800 }}>Abdullah Ahmad</div>
+                          <div style={{ fontSize: '0.5rem', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>STUDENT NAME</div>
+                          <div style={{ fontSize: '0.75rem', color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', fontWeight: 800 }}>Abdullah Ahmad</div>
                         </div>
                         <div style={{
                           fontSize: '0.55rem',
                           fontWeight: 700,
                           color: '#ffffff',
-                          background: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037',
+                          background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037',
                           padding: '3px 10px',
                           borderRadius: '12px'
                         }}>
@@ -7802,14 +7838,14 @@ const handleDownloadAllReports = async () => {
                       </div>
 
                       {/* Mini Table */}
-                      <div style={{ overflow: 'hidden', borderRadius: '6px', border: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` }}>
+                      <div style={{ overflow: 'hidden', borderRadius: '6px', border: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.55rem' }}>
                           <thead>
-                            <tr style={{ background: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#ffffff' }}>
-                              <th style={{ padding: '6px 8px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'left', fontWeight: 700, textTransform: 'uppercase' }}>DAYS</th>
-                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 1</th>
-                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 2</th>
-                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JUZHALI</th>
+                            <tr style={{ background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#ffffff' }}>
+                              <th style={{ padding: '6px 8px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'left', fontWeight: 700, textTransform: 'uppercase' }}>DAYS</th>
+                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 1</th>
+                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 2</th>
+                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JUZHALI</th>
                               <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JADEED</th>
                             </tr>
                           </thead>
@@ -7819,10 +7855,10 @@ const handleDownloadAllReports = async () => {
                               { day: 'TUESDAY', cells: ['11-15', '16-20', '4-6', '9-16'] },
                               { day: 'WEDNESDAY', cells: ['21-25', '26-30', '7-9', '17-24'] },
                             ].map((row, idx) => (
-                              <tr key={row.day} style={{ background: idx % 2 === 0 ? (reportSettingsDraft.jadwal_pdf_background_color || '#ffffff') : `${reportSettingsDraft.jadwal_pdf_background_color || '#ffffff'}f2` }}>
-                                <td style={{ padding: '5px 8px', borderRight: `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, borderBottom: idx < 2 ? `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', fontWeight: 700, color: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{row.day}</td>
+                              <tr key={row.day} style={{ background: idx % 2 === 0 ? (jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff') : `${jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff'}f2` }}>
+                                <td style={{ padding: '5px 8px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, borderBottom: idx < 2 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{row.day}</td>
                                 {row.cells.map((cell, ci) => (
-                                  <td key={ci} style={{ padding: '5px 4px', borderRight: ci < 4 ? `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', borderBottom: idx < 2 ? `1px solid ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', textAlign: 'center', color: '#333' }}>{cell}</td>
+                                  <td key={ci} style={{ padding: '5px 4px', borderRight: ci < 4 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', borderBottom: idx < 2 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', textAlign: 'center', color: '#333' }}>{cell}</td>
                                 ))}
                               </tr>
                             ))}
@@ -7831,8 +7867,8 @@ const handleDownloadAllReports = async () => {
                       </div>
 
                       {/* Footer */}
-                      <div style={{ marginTop: '12px', borderTop: `1px dashed ${reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, paddingTop: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.5rem', color: reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontStyle: 'italic', fontWeight: 600 }}>
+                      <div style={{ marginTop: '12px', borderTop: `1px dashed ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, paddingTop: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.5rem', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontStyle: 'italic', fontWeight: 600 }}>
                           "And We have indeed made the Quran easy to understand and remember..."
                         </div>
                       </div>
@@ -7841,17 +7877,17 @@ const handleDownloadAllReports = async () => {
 
                   <div style={{ marginTop: '12px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: reportSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#fff' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#fff' }}>
                         Primary
                       </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: reportSettingsDraft.jadwal_pdf_accent_color || '#d4af37', color: '#2c1e11' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', color: '#2c1e11' }}>
                         Accent
                       </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: reportSettingsDraft.jadwal_pdf_background_color || '#fff', border: '1px solid #ddd', color: '#666' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: jadwalSettingsDraft.jadwal_pdf_background_color || '#fff', border: '1px solid #ddd', color: '#666' }}>
                         Background
                       </span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: '#f0f0f0', color: '#555' }}>
-                        {(reportSettingsDraft.jadwal_pdf_font_family || 'Inter').replace(/'/g, '')}
+                        {(jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter').replace(/'/g, '')}
                       </span>
                     </div>
                   </div>
@@ -8158,6 +8194,7 @@ function TeacherPortal({
   portalRole,
   setSelectedAnnouncement,
   reportSettings = [],
+  jadwalSettings = [],
   parentViews = [],
   schoolData,
   teacherProfiles = [],
@@ -8477,17 +8514,17 @@ onShowAction,
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
-          {activePage === "Jadwal" && (
-             <Suspense fallback={null}>
-               <LazyJadwalTeacherView 
-                 students={filteredStudents} 
-                 onShowAction={onShowAction} 
-                 onBroadcastNotification={broadcastNotification} 
-                 initialStudentId={activeStudentId}
-                 jadwalSettings={reportSettings}
-               />
-             </Suspense>
-          )}
+           {activePage === "Jadwal" && (
+              <Suspense fallback={null}>
+                <LazyJadwalTeacherView 
+                  students={filteredStudents} 
+                  onShowAction={onShowAction} 
+                  onBroadcastNotification={broadcastNotification} 
+                  initialStudentId={activeStudentId}
+                  jadwalSettings={jadwalSettings}
+                />
+              </Suspense>
+           )}
 
           {activePage === "My Group" ? (
             <div className="portal-content">
@@ -9341,6 +9378,7 @@ export default function App() {
   const [adminTeacherFilter, setAdminTeacherFilter] = useState("All");
   const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [reportSettings, setReportSettings] = useState([]);
+  const [jadwalSettings, setJadwalSettings] = useState([]);
   const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
   const [whatsappConfig, setWhatsappConfig] = useState(null);
   const [emailSettings, setEmailSettings] = useState(null);
@@ -9710,6 +9748,7 @@ export default function App() {
             announcementResponse,
             teacherProfilesResponse,
             reportSettingsResponse,
+            jadwalSettingsResponse,
           ] = await Promise.all([
             supabase
               .from("attendance")
@@ -9725,6 +9764,7 @@ export default function App() {
             supabase.from("events").select("*").order("event_date", { ascending: false }),
             supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
             supabase.from("report_settings").select("*"),
+            supabase.from("jadwal_settings").select("*"),
           ]);
 
           // Handle potential missing tables (404) or other fetch errors gracefully
@@ -9732,6 +9772,7 @@ export default function App() {
             console.error("Attendance fetch error:", attendanceResponse.error);
           }
           if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
+          if (jadwalSettingsResponse.data) setJadwalSettings(jadwalSettingsResponse.data);
           if (scheduleResponse.error) throw scheduleResponse.error;
           if (resultsResponse.error) throw resultsResponse.error;
           if (announcementResponse.error) throw announcementResponse.error;
@@ -9789,6 +9830,7 @@ export default function App() {
           attendanceResponse,
           teacherProfilesResponse,
           reportSettingsResponse,
+          jadwalSettingsResponse,
           supportTicketsResponse,
           parentViewsResponse,
         ] = await Promise.all([
@@ -9801,6 +9843,7 @@ export default function App() {
           supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }),
           supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
           supabase.from("report_settings").select("*"),
+          supabase.from("jadwal_settings").select("*"),
           supabase.from("portal_issues").select("*").order("created_at", { ascending: false }),
           supabase.from("parent_report_views").select("*"),
         ]);
@@ -9808,6 +9851,7 @@ export default function App() {
         if (supportTicketsResponse.data) setSupportTickets(supportTicketsResponse.data);
 
         if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
+        if (jadwalSettingsResponse.data) setJadwalSettings(jadwalSettingsResponse.data);
 
         if (parentViewsResponse && parentViewsResponse.data) {
           setParentViews(parentViewsResponse.data);
@@ -11434,6 +11478,7 @@ const handleSendCustomNotification = async (event) => {
             parentData={parentData}
             portalRole={portalRole}
             reportSettings={reportSettings}
+            jadwalSettings={jadwalSettings}
             setActivePage={setActivePage}
             setAppTheme={setAppTheme}
             setIsDarkMode={setIsDarkMode}
@@ -11503,6 +11548,8 @@ const handleSendCustomNotification = async (event) => {
             portalAccess={portalAccess}
             portalRole={portalRole}
             reportSettings={reportSettings}
+            jadwalSettings={jadwalSettings}
+            onSaveJadwalSettings={saveJadwalSettings}
             whatsappConfig={whatsappConfig}
             emailSettings={emailSettings}
             onUpdateEmailConfig={handleUpdateEmailConfig}
@@ -11551,6 +11598,7 @@ const handleSendCustomNotification = async (event) => {
             portalAccess={portalAccess}
             portalRole={portalRole}
             reportSettings={reportSettings}
+            jadwalSettings={jadwalSettings}
             parentViews={parentViews}
             setActivePage={setActivePage}
             setMenuOpen={setMenuOpen}
