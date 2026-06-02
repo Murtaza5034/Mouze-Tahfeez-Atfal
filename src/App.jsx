@@ -5240,7 +5240,7 @@ const handleDownloadAllReports = async () => {
     loadPortalData(portalRole, user);
   };
 
-  const saveJadwalSettings = async (updates) => {
+  async function handleSaveJadwalConfig(updates) {
     const { error } = await supabase
       .from("jadwal_settings")
       .upsert({ id: 1, ...updates }, { onConflict: "id" })
@@ -11549,7 +11549,7 @@ const handleSendCustomNotification = async (event) => {
             portalRole={portalRole}
             reportSettings={reportSettings}
             jadwalSettings={jadwalSettings}
-            onSaveJadwalSettings={saveJadwalSettings}
+            onSaveJadwalSettings={handleSaveJadwalConfig}
             whatsappConfig={whatsappConfig}
             emailSettings={emailSettings}
             onUpdateEmailConfig={handleUpdateEmailConfig}
