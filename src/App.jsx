@@ -2393,9 +2393,9 @@ function FatemiDateSelector({ value, onChange, disabled = false }) {
 
     const targetYear = parseInt(y);
     const approxGregYear = Math.floor(622 + targetYear * 0.97);
-    const approxDate = new Date(approxGregYear, m - 1, d);
+    const approxDate = new Date(approxGregYear, 0, 1);
 
-    for (let i = -60; i <= 60; i++) {
+    for (let i = 0; i < 730; i++) {
       const testDate = new Date(approxDate);
       testDate.setDate(testDate.getDate() + i);
       const testInfo = getFatemiInfo(testDate.toISOString().split('T')[0]);
