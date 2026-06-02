@@ -541,6 +541,7 @@ const getJadwalThemeFromSettings = (settings = {}) => ({
   backgroundUrl: settings.jadwal_pdf_background_url || '',
   fontFamily: settings.jadwal_pdf_font_family || 'Inter',
   weekStart: settings.jadwal_week_start || '',
+  weekEnd: settings.jadwal_week_end || '',
 });
 
 const getFatemiDateStr = (dateStr) => {
