@@ -2390,6 +2390,7 @@ function FatemiDateSelector({ value, onChange, disabled = false }) {
   }), []);
 
   const hijriFromUTC = useCallback((utcDate) => {
+    if (!utcDate || isNaN(utcDate.getTime())) return { date: '...', month: '...', year: '...' };
     const parts = fmt.formatToParts(utcDate);
     let dd, mm, yy;
     for (const p of parts) {
@@ -2401,8 +2402,11 @@ function FatemiDateSelector({ value, onChange, disabled = false }) {
   }, [fmt]);
 
   const info = useMemo(() => {
-    if (!resolvedDate) return { date: '...', month: '...', year: '...' };
-    const [y, m, d] = resolvedDate.split('-').map(Number);
+    if (!resolvedDate || typeof resolvedDate !== 'string') return { date: '...', month: '...', year: '...' };
+    const parts = resolvedDate.split('-');
+    if (parts.length !== 3) return { date: '...', month: '...', year: '...' };
+    const [y, m, d] = parts.map(Number);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) return { date: '...', month: '...', year: '...' };
     return hijriFromUTC(new Date(Date.UTC(y, m - 1, d)));
   }, [resolvedDate, hijriFromUTC]);
 
