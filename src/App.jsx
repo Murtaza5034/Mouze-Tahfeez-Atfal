@@ -3863,7 +3863,7 @@ function ParentPortal({
                 { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
                 { label: "Daily Status", val: attendance?.status || "Present", sub: getToday(), icon: Clock, color: "#5d4037" },
                 { label: "Current Juz", val: hifzDetails?.juz || "--", sub: hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
-                { label: "My Muhaffiz", val: hifzDetails?.muhaffiz_name?.split(' ')[0] || "Pending", sub: "Direct Teacher", icon: GraduationCap, color: "#d4af37" },
+                { label: "My Muhaffiz", val: hifzDetails?.muhaffiz_name || "Pending", sub: "Direct Teacher", icon: GraduationCap, color: "#d4af37" },
               ].map((stat, i) => (
                 <div key={i} className="premium-stat-pill card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
                   <div className="pill-icon" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>

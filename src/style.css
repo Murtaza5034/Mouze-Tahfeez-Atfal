@@ -2367,7 +2367,10 @@ h1, h2, h3, h4, h5 {
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: var(--shadow-premium);
+  box-shadow: 
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    inset 0 -1px 0 rgba(61,43,31,0.06),
+    var(--shadow-premium);
   transition: transform 0.3s;
 }
 
@@ -2383,11 +2386,13 @@ h1, h2, h3, h4, h5 {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .pill-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .pill-label {
@@ -2402,6 +2407,9 @@ h1, h2, h3, h4, h5 {
   font-size: 1.2rem;
   font-weight: 900;
   color: var(--deep-brown);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .pill-sub {
