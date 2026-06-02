@@ -199,7 +199,8 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   }
 };
 
-const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates }) => {
+const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
+  const daysToRender = customDays || DAYS.map((day, idx) => ({ dayName: day, fatemiDate: dayDates?.[idx] || '' }));
   return (
     <div className="jadwal-table-wrapper">
       <table className="jadwal-table">
@@ -231,9 +232,11 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
           )}
         </thead>
         <tbody>
-          {DAYS.map((day, idx) => (
+          {daysToRender.map((dayObj) => {
+            const day = dayObj.dayName;
+            return (
             <tr key={day}>
-              <td className="day-cell">{day}{dayDates?.[idx] ? <div className="day-fatemi-date">{dayDates[idx]}</div> : null}</td>
+              <td className="day-cell">{day}{dayObj.fatemiDate ? <div className="day-fatemi-date">{dayObj.fatemiDate}</div> : null}</td>
               {mode === 'juz-wise' ? (
                 <>
                   {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => (
@@ -315,7 +318,8 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -437,23 +441,33 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   );
 };
 
-const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates }) => {
+const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
+  const daysList = customDays || DAYS.map((day, idx) => ({ dayName: day, date: '', fatemiDate: dayDates?.[idx] || '' }));
+  const maxIdx = daysList.length - 1;
   const [currentDayIndex, setCurrentDayIndex] = useState(() => {
+    if (customDays) return 0;
     const today = new Date().getDay();
     return today === 0 ? 6 : today - 1;
   });
 
-  const day = DAYS[currentDayIndex];
+  const dayObj = daysList[currentDayIndex];
+  const day = dayObj?.dayName || '';
   const row = scheduleData[day] || {};
-  const fatemiDate = dayDates?.[currentDayIndex] || '';
+  const fatemiDate = dayObj?.fatemiDate || '';
+  const { date } = dayObj;
 
   const goToDay = (offset) => {
     setCurrentDayIndex(prev => {
       const next = prev + offset;
-      if (next < 0) return 6;
-      if (next > 6) return 0;
+      if (next < 0) return maxIdx;
+      if (next > maxIdx) return 0;
       return next;
     });
+  };
+
+  const getNavDayName = (offset) => {
+    const idx = ((currentDayIndex + offset) % (maxIdx + 1) + (maxIdx + 1)) % (maxIdx + 1);
+    return daysList[idx]?.dayName || '';
   };
 
   const fields = mode === 'juz-wise'
@@ -465,15 +479,15 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
     <div className="jadwal-single-day-container">
       <div className="jadwal-single-day-nav">
         <button className="jadwal-calendar-nav-btn" onClick={() => goToDay(-1)}>
-          <ChevronLeft size={18} /> {DAYS[(currentDayIndex + 6) % 7]}
+          <ChevronLeft size={18} /> {getNavDayName(-1)}
         </button>
         <div className="jadwal-single-day-title">
-          <h3>{day}</h3>
+          <h3>{date ? `${day} - ${date}` : day}</h3>
           {fatemiDate && <span style={{ fontSize: '0.75rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl', display: 'block', marginTop: '2px' }}>{fatemiDate}</span>}
-          <span className="jadwal-single-day-subtitle">Current Day View</span>
+          {customDays ? null : <span className="jadwal-single-day-subtitle">Current Day View</span>}
         </div>
         <button className="jadwal-calendar-nav-btn" onClick={() => goToDay(1)}>
-          {DAYS[(currentDayIndex + 1) % 7]} <ChevronRight size={18} />
+          {getNavDayName(1)} <ChevronRight size={18} />
         </button>
       </div>
       <div className="jadwal-single-day-card">
@@ -570,6 +584,26 @@ const getDayDate = (weekStart, dayIndex) => {
   return getFatemiDateStr(d.toISOString().split('T')[0]);
 };
 
+const getDaysFromRange = (startStr, endStr) => {
+  if (!startStr || !endStr) return null;
+  const start = new Date(startStr + 'T00:00:00Z');
+  const end = new Date(endStr + 'T00:00:00Z');
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return null;
+  const DAY_NAMES = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+  const days = [];
+  const current = new Date(start);
+  while (current <= end) {
+    const dateStr = current.toISOString().split('T')[0];
+    days.push({
+      dayName: DAY_NAMES[current.getUTCDay()],
+      date: dateStr,
+      fatemiDate: getFatemiDateStr(dateStr)
+    });
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return days;
+};
+
 export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId, jadwalSettings }) => {
   const settings = Array.isArray(jadwalSettings) ? jadwalSettings[0] : jadwalSettings;
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
@@ -583,6 +617,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const isCompact = teacherStyle === 'compact';
   const theme = getJadwalThemeFromSettings(settings);
   const dayDates = theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : [];
+  const customDays = getDaysFromRange(theme.weekStart, theme.weekEnd);
 
   useEffect(() => {
     if (initialStudentId) {
@@ -691,6 +726,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             scheduleData={scheduleData}
             onCellChange={handleCellChange}
             dayDates={dayDates}
+            customDays={customDays}
           />
         );
       default:
@@ -700,6 +736,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             scheduleData={scheduleData}
             onCellChange={handleCellChange}
             dayDates={dayDates}
+            customDays={customDays}
           />
         );
     }
