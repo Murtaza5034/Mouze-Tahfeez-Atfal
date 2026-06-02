@@ -5240,22 +5240,6 @@ const handleDownloadAllReports = async () => {
     loadPortalData(portalRole, user);
   };
 
-  async function handleSaveJadwalConfig(updates) {
-    const { error } = await supabase
-      .from("jadwal_settings")
-      .upsert({ id: 1, ...updates }, { onConflict: "id" })
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      onShowAction("error", "Failed to update Jadwal settings: " + error.message);
-      return;
-    }
-
-    onShowAction("success", "Jadwal settings saved successfully!");
-    loadPortalData(portalRole, user);
-  };
-
   const updateReportDraft = (field) => (event) => {
     const value = event.target.value;
     setReportSettingsDraft((current) => ({ ...current, [field]: value }));
@@ -11549,7 +11533,19 @@ const handleSendCustomNotification = async (event) => {
             portalRole={portalRole}
             reportSettings={reportSettings}
             jadwalSettings={jadwalSettings}
-            onSaveJadwalSettings={handleSaveJadwalConfig}
+            onSaveJadwalSettings={async function(updates) {
+              const { error } = await supabase
+                .from("jadwal_settings")
+                .upsert({ id: 1, ...updates }, { onConflict: "id" })
+                .select()
+                .maybeSingle();
+              if (error) {
+                onShowAction("error", "Failed to update Jadwal settings: " + error.message);
+                return;
+              }
+              onShowAction("success", "Jadwal settings saved successfully!");
+              loadPortalData(portalRole, user);
+            }}
             whatsappConfig={whatsappConfig}
             emailSettings={emailSettings}
             onUpdateEmailConfig={handleUpdateEmailConfig}
