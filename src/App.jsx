@@ -2382,26 +2382,46 @@ function InfoHighlights({ items }) {
 }
 
 function FatemiDateSelector({ value, onChange, disabled = false }) {
-  const resolvedDate = value || new Date().toISOString().split('T')[0];
-  const info = useMemo(() => getFatemiInfo(resolvedDate), [resolvedDate]);
+  const toLocalStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const resolvedDate = value || toLocalStr(new Date());
+
+  const fmt = useMemo(() => new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
+    day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'UTC'
+  }), []);
+
+  const hijriFromUTC = useCallback((utcDate) => {
+    const parts = fmt.formatToParts(utcDate);
+    let dd, mm, yy;
+    for (const p of parts) {
+      if (p.type === 'day') dd = parseInt(p.value);
+      else if (p.type === 'month') mm = parseInt(p.value);
+      else if (p.type === 'year') yy = p.value;
+    }
+    return { date: dd, month: mm, year: yy };
+  }, [fmt]);
+
+  const info = useMemo(() => {
+    if (!resolvedDate) return { date: '...', month: '...', year: '...' };
+    const [y, m, d] = resolvedDate.split('-').map(Number);
+    return hijriFromUTC(new Date(Date.UTC(y, m - 1, d)));
+  }, [resolvedDate, hijriFromUTC]);
+
   const years = [1445, 1446, 1447, 1448];
   const days = Array.from({ length: 30 }, (_, i) => i + 1);
 
   const handleSelectChange = (type, newVal) => {
-    const d = type === 'day' ? newVal : info.date;
-    const m = type === 'month' ? newVal : info.month;
-    const y = type === 'year' ? newVal : info.year;
+    const targetDay = parseInt(type === 'day' ? newVal : info.date);
+    const targetMonth = parseInt(type === 'month' ? newVal : info.month);
+    const targetYear = String(type === 'year' ? newVal : info.year);
 
-    const targetYear = parseInt(y);
-    const approxGregYear = Math.floor(622 + targetYear * 0.97);
-    const approxDate = new Date(approxGregYear, 0, 1);
+    const gregYear = Math.floor(622 + parseInt(targetYear) * 0.97);
+    const start = new Date(Date.UTC(gregYear, 0, 1));
 
     for (let i = 0; i < 730; i++) {
-      const testDate = new Date(approxDate);
-      testDate.setDate(testDate.getDate() + i);
-      const testInfo = getFatemiInfo(testDate.toISOString().split('T')[0]);
-      if (parseInt(testInfo.date) === parseInt(d) && parseInt(testInfo.month) === parseInt(m) && String(testInfo.year) === String(y)) {
-        onChange({ target: { name: 'week_date', value: testDate.toISOString().split('T')[0] } });
+      const testDate = new Date(start.getTime() + i * 86400000);
+      const h = hijriFromUTC(testDate);
+      if (h.date === targetDay && h.month === targetMonth && String(h.year) === targetYear) {
+        onChange({ target: { name: 'week_date', value: toLocalStr(testDate) } });
         return;
       }
     }
