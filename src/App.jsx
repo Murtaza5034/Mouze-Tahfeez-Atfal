@@ -7552,30 +7552,35 @@ const handleDownloadAllReports = async () => {
                   e.preventDefault();
                   if (jadwalSaving) return;
                   setJadwalSaving(true);
-                  const updates = {
-                    jadwal_style: jadwalSettingsDraft.jadwal_style,
-                    jadwal_teacher_style: jadwalSettingsDraft.jadwal_teacher_style,
-                    jadwal_pdf_primary_color: jadwalSettingsDraft.jadwal_pdf_primary_color,
-                    jadwal_pdf_accent_color: jadwalSettingsDraft.jadwal_pdf_accent_color,
-                    jadwal_pdf_background_color: jadwalSettingsDraft.jadwal_pdf_background_color,
-                    jadwal_pdf_background_url: jadwalSettingsDraft.jadwal_pdf_background_url,
-                    jadwal_pdf_font_family: jadwalSettingsDraft.jadwal_pdf_font_family,
-                    jadwal_type: jadwalSettingsDraft.jadwal_type,
-                    jadwal_week_start: jadwalSettingsDraft.jadwal_week_start,
-                    jadwal_week_end: jadwalSettingsDraft.jadwal_week_end,
-                  };
-                  const { error } = await supabase
-                    .from("jadwal_settings")
-                    .upsert({ id: 1, ...updates }, { onConflict: "id" })
-                    .select()
-                    .maybeSingle();
-                  setJadwalSaving(false);
-                  if (error) {
-                    onShowAction("error", "Failed to update Jadwal settings: " + error.message);
-                    return;
+                  try {
+                    const updates = {
+                      jadwal_style: jadwalSettingsDraft.jadwal_style,
+                      jadwal_teacher_style: jadwalSettingsDraft.jadwal_teacher_style,
+                      jadwal_pdf_primary_color: jadwalSettingsDraft.jadwal_pdf_primary_color,
+                      jadwal_pdf_accent_color: jadwalSettingsDraft.jadwal_pdf_accent_color,
+                      jadwal_pdf_background_color: jadwalSettingsDraft.jadwal_pdf_background_color,
+                      jadwal_pdf_background_url: jadwalSettingsDraft.jadwal_pdf_background_url,
+                      jadwal_pdf_font_family: jadwalSettingsDraft.jadwal_pdf_font_family,
+                      jadwal_type: jadwalSettingsDraft.jadwal_type,
+                      jadwal_week_start: jadwalSettingsDraft.jadwal_week_start,
+                      jadwal_week_end: jadwalSettingsDraft.jadwal_week_end,
+                    };
+                    const { error } = await supabase
+                      .from("jadwal_settings")
+                      .upsert({ id: 1, ...updates }, { onConflict: "id" })
+                      .select()
+                      .maybeSingle();
+                    if (error) {
+                      onShowAction("error", "Failed to update Jadwal settings: " + error.message);
+                      return;
+                    }
+                    onShowAction("success", "Jadwal settings saved successfully!");
+                    loadPortalData(portalRole, user);
+                  } catch (err) {
+                    onShowAction("error", "Failed to save Jadwal settings: " + err.message);
+                  } finally {
+                    setJadwalSaving(false);
                   }
-                  onShowAction("success", "Jadwal settings saved successfully!");
-                  loadPortalData(portalRole, user);
                 }}>
                   <div className="card-headline" style={{ marginTop: '0', padding: '0', border: 'none' }}>
                     <Calendar size={16} />
@@ -7788,6 +7793,83 @@ const handleDownloadAllReports = async () => {
                   </button>
                 </form>
               </section>
+
+              {(() => {
+                const style = jadwalSettingsDraft.jadwal_style || 'table';
+                const isMiqaat = jadwalSettingsDraft.jadwal_type === 'miqaat' && jadwalSettingsDraft.jadwal_week_start && jadwalSettingsDraft.jadwal_week_end;
+                const getDayObjs = () => {
+                  if (isMiqaat) {
+                    const d1 = new Date(jadwalSettingsDraft.jadwal_week_start + 'T00:00:00Z');
+                    const d2 = new Date(jadwalSettingsDraft.jadwal_week_end + 'T00:00:00Z');
+                    const names = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                    const arr = [];
+                    const cur = new Date(d1);
+                    while (cur <= d2) {
+                      const ds = cur.toISOString().split('T')[0];
+                      arr.push({ name: names[cur.getUTCDay()], date: ds, fi: getFatemiInfo(ds) });
+                      cur.setUTCDate(cur.getUTCDate() + 1);
+                    }
+                    return arr;
+                  }
+                  const base = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
+                  const names = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+                  return base.map((n, i) => ({ name: names[i], date: '', fi: { ...getFatemiInfo(''), date: '...' } }));
+                };
+                const dayObjs = getDayObjs();
+                if (!dayObjs.length) return null;
+                const pCol = jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037';
+                const aCol = jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37';
+                return (
+                <section className="data-card card-appear">
+                  <div className="card-headline">
+                    <Eye size={16} />
+                    <h3>Teacher View Preview ({style === 'table' ? 'Table' : style === 'calendar' ? 'Calendar' : 'Single Day Card'})</h3>
+                  </div>
+                  <div style={{ padding: '16px' }}>
+                    {style === 'table' ? (
+                      <table className="jadwal-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr><th>Day</th><th style={{ textAlign: 'center', color: aCol }}>Fatemi Date</th></tr>
+                        </thead>
+                        <tbody>
+                          {dayObjs.map((d, i) => (
+                            <tr key={i}>
+                              <td style={{ fontWeight: 600, color: pCol }}>{d.name}{d.date ? <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '6px' }}>{d.date}</span> : null}</td>
+                              <td style={{ textAlign: 'center', fontFamily: "'Kanz al Marjaan', serif", color: aCol, direction: 'rtl', fontSize: '0.9rem' }}>
+                                {d.fi.date !== '...' ? `${d.fi.date} ${d.fi.monthName} ${d.fi.year}` : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : style === 'calendar' ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {dayObjs.map((d, i) => (
+                          <div key={i} style={{ flex: '1 1 140px', minWidth: '120px', border: `1px solid ${aCol}30`, borderRadius: '10px', padding: '12px', background: i % 2 === 0 ? 'rgba(253,250,244,0.8)' : '#fff', textAlign: 'center' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: pCol }}>{d.name}</div>
+                            {d.date ? <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>{d.date}</div> : null}
+                            <div style={{ fontSize: '0.8rem', fontFamily: "'Kanz al Marjaan', serif", color: aCol, direction: 'rtl', marginTop: '4px' }}>
+                              {d.fi.date !== '...' ? `${d.fi.date} ${d.fi.monthName} ${d.fi.year}` : '-'}
+                            </div>
+                            <div style={{ marginTop: '8px', padding: '6px', background: '#f9f6f0', borderRadius: '6px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>—</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ maxWidth: '360px', margin: '0 auto', border: `1px solid ${aCol}30`, borderRadius: '14px', padding: '20px', textAlign: 'center', background: '#fdfaf4' }}>
+                        <div style={{ fontWeight: 700, fontSize: '1rem', color: pCol }}>{dayObjs[0]?.name}</div>
+                        {dayObjs[0]?.date ? <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{dayObjs[0].date}</div> : null}
+                        <div style={{ fontSize: '1rem', fontFamily: "'Kanz al Marjaan', serif", color: aCol, direction: 'rtl', margin: '6px 0 12px' }}>
+                          {dayObjs[0]?.fi.date !== '...' ? `${dayObjs[0].fi.date} ${dayObjs[0].fi.monthName} ${dayObjs[0].fi.year}` : '-'}
+                        </div>
+                        <div style={{ padding: '10px', background: '#f9f6f0', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>—</div>
+                        {dayObjs.length > 1 ? <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--soft-brown)' }}>+{dayObjs.length - 1} more day{dayObjs.length > 2 ? 's' : ''}</div> : null}
+                      </div>
+                    )}
+                  </div>
+                </section>
+                );
+              })()}
 
               <section className="data-card card-appear">
                 <div className="card-headline">
