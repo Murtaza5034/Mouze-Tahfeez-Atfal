@@ -4837,24 +4837,7 @@ function AdminPortal({
   const [uploadingReportBackground, setUploadingReportBackground] = useState(false);
   const [uploadingJadwalBg, setUploadingJadwalBg] = useState(false);
   const [jadwalSaving, setJadwalSaving] = useState(false);
-  const [jadwalSaveResult, setJadwalSaveResult] = useState(null);
-
-  const daysBetween = (a, b) => {
-    if (!a || !b) return 0;
-    const d1 = new Date(a + 'T00:00:00Z'), d2 = new Date(b + 'T00:00:00Z');
-    return Math.max(0, Math.floor((d2 - d1) / 86400000) + 1);
-  };
-  const dayNamesList = (start, end) => {
-    const names = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const days = [];
-    const cur = new Date(start + 'T00:00:00Z'), endD = new Date(end + 'T00:00:00Z');
-    while (cur <= endD) {
-      const ds = cur.toISOString().split('T')[0];
-      days.push(`${names[cur.getUTCDay()]} (${ds})`);
-      cur.setUTCDate(cur.getUTCDate() + 1);
-    }
-    return days;
-  };
+  const [showJadwalPopup, setShowJadwalPopup] = useState(false);
 
   useEffect(() => {
     setReportSettingsDraft(normalizeReportSettings(reportSettings));
@@ -7592,17 +7575,7 @@ const handleDownloadAllReports = async () => {
                     onShowAction("error", "Failed to update Jadwal settings: " + error.message);
                     return;
                   }
-                  const count = updates.jadwal_type === 'miqaat' && updates.jadwal_week_start && updates.jadwal_week_end
-                    ? daysBetween(updates.jadwal_week_start, updates.jadwal_week_end) : 0;
-                  const dayList = updates.jadwal_type === 'miqaat' && updates.jadwal_week_start && updates.jadwal_week_end
-                    ? dayNamesList(updates.jadwal_week_start, updates.jadwal_week_end) : [];
-                  setJadwalSaveResult({
-                    type: updates.jadwal_type,
-                    start: updates.jadwal_week_start,
-                    end: updates.jadwal_week_end,
-                    count,
-                    dayList
-                  });
+                  setShowJadwalPopup(true);
                   loadPortalData(portalRole, user);
                 }}>
                   <div className="card-headline" style={{ marginTop: '0', padding: '0', border: 'none' }}>
@@ -9321,55 +9294,70 @@ onShowAction,
             />
           ) : null}
 
-          {jadwalSaveResult ? (
-            <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)' }}>
-              <div className="premium-modal-card card-appear" style={{ maxWidth: '520px', width: '90%', padding: '32px', background: 'linear-gradient(145deg, #fdfaf4 0%, #faf3e8 100%)', border: '1px solid var(--primary-gold)', borderRadius: '20px', boxShadow: '0 20px 60px rgba(93,64,55,0.25)', color: 'var(--text-main)', textAlign: 'center' }}>
+          {showJadwalPopup ? (
+            <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)' }}
+              onClick={() => setShowJadwalPopup(false)}>
+              <div className="premium-modal-card card-appear" style={{ maxWidth: '520px', width: '90%', padding: '32px', background: 'linear-gradient(145deg, #fdfaf4 0%, #faf3e8 100%)', border: '1px solid var(--primary-gold)', borderRadius: '20px', boxShadow: '0 20px 60px rgba(93,64,55,0.25)', color: 'var(--text-main)', textAlign: 'center' }}
+                onClick={e => e.stopPropagation()}>
                 <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #d4af37, #b8942f)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', animation: 'scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
                   <CheckCircle2 size={40} color="#fff" strokeWidth={2.5} />
                 </div>
                 <h2 style={{ margin: '0 0 4px', fontFamily: "'Cinzel', serif", color: 'var(--deep-brown)', fontSize: '1.3rem', letterSpacing: '0.5px' }}>
                   Jadwal Settings Saved
                 </h2>
-                {jadwalSaveResult.type === 'miqaat' && jadwalSaveResult.count > 0 ? (
-                  <>
+                {(() => {
+                  if (jadwalSettingsDraft.jadwal_type !== 'miqaat' || !jadwalSettingsDraft.jadwal_week_start || !jadwalSettingsDraft.jadwal_week_end) {
+                    return <p style={{ color: 'var(--soft-brown)', fontSize: '0.85rem', margin: '8px 0 16px' }}>
+                      Teachers will see the full 7-day weekly Jadwal (Mon–Sun).
+                    </p>;
+                  }
+                  const start = jadwalSettingsDraft.jadwal_week_start;
+                  const end = jadwalSettingsDraft.jadwal_week_end;
+                  const d1 = new Date(start + 'T00:00:00Z'), d2 = new Date(end + 'T00:00:00Z');
+                  const totalDays = Math.max(0, Math.floor((d2 - d1) / 86400000) + 1);
+                  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                  const items = [];
+                  const cur = new Date(d1);
+                  while (cur <= d2) {
+                    const ds = cur.toISOString().split('T')[0];
+                    items.push(dayNames[cur.getUTCDay()] + ' (' + ds + ')');
+                    cur.setUTCDate(cur.getUTCDate() + 1);
+                  }
+                  return <>
                     <p style={{ color: 'var(--soft-brown)', fontSize: '0.85rem', margin: '8px 0 12px', lineHeight: 1.5 }}>
-                      Miqaāt range <strong>{jadwalSaveResult.start}</strong> → <strong>{jadwalSaveResult.end}</strong>
+                      Miqaāt range <strong>{start}</strong> → <strong>{end}</strong>
                     </p>
                     <div style={{ background: 'rgba(212,175,55,0.08)', borderRadius: '12px', padding: '16px', marginBottom: '12px', border: '1px solid rgba(212,175,55,0.15)' }}>
                       <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary-gold)', fontFamily: "'Cinzel', serif", lineHeight: 1 }}>
-                        {jadwalSaveResult.count}
+                        {totalDays}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--soft-brown)', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '2px' }}>
-                        Day{jadwalSaveResult.count !== 1 ? 's' : ''} to fill
+                        Day{totalDays !== 1 ? 's' : ''} to fill
                       </div>
                     </div>
                     <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px', padding: '0 8px' }}>
-                      {jadwalSaveResult.dayList.map((d, i) => (
+                      {items.map((d, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)', padding: '4px 8px', background: i % 2 === 0 ? 'rgba(255,255,255,0.5)' : 'transparent', borderRadius: '6px' }}>
                           <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--primary-gold)', color: '#fff', fontSize: '0.65rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
                           {d}
                         </div>
                       ))}
                     </div>
-                  </>
-                ) : (
-                  <p style={{ color: 'var(--soft-brown)', fontSize: '0.85rem', margin: '8px 0 16px' }}>
-                    Teachers will see the full 7-day weekly Jadwal (Mon–Sun).
-                  </p>
-                )}
-                <button className="premium-btn gold" style={{ width: '100%', padding: '12px', fontSize: '0.95rem', fontWeight: 600 }} onClick={() => setJadwalSaveResult(null)}>
+                  </>;
+                })()}
+                <button className="premium-btn gold" style={{ width: '100%', padding: '12px', fontSize: '0.95rem', fontWeight: 600 }} onClick={() => setShowJadwalPopup(false)}>
                   Done
                 </button>
               </div>
             </div>
           ) : null}
 
-          {jadwalSaveResult ? <style>{`
+          <style>{`
             @keyframes scaleIn {
               0% { transform: scale(0); opacity: 0; }
               100% { transform: scale(1); opacity: 1; }
             }
-          `}</style> : null}
+          `}</style>
 
         </section>
       </main>
