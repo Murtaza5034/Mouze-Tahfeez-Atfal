@@ -41,6 +41,23 @@ const getDefaultTheme = () => ({
 
 const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', theme = {}) => {
   const t = { ...getDefaultTheme(), ...theme };
+  const pdfDays = (() => {
+    if (t.jadwalType === 'miqaat' && t.weekStart && t.weekEnd) {
+      const s = new Date(t.weekStart + 'T00:00:00Z');
+      const e = new Date(t.weekEnd + 'T00:00:00Z');
+      if (s <= e) {
+        const names = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+        const days = [];
+        const cur = new Date(s);
+        while (cur <= e) {
+          days.push(names[cur.getUTCDay()]);
+          cur.setUTCDate(cur.getUTCDate() + 1);
+        }
+        return days;
+      }
+    }
+    return DAYS;
+  })();
   const printContainer = document.createElement("div");
   printContainer.style.position = "absolute";
   printContainer.style.left = "-9999px";
@@ -75,7 +92,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       + '</tr>';
 
   const buildPdfRows = () => {
-    const rows = DAYS.map((day, idx) => {
+    const rows = pdfDays.map((day, idx) => {
       const row = scheduleData[day] || {};
       const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
       const bg = idx % 2 === 0 ? t.backgroundColor : `${t.backgroundColor}f2`;
@@ -109,7 +126,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${t.accentColor}; padding-bottom: 20px; margin-bottom: 25px;">
         <div>
           <h1 style="margin: 0; font-size: 26px; color: ${t.primaryColor}; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">MAUZE TAHFEEZ ATFAL</h1>
-          <p style="margin: 5px 0 0 0; font-size: 14px; color: ${t.accentColor}; font-weight: 600; letter-spacing: 0.5px;">Weekly Quran Jadwal (Timetable)</p>
+           <p style="margin: 5px 0 0 0; font-size: 14px; color: ${t.accentColor}; font-weight: 600; letter-spacing: 0.5px;">${t.jadwalType === 'miqaat' ? 'Miqaāt' : 'Weekly'} Quran Jadwal (Timetable)</p>
         </div>
         <div style="text-align: right;">
           <div style="font-size: 12px; color: #888; font-weight: 500;">Generated on</div>
