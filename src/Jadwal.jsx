@@ -368,17 +368,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     return getFatemiDateStr(d.toISOString().split('T')[0]);
   });
 
-  const printContainer = document.createElement("div");
-  printContainer.style.position = "absolute";
-  printContainer.style.left = "-9999px";
-  printContainer.style.top = "-9999px";
   const containerWidth = style === 'calendar' ? 1100 : 850;
-  printContainer.style.width = containerWidth + "px";
-  printContainer.style.padding = "40px";
-  printContainer.style.background = t.backgroundColor;
-  printContainer.style.fontFamily = t.fontFamily.includes(',') ? t.fontFamily : `'${t.fontFamily}', 'Inter', 'Segoe UI', sans-serif`;
-  printContainer.style.color = "#2c1e11";
-
   const bgImageStyle = t.backgroundUrl
     ? `background-image: url('${t.backgroundUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat;`
     : '';
@@ -390,7 +380,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     if (style === 'calendar') {
       const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
       return `
-        <div style="page-break-inside: avoid; break-inside: avoid; flex: 1 1 calc(33.33% - 20px); min-width: 300px; border: 1.5px solid ${t.accentColor}; border-radius: 14px; padding: 18px; background: ${idx % 2 === 0 ? '#fff' : `${t.backgroundColor}f2`}; box-sizing: border-box;">
+        <div style="flex: 1 1 calc(33.33% - 20px); min-width: 300px; max-width: calc(50% - 20px); border: 1.5px solid ${t.accentColor}; border-radius: 14px; padding: 18px; background: ${idx % 2 === 0 ? '#fff' : `${t.backgroundColor}f2`}; box-sizing: border-box;">
           <div style="border-bottom: 2px solid ${t.accentColor}; padding-bottom: 10px; margin-bottom: 12px;">
             <div style="font-size: 16px; font-weight: 800; color: ${t.primaryColor}; letter-spacing: 0.5px; text-transform: uppercase;">${day}</div>
             <div style="font-family: 'Kanz al Marjaan', serif; font-size: 13px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div>
@@ -428,7 +418,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     const starTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #FFD700; text-align: center; letter-spacing: 1px;">${stars}</td>`;
     const tdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${contentCss}"`;
     if (mode === 'juz-wise') {
-      return `<tr style="page-break-inside: avoid; break-inside: avoid; background: ${bg};">${dayTd}`
+      return `<tr style="background: ${bg};">${dayTd}`
         + `<td ${tdStyle}>${row.juz1 || '-'}</td>`
         + `<td ${tdStyle}>${row.juz2 || '-'}</td>`
         + `<td ${tdStyle}>${row.juz3 || '-'}</td>`
@@ -437,7 +427,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
         + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `${starTd}</tr>`;
     }
-    return `<tr style="page-break-inside: avoid; break-inside: avoid; background: ${bg};">${dayTd}`
+    return `<tr style="background: ${bg};">${dayTd}`
       + `<td ${tdStyle}>${row.murajah || '-'}</td>`
       + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
       + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
@@ -489,121 +479,95 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; width: 90px;">STAR</th>`
       + '</tr>';
 
-  const measureEl = document.createElement("div");
-  measureEl.style.position = "absolute";
-  measureEl.style.left = "-9999px";
-  measureEl.style.top = "-9999px";
-  measureEl.style.width = containerWidth + "px";
-  measureEl.style.padding = "40px";
-  measureEl.style.background = t.backgroundColor;
-  measureEl.style.fontFamily = t.fontFamily.includes(',') ? t.fontFamily : `'${t.fontFamily}', 'Inter', 'Segoe UI', sans-serif`;
-  measureEl.style.color = "#2c1e11";
-  measureEl.innerHTML = style === 'calendar'
-    ? pageFrameHtml(`<div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;"></div>`)
-    : pageFrameHtml(`<table style="width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 8px; overflow: hidden;"><thead>${tableHeaders}</thead><tbody></tbody></table>`);
-  document.body.appendChild(measureEl);
-
-  const staticPageHeight = measureEl.scrollHeight;
-  const a4HeightPx = containerWidth * (297 / 210);
-  const maxContentHeight = a4HeightPx - staticPageHeight;
+  // Load fonts first, with timeout
+  try {
+    await Promise.race([
+      document.fonts.ready,
+      new Promise(resolve => setTimeout(resolve, 5000)),
+    ]);
+    const kanzFamily = ['Kanz al Marjaan', 'Al-Kanz'];
+    for (const family of kanzFamily) {
+      if (!document.fonts.check('1em "' + family + '"', 'abcdefghijklmnopqrstuvwxyz0123456789')) {
+        const fontSrc = family === 'Kanz al Marjaan'
+          ? "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2) format('woff2'),url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff) format('woff'),url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf) format('truetype')"
+          : "url(/fonts/al-kanz.ttf) format('truetype')";
+        const ff = new FontFace(family, fontSrc);
+        await Promise.race([ff.load(), new Promise(resolve => setTimeout(resolve, 5000))]);
+        document.fonts.add(ff);
+      }
+    }
+    await Promise.race([
+      document.fonts.ready,
+      new Promise(resolve => setTimeout(resolve, 5000)),
+    ]);
+  } catch (e) {
+    console.warn('Custom font loading for Jadwal PDF failed:', e);
+  }
 
   const allCards = pdfDays.map((_, idx) => buildCardHtml(pdfDays[idx], idx));
-  const pageGroups = [];
-  let currentGroup = [];
-  let currentHeight = 0;
 
-  for (const card of allCards) {
-    if (style === 'calendar') {
-      pageGroups.push([card]);
-      continue;
+  // Split into page groups: table rows can be measured, calendar cards grouped by count
+  let pageGroups;
+  if (style === 'calendar') {
+    const cardsPerPage = 3;
+    pageGroups = [];
+    for (let i = 0; i < allCards.length; i += cardsPerPage) {
+      pageGroups.push(allCards.slice(i, i + cardsPerPage));
     }
-    measureEl.innerHTML = style === 'calendar'
-      ? pageFrameHtml(`<div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;">${[...currentGroup, card].join('')}</div>`)
-      : pageFrameHtml(`<table style="width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 8px; overflow: hidden;"><thead>${tableHeaders}</thead><tbody>${[...currentGroup, card].join('')}</tbody></table>`);
-    const totalH = measureEl.scrollHeight;
-    if (totalH > a4HeightPx && currentGroup.length > 0) {
-      pageGroups.push([...currentGroup]);
-      currentGroup = [card];
-    } else {
-      currentGroup.push(card);
-    }
-  }
-  if (currentGroup.length > 0) pageGroups.push(currentGroup);
+  } else {
+    const measureEl = document.createElement("div");
+    measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+    document.body.appendChild(measureEl);
 
-  document.body.removeChild(measureEl);
-
-  const pageContainers = pageGroups.map((group, pi) => {
-    const c = document.createElement("div");
-    c.style.position = "absolute";
-    c.style.left = "-9999px";
-    c.style.top = "-9999px";
-    c.style.width = containerWidth + "px";
-    c.style.padding = "40px";
-    c.style.background = t.backgroundColor;
-    c.style.fontFamily = t.fontFamily.includes(',') ? t.fontFamily : `'${t.fontFamily}', 'Inter', 'Segoe UI', sans-serif`;
-    c.style.color = "#2c1e11";
-    c.style.height = "auto";
-    c.style.minHeight = a4HeightPx + "px";
-    if (style === 'calendar') {
-      c.innerHTML = pageFrameHtml(`<div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;">${group.join('')}</div>`);
-    } else {
-      c.innerHTML = pageFrameHtml(`<table style="width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 8px; overflow: hidden;"><thead>${tableHeaders}</thead><tbody>${group.join('')}</tbody></table>`);
-    }
-    document.body.appendChild(c);
-    return c;
-  });
-
-  try {
-    try {
-      await document.fonts.ready;
-      const kanzFamily = ['Kanz al Marjaan', 'Al-Kanz'];
-      for (const family of kanzFamily) {
-        if (!document.fonts.check('1em "' + family + '"', 'abcdefghijklmnopqrstuvwxyz0123456789')) {
-          const fontSrc = family === 'Kanz al Marjaan'
-            ? "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2) format('woff2'),url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff) format('woff'),url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf) format('truetype')"
-            : "url(/fonts/al-kanz.ttf) format('truetype')";
-          const ff = new FontFace(family, fontSrc);
-          await ff.load();
-          document.fonts.add(ff);
-        }
+    pageGroups = [];
+    let currentGroup = [];
+    for (const card of allCards) {
+      measureEl.innerHTML = pageFrameHtml(`<table style="width:100%;border-collapse:collapse;margin-top:10px;border-radius:8px;overflow:hidden;"><thead>${tableHeaders}</thead><tbody>${[...currentGroup, card].join('')}</tbody></table>`);
+      const h = measureEl.scrollHeight;
+      if (h > containerWidth * (297 / 210) && currentGroup.length > 0) {
+        pageGroups.push([...currentGroup]);
+        currentGroup = [card];
+      } else {
+        currentGroup.push(card);
       }
-      await document.fonts.ready;
-    } catch (e) {
-      console.warn('Custom font loading for Jadwal PDF failed:', e);
     }
-
-    const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-
-    for (let pi = 0; pi < pageContainers.length; pi++) {
-      const canvas = await html2canvas(pageContainers[pi], {
-        scale: 4,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: t.backgroundColor,
-        onclone: async (clonedDoc) => {
-          const style = clonedDoc.createElement('style');
-          style.textContent = FONT_FACE_CSS;
-          clonedDoc.head.appendChild(style);
-          if (clonedDoc.fonts && clonedDoc.fonts.ready) {
-            await Promise.race([
-              clonedDoc.fonts.ready,
-              new Promise(resolve => setTimeout(resolve, 3000)),
-            ]);
-          }
-        },
-      });
-      const imgData = canvas.toDataURL("image/png");
-      if (pi > 0) pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, 0, 210, (canvas.height * 210) / canvas.width);
-    }
-
-    pdf.save(`${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`);
-  } catch (err) {
-    console.error("Failed to export Jadwal PDF:", err);
-    alert("Failed to export Jadwal PDF");
-  } finally {
-    pageContainers.forEach(c => { if (c.parentNode) c.parentNode.removeChild(c); });
+    if (currentGroup.length > 0) pageGroups.push(currentGroup);
+    document.body.removeChild(measureEl);
   }
+
+  // Render each page group as a separate html2canvas → PDF page
+  const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+
+  for (let pi = 0; pi < pageGroups.length; pi++) {
+    const group = pageGroups[pi];
+    const container = document.createElement("div");
+    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+    if (style === 'calendar') {
+      container.innerHTML = pageFrameHtml(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${group.join('')}</div>`);
+    } else {
+      container.innerHTML = pageFrameHtml(`<table style="width:100%;border-collapse:collapse;margin-top:10px;border-radius:8px;overflow:hidden;"><thead>${tableHeaders}</thead><tbody>${group.join('')}</tbody></table>`);
+    }
+    document.body.appendChild(container);
+
+    const canvas = await html2canvas(container, {
+      scale: 3,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: t.backgroundColor,
+      onclone: (clonedDoc) => {
+        const style = clonedDoc.createElement('style');
+        style.textContent = FONT_FACE_CSS;
+        clonedDoc.head.appendChild(style);
+      },
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    if (pi > 0) pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, 0, 210, (canvas.height * 210) / canvas.width);
+    document.body.removeChild(container);
+  }
+
+  pdf.save(`${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`);
 };
 
 const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
