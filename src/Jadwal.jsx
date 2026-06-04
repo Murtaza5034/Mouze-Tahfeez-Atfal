@@ -238,7 +238,7 @@ const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
         onChange={handleFrom}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', minWidth: '90px',
+          background: '#fff', fontSize: '12px',
         }}
       >
         <option value="">From</option>
@@ -246,13 +246,12 @@ const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
           <option key={p} value={String(p)}>Page {p}</option>
         ))}
       </select>
-      <span style={{ fontSize: '12px', color: 'var(--soft-brown)' }}>–</span>
       <select
         value={toVal}
         onChange={handleTo}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', minWidth: '90px',
+          background: '#fff', fontSize: '12px',
         }}
       >
         <option value="">To</option>
@@ -371,7 +370,7 @@ const JadeedPicker = ({ value, onChange }) => {
         onChange={handleSurah}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', minWidth: '120px', fontFamily: "'Kanz al Marjaan', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
           direction: (surahNum && SURAH_AYAH_DATA.find(s => String(s.number) === surahNum)?.nameAr) ? 'rtl' : 'ltr',
         }}
       >
@@ -388,7 +387,7 @@ const JadeedPicker = ({ value, onChange }) => {
         disabled={!surahNum}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', minWidth: '70px',
+          background: '#fff', fontSize: '12px',
         }}
       >
         <option value="">Ayah</option>
@@ -472,13 +471,13 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
           </div>
           <div style="display: flex; justify-content: space-between; padding: 6px 0;">
             <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL</span>
-            <span style="font-size: 16px; font-weight: 700; color: #d4af37;">${calcTotalPages(row, mode)}</span>
+            <span style="font-size: 16px; font-weight: 700; color: #d4af37;">${calcTotalPages(row, mode)} Pages to do</span>
           </div>
         </div>`;
     }
     const bg = idx % 2 === 0 ? t.backgroundColor : `${t.backgroundColor}f2`;
     const dayTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-weight: bold; font-size: 13px; color: ${t.primaryColor}; text-align: left;">${day}<div style="font-family: 'Kanz al Marjaan', serif; font-size: 11px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div></td>`;
-    const totalTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #d4af37; font-weight: 700; text-align: center;">${calcTotalPages(row, mode)}</td>`;
+    const totalTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #d4af37; font-weight: 700; text-align: center;">${calcTotalPages(row, mode)} Pages to do</td>`;
     const tdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${contentCss}"`;
     const jadeedTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${jadeedCss}"`;
     if (mode === 'juz-wise') {
@@ -755,7 +754,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                 </>
               )}
               <td className="star-cell" data-label="Total">
-                <span style="font-weight: 700; color: #d4af37;">${calcTotalPages(row, mode)}</span>
+                <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(scheduleData[day], mode)} Pages to do</span>
               </td>
             </tr>
             );
@@ -784,7 +783,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   const weekDays = getWeekDays();
   const fatemiDates = weekDays.map(d => getFatemiDateStr(d.toISOString().split('T')[0]));
 
-  const renderDayCell = (day, dateObj, customFatemi) => {
+  const renderDayCell = (day, dateObj, customFatemi, idx) => {
     const row = scheduleData[day] || {};
     const dateStr = customDays
       ? dateObj?.date || ''
@@ -797,7 +796,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
       : ['murajah'];
 
     return (
-      <div key={day} className={`jadwal-calendar-card ${isToday ? 'today' : ''}`}>
+      <div key={`${day}-${idx}`} className={`jadwal-calendar-card ${isToday ? 'today' : ''}`}>
         <div className="jadwal-calendar-card-header">
           <span className="jadwal-calendar-day-name">{day}</span>
           {dateStr ? <span className="jadwal-calendar-date">{dateStr}</span> : null}
@@ -848,7 +847,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
           </div>
           <div className="jadwal-calendar-field">
             <label>Total</label>
-            <span style={{ fontWeight: 700, color: '#d4af37' }}>{calcTotalPages(row, mode)}</span>
+            <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(row, mode)} Pages to do</span>
           </div>
         </div>
       </div>
@@ -863,7 +862,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
           <span>Showing <strong>{customDays.length}</strong> day{customDays.length !== 1 ? 's' : ''} — {customDays[0]?.date} to {customDays[customDays.length - 1]?.date}</span>
         </div>
         <div className="jadwal-calendar-grid">
-          {customDays.map(d => renderDayCell(d.dayName, d, d.fatemiDate))}
+          {customDays.map((d, idx) => renderDayCell(d.dayName, d, d.fatemiDate, idx))}
         </div>
       </div>
     );
@@ -883,7 +882,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
         </button>
       </div>
       <div className="jadwal-calendar-grid">
-        {DAYS.map((day, idx) => renderDayCell(day, weekDays[idx]))}
+        {DAYS.map((day, idx) => renderDayCell(day, weekDays[idx], null, idx))}
       </div>
     </div>
   );
@@ -979,7 +978,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
           </div>
           <div className="jadwal-calendar-field">
             <label>Total</label>
-            <span style={{ fontWeight: 700, color: '#d4af37' }}>{calcTotalPages(row, mode)}</span>
+            <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(row, mode)} Pages to do</span>
           </div>
         </div>
       </div>
