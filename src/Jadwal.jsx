@@ -788,7 +788,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                     return (
                       <td key={juz} data-label={label}>
                         {readOnly ? (
-                          <span>{scheduleData[day]?.[juz] ? `Juz ${scheduleData[day][juz]}` : '-'}</span>
+                          <span>{scheduleData[day]?.[juz] || '-'}</span>
                         ) : (
                           <JuzSelect
                             value={scheduleData[day]?.[juz] || ''}
@@ -912,7 +912,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
                 <div className="jadwal-calendar-field" key={juz}>
                   <label>{label}</label>
                   {readOnly ? (
-                    <span>{row[juz] ? `Juz ${row[juz]}` : '-'}</span>
+                    <span>{row[juz] || '-'}</span>
                   ) : (
                     <JuzSelect
                       value={row[juz] || ''}
@@ -1054,7 +1054,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
                 <div className="jadwal-calendar-field" key={juz}>
                   <label>{label}</label>
                   {readOnly ? (
-                    <span>{row[juz] ? `Juz ${row[juz]}` : '-'}</span>
+                    <span>{row[juz] || '-'}</span>
                   ) : (
                     <JuzSelect
                       value={row[juz] || ''}
