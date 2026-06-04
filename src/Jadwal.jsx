@@ -277,10 +277,24 @@ const formatJadeed = (val) => {
   const parts = val.split(':');
   if (parts.length === 2 && parts[0] && parts[1]) {
     const surah = SURAH_AYAH_DATA.find(s => s.number === Number(parts[0]));
-    const surahName = surah ? surah.nameEn : parts[0];
+    const surahName = surah ? surah.nameAr : parts[0];
     return `${surahName}:${parts[1]}`;
   }
   return val;
+};
+
+const formatMurajah = (val) => {
+  if (!val) return '-';
+  const parts = val.split(' til ');
+  if (parts.length >= 2) {
+    const from = findSurahByName(parts[0]);
+    const till = findSurahByName(parts[1]);
+    const fromName = from ? from.nameAr : parts[0];
+    const tillName = till ? till.nameAr : parts[1];
+    return `${fromName} إلى ${tillName}`;
+  }
+  const single = findSurahByName(val);
+  return single ? single.nameAr : val;
 };
 
 const findSurahByName = (name) => {
@@ -399,6 +413,91 @@ const JadeedPicker = ({ value, onChange }) => {
   );
 };
 
+const JuzPicker = ({ value, onChange }) => {
+  return (
+    <div className="jadwal-jadeed-picker">
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
+          background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+        }}
+      >
+        <option value="">-- Juz --</option>
+        {Array.from({ length: 30 }, (_, i) => (
+          <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
+const JuzSelect = ({ value, onChange }) => (
+  <select
+    value={value || ''}
+    onChange={(e) => onChange(e.target.value)}
+    style={{
+      padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
+      background: '#fff', fontSize: '12px', width: '100%', fontFamily: "'Kanz al Marjaan', serif",
+    }}
+  >
+    <option value="">-</option>
+    {Array.from({ length: 30 }, (_, i) => (
+      <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+    ))}
+  </select>
+);
+
+const SurahRangePicker = ({ value, onChange }) => {
+  const parts = (value || '').split(/\s+til\s+/i);
+  const fromSurah = parts[0] || '';
+  const tillSurah = parts[1] || '';
+
+  const handleFrom = (e) => {
+    const from = e.target.value;
+    if (!from) { onChange(''); return; }
+    onChange(from && tillSurah ? `${from} til ${tillSurah}` : `${from} til ${from}`);
+  };
+
+  const handleTill = (e) => {
+    const till = e.target.value;
+    if (!till) { onChange(''); return; }
+    onChange(fromSurah && till ? `${fromSurah} til ${till}` : `${till} til ${till}`);
+  };
+
+  return (
+    <div className="jadwal-jadeed-picker">
+      <select
+        value={fromSurah}
+        onChange={handleFrom}
+        style={{
+          padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
+          background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+        }}
+      >
+        <option value="">From Surah</option>
+        {SURAH_AYAH_DATA.map(s => (
+          <option key={s.number} value={s.nameEn}>{s.nameAr}</option>
+        ))}
+      </select>
+      <select
+        value={tillSurah}
+        onChange={handleTill}
+        style={{
+          padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
+          background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+        }}
+      >
+        <option value="">Till Surah</option>
+        {SURAH_AYAH_DATA.map(s => (
+          <option key={s.number} value={s.nameEn}>{s.nameAr}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
 const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', theme = {}, style = 'table', dayDates = []) => {
   const t = { ...getDefaultTheme(), ...theme };
   const pdfDays = (() => {
@@ -437,7 +536,8 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     : '';
 
   const contentCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; direction: ltr;";
-  const jadeedCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; direction: ltr;";
+  const arabicCss = "font-family: 'Kanz al Marjaan', serif; font-size: 14px; line-height: 1.6; direction: rtl;";
+  const jadeedCss = "font-family: 'Kanz al Marjaan', serif; font-size: 14px; line-height: 1.6; direction: rtl;";
 
   const buildCardHtml = (day, idx) => {
     const row = scheduleData[day] || {};
@@ -453,12 +553,12 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
                 const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
                 return `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
                   <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">${label}</span>
-                  <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${row[juz] || '-'}</span>
+                  <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${row[juz] ? 'Juz ' + row[juz] : '-'}</span>
                 </div>`;
               }).join('')
             : `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
               <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">MURAJAH</span>
-              <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${row.murajah || '-'}</span>
+              <span style="${arabicCss} font-size: 14px; font-weight: 500; color: #333;">${formatMurajah(row.murajah)}</span>
             </div>`
           }
           <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
@@ -479,19 +579,20 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     const dayTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-weight: bold; font-size: 13px; color: ${t.primaryColor}; text-align: left;">${day}<div style="font-family: 'Kanz al Marjaan', serif; font-size: 11px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div></td>`;
     const totalTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #d4af37; font-weight: 700; text-align: center;">${calcTotalPages(row, mode)} Pages to do</td>`;
     const tdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${contentCss}"`;
+    const arabicTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${arabicCss}"`;
     const jadeedTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${jadeedCss}"`;
     if (mode === 'juz-wise') {
       return `<tr style="background: ${bg};">${dayTd}`
-        + `<td ${tdStyle}>${row.juz1 || '-'}</td>`
-        + `<td ${tdStyle}>${row.juz2 || '-'}</td>`
-        + `<td ${tdStyle}>${row.juz3 || '-'}</td>`
-        + `<td ${tdStyle}>${row.juz4 || '-'}</td>`
+        + `<td ${tdStyle}>${row.juz1 ? 'Juz ' + row.juz1 : '-'}</td>`
+        + `<td ${tdStyle}>${row.juz2 ? 'Juz ' + row.juz2 : '-'}</td>`
+        + `<td ${tdStyle}>${row.juz3 ? 'Juz ' + row.juz3 : '-'}</td>`
+        + `<td ${tdStyle}>${row.juz4 ? 'Juz ' + row.juz4 : '-'}</td>`
         + `<td ${jadeedTdStyle}>${formatJadeed(row.jadeed)}</td>`
         + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `${totalTd}</tr>`;
     }
     return `<tr style="background: ${bg};">${dayTd}`
-      + `<td ${tdStyle}>${row.murajah || '-'}</td>`
+      + `<td ${arabicTdStyle}>${formatMurajah(row.murajah)}</td>`
       + `<td ${jadeedTdStyle}>${formatJadeed(row.jadeed)}</td>`
       + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
       + `${totalTd}</tr>`;
@@ -681,13 +782,11 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                     return (
                       <td key={juz} data-label={label}>
                         {readOnly ? (
-                          <span>{scheduleData[day]?.[juz] || '-'}</span>
+                          <span>{scheduleData[day]?.[juz] ? `Juz ${scheduleData[day][juz]}` : '-'}</span>
                         ) : (
-                          <input
-                            type="text"
+                          <JuzSelect
                             value={scheduleData[day]?.[juz] || ''}
-                            onChange={(e) => onCellChange(day, juz, e.target.value)}
-                            placeholder="-"
+                            onChange={(val) => onCellChange(day, juz, val)}
                           />
                         )}
                       </td>
@@ -721,12 +820,9 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                     {readOnly ? (
                       <span>{scheduleData[day]?.murajah || '-'}</span>
                     ) : (
-                      <input
-                        type="text"
+                      <SurahRangePicker
                         value={scheduleData[day]?.murajah || ''}
-                        onChange={(e) => onCellChange(day, 'murajah', e.target.value)}
-                        placeholder="-"
-                        style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.murajah || '') ? 'rtl' : 'ltr' }}
+                        onChange={(val) => onCellChange(day, 'murajah', val)}
                       />
                     )}
                   </td>
@@ -791,10 +887,6 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
     const isToday = customDays ? false : dateObj?.toDateString() === new Date().toDateString();
     const fatemi = customFatemi || (customDays ? '' : fatemiDates[DAYS.indexOf(day)]);
 
-    const fields = mode === 'juz-wise'
-      ? ['juz1', 'juz2', 'juz3', 'juz4']
-      : ['murajah'];
-
     return (
       <div key={`${day}-${idx}`} className={`jadwal-calendar-card ${isToday ? 'today' : ''}`}>
         <div className="jadwal-calendar-card-header">
@@ -807,21 +899,36 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
           </div>
         ) : null}
         <div className="jadwal-calendar-card-body">
-          {fields.map(field => (
-            <div className="jadwal-calendar-field" key={field}>
-              <label>{field.charAt(0).toUpperCase() + field.slice(1).replace(/\d/, ' $&')}</label>
+          {mode === 'juz-wise' ? (
+            ['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
+              const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
+              return (
+                <div className="jadwal-calendar-field" key={juz}>
+                  <label>{label}</label>
+                  {readOnly ? (
+                    <span>{row[juz] ? `Juz ${row[juz]}` : '-'}</span>
+                  ) : (
+                    <JuzSelect
+                      value={row[juz] || ''}
+                      onChange={(val) => onCellChange(day, juz, val)}
+                    />
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="jadwal-calendar-field">
+              <label>Murajah</label>
               {readOnly ? (
-                <span>{row[field] || '-'}</span>
+                <span>{row.murajah || '-'}</span>
               ) : (
-                <input
-                  type="text"
-                  value={row[field] || ''}
-                  onChange={(e) => onCellChange(day, field, e.target.value)}
-                  placeholder="-"
+                <SurahRangePicker
+                  value={row.murajah || ''}
+                  onChange={(val) => onCellChange(day, 'murajah', val)}
                 />
               )}
             </div>
-          ))}
+          )}
           <div className="jadwal-calendar-field">
             <label>Jadeed</label>
             {readOnly ? (
@@ -917,10 +1024,6 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
     return daysList[idx]?.dayName || '';
   };
 
-  const fields = mode === 'juz-wise'
-    ? ['juz1', 'juz2', 'juz3', 'juz4']
-    : ['murajah'];
-
   return (
     <div className="jadwal-single-day-container">
       <div className="jadwal-single-day-nav">
@@ -938,21 +1041,36 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
       </div>
       <div className="jadwal-single-day-card">
         <div className="jadwal-single-day-card-body">
-          {fields.map(field => (
-            <div className="jadwal-calendar-field" key={field}>
-              <label>{field.charAt(0).toUpperCase() + field.slice(1).replace(/\d/, ' $&')}</label>
+          {mode === 'juz-wise' ? (
+            ['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
+              const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
+              return (
+                <div className="jadwal-calendar-field" key={juz}>
+                  <label>{label}</label>
+                  {readOnly ? (
+                    <span>{row[juz] ? `Juz ${row[juz]}` : '-'}</span>
+                  ) : (
+                    <JuzSelect
+                      value={row[juz] || ''}
+                      onChange={(val) => onCellChange(day, juz, val)}
+                    />
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="jadwal-calendar-field">
+              <label>Murajah</label>
               {readOnly ? (
-                <span>{row[field] || '-'}</span>
+                <span>{row.murajah || '-'}</span>
               ) : (
-                <input
-                  type="text"
-                  value={row[field] || ''}
-                  onChange={(e) => onCellChange(day, field, e.target.value)}
-                  placeholder="-"
+                <SurahRangePicker
+                  value={row.murajah || ''}
+                  onChange={(val) => onCellChange(day, 'murajah', val)}
                 />
               )}
             </div>
-          ))}
+          )}
           <div className="jadwal-calendar-field">
             <label>Jadeed</label>
             {readOnly ? (

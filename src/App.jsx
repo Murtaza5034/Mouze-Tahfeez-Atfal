@@ -2691,6 +2691,7 @@ function SettingsPage({
     { id: "childish", name: "Playful Learning", desc: "Colorful and fun for kids", color: "#ff8a65" },
     { id: "men", name: "Executive Dark", desc: "Professional and sleek", color: "#263238" },
     { id: "women", name: "Royal Grace", desc: "Sophisticated and soft tones", color: "#8e24aa" },
+    { id: "ashara", name: "Ashara Mode", desc: "Aashra Mubarakah — Mourning for Imam Hussain (AS)", color: "#0a5c36", premium: true },
   ];
 
   const handleSupportSubmit = async (e) => {
@@ -2841,6 +2842,7 @@ function SettingsPage({
                   onClick={() => setAppTheme(t.id)}
                 >
                   <div className="theme-preview" style={{ backgroundColor: t.color }}>
+                    {t.premium && <span className="premium-badge"><Lock size={12} /> Premium</span>}
                     {appTheme === t.id && <CheckCircle size={24} color="white" />}
                   </div>
                   <div className="theme-info">
@@ -9568,7 +9570,7 @@ export default function App() {
     return localStorage.getItem("mauze-dark-mode") === "true";
   });
   const [appTheme, setAppTheme] = useState(() => {
-    return localStorage.getItem("mauze-app-theme") || "default";
+    return localStorage.getItem("mauze-app-theme") || "ashara";
   });
 
   useEffect(() => {

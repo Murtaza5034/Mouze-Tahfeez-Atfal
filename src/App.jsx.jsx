@@ -7789,7 +7789,7 @@ export default function App() {
     return localStorage.getItem("mauze-dark-mode") === "true";
   });
   const [appTheme, setAppTheme] = useState(() => {
-    return localStorage.getItem("mauze-app-theme") || "default";
+    return localStorage.getItem("mauze-app-theme") || "ashara";
   });
 
   useEffect(() => {

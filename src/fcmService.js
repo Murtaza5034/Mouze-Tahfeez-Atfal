@@ -237,8 +237,8 @@ class FCMService {
       // Create notification options with official styling
       const options = {
         body: notification?.body || 'New notification from Mauze Tahfeez',
-        icon: '/main logo.jpg',
-        badge: '/main logo.jpg',
+        icon: '/logo.png',
+        badge: '/logo.png',
         vibrate: [200, 100, 200],
         data: {
           ...data,
@@ -255,7 +255,7 @@ class FCMService {
           {
             action: 'open',
             title: 'Open Portal',
-            icon: '/main logo.jpg'
+            icon: '/logo.png'
           },
           {
             action: 'dismiss',

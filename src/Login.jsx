@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AlertCircle, Loader2, Lock, LogIn, Mail, ShieldCheck, Users } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import "./Login.css";
+import "./parent-portal.css";
 
 const ROLE_OPTIONS = [
   {
@@ -36,6 +37,11 @@ export default function Login({ onLoginSuccess }) {
   const [rememberMe, setRememberMe] = useState(() => {
     return localStorage.getItem("mauze-remember-me") !== "false";
   });
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("mauze-app-theme") || "ashara";
+    document.body.setAttribute("data-theme", savedTheme);
+  }, []);
 
   const activeRole = ROLE_OPTIONS.find((option) => option.id === selectedRole);
 

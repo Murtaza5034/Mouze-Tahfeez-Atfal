@@ -1198,6 +1198,299 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   --cream-bg: #f3e5f5 !important;
 }
 
+/* ============================================
+   ASHARA MODE — Aashra Mubarakah Theme
+   Colors: Green | White | Red
+   Mourning theme for Imam Hussain (AS)
+   Premium animated theme
+   ============================================ */
+
+/* ---- Falling drops background animation ---- */
+@keyframes asharaDropsFall {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 0 400px, 0 800px; }
+}
+
+/* ---- Ashara CSS Variables ---- */
+[data-theme="ashara"] {
+  --primary-gold: #0a5c36 !important;
+  --deep-brown: #0d3b1e !important;
+  --cream-bg: #f5f0eb !important;
+  --soft-brown: #1a5c3a !important;
+  --text-main: #1a1a1a !important;
+  --text-muted: #4a4a4a !important;
+  --premium-white: #ffffff !important;
+  --off-white: #faf8f5 !important;
+  --glass-bg: rgba(255, 255, 255, 0.9) !important;
+  --glass-border: rgba(10, 92, 54, 0.15) !important;
+  --shadow-premium: 0 12px 40px rgba(10, 92, 54, 0.1) !important;
+  --shadow-gold: 0 8px 24px rgba(180, 30, 30, 0.12) !important;
+  --accent-gold: #b41e1e !important;
+  --dark-gold: #8a1515 !important;
+  --light-gold: #fef5f5 !important;
+  --bg-gradient: linear-gradient(135deg, #faf8f5 0%, #f0f5eb 100%) !important;
+
+  /* Background: Fatemi geometric pattern + animated falling drops at 5% opacity */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cg opacity='0.35'%3E%3Cpath d='M200 20C200 20 160 70 160 90c0 22 18 40 40 40s40-18 40-40c0-20-40-70-40-70z' fill='%23b41e1e'/%3E%3Cpath d='M60 140C60 140 35 175 35 190c0 14 11 25 25 25s25-11 25-25c0-15-25-50-25-50z' fill='%23b41e1e'/%3E%3Cpath d='M320 80C320 80 295 115 295 130c0 14 11 25 25 25s25-11 25-25c0-15-25-50-25-50z' fill='%23b41e1e'/%3E%3Cpath d='M350 280C350 280 330 310 330 325c0 14 11 25 25 25s25-11 25-25c0-15-20-45-20-45z' fill='%23b41e1e'/%3E%3Cpath d='M100 330C100 330 80 360 80 375c0 14 11 25 25 25s25-11 25-25c0-15-20-45-20-45z' fill='%23b41e1e'/%3E%3Cpath d='M45 260C45 260 25 290 25 305c0 14 11 25 25 25s25-11 25-25c0-15-20-45-20-45z' fill='%23b41e1e'/%3E%3Cpath d='M270 170C270 170 250 200 250 215c0 14 11 25 25 25s25-11 25-25c0-15-20-45-20-45z' fill='%23b41e1e'/%3E%3Cpath d='M130 220C130 220 110 250 110 265c0 14 11 25 25 25s25-11 25-25c0-15-20-45-20-45z' fill='%23b41e1e'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(circle at 20% 50%, rgba(180, 30, 30, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 30%, rgba(10, 92, 54, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 50% 70%, rgba(180, 30, 30, 0.03) 0%, transparent 50%),
+    var(--bg-gradient) !important;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat !important;
+  background-size: 400px 400px, auto, auto, auto, auto !important;
+  background-attachment: fixed !important;
+  animation: asharaDropsFall 15s linear infinite !important;
+}
+
+/* ---- Ashara — All buttons: green bg, white text, red droplet ---- */
+[data-theme="ashara"] button:not(.no-theme):not(.notif-view-btn):not([class*="premium-toggle"]):not([class*="toggle-"]):not([class*="theme-"]):not(.swiper-button-next):not(.swiper-button-prev) {
+  background: #0a5c36 !important;
+  color: #ffffff !important;
+  border-color: #0a5c36 !important;
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+}
+
+[data-theme="ashara"] button:not(.no-theme):not(.card-dismiss-btn):not(.notif-view-btn)::before {
+  content: '' !important;
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b41e1e'%3E%3Cpath d='M12 2.5C12 2.5 6 10 6 14c0 3.3 2.7 6 6 6s6-2.7 6-6c0-4-6-11.5-6-11.5z'/%3E%3C/svg%3E") no-repeat center/contain !important;
+  flex-shrink: 0 !important;
+}
+
+[data-theme="ashara"] button:not(.no-theme):not(.card-dismiss-btn):not(.notif-view-btn):hover {
+  background: #07452a !important;
+  box-shadow: 0 4px 16px rgba(10, 92, 54, 0.3) !important;
+}
+
+/* ---- Ashara — Settings tab icons white outline ---- */
+[data-theme="ashara"] .settings-tab-btn {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+[data-theme="ashara"] .settings-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+[data-theme="ashara"] .settings-tab-btn.active {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(10, 92, 54, 0.2) !important;
+}
+[data-theme="ashara"] .tab-btn-icon {
+  background: transparent !important;
+  color: inherit !important;
+}
+[data-theme="ashara"] .settings-tab-btn.active .tab-btn-icon {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+[data-theme="ashara"] .settings-tab-btn.active::before {
+  background: #ffffff !important;
+}
+[data-theme="ashara"] .tab-btn-chevron {
+  color: #ffffff !important;
+}
+
+/* ---- Ashara — Card styling with green borders ---- */
+[data-theme="ashara"] .premium-card,
+[data-theme="ashara"] .dashboard-card,
+[data-theme="ashara"] .settings-tab-pane,
+[data-theme="ashara"] .glass-card {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(10, 92, 54, 0.2) !important;
+  box-shadow: 0 4px 20px rgba(10, 92, 54, 0.06) !important;
+}
+
+/* ---- Ashara — Section headings in green ---- */
+[data-theme="ashara"] h1,
+[data-theme="ashara"] h2,
+[data-theme="ashara"] h3,
+[data-theme="ashara"] h4,
+[data-theme="ashara"] .section-title {
+  color: #0a5c36 !important;
+}
+
+/* ---- Ashara — Accent elements in red (sorrow/Imam Hussain) ---- */
+[data-theme="ashara"] .accent-text,
+[data-theme="ashara"] .highlight-text,
+[data-theme="ashara"] [class*="badge"],
+[data-theme="ashara"] .status-indicator {
+  color: #b41e1e !important;
+}
+
+/* ---- Ashara — Sidebar / Navigation ---- */
+[data-theme="ashara"] .sidebar,
+[data-theme="ashara"] .side-nav {
+  background: linear-gradient(180deg, #0a5c36 0%, #07452a 100%) !important;
+}
+[data-theme="ashara"] .sidebar a,
+[data-theme="ashara"] .sidebar .nav-link,
+[data-theme="ashara"] .drawer-link,
+[data-theme="ashara"] .sidebar-link {
+  color: #ffffff !important;
+}
+[data-theme="ashara"] .sidebar a svg,
+[data-theme="ashara"] .sidebar .nav-link svg,
+[data-theme="ashara"] .drawer-link svg,
+[data-theme="ashara"] .sidebar-link svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+[data-theme="ashara"] .sidebar a:hover,
+[data-theme="ashara"] .sidebar .nav-link:hover,
+[data-theme="ashara"] .drawer-link:hover,
+[data-theme="ashara"] .sidebar-link:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+[data-theme="ashara"] .sidebar a.active,
+[data-theme="ashara"] .sidebar .nav-link.active,
+[data-theme="ashara"] .drawer-link.active,
+[data-theme="ashara"] .sidebar-link.active {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-left: 3px solid #b41e1e !important;
+}
+[data-theme="ashara"] .drawer-link.logout {
+  color: #fca5a5 !important;
+}
+[data-theme="ashara"] .drawer-link.logout svg {
+  color: #fca5a5 !important;
+  stroke: #fca5a5 !important;
+}
+[data-theme="ashara"] .sidebar-link.logout-btn {
+  color: #fca5a5 !important;
+}
+[data-theme="ashara"] .sidebar-link.logout-btn svg {
+  color: #fca5a5 !important;
+  stroke: #fca5a5 !important;
+}
+
+/* ---- Ashara — Inbox notification cards: white embossed text, red droplet ---- */
+[data-theme="ashara"] .premium-notif-card {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(180, 30, 30, 0.15) !important;
+  box-shadow: 0 4px 20px rgba(10, 92, 54, 0.08), inset 0 1px 0 rgba(255,255,255,0.8) !important;
+}
+[data-theme="ashara"] .premium-notif-card .notif-card-header h3,
+[data-theme="ashara"] .premium-notif-card .notif-card-content {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.08) !important;
+}
+[data-theme="ashara"] .card-dismiss-btn {
+  position: absolute !important;
+  top: 16px !important;
+  right: 16px !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  background: #b41e1e !important;
+  border: none !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 2px 8px rgba(180, 30, 30, 0.25) !important;
+}
+[data-theme="ashara"] .card-dismiss-btn:hover {
+  background: #8a1515 !important;
+  transform: scale(1.1) !important;
+}
+
+/* ---- Ashara — Selection highlights ---- */
+[data-theme="ashara"] ::selection {
+  background: rgba(10, 92, 54, 0.2) !important;
+  color: #0a5c36 !important;
+}
+
+/* ---- Ashara — Inbox card action buttons ---- */
+[data-theme="ashara"] .notif-view-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #0a5c36 !important;
+  font-weight: 800 !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.1em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 8px 4px !important;
+  cursor: pointer !important;
+  transition: all 0.3s !important;
+  position: static !important;
+  text-transform: uppercase !important;
+}
+[data-theme="ashara"] .notif-view-btn:hover {
+  gap: 12px !important;
+  color: #07452a !important;
+  transform: translateX(4px) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+[data-theme="ashara"] .notif-view-btn.gold {
+  border: 1.5px solid #0a5c36 !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #0a5c36 !important;
+  padding: 6px 14px !important;
+}
+[data-theme="ashara"] .notif-view-btn.gold:hover {
+  background: #0a5c36 !important;
+  color: #ffffff !important;
+  gap: 8px !important;
+  transform: none !important;
+}
+
+/* ---- Ashara — Input fields ---- */
+[data-theme="ashara"] input,
+[data-theme="ashara"] select,
+[data-theme="ashara"] textarea {
+  border-color: rgba(10, 92, 54, 0.3) !important;
+}
+[data-theme="ashara"] input:focus,
+[data-theme="ashara"] select:focus,
+[data-theme="ashara"] textarea:focus {
+  border-color: #0a5c36 !important;
+  box-shadow: 0 0 0 3px rgba(10, 92, 54, 0.1) !important;
+}
+
+/* ---- Ashara — Links in red (remembrance) ---- */
+[data-theme="ashara"] a {
+  color: #b41e1e !important;
+}
+[data-theme="ashara"] a:hover {
+  color: #8a1515 !important;
+}
+
+/* ---- Ashara — Settings tabs container (override dark background) ---- */
+[data-theme="ashara"] .settings-tabs {
+  background: linear-gradient(180deg, #0a5c36 0%, #07452a 100%) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ---- Premium badge on theme card ---- */
+.premium-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #b41e1e, #8a1515);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .settings-page {
   max-width: 1000px;
   margin: 0 auto;
@@ -1395,6 +1688,12 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+  position: relative;
+}
+.theme-preview .premium-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
 }
 .theme-info h4 { margin: 0; color: var(--deep-brown); font-size: 0.95rem; }
 .theme-info p { margin: 4px 0 0; font-size: 0.75rem; color: var(--text-muted); }
