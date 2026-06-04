@@ -263,13 +263,18 @@ const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
   );
 };
 
+const toArabicNum = (n) => {
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+  return String(n).replace(/\d/g, d => arabicDigits[d]);
+};
+
 const formatJuzhali = (val) => {
   if (!val) return '-';
   const parts = val.split(':');
   if (parts.length === 2 && parts[0] && parts[1]) {
-    return `${parts[0]}-${parts[1]}`;
+    return `${toArabicNum(parts[0])}-${toArabicNum(parts[1])}`;
   }
-  return val;
+  return toArabicNum(val);
 };
 
 const formatJadeed = (val) => {
@@ -278,7 +283,7 @@ const formatJadeed = (val) => {
   if (parts.length === 2 && parts[0] && parts[1]) {
     const surah = SURAH_AYAH_DATA.find(s => s.number === Number(parts[0]));
     const surahName = surah ? surah.nameAr : parts[0];
-    return `${surahName}:${parts[1]}`;
+    return `${surahName}:${toArabicNum(parts[1])}`;
   }
   return val;
 };
@@ -391,7 +396,7 @@ const JadeedPicker = ({ value, onChange }) => {
         <option value="" style={{ direction: 'ltr' }}>-- Surah --</option>
         {SURAH_AYAH_DATA.map(s => (
           <option key={s.number} value={String(s.number)}>
-            {s.number}. {s.nameAr}
+            {s.nameAr}
           </option>
         ))}
       </select>
@@ -437,10 +442,10 @@ const JuzSelect = ({ value, onChange }) => (
   <select
     value={value || ''}
     onChange={(e) => onChange(e.target.value)}
-    style={{
-      padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-      background: '#fff', fontSize: '12px', width: '100%', fontFamily: "'Kanz al Marjaan', serif",
-    }}
+        style={{
+          padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
+          background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+        }}
   >
     <option value="">-</option>
     {Array.from({ length: 30 }, (_, i) => (
