@@ -336,7 +336,7 @@ const JadeedPicker = ({ value, onChange }) => {
   );
 };
 
-const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', theme = {}) => {
+const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', theme = {}, style = 'table', dayDates = []) => {
   const t = { ...getDefaultTheme(), ...theme };
   const pdfDays = (() => {
     if (t.jadwalType === 'miqaat' && t.weekStart && t.weekEnd) {
@@ -355,11 +355,25 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     }
     return DAYS;
   })();
+
+  const fatemiDates = pdfDays.map((_, idx) => {
+    if (dayDates && dayDates[idx]) return dayDates[idx];
+    const dayIdx = DAYS.indexOf(pdfDays[idx]);
+    if (dayIdx === -1) return '';
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const d = new Date(monday);
+    d.setDate(d.getDate() + dayIdx);
+    return getFatemiDateStr(d.toISOString().split('T')[0]);
+  });
+
   const printContainer = document.createElement("div");
   printContainer.style.position = "absolute";
   printContainer.style.left = "-9999px";
   printContainer.style.top = "-9999px";
-  printContainer.style.width = "850px";
+  const containerWidth = style === 'calendar' ? 1100 : 850;
+  printContainer.style.width = containerWidth + "px";
   printContainer.style.padding = "40px";
   printContainer.style.background = t.backgroundColor;
   printContainer.style.fontFamily = t.fontFamily.includes(',') ? t.fontFamily : `'${t.fontFamily}', 'Inter', 'Segoe UI', sans-serif`;
@@ -369,33 +383,35 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     ? `background-image: url('${t.backgroundUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat;`
     : '';
 
-  const pdfHeaders = mode === 'juz-wise'
-    ? `<tr style="background: ${t.primaryColor}; color: #ffffff;">`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 1</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 2</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 3</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 4</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>`
-      + '</tr>'
-    : `<tr style="background: ${t.primaryColor}; color: #ffffff;">`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>`
-      + '</tr>';
+  const contentCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; direction: ltr;";
 
-  const buildPdfRows = () => {
+  const buildTableContent = () => {
+    const pdfHeaders = mode === 'juz-wise'
+      ? `<tr style="background: ${t.primaryColor}; color: #ffffff;">`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 1</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 2</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 3</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 4</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>`
+        + '</tr>'
+      : `<tr style="background: ${t.primaryColor}; color: #ffffff;">`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
+        + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>`
+        + '</tr>';
+
     const rows = pdfDays.map((day, idx) => {
       const row = scheduleData[day] || {};
       const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
       const bg = idx % 2 === 0 ? t.backgroundColor : `${t.backgroundColor}f2`;
-      const dayTd = `<td style="padding: 14px; border: 1px solid ${t.accentColor}; font-weight: bold; font-size: 13px; color: ${t.primaryColor}; text-align: left;">${day}</td>`;
+      const dayTd = `<td style="padding: 14px; border: 1px solid ${t.accentColor}; font-weight: bold; font-size: 13px; color: ${t.primaryColor}; text-align: left;">${day}<div style="font-family: 'Kanz al Marjaan', serif; font-size: 11px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div></td>`;
       const starTd = `<td style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #FFD700; text-align: center; letter-spacing: 1px;">${stars}</td>`;
-      const tdStyle = `style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 13px; color: #333; text-align: center; font-weight: 500;"`;
+      const tdStyle = `style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${contentCss}"`;
 
       if (mode === 'juz-wise') {
         return `<tr style="background: ${bg};">${dayTd}`
@@ -413,10 +429,57 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
         + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `${starTd}</tr>`;
     });
-    return rows.join('');
+
+    return `
+      <table style="width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(93, 64, 55, 0.03);">
+        <thead>${pdfHeaders}</thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>`;
   };
 
-  const pdfRows = buildPdfRows();
+  const buildCalendarContent = () => {
+    return `
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;">
+        ${pdfDays.map((day, idx) => {
+          const row = scheduleData[day] || {};
+          const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
+          return `
+            <div style="flex: 1 1 calc(33.33% - 20px); min-width: 300px; border: 1.5px solid ${t.accentColor}; border-radius: 14px; padding: 18px; background: ${idx % 2 === 0 ? '#fff' : `${t.backgroundColor}f2`}; box-sizing: border-box;">
+              <div style="border-bottom: 2px solid ${t.accentColor}; padding-bottom: 10px; margin-bottom: 12px;">
+                <div style="font-size: 16px; font-weight: 800; color: ${t.primaryColor}; letter-spacing: 0.5px; text-transform: uppercase;">${day}</div>
+                <div style="font-family: 'Kanz al Marjaan', serif; font-size: 13px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div>
+              </div>
+              ${mode === 'juz-wise'
+                ? ['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
+                    const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
+                    return `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
+                      <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">${label}</span>
+                      <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${row[juz] || '-'}</span>
+                    </div>`;
+                  }).join('')
+                : `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
+                  <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">MURAJAH</span>
+                  <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${row.murajah || '-'}</span>
+                </div>`
+              }
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
+                <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">JADEED</span>
+                <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${row.jadeed || '-'}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
+                <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">JUZHALI</span>
+                <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${formatJuzhali(row.juzhali)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">STAR</span>
+                <span style="font-size: 16px; color: #FFD700; letter-spacing: 1px;">${stars}</span>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>`;
+  };
+
+  const contentHtml = style === 'calendar' ? buildCalendarContent() : buildTableContent();
 
   printContainer.innerHTML = `
     <div style="border: 2px solid ${t.accentColor}; border-radius: 16px; padding: 30px; background: ${t.backgroundColor}; box-sizing: border-box; ${bgImageStyle}">
@@ -424,10 +487,6 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
         <div>
           <h1 style="margin: 0; font-size: 26px; color: ${t.primaryColor}; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">MAUZE TAHFEEZ ATFAL</h1>
            <p style="margin: 5px 0 0 0; font-size: 14px; color: ${t.accentColor}; font-weight: 600; letter-spacing: 0.5px;">${t.jadwalType === 'miqaat' ? 'Miqaāt' : 'Weekly'} Quran Jadwal (Timetable)</p>
-        </div>
-        <div style="text-align: right;">
-          <div style="font-size: 12px; color: #888; font-weight: 500;">Generated on</div>
-          <div style="font-size: 14px; color: ${t.primaryColor}; font-weight: bold;">${new Date().toLocaleDateString()}</div>
         </div>
       </div>
 
@@ -442,10 +501,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
         </div>
       </div>
 
-      <table style="width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(93, 64, 55, 0.03);">
-        <thead>${pdfHeaders}</thead>
-        <tbody>${pdfRows}</tbody>
-      </table>
+      ${contentHtml}
 
       <div style="margin-top: 35px; border-top: 1px dashed ${t.accentColor}; padding-top: 15px; text-align: center;">
         <p style="margin: 0; font-size: 12px; color: ${t.accentColor}; font-style: italic; font-weight: 600;">
@@ -475,7 +531,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       console.warn('Custom font loading for Jadwal PDF failed:', e);
     }
     const canvas = await html2canvas(printContainer, {
-      scale: 3,
+      scale: 4,
       useCORS: true,
       allowTaint: true,
       backgroundColor: t.backgroundColor,
@@ -493,17 +549,26 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     });
 
     const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
     const pdfWidth = 210;
-    const imgProps = new jsPDF().getImageProperties(imgData);
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    const pdfHeight = 297;
+    const imgProps = pdf.getImageProperties(imgData);
+    const imgWidth = pdfWidth;
+    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-    const pdf = new jsPDF({
-      orientation: "p",
-      unit: "mm",
-      format: "a4"
-    });
+    let heightLeft = imgHeight;
+    let position = 0;
 
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pdfHeight;
+
+    while (heightLeft > 0) {
+      position -= pdfHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+    }
+
     pdf.save(`${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`);
   } catch (err) {
     console.error("Failed to export Jadwal PDF:", err);
@@ -1137,7 +1202,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
               </button>
               <button
                 className="jadwal-download-btn"
-                onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme)}
+onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacherDisplayStyle, dayDates)}
               >
                 <Download size={16} /> Download PDF
               </button>
@@ -1292,7 +1357,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
         <h2>{theme.jadwalType === 'miqaat' ? "Miqaāt Jadwal Schedule" : "Weekly Jadwal Schedule"}</h2>
         <button
           className="jadwal-save-btn"
-          onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme)}
+          onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, displayStyle, dayDates)}
         >
           <Download size={16} /> Download PDF
         </button>
