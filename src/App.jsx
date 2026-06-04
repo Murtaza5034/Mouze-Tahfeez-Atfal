@@ -7966,8 +7966,8 @@ const handleDownloadAllReports = async () => {
                               <th style={{ padding: '6px 8px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'left', fontWeight: 700, textTransform: 'uppercase' }}>DAYS</th>
                               <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 1</th>
                               <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 2</th>
-                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JUZHALI</th>
-                              <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JADEED</th>
+                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JADEED</th>
+                              <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JUZHALI</th>
                             </tr>
                           </thead>
                           <tbody>

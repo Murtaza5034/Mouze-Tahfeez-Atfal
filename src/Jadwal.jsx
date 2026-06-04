@@ -376,15 +376,15 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 2</th>`
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 3</th>`
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH 4</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>`
       + '</tr>'
     : `<tr style="background: ${t.primaryColor}; color: #ffffff;">`
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>`
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH</th>`
-      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
+      + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
       + `<th style="padding: 14px; border: 1px solid ${t.accentColor}; font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; width: 110px;">STAR</th>`
       + '</tr>';
 
@@ -403,14 +403,14 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
           + `<td ${tdStyle}>${row.juz2 || '-'}</td>`
           + `<td ${tdStyle}>${row.juz3 || '-'}</td>`
           + `<td ${tdStyle}>${row.juz4 || '-'}</td>`
-          + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
           + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
+          + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
           + `${starTd}</tr>`;
       }
       return `<tr style="background: ${bg};">${dayTd}`
         + `<td ${tdStyle}>${row.murajah || '-'}</td>`
-        + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
+        + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `${starTd}</tr>`;
     });
     return rows.join('');
@@ -524,8 +524,8 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
               <tr>
                 <th rowSpan="2">Days</th>
                 <th colSpan="4" style={{ textAlign: 'center', borderBottom: 'none' }}>Murajah</th>
-                <th rowSpan="2">Juzhali</th>
                 <th rowSpan="2">Jadeed</th>
+                <th rowSpan="2">Juzhali</th>
                 <th rowSpan="2">Star</th>
               </tr>
               <tr>
@@ -539,8 +539,8 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
             <tr>
               <th>Days</th>
               <th>Murajah</th>
-              <th>Juzhali</th>
               <th>Jadeed</th>
+              <th>Juzhali</th>
               <th>Star</th>
             </tr>
           )}
@@ -570,6 +570,16 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                       </td>
                     );
                   })}
+                  <td data-label="Jadeed">
+                    {readOnly ? (
+                      <span>{scheduleData[day]?.jadeed || '-'}</span>
+                    ) : (
+                      <JadeedPicker
+                        value={scheduleData[day]?.jadeed || ''}
+                        onChange={(val) => onCellChange(day, 'jadeed', val)}
+                      />
+                    )}
+                  </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
                       <span>{formatJuzhali(scheduleData[day]?.juzhali)}</span>
@@ -578,16 +588,6 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                         value={scheduleData[day]?.juzhali || ''}
                         onChange={(val) => onCellChange(day, 'juzhali', val)}
                         jadeedValue={scheduleData[day]?.jadeed || ''}
-                      />
-                    )}
-                  </td>
-                  <td data-label="Jadeed">
-                    {readOnly ? (
-                      <span>{scheduleData[day]?.jadeed || '-'}</span>
-                    ) : (
-                      <JadeedPicker
-                        value={scheduleData[day]?.jadeed || ''}
-                        onChange={(val) => onCellChange(day, 'jadeed', val)}
                       />
                     )}
                   </td>
@@ -607,6 +607,16 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                       />
                     )}
                   </td>
+                  <td data-label="Jadeed">
+                    {readOnly ? (
+                      <span>{scheduleData[day]?.jadeed || '-'}</span>
+                    ) : (
+                      <JadeedPicker
+                        value={scheduleData[day]?.jadeed || ''}
+                        onChange={(val) => onCellChange(day, 'jadeed', val)}
+                      />
+                    )}
+                  </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
                       <span>{formatJuzhali(scheduleData[day]?.juzhali)}</span>
@@ -615,16 +625,6 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                         value={scheduleData[day]?.juzhali || ''}
                         onChange={(val) => onCellChange(day, 'juzhali', val)}
                         jadeedValue={scheduleData[day]?.jadeed || ''}
-                      />
-                    )}
-                  </td>
-                  <td data-label="Jadeed">
-                    {readOnly ? (
-                      <span>{scheduleData[day]?.jadeed || '-'}</span>
-                    ) : (
-                      <JadeedPicker
-                        value={scheduleData[day]?.jadeed || ''}
-                        onChange={(val) => onCellChange(day, 'jadeed', val)}
                       />
                     )}
                   </td>
@@ -715,6 +715,17 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             </div>
           ))}
           <div className="jadwal-calendar-field">
+            <label>Jadeed</label>
+            {readOnly ? (
+              <span>{row.jadeed || '-'}</span>
+            ) : (
+              <JadeedPicker
+                value={row.jadeed || ''}
+                onChange={(val) => onCellChange(day, 'jadeed', val)}
+              />
+            )}
+          </div>
+          <div className="jadwal-calendar-field">
             <label>Juzhali</label>
             {readOnly ? (
               <span>{formatJuzhali(row.juzhali)}</span>
@@ -723,17 +734,6 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
                 value={row.juzhali || ''}
                 onChange={(val) => onCellChange(day, 'juzhali', val)}
                 jadeedValue={row.jadeed || ''}
-              />
-            )}
-          </div>
-          <div className="jadwal-calendar-field">
-            <label>Jadeed</label>
-            {readOnly ? (
-              <span>{row.jadeed || '-'}</span>
-            ) : (
-              <JadeedPicker
-                value={row.jadeed || ''}
-                onChange={(val) => onCellChange(day, 'jadeed', val)}
               />
             )}
           </div>
@@ -861,6 +861,17 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             </div>
           ))}
           <div className="jadwal-calendar-field">
+            <label>Jadeed</label>
+            {readOnly ? (
+              <span>{row.jadeed || '-'}</span>
+            ) : (
+              <JadeedPicker
+                value={row.jadeed || ''}
+                onChange={(val) => onCellChange(day, 'jadeed', val)}
+              />
+            )}
+          </div>
+          <div className="jadwal-calendar-field">
             <label>Juzhali</label>
             {readOnly ? (
               <span>{formatJuzhali(row.juzhali)}</span>
@@ -869,17 +880,6 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
                 value={row.juzhali || ''}
                 onChange={(val) => onCellChange(day, 'juzhali', val)}
                 jadeedValue={row.jadeed || ''}
-              />
-            )}
-          </div>
-          <div className="jadwal-calendar-field">
-            <label>Jadeed</label>
-            {readOnly ? (
-              <span>{row.jadeed || '-'}</span>
-            ) : (
-              <JadeedPicker
-                value={row.jadeed || ''}
-                onChange={(val) => onCellChange(day, 'jadeed', val)}
               />
             )}
           </div>
