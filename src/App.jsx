@@ -127,6 +127,11 @@ const JADWAL_SETTING_DEFAULTS = {
   jadwal_type: 'weekly',
   jadwal_week_start: '',
   jadwal_week_end: '',
+  jadwal_pdf_title: 'MAUZE TAHFEEZ ATFAL',
+  jadwal_pdf_subtitle: 'Weekly Quran Jadwal (Timetable)',
+  jadwal_pdf_academic_portal: 'ACADEMIC PORTAL',
+  jadwal_pdf_hifz_program: 'Hifz Program',
+  jadwal_pdf_logo_url: '',
 };
 
 const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
@@ -4840,6 +4845,7 @@ function AdminPortal({
   const [jadwalSettingsDraft, setJadwalSettingsDraft] = useState(() => normalizeJadwalSettings(jadwalSettings));
   const [uploadingReportBackground, setUploadingReportBackground] = useState(false);
   const [uploadingJadwalBg, setUploadingJadwalBg] = useState(false);
+  const [uploadingJadwalLogo, setUploadingJadwalLogo] = useState(false);
   const [jadwalSaving, setJadwalSaving] = useState(false);
 
   useEffect(() => {
@@ -5369,6 +5375,61 @@ const handleDownloadAllReports = async () => {
       jadwal_pdf_background_url: "",
     }));
     await onSaveJadwalSettings({ jadwal_pdf_background_url: "" });
+  };
+
+  const handleJadwalLogoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type?.startsWith("image/")) {
+      onShowAction("error", "Please upload an image file for the Jadwal PDF logo.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      onShowAction("error", "Jadwal logo must be under 2MB.");
+      return;
+    }
+    setUploadingJadwalLogo(true);
+    try {
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "png";
+      const safeName = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-z0-9-_]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "jadwal-logo";
+      const filePath = `jadwal-logo/${Date.now()}-${safeName}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: file.type,
+        });
+      if (uploadError) throw uploadError;
+      const { data: publicUrlData } = supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .getPublicUrl(filePath);
+      const logoUrl = publicUrlData?.publicUrl;
+      if (!logoUrl) throw new Error("Logo URL was not returned.");
+      setJadwalSettingsDraft((current) => ({
+        ...current,
+        jadwal_pdf_logo_url: logoUrl,
+      }));
+      await onSaveJadwalSettings({ jadwal_pdf_logo_url: logoUrl });
+    } catch (error) {
+      console.error("Jadwal logo upload failed:", error);
+      onShowAction("error", `Jadwal logo upload failed: ${error.message}`);
+    } finally {
+      setUploadingJadwalLogo(false);
+    }
+  };
+
+  const removeJadwalLogo = async () => {
+    setJadwalSettingsDraft((current) => ({
+      ...current,
+      jadwal_pdf_logo_url: "",
+    }));
+    await onSaveJadwalSettings({ jadwal_pdf_logo_url: "" });
   };
 
   return (
@@ -7568,6 +7629,11 @@ const handleDownloadAllReports = async () => {
                       jadwal_type: jadwalSettingsDraft.jadwal_type,
                       jadwal_week_start: jadwalSettingsDraft.jadwal_week_start,
                       jadwal_week_end: jadwalSettingsDraft.jadwal_week_end,
+                      jadwal_pdf_title: jadwalSettingsDraft.jadwal_pdf_title,
+                      jadwal_pdf_subtitle: jadwalSettingsDraft.jadwal_pdf_subtitle,
+                      jadwal_pdf_academic_portal: jadwalSettingsDraft.jadwal_pdf_academic_portal,
+                      jadwal_pdf_hifz_program: jadwalSettingsDraft.jadwal_pdf_hifz_program,
+                      jadwal_pdf_logo_url: jadwalSettingsDraft.jadwal_pdf_logo_url,
                     };
                     const { error } = await supabase
                       .from("jadwal_settings")
@@ -7788,6 +7854,68 @@ const handleDownloadAllReports = async () => {
                     </label>
                   </div>
 
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <FileText size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>PDF Header Text</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Title (e.g. MAUZE TAHFEEZ ATFAL)</span>
+                      <input name="jadwal_pdf_title" type="text" value={jadwalSettingsDraft.jadwal_pdf_title || ''} onChange={updateJadwalDraft("jadwal_pdf_title")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Subtitle (e.g. Weekly Quran Jadwal)</span>
+                      <input name="jadwal_pdf_subtitle" type="text" value={jadwalSettingsDraft.jadwal_pdf_subtitle || ''} onChange={updateJadwalDraft("jadwal_pdf_subtitle")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Academic Portal Label</span>
+                      <input name="jadwal_pdf_academic_portal" type="text" value={jadwalSettingsDraft.jadwal_pdf_academic_portal || ''} onChange={updateJadwalDraft("jadwal_pdf_academic_portal")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Hifz Program Label</span>
+                      <input name="jadwal_pdf_hifz_program" type="text" value={jadwalSettingsDraft.jadwal_pdf_hifz_program || ''} onChange={updateJadwalDraft("jadwal_pdf_hifz_program")} className="premium-input" />
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Image size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>PDF Logo</h4>
+                  </div>
+                  <div className="form-grid" style={{ marginTop: '12px' }}>
+                    <label>
+                      <span>Logo Image (appears at top-right corner of PDF)</span>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label className="premium-input" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '10px 16px', border: '1px dashed var(--primary-gold)', background: '#fdfaf4', borderRadius: '8px', transition: 'all 0.2s' }}>
+                          <Upload size={18} style={{ color: 'var(--primary-gold)' }} />
+                          <span style={{ color: 'var(--deep-brown)', fontWeight: 500, fontSize: '0.9rem' }}>
+                            {uploadingJadwalLogo ? "Uploading..." : "Choose Logo PNG"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleJadwalLogoUpload}
+                            disabled={uploadingJadwalLogo}
+                            style={{ display: 'none' }}
+                          />
+                          {uploadingJadwalLogo && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary-gold)' }} />}
+                        </label>
+                        {jadwalSettingsDraft.jadwal_pdf_logo_url && (
+                          <button type="button" onClick={removeJadwalLogo} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, padding: '6px 10px', borderRadius: '6px' }}>
+                            <XCircle size={16} /> Remove
+                          </button>
+                        )}
+                      </div>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Upload a logo (PNG preferred) for the top-right corner of the Jadwal PDF (max 2MB).
+                      </small>
+                      {jadwalSettingsDraft.jadwal_pdf_logo_url && (
+                        <div style={{ marginTop: '10px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dfcbb5', maxWidth: '120px' }}>
+                          <img src={jadwalSettingsDraft.jadwal_pdf_logo_url} alt="Jadwal logo preview" style={{ width: '100%', display: 'block' }} />
+                        </div>
+                      )}
+                    </label>
+                  </div>
+
                   <button type="submit" className="action-button premium" style={{ marginTop: '20px', position: 'relative', transition: 'all 0.25s ease', opacity: jadwalSaving ? 0.7 : 1 }} disabled={jadwalSaving}>
                     {jadwalSaving ? (
                       <><Loader2 size={18} className="animate-spin" style={{ marginRight: '8px' }} /> Saving...</>
@@ -7919,19 +8047,24 @@ const handleDownloadAllReports = async () => {
                       }}>
                         <div>
                           <div style={{ fontSize: '0.85rem', fontWeight: 800, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', letterSpacing: '0.5px' }}>
-                            MAUZE TAHFEEZ ATFAL
+                            {jadwalSettingsDraft.jadwal_pdf_title || 'MAUZE TAHFEEZ ATFAL'}
                           </div>
                           <div style={{ fontSize: '0.6rem', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 600, marginTop: '2px' }}>
-                            Weekly Quran Jadwal
+                            {jadwalSettingsDraft.jadwal_pdf_subtitle || 'Weekly Quran Jadwal'}
                           </div>
                         </div>
-                        <div style={{
-                          fontSize: '0.55rem',
-                          color: '#888',
-                          textAlign: 'right'
-                        }}>
-                          <div>Generated on</div>
-                          <div style={{ fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{new Date().toLocaleDateString()}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {jadwalSettingsDraft.jadwal_pdf_logo_url && (
+                            <img src={jadwalSettingsDraft.jadwal_pdf_logo_url} alt="Logo" style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
+                          )}
+                          <div style={{
+                            fontSize: '0.55rem',
+                            color: '#888',
+                            textAlign: 'right'
+                          }}>
+                            <div>Generated on</div>
+                            <div style={{ fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{new Date().toLocaleDateString()}</div>
+                          </div>
                         </div>
                       </div>
 
@@ -7958,7 +8091,7 @@ const handleDownloadAllReports = async () => {
                           padding: '3px 10px',
                           borderRadius: '12px'
                         }}>
-                          Hifz Program
+                          {jadwalSettingsDraft.jadwal_pdf_hifz_program || 'Hifz Program'}
                         </div>
                       </div>
 

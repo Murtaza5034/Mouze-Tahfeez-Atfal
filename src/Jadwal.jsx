@@ -272,9 +272,9 @@ const formatJuzhali = (val) => {
   if (!val) return '-';
   const parts = val.split(':');
   if (parts.length === 2 && parts[0] && parts[1]) {
-    return `${toArabicNum(parts[0])}-${toArabicNum(parts[1])}`;
+    return `${toArabicNum(parts[0])}-${toArabicNum(parts[1])} صــ`;
   }
-  return toArabicNum(val);
+  return `${toArabicNum(val)} صــ`;
 };
 
 const formatJadeed = (val) => {
@@ -558,7 +558,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
                 const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
                 return `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
                   <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">${label}</span>
-                  <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${row[juz] ? 'Juz ' + row[juz] : '-'}</span>
+                  <span style="${jadeedCss} font-size: 14px; font-weight: 500; color: #333;">${row[juz] || '-'}</span>
                 </div>`;
               }).join('')
             : `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
@@ -572,7 +572,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
           </div>
           <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
             <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">JUZHALI</span>
-            <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${formatJuzhali(row.juzhali)}</span>
+            <span style="${jadeedCss} font-size: 14px; font-weight: 500; color: #333;">${formatJuzhali(row.juzhali)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; padding: 6px 0;">
             <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL</span>
@@ -588,12 +588,12 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     const jadeedTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${jadeedCss}"`;
     if (mode === 'juz-wise') {
       return `<tr style="background: ${bg};">${dayTd}`
-        + `<td ${tdStyle}>${row.juz1 ? 'Juz ' + row.juz1 : '-'}</td>`
-        + `<td ${tdStyle}>${row.juz2 ? 'Juz ' + row.juz2 : '-'}</td>`
-        + `<td ${tdStyle}>${row.juz3 ? 'Juz ' + row.juz3 : '-'}</td>`
-        + `<td ${tdStyle}>${row.juz4 ? 'Juz ' + row.juz4 : '-'}</td>`
+        + `<td ${jadeedTdStyle}>${row.juz1 || '-'}</td>`
+        + `<td ${jadeedTdStyle}>${row.juz2 || '-'}</td>`
+        + `<td ${jadeedTdStyle}>${row.juz3 || '-'}</td>`
+        + `<td ${jadeedTdStyle}>${row.juz4 || '-'}</td>`
         + `<td ${jadeedTdStyle}>${formatJadeed(row.jadeed)}</td>`
-        + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
+        + `<td ${jadeedTdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `${totalTd}</tr>`;
     }
     return `<tr style="background: ${bg};">${dayTd}`
@@ -607,9 +607,10 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     <div style="border: 2px solid ${t.accentColor}; border-radius: 16px; padding: 30px; background: ${t.backgroundColor}; box-sizing: border-box; ${bgImageStyle}">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${t.accentColor}; padding-bottom: 20px; margin-bottom: 25px;">
         <div>
-          <h1 style="margin: 0; font-size: 26px; color: ${t.primaryColor}; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">MAUZE TAHFEEZ ATFAL</h1>
-           <p style="margin: 5px 0 0 0; font-size: 14px; color: ${t.accentColor}; font-weight: 600; letter-spacing: 0.5px;">${t.jadwalType === 'miqaat' ? 'Miqaāt' : 'Weekly'} Quran Jadwal (Timetable)</p>
+          <h1 style="margin: 0; font-size: 26px; color: ${t.primaryColor}; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">${t.pdfTitle}</h1>
+           <p style="margin: 5px 0 0 0; font-size: 14px; color: ${t.accentColor}; font-weight: 600; letter-spacing: 0.5px;">${t.pdfSubtitle}</p>
         </div>
+        ${t.pdfLogoUrl ? `<div><img src="${t.pdfLogoUrl}" alt="Logo" style="height:50px; width:auto; object-fit:contain;" /></div>` : ''}
       </div>
       <div style="background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 18px 24px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
         <div>
@@ -617,8 +618,8 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
           <span style="font-size: 20px; color: ${t.primaryColor}; font-weight: 800;">${studentName}</span>
         </div>
         <div style="text-align: right;">
-          <span style="font-size: 11px; color: ${t.accentColor}; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">ACADEMIC PORTAL</span>
-          <span style="font-size: 14px; color: #ffffff; font-weight: 700; background: ${t.primaryColor}; padding: 4px 12px; border-radius: 20px;">Hifz Program</span>
+          <span style="font-size: 11px; color: ${t.accentColor}; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">${t.pdfAcademicPortal}</span>
+          <span style="font-size: 14px; color: #ffffff; font-weight: 700; background: ${t.primaryColor}; padding: 4px 12px; border-radius: 20px;">${t.pdfHifzProgram}</span>
         </div>
       </div>
       ${inner}
@@ -677,7 +678,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
   // Measure-based page splitting for both styles
   const measureEl = document.createElement("div");
-  measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+  measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
   document.body.appendChild(measureEl);
 
   const pageLimit = containerWidth * (297 / 210);
@@ -713,7 +714,8 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   for (let pi = 0; pi < pageGroups.length; pi++) {
     const group = pageGroups[pi];
     const container = document.createElement("div");
-    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+    const a4MinHeight = Math.round((containerWidth + 80) * 297 / 210);
+    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;min-height:${a4MinHeight}px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
     if (style === 'calendar') {
       container.innerHTML = pageFrameHtml(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${group.join('')}</div>`);
     } else {
@@ -725,7 +727,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       scale: 3,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: t.backgroundColor,
+      backgroundColor: null,
       onclone: (clonedDoc) => {
         const style = clonedDoc.createElement('style');
         style.textContent = FONT_FACE_CSS;
@@ -1119,6 +1121,11 @@ const getJadwalThemeFromSettings = (settings = {}) => ({
   jadwalType: settings.jadwal_type || 'weekly',
   weekStart: settings.jadwal_week_start || '',
   weekEnd: settings.jadwal_week_end || '',
+  pdfTitle: settings.jadwal_pdf_title || 'MAUZE TAHFEEZ ATFAL',
+  pdfSubtitle: settings.jadwal_pdf_subtitle || 'Weekly Quran Jadwal (Timetable)',
+  pdfAcademicPortal: settings.jadwal_pdf_academic_portal || 'ACADEMIC PORTAL',
+  pdfHifzProgram: settings.jadwal_pdf_hifz_program || 'Hifz Program',
+  pdfLogoUrl: settings.jadwal_pdf_logo_url || '',
 });
 
 const getFatemiDateStr = (dateStr) => {
