@@ -190,13 +190,24 @@ const getAyahPage = (surahNum, ayahNum) => {
   return Math.min(startPage + pageOffset, endPage);
 };
 
+const JUZ_PAGE_MAP = [1,22,42,62,82,102,122,142,162,182,202,222,242,262,282,302,322,342,362,382,402,422,442,462,482,502,522,542,562,582];
+
+const getJuzFromPage = (page) => {
+  for (let j = JUZ_PAGE_MAP.length - 1; j >= 0; j--) {
+    if (page >= JUZ_PAGE_MAP[j]) return j + 1;
+  }
+  return 1;
+};
+
 const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
   const jadeedParts = (jadeedValue || '').split(':');
   const jadeedSurah = jadeedParts[0];
   const jadeedAyah = jadeedParts[1];
   const jadeedAyahPage = jadeedSurah && jadeedAyah ? getAyahPage(jadeedSurah, jadeedAyah) : 0;
-  const rangeStart = Math.max(1, jadeedAyahPage - 10);
-  const rangeEnd = Math.max(1, jadeedAyahPage - 1);
+  const juz = getJuzFromPage(jadeedAyahPage);
+  const isLastFiveJuz = juz >= 26;
+  const rangeStart = isLastFiveJuz ? Math.min(604, jadeedAyahPage + 1) : Math.max(1, jadeedAyahPage - 10);
+  const rangeEnd = isLastFiveJuz ? Math.min(604, jadeedAyahPage + 10) : Math.max(1, jadeedAyahPage - 1);
   const pages = [];
   for (let p = rangeStart; p <= rangeEnd; p++) {
     pages.push(p);
