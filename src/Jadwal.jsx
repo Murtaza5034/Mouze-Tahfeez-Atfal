@@ -156,6 +156,112 @@ const SURAH_AYAH_DATA = [
   { number: 114, nameEn: "An-Nas", nameAr: 'الناس', ayahCount: 6 },
 ];
 
+const SURAH_PAGE_MAP = {
+  1:1,2:2,3:50,4:77,5:106,6:128,7:151,8:177,9:187,10:208,
+  11:221,12:235,13:249,14:255,15:262,16:267,17:282,18:293,
+  19:305,20:312,21:322,22:332,23:342,24:350,25:359,26:367,
+  27:377,28:385,29:396,30:404,31:410,32:415,33:417,34:428,
+  35:434,36:440,37:446,38:453,39:458,40:467,41:477,42:483,
+  43:489,44:496,45:499,46:502,47:507,48:511,49:515,50:518,
+  51:520,52:523,53:526,54:528,55:531,56:534,57:537,58:542,
+  59:545,60:549,61:551,62:553,63:554,64:556,65:558,66:559,
+  67:562,68:564,69:566,70:568,71:570,72:572,73:574,74:575,
+  75:577,76:578,77:580,78:582,79:583,80:585,81:586,82:587,
+  83:587,84:589,85:590,86:591,87:591,88:592,89:593,90:594,
+  91:595,92:595,93:596,94:596,95:597,96:597,97:598,98:598,
+  99:599,100:599,101:600,102:600,103:601,104:601,105:601,
+  106:602,107:602,108:602,109:603,110:603,111:603,112:604,
+  113:604,114:604
+};
+
+const getSurahPage = (surahNum) => SURAH_PAGE_MAP[Number(surahNum)] || 1;
+
+const getAyahPage = (surahNum, ayahNum) => {
+  const idx = SURAH_AYAH_DATA.findIndex(s => s.number === Number(surahNum));
+  if (idx === -1) return 1;
+  const surah = SURAH_AYAH_DATA[idx];
+  const startPage = getSurahPage(surahNum);
+  const endPage = idx < SURAH_AYAH_DATA.length - 1
+    ? getSurahPage(SURAH_AYAH_DATA[idx + 1].number) - 1
+    : 604;
+  const totalPages = endPage - startPage + 1;
+  const aN = Math.min(Math.max(1, Number(ayahNum)), surah.ayahCount);
+  const pageOffset = Math.floor(((aN - 1) / surah.ayahCount) * totalPages);
+  return Math.min(startPage + pageOffset, endPage);
+};
+
+const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
+  const jadeedParts = (jadeedValue || '').split(':');
+  const jadeedSurah = jadeedParts[0];
+  const jadeedAyah = jadeedParts[1];
+  const jadeedAyahPage = jadeedSurah && jadeedAyah ? getAyahPage(jadeedSurah, jadeedAyah) : 0;
+  const rangeStart = Math.max(1, jadeedAyahPage - 10);
+  const rangeEnd = Math.max(1, jadeedAyahPage - 1);
+  const pages = [];
+  for (let p = rangeStart; p <= rangeEnd; p++) {
+    pages.push(p);
+  }
+
+  const parts = (value || '').split(':');
+  const fromVal = parts[0] || '';
+  const toVal = parts[1] || '';
+
+  const valid = fromVal && toVal && Number(fromVal) <= Number(toVal);
+
+  const handleFrom = (e) => {
+    const f = e.target.value;
+    const t = toVal && Number(toVal) >= Number(f) ? toVal : f;
+    onChange(f && t ? `${f}:${t}` : '');
+  };
+
+  const handleTo = (e) => {
+    const t = e.target.value;
+    const f = fromVal && Number(fromVal) <= Number(t) ? fromVal : t;
+    onChange(f && t ? `${f}:${t}` : '');
+  };
+
+  return (
+    <div className="jadwal-jadeed-picker" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+      <select
+        value={fromVal}
+        onChange={handleFrom}
+        style={{
+          padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
+          background: '#fff', fontSize: '12px', minWidth: '90px',
+        }}
+      >
+        <option value="">From</option>
+        {pages.map(p => (
+          <option key={p} value={String(p)}>Page {p}</option>
+        ))}
+      </select>
+      <span style={{ fontSize: '12px', color: 'var(--soft-brown)' }}>–</span>
+      <select
+        value={toVal}
+        onChange={handleTo}
+        style={{
+          padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
+          background: '#fff', fontSize: '12px', minWidth: '90px',
+        }}
+      >
+        <option value="">To</option>
+        {pages.filter(p => !fromVal || Number(p) >= Number(fromVal)).map(p => (
+          <option key={p} value={String(p)}>Page {p}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
+const formatJuzhali = (val) => {
+  if (!val) return '-';
+  const parts = val.split(':');
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    return `Page ${parts[0]} - Page ${parts[1]}`;
+  }
+  return val;
+};
+
 const JadeedPicker = ({ value, onChange }) => {
   const parts = (value || '').split(':');
   const [surahNum, setSurahNum] = useState(parts[0] || '');
@@ -184,7 +290,7 @@ const JadeedPicker = ({ value, onChange }) => {
   };
 
   return (
-    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+    <div className="jadwal-jadeed-picker">
       <select
         value={surahNum}
         onChange={handleSurah}
@@ -286,13 +392,13 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
           + `<td ${tdStyle}>${row.juz2 || '-'}</td>`
           + `<td ${tdStyle}>${row.juz3 || '-'}</td>`
           + `<td ${tdStyle}>${row.juz4 || '-'}</td>`
-          + `<td ${tdStyle}>${row.juzhali || '-'}</td>`
+          + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
           + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
           + `${starTd}</tr>`;
       }
       return `<tr style="background: ${bg};">${dayTd}`
         + `<td ${tdStyle}>${row.murajah || '-'}</td>`
-        + `<td ${tdStyle}>${row.juzhali || '-'}</td>`
+        + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
         + `${starTd}</tr>`;
     });
@@ -436,34 +542,35 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
               <td className="day-cell">{day}{dayObj.fatemiDate ? <div className="day-fatemi-date">{dayObj.fatemiDate}</div> : null}</td>
               {mode === 'juz-wise' ? (
                 <>
-                  {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => (
-                    <td key={juz}>
-                      {readOnly ? (
-                        <span>{scheduleData[day]?.[juz] || '-'}</span>
-                      ) : (
-                        <input
-                          type="text"
-                          value={scheduleData[day]?.[juz] || ''}
-                          onChange={(e) => onCellChange(day, juz, e.target.value)}
-                          placeholder="-"
-                        />
-                      )}
-                    </td>
-                  ))}
-                  <td>
+                  {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
+                    const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
+                    return (
+                      <td key={juz} data-label={label}>
+                        {readOnly ? (
+                          <span>{scheduleData[day]?.[juz] || '-'}</span>
+                        ) : (
+                          <input
+                            type="text"
+                            value={scheduleData[day]?.[juz] || ''}
+                            onChange={(e) => onCellChange(day, juz, e.target.value)}
+                            placeholder="-"
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td data-label="Juzhali">
                     {readOnly ? (
-                      <span>{scheduleData[day]?.juzhali || '-'}</span>
+                      <span>{formatJuzhali(scheduleData[day]?.juzhali)}</span>
                     ) : (
-                      <input
-                        type="text"
+                      <JuzhaliPicker
                         value={scheduleData[day]?.juzhali || ''}
-                        onChange={(e) => onCellChange(day, 'juzhali', e.target.value)}
-                        placeholder="-"
-                        style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.juzhali || '') ? 'rtl' : 'ltr' }}
+                        onChange={(val) => onCellChange(day, 'juzhali', val)}
+                        jadeedValue={scheduleData[day]?.jadeed || ''}
                       />
                     )}
                   </td>
-                  <td>
+                  <td data-label="Jadeed">
                     {readOnly ? (
                       <span>{scheduleData[day]?.jadeed || '-'}</span>
                     ) : (
@@ -476,22 +583,31 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                 </>
               ) : (
                 <>
-                  {['murajah', 'juzhali'].map(field => (
-                    <td key={field}>
-                      {readOnly ? (
-                        <span>{scheduleData[day]?.[field] || '-'}</span>
-                      ) : (
-                        <input
-                          type="text"
-                          value={scheduleData[day]?.[field] || ''}
-                          onChange={(e) => onCellChange(day, field, e.target.value)}
-                          placeholder="-"
-                          style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.[field] || '') ? 'rtl' : 'ltr' }}
-                        />
-                      )}
-                    </td>
-                  ))}
-                  <td>
+                  <td data-label="Murajah">
+                    {readOnly ? (
+                      <span>{scheduleData[day]?.murajah || '-'}</span>
+                    ) : (
+                      <input
+                        type="text"
+                        value={scheduleData[day]?.murajah || ''}
+                        onChange={(e) => onCellChange(day, 'murajah', e.target.value)}
+                        placeholder="-"
+                        style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(scheduleData[day]?.murajah || '') ? 'rtl' : 'ltr' }}
+                      />
+                    )}
+                  </td>
+                  <td data-label="Juzhali">
+                    {readOnly ? (
+                      <span>{formatJuzhali(scheduleData[day]?.juzhali)}</span>
+                    ) : (
+                      <JuzhaliPicker
+                        value={scheduleData[day]?.juzhali || ''}
+                        onChange={(val) => onCellChange(day, 'juzhali', val)}
+                        jadeedValue={scheduleData[day]?.jadeed || ''}
+                      />
+                    )}
+                  </td>
+                  <td data-label="Jadeed">
                     {readOnly ? (
                       <span>{scheduleData[day]?.jadeed || '-'}</span>
                     ) : (
@@ -503,7 +619,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   </td>
                 </>
               )}
-              <td className="star-cell">
+              <td className="star-cell" data-label="Star">
                 {readOnly ? (
                   <span>{scheduleData[day]?.star ? '⭐'.repeat(parseInt(scheduleData[day].star)) : '-'}</span>
                 ) : (
@@ -587,22 +703,18 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
               )}
             </div>
           ))}
-          {['juzhali'].map(field => (
-            <div className="jadwal-calendar-field" key={field}>
-              <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
-              {readOnly ? (
-                <span>{row[field] || '-'}</span>
-              ) : (
-                <input
-                  type="text"
-                  value={row[field] || ''}
-                  onChange={(e) => onCellChange(day, field, e.target.value)}
-                  placeholder="-"
-                  style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(row[field] || '') ? 'rtl' : 'ltr' }}
-                />
-              )}
-            </div>
-          ))}
+          <div className="jadwal-calendar-field">
+            <label>Juzhali</label>
+            {readOnly ? (
+              <span>{formatJuzhali(row.juzhali)}</span>
+            ) : (
+              <JuzhaliPicker
+                value={row.juzhali || ''}
+                onChange={(val) => onCellChange(day, 'juzhali', val)}
+                jadeedValue={row.jadeed || ''}
+              />
+            )}
+          </div>
           <div className="jadwal-calendar-field">
             <label>Jadeed</label>
             {readOnly ? (
@@ -737,22 +849,18 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
               )}
             </div>
           ))}
-          {['juzhali'].map(field => (
-            <div className="jadwal-calendar-field" key={field}>
-              <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
-              {readOnly ? (
-                <span>{row[field] || '-'}</span>
-              ) : (
-                <input
-                  type="text"
-                  value={row[field] || ''}
-                  onChange={(e) => onCellChange(day, field, e.target.value)}
-                  placeholder="-"
-                  style={{ direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(row[field] || '') ? 'rtl' : 'ltr' }}
-                />
-              )}
-            </div>
-          ))}
+          <div className="jadwal-calendar-field">
+            <label>Juzhali</label>
+            {readOnly ? (
+              <span>{formatJuzhali(row.juzhali)}</span>
+            ) : (
+              <JuzhaliPicker
+                value={row.juzhali || ''}
+                onChange={(val) => onCellChange(day, 'juzhali', val)}
+                jadeedValue={row.jadeed || ''}
+              />
+            )}
+          </div>
           <div className="jadwal-calendar-field">
             <label>Jadeed</label>
             {readOnly ? (
@@ -1002,7 +1110,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             ))}
           </select>
           {selectedStudentId && (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div className="jadwal-actions-row">
               <button className="jadwal-save-btn" onClick={handleSave} disabled={saving}>
                 {saving ? (
                   <>
@@ -1031,7 +1139,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
         <div className="loading-spinner">Loading...</div>
       ) : selectedStudentId ? (
         <>
-          <div style={{ marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div className="jadwal-mode-row">
             <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Schedule Mode:</label>
             <select
               value={mode}
@@ -1083,6 +1191,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
   const displayStyle = settings?.jadwal_style || 'table';
   const theme = getJadwalThemeFromSettings(settings);
   const dayDates = theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : [];
+  const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd) : null;
 
   useEffect(() => {
     if (studentId) {
@@ -1136,6 +1245,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             onCellChange={noop}
             readOnly
             dayDates={dayDates}
+            customDays={customDays}
           />
         );
       case 'single_day_card':
@@ -1146,6 +1256,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             onCellChange={noop}
             readOnly
             dayDates={dayDates}
+            customDays={customDays}
           />
         );
       default:
@@ -1156,6 +1267,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             onCellChange={noop}
             readOnly
             dayDates={dayDates}
+            customDays={customDays}
           />
         );
     }
@@ -1165,8 +1277,8 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
 
   return (
     <div className="jadwal-container parent-view">
-      <div className="jadwal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Weekly Jadwal Schedule</h2>
+      <div className="jadwal-header">
+        <h2>{theme.jadwalType === 'miqaat' ? "Miqaāt Jadwal Schedule" : "Weekly Jadwal Schedule"}</h2>
         <button
           className="jadwal-save-btn"
           onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme)}

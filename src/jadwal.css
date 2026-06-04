@@ -619,3 +619,371 @@
   background: #222;
   color: #eee;
 }
+
+/* ========================================
+   MOBILE RESPONSIVE — All Jadwal Styles
+   ======================================== */
+
+@media (max-width: 768px) {
+  .jadwal-container {
+    padding: 16px;
+    margin-top: 12px;
+    border-radius: 16px;
+  }
+
+  .jadwal-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .jadwal-header h2 {
+    font-size: 1.15rem;
+    text-align: center;
+  }
+
+  .jadwal-header .jadwal-save-btn,
+  .jadwal-header .jadwal-download-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 16px;
+    font-size: 11px;
+  }
+
+  .student-selector {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .student-selector .premium-select {
+    width: 100%;
+    min-width: 0;
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .jadwal-actions-row {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .jadwal-actions-row > button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  /* ---------- Table Style: stacked card layout on mobile ---------- */
+  .jadwal-table-wrapper {
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+  }
+
+  .jadwal-table {
+    min-width: 0;
+    display: block;
+  }
+
+  .jadwal-table thead {
+    display: none;
+  }
+
+  .jadwal-table tbody {
+    display: block;
+  }
+
+  .jadwal-table tbody tr {
+    display: block;
+    background: var(--card-bg, #fff);
+    border: 1px solid #eee;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .jadwal-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: none;
+    padding: 6px 0;
+    text-align: right;
+    gap: 8px;
+  }
+
+  .jadwal-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--soft-brown, #8b6d31);
+    white-space: nowrap;
+    text-align: left;
+    min-width: 70px;
+  }
+
+  .jadwal-table td.day-cell {
+    text-align: center;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0 8px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 6px;
+    font-size: 14px;
+    background: transparent;
+  }
+
+  .jadwal-table td.day-cell::before {
+    display: none;
+  }
+
+  .jadwal-table td.day-cell .day-fatemi-date {
+    font-size: 0.7rem;
+  }
+
+  .jadwal-table td.star-cell {
+    justify-content: space-between;
+  }
+
+  .jadwal-table td.star-cell::before {
+    content: "Star";
+  }
+
+  .jadwal-jadeed-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .jadwal-jadeed-picker span {
+    display: none;
+  }
+
+  .jadwal-jadeed-picker select {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 11px;
+    padding: 5px 6px;
+  }
+
+  .jadwal-table input,
+  .jadwal-table select {
+    width: auto;
+    min-width: 80px;
+    max-width: 140px;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  .jadwal-table select.star-select {
+    width: auto;
+  }
+
+  .jadwal-table td span {
+    font-size: 13px;
+  }
+
+  /* ---------- Calendar Style ---------- */
+  .jadwal-calendar-container {
+    padding: 12px;
+  }
+
+  .jadwal-calendar-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .jadwal-calendar-nav {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .jadwal-calendar-nav-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .jadwal-calendar-week-label {
+    font-size: 12px;
+    text-align: center;
+    order: -1;
+  }
+
+  .jadwal-calendar-card-header {
+    padding: 10px 14px;
+  }
+
+  .jadwal-calendar-day-name {
+    font-size: 12px;
+  }
+
+  .jadwal-calendar-card-body {
+    padding: 10px 14px;
+  }
+
+  .jadwal-calendar-field {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .jadwal-calendar-field label {
+    font-size: 11px;
+    min-width: 60px;
+  }
+
+  .jadwal-calendar-field input,
+  .jadwal-calendar-field select {
+    width: 100px;
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+
+  .jadwal-calendar-field span {
+    font-size: 12px;
+  }
+
+  /* ---------- Single Day Card Style ---------- */
+  .jadwal-single-day-container {
+    max-width: 100%;
+    padding: 12px;
+  }
+
+  .jadwal-single-day-nav {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .jadwal-single-day-nav > button {
+    width: 100%;
+    justify-content: center;
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .jadwal-single-day-title h3 {
+    font-size: 1rem;
+  }
+
+  .jadwal-single-day-card {
+    padding: 16px;
+  }
+
+  .jadwal-single-day-card-body .jadwal-calendar-field label {
+    font-size: 12px;
+    min-width: 80px;
+  }
+
+  .jadwal-single-day-card-body .jadwal-calendar-field input,
+  .jadwal-single-day-card-body .jadwal-calendar-field select {
+    width: 120px;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  /* ---------- Schedule Mode Row ---------- */
+  .jadwal-mode-row {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch !important;
+  }
+
+  .jadwal-mode-row label {
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .jadwal-mode-row select {
+    width: 100%;
+  }
+
+  .jadwal-container select.premium-select,
+  .jadwal-container select.jadwal-style-select {
+    width: 100%;
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .jadwal-container {
+    padding: 12px 10px;
+    margin-top: 8px;
+  }
+
+  .jadwal-header h2 {
+    font-size: 1rem;
+  }
+
+  .jadwal-table tbody tr {
+    padding: 8px 10px;
+  }
+
+  .jadwal-table td {
+    padding: 5px 0;
+    font-size: 12px;
+  }
+
+  .jadwal-table td::before {
+    font-size: 10px;
+    min-width: 60px;
+  }
+
+  .jadwal-table input,
+  .jadwal-table select {
+    font-size: 11px;
+    min-width: 60px;
+    max-width: 100px;
+    padding: 4px 6px;
+  }
+
+  .jadwal-calendar-container {
+    padding: 8px;
+  }
+
+  .jadwal-calendar-field label {
+    font-size: 10px;
+    min-width: 50px;
+  }
+
+  .jadwal-calendar-field input,
+  .jadwal-calendar-field select {
+    width: 80px;
+    font-size: 11px;
+  }
+
+  .jadwal-single-day-container {
+    padding: 8px;
+  }
+
+  .jadwal-single-day-card {
+    padding: 12px;
+  }
+
+  .jadwal-single-day-card-body .jadwal-calendar-field label {
+    font-size: 11px;
+    min-width: 70px;
+  }
+
+  .jadwal-single-day-card-body .jadwal-calendar-field input,
+  .jadwal-single-day-card-body .jadwal-calendar-field select {
+    width: 100px;
+    font-size: 11px;
+  }
+
+  .student-selector .premium-select {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+}
