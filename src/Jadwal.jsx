@@ -268,7 +268,7 @@ const formatJuzhali = (val) => {
   if (!val) return '-';
   const parts = val.split(':');
   if (parts.length === 2 && parts[0] && parts[1]) {
-    return `Page ${parts[0]} - Page ${parts[1]}`;
+    return `${parts[0]}-${parts[1]}`;
   }
   return val;
 };
