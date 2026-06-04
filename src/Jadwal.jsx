@@ -380,7 +380,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     if (style === 'calendar') {
       const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
       return `
-        <div style="flex: 1 1 calc(33.33% - 20px); min-width: 300px; max-width: calc(50% - 20px); border: 1.5px solid ${t.accentColor}; border-radius: 14px; padding: 18px; background: ${idx % 2 === 0 ? '#fff' : `${t.backgroundColor}f2`}; box-sizing: border-box;">
+        <div style="flex: 1 1 calc(33.33% - 20px); min-width: 300px;  border: 1.5px solid ${t.accentColor}; border-radius: 14px; padding: 18px; background: ${idx % 2 === 0 ? '#fff' : `${t.backgroundColor}f2`}; box-sizing: border-box;">
           <div style="border-bottom: 2px solid ${t.accentColor}; padding-bottom: 10px; margin-bottom: 12px;">
             <div style="font-size: 16px; font-weight: 800; color: ${t.primaryColor}; letter-spacing: 0.5px; text-transform: uppercase;">${day}</div>
             <div style="font-family: 'Kanz al Marjaan', serif; font-size: 13px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div>
@@ -506,34 +506,37 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
   const allCards = pdfDays.map((_, idx) => buildCardHtml(pdfDays[idx], idx));
 
-  // Split into page groups: table rows can be measured, calendar cards grouped by count
-  let pageGroups;
-  if (style === 'calendar') {
-    const cardsPerPage = 3;
-    pageGroups = [];
-    for (let i = 0; i < allCards.length; i += cardsPerPage) {
-      pageGroups.push(allCards.slice(i, i + cardsPerPage));
-    }
-  } else {
-    const measureEl = document.createElement("div");
-    measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
-    document.body.appendChild(measureEl);
+  // Measure-based page splitting for both styles
+  const measureEl = document.createElement("div");
+  measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+  document.body.appendChild(measureEl);
 
-    pageGroups = [];
-    let currentGroup = [];
+  const pageLimit = containerWidth * (297 / 210);
+  let pageGroups = [];
+  let currentGroup = [];
+  if (style === 'calendar') {
     for (const card of allCards) {
-      measureEl.innerHTML = pageFrameHtml(`<table style="width:100%;border-collapse:collapse;margin-top:10px;border-radius:8px;overflow:hidden;"><thead>${tableHeaders}</thead><tbody>${[...currentGroup, card].join('')}</tbody></table>`);
-      const h = measureEl.scrollHeight;
-      if (h > containerWidth * (297 / 210) && currentGroup.length > 0) {
+      measureEl.innerHTML = pageFrameHtml(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${[...currentGroup, card].join('')}</div>`);
+      if (measureEl.scrollHeight > pageLimit && currentGroup.length > 0) {
         pageGroups.push([...currentGroup]);
         currentGroup = [card];
       } else {
         currentGroup.push(card);
       }
     }
-    if (currentGroup.length > 0) pageGroups.push(currentGroup);
-    document.body.removeChild(measureEl);
+  } else {
+    for (const card of allCards) {
+      measureEl.innerHTML = pageFrameHtml(`<table style="width:100%;border-collapse:collapse;margin-top:10px;border-radius:8px;overflow:hidden;"><thead>${tableHeaders}</thead><tbody>${[...currentGroup, card].join('')}</tbody></table>`);
+      if (measureEl.scrollHeight > pageLimit && currentGroup.length > 0) {
+        pageGroups.push([...currentGroup]);
+        currentGroup = [card];
+      } else {
+        currentGroup.push(card);
+      }
+    }
   }
+  if (currentGroup.length > 0) pageGroups.push(currentGroup);
+  document.body.removeChild(measureEl);
 
   // Render each page group as a separate html2canvas → PDF page
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
