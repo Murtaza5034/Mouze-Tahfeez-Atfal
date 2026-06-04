@@ -273,6 +273,17 @@ const formatJuzhali = (val) => {
   return val;
 };
 
+const formatJadeed = (val) => {
+  if (!val) return '-';
+  const parts = val.split(':');
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    const surah = SURAH_AYAH_DATA.find(s => s.number === Number(parts[0]));
+    const surahName = surah ? surah.nameEn : parts[0];
+    return `${surahName}:${parts[1]}`;
+  }
+  return val;
+};
+
 const JadeedPicker = ({ value, onChange }) => {
   const parts = (value || '').split(':');
   const [surahNum, setSurahNum] = useState(parts[0] || '');
@@ -374,6 +385,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     : '';
 
   const contentCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; direction: ltr;";
+  const jadeedCss = "font-family: 'Kanz al Marjaan', serif; font-size: 14px; line-height: 1.6; direction: rtl;";
 
   const buildCardHtml = (day, idx) => {
     const row = scheduleData[day] || {};
@@ -400,7 +412,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
           }
           <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
             <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">JADEED</span>
-            <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${row.jadeed || '-'}</span>
+            <span style="${jadeedCss} color: #333;">${formatJadeed(row.jadeed)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
             <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">JUZHALI</span>
@@ -417,19 +429,20 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     const dayTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-weight: bold; font-size: 13px; color: ${t.primaryColor}; text-align: left;">${day}<div style="font-family: 'Kanz al Marjaan', serif; font-size: 11px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div></td>`;
     const starTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #FFD700; text-align: center; letter-spacing: 1px;">${stars}</td>`;
     const tdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${contentCss}"`;
+    const jadeedTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${jadeedCss}"`;
     if (mode === 'juz-wise') {
       return `<tr style="background: ${bg};">${dayTd}`
         + `<td ${tdStyle}>${row.juz1 || '-'}</td>`
         + `<td ${tdStyle}>${row.juz2 || '-'}</td>`
         + `<td ${tdStyle}>${row.juz3 || '-'}</td>`
         + `<td ${tdStyle}>${row.juz4 || '-'}</td>`
-        + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
+        + `<td ${jadeedTdStyle}>${formatJadeed(row.jadeed)}</td>`
         + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `${starTd}</tr>`;
     }
     return `<tr style="background: ${bg};">${dayTd}`
       + `<td ${tdStyle}>${row.murajah || '-'}</td>`
-      + `<td ${tdStyle}>${row.jadeed || '-'}</td>`
+      + `<td ${jadeedTdStyle}>${formatJadeed(row.jadeed)}</td>`
       + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
       + `${starTd}</tr>`;
   };
