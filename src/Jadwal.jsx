@@ -283,7 +283,7 @@ const formatJadeed = (val) => {
   if (parts.length === 2 && parts[0] && parts[1]) {
     const surah = SURAH_AYAH_DATA.find(s => s.number === Number(parts[0]));
     const surahName = surah ? surah.nameAr : parts[0];
-    return `${surahName}:${toArabicNum(parts[1])}`;
+    return `${surahName}: ${toArabicNum(parts[1])} آية`;
   }
   return val;
 };
