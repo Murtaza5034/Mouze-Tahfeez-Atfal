@@ -1,3 +1,9 @@
+.jadwal-jadeed-picker {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .jadwal-container {
   padding: 24px;
   background: white;

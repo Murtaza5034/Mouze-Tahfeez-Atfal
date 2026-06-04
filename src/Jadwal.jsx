@@ -232,7 +232,7 @@ const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
   };
 
   return (
-    <div className="jadwal-jadeed-picker" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+    <div className="jadwal-jadeed-picker">
       <select
         value={fromVal}
         onChange={handleFrom}
