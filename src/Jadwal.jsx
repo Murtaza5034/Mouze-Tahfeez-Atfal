@@ -681,7 +681,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
   document.body.appendChild(measureEl);
 
-  const pageLimit = containerWidth * (297 / 210);
+  const pageLimit = (containerWidth + 80) * (297 / 210);
   let pageGroups = [];
   let currentGroup = [];
   if (style === 'calendar') {
@@ -714,8 +714,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   for (let pi = 0; pi < pageGroups.length; pi++) {
     const group = pageGroups[pi];
     const container = document.createElement("div");
-    const a4MinHeight = Math.round((containerWidth + 80) * 297 / 210);
-    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;min-height:${a4MinHeight}px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
+    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
     if (style === 'calendar') {
       container.innerHTML = pageFrameHtml(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${group.join('')}</div>`);
     } else {
