@@ -284,6 +284,59 @@ const formatJadeed = (val) => {
   return val;
 };
 
+const findSurahByName = (name) => {
+  const clean = name.trim().replace(/^["']|["']$/g, '');
+  if (!clean) return null;
+  return SURAH_AYAH_DATA.find(s =>
+    s.nameEn.toLowerCase() === clean.toLowerCase() || s.nameAr === clean
+  );
+};
+
+const calcTotalPages = (row, mode) => {
+  if (!row) return 0;
+  let murajahPages = 0;
+  if (mode === 'juz-wise') {
+    ['juz1', 'juz2', 'juz3', 'juz4'].forEach(f => {
+      if (row[f] && row[f].toString().trim()) murajahPages += 20;
+    });
+  } else {
+    const val = (row.murajah || '').trim();
+    if (val) {
+      const juzMatch = val.match(/[Jj]uz\s*(\d+)/);
+      if (juzMatch) {
+        murajahPages = 20;
+      } else {
+        const tilMatch = val.match(/(.+?)\s+til\s+(.+)/i);
+        if (tilMatch) {
+          const startSurah = findSurahByName(tilMatch[1]);
+          const endSurah = findSurahByName(tilMatch[2]);
+          if (startSurah && endSurah) {
+            const startPage = SURAH_PAGE_MAP[startSurah.number] || 1;
+            const endIdx = SURAH_AYAH_DATA.findIndex(s => s.number === endSurah.number);
+            const endPage = endIdx < SURAH_AYAH_DATA.length - 1
+              ? (SURAH_PAGE_MAP[SURAH_AYAH_DATA[endIdx + 1].number] || 1) - 1
+              : 604;
+            if (endPage >= startPage) murajahPages = endPage - startPage + 1;
+          }
+        }
+      }
+    }
+  }
+  let juzhaliPages = 0;
+  const juzhaliVal = (row.juzhali || '').trim();
+  if (juzhaliVal) {
+    const parts = juzhaliVal.split(':');
+    if (parts.length === 2 && parts[0] && parts[1]) {
+      const from = parseInt(parts[0]);
+      const to = parseInt(parts[1]);
+      if (!isNaN(from) && !isNaN(to) && to >= from) {
+        juzhaliPages = to - from + 1;
+      }
+    }
+  }
+  return murajahPages + juzhaliPages;
+};
+
 const JadeedPicker = ({ value, onChange }) => {
   const parts = (value || '').split(':');
   const [surahNum, setSurahNum] = useState(parts[0] || '');
@@ -390,7 +443,6 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   const buildCardHtml = (day, idx) => {
     const row = scheduleData[day] || {};
     if (style === 'calendar') {
-      const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
       return `
         <div style="flex: 1 1 calc(33.33% - 20px); min-width: 300px;  border: 1.5px solid ${t.accentColor}; border-radius: 14px; padding: 18px; background: ${idx % 2 === 0 ? '#fff' : `${t.backgroundColor}f2`}; box-sizing: border-box;">
           <div style="border-bottom: 2px solid ${t.accentColor}; padding-bottom: 10px; margin-bottom: 12px;">
@@ -419,15 +471,14 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
             <span style="${contentCss} font-size: 14px; font-weight: 500; color: #333;">${formatJuzhali(row.juzhali)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; padding: 6px 0;">
-            <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">STAR</span>
-            <span style="font-size: 16px; color: #FFD700; letter-spacing: 1px;">${stars}</span>
+            <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL</span>
+            <span style="font-size: 16px; font-weight: 700; color: #d4af37;">${calcTotalPages(row, mode)}</span>
           </div>
         </div>`;
     }
-    const stars = row.star ? '\u2B50'.repeat(parseInt(row.star)) : '-';
     const bg = idx % 2 === 0 ? t.backgroundColor : `${t.backgroundColor}f2`;
     const dayTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-weight: bold; font-size: 13px; color: ${t.primaryColor}; text-align: left;">${day}<div style="font-family: 'Kanz al Marjaan', serif; font-size: 11px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div></td>`;
-    const starTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #FFD700; text-align: center; letter-spacing: 1px;">${stars}</td>`;
+    const totalTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #d4af37; font-weight: 700; text-align: center;">${calcTotalPages(row, mode)}</td>`;
     const tdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${contentCss}"`;
     const jadeedTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${jadeedCss}"`;
     if (mode === 'juz-wise') {
@@ -438,13 +489,13 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
         + `<td ${tdStyle}>${row.juz4 || '-'}</td>`
         + `<td ${jadeedTdStyle}>${formatJadeed(row.jadeed)}</td>`
         + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
-        + `${starTd}</tr>`;
+        + `${totalTd}</tr>`;
     }
     return `<tr style="background: ${bg};">${dayTd}`
       + `<td ${tdStyle}>${row.murajah || '-'}</td>`
       + `<td ${jadeedTdStyle}>${formatJadeed(row.jadeed)}</td>`
       + `<td ${tdStyle}>${formatJuzhali(row.juzhali)}</td>`
-      + `${starTd}</tr>`;
+      + `${totalTd}</tr>`;
   };
 
   const pageFrameHtml = (inner) => `
@@ -482,14 +533,14 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center;">MUR 4</th>`
       + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
       + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
-      + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; width: 90px;">STAR</th>`
+      + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; width: 90px;">TOTAL</th>`
       + '</tr>'
     : `<tr style="background: ${t.primaryColor}; color: #ffffff;">`
       + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: left; width: 120px;">DAYS</th>`
       + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center;">MURAJAH</th>`
       + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center;">JADEED</th>`
       + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center;">JUZHALI</th>`
-      + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; width: 90px;">STAR</th>`
+      + `<th style="padding: 10px 14px; border: 1px solid ${t.accentColor}; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; width: 90px;">TOTAL</th>`
       + '</tr>';
 
   // Load fonts first, with timeout
@@ -599,7 +650,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                 <th colSpan="4" style={{ textAlign: 'center', borderBottom: 'none' }}>Murajah</th>
                 <th rowSpan="2">Jadeed</th>
                 <th rowSpan="2">Juzhali</th>
-                <th rowSpan="2">Star</th>
+                <th rowSpan="2">Total</th>
               </tr>
               <tr>
                 <th>1</th>
@@ -614,7 +665,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
               <th>Murajah</th>
               <th>Jadeed</th>
               <th>Juzhali</th>
-              <th>Star</th>
+              <th>Total</th>
             </tr>
           )}
         </thead>
@@ -703,23 +754,8 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   </td>
                 </>
               )}
-              <td className="star-cell" data-label="Star">
-                {readOnly ? (
-                  <span>{scheduleData[day]?.star ? '⭐'.repeat(parseInt(scheduleData[day].star)) : '-'}</span>
-                ) : (
-                  <select
-                    value={scheduleData[day]?.star || ''}
-                    onChange={(e) => onCellChange(day, 'star', e.target.value)}
-                    className="star-select"
-                  >
-                    <option value="">-</option>
-                    <option value="1">⭐</option>
-                    <option value="2">⭐⭐</option>
-                    <option value="3">⭐⭐⭐</option>
-                    <option value="4">⭐⭐⭐⭐</option>
-                    <option value="5">⭐⭐⭐⭐⭐</option>
-                  </select>
-                )}
+              <td className="star-cell" data-label="Total">
+                <span style="font-weight: 700; color: #d4af37;">${calcTotalPages(row, mode)}</span>
               </td>
             </tr>
             );
@@ -811,23 +847,8 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             )}
           </div>
           <div className="jadwal-calendar-field">
-            <label>Star</label>
-            {readOnly ? (
-              <span className="star-cell">{row.star ? '⭐'.repeat(parseInt(row.star)) : '-'}</span>
-            ) : (
-              <select
-                value={row.star || ''}
-                onChange={(e) => onCellChange(day, 'star', e.target.value)}
-                className="star-select"
-              >
-                <option value="">-</option>
-                <option value="1">⭐</option>
-                <option value="2">⭐⭐</option>
-                <option value="3">⭐⭐⭐</option>
-                <option value="4">⭐⭐⭐⭐</option>
-                <option value="5">⭐⭐⭐⭐⭐</option>
-              </select>
-            )}
+            <label>Total</label>
+            <span style={{ fontWeight: 700, color: '#d4af37' }}>{calcTotalPages(row, mode)}</span>
           </div>
         </div>
       </div>
@@ -957,29 +978,15 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             )}
           </div>
           <div className="jadwal-calendar-field">
-            <label>Star</label>
-            {readOnly ? (
-              <span className="star-cell">{row.star ? '⭐'.repeat(parseInt(row.star)) : '-'}</span>
-            ) : (
-              <select
-                value={row.star || ''}
-                onChange={(e) => onCellChange(day, 'star', e.target.value)}
-                className="star-select"
-              >
-                <option value="">-</option>
-                <option value="1">⭐</option>
-                <option value="2">⭐⭐</option>
-                <option value="3">⭐⭐⭐</option>
-                <option value="4">⭐⭐⭐⭐</option>
-                <option value="5">⭐⭐⭐⭐⭐</option>
-              </select>
-            )}
+            <label>Total</label>
+            <span style={{ fontWeight: 700, color: '#d4af37' }}>{calcTotalPages(row, mode)}</span>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 
 const getJadwalThemeFromSettings = (settings = {}) => ({
   primaryColor: settings.jadwal_pdf_primary_color || '#5d4037',
