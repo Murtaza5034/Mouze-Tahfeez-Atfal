@@ -9,8 +9,14 @@ create table if not exists public.jadwal_settings (
   jadwal_pdf_background_color text default '#ffffff',
   jadwal_pdf_background_url text default '',
   jadwal_pdf_font_family text default 'Inter',
+  jadwal_type text default 'weekly',
   jadwal_week_start text default '',
-  jadwal_week_end text default ''
+  jadwal_week_end text default '',
+  jadwal_pdf_title text default 'MAUZE TAHFEEZ ATFAL',
+  jadwal_pdf_subtitle text default 'Weekly Quran Jadwal (Timetable)',
+  jadwal_pdf_academic_portal text default 'ACADEMIC PORTAL',
+  jadwal_pdf_hifz_program text default 'Hifz Program',
+  jadwal_pdf_logo_url text default ''
 );
 
 insert into public.jadwal_settings (id)
