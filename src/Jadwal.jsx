@@ -385,7 +385,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     : '';
 
   const contentCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; direction: ltr;";
-  const jadeedCss = "font-family: 'Kanz al Marjaan', serif; font-size: 14px; line-height: 1.6; direction: rtl;";
+  const jadeedCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; direction: ltr;";
 
   const buildCardHtml = (day, idx) => {
     const row = scheduleData[day] || {};
