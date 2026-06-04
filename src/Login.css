@@ -179,6 +179,29 @@
   font-weight: 500;
 }
 
+.remember-me-row {
+  margin-bottom: 28px;
+}
+
+.remember-me-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--soft-brown);
+  user-select: none;
+}
+
+.remember-me-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary-gold);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
 .role-switcher {
   display: flex;
   gap: 12px;

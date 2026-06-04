@@ -823,6 +823,8 @@ const STORAGE_KEYS = {
   role: "mauze-active-role",
   teacherAttendance: "mauze-teacher-attendance",
   customGroups: "mauze-custom-groups",
+  rememberMe: "mauze-remember-me",
+  cachedAuth: "mauze-cached-auth",
 };
 
 const NAV_ICONS = {
@@ -9734,14 +9736,45 @@ export default function App() {
       if (mounted) setLoading(false);
     }, 5000);
 
+    async function tryRestoreCachedAuth() {
+      const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
+      const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (!rememberMe || !cachedRaw) return false;
+      try {
+        const cached = JSON.parse(cachedRaw);
+        if (!cached.userId || !cached.role) return false;
+        setUser({ id: cached.userId, email: cached.email });
+        storeRole(cached.role);
+        setLoading(false);
+        try {
+          await loadPortalData(cached.role, { id: cached.userId, email: cached.email });
+        } catch (e) {
+          console.warn("Offline: portal data unavailable", e);
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
     async function initialize() {
-      const { data: { session } } = await supabase.auth.getSession();
+      let session = null;
+      try {
+        const res = await supabase.auth.getSession();
+        session = res?.data?.session ?? null;
+      } catch (e) {
+        console.warn("Session check failed (offline?), trying cached auth", e);
+      }
+
       if (!mounted) return;
 
       if (session) {
         handleAuthChange("INITIAL_SESSION", session);
       } else {
-        setLoading(false);
+        const restored = await tryRestoreCachedAuth();
+        if (!restored && mounted) {
+          setLoading(false);
+        }
       }
     }
 
@@ -9809,10 +9842,23 @@ export default function App() {
       handleAuthChange(event, session);
     });
 
+    function handleOnline() {
+      const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (!user && cachedRaw) {
+        supabase.auth.getSession().then(res => {
+          if (res?.data?.session && mounted) {
+            handleAuthChange("SIGNED_IN", res.data.session);
+          }
+        });
+      }
+    }
+    window.addEventListener('online', handleOnline);
+
     return () => {
       mounted = false;
       clearTimeout(failsafe);
       subscription.unsubscribe();
+      window.removeEventListener('online', handleOnline);
     };
   }, []);
 
@@ -10154,7 +10200,7 @@ export default function App() {
     }
   }
 
-  const handleLoginSuccess = async (loggedInUser, selectedRole) => {
+  const handleLoginSuccess = async (loggedInUser, selectedRole, rememberMe = true) => {
     try {
       const access = await authorizePortalAccess(loggedInUser, selectedRole);
 
@@ -10170,6 +10216,18 @@ export default function App() {
       setPortalAccess(access.accessRow || emptyPortalAccess);
       setUser(loggedInUser);
       await loadPortalData(access.role, loggedInUser, access.parentProfile);
+
+      if (rememberMe) {
+        localStorage.setItem(STORAGE_KEYS.rememberMe, "true");
+        localStorage.setItem(STORAGE_KEYS.cachedAuth, JSON.stringify({
+          userId: loggedInUser.id,
+          email: loggedInUser.email,
+          role: access.role,
+        }));
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.rememberMe);
+        localStorage.removeItem(STORAGE_KEYS.cachedAuth);
+      }
 
       return { ok: true };
     } catch (error) {

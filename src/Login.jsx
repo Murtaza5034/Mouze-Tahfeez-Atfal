@@ -33,6 +33,9 @@ export default function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem("mauze-remember-me") !== "false";
+  });
 
   const activeRole = ROLE_OPTIONS.find((option) => option.id === selectedRole);
 
@@ -52,7 +55,7 @@ export default function Login({ onLoginSuccess }) {
       return;
     }
 
-    const result = await onLoginSuccess(data.user, selectedRole);
+    const result = await onLoginSuccess(data.user, selectedRole, rememberMe);
 
     if (!result?.ok) {
       setError(result?.message || "This account cannot access the selected portal.");
@@ -126,6 +129,17 @@ export default function Login({ onLoginSuccess }) {
               <span>{error}</span>
             </div>
           ) : null}
+
+          <div className="remember-me-row">
+            <label className="remember-me-label">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span>Remember me</span>
+            </label>
+          </div>
 
           <button type="submit" className="login-button" disabled={loading}>
             {loading ? (
