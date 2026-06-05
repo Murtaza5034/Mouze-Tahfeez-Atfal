@@ -132,6 +132,8 @@ const JADWAL_SETTING_DEFAULTS = {
   jadwal_pdf_academic_portal: 'ACADEMIC PORTAL',
   jadwal_pdf_hifz_program: 'Hifz Program',
   jadwal_pdf_logo_url: '',
+  jadwal_notification_enabled: false,
+  jadwal_notification_time: '07:00',
 };
 
 const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
@@ -7634,7 +7636,10 @@ const handleDownloadAllReports = async () => {
                       jadwal_pdf_academic_portal: jadwalSettingsDraft.jadwal_pdf_academic_portal,
                       jadwal_pdf_hifz_program: jadwalSettingsDraft.jadwal_pdf_hifz_program,
                       jadwal_pdf_logo_url: jadwalSettingsDraft.jadwal_pdf_logo_url,
+                      jadwal_notification_enabled: jadwalSettingsDraft.jadwal_notification_enabled,
+                      jadwal_notification_time: jadwalSettingsDraft.jadwal_notification_time,
                     };
+
                     const { error } = await supabase
                       .from("jadwal_settings")
                       .upsert({ id: 1, ...updates }, { onConflict: "id" })
@@ -7913,6 +7918,44 @@ const handleDownloadAllReports = async () => {
                           <img src={jadwalSettingsDraft.jadwal_pdf_logo_url} alt="Jadwal logo preview" style={{ width: '100%', display: 'block' }} />
                         </div>
                       )}
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Bell size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Daily Reminder Notification</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable Daily Reminder</span>
+                      <label className="premium-switch" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                        <input
+                          name="jadwal_notification_enabled"
+                          type="checkbox"
+                          checked={jadwalSettingsDraft.jadwal_notification_enabled !== false}
+                          onChange={(e) => setJadwalSettingsDraft((c) => ({ ...c, jadwal_notification_enabled: e.target.checked }))}
+                          style={{ width: '20px', height: '20px', accentColor: 'var(--primary-gold)' }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {jadwalSettingsDraft.jadwal_notification_enabled !== false ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </label>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Sends a push notification to parents each day with their child's assigned jadwal for the day.
+                      </small>
+                    </label>
+                    <label>
+                      <span>Notification Time</span>
+                      <input
+                        name="jadwal_notification_time"
+                        type="time"
+                        value={jadwalSettingsDraft.jadwal_notification_time || '07:00'}
+                        onChange={(e) => setJadwalSettingsDraft((c) => ({ ...c, jadwal_notification_time: e.target.value }))}
+                        className="premium-input"
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        The time of day the reminder notification is sent. Uses Indian Standard Time (IST, UTC+5:30).
+                      </small>
                     </label>
                   </div>
 

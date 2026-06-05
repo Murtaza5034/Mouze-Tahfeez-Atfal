@@ -243,7 +243,7 @@ const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
       >
         <option value="">From</option>
         {pages.map(p => (
-          <option key={p} value={String(p)}>Page {p}</option>
+          <option key={p} value={String(p)}>{p} صــ</option>
         ))}
       </select>
       <select
@@ -256,7 +256,7 @@ const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
       >
         <option value="">To</option>
         {pages.filter(p => !fromVal || Number(p) >= Number(fromVal)).map(p => (
-          <option key={p} value={String(p)}>Page {p}</option>
+          <option key={p} value={String(p)}>{p} صــ</option>
         ))}
       </select>
     </div>
@@ -449,7 +449,7 @@ const JuzSelect = ({ value, onChange }) => (
   >
     <option value="">-</option>
     {Array.from({ length: 30 }, (_, i) => (
-      <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+      <option key={i + 1} value={String(i + 1)} style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl' }}>{toArabicNum(i + 1)}</option>
     ))}
   </select>
 );
@@ -556,9 +556,11 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
           ${mode === 'juz-wise'
             ? ['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
                 const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
+                const juzVal = row[juz];
+                const formattedJuz = juzVal ? toArabicNum(juzVal) : '-';
                 return `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
                   <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">${label}</span>
-                  <span style="${jadeedCss} font-size: 14px; font-weight: 500; color: #333;">${row[juz] || '-'}</span>
+                  <span style="font-family: 'Al-Kanz', 'Kanz al Marjaan', serif; font-size: 14px; font-weight: 500; color: #333; direction: rtl;">${formattedJuz}</span>
                 </div>`;
               }).join('')
             : `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
@@ -587,11 +589,12 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     const arabicTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${arabicCss}"`;
     const jadeedTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${jadeedCss}"`;
     if (mode === 'juz-wise') {
+      const juzCss = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; font-family: 'Al-Kanz', 'Kanz al Marjaan', serif; direction: rtl;"`;
       return `<tr style="background: ${bg};">${dayTd}`
-        + `<td ${jadeedTdStyle}>${row.juz1 || '-'}</td>`
-        + `<td ${jadeedTdStyle}>${row.juz2 || '-'}</td>`
-        + `<td ${jadeedTdStyle}>${row.juz3 || '-'}</td>`
-        + `<td ${jadeedTdStyle}>${row.juz4 || '-'}</td>`
+        + `<td ${juzCss}>${toArabicNum(row.juz1) || '-'}</td>`
+        + `<td ${juzCss}>${toArabicNum(row.juz2) || '-'}</td>`
+        + `<td ${juzCss}>${toArabicNum(row.juz3) || '-'}</td>`
+        + `<td ${juzCss}>${toArabicNum(row.juz4) || '-'}</td>`
         + `<td ${jadeedTdStyle}>${formatJadeed(row.jadeed)}</td>`
         + `<td ${jadeedTdStyle}>${formatJuzhali(row.juzhali)}</td>`
         + `${totalTd}</tr>`;
@@ -785,20 +788,22 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                 <>
                   {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
                     const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
+                    const sd = scheduleData[day];
+                    const juzVal = sd ? sd[juz] : '';
                     return (
                       <td key={juz} data-label={label}>
                         {readOnly ? (
-                          <span>{scheduleData[day]?.[juz] || '-'}</span>
+                          <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(juzVal) || '-'}</span>
                         ) : (
                           <JuzSelect
-                            value={scheduleData[day]?.[juz] || ''}
+                            value={juzVal || ''}
                             onChange={(val) => onCellChange(day, juz, val)}
                           />
                         )}
                       </td>
                     );
                   })}
-                  <td data-label="Jadeed">
+                    <td data-label="Jadeed">
                     {readOnly ? (
                       <span>{scheduleData[day]?.jadeed || '-'}</span>
                     ) : (
@@ -909,10 +914,10 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             ['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
               const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
               return (
-                <div className="jadwal-calendar-field" key={juz}>
+                  <div className="jadwal-calendar-field" key={juz}>
                   <label>{label}</label>
                   {readOnly ? (
-                    <span>{row[juz] || '-'}</span>
+                    <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(row[juz]) || '-'}</span>
                   ) : (
                     <JuzSelect
                       value={row[juz] || ''}
@@ -1054,7 +1059,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
                 <div className="jadwal-calendar-field" key={juz}>
                   <label>{label}</label>
                   {readOnly ? (
-                    <span>{row[juz] || '-'}</span>
+                    <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(row[juz]) || '-'}</span>
                   ) : (
                     <JuzSelect
                       value={row[juz] || ''}

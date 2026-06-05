@@ -141,9 +141,20 @@ class FCMService {
         this.token = token;
         this.isSupported = true;
 
-        // Store token in database
+        // Store token in database (with retries)
         console.log('Storing FCM token in database...');
-        await this.storeToken(token, userRole);
+        const stored = await this.storeToken(token, userRole);
+        if (!stored) {
+          console.warn('FCM token stored failed on first attempt, retrying...');
+          // Retry once after a short delay
+          await new Promise(r => setTimeout(r, 1000));
+          const storedRetry = await this.storeToken(token, userRole);
+          if (!storedRetry) {
+            console.warn('FCM token storage failed after retry. Token is cached in memory but may not be reachable from server.');
+          } else {
+            console.log('FCM token stored on retry');
+          }
+        }
 
         // Set up message listener
         this.setupMessageListener();
