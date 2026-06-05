@@ -115,21 +115,26 @@ class FCMService {
     await PushNotifications.register();
     console.log('Capacitor PushNotifications registered');
 
-    // Listen for registration (token received)
+    // Set up a persistent listener that always keeps this.token current
+    PushNotifications.addListener('registration', (token) => {
+      console.log('Capacitor FCM Token:', token.value.substring(0, 20) + '...');
+      this.token = token.value;
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      console.error('Capacitor Push registration error:', err);
+    });
+
+    // Wait for the first token to arrive
     const tokenPromise = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Push registration timed out')), 15000);
-
-      PushNotifications.addListener('registration', (token) => {
-        clearTimeout(timeout);
-        console.log('Capacitor FCM Token:', token.value.substring(0, 20) + '...');
-        resolve(token.value);
-      });
-
-      PushNotifications.addListener('registrationError', (err) => {
-        clearTimeout(timeout);
-        console.error('Capacitor Push registration error:', err);
-        reject(err);
-      });
+      const checkInterval = setInterval(() => {
+        if (this.token) {
+          clearTimeout(timeout);
+          clearInterval(checkInterval);
+          resolve(this.token);
+        }
+      }, 200);
     });
 
     this.token = await tokenPromise;
@@ -170,18 +175,17 @@ class FCMService {
 
   async _getToken() {
     if (this.isNative) {
-      // Re-register to get a fresh native token via the registration listener
+      // Re-register for a fresh token; persistent listener in _initNative will update this.token
       try {
         const { PushNotifications } = await import('@capacitor/push-notifications');
-        const tokenPromise = new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve(this.token), 10000);
-          PushNotifications.addListener('registration', (token) => {
-            clearTimeout(timeout);
-            resolve(token.value);
-          });
-        });
+        const oldToken = this.token;
         await PushNotifications.register();
-        return await tokenPromise;
+        // Wait up to 10s for token to change
+        const deadline = Date.now() + 10000;
+        while (this.token === oldToken && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+        return this.token;
       } catch {
         return this.token || null;
       }
