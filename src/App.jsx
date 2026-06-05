@@ -10470,17 +10470,11 @@ export default function App() {
       return;
     }
 
-    const createdUserId = authData?.user?.id || null;
+    let createdUserId = authData?.user?.id || null;
 
-    const { data: rpcData, error: rpcError } = await supabase.rpc("grant_portal_access", {
-      target_email: targetEmail,
-      target_role: payload.portal_role,
-      target_name: payload.full_name,
-      target_student_id: payload.student_id || null,
-    });
-
-    if (rpcError) {
-      console.warn("RPC Grant Error (Expected if RPC missing):", rpcError);
+    if (!createdUserId) {
+      const { data: lookupData } = await supabase.rpc('get_user_id_by_email', { target_email: targetEmail });
+      if (lookupData) createdUserId = lookupData;
     }
 
     let accessRecord = null;
@@ -10518,7 +10512,7 @@ export default function App() {
       accessRecord = data || null;
     }
 
-    const finalUserId = accessRecord?.user_id || rpcData?.user_id || createdUserId || null;
+    const finalUserId = accessRecord?.user_id || createdUserId || null;
 
     if (payload.portal_role === "parents" && payload.student_id && finalUserId) {
       await supabase
