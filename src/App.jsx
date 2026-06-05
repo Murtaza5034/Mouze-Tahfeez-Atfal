@@ -7006,31 +7006,19 @@ const handleDownloadAllReports = async () => {
                         className="premium-select"
                       >
                         <option value="">-- Select Teacher --</option>
-                        {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
-                          <React.Fragment>
-                            {portalAccessList.length > 0 && (
-                              <option disabled className="select-group-label">── Portal Users ──</option>
-                            )}
-                            {portalAccessList.map(a => (
-                              <option key={`pa-${a.id}`} value={a.full_name}>{a.full_name}</option>
-                            ))}
-                            {teacherProfiles.filter(tp => !portalAccessList.some(pa =>
-                              pa.user_id === tp.user_id ||
-                              normalizeText(pa.full_name) === normalizeText(tp.full_name)
-                            )).length > 0 && (
-                              <option disabled className="select-group-label">── Staff Records ──</option>
-                            )}
-                            {teacherProfiles
-                              .filter(tp => !portalAccessList.some(pa =>
-                                pa.user_id === tp.user_id ||
-                                normalizeText(pa.full_name) === normalizeText(tp.full_name)
-                              ))
-                              .map(tp => (
-                                <option key={`profile-${tp.id}`} value={tp.full_name}>{tp.full_name}</option>
-                              ))
-                            }
-                          </React.Fragment>
-                        ) : null}
+                        {(portalAccessList.length > 0 || teacherProfiles.length > 0) &&
+                          portalAccessList.map(a => (
+                            <option key={a.id || a.full_name} value={a.full_name}>{a.full_name}</option>
+                          ))
+                        }
+                        {teacherProfiles.length > 0 && teacherProfiles
+                          .filter(tp => !portalAccessList.some(pa =>
+                            normalizeText(pa.full_name) === normalizeText(tp.full_name)
+                          ))
+                          .map(tp => (
+                            <option key={`tp-${tp.id || tp.full_name}`} value={tp.full_name}>{tp.full_name}</option>
+                          ))
+                        }
                       </select>
                     </label>
                   </div>
@@ -11704,6 +11692,7 @@ const handleSendCustomNotification = async (event) => {
     event.preventDefault();
     const payload = adminForms.teacherProfile;
 
+    const portalAccessList = schoolData.portalAccessList || [];
     const selectedAccess = portalAccessList.find(
       (access) => normalizeText(access.full_name) === normalizeText(payload.full_name)
     );
