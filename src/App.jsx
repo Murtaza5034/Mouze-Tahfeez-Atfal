@@ -1804,7 +1804,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                 {surahInfo && (
                   <div className="mushaf-header">
                     <div className="s-name arabic-kanz">{surahInfo.name_arabic}</div>
-                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">ط¨ظگط³ظ’ظ…ظگ ظ±ظ„ظ„ظ‘ظژظ‡ظگ ظ±ظ„ط±ظ‘ظژط­ظ’ظ…ظژظ°ظ†ظگ ظ±ظ„ط±ظ‘ظژط­ظگظٹظ…ظگ</div>}
+                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>}
                   </div>
                 )}
 
@@ -3822,16 +3822,14 @@ function ParentPortal({
       </aside>
 
       <header className="parent-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="parent-topbar-left">
           <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
             <Menu size={22} />
           </button>
-          <div className="parent-topbar-left">
-            <img src="/logo.png" alt="Logo" className="topbar-logo" />
-            <div>
-              <span className="topbar-brand">Mauze Tahfeez</span>
-              <span className="topbar-sub">Parents Portal</span>
-            </div>
+          <img src="/logo.png" alt="Logo" className="topbar-logo" />
+          <div>
+            <span className="topbar-brand">Mauze Tahfeez</span>
+            <span className="topbar-sub">Parents Portal</span>
           </div>
         </div>
 
@@ -5740,7 +5738,7 @@ const handleDownloadAllReports = async () => {
                       <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
                     </label>
                     <label>
-                      <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
+                      <span>Arabic Name (اسم الطالب)</span>
                       <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                     </label>
                   </div>
@@ -6813,7 +6811,7 @@ const handleDownloadAllReports = async () => {
                       </label>
 
                       <label>
-                        <span>Arabic Name (ط§ط³ظ… ط§ظ„ط·ط§ظ„ط¨)</span>
+                        <span>Arabic Name (اسم الطالب)</span>
                         <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
                       </label>
 
@@ -9236,10 +9234,11 @@ onShowAction,
                         value={teacherForms.result.wusool_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
                         {SURAH_NAMES_AR.map((name, i) => (
-                          <option key={i + 1} value={name}>{i + 1}. {name}</option>
+                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
                         ))}
                       </select>
                     </label>
@@ -9257,7 +9256,7 @@ onShowAction,
 
                   <div className="form-grid">
                     <label>
-                      <span>Matrookah (ظ…طھط±ظˆظƒط©)</span>
+                      <span>Matrookah <span className="arabic-kanz">متروكة</span></span>
                       <input
                         type="text"
                         name="matrookah"
@@ -9267,7 +9266,7 @@ onShowAction,
                       />
                     </label>
                     <label>
-                      <span>Daeefah (ط¶ط¹ظٹظپط©)</span>
+                      <span>Daeefah <span className="arabic-kanz">ضعيفة</span></span>
                       <input
                         type="text"
                         name="daeefah"
@@ -9302,10 +9301,11 @@ onShowAction,
                         value={teacherForms.result.next_week_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
                         {SURAH_NAMES_AR.map((name, i) => (
-                          <option key={i + 1} value={name}>{i + 1}. {name}</option>
+                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
                         ))}
                       </select>
                     </label>
@@ -9345,10 +9345,11 @@ onShowAction,
                         value={teacherForms.result.istifadah_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
                         {SURAH_NAMES_AR.map((name, i) => (
-                          <option key={i + 1} value={name}>{i + 1}. {name}</option>
+                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
                         ))}
                       </select>
                     </label>
@@ -9689,29 +9690,29 @@ onShowAction,
 
 // --- Quran Surah Names (Arabic) ---
 const SURAH_NAMES_AR = [
-  "ط§ظ„ظپط§طھط­ط©","ط§ظ„ط¨ظ‚ط±ط©","ط¢ظ„ ط¹ظ…ط±ط§ظ†","ط§ظ„ظ†ط³ط§ط،","ط§ظ„ظ…ط§ط¦ط¯ط©",
-  "ط§ظ„ط£ظ†ط¹ط§ظ…","ط§ظ„ط£ط¹ط±ط§ظپ","ط§ظ„ط£ظ†ظپط§ظ„","ط§ظ„طھظˆط¨ط©","ظٹظˆظ†ط³",
-  "ظ‡ظˆط¯","ظٹظˆط³ظپ","ط§ظ„ط±ط¹ط¯","ط¥ط¨ط±ط§ظ‡ظٹظ…","ط§ظ„ط­ط¬ط±",
-  "ط§ظ„ظ†ط­ظ„","ط§ظ„ط¥ط³ط±ط§ط،","ط§ظ„ظƒظ‡ظپ","ظ…ط±ظٹظ…","ط·ظ‡",
-  "ط§ظ„ط£ظ†ط¨ظٹط§ط،","ط§ظ„ط­ط¬","ط§ظ„ظ…ط¤ظ…ظ†ظˆظ†","ط§ظ„ظ†ظˆط±","ط§ظ„ظپط±ظ‚ط§ظ†",
-  "ط§ظ„ط´ط¹ط±ط§ط،","ط§ظ„ظ†ظ…ظ„","ط§ظ„ظ‚طµطµ","ط§ظ„ط¹ظ†ظƒط¨ظˆطھ","ط§ظ„ط±ظˆظ…",
-  "ظ„ظ‚ظ…ط§ظ†","ط§ظ„ط³ط¬ط¯ط©","ط§ظ„ط£ط­ط²ط§ط¨","ط³ط¨ط£","ظپط§ط·ط±",
-  "ظٹط³","ط§ظ„طµط§ظپط§طھ","طµ","ط§ظ„ط²ظ…ط±","ط؛ط§ظپط±",
-  "ظپطµظ„طھ","ط§ظ„ط´ظˆط±ظ‰","ط§ظ„ط²ط®ط±ظپ","ط§ظ„ط¯ط®ط§ظ†","ط§ظ„ط¬ط§ط«ظٹط©",
-  "ط§ظ„ط£ط­ظ‚ط§ظپ","ظ…ط­ظ…ط¯","ط§ظ„ظپطھط­","ط§ظ„ط­ط¬ط±ط§طھ","ظ‚",
-  "ط§ظ„ط°ط§ط±ظٹط§طھ","ط§ظ„ط·ظˆط±","ط§ظ„ظ†ط¬ظ…","ط§ظ„ظ‚ظ…ط±","ط§ظ„ط±ط­ظ…ظ†",
-  "ط§ظ„ظˆط§ظ‚ط¹ط©","ط§ظ„ط­ط¯ظٹط¯","ط§ظ„ظ…ط¬ط§ط¯ظ„ط©","ط§ظ„ط­ط´ط±","ط§ظ„ظ…ظ…طھط­ظ†ط©",
-  "ط§ظ„طµظپ","ط§ظ„ط¬ظ…ط¹ط©","ط§ظ„ظ…ظ†ط§ظپظ‚ظˆظ†","ط§ظ„طھط؛ط§ط¨ظ†","ط§ظ„ط·ظ„ط§ظ‚",
-  "ط§ظ„طھط­ط±ظٹظ…","ط§ظ„ظ…ظ„ظƒ","ط§ظ„ظ‚ظ„ظ…","ط§ظ„ط­ط§ظ‚ط©","ط§ظ„ظ…ط¹ط§ط±ط¬",
-  "ظ†ظˆط­","ط§ظ„ط¬ظ†","ط§ظ„ظ…ط²ظ…ظ„","ط§ظ„ظ…ط¯ط«ط±","ط§ظ„ظ‚ظٹط§ظ…ط©",
-  "ط§ظ„ط¥ظ†ط³ط§ظ†","ط§ظ„ظ…ط±ط³ظ„ط§طھ","ط§ظ„ظ†ط¨ط£","ط§ظ„ظ†ط§ط²ط¹ط§طھ","ط¹ط¨ط³",
-  "ط§ظ„طھظƒظˆظٹط±","ط§ظ„ط§ظ†ظپط·ط§ط±","ط§ظ„ظ…ط·ظپظپظٹظ†","ط§ظ„ط§ظ†ط´ظ‚ط§ظ‚","ط§ظ„ط¨ط±ظˆط¬",
-  "ط§ظ„ط·ط§ط±ظ‚","ط§ظ„ط£ط¹ظ„ظ‰","ط§ظ„ط؛ط§ط´ظٹط©","ط§ظ„ظپط¬ط±","ط§ظ„ط¨ظ„ط¯",
-  "ط§ظ„ط´ظ…ط³","ط§ظ„ظ„ظٹظ„","ط§ظ„ط¶ط­ظ‰","ط§ظ„ط´ط±ط­","ط§ظ„طھظٹظ†",
-  "ط§ظ„ط¹ظ„ظ‚","ط§ظ„ظ‚ط¯ط±","ط§ظ„ط¨ظٹظ†ط©","ط§ظ„ط²ظ„ط²ظ„ط©","ط§ظ„ط¹ط§ط¯ظٹط§طھ",
-  "ط§ظ„ظ‚ط§ط±ط¹ط©","ط§ظ„طھظƒط§ط«ط±","ط§ظ„ط¹طµط±","ط§ظ„ظ‡ظ…ط²ط©","ط§ظ„ظپظٹظ„",
-  "ظ‚ط±ظٹط´","ط§ظ„ظ…ط§ط¹ظˆظ†","ط§ظ„ظƒظˆط«ط±","ط§ظ„ظƒط§ظپط±ظˆظ†","ط§ظ„ظ†طµط±",
-  "ط§ظ„ظ…ط³ط¯","ط§ظ„ط¥ط®ظ„ط§طµ","ط§ظ„ظپظ„ظ‚","ط§ظ„ظ†ط§ط³"
+  "الفاتحة","البقرة","آل عمران","النساء","المائدة",
+  "الأنعام","الأعراف","الأنفال","التوبة","يونس",
+  "هود","يوسف","الرعد","إبراهيم","الحجر",
+  "النحل","الإسراء","الكهف","مريم","طه",
+  "الأنبياء","الحج","المؤمنون","النور","الفرقان",
+  "الشعراء","النمل","القصص","العنكبوت","الروم",
+  "لقمان","السجدة","الأحزاب","سبأ","فاطر",
+  "يس","الصافات","ص","الزمر","غافر",
+  "فصلت","الشورى","الزخرف","الدخان","الجاثية",
+  "الأحقاف","محمد","الفتح","الحجرات","ق",
+  "الذاريات","الطور","النجم","القمر","الرحمن",
+  "الواقعة","الحديد","المجادلة","الحشر","الممتحنة",
+  "الصف","الجمعة","المنافقون","التغابن","الطلاق",
+  "التحريم","الملك","القلم","الحاقة","المعارج",
+  "نوح","الجن","المزمل","المدثر","القيامة",
+  "الإنسان","المرسلات","النبأ","النازعات","عبس",
+  "التكوير","الانفطار","المطففين","الانشقاق","البروج",
+  "الطارق","الأعلى","الغاشية","الفجر","البلد",
+  "الشمس","الليل","الضحى","الشرح","التين",
+  "العلق","القدر","البينة","الزلزلة","العاديات",
+  "القارعة","التكاثر","العصر","الهمزة","الفيل",
+  "قريش","الماعون","الكوثر","الكافرون","النصر",
+  "المسد","الإخلاص","الفلق","الناس"
 ];
 
 // --- Juz/Surat Selector Component ---

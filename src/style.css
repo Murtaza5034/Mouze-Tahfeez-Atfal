@@ -5360,7 +5360,7 @@ n/* --- Full Width Label Helper --- */
 
 /* --- Kanz al Marjaan Font Helper (no RTL direction) --- */
 .kanz-font {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Kanz al Marjaan', 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   letter-spacing: normal;
 }
 
@@ -5371,7 +5371,7 @@ n/* --- Full Width Label Helper --- */
 
 .premium-select option.arabic-text,
 .juz-surat-selector .premium-select .arabic-kanz-option {
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif !important;
   font-size: 1.1rem;
 }
 

@@ -370,21 +370,23 @@
 }
 
 .topbar-menu-btn {
-  background: var(--premium-white);
-  border: 1.5px solid var(--glass-border);
-  color: #666;
-  border-radius: 14px;
-  width: 48px;
-  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(212, 175, 55, 0.05);
+  border: 1.5px solid var(--glass-border);
+  color: var(--text-main);
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.3s;
+  flex-shrink: 0;
 }
 
 .topbar-menu-btn:hover {
   background: var(--light-gold);
+  color: var(--dark-gold);
   border-color: var(--primary-gold);
   transform: translateY(-2px);
 }

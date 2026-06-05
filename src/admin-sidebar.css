@@ -83,25 +83,29 @@
 .admin-header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
 }
 
 .topbar-menu-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  width: 48px;
+  height: 48px;
   background: rgba(212, 175, 55, 0.05);
-  border: 1px solid rgba(212, 175, 55, 0.1);
+  border: 1.5px solid var(--glass-border);
   color: var(--text-main);
-  border-radius: 10px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s;
+  flex-shrink: 0;
 }
 
 .topbar-menu-btn:hover {
   background: var(--light-gold);
   color: var(--dark-gold);
+  border-color: var(--primary-gold);
+  transform: translateY(-2px);
 }
 
 .sidebar-toggle-btn {
