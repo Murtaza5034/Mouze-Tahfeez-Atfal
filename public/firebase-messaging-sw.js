@@ -36,8 +36,8 @@ function parsePushPayload(payload) {
 function buildNotificationOptions(info) {
   const options = {
     body: info.body,
-    icon: '/logo.png',
-    badge: '/logo.png',
+    icon: '/LOGO ATFAAL.png',
+    badge: '/LOGO ATFAAL.png',
     vibrate: [200, 100, 200],
     data: {
       ...info.data,
@@ -51,7 +51,9 @@ function buildNotificationOptions(info) {
     dir: 'ltr',
     lang: 'en-US',
     actions: [
-      { action: 'open', title: 'Open Portal', icon: '/logo.png' },
+      {            action: 'open',
+            title: 'Open Portal',
+            icon: '/LOGO ATFAAL.png' },
       { action: 'dismiss', title: 'Dismiss' }
     ]
   };
@@ -96,8 +98,8 @@ self.addEventListener('push', function(event) {
     console.error('Error in push event:', err);
     event.waitUntil(self.registration.showNotification("Mauze Tahfeez Update", {
       body: "You have a new update",
-      icon: '/logo.png',
-      badge: '/logo.png'
+      icon: '/LOGO ATFAAL.png',
+      badge: '/LOGO ATFAAL.png'
     }));
   }
 });

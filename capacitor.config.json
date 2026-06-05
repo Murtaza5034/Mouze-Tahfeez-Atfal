@@ -14,6 +14,9 @@
     "SplashScreen": {
       "launchShowDuration": 2000,
       "backgroundColor": "#fffdf8"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
     }
   }
 }
