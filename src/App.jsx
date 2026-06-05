@@ -2354,9 +2354,47 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
 
 function LoadingScreen({ message }) {
   return (
-    <div className="loading-screen">
-      <div className="spinner" />
-      <p>{message}</p>
+    <div className="skeleton-screen">
+      <div className="skeleton-sidebar">
+        <div className="skeleton-el skeleton-sidebar-logo" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="skeleton-el skeleton-sidebar-nav-item" />
+        ))}
+      </div>
+      <div className="skeleton-main">
+        <div className="skeleton-el skeleton-header-bar" />
+        <div className="skeleton-stats-row">
+          <div className="skeleton-el skeleton-stat-card" />
+          <div className="skeleton-el skeleton-stat-card" />
+          <div className="skeleton-el skeleton-stat-card" />
+        </div>
+        <div className="skeleton-content-grid">
+          <div className="skeleton-el skeleton-content-card">
+            <div className="skeleton-card-title" />
+            <div className="skeleton-el skeleton-line w90" />
+            <div className="skeleton-el skeleton-line w75" />
+            <div className="skeleton-el skeleton-line w60" />
+          </div>
+          <div className="skeleton-el skeleton-content-card">
+            <div className="skeleton-card-title" />
+            <div className="skeleton-el skeleton-line w75" />
+            <div className="skeleton-el skeleton-line w90" />
+            <div className="skeleton-el skeleton-line w60" />
+          </div>
+        </div>
+        <div className="skeleton-row">
+          <div className="skeleton-el skeleton-content-card">
+            <div className="skeleton-card-title" />
+            <div className="skeleton-el skeleton-line w90" />
+            <div className="skeleton-el skeleton-line w75" />
+          </div>
+          <div className="skeleton-el skeleton-content-card">
+            <div className="skeleton-card-title" />
+            <div className="skeleton-el skeleton-line w60" />
+            <div className="skeleton-el skeleton-line w90" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -103,9 +103,16 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
 
   if (loading) {
     return (
-      <div className="overview-container fade-in" style={{ padding: '40px', textAlign: 'center' }}>
-        <Loader2 size={40} className="spin" style={{ color: 'var(--primary-gold)' }} />
-        <p style={{ marginTop: '16px', color: 'var(--text-muted)' }}>Loading Jadwal tracking data...</p>
+      <div className="overview-container fade-in" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="skeleton-el" style={{ height: '52px', borderRadius: '14px' }} />
+          <div className="skeleton-el" style={{ height: '80px', borderRadius: '12px' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="skeleton-el" style={{ height: '100px', borderRadius: '12px' }} />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

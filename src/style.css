@@ -5525,3 +5525,127 @@ n/* --- Full Width Label Helper --- */
 .spin {
   animation: spin 1s linear infinite;
 }
+
+/* --- Skeleton Loading --- */
+@keyframes skeleton-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  z-index: 9999;
+  background: var(--bg-app, #fffdf8);
+  font-family: inherit;
+}
+
+.skeleton-sidebar {
+  width: 240px;
+  background: var(--bg-sidebar, #fffdf5);
+  border-right: 1px solid rgba(183, 137, 31, 0.1);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.skeleton-sidebar-logo {
+  width: 160px;
+  height: 28px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.skeleton-sidebar-nav-item {
+  height: 38px;
+  border-radius: 8px;
+}
+
+.skeleton-main {
+  flex: 1;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.skeleton-header-bar {
+  height: 52px;
+  border-radius: 12px;
+  width: 100%;
+}
+
+.skeleton-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.skeleton-stat-card {
+  height: 90px;
+  border-radius: 14px;
+}
+
+.skeleton-content-card {
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton-content-card .skeleton-card-title {
+  height: 18px;
+  width: 40%;
+  border-radius: 6px;
+}
+
+.skeleton-content-card .skeleton-line {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.skeleton-content-card .skeleton-line.w75 { width: 75%; }
+.skeleton-content-card .skeleton-line.w90 { width: 90%; }
+.skeleton-content-card .skeleton-line.w60 { width: 60%; }
+
+.skeleton-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.skeleton-row {
+  display: flex;
+  gap: 16px;
+}
+
+.skeleton-row > * { flex: 1; }
+
+.skeleton-el {
+  background: linear-gradient(
+    90deg,
+    rgba(183, 137, 31, 0.06) 0%,
+    rgba(183, 137, 31, 0.12) 40%,
+    rgba(183, 137, 31, 0.06) 80%
+  );
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.skeleton-text {
+  color: transparent;
+  user-select: none;
+}
+
+/* Mobile skeleton */
+@media (max-width: 768px) {
+  .skeleton-sidebar { display: none; }
+  .skeleton-stats-row { grid-template-columns: repeat(2, 1fr); }
+  .skeleton-content-grid { grid-template-columns: 1fr; }
+  .skeleton-main { padding: 16px; }
+}

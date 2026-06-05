@@ -1497,7 +1497,19 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
     }
   };
 
-  if (loading) return <div className="loading-spinner">Loading Jadwal...</div>;
+  if (loading) return (
+    <div className="jadwal-container parent-view">
+      <div className="jadwal-header">
+        <div className="skeleton-el" style={{ height: '32px', width: '280px', borderRadius: '8px' }} />
+        <div className="skeleton-el" style={{ height: '40px', width: '100%', borderRadius: '10px', marginTop: '12px' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px', padding: '20px 0' }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="skeleton-el" style={{ height: '120px', borderRadius: '12px' }} />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="jadwal-container parent-view">
