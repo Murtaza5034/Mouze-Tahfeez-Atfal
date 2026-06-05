@@ -127,7 +127,6 @@ class FCMService {
 
     // Wait for the first token to arrive
     const tokenPromise = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Push registration timed out')), 15000);
       const checkInterval = setInterval(() => {
         if (this.token) {
           clearTimeout(timeout);
@@ -135,6 +134,10 @@ class FCMService {
           resolve(this.token);
         }
       }, 200);
+      const timeout = setTimeout(() => {
+        clearInterval(checkInterval);
+        reject(new Error('Push registration timed out'));
+      }, 15000);
     });
 
     this.token = await tokenPromise;
@@ -469,6 +472,7 @@ class FCMService {
       if (this.isNative) {
         try {
           const { PushNotifications } = await import('@capacitor/push-notifications');
+          await PushNotifications.removeAllListeners();
           await PushNotifications.unregister();
         } catch (err) {
           console.warn('Capacitor unregister failed:', err);
