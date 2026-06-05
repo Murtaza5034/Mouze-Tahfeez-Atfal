@@ -6961,181 +6961,246 @@ const handleDownloadAllReports = async () => {
 
           {activePage === "Staff Profiles" ? (
             <div className="management-grid two-columns">
-              <section className="form-card">
+              <section className="form-card card-appear">
                 <div className="card-headline">
                   <User size={18} />
                   <h3>Update Staff Profile</h3>
                 </div>
                 <form className="stack-form" onSubmit={onUpdateTeacherProfile}>
-                  <label>
-                    <span>Teacher Full Name (Must match Supabase Auth name)</span>
-                    <select
-                      name="full_name"
-                      value={adminForms.teacherProfile.full_name}
-                    onChange={(e) => {
-                      const selectedName = e.target.value;
-                      const existingProfile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(selectedName));
-                      const existingAccess = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(selectedName));
-
-                      setAdminForms(curr => ({
-                        ...curr,
-                        teacherProfile: {
-                          ...curr.teacherProfile,
-                          user_id: existingProfile?.user_id || existingAccess?.user_id || "",
-                          full_name: selectedName,
-                          phone_number: existingProfile?.phone_number || "",
-                          whatsapp_number: existingProfile?.whatsapp_number || "",
-                          photo_url: existingProfile?.photo_url || existingAccess?.photo_url || "",
-                          salary_per_minute: existingProfile?.salary_per_minute || existingAccess?.salary_per_minute || "2.3",
-                            show_salary_card: existingProfile?.show_salary_card ?? existingAccess?.show_salary_card ?? true
-                          }
-                        }));
-                      }}
-                      required
-                      className="premium-select"
-                    >
-                      <option value="">-- Select Teacher --</option>
-                      {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
-                        <React.Fragment>
-                          {portalAccessList
-                            .filter(a =>
-                              normalizeText(a.portal_role).includes("teacher") ||
-                              normalizeText(a.portal_role).includes("muhaffiz")
-                            )
-                            .map(a => (
-                              <option key={`pa-${a.id}`} value={a.full_name}>{a.full_name}</option>
-                            ))
-                          }
-                          {teacherProfiles
-                            .filter(tp => !portalAccessList.some(pa =>
-                              pa.user_id === tp.user_id ||
-                              normalizeText(pa.full_name) === normalizeText(tp.full_name)
-                            ))
-                            .map(tp => (
-                              <option key={`profile-${tp.id}`} value={tp.full_name}>{tp.full_name}</option>
-                            ))
-                          }
-                        </React.Fragment>
-                      ) : null}
-                    </select>
-                  </label>
-                  <div className="form-grid">
+                  <div className="form-section">
+                    <div className="form-section-title">Select Staff Member</div>
                     <label>
-                      <span>Phone Number</span>
-                      <input
-                        type="text"
-                        name="phone_number"
-                        value={adminForms.teacherProfile.phone_number}
-                        onChange={onAdminFormChange("teacherProfile")}
-                        placeholder="+92 300 1234567"
-                      />
-                    </label>
-                    <label>
-                      <span>WhatsApp Number</span>
-                      <input
-                        type="text"
-                        name="whatsapp_number"
-                        value={adminForms.teacherProfile.whatsapp_number}
-                        onChange={onAdminFormChange("teacherProfile")}
-                        placeholder="923001234567"
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    <span>Profile Photo</span>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <label style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '8px 12px',
-                        borderRadius: '12px',
-                        border: '1px dashed var(--glass-border)',
-                        background: 'rgba(255,255,255,0.6)',
-                        cursor: 'pointer',
-                        transition: 'border-color 0.2s',
-                        fontSize: '13px',
-                        color: 'var(--text-muted)'
-                      }}>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={onTeacherPhotoUpload}
-                          style={{ position: 'absolute', width: 0, height: 0, opacity: 0 }}
-                        />
-                        {uploadingTeacherPhoto ? (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span className="upload-spinner" style={{ border: '2px solid #f3f3f3', borderTop: '2px solid #d4af37', borderRadius: '50%', width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />
-                            Uploading...
-                          </span>
-                        ) : (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            Upload Photo
-                          </span>
-                        )}
-                      </label>
-                      {adminForms.teacherProfile.photo_url && (
-                        <img
-                          src={adminForms.teacherProfile.photo_url}
-                          alt="Preview"
-                          style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '50%',
-                            objectFit: 'cover',
-                            border: '2px solid var(--glass-border)'
-                          }}
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                        />
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      name="photo_url"
-                      value={adminForms.teacherProfile.photo_url}
-                      onChange={onAdminFormChange("teacherProfile")}
-                      placeholder="https://example.com/photo.jpg"
-                      style={{ marginTop: '8px' }}
-                    />
-                  </label>
-                  <div className="form-grid">
-                    <label>
-                      <span>Salary per Minute</span>
-                      <input
-                        type="number"
-                        step="0.1"
-                        name="salary_per_minute"
-                        value={adminForms.teacherProfile.salary_per_minute || "2.3"}
-                        onChange={onAdminFormChange("teacherProfile")}
-                      />
-                    </label>
-                    <label style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', marginTop: '20px' }}>
-                      <input
-                        type="checkbox"
-                        name="show_salary_card"
-                        checked={adminForms.teacherProfile.show_salary_card}
+                      <span>Full Name</span>
+                      <select
+                        name="full_name"
+                        value={adminForms.teacherProfile.full_name}
                         onChange={(e) => {
-                          const { checked } = e.target;
+                          const selectedName = e.target.value;
+                          if (!selectedName) {
+                            setAdminForms(curr => ({
+                              ...curr,
+                              teacherProfile: { user_id: "", full_name: "", photo_url: "", phone_number: "", whatsapp_number: "", salary_per_minute: "2.3", show_salary_card: true }
+                            }));
+                            return;
+                          }
+                          const existingProfile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(selectedName));
+                          const existingAccess = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(selectedName));
+
+                          const rawSalary = existingProfile?.salary_per_minute ?? existingAccess?.salary_per_minute;
+                          const salaryStr = rawSalary != null ? String(rawSalary) : "2.3";
+
                           setAdminForms(curr => ({
                             ...curr,
-                            teacherProfile: { ...curr.teacherProfile, show_salary_card: checked }
+                            teacherProfile: {
+                              user_id: existingProfile?.user_id || existingAccess?.user_id || "",
+                              full_name: selectedName,
+                              phone_number: existingProfile?.phone_number || "",
+                              whatsapp_number: existingProfile?.whatsapp_number || "",
+                              photo_url: existingProfile?.photo_url || existingAccess?.photo_url || "",
+                              salary_per_minute: salaryStr,
+                              show_salary_card: existingProfile?.show_salary_card ?? existingAccess?.show_salary_card ?? true
+                            }
                           }));
                         }}
-                      />
-                      <span>Show Salary Card to Teacher</span>
+                        required
+                        className="premium-select"
+                      >
+                        <option value="">-- Select Teacher --</option>
+                        {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
+                          <React.Fragment>
+                            {portalAccessList.filter(a =>
+                              normalizeText(a.portal_role).includes("teacher") ||
+                              normalizeText(a.portal_role).includes("muhaffiz")
+                            ).length > 0 && (
+                              <option disabled className="select-group-label">── Portal Teachers ──</option>
+                            )}
+                            {portalAccessList
+                              .filter(a =>
+                                normalizeText(a.portal_role).includes("teacher") ||
+                                normalizeText(a.portal_role).includes("muhaffiz")
+                              )
+                              .map(a => (
+                                <option key={`pa-${a.id}`} value={a.full_name}>{a.full_name}</option>
+                              ))
+                            }
+                            {teacherProfiles.filter(tp => !portalAccessList.some(pa =>
+                              pa.user_id === tp.user_id ||
+                              normalizeText(pa.full_name) === normalizeText(tp.full_name)
+                            )).length > 0 && (
+                              <option disabled className="select-group-label">── Staff Records ──</option>
+                            )}
+                            {teacherProfiles
+                              .filter(tp => !portalAccessList.some(pa =>
+                                pa.user_id === tp.user_id ||
+                                normalizeText(pa.full_name) === normalizeText(tp.full_name)
+                              ))
+                              .map(tp => (
+                                <option key={`profile-${tp.id}`} value={tp.full_name}>{tp.full_name}</option>
+                              ))
+                            }
+                          </React.Fragment>
+                        ) : null}
+                      </select>
                     </label>
                   </div>
-                  <button type="submit" className="action-button">Save Profile</button>
+
+                  <div className="form-section">
+                    <div className="form-section-title">Contact Information</div>
+                    <div className="form-grid">
+                      <label>
+                        <span><Phone size={14} /> Phone</span>
+                        <input
+                          type="text"
+                          name="phone_number"
+                          value={adminForms.teacherProfile.phone_number}
+                          onChange={onAdminFormChange("teacherProfile")}
+                          placeholder="+92 300 1234567"
+                        />
+                      </label>
+                      <label>
+                        <span><MessageCircle size={14} /> WhatsApp</span>
+                        <input
+                          type="text"
+                          name="whatsapp_number"
+                          value={adminForms.teacherProfile.whatsapp_number}
+                          onChange={onAdminFormChange("teacherProfile")}
+                          placeholder="923001234567"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="form-section">
+                    <div className="form-section-title">Profile Photo</div>
+                    <label>
+                      <div className="photo-upload-row">
+                        <label className="photo-upload-btn">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={onTeacherPhotoUpload}
+                          />
+                          {uploadingTeacherPhoto ? (
+                            <span className="upload-status">
+                              <span className="upload-spinner" />
+                              Uploading...
+                            </span>
+                          ) : (
+                            <span className="upload-status">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                              Upload Photo
+                            </span>
+                          )}
+                        </label>
+                        {adminForms.teacherProfile.photo_url && (
+                          <img
+                            src={adminForms.teacherProfile.photo_url}
+                            alt="Preview"
+                            className="photo-preview-circle"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        name="photo_url"
+                        value={adminForms.teacherProfile.photo_url}
+                        onChange={onAdminFormChange("teacherProfile")}
+                        placeholder="https://example.com/photo.jpg"
+                        className="photo-url-input"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-section">
+                    <div className="form-section-title">Salary Settings</div>
+                    <div className="form-grid">
+                      <label>
+                        <span>Salary per Minute (Rs.)</span>
+                        <div className="input-with-icon">
+                          <span className="input-icon">Rs.</span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            name="salary_per_minute"
+                            value={adminForms.teacherProfile.salary_per_minute || "2.3"}
+                            onChange={onAdminFormChange("teacherProfile")}
+                          />
+                        </div>
+                      </label>
+                      <label className="checkbox-inline">
+                        <input
+                          type="checkbox"
+                          name="show_salary_card"
+                          checked={adminForms.teacherProfile.show_salary_card}
+                          onChange={onAdminFormChange("teacherProfile")}
+                        />
+                        <span>Show Salary Card to Teacher</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="action-button">
+                    <CheckCircle size={16} />
+                    Save Profile
+                  </button>
                 </form>
               </section>
 
-              <section className="data-card">
+              <section className="data-card card-appear" style={{ animationDelay: '0.1s' }}>
                 <div className="card-headline">
                   <ShieldCheck size={18} />
                   <h3>Existing Profiles</h3>
+                  <span className="badge-count">{teacherProfiles.length}</span>
                 </div>
+
+                {adminForms.teacherProfile.full_name && (() => {
+                  const sel = adminForms.teacherProfile;
+                  const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(sel.full_name));
+                  return (
+                    <div className="preview-card">
+                      <div className="preview-card-header">
+                        <img
+                          src={sel.photo_url || "/default-avatar.png"}
+                          alt=""
+                          className="preview-avatar"
+                          onError={(e) => { e.target.src = "/default-avatar.png"; }}
+                        />
+                        <div className="preview-info">
+                          <strong>{sel.full_name}</strong>
+                          {access && (
+                            <span className="preview-role-badge">{access.portal_role}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="preview-details">
+                        {sel.phone_number && (
+                          <div className="preview-detail-row">
+                            <Phone size={13} />
+                            <span>{sel.phone_number}</span>
+                          </div>
+                        )}
+                        {sel.whatsapp_number && (
+                          <div className="preview-detail-row">
+                            <MessageCircle size={13} />
+                            <span>{sel.whatsapp_number}</span>
+                          </div>
+                        )}
+                        <div className="preview-detail-row">
+                          <span className="preview-salary-label">Salary Rate</span>
+                          <span className="preview-salary-value">Rs. {sel.salary_per_minute || "2.3"} /min</span>
+                        </div>
+                        <div className="preview-detail-row">
+                          <span className="preview-salary-label">Card Visibility</span>
+                          <span className={`preview-status-badge ${sel.show_salary_card ? 'active' : 'inactive'}`}>
+                            {sel.show_salary_card ? "Visible" : "Hidden"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="record-stack">
                   {teacherProfiles.map(profile => (
                     <article key={profile.id} className="record-card flex-row-card">
@@ -7143,7 +7208,7 @@ const handleDownloadAllReports = async () => {
                         <img src={profile.photo_url || "/default-avatar.png"} alt="" className="user-dp-badge" />
                         <div>
                           <strong>{profile.full_name}</strong>
-                          <p style={{ fontSize: '11px' }}>{profile.whatsapp_number}</p>
+                          <p className="record-sub">{profile.whatsapp_number || "No contact"}</p>
                         </div>
                       </div>
                       <button
@@ -7154,6 +7219,9 @@ const handleDownloadAllReports = async () => {
                       </button>
                     </article>
                   ))}
+                  {teacherProfiles.length === 0 && (
+                    <p className="empty-state-text">No staff profiles yet. Create one above.</p>
+                  )}
                 </div>
               </section>
             </div>
@@ -11637,7 +11705,6 @@ const handleSendCustomNotification = async (event) => {
     event.preventDefault();
     const payload = adminForms.teacherProfile;
 
-    // Search BOTH portalAccessList AND teacherProfiles for the selected teacher
     const selectedAccess = portalAccessList.find(
       (access) => normalizeText(access.full_name) === normalizeText(payload.full_name)
     );
@@ -11651,7 +11718,6 @@ const handleSendCustomNotification = async (event) => {
       return;
     }
 
-    // Update the profile information
     const { error: profileError } = await supabase
       .from("teacher_profiles")
       .upsert(
@@ -11668,25 +11734,24 @@ const handleSendCustomNotification = async (event) => {
         { onConflict: "user_id" }
       );
 
-    // Upsert the portal access settings (salary/visibility/photo) so it works even if the teacher
-    // has no portal access entry yet â€” also add full_name in case we're creating a new record
-    const { error: accessError } = await supabase
-      .from("user_portal_access")
-      .upsert(
-        {
-          user_id: resolvedUserId,
-          full_name: payload.full_name,
+    if (profileError) {
+      showAction("error", profileError.message);
+      return;
+    }
+
+    if (selectedAccess) {
+      const { error: accessError } = await supabase
+        .from("user_portal_access")
+        .update({
           photo_url: payload.photo_url,
           salary_per_minute: Number(payload.salary_per_minute || 2.3),
           show_salary_card: !!payload.show_salary_card,
-          is_active: true,
-        },
-        { onConflict: "user_id" }
-      );
+        })
+        .eq("user_id", resolvedUserId);
 
-    if (profileError || accessError) {
-      showAction("error", profileError?.message || accessError?.message);
-      return;
+      if (accessError) {
+        console.warn("Portal access sync warning:", accessError.message);
+      }
     }
 
     await loadPortalData(portalRole, user, parentData.studentProfile);
