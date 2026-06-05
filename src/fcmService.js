@@ -170,8 +170,21 @@ class FCMService {
 
   async _getToken() {
     if (this.isNative) {
-      // Return the stored token; native token is received via the registration listener
-      return this.token || null;
+      // Re-register to get a fresh native token via the registration listener
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const tokenPromise = new Promise((resolve) => {
+          const timeout = setTimeout(() => resolve(this.token), 10000);
+          PushNotifications.addListener('registration', (token) => {
+            clearTimeout(timeout);
+            resolve(token.value);
+          });
+        });
+        await PushNotifications.register();
+        return await tokenPromise;
+      } catch {
+        return this.token || null;
+      }
     }
     // Web fallback
     const { getFCMToken } = await import('./firebaseConfig.js');
