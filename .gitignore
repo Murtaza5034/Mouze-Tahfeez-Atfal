@@ -50,4 +50,15 @@ supabase/.temp/
 # NUL device file
 nul
 
+# Android build output
+android/app/build/
+android/build/
+android/.gradle/
+android/capacitor-*
+android/app/capacitor-*
+*.apk
+
+# APK
+Mauze-Tahfeez.apk
+
 .vercel

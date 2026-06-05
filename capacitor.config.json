@@ -1,0 +1,19 @@
+{
+  "appId": "com.mauze.tahfeez",
+  "appName": "Mauze Tahfeez",
+  "webDir": "dist",
+  "server": {
+    "url": "https://mouze-tahfeez-atfal-mu.vercel.app",
+    "cleartext": true,
+    "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {}
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#fffdf8"
+    }
+  }
+}

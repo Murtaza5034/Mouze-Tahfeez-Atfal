@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mauze Tahfeez</string>
+    <string name="title_activity_main">Mauze Tahfeez</string>
+    <string name="package_name">com.mauze.tahfeez</string>
+    <string name="custom_url_scheme">com.mauze.tahfeez</string>
+</resources>
