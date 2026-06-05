@@ -7008,21 +7008,12 @@ const handleDownloadAllReports = async () => {
                         <option value="">-- Select Teacher --</option>
                         {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
                           <React.Fragment>
-                            {portalAccessList.filter(a =>
-                              normalizeText(a.portal_role).includes("teacher") ||
-                              normalizeText(a.portal_role).includes("muhaffiz")
-                            ).length > 0 && (
-                              <option disabled className="select-group-label">── Portal Teachers ──</option>
+                            {portalAccessList.length > 0 && (
+                              <option disabled className="select-group-label">── Portal Users ──</option>
                             )}
-                            {portalAccessList
-                              .filter(a =>
-                                normalizeText(a.portal_role).includes("teacher") ||
-                                normalizeText(a.portal_role).includes("muhaffiz")
-                              )
-                              .map(a => (
-                                <option key={`pa-${a.id}`} value={a.full_name}>{a.full_name}</option>
-                              ))
-                            }
+                            {portalAccessList.map(a => (
+                              <option key={`pa-${a.id}`} value={a.full_name}>{a.full_name}</option>
+                            ))}
                             {teacherProfiles.filter(tp => !portalAccessList.some(pa =>
                               pa.user_id === tp.user_id ||
                               normalizeText(pa.full_name) === normalizeText(tp.full_name)
@@ -7128,15 +7119,23 @@ const handleDownloadAllReports = async () => {
                           />
                         </div>
                       </label>
-                      <label className="checkbox-inline">
-                        <input
-                          type="checkbox"
-                          name="show_salary_card"
-                          checked={adminForms.teacherProfile.show_salary_card}
-                          onChange={onAdminFormChange("teacherProfile")}
-                        />
-                        <span>Show Salary Card to Teacher</span>
-                      </label>
+                    <label className="checkbox-inline">
+                      <input
+                        type="checkbox"
+                        name="show_salary_card"
+                        checked={adminForms.teacherProfile.show_salary_card}
+                        onChange={(e) => {
+                          setAdminForms(curr => ({
+                            ...curr,
+                            teacherProfile: {
+                              ...curr.teacherProfile,
+                              show_salary_card: e.target.checked
+                            }
+                          }));
+                        }}
+                      />
+                      <span>Show Salary Card to Teacher</span>
+                    </label>
                     </div>
                   </div>
 
@@ -11755,7 +11754,18 @@ const handleSendCustomNotification = async (event) => {
     }
 
     await loadPortalData(portalRole, user, parentData.studentProfile);
-    setAdminForms(curr => ({ ...curr, teacherProfile: { user_id: "", full_name: "", photo_url: "", phone_number: "", whatsapp_number: "", salary_per_minute: "2.3", show_salary_card: true } }));
+    setAdminForms(curr => ({
+      ...curr,
+      teacherProfile: {
+        user_id: resolvedUserId,
+        full_name: payload.full_name,
+        photo_url: payload.photo_url || "",
+        phone_number: payload.phone_number || "",
+        whatsapp_number: payload.whatsapp_number || "",
+        salary_per_minute: String(payload.salary_per_minute || "2.3"),
+        show_salary_card: !!payload.show_salary_card,
+      }
+    }));
     showAction("success", "Teacher profile updated.");
   };
 
