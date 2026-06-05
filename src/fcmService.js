@@ -25,9 +25,9 @@ class FCMService {
     this.refreshInterval = setInterval(async () => {
       console.log('FCM: Periodic token refresh...');
       try {
+        const oldToken = this.token;
         const freshToken = await this._getToken();
-        if (freshToken && freshToken !== this.token) {
-          this.token = freshToken;
+        if (freshToken && freshToken !== oldToken) {
           await this.storeToken(freshToken, userRole);
           console.log('FCM: Token refreshed');
         }
