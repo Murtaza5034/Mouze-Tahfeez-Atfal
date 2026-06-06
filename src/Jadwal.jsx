@@ -780,10 +780,10 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     document.body.appendChild(container);
 
     const canvas = await html2canvas(container, {
-      scale: 3,
+      scale: 2,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: null,
+      backgroundColor: '#ffffff',
       onclone: (clonedDoc) => {
         const style = clonedDoc.createElement('style');
         style.textContent = FONT_FACE_CSS;
@@ -791,9 +791,9 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       },
     });
 
-    const imgData = canvas.toDataURL("image/png");
+    const imgData = canvas.toDataURL("image/jpeg", 0.85);
     if (pi > 0) pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, 0, 210, (canvas.height * 210) / canvas.width);
+    pdf.addImage(imgData, "JPEG", 0, 0, 210, (canvas.height * 210) / canvas.width, undefined, 'FAST');
     document.body.removeChild(container);
   }
 

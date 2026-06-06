@@ -1,4 +1,4 @@
-﻿import "./style.css";
+import "./style.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -3606,7 +3606,7 @@ function ParentPortal({
           },
         });
 
-        const imgData = canvas.toDataURL("image/png");
+        const imgData = canvas.toDataURL("image/jpeg", 0.85);
         if (imgData.length < 5000) throw new Error("Capture failed");
 
         const pdfWidth = 210;
@@ -3620,7 +3620,7 @@ function ParentPortal({
           format: [pdfWidth, finalPdfHeight]
         });
 
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+        pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
         pdf.save(`${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, '_')}_Report.pdf`);
         if (showAction) showAction("success", "Report downloaded successfully!");
       } catch (err) {
@@ -5037,7 +5037,7 @@ const handleDownloadAllReports = async () => {
             },
           });
           
-          const imgData = canvas.toDataURL("image/png");
+          const imgData = canvas.toDataURL("image/jpeg", 0.85);
           if (imgData.length < 5000) {
             throw new Error("Captured image is blank or too small.");
           }
@@ -5065,7 +5065,7 @@ const handleDownloadAllReports = async () => {
             });
           }
           
-          finalPdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+          finalPdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
           const pdfBlob = finalPdf.output("blob");
           const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
           zip.file(`${i+1}_${safeName}_Report.pdf`, pdfBlob);
