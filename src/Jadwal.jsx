@@ -673,11 +673,6 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
         </div>
       </div>
       ${inner}
-      <div style="margin-top: 35px; border-top: 1px dashed ${t.accentColor}; padding-top: 15px; text-align: center;">
-        <p style="margin: 0; font-size: 12px; color: ${t.accentColor}; font-style: italic; font-weight: 600;">
-          "And We have indeed made the Quran easy to understand and remember..."
-        </p>
-      </div>
     </div>`;
 
   const pageFrameNoHeaderHtml = (inner) => `
