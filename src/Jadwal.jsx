@@ -726,33 +726,28 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
   const allCards = pdfDays.map((_, idx) => buildCardHtml(pdfDays[idx], idx));
 
-  // Measure-based page splitting for both styles
+  const pageLimit = (containerWidth + 80) * (297 / 210);
   const measureEl = document.createElement("div");
   measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
   document.body.appendChild(measureEl);
 
-  const pageLimit = (containerWidth + 80) * (297 / 210);
   let pageGroups = [];
   let currentGroup = [];
-  if (style === 'calendar') {
-    for (const card of allCards) {
-      measureEl.innerHTML = pageFrameHtml(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${[...currentGroup, card].join('')}</div>`);
-      if (measureEl.scrollHeight > pageLimit && currentGroup.length > 0) {
-        pageGroups.push([...currentGroup]);
-        currentGroup = [card];
-      } else {
-        currentGroup.push(card);
-      }
+  let firstPage = true;
+  for (const card of allCards) {
+    const frameFn = firstPage ? pageFrameHtml : pageFrameNoHeaderHtml;
+    if (style === 'calendar') {
+      measureEl.innerHTML = frameFn(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${[...currentGroup, card].join('')}</div>`);
+    } else {
+      const headersHtml = firstPage ? `<thead>${tableHeaders}</thead>` : '';
+      measureEl.innerHTML = frameFn(`<table style="width:100%;border-collapse:collapse;margin-top:10px;border-radius:8px;overflow:hidden;">${headersHtml}<tbody>${[...currentGroup, card].join('')}</tbody></table>`);
     }
-  } else {
-    for (const card of allCards) {
-      measureEl.innerHTML = pageFrameHtml(`<table style="width:100%;border-collapse:collapse;margin-top:10px;border-radius:8px;overflow:hidden;"><thead>${tableHeaders}</thead><tbody>${[...currentGroup, card].join('')}</tbody></table>`);
-      if (measureEl.scrollHeight > pageLimit && currentGroup.length > 0) {
-        pageGroups.push([...currentGroup]);
-        currentGroup = [card];
-      } else {
-        currentGroup.push(card);
-      }
+    if (measureEl.scrollHeight > pageLimit && currentGroup.length > 0) {
+      pageGroups.push([...currentGroup]);
+      currentGroup = [card];
+      firstPage = false;
+    } else {
+      currentGroup.push(card);
     }
   }
   if (currentGroup.length > 0) pageGroups.push(currentGroup);
