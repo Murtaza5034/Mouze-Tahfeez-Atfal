@@ -553,25 +553,26 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   const bgCss = t.backgroundUrl
     ? `background-image:linear-gradient(rgba(${bgRgb},${1 - (t.backgroundOpacity ?? 1)}),rgba(${bgRgb},${1 - (t.backgroundOpacity ?? 1)})),url('${t.backgroundUrl}');background-size:cover;background-position:center;`
     : '';
-  const pdfDays = (() => {
-    if (t.jadwalType === 'miqaat' && t.weekStart && t.weekEnd) {
-      const s = new Date(t.weekStart + 'T00:00:00Z');
-      const e = new Date(t.weekEnd + 'T00:00:00Z');
-      if (s <= e) {
-        const names = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
-        const days = [];
-        const cur = new Date(s);
-        while (cur <= e) {
-          days.push(names[cur.getUTCDay()]);
-          cur.setUTCDate(cur.getUTCDate() + 1);
-        }
-        return days;
-      }
+  const customDays = t.jadwalType === 'miqaat' && t.weekStart && t.weekEnd ? (() => {
+    const start = new Date(t.weekStart + 'T00:00:00Z');
+    const end = new Date(t.weekEnd + 'T00:00:00Z');
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return null;
+    const names = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+    const days = [];
+    const current = new Date(start);
+    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
+      days.push({ dayName: names[current.getUTCDay()], date: dateStr, fatemiDate: getFatemiDateStr(dateStr) });
+      current.setUTCDate(current.getUTCDate() + 1);
     }
+    return days;
+  })() : null;
+
+  const pdfDays = customDays ? customDays.map(d => d.dayName) : (() => {
     return DAYS;
   })();
 
-  const fatemiDates = pdfDays.map((_, idx) => {
+  const fatemiDates = customDays ? customDays.map(d => d.fatemiDate) : pdfDays.map((_, idx) => {
     if (dayDates && dayDates[idx]) return dayDates[idx];
     const dayIdx = DAYS.indexOf(pdfDays[idx]);
     if (dayIdx === -1) return '';
@@ -590,7 +591,8 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   const jadeedCss = "font-family: 'Kanz al Marjaan', serif; font-size: 14px; line-height: 1.6; direction: rtl;";
 
   const buildCardHtml = (day, idx) => {
-    const row = scheduleData[day] || {};
+    const dataKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
+    const row = scheduleData[dataKey] || scheduleData[day] || {};
     if (style === 'calendar') {
       return `
         <div style="flex: 1 1 calc(33.33% - 20px); min-width: 300px;  border: 1.5px solid ${t.accentColor}; border-radius: 14px; padding: 18px; background: ${idx % 2 === 0 ? '#fff' : `${t.backgroundColor}f2`}; box-sizing: border-box;">
@@ -863,25 +865,26 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
           )}
         </thead>
         <tbody>
-          {daysToRender.map((dayObj) => {
+          {daysToRender.map((dayObj, idx) => {
             const day = dayObj.dayName;
+            const dataKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
+            const row = scheduleData[dataKey] || scheduleData[day] || {};
             return (
-            <tr key={day}>
+            <tr key={`${day}-${idx}`}>
               <td className="day-cell">{day}{dayObj.fatemiDate ? <div className="day-fatemi-date">{dayObj.fatemiDate}</div> : null}</td>
               {mode === 'juz-wise' ? (
                 <>
                   {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
                     const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
-                    const sd = scheduleData[day];
-                    const juzVal = sd ? sd[juz] : '';
+                    const juzVal = row[juz] || '';
                     return (
                       <td key={juz} data-label={label}>
                         {readOnly ? (
                           <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(juzVal) || '-'}</span>
                         ) : (
                           <JuzSelect
-                            value={juzVal || ''}
-                            onChange={(val) => onCellChange(day, juz, val)}
+                            value={juzVal}
+                            onChange={(val) => onCellChange(day, juz, val, idx)}
                           />
                         )}
                       </td>
@@ -889,22 +892,22 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   })}
                     <td data-label="Jadeed">
                     {readOnly ? (
-                      <span>{scheduleData[day]?.jadeed || '-'}</span>
+                      <span>{row.jadeed || '-'}</span>
                     ) : (
                       <JadeedPicker
-                        value={scheduleData[day]?.jadeed || ''}
-                        onChange={(val) => onCellChange(day, 'jadeed', val)}
+                        value={row.jadeed || ''}
+                        onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
                       />
                     )}
                   </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
-                      <span>{formatJuzhali(scheduleData[day]?.juzhali)}</span>
+                      <span>{formatJuzhali(row.juzhali)}</span>
                     ) : (
                       <JuzhaliPicker
-                        value={scheduleData[day]?.juzhali || ''}
-                        onChange={(val) => onCellChange(day, 'juzhali', val)}
-                        jadeedValue={scheduleData[day]?.jadeed || ''}
+                        value={row.juzhali || ''}
+                        onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
+                        jadeedValue={row.jadeed || ''}
                       />
                     )}
                   </td>
@@ -913,39 +916,39 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                 <>
                   <td data-label="Murajah">
                     {readOnly ? (
-                      <span>{scheduleData[day]?.murajah || '-'}</span>
+                      <span>{row.murajah || '-'}</span>
                     ) : (
                       <SurahRangePicker
-                        value={scheduleData[day]?.murajah || ''}
-                        onChange={(val) => onCellChange(day, 'murajah', val)}
+                        value={row.murajah || ''}
+                        onChange={(val) => onCellChange(day, 'murajah', val, idx)}
                       />
                     )}
                   </td>
                   <td data-label="Jadeed">
                     {readOnly ? (
-                      <span>{scheduleData[day]?.jadeed || '-'}</span>
+                      <span>{row.jadeed || '-'}</span>
                     ) : (
                       <JadeedPicker
-                        value={scheduleData[day]?.jadeed || ''}
-                        onChange={(val) => onCellChange(day, 'jadeed', val)}
+                        value={row.jadeed || ''}
+                        onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
                       />
                     )}
                   </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
-                      <span>{formatJuzhali(scheduleData[day]?.juzhali)}</span>
+                      <span>{formatJuzhali(row.juzhali)}</span>
                     ) : (
                       <JuzhaliPicker
-                        value={scheduleData[day]?.juzhali || ''}
-                        onChange={(val) => onCellChange(day, 'juzhali', val)}
-                        jadeedValue={scheduleData[day]?.jadeed || ''}
+                        value={row.juzhali || ''}
+                        onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
+                        jadeedValue={row.jadeed || ''}
                       />
                     )}
                   </td>
                 </>
               )}
               <td className="star-cell" data-label="Total">
-                <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(scheduleData[day], mode)} Pages to do</span>
+                <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(row, mode)} Pages to do</span>
               </td>
             </tr>
             );
@@ -975,7 +978,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   const fatemiDates = weekDays.map(d => getFatemiDateStr(d.toISOString().split('T')[0]));
 
   const renderDayCell = (day, dateObj, customFatemi, idx) => {
-    const dayKey = customDays ? `${day}_${idx}` : day;
+    const dayKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
     const row = scheduleData[dayKey] || scheduleData[day] || {};
     const dateStr = customDays
       ? dateObj?.date || ''
@@ -1126,7 +1129,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
 
   const dayObj = daysList[currentDayIndex];
   const day = dayObj?.dayName || '';
-  const dayKey = customDays ? `${day}_${currentDayIndex}` : day;
+  const dayKey = customDays && currentDayIndex >= 6 ? `${day}_${currentDayIndex}` : day;
   const row = scheduleData[dayKey] || scheduleData[day] || {};
   const fatemiDate = dayObj?.fatemiDate || '';
   const { date } = dayObj;
