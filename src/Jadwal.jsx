@@ -536,9 +536,6 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   });
 
   const containerWidth = style === 'calendar' ? 1100 : 850;
-  const bgImageStyle = t.backgroundUrl
-    ? `background-image: url('${t.backgroundUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat;`
-    : '';
 
   const contentCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; direction: ltr;";
   const arabicCss = "font-family: 'Kanz al Marjaan', serif; font-size: 14px; line-height: 1.6; direction: rtl;";
@@ -607,7 +604,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   };
 
   const pageFrameHtml = (inner) => `
-    <div style="border: 2px solid ${t.accentColor}; border-radius: 16px; padding: 30px; background: ${t.backgroundColor}; box-sizing: border-box; ${bgImageStyle}">
+    <div style="border: 2px solid ${t.accentColor}; border-radius: 16px; padding: 30px; box-sizing: border-box;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${t.accentColor}; padding-bottom: 20px; margin-bottom: 25px;">
         <div>
           <h1 style="margin: 0; font-size: 26px; color: ${t.primaryColor}; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">${t.pdfTitle}</h1>
@@ -634,7 +631,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     </div>`;
 
   const pageFrameNoHeaderHtml = (inner) => `
-    <div style="border: 2px solid ${t.accentColor}; border-radius: 16px; padding: 30px; background: ${t.backgroundColor}; box-sizing: border-box; ${bgImageStyle}">
+    <div style="border: 2px solid ${t.accentColor}; border-radius: 16px; padding: 30px; box-sizing: border-box;">
       ${inner}
     </div>`;
 
@@ -722,7 +719,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   for (let pi = 0; pi < pageGroups.length; pi++) {
     const group = pageGroups[pi];
     const container = document.createElement("div");
-    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
+    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;min-height:${pageLimit}px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
     const frameFn = pi === 0 ? pageFrameHtml : pageFrameNoHeaderHtml;
     if (style === 'calendar') {
       container.innerHTML = frameFn(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${group.join('')}</div>`);
