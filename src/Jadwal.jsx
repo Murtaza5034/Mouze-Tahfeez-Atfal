@@ -610,7 +610,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
           <h1 style="margin: 0; font-size: 26px; color: ${t.primaryColor}; font-family: 'Cinzel', serif; font-weight: bold; letter-spacing: 1px;">${t.pdfTitle}</h1>
            <p style="margin: 5px 0 0 0; font-size: 14px; color: ${t.accentColor}; font-weight: 600; letter-spacing: 0.5px;">${t.pdfSubtitle}</p>
         </div>
-        ${t.pdfLogoUrl ? `<div><img src="${t.pdfLogoUrl}" alt="Logo" style="height:90px; width:auto; object-fit:contain;" /></div>` : ''}
+        ${t.pdfLogoUrl ? `<div><img src="${t.pdfLogoUrl}" alt="Logo" style="height:120px; width:auto; object-fit:contain;" /></div>` : ''}
       </div>
       <div style="background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 18px 24px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
         <div>
