@@ -586,9 +586,9 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
   const containerWidth = style === 'calendar' ? 1100 : 850;
 
-  const contentCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; direction: ltr;";
-  const arabicCss = "font-family: 'Kanz al Marjaan', serif; font-size: 14px; line-height: 1.6; direction: rtl;";
-  const jadeedCss = "font-family: 'Kanz al Marjaan', serif; font-size: 14px; line-height: 1.6; direction: rtl;";
+  const contentCss = "font-family: 'Al-Kanz', 'Segoe UI', sans-serif; font-size: 19px; line-height: 1.6; direction: ltr;";
+  const arabicCss = "font-family: 'Kanz al Marjaan', serif; font-size: 19px; line-height: 1.6; direction: rtl;";
+  const jadeedCss = "font-family: 'Kanz al Marjaan', serif; font-size: 19px; line-height: 1.6; direction: rtl;";
 
   const buildCardHtml = (day, idx) => {
     const dataKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
@@ -607,21 +607,21 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
                 const formattedJuz = juzVal ? toArabicNum(juzVal) : '-';
                 return `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
                   <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">${label}</span>
-                  <span style="font-family: 'Al-Kanz', 'Kanz al Marjaan', serif; font-size: 14px; font-weight: 500; color: #333; direction: rtl;">${formattedJuz}</span>
+                  <span style="font-family: 'Al-Kanz', 'Kanz al Marjaan', serif; font-size: 19px; font-weight: 500; color: #333; direction: rtl;">${formattedJuz}</span>
                 </div>`;
               }).join('')
             : `<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
               <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">MURAJAH</span>
-              <span style="${arabicCss} font-size: 14px; font-weight: 500; color: #333;">${formatMurajah(row.murajah)}</span>
+              <span style="${arabicCss} font-size: 19px; font-weight: 500; color: #333;">${formatMurajah(row.murajah)}</span>
             </div>`
           }
           <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
             <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">JADEED</span>
-            <span style="${jadeedCss} color: #333;">${formatJadeed(row.jadeed)}</span>
+            <span style="${jadeedCss} font-size: 19px; color: #333;">${formatJadeed(row.jadeed)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(212, 175, 55, 0.15);">
             <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">JUZHALI</span>
-            <span style="${jadeedCss} font-size: 14px; font-weight: 500; color: #333;">${formatJuzhali(row.juzhali)}</span>
+            <span style="${jadeedCss} font-size: 19px; font-weight: 500; color: #333;">${formatJuzhali(row.juzhali)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; padding: 6px 0;">
             <span style="font-size: 11px; font-weight: 600; color: ${t.accentColor}; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL</span>
@@ -632,11 +632,11 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     const bg = idx % 2 === 0 ? t.backgroundColor : `${t.backgroundColor}f2`;
     const dayTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-weight: bold; font-size: 13px; color: ${t.primaryColor}; text-align: left;">${day}<div style="font-family: 'Kanz al Marjaan', serif; font-size: 11px; color: ${t.accentColor}; margin-top: 4px; direction: rtl;">${fatemiDates[idx]}</div></td>`;
     const totalTd = `<td style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 16px; color: #d4af37; font-weight: 700; text-align: center;">${calcTotalPages(row, mode)} Pages to do</td>`;
-    const tdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${contentCss}"`;
-    const arabicTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${arabicCss}"`;
-    const jadeedTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; ${jadeedCss}"`;
+    const tdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 19px; color: #333; text-align: center; font-weight: 500; ${contentCss}"`;
+    const arabicTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 19px; color: #333; text-align: center; font-weight: 500; ${arabicCss}"`;
+    const jadeedTdStyle = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 19px; color: #333; text-align: center; font-weight: 500; ${jadeedCss}"`;
     if (mode === 'juz-wise') {
-      const juzCss = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 14px; color: #333; text-align: center; font-weight: 500; font-family: 'Al-Kanz', 'Kanz al Marjaan', serif; direction: rtl;"`;
+      const juzCss = `style="padding: 12px 14px; border: 1px solid ${t.accentColor}; font-size: 19px; color: #333; text-align: center; font-weight: 500; font-family: 'Al-Kanz', 'Kanz al Marjaan', serif; direction: rtl;"`;
       return `<tr style="background: ${bg};">${dayTd}`
         + `<td ${juzCss}>${toArabicNum(row.juz1) || '-'}</td>`
         + `<td ${juzCss}>${toArabicNum(row.juz2) || '-'}</td>`
