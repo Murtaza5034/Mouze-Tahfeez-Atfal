@@ -891,7 +891,8 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   const fatemiDates = weekDays.map(d => getFatemiDateStr(d.toISOString().split('T')[0]));
 
   const renderDayCell = (day, dateObj, customFatemi, idx) => {
-    const row = scheduleData[day] || {};
+    const dayKey = customDays ? `${day}_${idx}` : day;
+    const row = scheduleData[dayKey] || scheduleData[day] || {};
     const dateStr = customDays
       ? dateObj?.date || ''
       : dateObj?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -921,7 +922,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
                   ) : (
                     <JuzSelect
                       value={row[juz] || ''}
-                      onChange={(val) => onCellChange(day, juz, val)}
+                      onChange={(val) => onCellChange(day, juz, val, idx)}
                     />
                   )}
                 </div>
@@ -935,7 +936,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
               ) : (
                 <SurahRangePicker
                   value={row.murajah || ''}
-                  onChange={(val) => onCellChange(day, 'murajah', val)}
+                  onChange={(val) => onCellChange(day, 'murajah', val, idx)}
                 />
               )}
             </div>
@@ -947,7 +948,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             ) : (
               <JadeedPicker
                 value={row.jadeed || ''}
-                onChange={(val) => onCellChange(day, 'jadeed', val)}
+                onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
               />
             )}
           </div>
@@ -958,7 +959,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             ) : (
               <JuzhaliPicker
                 value={row.juzhali || ''}
-                onChange={(val) => onCellChange(day, 'juzhali', val)}
+                onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
                 jadeedValue={row.jadeed || ''}
               />
             )}
@@ -1031,7 +1032,8 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
 
   const dayObj = daysList[currentDayIndex];
   const day = dayObj?.dayName || '';
-  const row = scheduleData[day] || {};
+  const dayKey = customDays ? `${day}_${currentDayIndex}` : day;
+  const row = scheduleData[dayKey] || scheduleData[day] || {};
   const fatemiDate = dayObj?.fatemiDate || '';
   const { date } = dayObj;
 
@@ -1064,7 +1066,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
           {getNavDayName(1)} <ChevronRight size={18} />
         </button>
       </div>
-      <div className="jadwal-single-day-card">
+        <div className="jadwal-single-day-card">
         <div className="jadwal-single-day-card-body">
           {mode === 'juz-wise' ? (
             ['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
@@ -1077,7 +1079,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
                   ) : (
                     <JuzSelect
                       value={row[juz] || ''}
-                      onChange={(val) => onCellChange(day, juz, val)}
+                      onChange={(val) => onCellChange(day, juz, val, currentDayIndex)}
                     />
                   )}
                 </div>
@@ -1091,7 +1093,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
               ) : (
                 <SurahRangePicker
                   value={row.murajah || ''}
-                  onChange={(val) => onCellChange(day, 'murajah', val)}
+                  onChange={(val) => onCellChange(day, 'murajah', val, currentDayIndex)}
                 />
               )}
             </div>
@@ -1103,7 +1105,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             ) : (
               <JadeedPicker
                 value={row.jadeed || ''}
-                onChange={(val) => onCellChange(day, 'jadeed', val)}
+                onChange={(val) => onCellChange(day, 'jadeed', val, currentDayIndex)}
               />
             )}
           </div>
@@ -1114,7 +1116,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             ) : (
               <JuzhaliPicker
                 value={row.juzhali || ''}
-                onChange={(val) => onCellChange(day, 'juzhali', val)}
+                onChange={(val) => onCellChange(day, 'juzhali', val, currentDayIndex)}
                 jadeedValue={row.jadeed || ''}
               />
             )}
@@ -1324,14 +1326,17 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
     setSaving(false);
   };
 
-  const handleCellChange = (day, field, value) => {
-    setScheduleData(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [field]: value
-      }
-    }));
+  const handleCellChange = (day, field, value, idx) => {
+    setScheduleData(prev => {
+      const key = customDays && idx >= 6 ? `${day}_${idx}` : day;
+      return {
+        ...prev,
+        [key]: {
+          ...(prev[key] || {}),
+          [field]: value
+        }
+      };
+    });
   };
 
   const selectedStudentObj = (students || []).find(s => String(s.student_id) === String(selectedStudentId));
@@ -1340,14 +1345,21 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const handleRepeatPattern = (daysList, blockStartIdx) => {
     if (!daysList || daysList.length < 7) return;
     setScheduleData(prev => {
+      const sourceData = {};
+      for (let i = 0; i < 6; i++) {
+        const sourceKey = typeof daysList[i] === 'string' ? daysList[i] : daysList[i].dayName;
+        if (prev[sourceKey]) {
+          sourceData[i] = { ...prev[sourceKey] };
+        }
+      }
       const updated = { ...prev };
       for (let i = 0; i < 6; i++) {
         const targetIdx = blockStartIdx + i;
         if (targetIdx >= daysList.length) break;
-        const sourceKey = typeof daysList[i] === 'string' ? daysList[i] : daysList[i].dayName;
-        const targetKey = typeof daysList[targetIdx] === 'string' ? daysList[targetIdx] : daysList[targetIdx].dayName;
-        if (updated[sourceKey]) {
-          updated[targetKey] = { ...updated[sourceKey] };
+        const dayName = typeof daysList[targetIdx] === 'string' ? daysList[targetIdx] : daysList[targetIdx].dayName;
+        const targetKey = `${dayName}_${targetIdx}`;
+        if (sourceData[i]) {
+          updated[targetKey] = { ...sourceData[i] };
         }
       }
       return updated;
