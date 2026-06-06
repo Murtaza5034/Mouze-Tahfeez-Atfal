@@ -3967,27 +3967,10 @@ function ParentPortal({
                           e.stopPropagation(); 
                           onDismissHomeNotif(news.id); 
                         }}
-                        style={{
-                          position: 'absolute',
-                          top: '12px',
-                          right: '12px',
-                          background: 'rgba(0,0,0,0.05)',
-                          border: 'none',
-                          borderRadius: '50%',
-                          width: '24px',
-                          height: '24px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          color: 'var(--text-muted)',
-                          zIndex: 2,
-                          transition: 'all 0.2s'
-                        }}
                       >
                         <X size={14} />
                       </button>
-                      <div style={{ paddingRight: '24px' }}>
+                      <div style={{ paddingRight: '48px' }}>
                         <div className="news-meta">
                           <span className="tag update">
                             Alert
@@ -9019,7 +9002,7 @@ onShowAction,
                   {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
                     const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
                     return (
-                      <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', padding: '16px', borderRadius: '12px', marginBottom: '12px', position: 'relative' }} onClick={(e) => openNotificationDetail(e, news)}>
+                      <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', marginBottom: '12px', position: 'relative' }} onClick={(e) => openNotificationDetail(e, news)}>
                         <button 
                           className="card-dismiss-btn" 
                           title="Clear from home" 
@@ -9027,27 +9010,10 @@ onShowAction,
                             e.stopPropagation(); 
                             onDismissHomeNotif(news.id); 
                           }}
-                          style={{
-                            position: 'absolute',
-                            top: '12px',
-                            right: '12px',
-                            background: 'rgba(0,0,0,0.05)',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '24px',
-                            height: '24px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: 'var(--text-muted)',
-                            zIndex: 2,
-                            transition: 'all 0.2s'
-                          }}
                         >
                           <X size={14} />
                         </button>
-                        <div style={{ paddingRight: '24px' }}>
+                        <div style={{ paddingRight: '48px' }}>
                           <div className="news-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
                             <span className="tag update" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--primary-gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
                               Alert
