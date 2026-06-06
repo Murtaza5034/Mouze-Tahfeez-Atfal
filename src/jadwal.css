@@ -126,6 +126,11 @@
   color: #333;
 }
 
+.jadwal-table select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .jadwal-table input:focus, .jadwal-table input:hover {
   background: #fff;
   border-color: var(--dark-gold);
@@ -493,7 +498,9 @@
 
 .jadwal-calendar-field input,
 .jadwal-calendar-field select {
-  width: 120px;
+  width: 100px;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 4px 8px;
   border: 1px solid transparent;
   background: var(--brown-light, #f5f0eb);
@@ -512,7 +519,9 @@
 }
 
 .jadwal-calendar-field .star-select {
-  width: 120px;
+  width: 100px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .jadwal-single-day-container {
@@ -569,7 +578,9 @@
 
 .jadwal-single-day-card-body .jadwal-calendar-field input,
 .jadwal-single-day-card-body .jadwal-calendar-field select {
-  width: 160px;
+  width: 130px;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 8px 12px;
 }
 
@@ -635,6 +646,15 @@
 .dark-mode .jadwal-style-select option {
   background: #222;
   color: #eee;
+}
+
+/* ---------- Schedule Mode Row ---------- */
+.jadwal-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 /* ========================================

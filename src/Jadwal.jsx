@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { jsPDF } from "jspdf";
@@ -872,7 +872,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
   );
 };
 
-const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compact, customDays }) => {
+const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compact, customDays, onRepeatPattern }) => {
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
 
   const getWeekDays = () => {
@@ -967,6 +967,20 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             <label>Total</label>
             <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(row, mode)} Pages to do</span>
           </div>
+          {customDays && !readOnly && idx % 6 === 0 && idx > 0 && (
+            <div style={{ marginTop: '10px', textAlign: 'center' }}>
+              <button
+                onClick={() => onRepeatPattern(customDays, idx)}
+                style={{
+                  padding: '6px 14px', borderRadius: '8px', border: '1px solid #d4af37',
+                  background: '#fdfaf4', color: '#5d4037', fontSize: '12px', fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap'
+                }}
+              >
+                ↻ Repeat Pattern
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1006,7 +1020,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   );
 };
 
-const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
+const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays, onRepeatPattern }) => {
   const daysList = customDays || DAYS.map((day, idx) => ({ dayName: day, date: '', fatemiDate: dayDates?.[idx] || '' }));
   const maxIdx = daysList.length - 1;
   const [currentDayIndex, setCurrentDayIndex] = useState(() => {
@@ -1110,6 +1124,20 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(row, mode)} Pages to do</span>
           </div>
         </div>
+        {customDays && !readOnly && currentDayIndex % 6 === 0 && currentDayIndex > 0 && (
+          <div style={{ marginTop: '14px', textAlign: 'center' }}>
+            <button
+              onClick={() => onRepeatPattern(customDays, currentDayIndex)}
+              style={{
+                padding: '6px 14px', borderRadius: '8px', border: '1px solid #d4af37',
+                background: '#fdfaf4', color: '#5d4037', fontSize: '12px', fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap'
+              }}
+            >
+              ↻ Repeat Pattern
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1186,6 +1214,9 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const autoSaveTimerRef = useRef(null);
+  const lastSavedSnapshotRef = useRef('');
+
   const displayStyle = settings?.jadwal_style || 'table';
   const [teacherDisplayStyle, setTeacherDisplayStyle] = useState(displayStyle);
   const teacherStyle = settings?.jadwal_teacher_style || 'default';
@@ -1208,6 +1239,35 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
     }
   }, [selectedStudentId]);
 
+  useEffect(() => {
+    if (!selectedStudentId) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    const currentSnapshot = JSON.stringify({ data: scheduleData, mode });
+    if (currentSnapshot === lastSavedSnapshotRef.current) return;
+
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (!selectedStudentId) return;
+      const { error } = await supabase
+        .from('jadawal')
+        .upsert({
+          student_id: selectedStudentId,
+          schedule_data: { ...scheduleData, _mode: mode },
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'student_id' });
+
+      if (error) {
+        console.error('Auto-save failed:', error);
+      } else {
+        lastSavedSnapshotRef.current = JSON.stringify({ data: scheduleData, mode });
+      }
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [scheduleData, mode, selectedStudentId]);
+
   const fetchJadwal = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -1222,48 +1282,43 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
     } else if (data && data.schedule_data) {
       const savedMode = data.schedule_data._mode || 'juz-wise';
       setMode(savedMode);
-      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
+      const loaded = { ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode };
+      setScheduleData(loaded);
+      lastSavedSnapshotRef.current = JSON.stringify({ data: loaded, mode: savedMode });
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
+      lastSavedSnapshotRef.current = JSON.stringify({ data: DEFAULT_SCHEDULE, mode: 'juz-wise' });
     }
     setLoading(false);
   };
 
-  const handleSave = async () => {
+  const handleNotifyParents = async () => {
     if (!selectedStudentId) return;
     setSaving(true);
-    const { error } = await supabase
-      .from('jadawal')
-      .upsert({
-        student_id: selectedStudentId,
-        schedule_data: { ...scheduleData, _mode: mode },
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'student_id' });
+    onShowAction('info', 'Sending notification to parents...');
 
-    if (error) {
-      console.error(error);
-      onShowAction('error', 'Failed to save Jadwal. Make sure you ran the SQL setup script.');
-    } else {
-      onShowAction('success', 'Jadwal saved successfully');
-      if (onBroadcastNotification) {
-        try {
-          const targetStudent = (students || []).find(s =>
-            String(s.student_id) === String(selectedStudentId) ||
-            (s.allIds && s.allIds.includes(String(selectedStudentId)))
+    if (onBroadcastNotification) {
+      try {
+        const targetStudent = (students || []).find(s =>
+          String(s.student_id) === String(selectedStudentId) ||
+          (s.allIds && s.allIds.includes(String(selectedStudentId)))
+        );
+        const parentId = targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email;
+        if (parentId) {
+          await onBroadcastNotification(
+            "Jadwal Timetable Updated 📅",
+            `The weekly Quran study schedule (Jadwal) for ${studentName} has been updated by the teacher. Tap to view.`,
+            "parents",
+            parentId,
+            "Jadwal"
           );
-          const parentId = targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email;
-          if (parentId) {
-            await onBroadcastNotification(
-              "Jadwal Timetable Updated 📅",
-              `The weekly Quran study schedule (Jadwal) for ${studentName} has been updated by the teacher. Tap to view.`,
-              "parents",
-              parentId,
-              "Jadwal"
-            );
-          }
-        } catch (e) {
-          console.warn("Jadwal notification failed:", e);
+          onShowAction('success', 'Parents notified successfully');
+        } else {
+          onShowAction('error', 'No parent found for this student');
         }
+      } catch (e) {
+        console.warn("Jadwal notification failed:", e);
+        onShowAction('error', 'Failed to send notification to parents');
       }
     }
     setSaving(false);
@@ -1282,6 +1337,23 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const selectedStudentObj = (students || []).find(s => String(s.student_id) === String(selectedStudentId));
   const studentName = selectedStudentObj ? (selectedStudentObj.full_name || selectedStudentObj.name) : "Student";
 
+  const handleRepeatPattern = (daysList, blockStartIdx) => {
+    if (!daysList || daysList.length < 7) return;
+    setScheduleData(prev => {
+      const updated = { ...prev };
+      for (let i = 0; i < 6; i++) {
+        const targetIdx = blockStartIdx + i;
+        if (targetIdx >= daysList.length) break;
+        const sourceKey = typeof daysList[i] === 'string' ? daysList[i] : daysList[i].dayName;
+        const targetKey = typeof daysList[targetIdx] === 'string' ? daysList[targetIdx] : daysList[targetIdx].dayName;
+        if (updated[sourceKey]) {
+          updated[targetKey] = { ...updated[sourceKey] };
+        }
+      }
+      return updated;
+    });
+  };
+
   const renderJadwalContent = () => {
     switch (teacherDisplayStyle) {
       case 'calendar':
@@ -1293,6 +1365,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             compact={isCompact}
             dayDates={dayDates}
             customDays={customDays}
+            onRepeatPattern={handleRepeatPattern}
           />
         );
       case 'single_day_card':
@@ -1303,6 +1376,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             onCellChange={handleCellChange}
             dayDates={dayDates}
             customDays={customDays}
+            onRepeatPattern={handleRepeatPattern}
           />
         );
       default:
@@ -1335,16 +1409,16 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
           </select>
           {selectedStudentId && (
             <div className="jadwal-actions-row">
-              <button className="jadwal-save-btn" onClick={handleSave} disabled={saving}>
+              <button className="jadwal-save-btn" onClick={handleNotifyParents} disabled={saving}>
                 {saving ? (
                   <>
                     <Loader2 className="animate-spin" size={16} />
-                    <span>Saving...</span>
+                    <span>Notifying...</span>
                   </>
                 ) : (
                   <>
                     <Save size={16} />
-                    <span>Save Jadwal</span>
+                    <span>Notify Parents</span>
                   </>
                 )}
               </button>
