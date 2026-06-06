@@ -399,16 +399,16 @@ const calcTotalPages = (row, mode) => {
   return murajahPages + juzhaliPages;
 };
 
-const JadeedPicker = ({ value, onChange }) => {
+const JadeedPicker = ({ value, onChange, defaultSurah }) => {
   const parts = (value || '').split(':');
-  const [surahNum, setSurahNum] = useState(parts[0] || '');
+  const [surahNum, setSurahNum] = useState(parts[0] || defaultSurah || '');
   const [ayahNum, setAyahNum] = useState(parts[1] || '');
 
   useEffect(() => {
     const p = (value || '').split(':');
-    setSurahNum(p[0] || '');
+    setSurahNum(p[0] || defaultSurah || '');
     setAyahNum(p[1] || '');
-  }, [value]);
+  }, [value, defaultSurah]);
 
   const surah = SURAH_AYAH_DATA.find(s => String(s.number) === surahNum);
   const ayahCount = surah?.ayahCount || 0;
@@ -797,6 +797,20 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
 const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
   const daysToRender = customDays || DAYS.map((day, idx) => ({ dayName: day, fatemiDate: dayDates?.[idx] || '' }));
+  
+  const defaultJadeedSurah = React.useMemo(() => {
+    for (const dayObj of daysToRender) {
+      const day = dayObj.dayName;
+      const idx = daysToRender.indexOf(dayObj);
+      const dataKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
+      const row = scheduleData[dataKey] || scheduleData[day] || {};
+      if (row && row.jadeed) {
+        return row.jadeed.split(':')[0];
+      }
+    }
+    return '';
+  }, [scheduleData, daysToRender, customDays]);
+
   return (
     <div className="jadwal-table-wrapper">
       <table className="jadwal-table">
@@ -892,6 +906,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                       <JadeedPicker
                         value={row.jadeed || ''}
                         onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
+                        defaultSurah={defaultJadeedSurah}
                       />
                     )}
                   </td>
@@ -926,6 +941,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                       <JadeedPicker
                         value={row.jadeed || ''}
                         onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
+                        defaultSurah={defaultJadeedSurah}
                       />
                     )}
                   </td>
@@ -971,6 +987,20 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
 
   const weekDays = getWeekDays();
   const fatemiDates = weekDays.map(d => getFatemiDateStr(d.toISOString().split('T')[0]));
+
+  const defaultJadeedSurah = React.useMemo(() => {
+    const daysArr = customDays || weekDays.map((d, i) => ({ dayName: DAYS[i] }));
+    for (const dayObj of daysArr) {
+      const day = dayObj.dayName;
+      const idx = daysArr.indexOf(dayObj);
+      const dayKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
+      const row = scheduleData[dayKey] || scheduleData[day] || {};
+      if (row && row.jadeed) {
+        return row.jadeed.split(':')[0];
+      }
+    }
+    return '';
+  }, [scheduleData, customDays, weekDays]);
 
   const renderDayCell = (day, dateObj, customFatemi, idx) => {
     const dayKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
@@ -1037,6 +1067,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
               <JadeedPicker
                 value={row.jadeed || ''}
                 onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
+                defaultSurah={defaultJadeedSurah}
               />
             )}
           </div>
