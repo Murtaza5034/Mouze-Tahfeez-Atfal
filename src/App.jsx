@@ -8146,146 +8146,164 @@ const handleDownloadAllReports = async () => {
               <section className="data-card card-appear">
                 <div className="card-headline">
                   <Eye size={18} />
-                  <h3>Jadwal PDF Preview</h3>
+                  <h3>Jadwal PDF Preview (A4)</h3>
                 </div>
                 <div style={{
                   padding: '20px',
                   fontFamily: (jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter').includes(',') ? jadwalSettingsDraft.jadwal_pdf_font_family : `'${jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter'}', 'Inter', sans-serif`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                 }}>
-                  {/* Mini PDF Preview Card */}
-                  <div style={{
-                    border: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    background: jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff',
-                    position: 'relative',
-                    minHeight: '320px'
-                  }}>
-                    {/* Background Image Layer */}
-                    {jadwalSettingsDraft.jadwal_pdf_background_url && (
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        backgroundImage: `url(${jadwalSettingsDraft.jadwal_pdf_background_url})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        opacity: 0.25,
-                        pointerEvents: 'none'
-                      }} />
-                    )}
-                    
-                    {/* Content */}
-                    <div style={{ position: 'relative', zIndex: 1, padding: '16px' }}>
-                      {/* Header */}
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        borderBottom: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
-                        paddingBottom: '12px',
-                        marginBottom: '14px'
-                      }}>
-                        <div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', letterSpacing: '0.5px' }}>
-                            {jadwalSettingsDraft.jadwal_pdf_title || 'MAUZE TAHFEEZ ATFAL'}
-                          </div>
-                          <div style={{ fontSize: '0.6rem', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 600, marginTop: '2px' }}>
-                            {jadwalSettingsDraft.jadwal_pdf_subtitle || 'Weekly Quran Jadwal'}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {jadwalSettingsDraft.jadwal_pdf_logo_url && (
-                            <img src={jadwalSettingsDraft.jadwal_pdf_logo_url} alt="Logo" style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
-                          )}
-                          <div style={{
-                            fontSize: '0.55rem',
-                            color: '#888',
-                            textAlign: 'right'
-                          }}>
-                            <div>Generated on</div>
-                            <div style={{ fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{new Date().toLocaleDateString()}</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Student Info Badge */}
-                      <div style={{
-                        background: `rgba(212, 175, 55, 0.05)`,
-                        border: `1px solid rgba(212, 175, 55, 0.2)`,
-                        borderRadius: '8px',
-                        padding: '8px 12px',
-                        marginBottom: '14px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}>
-                        <div>
-                          <div style={{ fontSize: '0.5rem', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>STUDENT NAME</div>
-                          <div style={{ fontSize: '0.75rem', color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', fontWeight: 800 }}>Abdullah Ahmad</div>
-                        </div>
+                  {/* A4 Preview Wrapper */}
+                  <div style={{ width: '100%', maxWidth: '480px', boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      aspectRatio: '210 / 297',
+                      width: '100%',
+                      border: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                      borderRadius: '4px',
+                      overflow: 'hidden',
+                      background: jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff',
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}>
+                      {/* Background Image Layer */}
+                      {jadwalSettingsDraft.jadwal_pdf_background_url && (
                         <div style={{
-                          fontSize: '0.55rem',
-                          fontWeight: 700,
-                          color: '#ffffff',
-                          background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037',
-                          padding: '3px 10px',
-                          borderRadius: '12px'
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundImage: `url(${jadwalSettingsDraft.jadwal_pdf_background_url})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          opacity: jadwalSettingsDraft.jadwal_pdf_background_opacity ?? 1,
+                          pointerEvents: 'none',
+                        }} />
+                      )}
+                      
+                      {/* Content */}
+                      <div style={{
+                        position: 'relative',
+                        zIndex: 1,
+                        padding: 'clamp(10px, 3.5%, 24px)',
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}>
+                        {/* Header */}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          borderBottom: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                          paddingBottom: 'clamp(6px, 2.5%, 14px)',
+                          marginBottom: 'clamp(8px, 2.5%, 16px)',
                         }}>
-                          {jadwalSettingsDraft.jadwal_pdf_hifz_program || 'Hifz Program'}
+                          <div>
+                            <div style={{ fontSize: 'clamp(0.55rem, 2.2vw, 0.95rem)', fontWeight: 800, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', letterSpacing: '0.5px' }}>
+                              {jadwalSettingsDraft.jadwal_pdf_title || 'MAUZE TAHFEEZ ATFAL'}
+                            </div>
+                            <div style={{ fontSize: 'clamp(0.4rem, 1.5vw, 0.65rem)', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 600, marginTop: '2px' }}>
+                              {jadwalSettingsDraft.jadwal_pdf_subtitle || 'Weekly Quran Jadwal'}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1.5vw, 10px)' }}>
+                            {jadwalSettingsDraft.jadwal_pdf_logo_url && (
+                              <img src={jadwalSettingsDraft.jadwal_pdf_logo_url} alt="Logo" style={{ height: 'clamp(20px, 6vw, 45px)', width: 'auto', objectFit: 'contain' }} />
+                            )}
+                            <div style={{ fontSize: 'clamp(0.35rem, 1.2vw, 0.55rem)', color: '#888', textAlign: 'right', lineHeight: 1.3 }}>
+                              <div>Generated on</div>
+                              <div style={{ fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{new Date().toLocaleDateString()}</div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Mini Table */}
-                      <div style={{ overflow: 'hidden', borderRadius: '6px', border: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.55rem' }}>
-                          <thead>
-                            <tr style={{ background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#ffffff' }}>
-                              <th style={{ padding: '6px 8px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'left', fontWeight: 700, textTransform: 'uppercase' }}>DAYS</th>
-                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 1</th>
-                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 2</th>
-                              <th style={{ padding: '6px 4px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JADEED</th>
-                              <th style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JUZHALI</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[
-                              { day: 'MONDAY', cells: ['1-5', '6-10', '1-3', '1-8'] },
-                              { day: 'TUESDAY', cells: ['11-15', '16-20', '4-6', '9-16'] },
-                              { day: 'WEDNESDAY', cells: ['21-25', '26-30', '7-9', '17-24'] },
-                            ].map((row, idx) => (
-                              <tr key={row.day} style={{ background: idx % 2 === 0 ? (jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff') : `${jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff'}f2` }}>
-                                <td style={{ padding: '5px 8px', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, borderBottom: idx < 2 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{row.day}</td>
-                                {row.cells.map((cell, ci) => (
-                                  <td key={ci} style={{ padding: '5px 4px', borderRight: ci < 4 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', borderBottom: idx < 2 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', textAlign: 'center', color: '#333' }}>{cell}</td>
-                                ))}
+                        {/* Student Info Badge */}
+                        <div style={{
+                          background: `rgba(212, 175, 55, 0.05)`,
+                          border: `1px solid rgba(212, 175, 55, 0.2)`,
+                          borderRadius: 'clamp(4px, 1.5vw, 8px)',
+                          padding: 'clamp(5px, 2%, 12px) clamp(8px, 2.5%, 16px)',
+                          marginBottom: 'clamp(8px, 2.5%, 16px)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}>
+                          <div>
+                            <div style={{ fontSize: 'clamp(0.3rem, 1.2vw, 0.5rem)', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>STUDENT NAME</div>
+                            <div style={{ fontSize: 'clamp(0.45rem, 2vw, 0.8rem)', color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', fontWeight: 800, marginTop: '1px' }}>Abdullah Ahmad</div>
+                          </div>
+                          <div style={{
+                            fontSize: 'clamp(0.35rem, 1.3vw, 0.6rem)',
+                            fontWeight: 700,
+                            color: '#ffffff',
+                            background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037',
+                            padding: 'clamp(2px, 0.8vw, 6px) clamp(6px, 2vw, 14px)',
+                            borderRadius: 'clamp(6px, 2vw, 14px)',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {jadwalSettingsDraft.jadwal_pdf_hifz_program || 'Hifz Program'}
+                          </div>
+                        </div>
+
+                        {/* Mini Table */}
+                        <div style={{ overflow: 'hidden', borderRadius: 'clamp(3px, 1vw, 6px)', border: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'clamp(0.35rem, 1.3vw, 0.6rem)' }}>
+                            <thead>
+                              <tr style={{ background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#ffffff' }}>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(4px, 1.5vw, 10px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'left', fontWeight: 700, textTransform: 'uppercase' }}>DAYS</th>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(2px, 1vw, 6px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 1</th>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(2px, 1vw, 6px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 2</th>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(2px, 1vw, 6px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JADEED</th>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(2px, 1vw, 6px)', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JUZHALI</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody>
+                              {[
+                                { day: 'MONDAY', cells: ['1-5', '6-10', '1-3', '1-8'] },
+                                { day: 'TUESDAY', cells: ['11-15', '16-20', '4-6', '9-16'] },
+                                { day: 'WEDNESDAY', cells: ['21-25', '26-30', '7-9', '17-24'] },
+                              ].map((row, idx) => (
+                                <tr key={row.day} style={{ background: idx % 2 === 0 ? (jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff') : `${jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff'}f2` }}>
+                                  <td style={{ padding: 'clamp(3px, 1vw, 8px) clamp(4px, 1.5vw, 10px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, borderBottom: idx < 2 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{row.day}</td>
+                                  {row.cells.map((cell, ci) => (
+                                    <td key={ci} style={{ padding: 'clamp(3px, 1vw, 8px) clamp(2px, 0.8vw, 6px)', borderRight: ci < 4 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', borderBottom: idx < 2 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', textAlign: 'center', color: '#333' }}>{cell}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
 
-                      {/* Footer */}
-                      <div style={{ marginTop: '12px', borderTop: `1px dashed ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, paddingTop: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.5rem', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontStyle: 'italic', fontWeight: 600 }}>
-                          "And We have indeed made the Quran easy to understand and remember..."
+                        {/* Spacer to push footer down */}
+                        <div style={{ flex: 1 }} />
+
+                        {/* Footer */}
+                        <div style={{ marginTop: 'clamp(6px, 2%, 14px)', borderTop: `1px dashed ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, paddingTop: 'clamp(4px, 1.5%, 10px)', textAlign: 'center' }}>
+                          <div style={{ fontSize: 'clamp(0.3rem, 1.2vw, 0.5rem)', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontStyle: 'italic', fontWeight: 600 }}>
+                            "And We have indeed made the Quran easy to understand and remember..."
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ marginTop: '12px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#fff' }}>
+                  <div style={{ marginTop: '14px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#fff' }}>
                         Primary
                       </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', color: '#2c1e11' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', color: '#2c1e11' }}>
                         Accent
                       </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: jadwalSettingsDraft.jadwal_pdf_background_color || '#fff', border: '1px solid #ddd', color: '#666' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: jadwalSettingsDraft.jadwal_pdf_background_color || '#fff', border: '1px solid #ddd', color: '#666' }}>
                         Background
                       </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: '#f0f0f0', color: '#555' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: '#f0f0f0', color: '#555' }}>
                         {(jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter').replace(/'/g, '')}
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: '#e8f0fe', color: '#1a56db' }}>
+                        Opacity: {Math.round((jadwalSettingsDraft.jadwal_pdf_background_opacity ?? 1) * 100)}%
                       </span>
                     </div>
                   </div>
