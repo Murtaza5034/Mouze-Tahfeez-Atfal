@@ -187,10 +187,17 @@ const getAyahPage = (surahNum, ayahNum) => {
   if (idx === -1) return 1;
   const surah = SURAH_AYAH_DATA[idx];
   const startPage = getSurahPage(surahNum);
-  const endPage = idx < SURAH_AYAH_DATA.length - 1
-    ? getSurahPage(SURAH_AYAH_DATA[idx + 1].number) - 1
-    : 604;
-  const totalPages = endPage - startPage + 1;
+  let endPage = 604;
+  if (idx < SURAH_AYAH_DATA.length - 1) {
+    for (let i = idx + 1; i < SURAH_AYAH_DATA.length; i++) {
+      const nextStart = getSurahPage(SURAH_AYAH_DATA[i].number);
+      if (nextStart > startPage) {
+        endPage = nextStart - 1;
+        break;
+      }
+    }
+  }
+  const totalPages = Math.max(1, endPage - startPage + 1);
   const aN = Math.min(Math.max(1, Number(ayahNum)), surah.ayahCount);
   const pageOffset = Math.floor(((aN - 1) / surah.ayahCount) * totalPages);
   return Math.min(startPage + pageOffset, endPage);
@@ -337,10 +344,41 @@ const calcTotalPages = (row, mode) => {
           if (startSurah && endSurah) {
             const startPage = SURAH_PAGE_MAP[startSurah.number] || 1;
             const endIdx = SURAH_AYAH_DATA.findIndex(s => s.number === endSurah.number);
-            const endPage = endIdx < SURAH_AYAH_DATA.length - 1
-              ? (SURAH_PAGE_MAP[SURAH_AYAH_DATA[endIdx + 1].number] || 1) - 1
-              : 604;
-            if (endPage >= startPage) murajahPages = endPage - startPage + 1;
+            let endPage = 604;
+            if (endIdx < SURAH_AYAH_DATA.length - 1) {
+              const endStartPage = SURAH_PAGE_MAP[endSurah.number] || 1;
+              for (let i = endIdx + 1; i < SURAH_AYAH_DATA.length; i++) {
+                const nextStart = SURAH_PAGE_MAP[SURAH_AYAH_DATA[i].number];
+                if (nextStart > endStartPage) {
+                  endPage = nextStart - 1;
+                  break;
+                }
+              }
+            }
+            const fromPage = Math.min(startPage, endPage);
+            const toPage = Math.max(startPage, endPage);
+            murajahPages = toPage - fromPage + 1;
+          }
+        } else {
+          // Single surah
+          const surah = findSurahByName(val);
+          if (surah) {
+            const startPage = SURAH_PAGE_MAP[surah.number] || 1;
+            const idx = SURAH_AYAH_DATA.findIndex(s => s.number === surah.number);
+            let endPage = 604;
+            if (idx < SURAH_AYAH_DATA.length - 1) {
+              const endStartPage = SURAH_PAGE_MAP[surah.number] || 1;
+              for (let i = idx + 1; i < SURAH_AYAH_DATA.length; i++) {
+                const nextStart = SURAH_PAGE_MAP[SURAH_AYAH_DATA[i].number];
+                if (nextStart > endStartPage) {
+                  endPage = nextStart - 1;
+                  break;
+                }
+              }
+            }
+            const fromPage = Math.min(startPage, endPage);
+            const toPage = Math.max(startPage, endPage);
+            murajahPages = toPage - fromPage + 1;
           }
         }
       }
