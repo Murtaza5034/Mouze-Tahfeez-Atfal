@@ -123,6 +123,7 @@ const JADWAL_SETTING_DEFAULTS = {
   jadwal_pdf_accent_color: '#d4af37',
   jadwal_pdf_background_color: '#ffffff',
   jadwal_pdf_background_url: '',
+  jadwal_pdf_background_opacity: 1,
   jadwal_pdf_font_family: 'Inter',
   jadwal_type: 'weekly',
   jadwal_week_start: '',
@@ -7702,6 +7703,7 @@ const handleDownloadAllReports = async () => {
                       jadwal_pdf_accent_color: jadwalSettingsDraft.jadwal_pdf_accent_color,
                       jadwal_pdf_background_color: jadwalSettingsDraft.jadwal_pdf_background_color,
                       jadwal_pdf_background_url: jadwalSettingsDraft.jadwal_pdf_background_url,
+                      jadwal_pdf_background_opacity: jadwalSettingsDraft.jadwal_pdf_background_opacity,
                       jadwal_pdf_font_family: jadwalSettingsDraft.jadwal_pdf_font_family,
                       jadwal_type: jadwalSettingsDraft.jadwal_type,
                       jadwal_week_start: jadwalSettingsDraft.jadwal_week_start,
@@ -7931,6 +7933,26 @@ const handleDownloadAllReports = async () => {
                           <img src={jadwalSettingsDraft.jadwal_pdf_background_url} alt="Jadwal background preview" style={{ width: '100%', height: '80px', objectFit: 'cover', display: 'block' }} />
                         </div>
                       )}
+                    </label>
+                    <label>
+                      <span>Background Opacity</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="1"
+                          step="0.05"
+                          value={jadwalSettingsDraft.jadwal_pdf_background_opacity ?? 1}
+                          onChange={(e) => updateJadwalDraft("jadwal_pdf_background_opacity")({ target: { value: parseFloat(e.target.value) } })}
+                          style={{ flex: 1 }}
+                        />
+                        <span style={{ minWidth: '40px', fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.95rem' }}>
+                          {Math.round((jadwalSettingsDraft.jadwal_pdf_background_opacity ?? 1) * 100)}%
+                        </span>
+                      </div>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Adjust the visibility of the background image (100% = fully opaque, 10% = barely visible).
+                      </small>
                     </label>
                   </div>
 

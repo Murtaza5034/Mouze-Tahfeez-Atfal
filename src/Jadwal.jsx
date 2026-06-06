@@ -31,11 +31,17 @@ const FONT_FACE_CSS = `
 }
 `;
 
+const hexToRgb = (hex) => {
+  const c = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '#ffffff');
+  return c ? `${parseInt(c[1], 16)},${parseInt(c[2], 16)},${parseInt(c[3], 16)}` : '255,255,255';
+};
+
 const getDefaultTheme = () => ({
   primaryColor: '#5d4037',
   accentColor: '#d4af37',
   backgroundColor: '#ffffff',
   backgroundUrl: '',
+  backgroundOpacity: 1,
   fontFamily: 'Inter',
 });
 
@@ -505,6 +511,10 @@ const SurahRangePicker = ({ value, onChange }) => {
 
 const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', theme = {}, style = 'table', dayDates = []) => {
   const t = { ...getDefaultTheme(), ...theme };
+  const bgRgb = hexToRgb(t.backgroundColor);
+  const bgCss = t.backgroundUrl
+    ? `background-image:linear-gradient(rgba(${bgRgb},${1 - (t.backgroundOpacity ?? 1)}),rgba(${bgRgb},${1 - (t.backgroundOpacity ?? 1)})),url('${t.backgroundUrl}');background-size:cover;background-position:center;`
+    : '';
   const pdfDays = (() => {
     if (t.jadwalType === 'miqaat' && t.weekStart && t.weekEnd) {
       const s = new Date(t.weekStart + 'T00:00:00Z');
@@ -683,7 +693,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
   // Measure-based page splitting for both styles
   const measureEl = document.createElement("div");
-  measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
+  measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
   document.body.appendChild(measureEl);
 
   const pageLimit = (containerWidth + 80) * (297 / 210);
@@ -719,7 +729,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   for (let pi = 0; pi < pageGroups.length; pi++) {
     const group = pageGroups[pi];
     const container = document.createElement("div");
-    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;min-height:${pageLimit}px;background:${t.backgroundColor};background-size:cover;background-position:center;font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;${t.backgroundUrl ? `background-image:url('${t.backgroundUrl}');` : ''}`;
+    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;min-height:${pageLimit}px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
     const frameFn = pi === 0 ? pageFrameHtml : pageFrameNoHeaderHtml;
     if (style === 'calendar') {
       container.innerHTML = frameFn(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${group.join('')}</div>`);
@@ -1155,6 +1165,7 @@ const getJadwalThemeFromSettings = (settings = {}) => ({
   accentColor: settings.jadwal_pdf_accent_color || '#d4af37',
   backgroundColor: settings.jadwal_pdf_background_color || '#ffffff',
   backgroundUrl: settings.jadwal_pdf_background_url || '',
+  backgroundOpacity: settings.jadwal_pdf_background_opacity != null ? settings.jadwal_pdf_background_opacity : 1,
   fontFamily: settings.jadwal_pdf_font_family || 'Inter',
   jadwalType: settings.jadwal_type || 'weekly',
   weekStart: settings.jadwal_week_start || '',

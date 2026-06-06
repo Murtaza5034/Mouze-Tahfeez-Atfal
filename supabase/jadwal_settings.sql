@@ -16,7 +16,8 @@ create table if not exists public.jadwal_settings (
   jadwal_pdf_subtitle text default 'Weekly Quran Jadwal (Timetable)',
   jadwal_pdf_academic_portal text default 'ACADEMIC PORTAL',
   jadwal_pdf_hifz_program text default 'Hifz Program',
-  jadwal_pdf_logo_url text default ''
+  jadwal_pdf_logo_url text default '',
+  jadwal_pdf_background_opacity real default 1
 );
 
 insert into public.jadwal_settings (id)
