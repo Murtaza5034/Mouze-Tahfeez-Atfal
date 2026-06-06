@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { JadwalNotes } from "./JadwalNotes";
@@ -808,10 +808,26 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
             <>
               <tr>
                 <th rowSpan="2">Days</th>
-                <th colSpan="4" style={{ textAlign: 'center', borderBottom: 'none' }}>Murajah</th>
-                <th rowSpan="2">Jadeed</th>
-                <th rowSpan="2">Juzhali</th>
-                <th rowSpan="2">Total</th>
+                <th colSpan="4" style={{ textAlign: 'center', borderBottom: 'none' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                    <BookOpen size={14} /> <span>Murajah</span>
+                  </div>
+                </th>
+                <th rowSpan="2">
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center', flexDirection: 'column' }}>
+                    <Sparkles size={14} /> <span>Jadeed</span>
+                  </div>
+                </th>
+                <th rowSpan="2">
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center', flexDirection: 'column' }}>
+                    <Repeat size={14} /> <span>Juzhali</span>
+                  </div>
+                </th>
+                <th rowSpan="2">
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center', flexDirection: 'column' }}>
+                    <Calculator size={14} /> <span>Total</span>
+                  </div>
+                </th>
               </tr>
               <tr>
                 <th>1</th>
@@ -823,10 +839,26 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
           ) : (
             <tr>
               <th>Days</th>
-              <th>Murajah</th>
-              <th>Jadeed</th>
-              <th>Juzhali</th>
-              <th>Total</th>
+              <th>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                  <BookOpen size={14} /> <span>Murajah</span>
+                </div>
+              </th>
+              <th>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                  <Sparkles size={14} /> <span>Jadeed</span>
+                </div>
+              </th>
+              <th>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                  <Repeat size={14} /> <span>Juzhali</span>
+                </div>
+              </th>
+              <th>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                  <Calculator size={14} /> <span>Total</span>
+                </div>
+              </th>
             </tr>
           )}
         </thead>
@@ -968,7 +1000,9 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
               const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
               return (
                   <div className="jadwal-calendar-field" key={juz}>
-                  <label>{label}</label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>{label}</span>
+                  </label>
                   {readOnly ? (
                     <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(row[juz]) || '-'}</span>
                   ) : (
@@ -982,7 +1016,9 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             })
           ) : (
             <div className="jadwal-calendar-field">
-              <label>Murajah</label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>Murajah</span>
+              </label>
               {readOnly ? (
                 <span>{row.murajah || '-'}</span>
               ) : (
@@ -994,7 +1030,9 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             </div>
           )}
           <div className="jadwal-calendar-field">
-            <label>Jadeed</label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={13} style={{ flexShrink: 0 }} /> <span>Jadeed</span>
+            </label>
             {readOnly ? (
               <span>{row.jadeed || '-'}</span>
             ) : (
@@ -1005,7 +1043,9 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             )}
           </div>
           <div className="jadwal-calendar-field">
-            <label>Juzhali</label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Repeat size={13} style={{ flexShrink: 0 }} /> <span>Juzhali</span>
+            </label>
             {readOnly ? (
               <span>{formatJuzhali(row.juzhali)}</span>
             ) : (
@@ -1017,7 +1057,9 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             )}
           </div>
           <div className="jadwal-calendar-field">
-            <label>Total</label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Calculator size={13} style={{ flexShrink: 0 }} /> <span>Total</span>
+            </label>
             <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(row, mode)} Pages to do</span>
           </div>
           {customDays && !readOnly && idx % 6 === 0 && idx > 0 && (
@@ -1125,7 +1167,9 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
               const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
               return (
                 <div className="jadwal-calendar-field" key={juz}>
-                  <label>{label}</label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>{label}</span>
+                  </label>
                   {readOnly ? (
                     <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(row[juz]) || '-'}</span>
                   ) : (
@@ -1139,7 +1183,9 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             })
           ) : (
             <div className="jadwal-calendar-field">
-              <label>Murajah</label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>Murajah</span>
+              </label>
               {readOnly ? (
                 <span>{row.murajah || '-'}</span>
               ) : (
@@ -1151,7 +1197,9 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             </div>
           )}
           <div className="jadwal-calendar-field">
-            <label>Jadeed</label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={13} style={{ flexShrink: 0 }} /> <span>Jadeed</span>
+            </label>
             {readOnly ? (
               <span>{row.jadeed || '-'}</span>
             ) : (
@@ -1162,7 +1210,9 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             )}
           </div>
           <div className="jadwal-calendar-field">
-            <label>Juzhali</label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Repeat size={13} style={{ flexShrink: 0 }} /> <span>Juzhali</span>
+            </label>
             {readOnly ? (
               <span>{formatJuzhali(row.juzhali)}</span>
             ) : (
@@ -1174,7 +1224,9 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             )}
           </div>
           <div className="jadwal-calendar-field">
-            <label>Total</label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Calculator size={13} style={{ flexShrink: 0 }} /> <span>Total</span>
+            </label>
             <span style={{ fontWeight: 700, color: '#d4af37', fontSize: '16px' }}>{calcTotalPages(row, mode)} Pages to do</span>
           </div>
         </div>
