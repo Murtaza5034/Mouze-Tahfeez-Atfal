@@ -2512,7 +2512,7 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
   );
 }
 
-function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false }) {
+function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false, rankImproved = false }) {
   const report = normalizeReportSettings(settings);
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
   const hMain = report.main_heading;
@@ -2597,7 +2597,19 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
                   <span style={{ fontSize: '32px', lineHeight: '70px', color: 'var(--soft-brown)' }}>👤</span>
                 )}
               </div>
-              <span className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold' }}>{student?.arabic_name ? fixArabicScript(student.arabic_name) : student?.name}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold' }}>{student?.arabic_name ? fixArabicScript(student.arabic_name) : student?.name}</span>
+                {rankImproved && (
+                  <lottie-player
+                    src="/11eb8d74-1187-11ee-95e9-a721cfe73700.json"
+                    background="transparent"
+                    speed="1"
+                    style={{ width: "40px", height: "40px", flexShrink: 0 }}
+                    loop
+                    autoplay
+                  ></lottie-player>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -3471,6 +3483,27 @@ function ParentPortal({
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
   const reportSettingsObject = getReportSettingsObject(reportSettings);
 
+  const currentRank = weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank;
+  const studentId = studentProfile?.student_id;
+  let rankImproved = false;
+  if (currentRank && studentId) {
+    const studentResults = (schoolData.weeklyResults || []).filter(r =>
+      String(r.student_id).trim().toLowerCase() === String(studentId).trim().toLowerCase()
+    ).sort((a, b) => new Date(b.week_date) - new Date(a.week_date));
+    const previousResult = studentResults.length > 1 ? studentResults[1] : null;
+    if (previousResult) {
+      const weekResults = (schoolData.weeklyResults || []).filter(r => r.week_date === previousResult.week_date);
+      const sortedWeek = [...weekResults].sort((a, b) => (Number(b.total_score) || 0) - (Number(a.total_score) || 0));
+      const prevIdx = sortedWeek.findIndex(r =>
+        String(r.student_id).trim().toLowerCase() === String(studentId).trim().toLowerCase()
+      );
+      if (prevIdx >= 0) {
+        const previousRank = prevIdx + 1;
+        if (currentRank < previousRank) rankImproved = true;
+      }
+    }
+  }
+
   // Track parent viewing on Child Summary page
   useEffect(() => {
     setParentViewedStatus(false);
@@ -4131,6 +4164,7 @@ function ParentPortal({
                   parentViewed={parentViewedStatus}
                   timerSeconds={secondsSpent}
                   isParentPortal={true}
+                  rankImproved={rankImproved}
                 />
               );
             })()}
@@ -4162,6 +4196,7 @@ function ParentPortal({
                     settings={reportSettingsObject}
                     parentViewed={parentViewedStatus}
                     isParentPortal={true}
+                    rankImproved={rankImproved}
                   />
                 </div>
               )}
