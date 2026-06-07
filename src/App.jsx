@@ -1,6 +1,7 @@
 import "./style.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import lottie from "lottie-web";
+import trophyAnimationData from "../public/Trophyanimation.json";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -79,7 +80,7 @@ const LottieTrophy = ({ size = 120 }) => {
       renderer: 'svg',
       loop: true,
       autoplay: true,
-      path: '/Trophyanimation.json'
+      animationData: trophyAnimationData
     });
     return () => anim.destroy();
   }, []);
