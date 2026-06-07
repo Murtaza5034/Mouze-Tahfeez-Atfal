@@ -1,7 +1,5 @@
 import "./style.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
-import lottie from "lottie-web";
-import trophyAnimationData from "../public/Trophyanimation.json";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -72,19 +70,16 @@ import "./parent-portal.css";
 import "./marhala-posts.css";
 
 const LottieTrophy = ({ size = 120 }) => {
-  const container = useRef(null);
-  useEffect(() => {
-    if (!container.current) return;
-    const anim = lottie.loadAnimation({
-      container: container.current,
-      renderer: 'svg',
-      loop: true,
-      autoplay: true,
-      animationData: trophyAnimationData
-    });
-    return () => anim.destroy();
-  }, []);
-  return <div ref={container} style={{ width: size, height: size, flexShrink: 0 }} />;
+  return (
+    <lottie-player
+      src="/Trophyanimation.json"
+      background="transparent"
+      speed="1"
+      style={{ width: `${size}px`, height: `${size}px`, flexShrink: 0 }}
+      loop
+      autoplay
+    ></lottie-player>
+  );
 };
 
 const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
