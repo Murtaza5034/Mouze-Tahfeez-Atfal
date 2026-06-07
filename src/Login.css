@@ -32,6 +32,11 @@
   background: linear-gradient(90deg, var(--primary-gold), var(--dark-gold));
 }
 
+.welcome-animation {
+  max-width: 260px;
+  margin: 0 auto 10px;
+}
+
 .login-header {
   margin-bottom: 40px;
 }

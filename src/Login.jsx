@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { AlertCircle, Loader2, Lock, LogIn, Mail, ShieldCheck, Users } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import lottie from "lottie-web";
 import "./Login.css";
 import "./parent-portal.css";
 
@@ -34,6 +35,7 @@ export default function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const welcomeRef = useRef(null);
   const [rememberMe, setRememberMe] = useState(() => {
     return localStorage.getItem("mauze-remember-me") !== "false";
   });
@@ -41,6 +43,17 @@ export default function Login({ onLoginSuccess }) {
   useEffect(() => {
     const savedTheme = localStorage.getItem("mauze-app-theme") || "ashara";
     document.body.setAttribute("data-theme", savedTheme);
+  }, []);
+
+  useEffect(() => {
+    const anim = lottie.loadAnimation({
+      container: welcomeRef.current,
+      renderer: "svg",
+      loop: true,
+      autoplay: true,
+      path: "/Welcome.json",
+    });
+    return () => anim.destroy();
   }, []);
 
   const activeRole = ROLE_OPTIONS.find((option) => option.id === selectedRole);
@@ -77,6 +90,7 @@ export default function Login({ onLoginSuccess }) {
           <div className="logo-wrapper">
             <img src="/logo.png" alt="Mauze Tahfeez" className="app-logo" />
           </div>
+          <div ref={welcomeRef} className="welcome-animation" />
           <h1>{activeRole.title}</h1>
           <p>{activeRole.description}</p>
         </div>

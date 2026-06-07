@@ -3401,6 +3401,7 @@ function ParentPortal({
   activePage,
   parentData,
   setActivePage,
+  onSearchSelect,
   user,
   loading,
   menuOpen,
@@ -3879,7 +3880,7 @@ function ParentPortal({
                { label: "My Profile", value: "Profile" },
                { label: "App Settings", value: "Settings" }
              ]} 
-             onSelect={setActivePage} 
+             onSelect={onSearchSelect} 
            />
         )}
         {activePage === "Schedule" ? (
@@ -4820,6 +4821,7 @@ function AdminPortal({
   setMenuOpen,
   setSelectedStudentId,
   setActivePage,
+  onSearchSelect,
   onRoleChange,
   user,
   onAssignChild,
@@ -5560,10 +5562,10 @@ const handleDownloadAllReports = async () => {
                  { label: "Faculty Attendance", value: "Faculty" },
                  { label: "Notifications Hub", value: "Notifications" },
                  { label: "Master Schedule", value: "Schedule" },
-                 { label: "Support Tickets", value: "User Issues" }
-               ]} 
-               onSelect={setActivePage} 
-             />
+                { label: "Support Tickets", value: "User Issues" }
+              ]} 
+              onSelect={onSearchSelect} 
+              />
           )}
           {actionMessage && (
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
@@ -5844,7 +5846,18 @@ const handleDownloadAllReports = async () => {
                     </div>
                     <div className="ig-top-row">
                       <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
-                        <Icon size={18} />
+                        {stat.label === "Students" ? (
+                          <lottie-player
+                            src="/75d381a6-1151-11ee-b2bc-779f96f074bf.json"
+                            background="transparent"
+                            speed="1"
+                            style={{ width: "48px", height: "48px" }}
+                            loop
+                            autoplay
+                          ></lottie-player>
+                        ) : (
+                          <Icon size={18} />
+                        )}
                       </div>
                       {isParentViews && pct !== null && (
                         <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
@@ -8612,6 +8625,7 @@ function TeacherPortal({
   onTeacherResultSubmit,
   onRoleChange,
   setActivePage,
+  onSearchSelect,
   setMenuOpen,
   teacherData,
   teacherForms,
@@ -8934,10 +8948,10 @@ onShowAction,
                  { label: "Mark Progress (Result)", value: "Fill Result" },
                  { label: "Performance Overview", value: "Overview" },
                  { label: "Announcements", value: "Announcements" },
-                 { label: "My Profile", value: "Profile" }
-               ]} 
-               onSelect={setActivePage} 
-             />
+                  { label: "My Profile", value: "Profile" }
+                ]} 
+              onSelect={onSearchSelect} 
+              />
           )}
           {actionMessage && (
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
@@ -8985,7 +8999,16 @@ onShowAction,
                       </div>
                       <div className="ig-top-row">
                         <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
-                          {stat.icon === 'Users' && <Users size={18} />}
+                          {stat.label === "Students" ? (
+                            <lottie-player
+                              src="/75d381a6-1151-11ee-b2bc-779f96f074bf.json"
+                              background="transparent"
+                              speed="1"
+                              style={{ width: "48px", height: "48px" }}
+                              loop
+                              autoplay
+                            ></lottie-player>
+                          ) : stat.icon === 'Users' && <Users size={18} />}
                           {stat.icon === 'FileText' && <FileText size={18} />}
                           {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
                           {stat.icon === 'Eye' && <Eye size={18} />}
@@ -9755,7 +9778,17 @@ export default function App() {
     return "parents"; // Start with a safe default, will be overridden by auth
   });
   const [activePage, setActivePage] = useState(DEFAULT_PAGE_BY_ROLE.parents);
+  const [searchPageLoading, setSearchPageLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleSearchSelect = (page) => {
+    setSearchPageLoading(true);
+    setTimeout(() => setActivePage(page), 50);
+  };
+
+  useEffect(() => {
+    setSearchPageLoading(false);
+  }, [activePage]);
 
   useEffect(() => {
     // Cleanup old service workers (like OneSignal) to prevent conflicts with FCM
@@ -11954,6 +11987,7 @@ const handleSendCustomNotification = async (event) => {
             reportSettings={reportSettings}
             jadwalSettings={jadwalSettings}
             setActivePage={setActivePage}
+            onSearchSelect={handleSearchSelect}
             setAppTheme={setAppTheme}
             setIsDarkMode={setIsDarkMode}
             setMenuOpen={setMenuOpen}
@@ -12051,6 +12085,7 @@ const handleSendCustomNotification = async (event) => {
             onUpdateWhatsappConfig={handleUpdateWhatsappConfig}
             selectedStudentId={selectedStudentId}
             setActivePage={setActivePage}
+            onSearchSelect={handleSearchSelect}
             setAdminForms={setAdminForms}
             setMenuOpen={setMenuOpen}
             setSelectedAnnouncement={setSelectedAnnouncement}
@@ -12087,6 +12122,7 @@ const handleSendCustomNotification = async (event) => {
             jadwalSettings={jadwalSettings}
             parentViews={parentViews}
             setActivePage={setActivePage}
+            onSearchSelect={handleSearchSelect}
             setMenuOpen={setMenuOpen}
             setSelectedAnnouncement={setSelectedAnnouncement}
             teacherData={teacherData}
@@ -12123,6 +12159,18 @@ setAppTheme={setAppTheme}
         )}
 
       </div>
+      {searchPageLoading && (
+        <div className="page-loading-overlay">
+          <lottie-player
+            src="/072d1118-7b5f-4275-8eb5-9fefdce1b391 (2).json"
+            background="transparent"
+            speed="1"
+            style={{ width: "200px", height: "200px" }}
+            loop
+            autoplay
+          ></lottie-player>
+        </div>
+      )}
     </React.Fragment>
   );
 }
