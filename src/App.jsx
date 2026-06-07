@@ -1,5 +1,6 @@
 import "./style.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
+import lottie from "lottie-web";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -68,6 +69,22 @@ import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
 import "./marhala-posts.css";
+
+const LottieTrophy = ({ size = 120 }) => {
+  const container = useRef(null);
+  useEffect(() => {
+    if (!container.current) return;
+    const anim = lottie.loadAnimation({
+      container: container.current,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      path: '/Trophyanimation.json'
+    });
+    return () => anim.destroy();
+  }, []);
+  return <div ref={container} style={{ width: size, height: size, flexShrink: 0 }} />;
+};
 
 const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
 const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
@@ -2634,9 +2651,9 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             ))}
           </div>
 
-          <div className="trophy-container">
-            <Trophy size={100} className="trophy-icon trophyPulse" />
-            <span className="rank-text-overlay rankPop rankCelebration" key={weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank}>
+          <div className="trophy-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+            <LottieTrophy size={140} />
+            <span className="rankPopSide rankCelebrationSide" key={weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank} style={{ fontSize: '56px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
               <span className="kanz-font">{toArabicDigits(weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank || "-")}</span>
             </span>
           </div>

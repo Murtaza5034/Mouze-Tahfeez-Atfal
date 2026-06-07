@@ -3058,6 +3058,20 @@ h1, h2, h3, h4, h5 {
   100% { transform: translate(-50%, -50%) scale(1); }
 }
 
+@keyframes rankPopSide {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes rankCelebrationSide {
+  0% { transform: scale(1); }
+  20% { transform: scale(1.5); filter: drop-shadow(0 0 10px gold); }
+  40% { transform: scale(1); }
+  60% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
 .trophyPulse {
   animation: trophyPulse 3s infinite ease-in-out;
   filter: drop-shadow(0 4px 12px rgba(212, 175, 55, 0.6));
@@ -3067,9 +3081,18 @@ h1, h2, h3, h4, h5 {
   animation: rankPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
+.rankPopSide {
+  animation: rankPopSide 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
 .rankCelebration {
   animation: rankCelebration 1.2s ease-in-out;
   animation-delay: 0.8s; /* Start after rankPop */
+}
+
+.rankCelebrationSide {
+  animation: rankCelebrationSide 1.2s ease-in-out;
+  animation-delay: 0.8s;
 }
 
 .notification-bell-btn {
