@@ -58,6 +58,15 @@ android/capacitor-*
 android/app/capacitor-*
 *.apk
 
+# Keystore (signing keys - DO NOT COMMIT)
+android/app/mauze-tahfeez-release.keystore
+mauze-tahfeez-release.keystore
+android/app/keystore-pass.txt
+keystore-pass.txt
+
+# Local Android SDK path (machine-specific)
+android/local.properties
+
 # APK
 Mauze-Tahfeez.apk
 

@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.mauze.tahfeez"
+    namespace = "com.mauzetahfeez.myapp"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.mauze.tahfeez"
+        applicationId "com.mauzetahfeez.myapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -16,8 +16,20 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    def keystorePassword = file('keystore-pass.txt').text.trim()
+
+    signingConfigs {
+        release {
+            storeFile file('mauze-tahfeez-release.keystore')
+            storePassword keystorePassword
+            keyAlias 'mauze-tahfeez'
+            keyPassword keystorePassword
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

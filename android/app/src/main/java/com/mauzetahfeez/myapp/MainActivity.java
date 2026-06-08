@@ -1,4 +1,4 @@
-package com.mauze.tahfeez;
+package com.mauzetahfeez.myapp;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -1,12 +1,8 @@
 {
-  "appId": "com.mauze.tahfeez",
+  "appId": "com.mauzetahfeez.myapp",
   "appName": "Mauze Tahfeez",
   "webDir": "dist",
-  "server": {
-    "url": "https://mouze-tahfeez-atfal-mu.vercel.app",
-    "cleartext": true,
-    "androidScheme": "https"
-  },
+  "bundledWebRuntime": false,
   "android": {
     "buildOptions": {}
   },

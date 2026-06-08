@@ -896,7 +896,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   })}
                     <td data-label="Jadeed">
                     {readOnly ? (
-                      <span>{row.jadeed || '-'}</span>
+                      <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
                       <JadeedPicker
                         value={row.jadeed || ''}
@@ -907,7 +907,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
-                      <span>{formatJuzhali(row.juzhali)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
                       <JuzhaliPicker
                         value={row.juzhali || ''}
@@ -921,7 +921,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                 <>
                   <td data-label="Murajah">
                     {readOnly ? (
-                      <span>{row.murajah || '-'}</span>
+                      <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
                     ) : (
                       <SurahRangePicker
                         value={row.murajah || ''}
@@ -931,7 +931,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   </td>
                   <td data-label="Jadeed">
                     {readOnly ? (
-                      <span>{row.jadeed || '-'}</span>
+                      <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
                       <JadeedPicker
                         value={row.jadeed || ''}
@@ -942,7 +942,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
-                      <span>{formatJuzhali(row.juzhali)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
                       <JuzhaliPicker
                         value={row.juzhali || ''}
@@ -1043,7 +1043,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
                 <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>Murajah</span>
               </label>
               {readOnly ? (
-                <span>{row.murajah || '-'}</span>
+                <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
               ) : (
                 <SurahRangePicker
                   value={row.murajah || ''}
@@ -1057,7 +1057,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
               <Sparkles size={13} style={{ flexShrink: 0 }} /> <span>Jadeed</span>
             </label>
             {readOnly ? (
-              <span>{row.jadeed || '-'}</span>
+              <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
             ) : (
               <JadeedPicker
                 value={row.jadeed || ''}
@@ -1071,7 +1071,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
               <Repeat size={13} style={{ flexShrink: 0 }} /> <span>Juzhali</span>
             </label>
             {readOnly ? (
-              <span>{formatJuzhali(row.juzhali)}</span>
+              <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
             ) : (
               <JuzhaliPicker
                 value={row.juzhali || ''}
@@ -1211,7 +1211,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
                 <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>Murajah</span>
               </label>
               {readOnly ? (
-                <span>{row.murajah || '-'}</span>
+                <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
               ) : (
                 <SurahRangePicker
                   value={row.murajah || ''}
@@ -1225,7 +1225,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
               <Sparkles size={13} style={{ flexShrink: 0 }} /> <span>Jadeed</span>
             </label>
             {readOnly ? (
-              <span>{row.jadeed || '-'}</span>
+              <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
             ) : (
               <JadeedPicker
                 value={row.jadeed || ''}
@@ -1238,7 +1238,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
               <Repeat size={13} style={{ flexShrink: 0 }} /> <span>Juzhali</span>
             </label>
             {readOnly ? (
-              <span>{formatJuzhali(row.juzhali)}</span>
+              <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
             ) : (
               <JuzhaliPicker
                 value={row.juzhali || ''}
