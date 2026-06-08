@@ -119,6 +119,8 @@ const SURAH_AYAH_DATA = [
   { number: 114, nameEn: "An-Nas", nameAr: 'الناس', ayahCount: 6 },
 ];
 
+const NO_VALUE = 'NO';
+
 const toArabicNum = (n) => {
   const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
   return String(n).replace(/\d/g, d => arabicDigits[d]);
@@ -126,6 +128,7 @@ const toArabicNum = (n) => {
 
 const formatJadeed = (val) => {
   if (!val) return '-';
+  if (val === NO_VALUE) return 'NO';
   const parts = val.split(':');
   if (parts.length === 2 && parts[0] && parts[1]) {
     const surah = SURAH_AYAH_DATA.find(s => s.number === Number(parts[0]));
@@ -137,6 +140,7 @@ const formatJadeed = (val) => {
 
 const formatMurajah = (val) => {
   if (!val) return '-';
+  if (val === NO_VALUE) return 'NO';
   const parts = val.split(' til ');
   if (parts.length >= 2) {
     const from = SURAH_AYAH_DATA.find(s => s.nameEn.toLowerCase() === parts[0].toLowerCase() || s.nameAr === parts[0]);
@@ -151,6 +155,15 @@ const formatMurajah = (val) => {
 
 const formatJuzhali = (val) => {
   if (!val) return '-';
+  if (val === NO_VALUE) return 'NO';
+  if (val.includes(' til ')) {
+    const parts = val.split(/\s+til\s+/i);
+    const fromSurah = SURAH_AYAH_DATA.find(s => s.nameEn.toLowerCase() === (parts[0] || '').toLowerCase() || s.nameAr === parts[0]);
+    const toSurah = SURAH_AYAH_DATA.find(s => s.nameEn.toLowerCase() === (parts[1] || '').toLowerCase() || s.nameAr === (parts[1] || ''));
+    const fromName = fromSurah ? fromSurah.nameAr : (parts[0] || '');
+    const toName = toSurah ? toSurah.nameAr : (parts[1] || '');
+    return `${fromName} إلى ${toName}`;
+  }
   const parts = val.split(':');
   if (parts.length === 2 && parts[0] && parts[1]) {
     return `${toArabicNum(parts[0])}-${toArabicNum(parts[1])} صــ`;
@@ -177,7 +190,6 @@ const getDayKeys = (scheduleData, settings) => {
       current.setUTCDate(current.getUTCDate() + 1);
       idx++;
     }
-    keys.forEach(k => { if (!ordered.includes(k)) ordered.push(k); });
     return ordered;
   }
 
@@ -813,7 +825,6 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                                 </div>
                               );
                             })}
-                            {dayKeys.length > 10 && <div />}
 
                             <div style={{
                               fontSize: '11px',
@@ -829,9 +840,9 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                             {dayKeys.map((dd) => {
                               const d = dd.dayData || {};
                               return (
-                                <div key={dd.dayKey} style={{
+                                <div key={dd.dayKey}                                style={{
                                   fontSize: '12px',
-                                  fontFamily: "'Al-Kanz', serif",
+                                  fontFamily: "'Kanz al Marjaan', serif",
                                   direction: 'rtl',
                                   padding: '6px 8px',
                                   textAlign: 'center',

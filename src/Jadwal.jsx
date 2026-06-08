@@ -12,6 +12,48 @@ DAYS.forEach(day => {
   DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', murajah: '', juzhali: '', jadeed: '', star: '' };
 });
 
+const NO_VALUE = 'NO';
+
+const NoToggleButton = ({ value, onChange, label }) => {
+  const isNo = value === NO_VALUE;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange(isNo ? '' : NO_VALUE);
+      }}
+      title={isNo ? `Clear ${label}` : `Mark ${label} as not applicable`}
+      style={{
+        padding: '4px 10px',
+        borderRadius: '6px',
+        border: isNo ? '2px solid #c62828' : '1px solid #ccc',
+        background: isNo ? '#ffebee' : '#f5f5f5',
+        color: isNo ? '#c62828' : '#999',
+        fontSize: '11px',
+        fontWeight: isNo ? 800 : 500,
+        cursor: 'pointer',
+        fontFamily: 'Inter, sans-serif',
+        letterSpacing: '0.5px',
+        transition: 'all 0.15s ease',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+        lineHeight: 1,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'scale(1.05)';
+        e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
+    >
+      {isNo ? '✕ NO' : 'NO'}
+    </button>
+  );
+};
+
 const FONT_FACE_CSS = `
 @font-face {
   font-family: 'Kanz al Marjaan';
@@ -212,12 +254,60 @@ const getJuzFromPage = (page) => {
   return 1;
 };
 
-const JuzhaliPicker = ({ value, onChange, jadeedValue }) => {
+const JuzhaliPicker = ({ value, onChange, jadeedValue, mode }) => {
   const jadeedParts = (jadeedValue || '').split(':');
   const jadeedSurah = jadeedParts[0];
   const jadeedAyah = jadeedParts[1];
+  const jadeedSurahNum = parseInt(jadeedSurah);
+
+  if (mode === 'surah-wise') {
+    const parts = (value || '').split(/\s+til\s+/i);
+    const fromSurah = parts[0] || '';
+    const tillSurah = parts[1] || '';
+
+    const startFrom = !isNaN(jadeedSurahNum) ? jadeedSurahNum : 0;
+    const fromSurahs = SURAH_AYAH_DATA.filter(s => s.number > startFrom);
+    const fromSurahObj = SURAH_AYAH_DATA.find(s => s.nameEn === fromSurah);
+    const fromNum = fromSurahObj ? fromSurahObj.number : 0;
+
+    const handleFrom = (e) => {
+      const from = e.target.value;
+      if (!from) { onChange(''); return; }
+      onChange(from && tillSurah ? `${from} til ${tillSurah}` : `${from} til ${from}`);
+    };
+
+    const handleTill = (e) => {
+      const till = e.target.value;
+      if (!till) { onChange(''); return; }
+      onChange(fromSurah && till ? `${fromSurah} til ${till}` : `${till} til ${till}`);
+    };
+
+    const selectStyle = {
+      padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
+      background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+    };
+
+    return (
+      <div className="jadwal-jadeed-picker">
+        <select value={fromSurah} onChange={handleFrom} style={selectStyle}>
+          <option value="" style={{ direction: 'ltr' }}>From Sûrah</option>
+          {fromSurahs.map(s => (
+            <option key={s.number} value={s.nameEn}>{s.nameAr}</option>
+          ))}
+        </select>
+        <select value={tillSurah} onChange={handleTill} style={selectStyle}>
+          <option value="" style={{ direction: 'ltr' }}>Till Sûrah</option>
+          {SURAH_AYAH_DATA.filter(s => s.number >= fromNum).map(s => (
+            <option key={s.number} value={s.nameEn}>{s.nameAr}</option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
   const jadeedAyahPage = jadeedSurah && jadeedAyah ? getAyahPage(jadeedSurah, jadeedAyah) : 0;
   const juz = getJuzFromPage(jadeedAyahPage);
+
   const isLastFiveJuz = juz >= 26;
   const rangeStart = isLastFiveJuz ? Math.min(604, jadeedAyahPage + 1) : Math.max(1, jadeedAyahPage - 10);
   const rangeEnd = isLastFiveJuz ? Math.min(604, jadeedAyahPage + 10) : Math.max(1, jadeedAyahPage - 1);
@@ -283,6 +373,15 @@ const toArabicNum = (n) => {
 
 const formatJuzhali = (val) => {
   if (!val) return '-';
+  if (val === NO_VALUE) return 'NO';
+  if (val.includes(' til ')) {
+    const parts = val.split(/\s+til\s+/i);
+    const fromSurah = SURAH_AYAH_DATA.find(s => s.nameEn.toLowerCase() === parts[0].toLowerCase() || s.nameAr === parts[0]);
+    const toSurah = SURAH_AYAH_DATA.find(s => s.nameEn.toLowerCase() === (parts[1] || '').toLowerCase() || s.nameAr === (parts[1] || ''));
+    const fromName = fromSurah ? fromSurah.nameAr : parts[0];
+    const toName = toSurah ? toSurah.nameAr : (parts[1] || '');
+    return `${fromName} إلى ${toName}`;
+  }
   const parts = val.split(':');
   if (parts.length === 2 && parts[0] && parts[1]) {
     return `${toArabicNum(parts[0])}-${toArabicNum(parts[1])} صــ`;
@@ -292,6 +391,7 @@ const formatJuzhali = (val) => {
 
 const formatJadeed = (val) => {
   if (!val) return '-';
+  if (val === NO_VALUE) return 'NO';
   const parts = val.split(':');
   if (parts.length === 2 && parts[0] && parts[1]) {
     const surah = SURAH_AYAH_DATA.find(s => s.number === Number(parts[0]));
@@ -303,6 +403,7 @@ const formatJadeed = (val) => {
 
 const formatMurajah = (val) => {
   if (!val) return '-';
+  if (val === NO_VALUE) return 'NO';
   const parts = val.split(' til ');
   if (parts.length >= 2) {
     const from = findSurahByName(parts[0]);
@@ -332,7 +433,7 @@ const calcTotalPages = (row, mode) => {
     });
   } else {
     const val = (row.murajah || '').trim();
-    if (val) {
+    if (val && val !== NO_VALUE) {
       const juzMatch = val.match(/[Jj]uz\s*(\d+)/);
       if (juzMatch) {
         murajahPages = 20;
@@ -386,13 +487,37 @@ const calcTotalPages = (row, mode) => {
   }
   let juzhaliPages = 0;
   const juzhaliVal = (row.juzhali || '').trim();
-  if (juzhaliVal) {
-    const parts = juzhaliVal.split(':');
-    if (parts.length === 2 && parts[0] && parts[1]) {
-      const from = parseInt(parts[0]);
-      const to = parseInt(parts[1]);
-      if (!isNaN(from) && !isNaN(to) && to >= from) {
-        juzhaliPages = to - from + 1;
+  if (juzhaliVal && juzhaliVal !== NO_VALUE) {
+    const tilMatch = juzhaliVal.match(/(.+?)\s+til\s+(.+)/i);
+    if (tilMatch) {
+      const startSurah = findSurahByName(tilMatch[1]);
+      const endSurah = findSurahByName(tilMatch[2]);
+      if (startSurah && endSurah) {
+        const startPage = SURAH_PAGE_MAP[startSurah.number] || 1;
+        const endIdx = SURAH_AYAH_DATA.findIndex(s => s.number === endSurah.number);
+        let endPage = 604;
+        if (endIdx < SURAH_AYAH_DATA.length - 1) {
+          const endStartPage = SURAH_PAGE_MAP[endSurah.number] || 1;
+          for (let i = endIdx + 1; i < SURAH_AYAH_DATA.length; i++) {
+            const nextStart = SURAH_PAGE_MAP[SURAH_AYAH_DATA[i].number];
+            if (nextStart > endStartPage) {
+              endPage = nextStart - 1;
+              break;
+            }
+          }
+        }
+        const fromPage = Math.min(startPage, endPage);
+        const toPage = Math.max(startPage, endPage);
+        juzhaliPages = toPage - fromPage + 1;
+      }
+    } else {
+      const parts = juzhaliVal.split(':');
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        const from = parseInt(parts[0]);
+        const to = parseInt(parts[1]);
+        if (!isNaN(from) && !isNaN(to) && to >= from) {
+          juzhaliPages = to - from + 1;
+        }
       }
     }
   }
@@ -898,22 +1023,37 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                     {readOnly ? (
                       <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
-                      <JadeedPicker
-                        value={row.jadeed || ''}
-                        onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
-                        defaultSurah={defaultJadeedSurah}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
+                        {row.jadeed === NO_VALUE ? (
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 700, color: '#c62828', padding: '4px 8px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                        ) : (
+                          <JadeedPicker
+                            value={row.jadeed || ''}
+                            onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
+                            defaultSurah={defaultJadeedSurah}
+                          />
+                        )}
+                        <NoToggleButton value={row.jadeed || ''} onChange={(val) => onCellChange(day, 'jadeed', val, idx)} label="Jadeed" />
+                      </div>
                     )}
                   </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
                       <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
-                      <JuzhaliPicker
-                        value={row.juzhali || ''}
-                        onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
-                        jadeedValue={row.jadeed || ''}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
+                        {row.juzhali === NO_VALUE ? (
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 700, color: '#c62828', padding: '4px 8px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                        ) : (
+                          <JuzhaliPicker
+                            value={row.juzhali || ''}
+                            onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
+                            jadeedValue={row.jadeed || ''}
+                            mode={mode}
+                          />
+                        )}
+                        <NoToggleButton value={row.juzhali || ''} onChange={(val) => onCellChange(day, 'juzhali', val, idx)} label="Juzhali" />
+                      </div>
                     )}
                   </td>
                 </>
@@ -923,32 +1063,54 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                     {readOnly ? (
                       <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
                     ) : (
-                      <SurahRangePicker
-                        value={row.murajah || ''}
-                        onChange={(val) => onCellChange(day, 'murajah', val, idx)}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
+                        {row.murajah === NO_VALUE ? (
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 700, color: '#c62828', padding: '4px 8px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                        ) : (
+                          <SurahRangePicker
+                            value={row.murajah || ''}
+                            onChange={(val) => onCellChange(day, 'murajah', val, idx)}
+                          />
+                        )}
+                        <NoToggleButton value={row.murajah || ''} onChange={(val) => onCellChange(day, 'murajah', val, idx)} label="Murajah" />
+                      </div>
                     )}
                   </td>
                   <td data-label="Jadeed">
                     {readOnly ? (
                       <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
-                      <JadeedPicker
-                        value={row.jadeed || ''}
-                        onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
-                        defaultSurah={defaultJadeedSurah}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
+                        {row.jadeed === NO_VALUE ? (
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 700, color: '#c62828', padding: '4px 8px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                        ) : (
+                          <JadeedPicker
+                            value={row.jadeed || ''}
+                            onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
+                            defaultSurah={defaultJadeedSurah}
+                          />
+                        )}
+                        <NoToggleButton value={row.jadeed || ''} onChange={(val) => onCellChange(day, 'jadeed', val, idx)} label="Jadeed" />
+                      </div>
                     )}
                   </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
                       <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
-                      <JuzhaliPicker
-                        value={row.juzhali || ''}
-                        onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
-                        jadeedValue={row.jadeed || ''}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
+                        {row.juzhali === NO_VALUE ? (
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 700, color: '#c62828', padding: '4px 8px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                        ) : (
+                          <JuzhaliPicker
+                            value={row.juzhali || ''}
+                            onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
+                            jadeedValue={row.jadeed || ''}
+                            mode={mode}
+                          />
+                        )}
+                        <NoToggleButton value={row.juzhali || ''} onChange={(val) => onCellChange(day, 'juzhali', val, idx)} label="Juzhali" />
+                      </div>
                     )}
                   </td>
                 </>
@@ -1039,45 +1201,73 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
             })
           ) : (
             <div className="jadwal-calendar-field">
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>Murajah</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>Murajah</span>
+                </span>
+                {!readOnly && <NoToggleButton value={row.murajah || ''} onChange={(val) => onCellChange(day, 'murajah', val, idx)} label="Murajah" />}
               </label>
               {readOnly ? (
                 <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
               ) : (
-                <SurahRangePicker
-                  value={row.murajah || ''}
-                  onChange={(val) => onCellChange(day, 'murajah', val, idx)}
-                />
+                <div>
+                  {row.murajah === NO_VALUE ? (
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '11px', fontWeight: 700, color: '#c62828', padding: '3px 6px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                  ) : (
+                    <SurahRangePicker
+                      value={row.murajah || ''}
+                      onChange={(val) => onCellChange(day, 'murajah', val, idx)}
+                    />
+                  )}
+                </div>
               )}
             </div>
           )}
           <div className="jadwal-calendar-field">
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={13} style={{ flexShrink: 0 }} /> <span>Jadeed</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'space-between', width: '100%' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles size={13} style={{ flexShrink: 0 }} /> <span>Jadeed</span>
+              </span>
+              {!readOnly && <NoToggleButton value={row.jadeed || ''} onChange={(val) => onCellChange(day, 'jadeed', val, idx)} label="Jadeed" />}
             </label>
             {readOnly ? (
               <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
             ) : (
-              <JadeedPicker
-                value={row.jadeed || ''}
-                onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
-                defaultSurah={defaultJadeedSurah}
-              />
+              <div>
+                {row.jadeed === NO_VALUE ? (
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '11px', fontWeight: 700, color: '#c62828', padding: '3px 6px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                ) : (
+                  <JadeedPicker
+                    value={row.jadeed || ''}
+                    onChange={(val) => onCellChange(day, 'jadeed', val, idx)}
+                    defaultSurah={defaultJadeedSurah}
+                  />
+                )}
+              </div>
             )}
           </div>
           <div className="jadwal-calendar-field">
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Repeat size={13} style={{ flexShrink: 0 }} /> <span>Juzhali</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'space-between', width: '100%' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Repeat size={13} style={{ flexShrink: 0 }} /> <span>Juzhali</span>
+              </span>
+              {!readOnly && <NoToggleButton value={row.juzhali || ''} onChange={(val) => onCellChange(day, 'juzhali', val, idx)} label="Juzhali" />}
             </label>
             {readOnly ? (
               <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
             ) : (
-              <JuzhaliPicker
-                value={row.juzhali || ''}
-                onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
-                jadeedValue={row.jadeed || ''}
-              />
+              <div>
+                {row.juzhali === NO_VALUE ? (
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '11px', fontWeight: 700, color: '#c62828', padding: '3px 6px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                ) : (
+                  <JuzhaliPicker
+                    value={row.juzhali || ''}
+                    onChange={(val) => onCellChange(day, 'juzhali', val, idx)}
+                    jadeedValue={row.jadeed || ''}
+                    mode={mode}
+                  />
+                )}
+              </div>
             )}
           </div>
           <div className="jadwal-calendar-field">
@@ -1207,44 +1397,72 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
             })
           ) : (
             <div className="jadwal-calendar-field">
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>Murajah</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>Murajah</span>
+                </span>
+                {!readOnly && <NoToggleButton value={row.murajah || ''} onChange={(val) => onCellChange(day, 'murajah', val, currentDayIndex)} label="Murajah" />}
               </label>
               {readOnly ? (
                 <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
               ) : (
-                <SurahRangePicker
-                  value={row.murajah || ''}
-                  onChange={(val) => onCellChange(day, 'murajah', val, currentDayIndex)}
-                />
+                <div>
+                  {row.murajah === NO_VALUE ? (
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '11px', fontWeight: 700, color: '#c62828', padding: '3px 6px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                  ) : (
+                    <SurahRangePicker
+                      value={row.murajah || ''}
+                      onChange={(val) => onCellChange(day, 'murajah', val, currentDayIndex)}
+                    />
+                  )}
+                </div>
               )}
             </div>
           )}
           <div className="jadwal-calendar-field">
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={13} style={{ flexShrink: 0 }} /> <span>Jadeed</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'space-between', width: '100%' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles size={13} style={{ flexShrink: 0 }} /> <span>Jadeed</span>
+              </span>
+              {!readOnly && <NoToggleButton value={row.jadeed || ''} onChange={(val) => onCellChange(day, 'jadeed', val, currentDayIndex)} label="Jadeed" />}
             </label>
             {readOnly ? (
               <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
             ) : (
-              <JadeedPicker
-                value={row.jadeed || ''}
-                onChange={(val) => onCellChange(day, 'jadeed', val, currentDayIndex)}
-              />
+              <div>
+                {row.jadeed === NO_VALUE ? (
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '11px', fontWeight: 700, color: '#c62828', padding: '3px 6px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                ) : (
+                  <JadeedPicker
+                    value={row.jadeed || ''}
+                    onChange={(val) => onCellChange(day, 'jadeed', val, currentDayIndex)}
+                  />
+                )}
+              </div>
             )}
           </div>
           <div className="jadwal-calendar-field">
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Repeat size={13} style={{ flexShrink: 0 }} /> <span>Juzhali</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'space-between', width: '100%' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Repeat size={13} style={{ flexShrink: 0 }} /> <span>Juzhali</span>
+              </span>
+              {!readOnly && <NoToggleButton value={row.juzhali || ''} onChange={(val) => onCellChange(day, 'juzhali', val, currentDayIndex)} label="Juzhali" />}
             </label>
             {readOnly ? (
               <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
             ) : (
-              <JuzhaliPicker
-                value={row.juzhali || ''}
-                onChange={(val) => onCellChange(day, 'juzhali', val, currentDayIndex)}
-                jadeedValue={row.jadeed || ''}
-              />
+              <div>
+                {row.juzhali === NO_VALUE ? (
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '11px', fontWeight: 700, color: '#c62828', padding: '3px 6px', background: '#ffebee', borderRadius: '4px', border: '1px solid #ef9a9a' }}>NO</span>
+                ) : (
+                  <JuzhaliPicker
+                    value={row.juzhali || ''}
+                    onChange={(val) => onCellChange(day, 'juzhali', val, currentDayIndex)}
+                    jadeedValue={row.jadeed || ''}
+                    mode={mode}
+                  />
+                )}
+              </div>
             )}
           </div>
           <div className="jadwal-calendar-field">
@@ -1325,7 +1543,7 @@ const getDaysFromRange = (startStr, endStr) => {
   const DAY_NAMES = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
   const days = [];
   const current = new Date(start);
-  while (current <= end) {
+  while (current < end) {
     const dateStr = current.toISOString().split('T')[0];
     days.push({
       dayName: DAY_NAMES[current.getUTCDay()],
