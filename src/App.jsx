@@ -8859,7 +8859,7 @@ onShowAction,
       week_date: f.week_date || getToday(),
       student_id: numericId,
       attendance_count: toNumber(f.attendance_count),
-      total_jadeed_pages: toNumber(f.total_jadeed_pages),
+      total_jadeed_pages: f.total_jadeed_pages !== "" ? toNumber(f.total_jadeed_pages) : null,
       murajazah: sMurajazah,
       juz_hali: sJuzHali,
       takhteet: sTakhteet,
@@ -9361,7 +9361,7 @@ onShowAction,
                       <input
                         type="text"
                         name="total_jadeed_pages"
-                        value={teacherForms.result.total_jadeed_pages}
+                        value={teacherForms.result.total_jadeed_pages ?? ""}
                         onChange={onTeacherFormChange}
                       />
                     </label>
@@ -12025,7 +12025,7 @@ const handleSendCustomNotification = async (event) => {
       ...teacherForms.result,
       student_id: numericId,
       attendance_count: toNumber(teacherForms.result.attendance_count),
-      total_jadeed_pages: toNumber(teacherForms.result.total_jadeed_pages),
+      total_jadeed_pages: teacherForms.result.total_jadeed_pages !== "" ? toNumber(teacherForms.result.total_jadeed_pages) : null,
       murajazah: toNumber(teacherForms.result.murajazah),
       juz_hali: toNumber(teacherForms.result.juz_hali),
       takhteet: toNumber(teacherForms.result.takhteet),
