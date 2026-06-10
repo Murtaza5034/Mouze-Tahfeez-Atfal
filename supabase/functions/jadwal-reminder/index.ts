@@ -8,6 +8,19 @@ const corsHeaders = {
 
 const DAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
+function isZilhaj30(dateStr: string): boolean {
+  if (!dateStr) return false;
+  try {
+    const date = new Date(dateStr);
+    const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
+      day: 'numeric', month: 'numeric', year: 'numeric'
+    }).formatToParts(date);
+    const d = parseInt(parts.find(p => p.type === 'day')!.value);
+    const m = parseInt(parts.find(p => p.type === 'month')!.value);
+    return m === 12 && d === 30;
+  } catch { return false; }
+}
+
 const SURAH_AYAH_DATA = [
   { number: 1, nameEn: 'Al-Fatiha', nameAr: 'الفاتحة' },
   { number: 2, nameEn: "Al-Baqarah", nameAr: 'البقرة' },
@@ -329,10 +342,10 @@ Deno.serve(async (req) => {
 
     console.log(`jadwal-reminder: Running for ${todayDayName} (${todayDateStr}) at ${todayHour}:${todayMinute} IST`);
 
-    // Check jadwal_settings for notification enabled and time
+    // Check jadwal_settings for notification enabled, time, and type
     const { data: jadwalSettings, error: settingsError } = await supabase
       .from('jadwal_settings')
-      .select('jadwal_notification_enabled, jadwal_notification_time')
+      .select('jadwal_notification_enabled, jadwal_notification_time, jadwal_type, jadwal_week_start, jadwal_week_end')
       .eq('id', 1)
       .maybeSingle();
 
@@ -343,6 +356,10 @@ Deno.serve(async (req) => {
     const notifEnabled = jadwalSettings?.jadwal_notification_enabled !== false;
     const notifTimeStr: string = jadwalSettings?.jadwal_notification_time || '07:00:00';
     const [notifHour, notifMin] = notifTimeStr.split(':').map(Number);
+
+    // For miqaat mode, determine if we need indexed key lookup
+    const isMiqaat = jadwalSettings?.jadwal_type === 'miqaat' && jadwalSettings?.jadwal_week_start && jadwalSettings?.jadwal_week_end;
+    const miqaatWeekStart = isMiqaat ? jadwalSettings.jadwal_week_start : null;
 
     // Allow a 15-minute window around the target time
     const currentMinutes = todayHour * 60 + todayMinute;
@@ -423,7 +440,28 @@ Deno.serve(async (req) => {
       }
 
       // Get today's row from schedule_data
-      const dayData = schedule_data?.[todayDayName];
+      // In miqaat mode with custom date range, keys may include index suffix (e.g. MONDAY_6)
+      // Determine correct key by iterating week_start→today, skipping 30th Zilhaj
+      let dayData: Record<string, string> | undefined;
+      if (isMiqaat && miqaatWeekStart) {
+        let idx = 0;
+        const cur = new Date(miqaatWeekStart + 'T00:00:00Z');
+        const todayEnd = new Date(todayDateStr + 'T00:00:00Z');
+        while (cur < todayEnd) {
+          const ds = cur.toISOString().split('T')[0];
+          if (!isZilhaj30(ds)) {
+            idx++;
+          }
+          cur.setUTCDate(cur.getUTCDate() + 1);
+        }
+        // idx now equals today's position in the adjusted range
+        const key = idx >= 6 ? `${todayDayName}_${idx}` : todayDayName;
+        dayData = schedule_data?.[key];
+      }
+      if (!dayData) {
+        // Fallback / non-miqaat: simple day name key
+        dayData = schedule_data?.[todayDayName];
+      }
       if (!dayData) {
         details.push({ studentId: student_id, status: 'skipped', message: 'No data for today' });
         skippedCount++;

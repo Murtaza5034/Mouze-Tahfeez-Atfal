@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { Calendar, Users, X, ChevronRight, CheckCircle, AlertCircle, Loader2, GraduationCap, Sparkles, Eye, BookOpen, Repeat, Calculator } from 'lucide-react';
+import { Calendar, Users, X, ChevronRight, CheckCircle, AlertCircle, Loader2, GraduationCap, Sparkles, Eye, BookOpen, Repeat, Calculator, Download } from 'lucide-react';
 
 const SURAH_AYAH_DATA = [
   { number: 1, nameEn: 'Al-Fatiha', nameAr: 'الفاتحة', ayahCount: 7 },
@@ -171,6 +171,7 @@ const formatJuzhali = (val) => {
   return `${toArabicNum(val)} صــ`;
 };
 
+
 const getDayKeys = (scheduleData, settings) => {
   if (!scheduleData) return [];
   const keys = Object.keys(scheduleData).filter(k => k !== '_mode' && k !== '_star');
@@ -182,13 +183,17 @@ const getDayKeys = (scheduleData, settings) => {
     const DAY_NAMES = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
     const ordered = [];
     const current = new Date(start);
-    let idx = 0;
+    let skipIdx = 0;
     while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
       const dayName = DAY_NAMES[current.getUTCDay()];
-      const key = idx >= 6 ? `${dayName}_${idx}` : dayName;
-      if (keys.includes(key)) ordered.push(key);
+      ordered.push(skipIdx >= 6 ? `${dayName}_${skipIdx}` : dayName);
+      skipIdx++;
       current.setUTCDate(current.getUTCDate() + 1);
-      idx++;
+    }
+    // Remove only the very last day if the range exceeds 19 (per user request)
+    if (ordered.length > 19) {
+      ordered.pop();
     }
     return ordered;
   }
@@ -201,6 +206,36 @@ const getDayKeys = (scheduleData, settings) => {
     const bIdx = bParts.length > 1 ? Number(bParts[1]) : DAY_ORDER[bParts[0]] ?? 99;
     return aIdx - bIdx;
   });
+};
+
+const getBaseDayKey = (dayKey) => String(dayKey || '').split('_')[0];
+
+const getDayData = (scheduleData, dayKey) => {
+  if (!scheduleData || !dayKey) return null;
+  return scheduleData[dayKey] || scheduleData[getBaseDayKey(dayKey)] || null;
+};
+
+const getFatemiDateStr = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
+      day: 'numeric', month: 'numeric', year: 'numeric'
+    }).formatToParts(date);
+    let d = parseInt(parts.find(p => p.type === 'day').value);
+    let m = parseInt(parts.find(p => p.type === 'month').value);
+    let y = parseInt(parts.find(p => p.type === 'year').value);
+    const arabicMonths = [
+      "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
+      "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
+      "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
+    ];
+    if (m === 12 && d === 30) {
+      return `1 ${arabicMonths[0]} ${y + 1}`;
+    }
+    if (m === 1) d++;
+    return `${d} ${arabicMonths[m - 1] || ''} ${y}`;
+  } catch { return ''; }
 };
 
 const isFieldFilled = (val) => val && val.toString().trim() !== '';
@@ -228,14 +263,22 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
   const [expandedStudent, setExpandedStudent] = useState(null);
   const [jadwalSettings, setJadwalSettings] = useState(null);
 
-  const weekStart = jadwalSettings?.jadwal_week_start || '';
-
-  const getDayDate = (dayIndex) => {
-    if (!weekStart) return '';
-    const d = new Date(weekStart + 'T00:00:00Z');
-    d.setUTCDate(d.getUTCDate() + dayIndex);
-    return d.toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
-  };
+  const dayDateStrings = useMemo(() => {
+    if (!jadwalSettings?.jadwal_week_start || !jadwalSettings?.jadwal_week_end) return [];
+    const start = new Date(jadwalSettings.jadwal_week_start + 'T00:00:00Z');
+    const end = new Date(jadwalSettings.jadwal_week_end + 'T00:00:00Z');
+    const dates = [];
+    const cur = new Date(start);
+    while (cur <= end) {
+      dates.push(cur.toISOString().split('T')[0]);
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    // Remove only the very last day if the range exceeds 19 (per user request: Zilhaj 26-29 + Muharram 1-15 = 19 days max)
+    if (dates.length > 19) {
+      dates.pop();
+    }
+    return dates;
+  }, [jadwalSettings?.jadwal_week_start, jadwalSettings?.jadwal_week_end]);
 
   useEffect(() => {
     fetchAllJadwal();
@@ -310,7 +353,7 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
       let totalFields = 0;
 
       const dayDetails = dayKeys.map(dayKey => {
-        const dayData = scheduleData?.[dayKey];
+        const dayData = getDayData(scheduleData, dayKey);
         const completion = getDayCompletion(dayData, mode);
         totalFilled += completion.filled;
         totalFields += completion.total;
@@ -347,6 +390,69 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
   }, [students, jadwalData, jadwalSettings]);
 
   const totalTeachersWithJadwal = teacherJadwalStats.filter(t => t.jadwalFilledCount > 0).length;
+
+  const downloadCSV = () => {
+    const BOM = '\uFEFF';
+    // Determine max number of days across all children
+    let maxDays = 0;
+    teacherJadwalStats.forEach(t => {
+      t.children.forEach(c => {
+        if (c.dayDetails.length > maxDays) maxDays = c.dayDetails.length;
+      });
+    });
+
+    // Build header row
+    const headers = ['Student Name', 'Teacher Group', 'Mode'];
+    for (let d = 0; d < maxDays; d++) {
+      const dateStr = dayDateStrings[d] || '';
+      const engDate = dateStr ? new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }) : `Day ${d + 1}`;
+      headers.push(`Day ${d + 1} - Murajah (${engDate})`);
+      headers.push(`Day ${d + 1} - Jadeed`);
+      headers.push(`Day ${d + 1} - Juzhali`);
+    }
+
+    const rows = [];
+    teacherJadwalStats.forEach(t => {
+      t.children.forEach(c => {
+        const row = [c.name, c.groupName, c.mode === 'juz-wise' ? 'Juz Wise' : 'Surah Wise'];
+        for (let d = 0; d < maxDays; d++) {
+          const dd = c.dayDetails[d];
+          if (dd && dd.dayData) {
+            const data = dd.dayData;
+            if (c.mode === 'juz-wise') {
+              const juzVals = ['juz1', 'juz2', 'juz3', 'juz4'].map(j => data[j] ? toArabicNum(data[j]) : '').filter(Boolean).join(' - ');
+              row.push(juzVals || '');
+            } else {
+              row.push(isFieldFilled(data.murajah) ? formatMurajah(data.murajah) : '');
+            }
+            row.push(isFieldFilled(data.jadeed) ? formatJadeed(data.jadeed) : '');
+            row.push(isFieldFilled(data.juzhali) ? formatJuzhali(data.juzhali) : '');
+          } else {
+            row.push('', '', '');
+          }
+        }
+        rows.push(row);
+      });
+    });
+
+    // Escape CSV cells
+    const esc = (val) => {
+      const s = String(val || '');
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    };
+
+    const csvContent = BOM + [headers, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Jadwal_Tracking_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const renderDayCell = (dayDetail, mode) => {
     const dayData = dayDetail.dayData || {};
@@ -415,13 +521,22 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                 </p>
               </div>
             </div>
-            <button
-              className="action-button"
-              onClick={fetchAllJadwal}
-              style={{ background: 'var(--soft-brown)', color: 'white', padding: '8px 16px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
-            >
-              <Loader2 size={14} /> Refresh
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                className="action-button"
+                onClick={downloadCSV}
+                style={{ background: '#2e7d32', color: 'white', padding: '8px 16px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                <Download size={14} /> Download CSV
+              </button>
+              <button
+                className="action-button"
+                onClick={fetchAllJadwal}
+                style={{ background: 'var(--soft-brown)', color: 'white', padding: '8px 16px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                <Loader2 size={14} /> Refresh
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -723,31 +838,39 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                             }}>
                               <Eye size={12} /> Day
                             </div>
-                            {dayKeys.map((dd, dIdx) => (
-                              <div key={dd.dayKey} style={{
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                color: 'var(--deep-brown)',
-                                padding: '6px 8px',
-                                textAlign: 'center',
-                                borderBottom: '2px solid var(--primary-gold)',
-                                background: dd.completed ? 'rgba(46,125,50,0.05)' : dd.filled > 0 ? 'rgba(245,127,23,0.05)' : 'rgba(198,40,40,0.04)',
-                                borderRadius: '4px 4px 0 0',
-                              }}>
-                                <div>Day {dIdx + 1}</div>
-                                <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px' }}>
-                                  {getDayDate(dIdx) || '—'}
+                            {dayKeys.map((dd, dIdx) => {
+                              const dateStr = dayDateStrings[dIdx] || '';
+                              const engDate = dateStr ? new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+                              const fatemiDate = getFatemiDateStr(dateStr);
+                              return (
+                                <div key={dd.dayKey} style={{
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  color: 'var(--deep-brown)',
+                                  padding: '6px 8px',
+                                  textAlign: 'center',
+                                  borderBottom: '2px solid var(--primary-gold)',
+                                  background: dd.completed ? 'rgba(46,125,50,0.05)' : dd.filled > 0 ? 'rgba(245,127,23,0.05)' : 'rgba(198,40,40,0.04)',
+                                  borderRadius: '4px 4px 0 0',
+                                }}>
+                                  <div>Day {dIdx + 1}</div>
+                                  <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px' }}>
+                                    {engDate}
+                                  </div>
+                                  <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl' }}>
+                                    {fatemiDate}
+                                  </div>
+                                  <div style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    background: dd.completed ? '#43a047' : dd.filled > 0 ? '#ffb300' : '#ef5350',
+                                    margin: '2px auto 0',
+                                    display: 'inline-block',
+                                  }} />
                                 </div>
-                                <div style={{
-                                  width: '6px',
-                                  height: '6px',
-                                  borderRadius: '50%',
-                                  background: dd.completed ? '#43a047' : dd.filled > 0 ? '#ffb300' : '#ef5350',
-                                  margin: '2px auto 0',
-                                  display: 'inline-block',
-                                }} />
-                              </div>
-                            ))}
+                              );
+                            })}
 
                             <div style={{
                               fontSize: '11px',

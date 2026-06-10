@@ -665,6 +665,7 @@ const LazyJadwalParentView = React.lazy(() =>
 const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
 const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
 const LazyMarhalaPosts = React.lazy(() => import("./MarhalaPosts"));
+const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
 
 const fixArabicScript = (text) => {
   if (!text) return "";
@@ -679,24 +680,20 @@ const fixArabicScript = (text) => {
 };
 
 const NotificationStatus = ({ role }) => {
-  const [permission, setPermission] = useState(typeof window !== 'undefined' ? Notification.permission : 'default');
+  const [permission, setPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'default');
   const [isInitializing, setIsInitializing] = useState(false);
 
   const requestPermission = async () => {
-    if (!('Notification' in window)) {
-      alert("This browser does not support notifications.");
-      return;
-    }
     
     setIsInitializing(true);
     try {
       const fcmService = await loadFcmService();
       const result = await fcmService.initialize(role);
-      setPermission(Notification.permission);
+      setPermission(typeof Notification !== "undefined" ? Notification.permission : (result ? "granted" : "default"));
       if (result) {
         alert("Notifications enabled successfully!");
       } else {
-        if (Notification.permission === 'denied') {
+        if ((typeof Notification !== 'undefined' && Notification.permission === 'denied')) {
           alert("Notifications are blocked in your browser settings. Please click the lock icon in your address bar to allow them.");
         } else {
           alert("Failed to initialize notification service. Please try again.");
@@ -873,6 +870,7 @@ const NAV_ICONS = {
   "Messages": MessageCircle,
   "Email Settings": Mail,
   "Marhala Posts": Heart,
+  "App Update": FileArchive,
 };
 
 const emptyParentData = {
@@ -3668,7 +3666,14 @@ function ParentPortal({
         });
 
         pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-        pdf.save(`${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, '_')}_Report.pdf`);
+        // Use data URI for cross-platform compatibility (works in Capacitor Android WebView)
+        const pdfDataUri = pdf.output(datauristring);
+        const dlLink = document.createElement(a);
+        dlLink.href = pdfDataUri;
+        dlLink.download = `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`;
+        document.body.appendChild(dlLink);
+        dlLink.click();
+        document.body.removeChild(dlLink);
         if (showAction) showAction("success", "Report downloaded successfully!");
       } catch (err) {
         console.error("PDF Error:", err);
@@ -5146,7 +5151,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Global Settings", "Email Settings", "Marhala Posts"];
+  const sidebarLinks = ["Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
@@ -5595,10 +5600,11 @@ const handleDownloadAllReports = async () => {
                  { label: "Student Assignments", value: "Assignments" },
                  { label: "Portal Access", value: "Portal Access" },
                  { label: "Faculty Attendance", value: "Faculty" },
-                 { label: "Notifications Hub", value: "Notifications" },
-                 { label: "Master Schedule", value: "Schedule" },
-                { label: "Support Tickets", value: "User Issues" }
-              ]} 
+                  { label: "Notifications Hub", value: "Notifications" },
+                  { label: "Master Schedule", value: "Schedule" },
+                  { label: "App Update Manager", value: "App Update" },
+                  { label: "Support Tickets", value: "User Issues" }
+                ]} 
               onSelect={onSearchSelect} 
               />
           )}
@@ -5724,6 +5730,11 @@ const handleDownloadAllReports = async () => {
                 onShowAction={onShowAction}
                 onPostCreated={onMarhalaPostCreated}
               />
+            </Suspense>
+          ) : null}
+          {activePage === "App Update" ? (
+            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading App Update Manager...</p></div>}>
+              <LazyAppUpdateManager onBroadcastNotification={broadcastNotification} />
             </Suspense>
           ) : null}
           {activePage === "Student Registry" && (
@@ -7898,7 +7909,8 @@ const handleDownloadAllReports = async () => {
                   {jadwalSettingsDraft.jadwal_week_start && jadwalSettingsDraft.jadwal_week_end ? (() => {
                     const d1 = new Date(jadwalSettingsDraft.jadwal_week_start + 'T00:00:00Z');
                     const d2 = new Date(jadwalSettingsDraft.jadwal_week_end + 'T00:00:00Z');
-                    const totalDays = Math.max(0, Math.floor((d2 - d1) / 86400000) + 1);
+                    let totalDays = Math.max(0, Math.floor((d2 - d1) / 86400000) + 1);
+                    totalDays = items.length;
                     if (totalDays < 1) return null;
                     const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
                     const items = [];
@@ -7907,6 +7919,9 @@ const handleDownloadAllReports = async () => {
                       const ds = cur.toISOString().split('T')[0];
                       items.push(dayNames[cur.getUTCDay()] + ' (' + ds + ')');
                       cur.setUTCDate(cur.getUTCDate() + 1);
+                    }
+                    if (items.length > 19) {
+                      items.pop();
                     }
                     return (
                       <div style={{ marginTop: '16px', background: 'rgba(212,175,55,0.06)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(212,175,55,0.12)' }}>
@@ -8141,6 +8156,9 @@ const handleDownloadAllReports = async () => {
                       const ds = cur.toISOString().split('T')[0];
                       arr.push({ name: names[cur.getUTCDay()], date: ds, fi: getFatemiInfo(ds) });
                       cur.setUTCDate(cur.getUTCDate() + 1);
+                    }
+                    if (arr.length > 19) {
+                      arr.pop();
                     }
                     return arr;
                   }

@@ -3,29 +3,31 @@ import { AlertCircle, Loader2, Lock, LogIn, Mail, ShieldCheck, Users } from "luc
 import { supabase } from "./supabaseClient";
 import lottie from "lottie-web";
 import "./Login.css";
-import "./parent-portal.css";
 
 const ROLE_OPTIONS = [
   {
     id: "parents",
     label: "Parents",
-    title: "Parents Login",
+    title: "Parents Portal",
     description: "Access your child's schedule, announcements, and tahfeez report.",
     icon: Users,
+    gradient: "linear-gradient(135deg, #c4a54d 0%, #8a6515 100%)",
   },
   {
     id: "admin",
     label: "Admin",
-    title: "Admin Login",
+    title: "Admin Portal",
     description: "Manage schedules, announcements, teacher attendance, and child overviews.",
     icon: ShieldCheck,
+    gradient: "linear-gradient(135deg, #5a3e1b 0%, #3d2a12 100%)",
   },
   {
     id: "teacher",
     label: "Teacher",
-    title: "Teacher Login",
+    title: "Teacher Portal",
     description: "Open your group cards and fill child results from the tahfeez report form.",
     icon: LogIn,
+    gradient: "linear-gradient(135deg, #b8941f 0%, #7a5c0e 100%)",
   },
 ];
 
@@ -46,6 +48,7 @@ export default function Login({ onLoginSuccess }) {
   }, []);
 
   useEffect(() => {
+    if (!welcomeRef.current) return;
     const anim = lottie.loadAnimation({
       container: welcomeRef.current,
       renderer: "svg",
@@ -85,99 +88,122 @@ export default function Login({ onLoginSuccess }) {
 
   return (
     <div className="login-container">
-      <div className="login-card role-card">
-        <div className="login-header">
-          <div className="logo-wrapper">
-            <img src="/logo.png" alt="Mauze Tahfeez" className="app-logo" />
+      <div className="login-card">
+        {/* Gold accent top bar */}
+        <div className="login-card-accent" />
+
+        {/* Vertical Sidebar Tabs */}
+        <div className="login-sidebar">
+          <div className="sidebar-logo">
+            <img src="/logo.png" alt="Mauze Tahfeez" className="sidebar-logo-img" />
           </div>
-          <div ref={welcomeRef} className="welcome-animation" />
-          <h1>{activeRole.title}</h1>
-          <p>{activeRole.description}</p>
+          <div className="sidebar-portal-label">SELECT PORTAL</div>
+          <div className="sidebar-tabs">
+            {ROLE_OPTIONS.map((role) => {
+              const Icon = role.icon;
+              const isActive = selectedRole === role.id;
+              return (
+                <button
+                  key={role.id}
+                  type="button"
+                  className={`sidebar-tab ${isActive ? "active" : ""}`}
+                  onClick={() => {
+                    setSelectedRole(role.id);
+                    setError(null);
+                    setEmail("");
+                    setPassword("");
+                  }}
+                  style={isActive ? { background: role.gradient } : undefined}
+                >
+                  <div className="sidebar-tab-icon">
+                    <Icon size={20} />
+                  </div>
+                  <span className="sidebar-tab-label">{role.label}</span>
+                  {isActive && <div className="sidebar-tab-indicator" />}
+                </button>
+              );
+            })}
+          </div>
+          <div className="sidebar-footer">
+            <div ref={welcomeRef} className="welcome-animation" />
+            <p className="sidebar-footer-text">&copy; 2026 Mahad al zahra</p>
+          </div>
         </div>
 
-        <div className="role-switcher" aria-label="Select login role">
-          {ROLE_OPTIONS.map((role) => {
-            const Icon = role.icon;
-            return (
-              <button
-                key={role.id}
-                type="button"
-                className={selectedRole === role.id ? "role-tab active" : "role-tab"}
-                onClick={() => setSelectedRole(role.id)}
-              >
-                <Icon size={16} />
-                {role.label}
+        {/* Login Content */}
+        <div className="login-content">
+          <div className="login-content-inner">
+            <div className="content-header">
+              <h1 className="content-title">{activeRole.title}</h1>
+              <p className="content-desc">{activeRole.description}</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="login-form">
+              <div className="input-group">
+                <label htmlFor="email">Email Address</label>
+                <div className="input-with-icon">
+                  <Mail size={18} />
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder={`Enter ${activeRole.label.toLowerCase()} email`}
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label htmlFor="password">Password</label>
+                <div className="input-with-icon">
+                  <Lock size={18} />
+                  <input
+                    id="password"
+                    type="password"
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="error-message">
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="form-row">
+                <label className="remember-me-label">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span>Remember me</span>
+                </label>
+              </div>
+
+              <button type="submit" className="login-button" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="spinner" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    <LogIn size={18} />
+                    Open {activeRole.label} Portal
+                  </>
+                )}
               </button>
-            );
-          })}
-        </div>
-
-        <form onSubmit={handleLogin} className="login-form">
-          <div className="input-group">
-            <label htmlFor="email">Email Address</label>
-            <div className="input-with-icon">
-              <Mail size={18} />
-              <input
-                id="email"
-                type="email"
-                placeholder={`Enter ${activeRole.label.toLowerCase()} email`}
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </div>
+            </form>
           </div>
-
-          <div className="input-group">
-            <label htmlFor="password">Password</label>
-            <div className="input-with-icon">
-              <Lock size={18} />
-              <input
-                id="password"
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          {error ? (
-            <div className="error-message">
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
-          ) : null}
-
-          <div className="remember-me-row">
-            <label className="remember-me-label">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-              />
-              <span>Remember me</span>
-            </label>
-          </div>
-
-          <button type="submit" className="login-button" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 size={18} className="spinner" />
-                Signing in...
-              </>
-            ) : (
-              <>
-                <LogIn size={18} />
-                Open {activeRole.label} Portal
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className="login-footer">
-          <p>&copy; 2026 Mahad al zahra Aljamea tus saifiyah Galiakot</p>
         </div>
       </div>
     </div>

@@ -1878,9 +1878,12 @@ function getFatemiInfo(dateStr) {
       year: 'numeric'
     }).formatToParts(date);
 
-    const d = parseInt(parts.find(p => p.type === 'day').value);
-    const m = parseInt(parts.find(p => p.type === 'month').value);
+    let d = parseInt(parts.find(p => p.type === 'day').value);
+    let m = parseInt(parts.find(p => p.type === 'month').value);
     const y = parts.find(p => p.type === 'year').value;
+
+    if (m === 12 && d === 30) { m = 1; d = 1; }
+    else if (m === 1) d++;
 
     return {
       week: Math.ceil(d / 7),
@@ -7789,7 +7792,7 @@ export default function App() {
     return localStorage.getItem("mauze-dark-mode") === "true";
   });
   const [appTheme, setAppTheme] = useState(() => {
-    return localStorage.getItem("mauze-app-theme") || "ashara";
+    return localStorage.getItem("mauze-app-theme") || "default";
   });
 
   useEffect(() => {

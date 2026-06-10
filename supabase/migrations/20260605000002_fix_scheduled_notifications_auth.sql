@@ -57,7 +57,7 @@ BEGIN
     -- 1. Insert into system_notifications for in-app inbox
     BEGIN
       INSERT INTO system_notifications (title, body, target_role, target_user, redirect_page, file_url)
-      VALUES (notif.title, notif.body, notif.target_role, notif.target_user, notif.redirect_page, notif.file_url);
+      VALUES (notif.title, COALESCE(notif.body, ''), notif.target_role, notif.target_user, notif.redirect_page, notif.file_url);
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'Failed to insert system_notification for %: %', notif.id, SQLERRM;
     END;

@@ -912,7 +912,14 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     document.body.removeChild(container);
   }
 
-  pdf.save(`${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`);
+  // Use data URI for cross-platform compatibility (works in Capacitor Android WebView)
+        const pdfDataUri = pdf.output('datauristring');
+        const dlLink = document.createElement("a");
+        dlLink.href = pdfDataUri;
+        dlLink.download = `${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`;
+        document.body.appendChild(dlLink);
+        dlLink.click();
+        document.body.removeChild(dlLink);
 };
 
 const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
@@ -1516,14 +1523,18 @@ const getFatemiDateStr = (dateStr) => {
     const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
       day: 'numeric', month: 'numeric', year: 'numeric'
     }).formatToParts(date);
-    const d = parts.find(p => p.type === 'day').value;
-    const m = parseInt(parts.find(p => p.type === 'month').value);
-    const y = parts.find(p => p.type === 'year').value;
+    let d = parseInt(parts.find(p => p.type === 'day').value);
+    let m = parseInt(parts.find(p => p.type === 'month').value);
+    let y = parseInt(parts.find(p => p.type === 'year').value);
     const arabicMonths = [
       "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
       "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
       "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
     ];
+    if (m === 12 && d === 30) {
+      return `1 ${arabicMonths[0]} ${y + 1}`;
+    }
+    if (m === 1) d++;
     return `${d} ${arabicMonths[m - 1] || ''} ${y}`;
   } catch { return ''; }
 };
@@ -1542,17 +1553,20 @@ const getDaysFromRange = (startStr, endStr) => {
   if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return null;
   const DAY_NAMES = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
   const days = [];
-  const current = new Date(start);
-  while (current < end) {
-    const dateStr = current.toISOString().split('T')[0];
-    days.push({
-      dayName: DAY_NAMES[current.getUTCDay()],
-      date: dateStr,
-      fatemiDate: getFatemiDateStr(dateStr)
-    });
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-  return days;
+  const current = new Date(start);    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
+      days.push({
+        dayName: DAY_NAMES[current.getUTCDay()],
+        date: dateStr,
+        fatemiDate: getFatemiDateStr(dateStr)
+      });
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+    // Remove only the very last day if the range exceeds 19
+    if (days.length > 19) {
+      days.pop();
+    }
+    return days;
 };
 
 export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId, jadwalSettings }) => {
