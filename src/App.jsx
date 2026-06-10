@@ -2276,7 +2276,13 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
   const rankMap = new Map(); // key: student_id + week_date
   Object.keys(resultsByWeek).forEach(week => {
     const weekResults = resultsByWeek[week];
-    const sorted = [...weekResults].sort((a, b) => (Number(b.total_score) || 0) - (Number(a.total_score) || 0));
+    const sorted = [...weekResults].sort((a, b) => {
+      const scoreDiff = (Number(b.total_score) || 0) - (Number(a.total_score) || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
+      if (jadeedDiff !== 0) return jadeedDiff;
+      return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
+    });
 
     // Unique sequential ranks sorted by total_score descending (no ties)
     sorted.forEach((result, idx) => {
@@ -2305,7 +2311,13 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
 
   // Calculate Global Rank among all students' latest results
   const latestResultsArray = Array.from(latestResultMap.values());
-  latestResultsArray.sort((a, b) => b.effectiveScore - a.effectiveScore);
+  latestResultsArray.sort((a, b) => {
+    const scoreDiff = b.effectiveScore - a.effectiveScore;
+    if (scoreDiff !== 0) return scoreDiff;
+    const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
+    if (jadeedDiff !== 0) return jadeedDiff;
+    return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
+  });
 
   // Unique sequential global ranks (no ties)
   latestResultsArray.forEach((result, idx) => {
@@ -3480,7 +3492,13 @@ function ParentPortal({
   };
 
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
-  const reportSettingsObject = getReportSettingsObject(reportSettings);
+      const sortedWeek = [...weekResults].sort((a, b) => {
+        const scoreDiff = (Number(b.total_score) || 0) - (Number(a.total_score) || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
+        if (jadeedDiff !== 0) return jadeedDiff;
+        return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
+      });
 
   const currentRank = weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank;
   const studentId = studentProfile?.student_id;
@@ -3869,7 +3887,7 @@ function ParentPortal({
         </div>
       </aside>
 
-      <header className="parent-topbar">
+<header className="parent-topbar">
         <div className="parent-topbar-left">
           <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
             <Menu size={22} />
@@ -3880,6 +3898,7 @@ function ParentPortal({
             <span className="topbar-sub">Parents Portal</span>
           </div>
         </div>
+          <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
 
         {allProfiles.length > 1 && (
           <div className="topbar-student-switcher">
@@ -3894,6 +3913,9 @@ function ParentPortal({
             </select>
           </div>
         )}
+        <button className="topbar-logout-btn" onClick={onLogout} title="Logout">
+          <LogOut size={22} />
+        </button>
       </header>
 
       <main className="parent-main">
@@ -5579,6 +5601,7 @@ const handleDownloadAllReports = async () => {
             </button>
             <h2 className="page-title">{activePage}</h2>
           </div>
+          <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
         </header>
 
         <section className="admin-content-pad">
@@ -9310,6 +9333,7 @@ onShowAction,
                         type="number"
                         min="0"
                         name="murajazah"
+                        step="0.1"
                         value={teacherForms.result.murajazah}
                         onChange={onTeacherFormChange}
                         required
@@ -9321,6 +9345,7 @@ onShowAction,
                       <input
                         type="number"
                         min="0"
+                        step="0.1"
                         name="juz_hali"
                         value={teacherForms.result.juz_hali}
                         onChange={onTeacherFormChange}
@@ -9334,6 +9359,7 @@ onShowAction,
                         type="number"
                         min="0"
                         name="takhteet"
+                        step="0.1"
                         value={teacherForms.result.takhteet}
                         onChange={onTeacherFormChange}
                         required

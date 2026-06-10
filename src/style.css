@@ -5682,3 +5682,23 @@ n/* --- Full Width Label Helper --- */
   .skeleton-content-grid { grid-template-columns: 1fr; }
   .skeleton-main { padding: 16px; }
 }
+
+/* Topbar logout button */
+.topbar-logout-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+}
+
+.topbar-logout-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+

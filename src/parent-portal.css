@@ -384,7 +384,22 @@
   flex-shrink: 0;
 }
 
-.topbar-menu-btn:hover {
+.topbar-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(212, 175, 55, 0.05);
+  border: 1.5px solid var(--glass-border);
+  color: var(--text-main);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.topbar-logout-btn:hover {
   background: var(--light-gold);
   color: var(--dark-gold);
   border-color: var(--primary-gold);
@@ -1676,10 +1691,9 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   padding: 16px;
   text-align: center;
   border: 2px solid transparent;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: var(--shadow-sm);
+  margin-left: auto;
 }
+
 .theme-card:hover { transform: translateY(-4px); }
 .theme-card.selected { border-color: var(--primary-gold); background: var(--light-gold); }
 .theme-preview {
