@@ -5555,18 +5555,17 @@ const handleDownloadAllReports = async () => {
               <RotateCw size={14} /> Refresh Data
             </button>
           </div>
-
-          <div className="sidebar-footer">
-            {getAssignedRoles(user).filter(r => r !== 'admin' && r !== 'parents').map((role) => (
-              <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
-                <LogOut size={18} /> Switch to {role}
-              </button>
-            ))}
-            <button className="sidebar-link logout-btn" onClick={onLogout}>
-              <LogOut size={18} /> Logout
-            </button>
-          </div>
         </nav>
+        <div className="sidebar-footer">
+          {getAssignedRoles(user).filter(r => r !== 'admin' && r !== 'parents').map((role) => (
+            <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
+              <LogOut size={18} /> Switch to {role}
+            </button>
+          ))}
+          <button className="sidebar-link logout-btn" onClick={onLogout}>
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
       </aside>
 
       <main className="admin-main">
@@ -9023,18 +9022,17 @@ onShowAction,
               <page.icon size={18} /> {page.label}
             </button>
           ))}
-
-          <div className="sidebar-footer">
-            {getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents').map((role) => (
-              <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
-                <LogOut size={18} /> Switch to {role}
-              </button>
-            ))}
-            <button className="sidebar-link logout-btn" onClick={onLogout}>
-              <LogOut size={18} /> Logout
-            </button>
-          </div>
         </nav>
+        <div className="sidebar-footer">
+          {getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents').map((role) => (
+            <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
+              <LogOut size={18} /> Switch to {role}
+            </button>
+          ))}
+          <button className="sidebar-link logout-btn" onClick={onLogout}>
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
       </aside>
 
       <main className="admin-main">
