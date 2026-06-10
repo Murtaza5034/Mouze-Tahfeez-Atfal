@@ -1275,14 +1275,14 @@ function NotificationBell({ notifications }) {
                       {isImageFile(n.file_url) ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <img src={n.file_url} alt="Attachment" style={{ maxWidth: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '4px' }} />
-                          <a href={n.file_url} target="_blank" rel="noreferrer" download style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none', color: 'var(--primary-gold)', fontWeight: 'bold' }}>
+                          <button onClick={(e) => { e.preventDefault(); downloadFile(n.file_url, getFileNameFromUrl(n.file_url)); }} style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-gold)', fontWeight: 'bold', padding: 0 }}>
                             <Download size={12} /> Download Image
-                          </a>
+                          </button>
                         </div>
                       ) : (
-                        <a href={n.file_url} target="_blank" rel="noreferrer" download style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', color: 'var(--primary-gold)', fontWeight: 'bold' }}>
+                        <button onClick={(e) => { e.preventDefault(); downloadFile(n.file_url, getFileNameFromUrl(n.file_url)); }} style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-gold)', fontWeight: 'bold', padding: 0 }}>
                           <FileArchive size={14} /> Download {getFileNameFromUrl(n.file_url).substring(0, 20)}...
-                        </a>
+                        </button>
                       )}
                     </div>
                   )}
@@ -1735,11 +1735,22 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     setRecording(false);
   };
 
-  const downloadFile = (url, name) => {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = name;
-    link.click();
+  const downloadFile = async (url, name) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const { saveAs } = await import("file-saver");
+      saveAs(blob, name);
+    } catch {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   return (
@@ -3666,14 +3677,9 @@ function ParentPortal({
         });
 
         pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-        // Use data URI for cross-platform compatibility (works in Capacitor Android WebView)
-        const pdfDataUri = pdf.output(datauristring);
-        const dlLink = document.createElement(a);
-        dlLink.href = pdfDataUri;
-        dlLink.download = `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`;
-        document.body.appendChild(dlLink);
-        dlLink.click();
-        document.body.removeChild(dlLink);
+        const pdfBlob = pdf.output("blob");
+        const { saveAs } = await import("file-saver");
+        saveAs(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (showAction) showAction("success", "Report downloaded successfully!");
       } catch (err) {
         console.error("PDF Error:", err);
@@ -4550,16 +4556,13 @@ function ParentPortal({
                         </div>
                       </div>
                     )}
-                    <a 
-                      href={selectedNotification.file_url} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      download
+                    <button 
+                      onClick={() => downloadFile(selectedNotification.file_url, getFileNameFromUrl(selectedNotification.file_url))}
                       className="premium-btn gold" 
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box', border: 'none', cursor: 'pointer' }}
                     >
                       <Download size={16} /> Download File
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>
@@ -9724,16 +9727,13 @@ onShowAction,
                           </div>
                         </div>
                       )}
-                      <a 
-                        href={selectedNotification.file_url} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        download
+                      <button 
+                        onClick={() => downloadFile(selectedNotification.file_url, getFileNameFromUrl(selectedNotification.file_url))}
                         className="premium-btn gold" 
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box' }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box', border: 'none', cursor: 'pointer' }}
                       >
                         <Download size={16} /> Download File
-                      </a>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -9946,7 +9946,7 @@ export default function App() {
     return localStorage.getItem("mauze-dark-mode") === "true";
   });
   const [appTheme, setAppTheme] = useState(() => {
-    return localStorage.getItem("mauze-app-theme") || "ashara";
+    return localStorage.getItem("mauze-app-theme") || "default";
   });
 
   useEffect(() => {

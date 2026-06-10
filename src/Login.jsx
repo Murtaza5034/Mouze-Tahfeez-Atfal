@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { AlertCircle, Loader2, Lock, LogIn, Mail, ShieldCheck, Users } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2, Lock, LogIn, Mail, ShieldCheck, Users } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import lottie from "lottie-web";
 import "./Login.css";
@@ -32,32 +32,65 @@ const ROLE_OPTIONS = [
 ];
 
 export default function Login({ onLoginSuccess }) {
-  const [selectedRole, setSelectedRole] = useState("parents");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState(() => {
+    return localStorage.getItem("mauze-saved-role") || "parents";
+  });
+  const [email, setEmail] = useState(() => {
+    return localStorage.getItem("mauze-saved-email") || "";
+  });
+  const [password, setPassword] = useState(() => {
+    return localStorage.getItem("mauze-saved-password") || "";
+  });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const welcomeRef = useRef(null);
   const [rememberMe, setRememberMe] = useState(() => {
-    return localStorage.getItem("mauze-remember-me") !== "false";
+    const saved = localStorage.getItem("mauze-remember-me");
+    if (saved === null) return true;
+    return saved !== "false";
   });
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("mauze-app-theme") || "ashara";
+    const savedTheme = localStorage.getItem("mauze-app-theme") || "default";
     document.body.setAttribute("data-theme", savedTheme);
   }, []);
 
   useEffect(() => {
     if (!welcomeRef.current) return;
-    const anim = lottie.loadAnimation({
-      container: welcomeRef.current,
-      renderer: "svg",
-      loop: true,
-      autoplay: true,
-      path: "/Welcome.json",
-    });
-    return () => anim.destroy();
+    let anim = null;
+    const timer = setTimeout(() => {
+      try {
+        anim = lottie.loadAnimation({
+          container: welcomeRef.current,
+          renderer: "svg",
+          loop: true,
+          autoplay: true,
+          path: "/Welcome.json",
+        });
+      } catch (e) {
+        console.warn("Lottie animation failed to load:", e);
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      if (anim) anim.destroy();
+    };
   }, []);
+
+  useEffect(() => {
+    if (rememberMe && email && password) {
+      localStorage.setItem("mauze-saved-email", email);
+      localStorage.setItem("mauze-saved-password", password);
+      localStorage.setItem("mauze-saved-role", selectedRole);
+      localStorage.setItem("mauze-remember-me", "true");
+    } else if (!rememberMe) {
+      localStorage.removeItem("mauze-saved-email");
+      localStorage.removeItem("mauze-saved-password");
+      localStorage.removeItem("mauze-saved-role");
+      localStorage.setItem("mauze-remember-me", "false");
+    }
+  }, [rememberMe, email, password, selectedRole]);
 
   const activeRole = ROLE_OPTIONS.find((option) => option.id === selectedRole);
 
@@ -86,6 +119,15 @@ export default function Login({ onLoginSuccess }) {
     }
   };
 
+  const handleRoleSwitch = (roleId) => {
+    setSelectedRole(roleId);
+    setError(null);
+    if (!rememberMe) {
+      setEmail("");
+      setPassword("");
+    }
+  };
+
   return (
     <div className="login-container">
       <div className="login-card">
@@ -107,12 +149,7 @@ export default function Login({ onLoginSuccess }) {
                   key={role.id}
                   type="button"
                   className={`sidebar-tab ${isActive ? "active" : ""}`}
-                  onClick={() => {
-                    setSelectedRole(role.id);
-                    setError(null);
-                    setEmail("");
-                    setPassword("");
-                  }}
+                  onClick={() => handleRoleSwitch(role.id)}
                   style={isActive ? { background: role.gradient } : undefined}
                 >
                   <div className="sidebar-tab-icon">
@@ -161,13 +198,22 @@ export default function Login({ onLoginSuccess }) {
                   <Lock size={18} />
                   <input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     required
                     autoComplete="current-password"
                   />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
 
