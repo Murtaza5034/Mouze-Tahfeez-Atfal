@@ -911,6 +911,11 @@ function getFileNameFromUrl(url) {
   }
 }
 
+async function downloadFile(...args) {
+  const { downloadFile: df } = await import("./downloadUtils");
+  return df(...args);
+}
+
 function readLocalArray(key) {
   if (typeof window === "undefined") {
     return [];
@@ -1733,24 +1738,6 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
   const stopRecording = () => {
     mediaRecorderRef.current?.stop();
     setRecording(false);
-  };
-
-  const downloadFile = async (url, name) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const { saveAs } = await import("file-saver");
-      saveAs(blob, name);
-    } catch {
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = name;
-      link.target = "_blank";
-      link.rel = "noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
   };
 
   return (
@@ -3678,8 +3665,7 @@ function ParentPortal({
 
         pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
         const pdfBlob = pdf.output("blob");
-        const { saveAs } = await import("file-saver");
-        saveAs(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
+        downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (showAction) showAction("success", "Report downloaded successfully!");
       } catch (err) {
         console.error("PDF Error:", err);
@@ -5142,7 +5128,7 @@ const handleDownloadAllReports = async () => {
       if (content.size < 500) {
         throw new Error("Generated ZIP is empty. Please try again.");
       }
-      saveAs(content, `Student_Reports_Bulk_${new Date().toISOString().split('T')[0]}.zip`);
+      downloadFile(content, `Student_Reports_Bulk_${new Date().toISOString().split('T')[0]}.zip`);
       if (onShowAction) onShowAction("success", "All reports downloaded successfully!");
     } catch (err) {
       console.error("Error generating ZIP:", err);

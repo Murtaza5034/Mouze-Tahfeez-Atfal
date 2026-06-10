@@ -825,17 +825,7 @@ function MarhalaPosts({
     }
 
     // 3) Final fallback — download image
-    const link = document.createElement("a");
-    link.download = `marhala-post-${post.id}.png`;
-    link.href = URL.createObjectURL(file);
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-    }, 100);
-    URL.revokeObjectURL(link.href);
+    import("./downloadUtils").then(m => m.downloadFile(file, `marhala-post-${post.id}.png`));
   };
 
   const handleWhatsAppShare = (post, studentInfo) => {

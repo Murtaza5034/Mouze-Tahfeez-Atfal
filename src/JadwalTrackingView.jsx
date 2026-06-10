@@ -393,7 +393,6 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
 
   const downloadCSV = () => {
     const BOM = '\uFEFF';
-    // Determine max number of days across all children
     let maxDays = 0;
     teacherJadwalStats.forEach(t => {
       t.children.forEach(c => {
@@ -401,7 +400,6 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
       });
     });
 
-    // Build header row
     const headers = ['Student Name', 'Teacher Group', 'Mode'];
     for (let d = 0; d < maxDays; d++) {
       const dateStr = dayDateStrings[d] || '';
@@ -435,7 +433,6 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
       });
     });
 
-    // Escape CSV cells
     const esc = (val) => {
       const s = String(val || '');
       if (s.includes(',') || s.includes('"') || s.includes('\n')) {
@@ -446,12 +443,7 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
 
     const csvContent = BOM + [headers, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Jadwal_Tracking_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    import("./downloadUtils").then(m => m.downloadFile(blob, `Jadwal_Tracking_${new Date().toISOString().split('T')[0]}.csv`));
   };
 
   const renderDayCell = (dayDetail, mode) => {

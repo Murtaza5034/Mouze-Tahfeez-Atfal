@@ -912,14 +912,8 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     document.body.removeChild(container);
   }
 
-  // Use data URI for cross-platform compatibility (works in Capacitor Android WebView)
-        const pdfDataUri = pdf.output('datauristring');
-        const dlLink = document.createElement("a");
-        dlLink.href = pdfDataUri;
-        dlLink.download = `${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`;
-        document.body.appendChild(dlLink);
-        dlLink.click();
-        document.body.removeChild(dlLink);
+  const pdfBlob = pdf.output('blob');
+  import("./downloadUtils").then(m => m.downloadFile(pdfBlob, `${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`));
 };
 
 const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
