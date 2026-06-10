@@ -2657,9 +2657,12 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
           <div className="trophy-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
             <LottieTrophy size={140} />
-            <span className="rankPopSide rankCelebrationSide" key={weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank} style={{ fontSize: '56px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-              <span className="kanz-font">{toArabicDigits(weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank || "-")}</span>
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#c5a059', textTransform: 'uppercase', letterSpacing: '2px' }} className="child-hood-font">Rank</span>
+              <span className="rankPopSide rankCelebrationSide" key={weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank} style={{ fontSize: '56px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                <span className="kanz-font">{toArabicDigits(weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank || "-")}</span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -8924,6 +8927,8 @@ onShowAction,
     }
 
     setSchoolData((current) => {
+      const prevStudent = current.students.find(s => String(s.student_id) === String(data.student_id));
+      const prevRank = prevStudent?.latestResult?.computedRank;
       const nextWeeklyResults = [
         data,
         ...current.weeklyResults.filter((result) =>
@@ -8935,7 +8940,7 @@ onShowAction,
       ];
       const refreshedStudents = current.students.map((student) =>
         String(student.student_id) === String(data.student_id)
-          ? { ...student, latestResult: data }
+          ? { ...student, latestResult: prevRank ? { ...data, computedRank: prevRank } : data }
           : student
       );
       return {
@@ -9587,7 +9592,7 @@ onShowAction,
                         {isGeneratingTeacherPDF ? "Generating PDF..." : "Download Report PDF"}
                       </button>
                     </div>
-                    <div id="teacher-capture-content">
+                    <div>
                       <TahfeezReportCard
                         student={selectedStudent}
                         weeklyResult={liveResult}
@@ -9601,6 +9606,32 @@ onShowAction,
                   </div>
                 )}
               </section>
+
+              {/* Hidden capture zone for Teacher PDF download */}
+              <div 
+                id="teacher-capture-zone"
+                style={{ 
+                  position: 'fixed', 
+                  left: '-10000px', 
+                  top: '0', 
+                  width: '850px', 
+                  zIndex: -1000, 
+                  background: 'white',
+                  overflow: 'hidden',
+                  height: isGeneratingTeacherPDF ? 'auto' : '1px',
+                  visibility: isGeneratingTeacherPDF ? 'visible' : 'hidden'
+                }}
+              >
+                {isGeneratingTeacherPDF && (
+                  <div id="teacher-capture-content" style={{ padding: '40px', background: 'white' }}>
+                    <TahfeezReportCard
+                      student={selectedStudent}
+                      weeklyResult={liveResult}
+                      settings={reportSettingsObject}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           ) : null}
 
@@ -12018,6 +12049,8 @@ const handleSendCustomNotification = async (event) => {
     }
 
     setSchoolData((current) => {
+      const prevStudent = current.students.find(s => String(s.student_id) === String(data.student_id));
+      const prevRank = prevStudent?.latestResult?.computedRank;
       const nextWeeklyResults = [
         data,
         ...current.weeklyResults.filter((result) =>
@@ -12029,7 +12062,7 @@ const handleSendCustomNotification = async (event) => {
       ];
       const refreshedStudents = current.students.map((student) =>
         String(student.student_id) === String(data.student_id)
-          ? { ...student, latestResult: data }
+          ? { ...student, latestResult: prevRank ? { ...data, computedRank: prevRank } : data }
           : student
       );
 
