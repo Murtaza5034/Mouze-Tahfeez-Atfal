@@ -8769,6 +8769,76 @@ onShowAction,
       total_score
     };
   }, [selectedStudent, teacherForms.result]);
+
+  const [isGeneratingTeacherPDF, setIsGeneratingTeacherPDF] = useState(false);
+  const handleTeacherDownloadReport = async () => {
+    if (!selectedStudent) return;
+    setIsGeneratingTeacherPDF(true);
+    if (onShowAction) onShowAction("success", "Preparing report PDF...");
+
+    let element = null;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 400));
+      element = document.getElementById("teacher-capture-content");
+      if (element) break;
+    }
+
+    if (element) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadCustomFontsForCanvas();
+
+        const [html2canvas, jsPDF] = await Promise.all([
+          loadHtml2Canvas(),
+          loadJsPDF(),
+        ]);
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          onclone: async (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent = FONT_FACE_CSS;
+            clonedDoc.head.appendChild(style);
+            if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+              await Promise.race([
+                clonedDoc.fonts.ready,
+                new Promise(resolve => setTimeout(resolve, 3000)),
+              ]);
+            }
+          },
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.85);
+        if (imgData.length < 5000) throw new Error("Capture failed");
+
+        const pdfWidth = 210;
+        const imgProps = new jsPDF().getImageProperties(imgData);
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const finalPdfHeight = Math.max(297, pdfHeight);
+
+        const pdf = new jsPDF({
+          orientation: "p",
+          unit: "mm",
+          format: [pdfWidth, finalPdfHeight]
+        });
+
+        pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        const pdfBlob = pdf.output("blob");
+        downloadFile(pdfBlob, `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
+        if (onShowAction) onShowAction("success", "Report downloaded successfully!");
+      } catch (err) {
+        console.error("PDF Error:", err);
+        if (onShowAction) onShowAction("error", "Failed to generate PDF.");
+      }
+    } else {
+      if (onShowAction) onShowAction("error", "Capture element not found.");
+    }
+
+    setIsGeneratingTeacherPDF(false);
+  };
+
   const performAutoSaveTeacherResult = useCallback(async () => {
     if (!canTeacherFillProgress) return;
     if (isTeacherResultLocked(reportSettingsObject)) return;
@@ -9500,15 +9570,32 @@ onShowAction,
                       <div>
                         <h3>{selectedStudent.name}</h3>
                         <p>
-                          {selectedStudent.groupName} آ· {selectedStudent.teacherName}
+                          {selectedStudent.groupName} · {selectedStudent.teacherName}
                         </p>
                       </div>
                     </div>
-                    <TahfeezReportCard
-                      student={selectedStudent}
-                      weeklyResult={liveResult}
-                      settings={reportSettingsObject}
-                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                      <button
+                        className="action-button premium"
+                        onClick={handleTeacherDownloadReport}
+                        disabled={isGeneratingTeacherPDF}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontSize: '13px' }}
+                      >
+                        {isGeneratingTeacherPDF ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Download size={16} />
+                        )}
+                        {isGeneratingTeacherPDF ? "Generating PDF..." : "Download Report PDF"}
+                      </button>
+                    </div>
+                    <div id="teacher-capture-content">
+                      <TahfeezReportCard
+                        student={selectedStudent}
+                        weeklyResult={liveResult}
+                        settings={reportSettingsObject}
+                      />
+                    </div>
                   </>
                 ) : (
                   <div className="empty-state">
