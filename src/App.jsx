@@ -3457,6 +3457,7 @@ function ParentPortal({
   onClearAllAnnounces,
   actionMessage,
 }) {
+  const reportSettingsObject = normalizeReportSettings(propReportSettings);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const backdropMouseDownRef = useRef(false);
   const notificationOpenedAtRef = useRef(0);
@@ -3491,14 +3492,7 @@ function ParentPortal({
     closeNotificationDetail();
   };
 
-  const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData;
-      const sortedWeek = [...weekResults].sort((a, b) => {
-        const scoreDiff = (Number(b.total_score) || 0) - (Number(a.total_score) || 0);
-        if (scoreDiff !== 0) return scoreDiff;
-        const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
-        if (jadeedDiff !== 0) return jadeedDiff;
-        return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
-      });
+  const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData || {};
 
   const currentRank = weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank;
   const studentId = studentProfile?.student_id;
@@ -3644,10 +3638,8 @@ function ParentPortal({
     if (element) {
       try {
         await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Ensure custom fonts (Kanz al Marjaan, Al-Kanz) are fully loaded before canvas capture
+        // Ensure custom fonts are loaded
         await loadCustomFontsForCanvas();
-
         const [html2canvas, jsPDF] = await Promise.all([
           loadHtml2Canvas(),
           loadJsPDF(),
@@ -3669,23 +3661,19 @@ function ParentPortal({
             }
           },
         });
-
-        const imgData = canvas.toDataURL("image/jpeg", 0.85);
+        const imgData = canvas.toDataURL("image/jpeg", 0.75); // reduced quality for smaller size
         if (imgData.length < 5000) throw new Error("Capture failed");
 
-        const pdfWidth = 210;
-        const imgProps = new jsPDF().getImageProperties(imgData);
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        const finalPdfHeight = Math.max(297, pdfHeight);
-
-        const pdf = new jsPDF({
-          orientation: "p",
-          unit: "mm",
-          format: [pdfWidth, finalPdfHeight]
-        });
-
-        pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-        const pdfBlob = pdf.output("blob");
+        // Use A4 size and fit the image while preserving aspect ratio
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgWidth = pageWidth - 20; // 10mm margin each side
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+        const finalHeight = imgHeight > pageHeight - 20 ? pageHeight - 20 : imgHeight;
+        pdf.addImage(imgData, "JPEG", 10, 10, imgWidth, finalHeight, undefined, 'FAST');
+        const pdfBlob = pdf.output('blob');
         downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (showAction) showAction("success", "Report downloaded successfully!");
       } catch (err) {
@@ -4947,6 +4935,8 @@ function AdminPortal({
     setJadwalSettingsDraft(normalizeJadwalSettings(jadwalSettings));
   }, [jadwalSettings]);
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [studentToRender, setStudentToRender] = useState(null);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
   const [whatsAppLogs, setWhatsAppLogs] = useState([]);
@@ -5111,31 +5101,19 @@ const handleDownloadAllReports = async () => {
             throw new Error("Captured image is blank or too small.");
           }
 
-          const pdfWidth = 210; // A4 Width in mm
-          
-          // Create a temporary instance to calculate dimensions
-          const pdf = new jsPDF({
-            orientation: "p",
-            unit: "mm",
-            format: "a4"
-          });
-          
+          // Use A4 size and fit the image while preserving aspect ratio with margins
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
           const imgProps = pdf.getImageProperties(imgData);
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-          const finalPdfHeight = Math.max(297, pdfHeight);
-          
-          // If height is custom, we need a new instance with that height
-          let finalPdf = pdf;
-          if (finalPdfHeight > 297) {
-            finalPdf = new jsPDF({
-              orientation: "p",
-              unit: "mm",
-              format: [pdfWidth, finalPdfHeight]
-            });
-          }
-          
-          finalPdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-          const pdfBlob = finalPdf.output("blob");
+          const margin = 10;
+          const maxWidth = pageWidth - margin * 2;
+          const maxHeight = pageHeight - margin * 2;
+          const imgWidth = maxWidth;
+          const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+          const finalHeight = imgHeight > maxHeight ? maxHeight : imgHeight;
+          pdf.addImage(imgData, "JPEG", margin, margin, imgWidth, finalHeight, undefined, 'FAST');
+          const pdfBlob = pdf.output("blob");
           const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
           zip.file(`${i+1}_${safeName}_Report.pdf`, pdfBlob);
         } catch (err) {
@@ -8889,13 +8867,13 @@ onShowAction,
       jadeed: sJadeed,
       wusool_juz: f.wusool_juz || null,
       wusool_page: f.wusool_page || null,
-      wusool_surah: f.wusool_surah || null,
+      wusool_surah: f.wusool_surah ?? "",
       next_week_juz: f.next_week_juz || null,
       next_week_page: f.next_week_page || null,
-      next_week_surah: f.next_week_surah || null,
+      next_week_surah: f.next_week_surah ?? "",
       istifadah_juz: f.istifadah_juz || null,
       istifadah_page: f.istifadah_page || null,
-      istifadah_surah: f.istifadah_surah || null,
+      istifadah_surah: f.istifadah_surah ?? "",
       matrookah: f.matrookah || null,
       daeefah: f.daeefah || null,
       attendance_note: f.attendance_note || null,
@@ -10172,7 +10150,7 @@ export default function App() {
     if (studentResults.length > 0) {
       setTeacherForms(curr => ({
         ...curr,
-        result: { ...curr.result, ...studentResults[0], student_id: numericId }
+        result: { ...curr.result, ...studentResults[0], wusool_surah: studentResults[0]?.wusool_surah || "", next_week_surah: studentResults[0]?.next_week_surah || "", istifadah_surah: studentResults[0]?.istifadah_surah || "", student_id: numericId }
       }));
     } else {
       setTeacherForms(curr => ({
@@ -11156,7 +11134,7 @@ export default function App() {
           // Load today's existing result
           setTeacherForms(curr => ({
             ...curr,
-            result: { ...curr.result, ...todayResult, student_id: numericId }
+            result: { ...curr.result, ...todayResult, wusool_surah: todayResult?.wusool_surah || "", next_week_surah: todayResult?.next_week_surah || "", istifadah_surah: todayResult?.istifadah_surah || "", student_id: numericId }
           }));
         } else if (studentResults.length > 0) {
           // Load latest result as template but use today's week_date (new record)
@@ -11165,6 +11143,9 @@ export default function App() {
             result: {
               ...curr.result,
               ...studentResults[0],
+              wusool_surah: studentResults[0]?.wusool_surah || "",
+              next_week_surah: studentResults[0]?.next_week_surah || "",
+              istifadah_surah: studentResults[0]?.istifadah_surah || "",
               student_id: numericId,
               week_date: today,
               teacher_edit_count: 0,
