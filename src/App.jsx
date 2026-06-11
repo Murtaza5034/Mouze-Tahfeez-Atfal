@@ -3504,7 +3504,13 @@ function ParentPortal({
     const previousResult = studentResults.length > 1 ? studentResults[1] : null;
     if (previousResult) {
       const weekResults = (schoolData.weeklyResults || []).filter(r => r.week_date === previousResult.week_date);
-      const sortedWeek = [...weekResults].sort((a, b) => (Number(b.total_score) || 0) - (Number(a.total_score) || 0));
+      const sortedWeek = [...weekResults].sort((a, b) => {
+        const scoreDiff = (Number(b.total_score) || 0) - (Number(a.total_score) || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
+        if (jadeedDiff !== 0) return jadeedDiff;
+        return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
+      })
       const prevIdx = sortedWeek.findIndex(r =>
         String(r.student_id).trim().toLowerCase() === String(studentId).trim().toLowerCase()
       );
