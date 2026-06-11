@@ -9016,7 +9016,7 @@ onShowAction,
       week_date: f.week_date || getToday(),
       student_id: numericId,
       attendance_count: toNumber(f.attendance_count),
-      total_jadeed_pages: f.total_jadeed_pages || null,
+      total_jadeed_pages: f.total_jadeed_pages ?? null,
       murajazah: sMurajazah,
       juz_hali: sJuzHali,
       takhteet: sTakhteet,
@@ -10895,7 +10895,6 @@ export default function App() {
       schedule: [],
       portalAccessList: [],
     });
-    localStorage.clear();
     showAction(null, null);
 
     try {
@@ -10903,6 +10902,7 @@ export default function App() {
     } catch (err) {
       console.warn("Logout error:", err);
     }
+    localStorage.clear();
     window.location.reload();
   };
 
@@ -11336,25 +11336,7 @@ export default function App() {
       }
       setSaveStatus("");
 
-      // Reset surah fields when switching to a low-Juz student (prevents stale data)
-      const newStudent = schoolData.students.find(
-        (s) => String(s.student_id) === String(value)
-      );
-      if (newStudent) {
-        const newJuz = Number(newStudent.hifz?.juz) || 0;
-        if (newJuz > 0 && newJuz < 26) {
-          // Clear surah fields since SurahDropdown is hidden for Juz 1-25
-          setTeacherForms((curr) => ({
-            ...curr,
-            result: {
-              ...curr.result,
-              wusool_surah: "",
-              next_week_surah: "",
-              istifadah_surah: "",
-            },
-          }));
-        }
-      }
+
     } else if (name !== "student_id" && teacherForms.result.student_id) {
       if (typeof performAutoSaveRef?.current === "function") {
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
