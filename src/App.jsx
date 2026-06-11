@@ -2667,11 +2667,10 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             ))}
           </div>
 
-          <div className="trophy-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
-            <LottieTrophy size={140} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '10px 0' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#c5a059', textTransform: 'uppercase', letterSpacing: '2px' }} className="child-hood-font">Rank</span>
-              <span className="rankPopSide rankCelebrationSide" key={weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank} style={{ fontSize: '56px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#c5a059', textTransform: 'uppercase', letterSpacing: '1.5px' }} className="child-hood-font">Rank</span>
+              <span style={{ fontSize: '48px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 6px rgba(0,0,0,0.12)', lineHeight: '1' }}>
                 <span className="kanz-font">{toArabicDigits(weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank || "-")}</span>
               </span>
             </div>
@@ -2737,6 +2736,21 @@ function RankPreview({ students }) {
     return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
   };
 
+  const getTieInfo = (sorted, student, idx) => {
+    if (idx === 0) return 'Leader';
+    const prev = sorted[idx - 1];
+    if (prev.score === student.score) {
+      if (prev.jadeed === student.jadeed) {
+        if (prev.attendance === student.attendance) {
+          return "Tied on Score, Jadeed & Attendance";
+        }
+        return "Tied on Score & Jadeed \u2192 Attendance broke tie";
+      }
+      return "Tied on Score \u2192 Jadeed broke tie";
+    }
+    return '';
+  };
+
   const rankedStudents = useMemo(() => {
     const withScores = studentList
       .filter(s => s.latestResult)
@@ -2761,21 +2775,6 @@ function RankPreview({ students }) {
       tieInfo: getTieInfo(withScores, s, idx),
     }));
   }, [students]);
-
-  const getTieInfo = (sorted, student, idx) => {
-    if (idx === 0) return 'Leader';
-    const prev = sorted[idx - 1];
-    if (prev.score === student.score) {
-      if (prev.jadeed === student.jadeed) {
-        if (prev.attendance === student.attendance) {
-          return "Tied on Score, Jadeed & Attendance";
-        }
-        return "Tied on Score & Jadeed \u2192 Attendance broke tie";
-      }
-      return "Tied on Score \u2192 Jadeed broke tie";
-    }
-    return '';
-  };
 
   return (
     <div className="fade-in" style={{ padding: '20px 0' }}>
@@ -8393,8 +8392,7 @@ const handleDownloadAllReports = async () => {
                       width: '100%',
                       border: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
                       borderRadius: '4px',
-                      overflow: 'hidden',
-                      background: jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff',
+                          background: jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff',
                       position: 'relative',
                       display: 'flex',
                       flexDirection: 'column',
@@ -10405,7 +10403,11 @@ export default function App() {
         const res = await supabase.auth.getSession();
         session = res?.data?.session ?? null;
       } catch (e) {
-        console.warn("Session check failed (offline?), trying cached auth", e);
+        console.warn("Session check failed, clearing stale Supabase tokens", e);
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        }
+        try { await supabase.auth.signOut(); } catch (_) {}
       }
 
       if (!mounted) return;
