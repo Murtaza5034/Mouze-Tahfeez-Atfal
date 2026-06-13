@@ -73,10 +73,15 @@
   }
   .admin-sidebar {
     transform: translateX(-100%);
+    overflow-y: auto;
   }
   .admin-sidebar:not(.collapsed) {
     transform: translateX(0);
     box-shadow: 20px 0 60px rgba(61, 43, 31, 0.2);
+  }
+  .sidebar-nav {
+    overflow-y: visible;
+    flex: none;
   }
 }
 
@@ -207,6 +212,7 @@
   margin-top: auto;
   padding: 16px 0 24px;
   border-top: 1px solid var(--glass-border);
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 .sidebar-link.logout-btn {

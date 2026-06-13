@@ -14,20 +14,20 @@ const ROLE_OPTIONS = [
     gradient: "linear-gradient(135deg, #c4a54d 0%, #8a6515 100%)",
   },
   {
-    id: "admin",
-    label: "Admin",
-    title: "Admin Portal",
-    description: "Manage schedules, announcements, teacher attendance, and child overviews.",
-    icon: ShieldCheck,
-    gradient: "linear-gradient(135deg, #5a3e1b 0%, #3d2a12 100%)",
-  },
-  {
     id: "teacher",
     label: "Teacher",
     title: "Teacher Portal",
     description: "Open your group cards and fill child results from the tahfeez report form.",
     icon: LogIn,
     gradient: "linear-gradient(135deg, #b8941f 0%, #7a5c0e 100%)",
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    title: "Admin Portal",
+    description: "Manage schedules, announcements, teacher attendance, and child overviews.",
+    icon: ShieldCheck,
+    gradient: "linear-gradient(135deg, #5a3e1b 0%, #3d2a12 100%)",
   },
 ];
 
@@ -131,125 +131,115 @@ export default function Login({ onLoginSuccess }) {
   return (
     <div className="login-container">
       <div className="login-card">
-        {/* Gold accent top bar */}
         <div className="login-card-accent" />
 
-        {/* Vertical Sidebar Tabs */}
-        <div className="login-sidebar">
-          <div className="sidebar-logo">
-            <img src="/logo.png" alt="Mauze Tahfeez" className="sidebar-logo-img" />
-          </div>
-          <div className="sidebar-portal-label">SELECT PORTAL</div>
-          <div className="sidebar-tabs">
-            {ROLE_OPTIONS.map((role) => {
-              const Icon = role.icon;
-              const isActive = selectedRole === role.id;
-              return (
-                <button
-                  key={role.id}
-                  type="button"
-                  className={`sidebar-tab ${isActive ? "active" : ""}`}
-                  onClick={() => handleRoleSwitch(role.id)}
-                  style={isActive ? { background: role.gradient } : undefined}
-                >
-                  <div className="sidebar-tab-icon">
-                    <Icon size={20} />
-                  </div>
-                  <span className="sidebar-tab-label">{role.label}</span>
-                  {isActive && <div className="sidebar-tab-indicator" />}
-                </button>
-              );
-            })}
-          </div>
-          <div className="sidebar-footer">
-            <div ref={welcomeRef} className="welcome-animation" />
-            <p className="sidebar-footer-text">&copy; 2026 Mahad al zahra</p>
-          </div>
+        <div className="login-logo">
+          <img src="/logo.png" alt="Mauze Tahfeez" className="login-logo-img" />
         </div>
 
-        {/* Login Content */}
-        <div className="login-content">
-          <div className="login-content-inner">
-            <div className="content-header">
-              <h1 className="content-title">{activeRole.title}</h1>
-              <p className="content-desc">{activeRole.description}</p>
+        <div className="portal-tabs-row">
+          {ROLE_OPTIONS.map((role) => {
+            const Icon = role.icon;
+            const isActive = selectedRole === role.id;
+            return (
+              <button
+                key={role.id}
+                type="button"
+                className={`portal-tab ${isActive ? "active" : ""}`}
+                onClick={() => handleRoleSwitch(role.id)}
+                style={isActive ? { background: role.gradient } : undefined}
+              >
+                <div className="portal-tab-icon">
+                  <Icon size={20} />
+                </div>
+                <span className="portal-tab-label">{role.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="login-body">
+          <div ref={welcomeRef} className="welcome-animation" />
+
+          <div className="content-header">
+            <h1 className="content-title">{activeRole.title}</h1>
+            <p className="content-desc">{activeRole.description}</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="login-form">
+            <div className="input-group">
+              <label htmlFor="email">Email Address</label>
+              <div className="input-with-icon">
+                <Mail size={18} />
+                <input
+                  id="email"
+                  type="email"
+                  placeholder={`Enter ${activeRole.label.toLowerCase()} email`}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
             </div>
 
-            <form onSubmit={handleLogin} className="login-form">
-              <div className="input-group">
-                <label htmlFor="email">Email Address</label>
-                <div className="input-with-icon">
-                  <Mail size={18} />
-                  <input
-                    id="email"
-                    type="email"
-                    placeholder={`Enter ${activeRole.label.toLowerCase()} email`}
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
+            <div className="input-group">
+              <label htmlFor="password">Password</label>
+              <div className="input-with-icon">
+                <Lock size={18} />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
+            </div>
 
-              <div className="input-group">
-                <label htmlFor="password">Password</label>
-                <div className="input-with-icon">
-                  <Lock size={18} />
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    className="password-toggle-btn"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    tabIndex={-1}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+            {error && (
+              <div className="error-message">
+                <AlertCircle size={16} />
+                <span>{error}</span>
               </div>
+            )}
 
-              {error && (
-                <div className="error-message">
-                  <AlertCircle size={16} />
-                  <span>{error}</span>
-                </div>
+            <div className="form-row">
+              <label className="remember-me-label">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <span>Remember me</span>
+              </label>
+            </div>
+
+            <button type="submit" className="login-button" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 size={18} className="spinner" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <LogIn size={18} />
+                  Open {activeRole.label} Portal
+                </>
               )}
-
-              <div className="form-row">
-                <label className="remember-me-label">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  <span>Remember me</span>
-                </label>
-              </div>
-
-              <button type="submit" className="login-button" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 size={18} className="spinner" />
-                    Signing in...
-                  </>
-                ) : (
-                  <>
-                    <LogIn size={18} />
-                    Open {activeRole.label} Portal
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
+            </button>
+          </form>
         </div>
       </div>
     </div>

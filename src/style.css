@@ -3410,7 +3410,8 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-.topbar {
+.topbar,
+.parent-topbar {
   padding-top: var(--safe-top);
 }
 

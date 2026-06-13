@@ -212,6 +212,7 @@
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 20px 0 60px rgba(61, 43, 31, 0.15);
   border-right: 1px solid var(--glass-border);
+  overflow-y: auto;
 }
 
 .parent-drawer.open {
@@ -272,9 +273,7 @@
 }
 
 .drawer-nav {
-  flex: 1;
   padding: 24px 0;
-  overflow-y: auto;
 }
 
 .drawer-section-label {
@@ -317,8 +316,9 @@
 .drawer-link.logout:hover { background: #fef2f2; }
 
 .drawer-footer {
-  padding: 16px 0 40px;
+  padding: 16px 0 24px;
   border-top: 1px solid var(--glass-border);
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ---- Top Header Bar ---- */

@@ -672,7 +672,7 @@ const SurahRangePicker = ({ value, onChange }) => {
   );
 };
 
-const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', theme = {}, style = 'table', dayDates = []) => {
+const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', theme = {}, style = 'table', dayDates = [], onDownloadComplete = null) => {
   const t = { ...getDefaultTheme(), ...theme };
   const bgRgb = hexToRgb(t.backgroundColor);
   const bgCss = t.backgroundUrl
@@ -851,7 +851,10 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
   const allCards = pdfDays.map((_, idx) => buildCardHtml(pdfDays[idx], idx));
 
-  const pageLimit = (containerWidth + 80) * (297 / 210);
+  const margin = 10;
+  const printableWidth = 210 - margin * 2;
+  const printableHeight = 297 - margin * 2;
+  const pageLimit = (containerWidth + 80) * (printableHeight / printableWidth);
   const measureEl = document.createElement("div");
   measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
   document.body.appendChild(measureEl);
@@ -908,12 +911,19 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
     const imgData = canvas.toDataURL("image/jpeg", 0.85);
     if (pi > 0) pdf.addPage();
-    pdf.addImage(imgData, "JPEG", 0, 0, 210, (canvas.height * 210) / canvas.width, undefined, 'FAST');
+    const imgWidth2 = printableWidth;
+    const imgHeight2 = (canvas.height * imgWidth2) / canvas.width;
+    const finalHeight = imgHeight2 > printableHeight ? printableHeight : imgHeight2;
+    pdf.addImage(imgData, "JPEG", margin, margin, imgWidth2, finalHeight, undefined, 'FAST');
     document.body.removeChild(container);
   }
 
   const pdfBlob = pdf.output('blob');
-  import("./downloadUtils").then(m => m.downloadFile(pdfBlob, `${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`));
+  const fileName = `${studentName.replace(/[^a-z0-9]/gi, '_')}_Jadwal.pdf`;
+  const dlResult = await import("./downloadUtils").then(m => m.downloadFile(pdfBlob, fileName));
+  if (dlResult?.type === "native" && onDownloadComplete) {
+    onDownloadComplete({ filePath: dlResult.filePath, fileName });
+  }
 };
 
 const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
@@ -1563,7 +1573,7 @@ const getDaysFromRange = (startStr, endStr) => {
     return days;
 };
 
-export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId, jadwalSettings }) => {
+export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotification, initialStudentId, jadwalSettings, onDownloadComplete }) => {
   const settings = Array.isArray(jadwalSettings) ? jadwalSettings[0] : jadwalSettings;
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [scheduleData, setScheduleData] = useState({ ...DEFAULT_SCHEDULE, _mode: 'juz-wise' });
@@ -1791,7 +1801,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
               </button>
               <button
                 className="jadwal-download-btn"
-onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacherDisplayStyle, dayDates)}
+onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacherDisplayStyle, dayDates, onDownloadComplete)}
               >
                 <Download size={16} /> Download PDF
               </button>
@@ -1846,7 +1856,7 @@ onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacher
   );
 };
 
-export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherProfiles, showAction, jadwalSettings }) => {
+export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherProfiles, showAction, jadwalSettings, onDownloadComplete }) => {
   const settings = Array.isArray(jadwalSettings) ? jadwalSettings[0] : jadwalSettings;
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [studentName, setStudentName] = useState('Student');
@@ -1958,7 +1968,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
         <h2>{theme.jadwalType === 'miqaat' ? "Miqaāt Jadwal Schedule" : "Weekly Jadwal Schedule"}</h2>
         <button
           className="jadwal-save-btn"
-          onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, displayStyle, dayDates)}
+          onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, displayStyle, dayDates, onDownloadComplete)}
         >
           <Download size={16} /> Download PDF
         </button>

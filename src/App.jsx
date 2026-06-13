@@ -3616,6 +3616,7 @@ function ParentPortal({
 
   const [parentViewedStatus, setParentViewedStatus] = useState(false);
   const [celebrationRank, setCelebrationRank] = useState(null); // 1, 2, or 3 for celebration popup
+  const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
   const [secondsSpent, setSecondsSpent] = useState(0);
 
   const openNotificationDetail = (event, notification) => {
@@ -3832,8 +3833,12 @@ function ParentPortal({
         const finalHeight = imgHeight > pageHeight - 20 ? pageHeight - 20 : imgHeight;
         pdf.addImage(imgData, "JPEG", 10, 10, imgWidth, finalHeight, undefined, 'FAST');
         const pdfBlob = pdf.output('blob');
-        downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
-        if (showAction) showAction("success", "Report downloaded successfully!");
+        const dlResult = await downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
+        if (dlResult?.type === "native") {
+          setDownloadPopup({ filePath: dlResult.filePath, fileName: `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf` });
+        } else {
+          if (showAction) showAction("success", "Report downloaded successfully!");
+        }
       } catch (err) {
         console.error("PDF Error:", err);
         if (showAction) showAction("error", "Failed to generate PDF.");
@@ -4044,8 +4049,6 @@ function ParentPortal({
             <span className="topbar-sub">Parents Portal</span>
           </div>
         </div>
-          <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
-
         {allProfiles.length > 1 && (
           <div className="topbar-student-switcher">
             <select
@@ -4260,22 +4263,6 @@ function ParentPortal({
 
         {activePage === "Child Summary" ? (
           <div className="card-appear">
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-              <button 
-                className="action-button premium" 
-                onClick={handleDownloadReport}
-                disabled={isGeneratingPDF}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
-              >
-                {isGeneratingPDF ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Download size={18} />
-                )}
-                {isGeneratingPDF ? "Generating PDF..." : "Download Report"}
-              </button>
-            </div>
-
             {(() => {
               const settings = reportSettingsObject;
               const isLiveMode = settings?.reports_live !== false; // true = Live, false = Hidden
@@ -4319,21 +4306,38 @@ function ParentPortal({
               }
 
               return (
-                <TahfeezReportCard
-                  student={{
-                    name: studentProfile?.name,
-                    arabic_name: studentProfile?.arabic_name,
-                    groupName: studentProfile?.groupName || studentProfile?.class_level,
-                    photoUrl: studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url,
-                    photo_url: studentProfile?.photo_url || studentProfile?.photoUrl || studentProfile?.avatar_url,
-                  }}
-                  weeklyResult={weeklyResult || studentProfile?.latestResult}
-                  settings={settings}
-                  parentViewed={parentViewedStatus}
-                  timerSeconds={secondsSpent}
-                  isParentPortal={true}
-                  rankImproved={rankImproved}
-                />
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                    <button 
+                      className="action-button premium" 
+                      onClick={handleDownloadReport}
+                      disabled={isGeneratingPDF}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
+                    >
+                      {isGeneratingPDF ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <Download size={18} />
+                      )}
+                      {isGeneratingPDF ? "Generating PDF..." : "Download Report"}
+                    </button>
+                  </div>
+                  <TahfeezReportCard
+                    student={{
+                      name: studentProfile?.name,
+                      arabic_name: studentProfile?.arabic_name,
+                      groupName: studentProfile?.groupName || studentProfile?.class_level,
+                      photoUrl: studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url,
+                      photo_url: studentProfile?.photo_url || studentProfile?.photoUrl || studentProfile?.avatar_url,
+                    }}
+                    weeklyResult={weeklyResult || studentProfile?.latestResult}
+                    settings={settings}
+                    parentViewed={parentViewedStatus}
+                    timerSeconds={secondsSpent}
+                    isParentPortal={true}
+                    rankImproved={rankImproved}
+                  />
+                </>
               );
             })()}
 
@@ -4401,6 +4405,53 @@ function ParentPortal({
           </div>
         )}
 
+        {downloadPopup && (
+          <div className="celebration-overlay" onClick={() => setDownloadPopup(null)}>
+            <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+              <div className="celebration-content">
+                <div className="celebration-emoji-row">
+                  <span className="celebration-emoji" style={{fontSize:'36px'}}>&#x2705;</span>
+                </div>
+                <h2 className="celebration-title">Download Completed!</h2>
+                <p className="celebration-message">
+                  Your report has been downloaded successfully.
+                </p>
+                <p style={{fontSize:'0.8rem',color:'var(--soft-brown)',marginBottom:'20px',wordBreak:'break-all'}}>
+                  {downloadPopup.fileName}
+                </p>
+                <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
+                  <button className="celebration-close-btn" onClick={async () => {
+                    try {
+                      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+                      const result = await Filesystem.readFile({
+                        path: downloadPopup.fileName,
+                        directory: Directory.Documents,
+                      });
+                      const byteString = atob(result.data);
+                      const ab = new ArrayBuffer(byteString.length);
+                      const ia = new Uint8Array(ab);
+                      for (let i = 0; i < byteString.length; i++) {
+                        ia[i] = byteString.charCodeAt(i);
+                      }
+                      const blob = new Blob([ab], { type: 'application/pdf' });
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, '_blank');
+                    } catch (e) {
+                      if (showAction) showAction("error", "Could not open file.");
+                    }
+                    setDownloadPopup(null);
+                  }}>
+                    Open
+                  </button>
+                  <button className="celebration-close-btn" style={{background:'var(--glass-bg)',color:'var(--deep-brown)'}} onClick={() => setDownloadPopup(null)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
 {activePage === "Jadwal" ? (
           <Suspense fallback={null}>
             <LazyJadwalParentView 
@@ -4409,7 +4460,8 @@ function ParentPortal({
               teacherId={studentProfile?.muhaffiz_id}
               teacherProfiles={teacherProfiles}
               showAction={showAction}
-               jadwalSettings={propJadwalSettings}
+              jadwalSettings={propJadwalSettings}
+              onDownloadComplete={(popup) => setDownloadPopup(popup)}
             />
           </Suspense>
         ) : null}
@@ -8932,6 +8984,7 @@ onShowAction,
   }, [selectedStudent, teacherForms.result]);
 
   const [isGeneratingTeacherPDF, setIsGeneratingTeacherPDF] = useState(false);
+  const [teacherDownloadPopup, setTeacherDownloadPopup] = useState(null);
   const handleTeacherDownloadReport = async () => {
     if (!selectedStudent) return;
     setIsGeneratingTeacherPDF(true);
@@ -8985,8 +9038,12 @@ onShowAction,
         const finalHeight = imgHeight > pageHeight - margin * 2 ? pageHeight - margin * 2 : imgHeight;
         pdf.addImage(imgData, "JPEG", margin, margin, imgWidth, finalHeight, undefined, 'FAST');
         const pdfBlob = pdf.output("blob");
-        downloadFile(pdfBlob, `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
-        if (onShowAction) onShowAction("success", "Report downloaded successfully!");
+        const dlResult = await downloadFile(pdfBlob, `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
+        if (dlResult?.type === "native") {
+          setTeacherDownloadPopup({ filePath: dlResult.filePath, fileName: `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf` });
+        } else {
+          if (onShowAction) onShowAction("success", "Report downloaded successfully!");
+        }
       } catch (err) {
         console.error("PDF Error:", err);
         if (onShowAction) onShowAction("error", "Failed to generate PDF.");
@@ -9210,6 +9267,7 @@ onShowAction,
               Estimated: <strong>{monthlySalary.amount?.toFixed(0) || "0"}rs</strong>
             </div>
           )}
+          <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
         </header>
 
         <section className="admin-content-pad">
@@ -9237,6 +9295,7 @@ onShowAction,
                   onBroadcastNotification={broadcastNotification} 
                   initialStudentId={activeStudentId}
                   jadwalSettings={jadwalSettings}
+                  onDownloadComplete={(popup) => setTeacherDownloadPopup(popup)}
                 />
               </Suspense>
            )}
@@ -9577,7 +9636,7 @@ onShowAction,
                       <input
                         type="text"
                         name="matrookah"
-                        value={teacherForms.result.matrookah}
+                        value={teacherForms.result.matrookah ?? ""}
                         onChange={onTeacherFormChange}
                         placeholder="e.g. 1, 2, 5"
                       />
@@ -9587,7 +9646,7 @@ onShowAction,
                       <input
                         type="text"
                         name="daeefah"
-                        value={teacherForms.result.daeefah}
+                        value={teacherForms.result.daeefah ?? ""}
                         onChange={onTeacherFormChange}
                         placeholder="e.g. 3, 7"
                       />
@@ -9700,7 +9759,7 @@ onShowAction,
                     <textarea
                       name="attendance_note"
                       rows="3"
-                      value={teacherForms.result.attendance_note}
+                      value={teacherForms.result.attendance_note ?? ""}
                       onChange={onTeacherFormChange}
                       placeholder="Behaviour, attendance, or memorization note"
                     />
@@ -10040,10 +10099,47 @@ onShowAction,
 
         </section>
       </main>
+
+      {teacherDownloadPopup && (
+        <div className="celebration-overlay" onClick={() => setTeacherDownloadPopup(null)}>
+          <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+            <div className="celebration-content">
+              <div className="celebration-emoji-row">
+                <span className="celebration-emoji" style={{fontSize:'36px'}}>&#x2705;</span>
+              </div>
+              <h2 className="celebration-title">Download Completed!</h2>
+              <p className="celebration-message">
+                The report has been downloaded successfully.
+              </p>
+              <p style={{fontSize:'0.8rem',color:'var(--soft-brown)',marginBottom:'20px',wordBreak:'break-all'}}>
+                {teacherDownloadPopup.fileName}
+              </p>
+              <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
+                <button className="celebration-close-btn" onClick={async () => {
+                  try {
+                    const { Share } = await import("@capacitor/share");
+                    await Share.share({
+                      url: teacherDownloadPopup.filePath,
+                      title: "Open Report",
+                    });
+                  } catch (e) {
+                    if (onShowAction) onShowAction("error", "Could not open file.");
+                  }
+                  setTeacherDownloadPopup(null);
+                }}>
+                  Open
+                </button>
+                <button className="celebration-close-btn" style={{background:'var(--glass-bg)',color:'var(--deep-brown)'}} onClick={() => setTeacherDownloadPopup(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
 
 // --- Quran Surah Names (Arabic) ---
 const SURAH_NAMES_AR = [
@@ -10398,15 +10494,17 @@ export default function App() {
     }
 
     async function initialize() {
+      // Remove stale Supabase tokens before they trigger recovery errors
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('sb-')) localStorage.removeItem(key);
+      }
+
       let session = null;
       try {
         const res = await supabase.auth.getSession();
         session = res?.data?.session ?? null;
       } catch (e) {
-        console.warn("Session check failed, clearing stale Supabase tokens", e);
-        for (const key of Object.keys(localStorage)) {
-          if (key.startsWith('sb-')) localStorage.removeItem(key);
-        }
+        console.warn("Session check failed", e);
         try { await supabase.auth.signOut(); } catch (_) {}
       }
 
@@ -10475,16 +10573,27 @@ export default function App() {
           setParentData(emptyParentData);
           setLoading(false);
         }
+        // Ensure stale Supabase tokens are cleaned up
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        }
       }
     }
 
-    initialize();
-
+    // Register auth listener FIRST so no SIGNED_OUT events are missed
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        // Clear stale Supabase tokens on sign out
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        }
+      }
       handleAuthChange(event, session);
     });
+
+    initialize();
 
     function handleOnline() {
       const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
@@ -11268,7 +11377,7 @@ export default function App() {
     });
   };
 
-  const handleTeacherFormChange = async (event) => {
+  const handleTeacherFormChange = (event) => {
     const { name, value } = event.target;
 
     setTeacherForms((current) => ({
@@ -11287,17 +11396,14 @@ export default function App() {
           .filter(r => String(r.student_id) === String(numericId))
           .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
 
-        // Check if there's already a result for today
         const todayResult = studentResults.find(r => r.week_date === today);
-        
+
         if (todayResult) {
-          // Load today's existing result
           setTeacherForms(curr => ({
             ...curr,
             result: { ...curr.result, ...todayResult, wusool_surah: todayResult?.wusool_surah || "", next_week_surah: todayResult?.next_week_surah || "", istifadah_surah: todayResult?.istifadah_surah || "", student_id: numericId }
           }));
         } else if (studentResults.length > 0) {
-          // Load latest result as template but use today's week_date (new record)
           setTeacherForms(curr => ({
             ...curr,
             result: {
@@ -11314,7 +11420,6 @@ export default function App() {
             }
           }));
         } else {
-          // No results at all - fresh draft for today
           setTeacherForms(curr => ({
             ...curr,
             result: createTeacherResultDraft({
@@ -11322,21 +11427,15 @@ export default function App() {
             }),
           }));
         }
-        // Clear any stale save status when switching students
         setSaveStatus("");
         setSaveErrorDetails("");
       }
-    }
-    if (name === "student_id") {
       currentStudentIdRef.current = value;
-      // Clear any pending auto-save when switching students
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;
       }
       setSaveStatus("");
-
-
     } else if (name !== "student_id" && teacherForms.result.student_id) {
       if (typeof performAutoSaveRef?.current === "function") {
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);

@@ -22,11 +22,16 @@ export async function downloadFile(urlOrBlob, name) {
         data: base64Data,
         directory: Directory.Documents,
       });
-      return;
+      const result = await Filesystem.getUri({
+        path: name,
+        directory: Directory.Documents,
+      });
+      return { type: "native", filePath: result.uri };
     }
 
     const { saveAs } = await import("file-saver");
     saveAs(blob, name);
+    return { type: "web" };
   } catch {
     if (typeof urlOrBlob === "string") {
       const link = document.createElement("a");
@@ -38,5 +43,6 @@ export async function downloadFile(urlOrBlob, name) {
       link.click();
       document.body.removeChild(link);
     }
+    return { type: "web" };
   }
 }
