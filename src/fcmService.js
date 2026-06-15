@@ -1,0 +1,510 @@
+import { supabase } from './supabaseClient.js';
+
+// Detect if running inside a Capacitor native app
+function isCapacitor() {
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform);
+}
+
+function isNativeAndroid() {
+  return isCapacitor() && window.Capacitor.getPlatform() === 'android';
+}
+
+class FCMService {
+  constructor() {
+    this.isSupported = false;
+    this.token = null;
+    this.initialized = false;
+    this.initializingPromise = null;
+    this.refreshInterval = null;
+    this.isNative = false;
+  }
+
+  // Refresh token periodically (every 2 hours) to keep it valid
+  startTokenRefresh(userRole) {
+    this.stopTokenRefresh();
+    this.refreshInterval = setInterval(async () => {
+      console.log('FCM: Periodic token refresh...');
+      try {
+        const oldToken = this.token;
+        const freshToken = await this._getToken();
+        if (freshToken && freshToken !== oldToken) {
+          await this.storeToken(freshToken, userRole);
+          console.log('FCM: Token refreshed');
+        }
+      } catch (err) {
+        console.warn('FCM: Token refresh failed:', err);
+      }
+    }, 2 * 60 * 60 * 1000);
+  }
+
+  stopTokenRefresh() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
+  }
+
+  // Play premium notification chime using Web Audio API
+  playPremiumChime() {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+
+      // Create gain node for volume control (full volume = 1.0)
+      const masterGain = audioCtx.createGain();
+      masterGain.gain.value = 1.0;
+      masterGain.connect(audioCtx.destination);
+
+      // Note frequencies for a rich ascending chime (C5, E5, G5, C6)
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = i === 3 ? 'sine' : 'triangle'; // C6 sine for shimmer
+        osc.frequency.value = freq;
+
+        // Envelope: quick attack, medium decay, sustain, release
+        const startTime = now + i * 0.08;
+        const attack = 0.02;
+        const release = 0.6;
+
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.7, startTime + attack);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + release);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(startTime);
+        osc.stop(startTime + release);
+      });
+
+      // Add a soft sub-bass for fullness
+      const bassOsc = audioCtx.createOscillator();
+      const bassGain = audioCtx.createGain();
+      bassOsc.type = 'sine';
+      bassOsc.frequency.value = 261.63; // Middle C
+      bassGain.gain.setValueAtTime(0, now);
+      bassGain.gain.linearRampToValueAtTime(0.25, now + 0.05);
+      bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+      bassOsc.connect(bassGain);
+      bassGain.connect(masterGain);
+      bassOsc.start(now);
+      bassOsc.stop(now + 0.8);
+    } catch (err) {
+      console.warn('Premium notification chime could not play:', err);
+    }
+  }
+
+  // --- Native (Capacitor) FCM helpers ---
+
+  async _initNative(userRole) {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+
+    // Request permission (Android 13+)
+    const permResult = await PushNotifications.requestPermissions();
+    console.log('Capacitor PushNotifications permission:', permResult);
+    if (permResult.receive !== 'granted') {
+      console.error('Push notification permission not granted');
+      return false;
+    }
+
+    // Register for push
+    await PushNotifications.register();
+    console.log('Capacitor PushNotifications registered');
+
+    // Set up a persistent listener that always keeps this.token current
+    PushNotifications.addListener('registration', (token) => {
+      console.log('Capacitor FCM Token:', token.value.substring(0, 20) + '...');
+      this.token = token.value;
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      console.error('Capacitor Push registration error:', err);
+    });
+
+    // Wait for the first token to arrive
+    const tokenPromise = new Promise((resolve, reject) => {
+      const checkInterval = setInterval(() => {
+        if (this.token) {
+          clearTimeout(timeout);
+          clearInterval(checkInterval);
+          resolve(this.token);
+        }
+      }, 200);
+      const timeout = setTimeout(() => {
+        clearInterval(checkInterval);
+        reject(new Error('Push registration timed out'));
+      }, 15000);
+    });
+
+    this.token = await tokenPromise;
+
+    // Store token in database
+    const stored = await this.storeToken(this.token, userRole);
+    if (!stored) {
+      await new Promise(r => setTimeout(r, 1000));
+      await this.storeToken(this.token, userRole);
+    }
+
+    // Listen for incoming notifications (foreground)
+    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      console.log('Capacitor foreground notification:', notification);
+      this.playPremiumChime();
+      // Note: Capacitor handles the native notification display automatically
+      // We just add the chime here
+    });
+
+    // Listen for notification action (tap)
+    PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      console.log('Capacitor notification action:', action);
+      const data = action.notification?.data || {};
+      const url = data?.url || data?.redirectPage || '/';
+      // Navigate to the URL
+      window.location.href = url;
+    });
+
+    this.isNative = true;
+    this.isSupported = true;
+    this.initialized = true;
+
+    // Start periodic token refresh (re-register native push)
+    this.startTokenRefresh(userRole);
+
+    return true;
+  }
+
+  async _getToken() {
+    if (this.isNative) {
+      // Re-register for a fresh token; persistent listener in _initNative will update this.token
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const oldToken = this.token;
+        await PushNotifications.register();
+        // Wait up to 10s for token to change
+        const deadline = Date.now() + 10000;
+        while (this.token === oldToken && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+        return this.token;
+      } catch {
+        return this.token || null;
+      }
+    }
+    // Web fallback
+    const { getFCMToken } = await import('./firebaseConfig.js');
+    return getFCMToken();
+  }
+
+  // --- Initialize FCM service ---
+  async initialize(userRole) {
+    if (this.initialized && this.token) {
+      console.log('FCM service already initialized');
+      return true;
+    }
+
+    if (this.initializingPromise) {
+      console.log('FCM service initialization already in progress, waiting...');
+      return this.initializingPromise;
+    }
+
+    this.initializingPromise = (async () => {
+      try {
+        console.log('Initializing FCM service for role:', userRole);
+
+        // --- Native Capacitor path ---
+        if (isNativeAndroid()) {
+          console.log('Running in native Android Capacitor — using native PushNotifications');
+          return await this._initNative(userRole);
+        }
+
+        // --- Web / PWA path ---
+        if (!('Notification' in window)) {
+          console.error('This browser does not support notifications');
+          return false;
+        }
+
+        if (!('serviceWorker' in navigator)) {
+          console.error('Service workers are not supported in this browser');
+          return false;
+        }
+
+        // Check current permission status
+        const currentPermission = Notification.permission;
+        console.log('Current notification permission:', currentPermission);
+
+        // Request notification permission if not granted
+        let permission = currentPermission;
+        if (permission === 'default') {
+          console.log('Requesting notification permission...');
+          permission = await Notification.requestPermission();
+          console.log('Notification permission status:', permission);
+        }
+
+        if (permission !== 'granted') {
+          console.error('Notification permission denied. Please enable notifications in your browser settings.');
+          return false;
+        }
+
+        // Dynamically import web FCM only when needed
+        const { getFCMToken } = await import('./firebaseConfig.js');
+
+        // Get FCM token
+        console.log('Retrieving FCM token...');
+        const token = await getFCMToken();
+        if (!token) {
+          console.error('Failed to get FCM token. Please refresh the page and try again.');
+          return false;
+        }
+
+        console.log('FCM token retrieved successfully:', token.substring(0, 20) + '...');
+        this.token = token;
+        this.isSupported = true;
+
+        // Store token in database (with retries)
+        console.log('Storing FCM token in database...');
+        const stored = await this.storeToken(token, userRole);
+        if (!stored) {
+          console.warn('FCM token stored failed on first attempt, retrying...');
+          await new Promise(r => setTimeout(r, 1000));
+          const storedRetry = await this.storeToken(token, userRole);
+          if (!storedRetry) {
+            console.warn('FCM token storage failed after retry. Token is cached in memory but may not be reachable from server.');
+          } else {
+            console.log('FCM token stored on retry');
+          }
+        }
+
+        // Set up message listener
+        this.setupMessageListener();
+
+        this.initialized = true;
+        console.log('FCM service initialized successfully for role:', userRole);
+
+        // Start periodic token refresh
+        this.startTokenRefresh(userRole);
+
+        return true;
+
+      } catch (error) {
+        console.error('Error initializing FCM service:', error);
+        if (error.name === 'AbortError') {
+          console.error('FCM registration was aborted. This might be due to a service worker conflict or insecure context.');
+        } else if (error.code === 'messaging/permission-blocked') {
+          console.error('Notification permission was blocked by the user.');
+        } else if (error.code === 'messaging/unsupported-browser') {
+          console.error('This browser is not supported for FCM.');
+        }
+        return false;
+      } finally {
+        this.initializingPromise = null;
+      }
+    })();
+
+    return this.initializingPromise;
+  }
+
+  // Store FCM token in database
+  async storeToken(token, userRole) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found - cannot store FCM token');
+        return false;
+      }
+
+      console.log('Storing token for user:', user.id, 'with role:', userRole);
+
+      const deviceInfo = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform || (isCapacitor() ? window.Capacitor.getPlatform() : 'unknown'),
+        language: navigator.language,
+        timestamp: new Date().toISOString()
+      };
+
+      // Upsert token (update if exists, insert if new)
+      const { error } = await supabase
+        .from('user_fcm_tokens')
+        .upsert({
+          user_id: user.id,
+          user_role: userRole,
+          fcm_token: token,
+          device_info: deviceInfo
+        }, {
+          onConflict: 'user_id,fcm_token'
+        });
+
+      if (error) {
+        console.error('Error storing FCM token:', error);
+        return false;
+      } else {
+        console.log('FCM token stored successfully for user:', user.id);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error in storeToken:', error);
+      return false;
+    }
+  }
+
+  // Set up message listener for foreground messages (web only)
+  setupMessageListener() {
+    if (this.isNative) return; // Native handles this via PushNotifications.addListener
+
+    import('./firebaseConfig.js').then(({ onMessageListener }) => {
+      onMessageListener((payload) => {
+        console.log('Processing foreground message in fcmService');
+        this.showNotification(payload);
+      });
+    });
+  }
+
+  // Show notification (web only - native handles display automatically)
+  showNotification(payload) {
+    if (this.isNative) return;
+
+    try {
+      console.log('Showing notification:', payload);
+      // Play premium notification chime at full volume
+      this.playPremiumChime();
+      const { notification, data } = payload;
+      const image = notification?.image || data?.image || "";
+
+      // Create notification options with official styling
+      const options = {
+        body: notification?.body || 'New notification from Mauze Tahfeez',
+        icon: '/LOGO ATFAAL.png',
+        badge: '/LOGO ATFAAL.png',
+        vibrate: [200, 100, 200],
+        data: {
+          ...data,
+          url: data?.url || payload.fcmOptions?.link || '/',
+          timestamp: new Date().toISOString()
+        },
+        tag: 'mauze-tahfeez-notification',
+        renotify: true,
+        requireInteraction: true,
+        silent: false,
+        dir: 'ltr',
+        lang: 'en-US',
+        actions: [
+          {
+            action: 'open',
+            title: 'Open Portal',
+            icon: '/LOGO ATFAAL.png'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss'
+          }
+        ]
+      };
+
+      if (image) {
+        options.image = image;
+      }
+
+      // Create and show notification
+      if ('serviceWorker' in navigator && 'showNotification' in ServiceWorkerRegistration.prototype) {
+        navigator.serviceWorker.ready.then((registration) => {
+          console.log('Using service worker to show notification');
+          registration.showNotification(notification?.title || 'Mauze Tahfeez Update', options);
+        }).catch((error) => {
+          console.error('Service worker notification failed:', error);
+          this.showBrowserNotification(notification?.title || 'Mauze Tahfeez Update', options, data);
+        });
+      } else {
+        console.log('Using browser notification');
+        this.showBrowserNotification(notification?.title || 'Mauze Tahfeez Update', options, data);
+      }
+    } catch (error) {
+      console.error('Error showing notification:', error);
+    }
+  }
+
+  // Show browser notification with click handling
+  showBrowserNotification(title, options, data) {
+    const notification = new Notification(title, options);
+
+    notification.onclick = (event) => {
+      event.preventDefault();
+      notification.close();
+      this.handleNotificationClick(data);
+    };
+
+    return notification;
+  }
+
+  // Handle notification click
+  handleNotificationClick(data) {
+    try {
+      const url = data?.url || data?.redirectPage || '/';
+      console.log('Navigating to:', url);
+
+      if (window.focus && !window.document.hidden) {
+        window.location.href = url;
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error handling notification click:', error);
+      window.location.href = data?.url || data?.redirectPage || '/';
+    }
+  }
+
+  // Remove token (for logout)
+  async removeToken() {
+    if (!this.token) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase
+        .from('user_fcm_tokens')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('fcm_token', this.token);
+
+      // Unregister on native
+      if (this.isNative) {
+        try {
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          await PushNotifications.removeAllListeners();
+          await PushNotifications.unregister();
+        } catch (err) {
+          console.warn('Capacitor unregister failed:', err);
+        }
+      }
+
+      this.token = null;
+      this.initialized = false;
+      this.stopTokenRefresh();
+      console.log('FCM token removed successfully');
+    } catch (error) {
+      console.error('Error removing FCM token:', error);
+    }
+  }
+
+  // Get current token
+  getToken() {
+    return this.token;
+  }
+
+  // Check if FCM is supported
+  isFCMSupported() {
+    return this.isSupported;
+  }
+
+  // Check if service is initialized
+  isInitialized() {
+    return this.initialized;
+  }
+}
+
+// Create singleton instance
+const fcmService = new FCMService();
+
+export default fcmService;

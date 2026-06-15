@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+android/app/build
+android/app/src/main/assets/public
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Android (not needed in Docker web build)
+android/
+ios/
+
+# Python SDK
+antigravity-sdk-python-main/
+
+# Environment files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Keep package-lock.json for npm ci (Docker best practice)
+
+# Documentation
+*.md
+LICENSE
+
+# Supabase local
+supabase/.temp

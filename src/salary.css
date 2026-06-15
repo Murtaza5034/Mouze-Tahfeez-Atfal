@@ -1,0 +1,70 @@
+/* --- Salary Card Styles --- */
+.salary-callout {
+  background: linear-gradient(135deg, var(--premium-white), var(--off-white)) !important;
+  color: var(--text-main) !important;
+  margin-bottom: 24px;
+  border: 1px solid var(--accent-gold) !important;
+  box-shadow: 0 12px 24px rgba(212, 175, 55, 0.1) !important;
+}
+
+.salary-callout h3 {
+  color: var(--dark-gold) !important;
+}
+
+.salary-flex {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--light-gold);
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.salary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.salary-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary-gold);
+  margin-bottom: 4px;
+}
+
+.salary-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--dark-gold);
+}
+
+.salary-value.highlight {
+  color: var(--accent-gold) !important;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+}
+
+.badge {
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.badge.teacher { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.badge.admin { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.badge.parents { background: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; }
+.badge.info { background: #fffbeb; color: #92400e; border: 1px solid #fef3c7; }
+
+@media (max-width: 600px) {
+  .salary-flex {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

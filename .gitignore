@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+node_modules
+
+# Build output
+dist/
+dist
+
+# Vercel
+.vercel/
+.vercel
+
+# Environment variables
+.env
+.env.local
+.env*.local
+.env.production
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Scratch/temp files
+scratch/
+*.cjs
+test-*.js
+test-*.html
+check-*.cjs
+verify-*.cjs
+verify-*.js
+
+# Scratch/debug files
+_debug_*.txt
+_edit_*.py
+_extract_*.js
+_tp_*.txt
+_verify_*.txt
+
+# Supabase temp files
+supabase/.temp/
+
+# NUL device file
+nul
+
+# Android build output
+android/app/build/
+android/build/
+android/.gradle/
+android/capacitor-*
+android/app/capacitor-*
+*.apk
+
+# Keystore (signing keys - DO NOT COMMIT)
+android/app/mauze-tahfeez-release.keystore
+mauze-tahfeez-release.keystore
+android/app/keystore-pass.txt
+keystore-pass.txt
+
+# Local Android SDK path (machine-specific)
+android/local.properties
+
+# APK
+Mauze-Tahfeez.apk
+
+.vercel

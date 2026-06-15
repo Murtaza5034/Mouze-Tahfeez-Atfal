@@ -1,0 +1,105 @@
+import { initializeApp } from 'firebase/app';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAxoLoIPRZum286Y0uXM3Vq98V3403L7Uo",
+  authDomain: "mawaid-b929a.firebaseapp.com",
+  projectId: "mawaid-b929a",
+  storageBucket: "mawaid-b929a.appspot.com",
+  messagingSenderId: "353078822685",
+  appId: "1:353078822685:android:8f83b293733213472bc3f4",
+  measurementId: "B5W2bPUAQQmqbmDf5lF-6g"
+};
+
+// Initialize Firebase
+const firebaseApp = initializeApp(firebaseConfig);
+
+// Initialize Firebase Cloud Messaging
+const messaging = getMessaging(firebaseApp);
+
+// Get registration token with retry
+export const getFCMToken = async (retries = 3) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`Requesting FCM Token (attempt ${attempt}/${retries})...`);
+      
+      // Explicitly register service worker for official PWA support
+      if ('serviceWorker' in navigator) {
+        // Don't clean up existing service workers to prevent conflicts with PWA
+        // Just register the Firebase messaging SW if it's not already registered
+        let registration;
+        const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+        const existingFcmSw = existingRegistrations.find(r => 
+          r.active?.scriptURL?.includes('firebase-messaging-sw')
+        );
+        
+        if (existingFcmSw) {
+          registration = existingFcmSw;
+          console.log('Using existing Firebase SW registration');
+        } else {
+          registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+            scope: '/'
+          });
+          console.log('Service Worker registered with scope:', registration.scope);
+        }
+        
+        // Wait for service worker to be ready
+        await navigator.serviceWorker.ready;
+        
+        const currentToken = await getToken(messaging, { 
+          vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || "BGrvEM2dyLW86HLnNNIDibzCT7NHZka42OFBlVxyA86wBieuXZ09vJldEnQazc9h3VQgBbikEh0oqfiG0xeeyfg",
+          serviceWorkerRegistration: registration
+        });
+        
+        if (currentToken) {
+          console.log('Official FCM Token retrieved:', currentToken.substring(0, 20) + '...');
+          return currentToken;
+        } else {
+          console.log('No registration token available. Permission might be needed.');
+          return null;
+        }
+      } else {
+        console.error('Service workers are not supported in this browser.');
+        return null;
+      }
+    } catch (error) {
+      console.error(`An error occurred while retrieving token (attempt ${attempt}/${retries}): `, error);
+      if (error.code === 'messaging/permission-blocked') {
+        alert('Notification permission was blocked. Please reset permissions in your browser bar.');
+        return null;
+      } else if (error.code === 'messaging/unsupported-browser') {
+        console.error('This browser is not supported for FCM notifications.');
+        return null;
+      }
+      if (attempt < retries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  console.error('Failed to get FCM token after', retries, 'attempts');
+  return null;
+};
+
+// Handle incoming messages - don't return the onMessage unsubscribe function
+// directly to prevent message channel issues
+export const onMessageListener = (callback) => {
+  try {
+    return onMessage(messaging, (payload) => {
+      try {
+        console.log('Foreground message received: ', payload);
+        if (callback) {
+          callback(payload);
+        }
+      } catch (callbackError) {
+        console.error('Error in onMessage callback:', callbackError);
+      }
+    });
+  } catch (error) {
+    console.error('Error setting up onMessage listener:', error);
+    return null;
+  }
+};
+
+export { messaging };

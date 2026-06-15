@@ -1,0 +1,12600 @@
+import "./style.css";
+import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
+import {
+  Bell,
+  BookOpen,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  GraduationCap,
+  Hash,
+  Home,
+  Layers3,
+  LogOut,
+  Menu,
+  ShieldCheck,
+  Eye,
+  Sparkles,
+  Trophy,
+  Trash,
+  X,
+  User,
+  Users,
+  Phone,
+  MessageCircle,
+  ArrowRight,
+  CheckCircle,
+  UserCheck,
+  UserX,
+  RotateCw,
+  Mic,
+  Square,
+  Download,
+  CreditCard,
+  Search,
+  Settings,
+  Sun,
+  Moon,
+  Palette,
+  LifeBuoy,
+  Info,
+  FileArchive,
+  Loader2,
+  Lock,
+  Unlock,
+  CalendarX,
+  AlertCircle,
+  ChevronRight,
+  Paperclip,
+  Trash2,
+  Pause,
+  Play,
+  Mail,
+  Send,
+  Heart,
+  Upload,
+  Image,
+  XCircle,
+  FileText,
+  TrendingUp,
+  DollarSign
+} from "lucide-react";
+import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
+import Login from "./Login";
+import "./style.css";
+import "./salary.css";
+import "./teacher-profiles.css";
+import "./admin-sidebar.css";
+import "./parent-portal.css";
+import "./marhala-posts.css";
+
+const LottieTrophy = ({ size = 120 }) => {
+  return (
+    <lottie-player
+      src="/Trophyanimation.json"
+      background="transparent"
+      speed="1"
+      style={{ width: `${size}px`, height: `${size}px`, flexShrink: 0 }}
+      loop
+      autoplay
+    ></lottie-player>
+  );
+};
+
+const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
+const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
+
+const getLocalDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const DAY_INDEX = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+
+const getReportSettingsObject = (reportSettings) =>
+  Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
+
+const REPORT_SETTING_DEFAULTS = {
+  main_heading: "Rawdat Tahfeez al Atfal",
+  sub_heading: "TAHFEEZ REPORT 1447H",
+  weekly_score_heading: "Total Weekly Score",
+  jumla_heading: "Jumla",
+  murajazah_heading: "Murajah",
+  juz_hali_heading: "Juz Hali",
+  takhteet_heading: "Takhteet",
+  jadeed_heading: "Jadeed",
+  jadeed_safahat_heading: "Jadeed Safahat",
+  attendance_heading: "Attendance",
+  matrookah_heading: "Matrookah",
+  daeefah_heading: "Zaeefah",
+  wusool_heading: "Wusool",
+  wusool_juz_heading: "Wusool Juz",
+  wusool_page_heading: "Wusool Page",
+  next_week_heading: "Next Week Target",
+  next_week_juz_heading: "Next Week Juz",
+  next_week_page_heading: "Next Week Page",
+  istifadah_heading: "Target Till",
+  istifadah_juz_heading: "Its Juz",
+  istifadah_page_heading: "Its Page",
+  progress_card_background_url: "",
+  progress_card_background_position: "center",
+  progress_card_overlay_opacity: 0.82,
+  auto_lock_enabled: true,
+  auto_lock_day: "Saturday",
+  auto_lock_time: "00:00",
+  auto_unlock_day: "Friday",
+  auto_unlock_time: "16:30",
+};
+
+const JADWAL_SETTING_DEFAULTS = {
+  jadwal_style: 'table',
+  jadwal_teacher_style: 'default',
+  jadwal_pdf_primary_color: '#5d4037',
+  jadwal_pdf_accent_color: '#d4af37',
+  jadwal_pdf_background_color: '#ffffff',
+  jadwal_pdf_background_url: '',
+  jadwal_pdf_background_opacity: 1,
+  jadwal_pdf_font_family: 'Inter',
+  jadwal_type: 'weekly',
+  jadwal_week_start: '',
+  jadwal_week_end: '',
+  jadwal_pdf_title: 'MAUZE TAHFEEZ ATFAL',
+  jadwal_pdf_subtitle: 'Weekly Quran Jadwal (Timetable)',
+  jadwal_pdf_academic_portal: 'ACADEMIC PORTAL',
+  jadwal_pdf_hifz_program: 'Hifz Program',
+  jadwal_pdf_logo_url: '',
+  jadwal_notification_enabled: false,
+  jadwal_notification_time: '07:00',
+};
+
+const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
+const MAX_REPORT_BACKGROUND_SIZE = 5 * 1024 * 1024;
+
+const normalizeReportSettings = (reportSettings) => ({
+  ...REPORT_SETTING_DEFAULTS,
+  ...(getReportSettingsObject(reportSettings) || {}),
+});
+
+const normalizeJadwalSettings = (settings) => ({
+  ...JADWAL_SETTING_DEFAULTS,
+  ...(Array.isArray(settings) ? settings[0] : settings || {}),
+});
+
+const getReportActionTime = (settings) => {
+  if (!settings?.live_at) return null;
+  const actionTime = new Date(settings.live_at);
+  return Number.isNaN(actionTime.getTime()) ? null : actionTime;
+};
+
+const isReportVisibleNow = (settings, now = new Date()) => {
+  const normalizedSettings = normalizeReportSettings(settings);
+  const actionTime = getReportActionTime(normalizedSettings);
+
+  return normalizedSettings.reports_live !== false
+    ? (!actionTime || actionTime <= now)
+    : Boolean(actionTime && actionTime > now);
+};
+
+const createTeacherResultDraft = (overrides = {}) => ({
+  student_id: "",
+  week_date: getToday(),
+  murajazah: "",
+  juz_hali: "",
+  takhteet: "",
+  jadeed: "",
+  next_week_juz: "",
+  next_week_page: "",
+  next_week_surah: "",
+  total_jadeed_pages: "",
+  istifadah_juz: "",
+  istifadah_page: "",
+  istifadah_surah: "",
+  wusool_juz: "",
+  wusool_page: "",
+  wusool_surah: "",
+  matrookah: "",
+  daeefah: "",
+  attendance_count: "",
+  attendance_note: "",
+  ...overrides,
+});
+
+const isTeacherResultLocked = (settings) => {
+  if (settings?.auto_lock_enabled === false) return false;
+  const now = new Date();
+  const day = now.getDay();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const unlockDay = DAY_INDEX[(settings?.auto_unlock_day || "Friday").toLowerCase()] ?? 5;
+  const lockDay = DAY_INDEX[(settings?.auto_lock_day || "Saturday").toLowerCase()] ?? 6;
+  const [unlockH, unlockM] = (settings?.auto_unlock_time || "16:30").split(":").map(Number);
+  const [lockH, lockM] = (settings?.auto_lock_time || "00:00").split(":").map(Number);
+  const unlockTotal = unlockDay * 1440 + unlockH * 60 + unlockM;
+  const lockTotal = lockDay * 1440 + lockH * 60 + lockM;
+  const current = day * 1440 + minutes;
+  return !(current >= unlockTotal && current < lockTotal);
+};
+
+const getNextWindowTime = (settings) => {
+  const now = new Date();
+  const day = now.getDay();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const current = day * 1440 + minutes;
+  const unlockDay = DAY_INDEX[(settings?.auto_unlock_day || "Friday").toLowerCase()] ?? 5;
+  const lockDay = DAY_INDEX[(settings?.auto_lock_day || "Saturday").toLowerCase()] ?? 6;
+  const [unlockH, unlockM] = (settings?.auto_unlock_time || "16:30").split(":").map(Number);
+  const [lockH, lockM] = (settings?.auto_lock_time || "00:00").split(":").map(Number);
+  const unlockTotal = unlockDay * 1440 + unlockH * 60 + unlockM;
+  const lockTotal = lockDay * 1440 + lockH * 60 + lockM;
+  const locked = isTeacherResultLocked(settings);
+  if (!locked) return { type: "lock", time: lockTotal > current ? lockTotal : lockTotal + 7 * 1440 };
+  const nextUnlock = unlockTotal > current ? unlockTotal : unlockTotal + 7 * 1440;
+  return { type: "unlock", time: nextUnlock };
+};
+
+const loadTrackedDays = (userId) => {
+  if (!userId) return [];
+  let storedDays = localStorage.getItem(`mauze-hifz-tracked-days-${userId}`);
+  if (!storedDays) {
+    // Fallback to legacy global key
+    storedDays = localStorage.getItem("mauze-hifz-tracked-days");
+    if (storedDays) {
+      // Migrate to user specific key
+      localStorage.setItem(`mauze-hifz-tracked-days-${userId}`, storedDays);
+    }
+  }
+  if (storedDays) {
+    try {
+      const parsed = JSON.parse(storedDays);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((day) => typeof day === "string" && day.trim() !== "");
+      }
+    } catch {
+      // Fall through to the legacy single-date storage below.
+    }
+  }
+
+  let legacyLastDate = localStorage.getItem(`mauze-hifz-last-date-${userId}`);
+  if (!legacyLastDate) {
+    legacyLastDate = localStorage.getItem("mauze-hifz-last-date");
+    if (legacyLastDate) {
+      localStorage.setItem(`mauze-hifz-last-date-${userId}`, legacyLastDate);
+    }
+  }
+  return legacyLastDate ? [legacyLastDate] : [];
+};
+
+const ROLE_LABELS = {
+  parents: "Parents",
+  admin: "Admin",
+  teacher: "Teacher",
+};
+
+const ASSETS = {
+  LOGO: "/logo.png",
+};
+
+
+const PREMIUM_NOTIFICATION_CSS = `
+  .mauze-premium-notifications {
+    --notif-ink: var(--deep-brown, #2f2118);
+    --notif-muted: var(--text-muted, #8a786a);
+    --notif-gold: var(--primary-gold, #d4af37);
+    --notif-surface: rgba(255, 252, 246, 0.92);
+    --notif-border: rgba(212, 175, 55, 0.22);
+  }
+
+  .mauze-premium-notifications .premium-notifications-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 22px;
+  }
+
+  .mauze-premium-notifications .premium-notif-card {
+    position: relative;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 18px;
+    border-radius: 22px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.96), rgba(252,248,239,0.92)),
+      radial-gradient(circle at top left, rgba(212,175,55,0.16), transparent 38%);
+    border: 1px solid var(--notif-border);
+    box-shadow: 0 18px 45px rgba(61, 43, 31, 0.10);
+    overflow: hidden;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  }
+
+  .mauze-premium-notifications .premium-notif-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(212, 175, 55, 0.42);
+    box-shadow: 0 26px 60px rgba(61, 43, 31, 0.14);
+  }
+
+  .mauze-premium-notifications .premium-notif-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: linear-gradient(180deg, var(--notif-gold), rgba(212,175,55,0.2));
+  }
+
+  .mauze-premium-notifications .notif-card-icon {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    color: var(--notif-gold);
+    background: linear-gradient(145deg, rgba(212,175,55,0.18), rgba(255,255,255,0.72));
+    border: 1px solid rgba(212,175,55,0.24);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+  }
+
+  .mauze-premium-notifications .notif-card-content {
+    min-width: 0;
+    flex: 1;
+    padding-right: 24px;
+  }
+
+  .mauze-premium-notifications .notif-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .mauze-premium-notifications .notif-date {
+    width: fit-content;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--notif-gold);
+    background: rgba(212,175,55,0.10);
+    border: 1px solid rgba(212,175,55,0.16);
+    font-weight: 800;
+  }
+
+  .mauze-premium-notifications .notif-card-header h3 {
+    margin: 0;
+    color: var(--notif-ink);
+    font-size: clamp(1rem, 2vw, 1.15rem);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  .mauze-premium-notifications .notif-excerpt {
+    margin: 8px 0 10px;
+    color: var(--notif-muted);
+    line-height: 1.55;
+    font-size: 0.92rem;
+  }
+
+  .mauze-premium-notifications .notif-view-btn {
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(61, 43, 31, 0.12);
+    background: #fff;
+    color: var(--notif-ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(61, 43, 31, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .mauze-premium-notifications .notif-view-btn:hover {
+    transform: translateY(-1px);
+    background: #fcfaf5;
+    box-shadow: 0 14px 30px rgba(61, 43, 31, 0.12);
+  }
+
+  .mauze-notif-detail-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 22px;
+    background:
+      radial-gradient(circle at top, rgba(212,175,55,0.18), transparent 34%),
+      rgba(16, 12, 9, 0.58);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .mauze-notif-detail-card {
+    width: min(680px, 100%);
+    max-height: min(82vh, 760px);
+    overflow: hidden;
+    border-radius: 28px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(253,249,241,0.96));
+    border: 1px solid rgba(212,175,55,0.32);
+    box-shadow: 0 36px 100px rgba(0,0,0,0.30);
+    position: relative;
+    animation: mauzeNotificationRise 0.22s ease-out both;
+  }
+
+  .mauze-notif-detail-card .notif-overlay-header {
+    padding: 28px 30px 20px;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(212,175,55,0.22), transparent 38%),
+      linear-gradient(135deg, rgba(61,43,31,0.98), rgba(96,72,42,0.92));
+    color: #fff;
+  }
+
+  .mauze-notif-detail-card .notif-badge {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(212,175,55,0.18);
+    color: #f6dc88;
+    border: 1px solid rgba(246,220,136,0.28);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .mauze-notif-detail-card .notif-full-date {
+    display: block;
+    opacity: 0.76;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+
+  .mauze-notif-detail-card .notif-overlay-header h2 {
+    margin: 0;
+    color: #fff;
+    font-size: clamp(1.35rem, 3vw, 2rem);
+    letter-spacing: -0.035em;
+    line-height: 1.12;
+  }
+
+  .mauze-notif-detail-card .notif-overlay-body {
+    padding: 24px 30px;
+    max-height: 46vh;
+    overflow: auto;
+  }
+
+  .mauze-notif-detail-card .notif-overlay-body p {
+    font-size: 1rem;
+    line-height: 1.75 !important;
+  }
+
+  .mauze-notif-detail-card .notif-overlay-footer {
+    padding: 18px 30px 26px;
+    border-top: 1px solid rgba(61,43,31,0.08);
+    background: rgba(252,250,245,0.86);
+  }
+
+  .mauze-notif-detail-card .notif-overlay-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 3;
+    width: 38px;
+    height: 38px;
+    border: 1px solid rgba(255,255,255,0.24);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: transform 0.18s ease, background 0.18s ease;
+  }
+
+  .mauze-notif-detail-card .notif-overlay-close:hover {
+    transform: rotate(90deg);
+    background: rgba(255,255,255,0.24);
+  }
+
+  .mauze-notif-detail-card .premium-btn.gold {
+    background: linear-gradient(135deg, #d4af37, #b88a1d);
+    color: #fff;
+    border: none;
+    box-shadow: 0 14px 30px rgba(184,138,29,0.25);
+  }
+
+  .mauze-notif-detail-card .premium-btn.secondary {
+    border-radius: 999px;
+    min-height: 42px;
+    padding: 0 18px;
+    font-weight: 800;
+  }
+
+  @keyframes mauzeNotificationRise {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @media (max-width: 640px) {
+    .mauze-notif-detail-modal { padding: 12px; align-items: end; }
+    .mauze-notif-detail-card { max-height: 88vh; border-radius: 24px 24px 0 0; }
+    .mauze-notif-detail-card .notif-overlay-header,
+    .mauze-notif-detail-card .notif-overlay-body,
+    .mauze-notif-detail-card .notif-overlay-footer { padding-left: 20px; padding-right: 20px; }
+    .mauze-premium-notifications .premium-notifications-list { grid-template-columns: 1fr; }
+  }
+`;
+
+
+const loadFcmService = async () => {
+  const mod = await import("./fcmService");
+  return mod.default;
+};
+
+const loadHtml2Canvas = async () => {
+  const mod = await import("html2canvas");
+  return mod.default;
+};
+
+const loadJsPDF = async () => {
+  const mod = await import("jspdf");
+  return mod.jsPDF;
+};
+
+const loadJSZip = async () => {
+  const mod = await import("jszip");
+  return mod.default;
+};
+
+const loadSaveAs = async () => {
+  const mod = await import("file-saver");
+  return mod.saveAs;
+};
+
+// @font-face CSS for injection into html2canvas cloned document (ensures Kanz al Marjaan renders in PDFs)
+const FONT_FACE_CSS = `
+@font-face {
+  font-family: 'Kanz al Marjaan';
+  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Al-Kanz';
+  src: url('/fonts/al-kanz.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Qilka-Bold';
+  src: url('/Qilka-Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Child Hood';
+  src: url('/Child-Hood.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+`;
+
+const loadCustomFontsForCanvas = async () => {
+  const timeout = setTimeout(() => { throw new Error("Font loading timed out"); }, 8000);
+  try {
+    // Wait for any browser-triggered font loading to settle
+    await Promise.race([
+      document.fonts.ready,
+      new Promise(resolve => setTimeout(resolve, 2000)),
+    ]);
+
+    // Explicitly load Kanz al Marjaan via FontFace API
+    const fontUrls = [
+      {
+        family: "Kanz al Marjaan",
+        sources: [
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2) format('woff2')",
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff) format('woff')",
+          "url(/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf) format('truetype')",
+        ],
+      },
+      {
+        family: "Al-Kanz",
+        sources: [
+          "url(/fonts/al-kanz.ttf) format('truetype')",
+        ],
+      },
+      {
+        family: "Qilka-Bold",
+        sources: [
+          "url(/Qilka-Bold.otf) format('opentype')",
+        ],
+      },
+      {
+        family: "Child Hood",
+        sources: [
+          "url(/Child-Hood.otf) format('opentype')",
+        ],
+      },
+    ];
+
+    for (const { family, sources } of fontUrls) {
+      const testStr = "abcdefghijklmnopqrstuvwxyz0123456789";
+      if (!document.fonts.check(`1em "${family}"`, testStr)) {
+        const ff = new FontFace(family, sources.join(", "));
+        await ff.load();
+        document.fonts.add(ff);
+      }
+    }
+
+    // One final wait to ensure everything is settled
+    await Promise.race([
+      document.fonts.ready,
+      new Promise(resolve => setTimeout(resolve, 3000)),
+    ]);
+    clearTimeout(timeout);
+  } catch (err) {
+    clearTimeout(timeout);
+    console.warn("Custom font loading for canvas capture failed:", err);
+  }
+};
+
+const LazyJadwalTeacherView = React.lazy(() =>
+  import("./Jadwal").then((mod) => ({ default: mod.JadwalTeacherView }))
+);
+
+const LazyJadwalParentView = React.lazy(() =>
+  import("./Jadwal").then((mod) => ({ default: mod.JadwalParentView }))
+);
+
+const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
+const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
+const LazyMarhalaPosts = React.lazy(() => import("./MarhalaPosts"));
+const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
+
+const fixArabicScript = (text) => {
+  if (!text) return "";
+  // Normalize Gaf (Persian/Urdu script)
+  // Some systems render Gaf as double kaaf or k-k-a
+  return text
+    .replace(/ظƒظƒ/g, "ع¯")      // Double Kaaf -> Gaf
+    .replace(/ظ…ط±ظƒظƒط§/g, "ظ…ط±ع¯ط§") // Murga (K-K-A) -> Murga (G-A)
+    .replace(/ط¨ظ‡ط§ط¦ظٹ/g, "ط¨ع¾ط§ط¦غŒ") // Bhai phonetic
+    .replace(/ط³ظٹ/g, "ط³غŒ")      // Common character fixing
+    .replace(/ظپظٹ/g, "ظپغŒ");     // Common character fixing
+};
+
+const NotificationStatus = ({ role }) => {
+  const [permission, setPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'default');
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  const requestPermission = async () => {
+    
+    setIsInitializing(true);
+    try {
+      const fcmService = await loadFcmService();
+      const result = await fcmService.initialize(role);
+      setPermission(typeof Notification !== "undefined" ? Notification.permission : (result ? "granted" : "default"));
+      if (result) {
+        alert("Notifications enabled successfully!");
+      } else {
+        if ((typeof Notification !== 'undefined' && Notification.permission === 'denied')) {
+          alert("Notifications are blocked in your browser settings. Please click the lock icon in your address bar to allow them.");
+        } else {
+          alert("Failed to initialize notification service. Please try again.");
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      alert("An error occurred. Check console for details.");
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  return (
+    <div className="notification-status-card card-appear">
+      <div className="n-status-head">
+        <Bell size={20} />
+        <h4>Push Notifications</h4>
+      </div>
+      <div className="n-status-body">
+        {permission === "granted" ? (
+          <p className="status-text success"><CheckCircle size={14} /> Notifications are Active</p>
+        ) : permission === "denied" ? (
+          <p className="status-text error"><X size={14} /> Notifications are Blocked</p>
+        ) : (
+          <p className="status-text warning"><Info size={14} /> Not Configured Yet</p>
+        )}
+        
+        {permission === "granted" && (
+          <button 
+            className="action-button mini" 
+            style={{ background: 'var(--soft-brown)', color: 'white' }}
+            onClick={async () => {
+              const authRes = await supabase.auth.getUser();
+              const user = authRes?.data?.user;
+              if (!user) return alert("Please login first to test notifications.");
+              
+              const { data, error } = await supabase.functions.invoke('fcm-notification', {
+                body: {
+                  title: "Test Alert",
+                  body: "Your device is correctly linked to Mauze Tahfeez notifications!",
+                  targetUser: user?.id
+                }
+              });
+              
+              if (error) {
+                console.error("Diagnostic Error:", error);
+                let msg = error.message;
+                try {
+                  const body = await error.context?.json();
+                  if (body?.details) msg += "\n\nDetails: " + body.details;
+                  else if (body?.error) msg += "\n\nError: " + body.error;
+                } catch(e) {}
+                alert("Test failed: " + msg);
+              } else {
+                if (data?.message === 'NO_TOKENS_FOUND') {
+                  alert("Server reached, but NO TOKEN FOUND for your user ID.\nPlease refresh the page and allow notifications to save your token.");
+                } else {
+                  const deliveredCount = data?.summary?.delivered ?? data?.summary?.success ?? 0;
+                  const staleCount = data?.summary?.staleTokensRemoved ?? data?.summary?.stale ?? 0;
+                  const failureCount = data?.summary?.failures ?? 0;
+
+                  if (failureCount > 0) {
+                    console.error("FCM Delivery Failed:", data);
+                    let extraErr = "";
+                    if (data?.results && data.results[0]?.error) {
+                      extraErr = "\nReason: " + data.results[0].error;
+                    }
+                    alert(`Test alert sent to Firebase, but some deliveries still failed.\nDelivered: ${deliveredCount}\nFailures: ${failureCount}${extraErr}${staleCount > 0 ? `\nStale tokens cleaned: ${staleCount}` : ""}\n\nCheck browser console for details.`);
+                  } else if (deliveredCount > 0) {
+                    const cleanupNote = staleCount > 0 ? `\nStale tokens cleaned: ${staleCount}` : "";
+                    alert(`Test alert successfully delivered to ${deliveredCount} device${deliveredCount === 1 ? "" : "s"}!${cleanupNote}`);
+                  } else if (staleCount > 0) {
+                    alert(`No active devices were reachable, but ${staleCount} stale token${staleCount === 1 ? "" : "s"} were cleaned up.\nPlease reopen the app on a device and enable notifications again.`);
+                  } else {
+                    alert("Test alert completed, but no delivery details were returned.");
+                  }
+                }
+              }
+            }}
+          >
+            Send Test Alert
+          </button>
+        )}
+        
+        {permission !== "granted" && (
+          <button 
+            className="action-button mini" 
+            onClick={requestPermission}
+            disabled={isInitializing}
+          >
+            {isInitializing ? "Configuring..." : "Enable Push Alerts"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SidebarHeader({ photoUrl, name, arabicName, tag }) {
+  const isArabic = (text) => /[\u0600-\u06FF]/.test(text);
+  const nameIsArabic = isArabic(name);
+  const finalPhoto = (photoUrl && photoUrl !== "" && photoUrl !== "null" && photoUrl !== "undefined") ? photoUrl : "/logo.png";
+
+  return (
+    <div className="sidebar-profile-centered">
+      <div className="avatar-vessel-centered">
+        <img
+          src={finalPhoto}
+          alt="Profile"
+          className="sidebar-avatar-img"
+          onError={(e) => { e.target.src = "/logo.png"; }}
+          loading="eager"
+        />
+        <div className="avatar-ring"></div>
+      </div>
+      <div className="profile-info-centered">
+        <p className="profile-tag-premium">{tag}</p>
+        <h2 className="profile-name-premium">
+          {name}
+        </h2>
+        {arabicName && (
+          <h3 className="profile-arabic-premium arabic-kanz">
+            {fixArabicScript(arabicName)}
+          </h3>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const UI_TEXT = {
+  PER_MAX: " / ",
+  OF_TOTAL: " out of ",
+};
+
+const DEFAULT_PAGE_BY_ROLE = {
+  parents: "Home",
+  admin: "Overview",
+  teacher: "My Group",
+};
+
+const RESULT_NUMERIC_FIELDS = ["murajazah", "juz_hali", "takhteet", "jadeed"];
+const STORAGE_KEYS = {
+  role: "mauze-active-role",
+  teacherAttendance: "mauze-teacher-attendance",
+  customGroups: "mauze-custom-groups",
+  rememberMe: "mauze-remember-me",
+  cachedAuth: "mauze-cached-auth",
+};
+
+const NAV_ICONS = {
+  Home: Sparkles,
+  Profile: User,
+  "Child Summary": CheckCircle2,
+  Policy: ShieldCheck,
+  Overview: Layers3,
+  Schedule: Calendar,
+  Announcements: Bell,
+  Notifications: Send,
+  Teachers: GraduationCap,
+  Groups: Users,
+  "Portal Access": ShieldCheck,
+  "My Group": Users,
+  "Fill Result": Sparkles,
+  Settings: Settings,
+  Support: LifeBuoy,
+  About: Info,
+  "User Issues": LifeBuoy,
+  "Leave Management": CalendarX,
+  "Report Settings": Palette,
+  "Jadwal Settings": Calendar,
+  "Global Settings": Settings,
+  "Messages": MessageCircle,
+  "Email Settings": Mail,
+  "Marhala Posts": Heart,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,
+};
+
+const emptyParentData = {
+  studentProfile: null,
+  hifzDetails: null,
+  announcements: [],
+  schedule: [],
+  attendance: null,
+  weeklyResult: null,
+  reportSettings: null,
+};
+
+const emptyPortalAccess = {
+  portal_role: "",
+  is_active: false,
+  full_name: "",
+};
+
+function getToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isImageFile(url) {
+  if (!url) return false;
+  const cleanUrl = url.split('?')[0]; // Remove query params if any
+  return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(cleanUrl);
+}
+
+function getFileNameFromUrl(url) {
+  if (!url) return "";
+  try {
+    const decoded = decodeURIComponent(url);
+    const parts = decoded.split('/');
+    const lastPart = parts[parts.length - 1];
+    return lastPart.split('?')[0]; // Strip query parameters
+  } catch (e) {
+    return "Download Attachment";
+  }
+}
+
+async function downloadFile(...args) {
+  const { downloadFile: df } = await import("./downloadUtils");
+  return df(...args);
+}
+
+function readLocalArray(key) {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(key);
+    return rawValue ? JSON.parse(rawValue) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalArray(key, value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+// Celebration component removed as requested.
+
+
+
+const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home", skipInbox = false, fileUrl = null) => {
+  const dbPayload = {
+    title,
+    body,
+    target_role: targetRole,
+    target_user: targetUser,
+    redirect_page: redirectPage,
+    file_url: fileUrl
+  };
+  
+  let inboxError = null;
+  let fcmError = null;
+  let fcmData = null;
+
+  // Store in database first (Inbox)
+  if (!skipInbox) {
+    const { error } = await supabase.from("system_notifications").insert([dbPayload]);
+    if (error) {
+      inboxError = error;
+      console.error('Inbox notification error:', error);
+    }
+  }
+
+  // Send FCM notification via Edge Function
+  try {
+    const { data, error } = await supabase.functions.invoke('fcm-notification', {
+      body: {
+        title,
+        body,
+        targetRole: targetRole === "user" ? null : targetRole,
+        targetUser: targetUser,
+        data: {
+          redirectPage,
+          fileUrl: fileUrl || "",
+          timestamp: new Date().toISOString()
+        }
+      }
+    });
+
+    if (error) {
+      fcmError = error;
+      console.error('FCM notification error:', error);
+    } else {
+      fcmData = data;
+      console.log('FCM notification sent successfully:', data);
+    }
+  } catch (err) {
+    fcmError = err;
+    console.error('FCM notification error:', err);
+  }
+
+  return { inboxError, fcmError, fcmData };
+};
+
+function NotificationEnabler({ permission, onRequest }) {
+  if (permission === "granted" || permission === "denied") return null;
+  return (
+    <div style={{ display: "flex", gap: "10px", alignItems: "center", marginLeft: "auto", marginRight: "12px" }}>
+      <button onClick={onRequest} className="notification-enabler-btn">
+        Enable Alerts
+      </button>
+    </div>
+  );
+}
+
+function AnnouncementDetailsModal({ announcement, onClose }) {
+  if (!announcement) return null;
+  return (
+    <div className="notifications-panel-overlay" onClick={onClose}>
+      <div className="notifications-panel announce-details-modal" onClick={e => e.stopPropagation()}>
+        <button className="panel-close-btn" onClick={onClose}><X size={20} /></button>
+        <div className="details-header">
+          <img
+            src={announcement.image_url || "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=800&q=80"}
+            alt="Announcement"
+            className="details-hero-img"
+          />
+          <div className="details-badge">{announcement.target_role === 'all' ? 'System Broadcast' : 'Targeted Update'}</div>
+        </div>
+        <div className="details-body">
+          <h2>{announcement.title}</h2>
+          <p className="details-date">{new Date(announcement.created_at).toLocaleDateString()} at {new Date(announcement.created_at).toLocaleTimeString()}</p>
+          <div className="details-content">
+            {announcement.body}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ELearningModal({ isOpen, onClose }) {
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [iframeKey, setIframeKey] = useState(0);
+
+  // Reset iframe when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    setIframeLoaded(false);
+    setIframeKey(prev => prev + 1);
+  }, [isOpen]);
+  
+  const handleIframeLoad = () => {
+    setIframeLoaded(true);
+    console.log('eLearning iframe loaded successfully');
+    
+    // Try to auto-login with stored credentials
+    const credentials = {
+      email: localStorage.getItem('elearning-email') || '',
+      password: localStorage.getItem('elearning-password') || '',
+      rememberMe: localStorage.getItem('elearning-remember-me') === 'true'
+    };
+    
+    console.log('Stored credentials found:', !!credentials.email && !!credentials.password && credentials.rememberMe);
+    
+    // Send credentials to iframe for auto-login if remember me is enabled
+    if (credentials.rememberMe && credentials.email && credentials.password) {
+      setTimeout(() => {
+        const iframe = document.querySelector('.elearning-iframe');
+        if (iframe && iframe.contentWindow) {
+          console.log('Sending auto-login credentials to iframe');
+          iframe.contentWindow.postMessage({
+            type: 'AUTO_LOGIN',
+            credentials: credentials
+          }, ELEARNING_ORIGIN);
+        }
+      }, 3000); // Increased delay to ensure site is fully loaded
+    }
+  };
+  
+  // Listen for credential storage from the eLearning site
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.origin === ELEARNING_ORIGIN && event.data.type === 'STORE_CREDENTIALS') {
+        const { email, password, rememberMe } = event.data.credentials;
+        console.log('Storing credentials from eLearning site');
+        localStorage.setItem('elearning-email', email);
+        localStorage.setItem('elearning-password', password);
+        localStorage.setItem('elearning-remember-me', rememberMe.toString());
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="notifications-panel-overlay" onClick={onClose}>
+      <div className="notifications-panel elearning-modal" onClick={e => e.stopPropagation()}>
+        <div className="panel-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--glass-border)' }}>
+          <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>E-Learning Quran Portal</h3>
+          <button className="panel-close-btn" onClick={onClose}><X size={20} /></button>
+        </div>
+        <div className="elearning-iframe-container">
+          {!iframeLoaded && (
+            <div className="iframe-loading">
+              <div className="loading-spinner"></div>
+              <p>Loading E-Learning Portal...</p>
+              <small style={{ color: 'var(--text-muted)', marginTop: '8px', display: 'block' }}>
+                Please wait while we connect to the portal
+              </small>
+            </div>
+          )}
+          <iframe 
+            key={iframeKey}
+            src={ELEARNING_URL} 
+            title="E-Learning Quran"
+            className="elearning-iframe"
+            allow="clipboard-write; camera; microphone; autoplay; fullscreen; geolocation; microphone"
+            onLoad={handleIframeLoad}
+            style={{ display: iframeLoaded ? 'block' : 'none' }}
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation-by-user-activation"
+          />
+        </div>
+        <div className="elearning-footer">
+          <p>This portal stays connected to your app sessions. Your login credentials are remembered for quick access.</p>
+          <a href={ELEARNING_URL} target="_blank" rel="noreferrer">
+            Open in browser <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PremiumHifzCard({ user }) {
+  const [trackCount, setTrackCount] = useState(0);
+  const [trackedDays, setTrackedDays] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTrackingData = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('elearning_tracking')
+        .select('tracked_date')
+        .eq('user_id', user.id);
+
+      if (error) {
+        if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+          console.warn("Tracking table missing, falling back to local storage");
+          throw new Error("Table missing");
+        }
+        throw error;
+      }
+
+      if (data) {
+        const dbDays = data.map(row => row.tracked_date);
+        const localDays = loadTrackedDays(user.id);
+        // Merge unique days
+        const mergedDays = Array.from(new Set([...dbDays, ...localDays]));
+        setTrackedDays(mergedDays);
+        setTrackCount(mergedDays.length);
+        // Sync local storage with DB state
+        localStorage.setItem(`mauze-hifz-tracked-days-${user.id}`, JSON.stringify(mergedDays));
+      }
+    } catch (err) {
+      console.error("Error fetching tracking data:", err);
+      const localDays = loadTrackedDays(user.id);
+      setTrackedDays(localDays);
+      setTrackCount(localDays.length);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTrackingData();
+  }, [user]);
+
+  const handleTrackClick = async () => {
+    if (!user) return;
+    const today = getLocalDateKey();
+    
+    // Only increment and sync if not already tracked today
+    if (!trackedDays.includes(today)) {
+      const nextDays = [...trackedDays, today];
+      
+      // Optimistic update
+      setTrackedDays(nextDays);
+      setTrackCount(nextDays.length);
+      localStorage.setItem(`mauze-hifz-tracked-days-${user.id}`, JSON.stringify(nextDays));
+
+      try {
+        const { error } = await supabase
+          .from('elearning_tracking')
+          .insert([{ user_id: user.id, tracked_date: today }]);
+
+        if (error && error.code !== '23505') {
+          console.error("Supabase sync failed:", error);
+        }
+      } catch (err) {
+        console.error("Backend tracking failed:", err);
+      }
+    }
+    
+    // The button link will still open the site regardless of tracking status
+  };
+
+  const isMarkedToday = trackedDays.includes(getLocalDateKey());
+
+  return (
+    <div className="premium-hifz-card card-appear">
+      <div className="card-content">
+        <div className="card-header-flex">
+          <div className="header-text">
+            <h2>
+              <Sparkles size={24} className="sparkle-icon" />
+              Daily Hifz Entry of the Day
+            </h2>
+            <p>
+              Maintaining a consistent daily record is the cornerstone of your students' Hifz journey. 
+              Your dedication ensures their progress is tracked.
+            </p>
+          </div>
+          <div className="track-status-box">
+            <span className="track-number">{loading ? "..." : trackCount}</span>
+            <span className="track-label">Total Days</span>
+          </div>
+        </div>
+        
+        <div className="card-actions">
+          <a 
+            className={`golden-gradient-btn ${isMarkedToday ? 'marked' : ''}`} 
+            href={ELEARNING_URL} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            onClick={handleTrackClick}
+          >
+            <BookOpen size={20} />
+            Elearning quran
+            <ArrowRight size={18} />
+          </a>
+          {isMarkedToday && (
+            <span className="status-note success">
+              <CheckCircle size={16} /> Today's entry locked & saved
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function NotificationBell({ notifications }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const unreadCount = notifications.length;
+
+  return (
+    <div className="notif-bell-container">
+      <button className="notif-bell-btn" onClick={() => setIsOpen(!isOpen)} aria-label="Notifications">
+        <Bell size={22} />
+        {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+      </button>
+
+      {isOpen && (
+        <React.Fragment>
+          <div className="notifications-panel-overlay" onClick={() => setIsOpen(false)} />
+          <div className="notifications-panel fade-in" onClick={e => e.stopPropagation()}>
+            <div className="panel-header">
+              <h3>System Notifications</h3>
+              <button className="panel-close-btn" onClick={() => setIsOpen(false)}><X size={18} /></button>
+            </div>
+            <div className="panel-list">
+              {notifications.map((n, i) => (
+                <div key={n.id || i} className="notification-item">
+                  <div className="notif-item-header">
+                    <h4>{n.title}</h4>
+                  </div>
+                  <p>{n.body}</p>
+                  {n.file_url && (
+                    <div className="notif-bell-attachment-box" style={{ marginTop: '8px', padding: '8px', borderRadius: '8px', background: '#fcfaf5', border: '1px solid var(--glass-border)' }}>
+                      {isImageFile(n.file_url) ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <img src={n.file_url} alt="Attachment" style={{ maxWidth: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '4px' }} />
+                          <button onClick={(e) => { e.preventDefault(); downloadFile(n.file_url, getFileNameFromUrl(n.file_url)); }} style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-gold)', fontWeight: 'bold', padding: 0 }}>
+                            <Download size={12} /> Download Image
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={(e) => { e.preventDefault(); downloadFile(n.file_url, getFileNameFromUrl(n.file_url)); }} style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-gold)', fontWeight: 'bold', padding: 0 }}>
+                          <FileArchive size={14} /> Download {getFileNameFromUrl(n.file_url).substring(0, 20)}...
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <span className="time">{new Date(n.created_at).toLocaleString()}</span>
+                </div>
+              ))}
+              {notifications.length === 0 && (
+                <div className="empty-panel">
+                  <Bell size={32} style={{ opacity: 0.2 }} />
+                  <p>No notifications yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+// Quran Ikhtebar Component with Al-Muhaffiz Library
+function QuickSearch({ pages, onSelect }) {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const searchRef = useRef(null);
+
+  const clean = (str) => str.toLowerCase().replace(/\s+/g, '');
+  
+  const filtered = pages.filter(p => {
+    const label = typeof p === 'string' ? p : p.label;
+    return clean(label).includes(clean(query));
+  });
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && filtered.length > 0) {
+      const first = filtered[0];
+      const value = typeof first === 'string' ? first : first.value;
+      onSelect(value);
+      setIsOpen(false);
+      setQuery("");
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="quick-search-wrapper" ref={searchRef}>
+      <div className="search-input-group">
+        <Search size={18} className="search-icon" />
+        <input 
+          type="text" 
+          placeholder="Search all app pages..." 
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+        />
+      </div>
+      {isOpen && query.trim() !== "" && (
+        <div className="search-results-dropdown card-appear">
+          {filtered.length > 0 ? (
+            filtered.map((p, idx) => {
+              const label = typeof p === 'string' ? p : p.label;
+              const value = typeof p === 'string' ? p : p.value;
+              return (
+                <button 
+                  key={idx} 
+                  onClick={() => { onSelect(value); setIsOpen(false); setQuery(""); }}
+                  className="search-result-item"
+                >
+                  <ArrowRight size={14} style={{ marginRight: '8px', opacity: 0.5 }} />
+                  {label}
+                </button>
+              );
+            })
+          ) : (
+            <div className="search-no-results">
+               <X size={14} style={{ marginRight: '8px', opacity: 0.5 }} />
+               No matching pages found
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// WaveSurfer Player Component for Quran Ikhtebar
+function WaveSurferPlayer({ url }) {
+  const containerRef = useRef(null);
+  const waveSurferRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    if (!containerRef.current || !window.WaveSurfer) return;
+
+    waveSurferRef.current = window.WaveSurfer.create({
+      container: containerRef.current,
+      waveColor: '#d4af37',
+      progressColor: '#3d2b1f',
+      cursorColor: '#3d2b1f',
+      barWidth: 2,
+      barRadius: 3,
+      responsive: true,
+      height: 40,
+    });
+
+    waveSurferRef.current.load(url);
+
+    waveSurferRef.current.on('play', () => setIsPlaying(true));
+    waveSurferRef.current.on('pause', () => setIsPlaying(false));
+
+    return () => {
+      if (waveSurferRef.current) waveSurferRef.current.destroy();
+    };
+  }, [url]);
+
+  return (
+    <div className="wavesurfer-player" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fcfaf5', padding: '10px', borderRadius: '12px', marginTop: '10px', border: '1px solid #eee' }}>
+      <button 
+        onClick={() => waveSurferRef.current?.playPause()}
+        style={{ background: 'var(--primary-gold)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+      >
+        {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+      </button>
+      <div ref={containerRef} style={{ flex: 1 }} />
+    </div>
+  );
+}
+
+function QuranIkhtebar({ studentProfile, hifzDetails }) {
+  const marhalaLibrary = {
+    "Marhala Ula": {
+      range: "Juz 30",
+      easy: [{ text: "Surah Al-Naba (Ayat 1-5)", page: 582 }, { text: "Surah Al-Ala (Ayat 1-4)", page: 591 }, { text: "Surah Al-Ghashiyah (Ayat 1-8)", page: 592 }],
+      medium: [{ text: "Surah Al-Inshiqaq (Ayat 10-15)", page: 589 }, { text: "Surah Al-Mutaffifin (Ayat 20-25)", page: 588 }, { text: "Surah Al-Infitar (Ayat 1-5)", page: 587 }],
+      hard: [{ text: "Surah Abasa (Ayat 20-30)", page: 585 }, { text: "Surah Al-Nazi'at (Ayat 15-25)", page: 583 }, { text: "Surah Al-Burooj (Ayat 12-22)", page: 590 }]
+    },
+    "Marhala Saniyah": {
+      range: "Juz 28-30",
+      easy: [{ text: "Surah Al-Mulk (Ayat 1-5)", page: 562 }, { text: "Surah Al-Qalam (Ayat 1-7)", page: 564 }, { text: "Surah Al-Haqqah (Ayat 1-8)", page: 566 }],
+      medium: [{ text: "Surah Al-Jinn (Ayat 10-15)", page: 572 }, { text: "Surah Al-Muzzammil (Ayat 1-5)", page: 574 }, { text: "Surah Al-Qiyamah (Ayat 20-25)", page: 577 }],
+      hard: [{ text: "Surah Al-Mujadila (Ayat 1-5)", page: 542 }, { text: "Surah Al-Hashr (Ayat 21-24)", page: 548 }, { text: "Surah Al-Tahrim (Ayat 6-8)", page: 560 }]
+    },
+    "Marhala Salesah": {
+      range: "Juz 26-30",
+      easy: [{ text: "Surah Al-Ahqaf (Ayat 1-5)", page: 502 }, { text: "Surah Muhammad (Ayat 1-4)", page: 507 }, { text: "Surah Al-Fath (Ayat 1-3)", page: 511 }],
+      medium: [{ text: "Surah Al-Hujurat (Ayat 10-13)", page: 516 }, { text: "Surah Qaf (Ayat 1-5)", page: 518 }, { text: "Surah Al-Dhariyat (Ayat 15-20)", page: 520 }],
+      hard: [{ text: "Surah Al-Najm (Ayat 1-10)", page: 526 }, { text: "Surah Al-Qamar (Ayat 1-8)", page: 528 }, { text: "Surah Ar-Rahman (Ayat 1-13)", page: 531 }]
+    },
+    "Marhala Rabeah": {
+      range: "Juz 1-5 + 26-30",
+      easy: [{ text: "Surah Al-Baqarah (Ayat 1-5)", page: 2 }, { text: "Surah Al-Imran (Ayat 1-9)", page: 50 }, { text: "Surah An-Nisa (Ayat 1-3)", page: 77 }],
+      medium: [{ text: "Surah Al-Baqarah (Ayat 255)", page: 42 }, { text: "Surah Al-Imran (Ayat 102-105)", page: 63 }, { text: "Surah An-Nisa (Ayat 58-59)", page: 87 }],
+      hard: [{ text: "Surah Al-Baqarah (Ayat 284-286)", page: 49 }, { text: "Surah Al-Imran (Ayat 190-194)", page: 75 }, { text: "Surah An-Nisa (Ayat 100-105)", page: 94 }]
+    },
+    "Marhala Khamesah": {
+      range: "Juz 1-10 + 26-30",
+      easy: [{ text: "Surah Al-Ma'idah (Ayat 1-3)", page: 106 }, { text: "Surah Al-An'am (Ayat 1-5)", page: 128 }, { text: "Surah Al-A'raf (Ayat 1-10)", page: 151 }],
+      medium: [{ text: "Surah Al-Ma'idah (Ayat 116-120)", page: 127 }, { text: "Surah Al-An'am (Ayat 151-153)", page: 149 }, { text: "Surah Al-Anfal (Ayat 1-4)", page: 177 }],
+      hard: [{ text: "Surah At-Tawbah (Ayat 128-129)", page: 207 }, { text: "Surah Al-An'am (Ayat 59-65)", page: 134 }, { text: "Surah Al-A'raf (Ayat 172-174)", page: 173 }]
+    },
+    "Marhala Sadesah": {
+      range: "Juz 1-15 + 26-30",
+      easy: [{ text: "Surah Yunus (Ayat 1-5)", page: 208 }, { text: "Surah Hud (Ayat 1-4)", page: 221 }, { text: "Surah Yusuf (Ayat 1-6)", page: 235 }],
+      medium: [{ text: "Surah Ibrahim (Ayat 35-41)", page: 260 }, { text: "Surah Ar-Ra'd (Ayat 28-31)", page: 253 }, { text: "Surah Al-Hijr (Ayat 1-9)", page: 262 }],
+      hard: [{ text: "Surah An-Nahl (Ayat 125-128)", page: 281 }, { text: "Surah Al-Isra (Ayat 1-5)", page: 282 }, { text: "Surah Al-Kahf (Ayat 1-10)", page: 293 }]
+    },
+    "Marhala Sabeah": {
+      range: "Juz 1-20 + 26-30",
+      easy: [{ text: "Surah Maryam (Ayat 1-5)", page: 305 }, { text: "Surah Taha (Ayat 1-8)", page: 312 }, { text: "Surah Al-Anbiya (Ayat 1-4)", page: 322 }],
+      medium: [{ text: "Surah Al-Hajj (Ayat 1-5)", page: 332 }, { text: "Surah Al-Mu'minun (Ayat 1-11)", page: 342 }, { text: "Surah An-Nur (Ayat 35)", page: 354 }],
+      hard: [{ text: "Surah Al-Furqan (Ayat 63-77)", page: 365 }, { text: "Surah Ash-Shu'ara (Ayat 1-9)", page: 367 }, { text: "Surah Al-Naml (Ayat 1-6)", page: 377 }]
+    },
+    "Marhala Saminah": {
+      range: "Juz 1-25 + 26-30",
+      easy: [{ text: "Surah Al-Qasas (Ayat 1-6)", page: 385 }, { text: "Surah Al-Ankabut (Ayat 1-5)", page: 396 }, { text: "Surah Ar-Rum (Ayat 1-5)", page: 404 }],
+      medium: [{ text: "Surah Luqman (Ayat 12-19)", page: 412 }, { text: "Surah As-Sajdah (Ayat 1-5)", page: 415 }, { text: "Surah Al-Ahzab (Ayat 21-25)", page: 420 }],
+      hard: [{ text: "Surah Saba (Ayat 1-5)", page: 428 }, { text: "Surah Fatir (Ayat 1-7)", page: 434 }, { text: "Surah Yasin (Ayat 1-12)", page: 440 }]
+    }
+  };
+
+  const [selectedMarhalaName, setSelectedMarhalaName] = useState("Marhala Ula");
+  const [difficulty, setDifficulty] = useState("medium");
+  const [testMode, setTestMode] = useState("teacher");
+  const [recording, setRecording] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [surahInfo, setSurahInfo] = useState(null);
+  const [versesData, setVersesData] = useState([]);
+  const [revealedWords, setRevealedWords] = useState([]);
+  const [audioGuidanceUrl, setAudioGuidanceUrl] = useState(null);
+  const [loadingQuestion, setLoadingQuestion] = useState(false);
+  const [mistakes, setMistakes] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [student_id, setStudentId] = useState(studentProfile?.student_id || studentProfile?.id || null);
+
+  useEffect(() => {
+    const sid = studentProfile?.student_id || studentProfile?.id || studentProfile?.uuid || studentProfile?.studentId;
+    if (sid) {
+      console.log("Ikhtebar: Detected student ID:", sid);
+      setStudentId(sid);
+    } else {
+      console.warn("Ikhtebar: Could not detect student ID in profile:", studentProfile);
+    }
+  }, [studentProfile]);
+
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const silenceTimerRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [student_id]);
+
+  const fetchHistory = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      console.log("Ikhtebar: Fetching history for user_id:", user.id);
+
+      const { data, error } = await supabase
+        .from("quran_ikhtebar")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Ikhtebar: Fetch error:", error);
+      }
+
+      if (data) {
+        console.log(`Ikhtebar: Successfully retrieved ${data.length} records.`);
+        setHistory(data);
+      }
+    } catch (e) {
+      console.error("Ikhtebar: Unexpected error in fetchHistory:", e);
+    }
+  };
+
+  const generateQuestion = async () => {
+    setLoadingQuestion(true);
+    setRevealedWords([]);
+    setAudioGuidanceUrl(null);
+    setVersesData([]);
+    setSurahInfo(null);
+
+    const pool = marhalaLibrary[selectedMarhalaName][difficulty];
+    const q = pool[Math.floor(Math.random() * pool.length)];
+    setCurrentQuestion(q);
+    setMistakes([]);
+
+    try {
+      // Step 1: Fetch Verses with full metadata
+      const textRes = await fetch(`https://api.quran.com/api/v4/verses/by_page/${q.page}?words=true&word_fields=text_uthmani,text_tajweed&fields=text_uthmani`);
+      const textData = await textRes.json();
+      const verses = textData.verses; // All verses on the page
+
+      // Target the verse
+      const targetVerse = verses?.[0];
+      if (!targetVerse) {
+        throw new Error("No verses found on page " + q.page);
+      }
+      setVersesData([targetVerse]);
+
+      // Step 2: Fetch Audio for that SPECIFIC verse (Hussary ID 12)
+      if (testMode === "self") {
+        const audioRes = await fetch(`https://api.quran.com/api/v4/recitations/12/by_verse/${targetVerse.verse_key}`);
+        const audioData = await audioRes.json();
+        if (audioData.audio_files?.length > 0) {
+          const url = audioData.audio_files[0].url;
+          setAudioGuidanceUrl(url);
+          new Audio(url).play().catch(() => { });
+        }
+      }
+
+      // Step 3: Get Surah Info
+      const surahRes = await fetch(`https://api.quran.com/api/v4/chapters/${targetVerse.verse_key.split(":")[0]}`);
+      const surahData = await surahRes.json();
+      setSurahInfo(surahData.chapter);
+
+      // Step 4: Prepare words for animation (Only one verse)
+      const allWords = targetVerse.words;
+
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i < allWords.length) {
+          setRevealedWords(prev => [...prev, allWords[i]]);
+          i++;
+        } else {
+          clearInterval(interval);
+        }
+      }, 80);
+
+    } catch (err) {
+      console.error("Error fetching Quran data:", err);
+    }
+    setLoadingQuestion(false);
+  };
+
+  const logWordMistake = (word, type) => {
+    setMistakes(prev => {
+      const exists = prev.find(m => m.wordId === word.id && m.type === type);
+      if (exists) return prev;
+      return [...prev, {
+        type,
+        wordId: word.id,
+        wordText: word.text_uthmani || word.text || "General",
+        time: new Date().toLocaleTimeString()
+      }];
+    });
+    playBeep();
+    if (testMode === "self") pauseAndRestartOnMistake();
+  };
+
+  const calculateStars = (mistakeCount) => {
+    if (mistakeCount === 0) return 5;
+    if (mistakeCount === 1) return 4;
+    if (mistakeCount <= 3) return 3;
+    if (mistakeCount <= 5) return 2;
+    return 1;
+  };
+
+  const playBeep = () => {
+    const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+    audio.play();
+  };
+
+  const logMistake = (type) => {
+    setMistakes(prev => [...prev, { type, time: new Date().toLocaleTimeString() }]);
+    playBeep();
+    if (testMode === "self") {
+      pauseAndRestartOnMistake();
+    }
+  };
+
+  const pauseAndRestartOnMistake = () => {
+    mediaRecorderRef.current?.pause();
+    setTimeout(() => {
+      alert("Mistake detected! Please correct your recitation and press OK to continue.");
+      mediaRecorderRef.current?.resume();
+    }, 500);
+  };
+
+  // Silence Detection for Self Mode
+  const startSilenceDetection = (stream) => {
+    if (testMode !== "self") return;
+
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    analyserRef.current = audioContextRef.current.createAnalyser();
+    const source = audioContextRef.current.createMediaStreamSource(stream);
+    source.connect(analyserRef.current);
+
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const checkSilence = () => {
+      if (!recording) return;
+      analyserRef.current.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+
+      if (average < 5) { // Threshold for silence
+        if (!silenceTimerRef.current) {
+          silenceTimerRef.current = setTimeout(() => {
+            logWordMistake({ id: 'pause', text_uthmani: 'Pause' }, "Silence/Pause");
+            silenceTimerRef.current = null;
+          }, 3000); // 3 seconds pause = beep
+        }
+      } else {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      }
+      requestAnimationFrame(checkSilence);
+    };
+    checkSilence();
+  };
+
+  // Silence Detection for Self Mode
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+      mediaRecorderRef.current.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const fileName = `${student_id}/${Date.now()}.webm`;
+
+        const { error: uploadError } = await supabase.storage.from("ikhtebar_recordings").upload(fileName, blob);
+        if (uploadError) return;
+
+        const { data: publicUrlData } = supabase.storage.from("ikhtebar_recordings").getPublicUrl(fileName);
+
+        // Calculate score/stars
+        const starCount = calculateStars(mistakes.length);
+
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const entry = {
+          student_id,
+          user_id: user?.id,
+          marhala: selectedMarhalaName,
+          difficulty,
+          mode: testMode,
+          question_text: currentQuestion?.text,
+          page_number: currentQuestion?.page,
+          audio_url: publicUrlData.publicUrl,
+          mistakes: mistakes,
+          score: starCount,
+          verses_json: versesData, // Save verses for highlighting in history
+          created_at: new Date().toISOString()
+        };
+
+        console.log("Ikhtebar: Attempting to save record for student:", student_id);
+        const { data: savedData, error: dbError } = await supabase.from("quran_ikhtebar").insert([entry]).select();
+
+        if (!dbError) {
+          console.log("Ikhtebar: Record saved successfully:", savedData);
+          await fetchHistory();
+
+        } else {
+          console.error("Ikhtebar: Database save error details:", dbError);
+          alert("Error saving record: " + dbError.message);
+        }
+      };
+
+      mediaRecorderRef.current.start();
+      setRecording(true);
+      startSilenceDetection(stream);
+    } catch (err) {
+      alert("Microphone access denied: " + err.message);
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
+
+  return (
+    <div className="ikhtebar-container fade-in">
+      <div className="ikhtebar-header-card premium-card">
+        <div className="header-icon-box">
+          <BookOpen size={32} />
+        </div>
+        <div className="header-text">
+          <h2 className="arabic-kanz" style={{ fontSize: '1.8rem' }}>Al-Muhaffiz Quran Ikhtebar</h2>
+          <p>Professional Ikhtebar Portal for Tahfeez Students</p>
+        </div>
+      </div>
+
+      <div className="ikhtebar-live-section">
+        <section className="ikhtebar-setup-card premium-card">
+          <h3 className="section-title"><Sparkles size={18} /> Ikhtebar Control Panel</h3>
+
+          <div className="setup-grid">
+            <div className="setup-form">
+              <label className="form-group">
+                <span>Select Marhala</span>
+                <select
+                  value={selectedMarhalaName}
+                  onChange={(e) => setSelectedMarhalaName(e.target.value)}
+                  className="premium-select"
+                >
+                  {Object.keys(marhalaLibrary).map(name => (
+                    <option key={name} value={name}>{name} ({marhalaLibrary[name].range})</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="form-group">
+                <span>Ikhtebar Mode</span>
+                <select
+                  value={testMode}
+                  onChange={(e) => setTestMode(e.target.value)}
+                  className="premium-select"
+                >
+                  <option value="teacher">With Teacher (Manual Feedback)</option>
+                  <option value="self">Self Ikhtebar (Auto-Beep/Voice Monitor)</option>
+                </select>
+              </label>
+
+              <label className="form-group">
+                <span>Ikhtebar Difficulty</span>
+                <div className="difficulty-toggle">
+                  {["easy", "medium", "hard"].map(level => (
+                    <button
+                      key={level}
+                      className={`diff-btn ${difficulty === level ? 'active' : ''} ${level}`}
+                      onClick={() => setDifficulty(level)}
+                    >
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </label>
+
+              <button
+                className={`generate-btn action-button ${loadingQuestion ? 'loading' : ''}`}
+                onClick={generateQuestion}
+                disabled={loadingQuestion}
+                style={{ background: 'var(--deep-brown)', color: 'white', marginTop: '10px' }}
+              >
+                {loadingQuestion ? <RotateCw className="spin" size={18} /> : <Sparkles size={18} />}
+                {loadingQuestion ? " Fetching Quran Data..." : " Generate Lively Question"}
+              </button>
+            </div>
+
+            {currentQuestion && (
+              <div className="question-display-lively mushaf-page card-appear">
+                {surahInfo && (
+                  <div className="mushaf-header">
+                    <div className="s-name arabic-kanz">{surahInfo.name_arabic}</div>
+                    {surahInfo.bismillah_pre && <div className="bismillah arabic-kanz">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>}
+                  </div>
+                )}
+
+                <div className="q-label-badge" style={{ marginBottom: '15px' }}>
+                  {testMode === "self" ? "âœ¨ Sheikh Hussary Guidance (Auto-Playing...)" : "ًں“– Teacher Prompt (Start Reciting):"}
+                </div>
+
+                <div className="mushaf-inner quran-uthmani" style={{ minHeight: '150px' }}>
+                  {revealedWords.map((w, idx) => (
+                    w && (
+                      <span
+                        key={idx}
+                        className={`q-word ${w.char_type_name || ''} ${mistakes.find(m => m && m.wordId === w.id) ? 'has-mistake' : ''}`}
+                        onClick={() => recording && logWordMistake(w, "Word")}
+                        title={w.char_type_name?.replace('tajweed-', '').toUpperCase()}
+                        dangerouslySetInnerHTML={{ __html: w.text_tajweed || w.text_uthmani }}
+                      />
+                    )
+                  ))}
+                  {revealedWords.length === 0 && !loadingQuestion && currentQuestion && (
+                    <div className="prompt-ayat-placeholder">
+                      {currentQuestion.text}
+                    </div>
+                  )}
+                  {testMode === "teacher" && !loadingQuestion && revealedWords.length > 0 && (
+                    <div className="continue-prompt-container">
+                      <span className="continue-prompt">Continue recitation with full Ahkam...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="q-meta-info" style={{ marginTop: '20px' }}>
+                  <span className="q-page-pill">Page {currentQuestion.page}</span>
+                  <span className={`q-diff-pill ${difficulty}`}>{difficulty} ({difficulty === 'easy' ? '7 Lines' : '15 Lines'})</span>
+                </div>
+
+                <div className="recording-controls-lively">
+                  {!recording ? (
+                    <button className="rec-btn-lively start" onClick={startRecording}><Mic size={24} /> Start Recitation</button>
+                  ) : (
+                    <button className="rec-btn-lively stop" onClick={stopRecording}><Square size={24} /> Finish & Save</button>
+                  )}
+                </div>
+
+                {recording && (
+                  <div className="live-mistake-panel fade-in">
+                    <p className="live-label">ًں”´ MARK MISTAKES LIVE:</p>
+                    <div className="mistake-btns-grid">
+                      <button className="mistake-btn word" onClick={() => logWordMistake({ id: Date.now(), text_uthmani: 'Word' }, "Word")}>
+                        Word Mistake
+                      </button>
+                      <button className="mistake-btn ahkam" onClick={() => logWordMistake({ id: Date.now(), text_uthmani: 'Ahkam' }, "Ahkam")}>
+                        Ahkam/Makharij
+                      </button>
+                      <button className="mistake-btn beep" onClick={() => playBeep()}>
+                        Manual Beep
+                      </button>
+                    </div>
+                    <p className="helper-text">You can also tap words in the Mushaf above to mark specific Word mistakes.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      </section>
+
+      <div className="ikhtebar-history-section">
+        <h3 className="section-title"><Clock size={18} /> Ikhtebar History & Quran References</h3>
+        <div className="history-grid">
+          {history.length === 0 ? (
+            <div className="empty-history">No history found. Generate a question and start reciting!</div>
+          ) : (
+            history.map((entry, i) => (
+              <div key={i} className="history-card-premium card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                <div className="history-card-top">
+                  <span className="q-page-reference">Page {entry.page_number || "--"}</span>
+                  <span className="timestamp">{new Date(entry.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="history-card-main">
+                  <div className="h-marhala-row">
+                    <h4 className="arabic-kanz">{entry.marhala}</h4>
+                    <div className="star-rating">
+                      {[...Array(5)].map((_, idx) => (
+                        <Sparkles key={idx} size={14} color={idx < (entry.score || 0) ? "var(--primary-gold)" : "#ccc"} fill={idx < (entry.score || 0) ? "var(--primary-gold)" : "transparent"} />
+                      ))}
+                    </div>
+                    <span className={`mode-badge ${entry.mode}`}>{entry.mode}</span>
+                  </div>
+
+                  <div className="h-page-view quran-uthmani mushaf-card-view">
+                    <div className="mistake-badge-counter">
+                      {entry.mistakes?.length || 0} Mistakes Detected
+                    </div>
+                    {entry.verses_json?.map((v, vIdx) => (
+                      <div key={vIdx} className="h-verse">
+                        {v?.words?.map((w, wIdx) => {
+                          if (!w) return null;
+                          const mistake = entry.mistakes?.find(m => m && m.wordId === w.id);
+                          return (
+                            <span
+                              key={wIdx}
+                              className={`h-word ${mistake ? (mistake.type === 'Word' ? 'has-mistake' : 'has-mistake ahkam') : ''}`}
+                              dangerouslySetInnerHTML={{ __html: w.text_tajweed || w.text_uthmani }}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="history-mistake-feedback">
+                    <strong>Feedback:</strong>
+                    {entry.mistakes && entry.mistakes.length > 0 ? (
+                      <div className="mistake-tag-row">
+                        {entry.mistakes.map((m, idx) => (
+                          <span key={idx} className={`mistake-dot ${m.type === 'Word' ? 'blue' : 'yellow'}`}>
+                            {m.wordText || m.type}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="perfect-score">Excellent! Perfect Recitation â­گ</p>
+                    )}
+                  </div>
+                </div>
+                <div className="history-card-footer">
+                  {entry.audio_url && (
+                    <div className="history-audio-box">
+                      <WaveSurferPlayer url={entry.audio_url} />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '5px' }}>
+                        <button className="btn-text-only" onClick={() => downloadFile(entry.audio_url, `ikhtebar_p${entry.page_number}.webm`)}>
+                          <Download size={14} /> Download Recording
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+      </div>
+    </div>
+  );
+}
+
+
+function AnnouncementsPage({ announcements = [], setActivePage, setSelectedAnnouncement, onDismiss, onClearAll, dismissedIds = [] }) {
+  const images = [
+    "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=400&q=80",
+    "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=400&q=80",
+    "https://images.unsplash.com/photo-1577563908411-50cb98976ffe?auto=format&fit=crop&w=400&q=80"
+  ];
+
+  const visibleAnnounces = announcements.filter(n => !dismissedIds.includes(n.id));
+
+  return (
+    <div className="announcements-page fade-in">
+      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 className="premium-title">System Announcements</h2>
+          <p className="subtitle">Important updates and schedules from the administration</p>
+        </div>
+        {visibleAnnounces.length > 0 && (
+          <button className="clear-history-btn" onClick={() => onClearAll(visibleAnnounces.map(n => n.id))}>
+            <Trash2 size={16} /> Clear All
+          </button>
+        )}
+      </div>
+      <div className="announcements-grid">
+        {visibleAnnounces.length === 0 ? (
+          <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
+            <Bell size={48} style={{ opacity: 0.2 }} />
+            <p>No system announcements available</p>
+          </div>
+        ) : (
+          visibleAnnounces.map((n, i) => (
+            <div key={n.id || i} className="announce-card">
+              <button className="card-dismiss-btn" onClick={() => onDismiss(n.id)} title="Clear from view">
+                <X size={16} />
+              </button>
+              <img src={images[i % images.length]} alt="Announcement" className="announce-img" />
+              <div className="announce-content">
+                <div className="announce-badge">{n.type || 'Update'}</div>
+                <h4>{n.title}</h4>
+                <p>{n.description || n.title || "No description provided."}</p>
+                <div className="announce-footer">
+                  <span className="announce-time">{n.event_date || new Date(n.created_at).toLocaleDateString()}</span>
+                  <button className="announce-btn" onClick={() => {
+                    setSelectedAnnouncement(n);
+                  }}>
+                    Open Details <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function normalizeText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function toNumber(value) {
+  return Number(value || 0);
+}
+
+const toArabicDigits = (str) => {
+  if (str == null) return str;
+  return String(str).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d, 10)]);
+};
+
+const ARABIC_MONTHS = [
+  "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
+  "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
+  "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
+];
+
+function getFatemiInfo(dateStr) {
+  if (!dateStr) return { week: "...", month: "...", date: "...", monthName: "..." };
+
+  try {
+    const date = new Date(dateStr);
+    const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC'
+    }).formatToParts(date);
+
+    const d = parseInt(parts.find(p => p.type === 'day').value);
+    const m = parseInt(parts.find(p => p.type === 'month').value);
+    const y = parts.find(p => p.type === 'year').value;
+
+    return {
+      week: Math.ceil(d / 7),
+      month: m,
+      date: d,
+      year: y,
+      monthName: ARABIC_MONTHS[m - 1] || "..."
+    };
+  } catch (e) {
+    return { week: "...", month: "...", date: "...", monthName: "..." };
+  }
+}
+
+async function findPortalAccess(userId) {
+  const { data, error } = await supabase
+    .from("user_portal_access")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data || null;
+}
+
+function getAssignedRoles(user) {
+  const rawRoles = [
+    user?.user_metadata?.portal_roles,
+    user?.app_metadata?.portal_roles,
+    user?.user_metadata?.portal_role,
+    user?.user_metadata?.role,
+    user?.app_metadata?.portal_role,
+    user?.app_metadata?.role,
+  ].filter(Boolean);
+
+  const roles = rawRoles.flatMap((value) => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+
+    return String(value)
+      .split(",")
+      .map((role) => role.trim().toLowerCase())
+      .filter(Boolean);
+  });
+
+  return Array.from(
+    new Set(roles.filter((role) => Object.prototype.hasOwnProperty.call(ROLE_LABELS, role)))
+  );
+}
+
+function formatRoleList(roles) {
+  return roles.map((role) => ROLE_LABELS[role] || role).join(", ");
+}
+
+async function findParentProfiles(userId, email = null) {
+  let query = supabase
+    .from("child_profiles")
+    .select("*");
+
+  if (userId && email) {
+    // If we have both, use a more robust check. We use .or() with explicit casting hint for userId
+    query = query.or(`parent_user_id.eq.${userId},parent_email.ilike.%${email.trim()}%`);
+  } else if (userId) {
+    query = query.eq("parent_user_id", userId);
+  } else if (email) {
+    query = query.ilike("parent_email", email.trim());
+  } else {
+    return [];
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
+async function authorizePortalAccess(user, requestedRole) {
+  const tableAccess = await findPortalAccess(user.id);
+  const assignedRoles = getAssignedRoles(user);
+  const requestedLabel = ROLE_LABELS[requestedRole] || requestedRole;
+
+  if (tableAccess?.is_active && tableAccess.portal_role === requestedRole) {
+    return {
+      ok: true,
+      role: requestedRole,
+      assignedRoles: [requestedRole],
+      parentProfile: null,
+      accessRow: tableAccess,
+    };
+  }
+
+  if (tableAccess?.is_active && tableAccess.portal_role && tableAccess.portal_role !== requestedRole) {
+    return {
+      ok: false,
+      message: `This account is assigned to the ${ROLE_LABELS[tableAccess.portal_role] || tableAccess.portal_role
+        } portal in Supabase. It cannot open the ${requestedLabel} portal.`,
+    };
+  }
+
+  if (assignedRoles.includes(requestedRole)) {
+    return {
+      ok: true,
+      role: requestedRole,
+      assignedRoles,
+      parentProfile: null,
+      accessRow: null,
+    };
+  }
+
+  if (requestedRole === "parents") {
+    const parentProfiles = await findParentProfiles(user.id, user.email);
+
+    if (parentProfiles.length > 0) {
+      return {
+        ok: true,
+        role: "parents",
+        assignedRoles: assignedRoles.length > 0 ? assignedRoles : ["parents"],
+        parentProfile: parentProfiles[0],
+        allParentProfiles: parentProfiles,
+        accessRow: tableAccess || null,
+      };
+    }
+  }
+
+  if (tableAccess && !tableAccess.is_active) {
+    return {
+      ok: false,
+      message: "This account exists in Supabase portal access, but it is currently inactive.",
+    };
+  }
+
+  if (assignedRoles.length > 0) {
+    return {
+      ok: false,
+      message: `This account is assigned to ${formatRoleList(
+        assignedRoles
+      )}. It cannot open the ${requestedLabel} portal.`,
+    };
+  }
+
+  return {
+    ok: false,
+    message: `This account is not assigned to the ${requestedLabel} portal yet. Add a role in Supabase user metadata first.`,
+  };
+}
+
+async function resolveInitialPortal(user, preferredRole) {
+  const tableAccess = await findPortalAccess(user.id);
+  const assignedRoles = getAssignedRoles(user);
+
+  if (tableAccess?.is_active && tableAccess.portal_role) {
+    return authorizePortalAccess(user, tableAccess.portal_role);
+  }
+
+  if (preferredRole) {
+    const preferredAccess = await authorizePortalAccess(user, preferredRole);
+    if (preferredAccess.ok) {
+      return preferredAccess;
+    }
+  }
+
+  for (const role of assignedRoles) {
+    const access = await authorizePortalAccess(user, role);
+    if (access.ok) {
+      return access;
+    }
+  }
+
+  return authorizePortalAccess(user, "parents");
+}
+
+function guessTeacherIdentity(user, portalAccess = null) {
+  if (portalAccess?.full_name) return portalAccess.full_name;
+
+  const metadataName =
+    user?.user_metadata?.teacher_name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name;
+
+  if (metadataName) return metadataName;
+
+  return (user?.email || "")
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .trim();
+}
+
+function getStudentStatus(student) {
+  if (student?.latestResult?.attendance_note) {
+    return student.latestResult.attendance_note;
+  }
+
+  if (student?.hifz?.teacher_note) {
+    return student.hifz.teacher_note;
+  }
+
+  if (student?.hifz?.surat) {
+    return `Memorizing ${student.hifz.surat}`;
+  }
+
+  return "Status update pending";
+}
+
+function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles = []) {
+  // Calculate dynamic ranks per week
+  const resultsByWeek = {};
+  weeklyResults.forEach(r => {
+    if (!r.week_date) return;
+    if (!resultsByWeek[r.week_date]) resultsByWeek[r.week_date] = [];
+    resultsByWeek[r.week_date].push(r);
+  });
+
+  const rankMap = new Map(); // key: student_id + week_date
+  Object.keys(resultsByWeek).forEach(week => {
+    const weekResults = resultsByWeek[week];
+    const sorted = [...weekResults].sort((a, b) => {
+      const scoreDiff = (Number(b.total_score) || 0) - (Number(a.total_score) || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
+      if (jadeedDiff !== 0) return jadeedDiff;
+      return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
+    });
+
+    // Unique sequential ranks sorted by total_score descending (no ties)
+    sorted.forEach((result, idx) => {
+      const resId = String(result.student_id || "").trim().toLowerCase();
+      rankMap.set(`${resId}-${week}`, idx + 1);
+    });
+  });
+
+  const latestResultMap = new Map();
+  // Sort by date descending to get the latest result first
+  const sortedByDate = [...weeklyResults].sort((a, b) => new Date(b.week_date) - new Date(a.week_date));
+
+  const getEffectiveScore = (r) => {
+    if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
+    return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
+  };
+
+  sortedByDate.forEach((result) => {
+    const resId = String(result.student_id || "").trim().toLowerCase();
+    if (resId && !latestResultMap.has(resId)) {
+      // For now, we'll use the weekly rank if it exists, but we'll recalculate global rank below
+      const weeklyRank = rankMap.get(`${resId}-${result.week_date}`);
+      latestResultMap.set(resId, { ...result, weeklyRank, effectiveScore: getEffectiveScore(result) });
+    }
+  });
+
+  // Calculate Global Rank among all students' latest results
+  const latestResultsArray = Array.from(latestResultMap.values());
+  latestResultsArray.sort((a, b) => {
+    const scoreDiff = b.effectiveScore - a.effectiveScore;
+    if (scoreDiff !== 0) return scoreDiff;
+    const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
+    if (jadeedDiff !== 0) return jadeedDiff;
+    return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
+  });
+
+  // Unique sequential global ranks (no ties)
+  latestResultsArray.forEach((result, idx) => {
+    const resId = String(result.student_id || "").trim().toLowerCase();
+    const resultInMap = latestResultMap.get(resId);
+    if (resultInMap) {
+      resultInMap.computedRank = idx + 1;
+    }
+  });
+
+  return childProfiles.map((profile) => {
+    const sId = profile.student_id || profile.its || profile.id;
+    const numericId = !isNaN(sId) ? Number(sId) : sId;
+    
+    const normalizeId = (id) => String(id || "").trim().toLowerCase();
+    const pId = normalizeId(profile.id);
+    const psId = normalizeId(profile.student_id);
+    const pIts = normalizeId(profile.its);
+
+    const latestResult = 
+      (pId && latestResultMap.get(pId)) || 
+      (psId && latestResultMap.get(psId)) || 
+      (pIts && latestResultMap.get(pIts)) ||
+      (Array.from(latestResultMap.values()).find(r => 
+        profile.full_name && r.full_name && normalizeText(r.full_name) === normalizeText(profile.full_name)
+      )) || null;
+
+    const teacherInProfiles = teacherProfiles.find(t =>
+      (profile.teacher_id && (t.id === profile.teacher_id || t.user_id === profile.teacher_id))
+    );
+
+    return {
+      ...profile,
+      id: profile.id,
+      student_id: numericId,
+      allIds: [profile.student_id, profile.its, profile.id].filter(Boolean).map(String),
+      name: profile.full_name,
+      arabic_name: fixArabicScript(profile.arabic_name),
+      its: profile.its || "...",
+      latestResult,
+      teacherName: profile.teacher_name || teacherInProfiles?.full_name || "Unassigned teacher",
+      groupName: profile.group_name || "Ungrouped",
+      muhaffiz_id: profile.teacher_id || null,
+      user_id: profile.parent_user_id || null,
+      parent_email: profile.parent_email || null,
+      photoUrl: profile.photo_url || "",
+      whatsapp_number: profile.whatsapp_number || "",
+      hifz: {
+        juz: profile.juz || "N-A",
+        surat: profile.surat || "Pending",
+      },
+      hifzStatus: profile.surat ? `Memorizing ${profile.surat}` : "Status pending",
+    };
+  });
+}
+
+function LoadingScreen({ message }) {
+  return (
+    <div className="skeleton-screen">
+      <div className="skeleton-sidebar">
+        <div className="skeleton-el skeleton-sidebar-logo" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="skeleton-el skeleton-sidebar-nav-item" />
+        ))}
+      </div>
+      <div className="skeleton-main">
+        <div className="skeleton-el skeleton-header-bar" />
+        <div className="skeleton-stats-row">
+          <div className="skeleton-el skeleton-stat-card" />
+          <div className="skeleton-el skeleton-stat-card" />
+          <div className="skeleton-el skeleton-stat-card" />
+        </div>
+        <div className="skeleton-content-grid">
+          <div className="skeleton-el skeleton-content-card">
+            <div className="skeleton-card-title" />
+            <div className="skeleton-el skeleton-line w90" />
+            <div className="skeleton-el skeleton-line w75" />
+            <div className="skeleton-el skeleton-line w60" />
+          </div>
+          <div className="skeleton-el skeleton-content-card">
+            <div className="skeleton-card-title" />
+            <div className="skeleton-el skeleton-line w75" />
+            <div className="skeleton-el skeleton-line w90" />
+            <div className="skeleton-el skeleton-line w60" />
+          </div>
+        </div>
+        <div className="skeleton-row">
+          <div className="skeleton-el skeleton-content-card">
+            <div className="skeleton-card-title" />
+            <div className="skeleton-el skeleton-line w90" />
+            <div className="skeleton-el skeleton-line w75" />
+          </div>
+          <div className="skeleton-el skeleton-content-card">
+            <div className="skeleton-card-title" />
+            <div className="skeleton-el skeleton-line w60" />
+            <div className="skeleton-el skeleton-line w90" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StudentAvatar({ student, size = "regular" }) {
+  if (student?.photoUrl) {
+    return (
+      <img
+        src={student.photoUrl}
+        alt={student.name || "Student"}
+        className={`student-avatar ${size}`}
+      />
+    );
+  }
+
+  return (
+    <div className={`avatar-placeholder ${size === "small" ? "small" : ""}`}>
+      <User size={size === "small" ? 20 : 28} />
+    </div>
+  );
+}
+
+function InfoHighlights({ items }) {
+  return (
+    <div className="info-grid">
+      {items.map((item) => (
+        <section key={item}>
+          <h3>Highlight</h3>
+          <p>{item}</p>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function DatePicker({ value, onChange, disabled = false }) {
+  const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const info = value ? getFatemiInfo(value) : null;
+  const dayName = value ? dayNames[new Date(value + 'T00:00:00Z').getUTCDay()] : '';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <input type="date" value={value || ''} onChange={(e) => {
+        if (e.target.value) onChange({ target: { name: 'week_date', value: e.target.value } });
+      }} disabled={disabled} className="premium-input" style={{ padding: '8px 12px', fontSize: '0.9rem' }} />
+      {value && info && info.date !== '...' ? (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '2px' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{dayName}</span>
+          <span style={{ fontSize: '1rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
+            {info.date} {info.monthName} {info.year}
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
+  const stars = Array.from({ length: total }, (_, i) => i < Number(count || 0));
+
+  return (
+    <div className="attendance-card-modern card-appear">
+      <div className="attendance-lighting" />
+      <div className="attendance-stars-container">
+        {stars.map((isFilled, i) => (
+          <Sparkles
+            key={i}
+            size={24}
+            className={`attendance-star ${isFilled ? 'filled' : 'empty'}`}
+            style={{ animationDelay: `${i * 0.1}s` }}
+          />
+        ))}
+      </div>
+      <div>
+        <h4 className="attendance-rating-text" dir="rtl" style={{ fontFamily: "'Kanz al Marjaan', serif", letterSpacing: 'normal' }}>
+          {heading}
+        </h4>
+        <p className="attendance-sub-label kanz-font" style={{ textAlign: 'center', fontSize: '11px' }}>
+          {toArabicDigits(count || 0)} out of {toArabicDigits(total)} {heading}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
+  return (
+    <div className="jadeed-pages-card card-appear">
+      <div className="attendance-lighting" />
+      <div className="jadeed-icon-container">
+        <BookOpen size={80} className="jadeed-icon-bg" />
+        <span className="jadeed-count-overlay"><span className="kanz-font">{toArabicDigits(count || 0)}</span></span>
+      </div>
+      <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontFamily: "'Kanz al Marjaan', serif", fontSize: '1.6rem', marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
+        {heading}
+      </h4>
+      <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
+        New pages memorized this week
+      </p>
+    </div>
+  );
+}
+
+function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false, rankImproved = false }) {
+  const report = normalizeReportSettings(settings);
+  const fatemi = getFatemiInfo(weeklyResult?.week_date);
+  const hMain = report.main_heading;
+  const hSub = report.sub_heading;
+  const hWusool = report.wusool_heading;
+  const hNext = report.next_week_heading;
+  const hIstifadah = report.istifadah_heading;
+  const progressCardBackground = report.progress_card_background_url || "";
+  const progressCardOverlayOpacity = Math.min(
+    Math.max(Number(report.progress_card_overlay_opacity ?? 0.82), 0),
+    1
+  );
+  const progressCardStyle = progressCardBackground
+    ? {
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundColor: '#fffaf0',
+        backgroundImage: `linear-gradient(rgba(255, 250, 240, ${progressCardOverlayOpacity}), rgba(255, 250, 240, ${progressCardOverlayOpacity})), url(${progressCardBackground})`,
+        backgroundSize: 'cover',
+        backgroundPosition: report.progress_card_background_position || 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    : { position: 'relative' };
+
+  return (
+    <div className="progress-overview">
+      <div className="result-card-premium card-appear" style={progressCardStyle}>
+        {parentViewed !== undefined && (
+          <div 
+            className={`parent-view-status-dot ${parentViewed ? 'viewed' : 'not-viewed'}`}
+            title={parentViewed ? "Parent viewed this report" : "New result! Please view."}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              width: '14px',
+              height: '14px',
+              borderRadius: '50%',
+              backgroundColor: isParentPortal 
+                ? (parentViewed ? '#e71d36' : '#2ec4b6')
+                : (parentViewed ? '#2ec4b6' : '#e71d36'),
+              boxShadow: isParentPortal
+                ? (parentViewed 
+                    ? '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)' 
+                    : '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)')
+                : (parentViewed
+                    ? '0 0 10px rgba(46, 196, 182, 0.8), 0 0 20px rgba(46, 196, 182, 0.4)' 
+                    : '0 0 10px rgba(231, 29, 54, 0.8), 0 0 20px rgba(231, 29, 54, 0.4)'),
+              border: '2px solid #ffffff',
+              zIndex: 10,
+              cursor: 'help'
+            }}
+          />
+        )}
+        {parentViewed === false && timerSeconds !== undefined && timerSeconds < 20 && (
+          <svg width="34" height="34" style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 9 }}>
+            <circle cx="17" cy="17" r="15" fill="none" stroke="rgba(46, 196, 182, 0.2)" strokeWidth="3" />
+            <circle 
+              cx="17" 
+              cy="17" 
+              r="15" 
+              fill="none" 
+              stroke="#2ec4b6" 
+              strokeWidth="3" 
+              strokeDasharray="94.2" 
+              strokeDashoffset={94.2 - (94.2 * (timerSeconds / 20))}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dashoffset 1s linear', transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+            />
+          </svg>
+        )}
+        <div className="result-card-header" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="school-logo" style={{ marginBottom: '12px' }}><img src="/logo.png" alt="Logo" /></div>
+          <div className="school-info" style={{ textAlign: 'center' }}>
+            <h2 className="qilka-bold-font" style={{ fontSize: '2.5rem', color: 'var(--deep-brown)', margin: 0, textTransform: 'uppercase' }}>{hMain}</h2>
+            <h4 className="qilka-bold-font" style={{ fontSize: '1.2rem', color: 'var(--primary-gold)', margin: '4px 0 0' }}>{hSub.replace(/\b\w/g, c => c.toUpperCase()).replace(/(\b[A-Z])([A-Z]+)/g, (_, f, r) => f + r.toLowerCase())}</h4>
+            <div className="report-student-name" style={{ marginTop: '28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', border: '3px solid var(--primary-gold)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8' }}>
+                {student?.photoUrl || student?.photo_url ? (
+                  <img src={student.photoUrl || student.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: '32px', lineHeight: '70px', color: 'var(--soft-brown)' }}>👤</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold' }}>{student?.arabic_name ? fixArabicScript(student.arabic_name) : student?.name}</span>
+                {rankImproved && (
+                  <lottie-player
+                    src="/11eb8d74-1187-11ee-95e9-a721cfe73700.json"
+                    background="transparent"
+                    speed="1"
+                    style={{ width: "40px", height: "40px", flexShrink: 0 }}
+                    loop
+                    autoplay
+                  ></lottie-player>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="result-week-meta">
+          <div className="week-meta-grid">
+            <div className="meta-col">
+              <span className="meta-label child-hood-font">Week:</span>
+              <span className="meta-val kanz-font">{fatemi.week}</span>
+            </div>
+            <div className="meta-col">
+              <span className="meta-label child-hood-font">Date:</span>
+              <span className="meta-val kanz-font">{fatemi.date}</span>
+            </div>
+            <div className="meta-col">
+              <span className="meta-label child-hood-font">Month:</span>
+              <span className="meta-val arabic-kanz">{fatemi.monthName}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="result-main">
+          <div className="total-score-block">
+            <span className="score-title child-hood-font">{report.weekly_score_heading}</span>
+            <span className="jumla-label arabic-kanz">{report.jumla_heading}</span>
+            <div className="score-circle">
+              <span className="kanz-font">{toArabicDigits((weeklyResult?.total_score ?? 
+                (toNumber(weeklyResult?.murajazah) + 
+                 toNumber(weeklyResult?.juz_hali) + 
+                 toNumber(weeklyResult?.takhteet) + 
+                 toNumber(weeklyResult?.jadeed))) || "0")}</span>
+            </div>
+            <span className="max-score"><span className="kanz-font"><span style={{fontFamily:'Arial,sans-serif'}}> / </span>{toArabicDigits(100)}</span></span>
+          </div>
+
+          <div className="score-details-box">
+            {[
+              { label: report.murajazah_heading, val: weeklyResult?.murajazah, max: 30 },
+              { label: report.juz_hali_heading, val: weeklyResult?.juz_hali, max: 30 },
+              { label: report.takhteet_heading, val: weeklyResult?.takhteet, max: 20 },
+              { label: report.jadeed_heading, val: weeklyResult?.jadeed, max: 20 }
+            ].map((item) => (
+              <div key={item.label} className="score-row" dir="rtl">
+                <span className="arabic-label kanz-font">{item.label} :</span>
+                <span className="score-val" style={{ direction: 'ltr', unicodeBidi: 'isolate' }}><span className="kanz-font">{toArabicDigits(item.val || "0")}</span><span style={{fontFamily:'Arial,sans-serif'}}> / </span><span className="kanz-font">{toArabicDigits(item.max)}</span></span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '10px 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#c5a059', textTransform: 'uppercase', letterSpacing: '1.5px' }} className="child-hood-font">Rank</span>
+              <span style={{ fontSize: '48px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 6px rgba(0,0,0,0.12)', lineHeight: '1' }}>
+                <span className="kanz-font">{toArabicDigits(weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank || "-")}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="result-footer-grid">
+          <div className="target-box highlight-wusool">
+            <h5 className="arabic-kanz" dir="rtl" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
+            <p dir="rtl"><span className="arabic-kanz">{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
+          </div>
+          <div className="target-box highlight-matrookah">
+            <div className="note-item-row">
+              <span className="note-val kanz-font">{toArabicDigits(weeklyResult?.matrookah || "-")}</span>
+              <span className="note-label arabic-kanz">{report.matrookah_heading} :</span>
+            </div>
+            <div className="note-item-row">
+              <span className="note-val kanz-font">{toArabicDigits(weeklyResult?.daeefah || "-")}</span>
+              <span className="note-label arabic-kanz">{report.daeefah_heading} :</span>
+            </div>
+          </div>
+          <div className="target-box">
+            <h5 className="child-hood-font">{hNext}</h5>
+            <p dir="rtl"><span className="arabic-kanz">{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
+          </div>
+          <div className="target-box highlight">
+            <h5 className="child-hood-font">{hIstifadah}</h5>
+            <p dir="rtl"><span className="arabic-kanz">{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz">{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
+          </div>
+        </div>
+
+        <div className="report-footer-cards">
+          <AttendanceCard
+            count={weeklyResult?.attendance_count}
+            total={6}
+            heading={report.attendance_heading}
+          />
+          <JadeedPagesCard
+            count={weeklyResult?.total_jadeed_pages}
+            heading={report.jadeed_safahat_heading}
+          />
+        </div>
+
+        {weeklyResult?.attendance_note && (
+          <div className="attendance-ribbon">{weeklyResult.attendance_note}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RankPreview({ students }) {
+  const studentList = students || [];
+  const getEffectiveScore = (r) => {
+    if (!r) return 0;
+    if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
+    return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
+  };
+
+  const getTieInfo = (sorted, student, idx) => {
+    if (idx === 0) return 'Leader';
+    const prev = sorted[idx - 1];
+    if (prev.score === student.score) {
+      if (prev.jadeed === student.jadeed) {
+        if (prev.attendance === student.attendance) {
+          return "Tied on Score, Jadeed & Attendance";
+        }
+        return "Tied on Score & Jadeed \u2192 Attendance broke tie";
+      }
+      return "Tied on Score \u2192 Jadeed broke tie";
+    }
+    return '';
+  };
+
+  const rankedStudents = useMemo(() => {
+    const withScores = studentList
+      .filter(s => s.latestResult)
+      .map(s => ({
+        ...s,
+        score: getEffectiveScore(s.latestResult),
+        jadeed: Number(s.latestResult.jadeed) || 0,
+        attendance: Number(s.latestResult.attendance_count) || 0,
+      }));
+    
+    withScores.sort((a, b) => {
+      const scoreDiff = b.score - a.score;
+      if (scoreDiff !== 0) return scoreDiff;
+      const jadeedDiff = b.jadeed - a.jadeed;
+      if (jadeedDiff !== 0) return jadeedDiff;
+      return b.attendance - a.attendance;
+    });
+
+    return withScores.map((s, idx) => ({
+      ...s,
+      rank: idx + 1,
+      tieInfo: getTieInfo(withScores, s, idx),
+    }));
+  }, [students]);
+
+  return (
+    <div className="fade-in" style={{ padding: '20px 0' }}>
+      <div className="page-header">
+        <h2 className="premium-title">Rank Preview & Tie-Breaking Analysis</h2>
+        <p className="subtitle">
+          Students sorted by <strong>Score</strong> \u2193 \u2192 <strong>Jadeed</strong> \u2193 \u2192 <strong>Attendance</strong> \u2193
+          \u2014 ranks are unique sequential (no ties)
+        </p>
+      </div>
+
+      {rankedStudents.length === 0 ? (
+        <div className="empty-state">
+          <TrendingUp size={48} style={{ opacity: 0.2 }} />
+          <p>No student results available for ranking</p>
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto', borderRadius: '16px', border: '1px solid var(--glass-border)', background: '#fff' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+            <thead>
+              <tr style={{ background: 'linear-gradient(135deg, #3d2b1f, #5d4037)', color: '#fff' }}>
+                <th style={{ padding: '14px 16px', textAlign: 'left' }}>Rank</th>
+                <th style={{ padding: '14px 16px', textAlign: 'left' }}>Student</th>
+                <th style={{ padding: '14px 16px', textAlign: 'center' }}>Score</th>
+                <th style={{ padding: '14px 16px', textAlign: 'center' }}>Jadeed</th>
+                <th style={{ padding: '14px 16px', textAlign: 'center' }}>Attendance</th>
+                <th style={{ padding: '14px 16px', textAlign: 'left' }}>Tie-Break Info</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rankedStudents.map((s, i) => (
+                <tr key={s.id || i} style={{ borderBottom: '1px solid #f0ede8', background: i % 2 === 0 ? '#fcfaf5' : '#fff' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: 900 }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: '36px', height: '36px', borderRadius: '50%',
+                      background: s.rank <= 3 ? 'linear-gradient(135deg, #d4af37, #b88a1d)' : '#f0ede8',
+                      color: s.rank <= 3 ? '#fff' : '#3d2b1f', fontSize: '0.85rem',
+                    }}>
+                      {s.rank <= 3 ? ['\U0001F3C6', '\U0001F948', '\U0001F949'][s.rank - 1] : s.rank}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', background: '#f0ede8', flexShrink: 0 }}>
+                        {s.photoUrl ? (
+                          <img src={s.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>\U0001F464</div>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#3d2b1f' }}>{s.name || s.full_name}</div>
+                        {s.arabic_name && <div style={{ fontSize: '0.8rem', color: '#d4af37' }}>{s.arabic_name}</div>}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <div style={{
+                      width: '40px', height: '40px', borderRadius: '50%',
+                      background: s.score >= 80 ? '#d4af37' : s.score >= 50 ? '#f0ede8' : '#f8e8e8',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 900, fontSize: '0.85rem', color: s.score >= 80 ? '#fff' : '#3d2b1f'
+                    }}>
+                      {s.score}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#aaa', marginTop: '2px' }}>out of 100</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600 }}>
+                    <span style={{ color: s.jadeed >= 15 ? '#2e7d32' : '#3d2b1f' }}>{s.jadeed}</span>
+                    <div style={{ fontSize: '0.7rem', color: '#aaa' }}>max 20</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '3px' }}>
+                      {Array.from({ length: 6 }, (_, j) => (
+                        <Sparkles key={j} size={12}
+                          color={j < s.attendance ? '#d4af37' : '#e0ddd8'}
+                          fill={j < s.attendance ? '#d4af37' : 'transparent'}
+                        />
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#aaa', marginTop: '2px' }}>{s.attendance}/6</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: s.tieInfo ? '#b88a1d' : '#999' }}>
+                    {s.tieInfo || '\u2014'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div style={{ marginTop: '24px', padding: '16px 20px', background: '#fcfaf5', borderRadius: '12px', border: '1px solid var(--glass-border)', fontSize: '0.85rem', color: '#666' }}>
+        <strong style={{ color: '#3d2b1f' }}>Tie-Breaking Order:</strong>
+        <ol style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
+          <li><strong>Total Score</strong> (descending) \u2014 highest marks first</li>
+          <li><strong>Jadeed (New Pages)</strong> (descending) \u2014 more new pages = higher rank</li>
+          <li><strong>Attendance Count</strong> (descending) \u2014 better attendance = higher rank</li>
+        </ol>
+        <p style={{ marginTop: '8px', fontStyle: 'italic' }}>Ranks are unique and sequential \u2014 no two students share the same rank.</p>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPage({ 
+  isDarkMode, 
+  setIsDarkMode, 
+  appTheme, 
+  setAppTheme, 
+  user, 
+  studentProfile,
+  onShowAction,
+  teacherUnlockStatus,
+  setTeacherUnlockStatus,
+  role = "parents"
+}) {
+  const [activeTab, setActiveTab] = useState("Dark mode");
+  const tabs = ["Dark mode", "App themes", "Notifications", "Security", "Support", "About"];
+  const [passForm, setPassForm] = useState({ newPassword: "", confirmPassword: "" });
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (passForm.newPassword !== passForm.confirmPassword) {
+      onShowAction("error", "Passwords do not match.");
+      return;
+    }
+    if (passForm.newPassword.length < 6) {
+      onShowAction("error", "Password must be at least 6 characters.");
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: passForm.newPassword
+    });
+
+    if (error) {
+      onShowAction("error", "Failed to update password: " + error.message);
+    } else {
+      onShowAction("success", "Password updated successfully!");
+      setPassForm({ newPassword: "", confirmPassword: "" });
+    }
+  };
+
+  const themes = [
+    { id: "default", name: "Classic Premium", desc: "The original elegant look", color: "#5d4037" },
+    { id: "childish", name: "Playful Learning", desc: "Colorful and fun for kids", color: "#ff8a65" },
+    { id: "men", name: "Executive Dark", desc: "Professional and sleek", color: "#263238" },
+    { id: "women", name: "Royal Grace", desc: "Sophisticated and soft tones", color: "#8e24aa" },
+    { id: "ashara", name: "Ashara Mode", desc: "Aashra Mubarakah — Mourning for Imam Hussain (AS)", color: "#0a5c36", premium: true },
+  ];
+
+  const handleSupportSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const page = formData.get("page_issue");
+    const desc = formData.get("description");
+
+    const userRoleStr = role === "teacher" ? "Teacher" : "Parent";
+    const userName = studentProfile?.guardian_name || 
+                     user?.user_metadata?.full_name || 
+                     user?.email?.split('@')[0] || 
+                     `${userRoleStr} User`;
+
+    const { error } = await supabase.from("portal_issues").insert([{
+      user_id: user.id,
+      user_name: `${userName} (${userRoleStr})`,
+      page_issue: page,
+      description: desc,
+      status: 'open'
+    }]);
+
+    if (error) {
+      onShowAction("error", "Failed to send ticket: " + error.message);
+    } else {
+      // Send FCM notification to admin
+      try {
+        await supabase.functions.invoke('fcm-notification', {
+          body: {
+            title: `New Support Issue (${userRoleStr})`,
+            body: `Issue from ${userName}: ${desc}`,
+            targetRole: 'admin'
+          }
+        });
+      } catch (fcmErr) {
+        console.error("FCM Notify Admin Error:", fcmErr);
+      }
+      onShowAction("success", "Support ticket sent to Admin!");
+      e.target.reset();
+    }
+  };
+
+  return (
+    <div className="settings-page fade-in">
+      <div className="section-title-block">
+        <h2 className="page-title">Portal Settings</h2>
+        <p className="page-eyebrow">Personalize your experience</p>
+      </div>
+      <div className="settings-layout">
+      <div className="settings-tabs">
+        {tabs.map(tab => (
+          <button 
+            key={tab} 
+            className={`settings-tab-btn ${activeTab === tab ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            <span className="tab-btn-icon">
+              {tab === "Dark mode" && <Moon size={18} />}
+              {tab === "App themes" && <Palette size={18} />}
+              {tab === "Notifications" && <Bell size={18} />}
+              {tab === "Security" && <Lock size={18} />}
+              {tab === "Support" && <LifeBuoy size={18} />}
+              {tab === "About" && <Info size={18} />}
+            </span>
+            <span className="tab-btn-label">{tab}</span>
+            <ChevronRight size={16} className="tab-btn-chevron" />
+          </button>
+        ))}
+      </div>
+      <div className="settings-content premium-card card-appear">
+        {activeTab === "Dark mode" && (
+          <div className="settings-tab-pane">
+            <h3>Appearance</h3>
+            <p>Switch between light and dark visual modes.</p>
+            <div className="setting-control-row">
+              <div className="control-label">
+                {isDarkMode ? <Moon className="gold-icon" /> : <Sun className="gold-icon" />}
+                <span>Dark Mode Status</span>
+              </div>
+              <button 
+                className={`toggle-switch ${isDarkMode ? 'on' : 'off'}`}
+                onClick={() => setIsDarkMode(!isDarkMode)}
+              >
+                <div className="toggle-thumb" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Notifications" && (
+          <div className="settings-tab-pane">
+            <h3>Notifications</h3>
+            {role === "parents" ? (
+              <p>Control how you receive alerts about your child's progress.</p>
+            ) : (
+              <p>Control how you receive alerts about students and schedules.</p>
+            )}
+            <NotificationStatus role={role} />
+            <div className="hint-text" style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <Info size={14} /> If you are still not receiving alerts after enabling, check your browser permissions for this site by clicking the lock icon in the address bar.
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Security" && (
+          <div className="settings-tab-pane">
+            <h3>Security & Password</h3>
+            <p>Update your portal access credentials.</p>
+            <form className="stack-form" onSubmit={handleUpdatePassword}>
+              <label>
+                <span>New Password</span>
+                <input 
+                  type="password" 
+                  className="premium-input" 
+                  value={passForm.newPassword}
+                  onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
+                  placeholder="Min 6 characters"
+                  required
+                />
+              </label>
+              <label>
+                <span>Confirm New Password</span>
+                <input 
+                  type="password" 
+                  className="premium-input" 
+                  value={passForm.confirmPassword}
+                  onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
+                  placeholder="Re-type password"
+                  required
+                />
+              </label>
+              <button type="submit" className="action-button">
+                Update Password
+              </button>
+            </form>
+          </div>
+        )}
+
+        {activeTab === "App themes" && (
+          <div className="settings-tab-pane">
+            <h3>Premium Themes</h3>
+            <p>Choose a visual style that matches your preference.</p>
+            <div className="themes-grid">
+              {themes.map(t => (
+                <div 
+                  key={t.id} 
+                  className={`theme-card ${appTheme === t.id ? 'selected' : ''}`}
+                  onClick={() => setAppTheme(t.id)}
+                >
+                  <div className="theme-preview" style={{ backgroundColor: t.color }}>
+                    {t.premium && <span className="premium-badge"><Lock size={12} /> Premium</span>}
+                    {appTheme === t.id && <CheckCircle size={24} color="white" />}
+                  </div>
+                  <div className="theme-info">
+                    <h4>{t.name}</h4>
+                    <p>{t.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Support" && (
+          <div className="settings-tab-pane">
+            <h3>Technical Support</h3>
+            <p>Encountering an issue? Let our team know.</p>
+            <form className="stack-form" onSubmit={handleSupportSubmit}>
+              <label>
+                <span>Which page has the issue?</span>
+                <select name="page_issue" className="premium-select" required>
+                  {role === "parents" ? (
+                    <>
+                      <option value="Home">Home Dashboard</option>
+                      <option value="Schedule">Daily Schedule</option>
+                      <option value="Progress">Progress Report</option>
+                      <option value="Teachers">Teacher Contacts</option>
+                      <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                      <option value="Hub Raqam">Hub Raqam (Fees)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Students">Student List</option>
+                      <option value="Mark Progress">Mark Progress</option>
+                      <option value="Performance">Performance Overview</option>
+                      <option value="Jadwal">Jadwal</option>
+                      <option value="Inbox">Notifications Inbox</option>
+                    </>
+                  )}
+                  <option value="Other">Other / General Issue</option>
+                </select>
+              </label>
+              <label>
+                <span>Describe your issue</span>
+                <textarea 
+                  name="description" 
+                  className="premium-input" 
+                  placeholder="Tell us what happened..." 
+                  rows="4" 
+                  required
+                ></textarea>
+              </label>
+              <button type="submit" className="action-button">
+                <Send size={18} /> Send Support Ticket
+              </button>
+            </form>
+          </div>
+        )}
+
+        {activeTab === "About" && (
+          <div className="settings-tab-pane about-pane">
+            <div className="about-header">
+              <img src="/logo.png" alt="Mauze Tahfeez" className="about-logo" />
+              <h3>Mauze Tahfeez Atfal</h3>
+              <p>v2.4.0 Premium Portal</p>
+            </div>
+            <div className="about-details">
+              <p>Mauze Tahfeez is a comprehensive Quran memorization tracking platform designed for the students and parents of Al-Madrasa tus Saifiya tul Burhaniyah.</p>
+              <div className="program-details">
+                <h4>Program Features:</h4>
+                <ul>
+                  <li>Real-time Progress Monitoring</li>
+                  <li>Direct Teacher-Parent Communication</li>
+                  <li>Automated Weekly Performance Reports</li>
+                  <li>Interactive Quran Ikhtebar System</li>
+                </ul>
+              </div>
+              <div className="registration-promo">
+                <p>Join our specialized memorization programs today.</p>
+                <a 
+                  href="https://www.mahadalquran.com/quran-programs/" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="register-btn"
+                >
+                  Register Now at Mahad al Quran <ArrowRight size={16} />
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+    </div>
+  );
+}
+
+function SupportTicketsAdmin({ tickets = [], onRefresh }) {
+  const [filter, setFilter] = useState("all");
+
+  const filteredTickets = (tickets || []).filter(t => filter === "all" || t.status === filter);
+
+  const updateStatus = async (id, status) => {
+    const { error } = await supabase.from("portal_issues").update({ status }).eq("id", id);
+    if (!error) onRefresh();
+  };
+
+  return (
+    <div className="admin-section fade-in">
+      <div className="section-header">
+        <h2 className="premium-title">User Issues & Support</h2>
+        <div className="filter-group premium-segmented-control">
+          {["all", "open", "resolved"].map(s => (
+            <button 
+              key={s} 
+              className={`filter-btn ${filter === s ? 'active' : ''}`}
+              onClick={() => setFilter(s)}
+            >
+              {s.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="tickets-list premium-grid" style={{ marginTop: '24px' }}>
+        {filteredTickets.map(t => (
+          <div key={t.id} className={`ticket-card premium-glass-card ${t.status || 'open'}`}>
+            <div className="ticket-header">
+              <div className="user-info">
+                <div className="user-avatar-mini">{t.user_name?.charAt(0) || 'U'}</div>
+                <span className="user-name-tag">{t.user_name || 'Anonymous'}</span>
+              </div>
+              <span className={`status-pill ${t.status || 'open'}`}>
+                {t.status === 'resolved' ? <CheckCircle size={12} /> : <Info size={12} />}
+                {t.status || 'open'}
+              </span>
+            </div>
+            
+            <div className="ticket-content">
+              <div className="issue-context">
+                <span className="context-label">Page:</span>
+                <span className="context-value">{t.page_issue}</span>
+              </div>
+              <p className="issue-description">{t.description}</p>
+              <span className="ticket-date">{new Date(t.created_at).toLocaleDateString()} at {new Date(t.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
+
+            <div className="ticket-actions">
+              {t.status === 'open' ? (
+                <button className="premium-action-button success" onClick={() => updateStatus(t.id, 'resolved')}>
+                  <CheckCircle size={16} /> Mark as Resolved
+                </button>
+              ) : (
+                <button className="premium-action-button secondary" onClick={() => updateStatus(t.id, 'open')}>
+                  <RotateCw size={16} /> Reopen Issue
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        
+        {filteredTickets.length === 0 && (
+          <div className="empty-state-card card-appear">
+            <LifeBuoy size={64} className="floating-icon" />
+            <h3>No Support Tickets</h3>
+            <p>Everything is running smoothly! No {filter !== 'all' ? filter : ''} issues found.</p>
+            <button className="action-button secondary" onClick={onRefresh}>
+              <RotateCw size={18} /> Refresh Data
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
+  const [leaveType, setLeaveType] = useState("");
+  const [reason, setReason] = useState("");
+  const [attachment, setAttachment] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [status, setStatus] = useState("checking");
+  const [timeLeft, setTimeLeft] = useState("");
+  const [history, setHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    checkTime();
+    fetchHistory();
+    const timer = setInterval(checkTime, 60000);
+    return () => clearInterval(timer);
+  }, [studentProfile]);
+
+  const checkTime = () => {
+    const now = new Date();
+    const hours = now.getHours();
+    if (hours >= 0 && hours < 16) {
+      setStatus("open");
+      const closingTime = new Date();
+      closingTime.setHours(16, 0, 0, 0);
+      const diff = closingTime - now;
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      setTimeLeft(`${h}h ${m}m remaining for today`);
+    } else {
+      setStatus("closed");
+      setTimeLeft("Window opens again at 12:00 AM");
+    }
+  };
+
+  const fetchHistory = async () => {
+    if (!studentProfile) return;
+    setLoadingHistory(true);
+    console.log("Parent: Fetching history for student:", studentProfile.student_id);
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Fetch by student_id (string conversion for safety)
+    const { data, error } = await supabase
+      .from('student_leaves')
+      .select('*')
+      .eq('student_id', String(studentProfile.student_id))
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Parent History Error:", error);
+      // Fallback: try by parent_id if student_id check fails
+      const { data: fallbackData } = await supabase
+        .from('student_leaves')
+        .select('*')
+        .eq('parent_id', user?.id)
+        .order('created_at', { ascending: false });
+      
+      if (fallbackData) setHistory(fallbackData);
+    } else {
+      setHistory(data || []);
+    }
+    setLoadingHistory(false);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) return showAction("error", "File size must be under 2MB");
+      const reader = new FileReader();
+      reader.onloadend = () => setAttachment(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (status === "closed") return;
+    if (!leaveType) return showAction("error", "Please select a leave type.");
+    
+    if (leaveType === "ILLNESS" && !attachment) return showAction("error", "Medical document is required for illness.");
+    if (["EMERGENCY", "Miqaat", "other"].includes(leaveType) && !reason.trim()) return showAction("error", "Please provide details.");
+
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error: dbErr } = await supabase.from('student_leaves').insert({
+        student_id: studentProfile?.student_id,
+        parent_id: user?.id,
+        leave_type: leaveType,
+        reason: reason,
+        attachment_url: attachment,
+        leave_date: new Date().toISOString().split('T')[0]
+      });
+      if (dbErr) throw dbErr;
+
+      await broadcastNotification(
+        `Leave Application ًں“…`,
+        `${studentProfile?.name} has applied for leave (${leaveType}). Reason: ${reason || 'Not provided'}`,
+        "admin",
+        null,
+        "Leave Management"
+      );
+
+      // Also notify the student's teacher
+      try {
+        const teacherIdField = studentProfile?.muhaffiz_id || studentProfile?.teacher_id;
+        if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
+          const teacherMatch = teacherProfiles.find(t =>
+            t.id === teacherIdField || t.user_id === teacherIdField ||
+            normalizeText(t.full_name) === normalizeText(studentProfile?.teacherName)
+          );
+          const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
+          if (teacherTarget) {
+            await broadcastNotification(
+              `Leave Application ًں“…`,
+              `${studentProfile?.name} (${leaveType}) has applied for leave. Reason: ${reason || 'Not provided'}`,
+              "user",
+              teacherTarget,
+              "Leave Management"
+            );
+          }
+        }
+      } catch (tErr) {
+        console.warn("Could not notify teacher about leave:", tErr);
+      }
+
+      showAction("success", "Leave applied successfully!");setLeaveType("");
+      setReason("");
+      setAttachment(null);
+      fetchHistory();
+    } catch (err) {
+      showAction("error", "Failed to submit leave.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const showTextBox = ["EMERGENCY", "Miqaat", "other"].includes(leaveType);
+  const showUpload = leaveType === "ILLNESS";
+
+  return (
+    <div className="leave-apply-container card-appear">
+      <div className="premium-card leave-card" style={{ position: 'relative', overflow: 'hidden', marginBottom: '30px' }}>
+        <div className="leave-header-strip" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className={`status-indicator-ring ${status}`}>
+              <Clock size={20} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>Apply Student Leave</h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: status === 'open' ? '#2e7d32' : '#d32f2f', fontWeight: 'bold' }}>
+                {timeLeft}
+              </p>
+            </div>
+          </div>
+          <span className={`status-pill ${status}`}>
+            {status === 'open' ? 'Window Active' : 'Window Closed'}
+          </span>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-group" style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: 'var(--deep-brown)' }}>Select Leave Type</label>
+            <select
+              className="premium-select"
+              value={leaveType}
+              onChange={(e) => {
+                setLeaveType(e.target.value);
+                setReason("");
+                setAttachment(null);
+              }}
+              disabled={status === 'closed' || isSubmitting}
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #ddd', fontSize: '1rem' }}
+              required
+            >
+              <option value="">-- Choose Category --</option>
+              <option value="ILLNESS">ILLNESS (Document Required)</option>
+              <option value="EVENT">EVENT</option>
+              <option value="EMERGENCY">EMERGENCY (Details Required)</option>
+              <option value="Miqaat">Miqaat (Details Required)</option>
+              <option value="other">Other (Details Required)</option>
+            </select>
+          </div>
+
+          {showUpload && (
+            <div className="form-group card-appear" style={{ marginBottom: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '12px', border: '1px dashed var(--primary-gold)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: 'bold', color: '#d32f2f' }}>
+                <FileArchive size={16} /> Upload Medical Document (Required)
+              </label>
+              <input 
+                type="file" 
+                accept="image/*,.pdf" 
+                onChange={handleFileChange}
+                disabled={isSubmitting}
+                style={{ width: '100%' }}
+                required
+              />
+              {attachment && <p style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '5px' }}>âœ“ Document attached successfully</p>}
+            </div>
+          )}
+
+          {showTextBox && (
+            <div className="form-group card-appear" style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: 'var(--deep-brown)' }}>Provide Details (Required)</label>
+              <textarea
+                className="premium-textarea"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder={`Please explain the ${leaveType.toLowerCase()}...`}
+                disabled={isSubmitting}
+                style={{ width: '100%', minHeight: '100px', padding: '15px', borderRadius: '12px', border: '1px solid #ddd' }}
+                required
+              />
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className={`leave-submit-btn ${status}`}
+            disabled={status === 'closed' || isSubmitting}
+            style={{ 
+              width: '100%', 
+              padding: '16px', 
+              borderRadius: '12px', 
+              border: 'none', 
+              background: status === 'open' ? 'var(--primary-gold)' : '#ccc', 
+              color: 'white', 
+              fontWeight: 'bold', 
+              fontSize: '1rem', 
+              cursor: status === 'open' ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px'
+            }}
+          >
+            {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+            {status === 'open' ? 'Submit Leave Application' : 'Submission Closed'}
+          </button>
+        </form>
+
+        {status === 'closed' && (
+          <div className="lock-watermark" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.03, pointerEvents: 'none' }}>
+            <Lock size={200} />
+          </div>
+        )}
+      </div>
+
+      <div className="leave-history-section card-appear" style={{ animationDelay: '0.2s' }}>
+        <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+          <Clock size={20} style={{ color: 'var(--primary-gold)' }} />
+          <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>My Leave History</h3>
+        </div>
+
+        <div className="history-stack" style={{ display: 'grid', gap: '12px' }}>
+          {loadingHistory ? (
+            <div className="empty-state"><Loader2 className="animate-spin" /> Loading history...</div>
+          ) : history.map(item => (
+            <div key={item.id} className="history-card premium-card" style={{ padding: '15px', borderLeft: `4px solid ${item.status === 'Approved' ? '#4caf50' : item.status === 'Rejected' ? '#f44336' : '#ff9800'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--primary-gold)', textTransform: 'uppercase' }}>{item.leave_type}</span>
+                  <h4 style={{ margin: '4px 0', fontSize: '1rem' }}>{item.leave_date}</h4>
+                </div>
+                <span className={`status-pill ${item.status.toLowerCase()}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>{item.status}</span>
+              </div>
+              {item.reason && <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '8px', margin: '8px 0 0' }}>{item.reason}</p>}
+            </div>
+          ))}
+          {history.length === 0 && !loadingHistory && (
+            <div className="empty-state" style={{ padding: '40px' }}>
+              <CalendarX size={32} opacity={0.2} />
+              <p>No previous leave records found.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const resolveRedirectPage = (page, role) => {
+  if (!page) return "Home";
+  
+  if (role === "parents") {
+    const parentMap = {
+      "Announcements": "Home",
+      "Progress": "Child Summary",
+      "Child Summary": "Child Summary",
+      "Schedule": "Schedule",
+      "Teachers": "Teachers",
+      "Inbox": "Inbox",
+      "Profile": "Profile",
+      "Quran Ikhtebar": "Quran Ikhtebar",
+      "Hub Raqam": "Hub Raqam",
+      "Apply Leave": "Apply Leave",
+      "Settings": "Settings",
+      "Jadwal": "Jadwal",
+      "Home": "Home"
+    };
+    return parentMap[page] || "Home";
+  }
+  
+  if (role === "teacher") {
+    const teacherMap = {
+      "Announcements": "My Group",
+      "Reports": "Fill Result",
+      "Home": "My Group",
+      "My Group": "My Group",
+      "Jadwal": "Jadwal",
+      "Quran Ikhtebar": "Quran Ikhtebar",
+      "Inbox": "Inbox",
+      "Settings": "Settings"
+    };
+    return teacherMap[page] || "My Group";
+  }
+  
+  return page;
+};
+
+function ParentPortal({
+  activePage,
+  parentData,
+  setActivePage,
+  onSearchSelect,
+  user,
+  loading,
+  menuOpen,
+  setMenuOpen,
+  onRoleChange,
+  teacherProfiles = [],
+  setSelectedStudentId,
+  onLogout,
+  loadPortalData,
+  portalRole,
+  reportSettings: propReportSettings = [],
+  jadwalSettings: propJadwalSettings = [],
+  setSelectedAnnouncement,
+  isDarkMode,
+  setIsDarkMode,
+  appTheme,
+  setAppTheme,
+  showAction,
+  schoolData,
+  notifications = [],
+  selectedNotification,
+  setSelectedNotification,
+  dismissedNotifs = [],
+  dismissedAnnounces = [],
+  dismissedHomeNotifs = [],
+  onDismissNotif,
+  onDismissHomeNotif,
+  onClearAllNotifs,
+  onDismissAnnounce,
+  onClearAllAnnounces,
+  actionMessage,
+}) {
+  const reportSettingsObject = normalizeReportSettings(propReportSettings);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const backdropMouseDownRef = useRef(false);
+  const notificationOpenedAtRef = useRef(0);
+
+  const [parentViewedStatus, setParentViewedStatus] = useState(false);
+  const [celebrationRank, setCelebrationRank] = useState(null); // 1, 2, or 3 for celebration popup
+  const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
+  const [secondsSpent, setSecondsSpent] = useState(0);
+
+  const openNotificationDetail = (event, notification) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    event?.nativeEvent?.stopImmediatePropagation?.();
+    if (!notification) return;
+    notificationOpenedAtRef.current = Date.now();
+    setSelectedNotification({ ...notification });
+  };
+
+  const closeNotificationDetail = () => {
+    setSelectedNotification(null);
+  };
+
+  const handleNotificationBackdropPointerDown = (event) => {
+    backdropMouseDownRef.current = event.target === event.currentTarget;
+  };
+
+  const handleNotificationBackdropClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.target !== event.currentTarget) return;
+    if (!backdropMouseDownRef.current) return;
+    if (Date.now() - notificationOpenedAtRef.current < 350) return;
+    closeNotificationDetail();
+  };
+
+  const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData || {};
+
+  const currentRank = weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank;
+  const studentId = studentProfile?.student_id;
+  let rankImproved = false;
+  if (currentRank && studentId) {
+    const studentResults = (schoolData.weeklyResults || []).filter(r =>
+      String(r.student_id).trim().toLowerCase() === String(studentId).trim().toLowerCase()
+    ).sort((a, b) => new Date(b.week_date) - new Date(a.week_date));
+    const previousResult = studentResults.length > 1 ? studentResults[1] : null;
+    if (previousResult) {
+      const weekResults = (schoolData.weeklyResults || []).filter(r => r.week_date === previousResult.week_date);
+      const sortedWeek = [...weekResults].sort((a, b) => {
+        const scoreDiff = (Number(b.total_score) || 0) - (Number(a.total_score) || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
+        if (jadeedDiff !== 0) return jadeedDiff;
+        return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
+      })
+      const prevIdx = sortedWeek.findIndex(r =>
+        String(r.student_id).trim().toLowerCase() === String(studentId).trim().toLowerCase()
+      );
+      if (prevIdx >= 0) {
+        const previousRank = prevIdx + 1;
+        if (currentRank < previousRank) rankImproved = true;
+      }
+    }
+  }
+
+  // Track parent viewing on Child Summary page
+  useEffect(() => {
+    setParentViewedStatus(false);
+    setCelebrationRank(null);
+    setSecondsSpent(0);
+
+    if (activePage !== "Child Summary" || !studentProfile?.student_id) {
+      return;
+    }
+
+    if (!isReportVisibleNow(reportSettingsObject)) {
+      return;
+    }
+
+    let interval;
+    // First check database for existing viewed status
+    supabase
+      .from('parent_report_views')
+      .select('viewed')
+      .eq('student_id', String(studentProfile.student_id))
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("parent_report_views table not initialized or access error:", error.message);
+        }
+        if (data?.viewed) {
+          setParentViewedStatus(true);
+        } else {
+          setParentViewedStatus(false);
+          // Start 20-second timer only if not viewed
+          interval = setInterval(async () => {
+            setSecondsSpent(prev => {
+              const next = prev + 1;
+              if (next >= 20) {
+                clearInterval(interval);
+                // Mark as viewed in DB!
+                supabase
+                  .from('parent_report_views')
+                  .upsert({
+                    student_id: String(studentProfile.student_id),
+                    viewed: true,
+                    view_duration_seconds: 20,
+                    updated_at: new Date().toISOString()
+                  }, { onConflict: 'student_id' })
+                  .then(({ error }) => {
+                    if (error) {
+                      console.warn("Failed to update parent view in DB:", error.message);
+                    } else {
+                      setParentViewedStatus(true);
+                      if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
+                      // Check if child ranked in top 3 and trigger celebration + notifications
+                      const rankForCelebration = studentProfile?.latestResult?.weeklyRank || studentProfile?.latestResult?.computedRank;
+                      if (rankForCelebration && rankForCelebration >= 1 && rankForCelebration <= 3) {
+                        setCelebrationRank(rankForCelebration);
+                        const ordinalMap = { 1: "1st", 2: "2nd", 3: "3rd" };
+                        const ordinal = ordinalMap[rankForCelebration];
+                        const childName = studentProfile?.name || studentProfile?.full_name || "Your child";
+                        // Notify parent
+                        broadcastNotification(
+                          "ًںژ‰ " + ordinal + " Place! Mubarak Mohanna!",
+                          "ًںژ‰ " + ordinal + " Place! Mubarak Mohanna!\n" + childName + " topped this week\'s Hifz result. Keep it up! ًں¤©",
+                          "user",
+                          user?.id,
+                          "Child Summary",
+                          true
+                        );
+                        // Notify teacher
+                        const teacherIdField = studentProfile?.muhaffiz_id;
+                        if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
+                          const teacherMatch = teacherProfiles.find(t =>
+                            t.id === teacherIdField || t.user_id === teacherIdField ||
+                            normalizeText(t.full_name) === normalizeText(studentProfile?.teacherName)
+                          );
+                          const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
+                          if (teacherTarget) {
+                            broadcastNotification(
+                              "ًںژ‰ Student Achievement!",
+                              "Your student " + childName + " got " + ordinal + " place in this week\'s Hifz result! Mubarak Mohanna! ًں¤©",
+                              "user",
+                              teacherTarget,
+                              "My Group",
+                              true
+                            );
+                          }
+                        }
+                      }
+                    }
+                  });
+                return 60;
+              }
+              return next;
+            });
+          }, 1000);
+        }
+      });
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [
+    activePage,
+    studentProfile?.student_id,
+    reportSettingsObject?.reports_live,
+    reportSettingsObject?.live_at,
+  ]);
+
+  const handleDownloadReport = async () => {
+    if (!studentProfile) return;
+    
+    setIsGeneratingPDF(true);
+    if (showAction) showAction("success", "Preparing your child's progress report...");
+
+    // Wait for render
+    let element = null;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 400));
+      element = document.getElementById("parent-capture-content");
+      if (element) break;
+    }
+
+    if (element) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Ensure custom fonts are loaded
+        await loadCustomFontsForCanvas();
+        const [html2canvas, jsPDF] = await Promise.all([
+          loadHtml2Canvas(),
+          loadJsPDF(),
+        ]);
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          onclone: async (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent = FONT_FACE_CSS;
+            clonedDoc.head.appendChild(style);
+            if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+              await Promise.race([
+                clonedDoc.fonts.ready,
+                new Promise(resolve => setTimeout(resolve, 3000)),
+              ]);
+            }
+          },
+        });
+        const imgData = canvas.toDataURL("image/jpeg", 0.75); // reduced quality for smaller size
+        if (imgData.length < 5000) throw new Error("Capture failed");
+
+        // Use A4 size and fill the full page
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        let imgWidth = pageWidth;
+        let imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+        if (imgHeight > pageHeight) {
+          imgWidth = (imgWidth * pageHeight) / imgHeight;
+          imgHeight = pageHeight;
+        }
+        const xOffset = (pageWidth - imgWidth) / 2;
+        pdf.addImage(imgData, "JPEG", xOffset, 0, imgWidth, imgHeight, undefined, 'FAST');
+        const pdfBlob = pdf.output('blob');
+        const dlResult = await downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
+        if (dlResult?.type === "native") {
+          setDownloadPopup({ filePath: dlResult.filePath, fileName: `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf` });
+        } else {
+          if (showAction) showAction("success", "Report downloaded successfully!");
+        }
+      } catch (err) {
+        console.error("PDF Error:", err);
+        if (showAction) showAction("error", "Failed to generate PDF.");
+      }
+    } else {
+      if (showAction) showAction("error", "Capture element not found.");
+    }
+    
+    setIsGeneratingPDF(false);
+  };
+  parentData;
+
+  const pageNames = ["Home", "Schedule", "Progress", "Teachers", "Quran Ikhtebar", "Settings"];
+  const assignedRoles = getAssignedRoles(user);
+
+  const navigationMap = {
+    "Home": "Home",
+    "Schedule": "Schedule",
+    "Teachers": "Teachers",
+    "Progress": "Child Summary",
+    "Profile": "Profile",
+    "Quran Ikhtebar": "Quran Ikhtebar",
+    "Settings": "Settings",
+  };
+
+  const myTeacher = teacherProfiles.find(t =>
+    normalizeText(t.full_name) === normalizeText(studentProfile?.teacher_name)
+  );
+
+  const sortedTeachers = useMemo(() => {
+    if (!myTeacher) return teacherProfiles;
+    return [myTeacher, ...teacherProfiles.filter(t => t.id !== myTeacher.id)];
+  }, [teacherProfiles, myTeacher]);
+
+  const recentMarhalaPostPreview = (
+    <Suspense fallback={null}>
+      <LazyMarhalaPosts
+        role="parents"
+        studentProfile={studentProfile}
+        onShowAction={showAction}
+        maxAgeHours={24}
+        limit={3}
+        hideEmpty
+        homePreview
+        className="mp-home-preview"
+      />
+    </Suspense>
+  );
+
+  if (loading && !studentProfile && user) {
+    return <LoadingScreen message="Fetching your child's data..." />;
+  }
+
+  const pages = {
+    Profile: {
+      eyebrow: "Student Profile",
+      title: "Track your child with clarity",
+      description:
+        "See attendance, class level, guardian details, and the latest updates in one education dashboard.",
+      highlights: [
+        `Student ID: ${studentProfile?.student_id || "..."}`,
+        `Attendance: ${attendance ? attendance.status : "..."}`,
+        `Class: ${studentProfile?.class_level || "..."}`,
+      ],
+      childInfo: {
+        name: studentProfile?.name || allProfiles[0]?.name || "Loading Student...",
+        its: studentProfile?.its || allProfiles[0]?.its || "...",
+        hifzJuz: hifzDetails?.juz || "...",
+        hifzSurat: hifzDetails?.surat || "...",
+        muhaffizName: hifzDetails?.muhaffiz_name || "Unassigned",
+      },
+    },
+    Home: {
+      eyebrow: "Parents Home",
+      title: `Welcome back, ${studentProfile?.guardian_name || "Guardian"}`,
+      description:
+        "Access your child's daily learning schedule, important announcements, and school actions here.",
+      highlights: [
+        `Attendance: ${attendance?.status || "Present"}`,
+        `Lesson: ${studentProfile?.latestResult?.surat || studentProfile?.surat || hifzDetails?.surat || "Update pending"}`,
+        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} آ· Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
+      ],
+      announcements:
+        announcements.length > 0
+          ? announcements
+          : [{ id: 1, title: "Waiting for updates...", event_date: "", type: "Update" }],
+      schedule:
+        schedule.length > 0
+          ? schedule
+          : [{ task_time: "--:--", task_name: "No tasks scheduled for today", is_done: false }],
+    },
+    "Child Summary": {
+      eyebrow: "Progress Overview",
+      title: "Review child performance in one place",
+      description:
+        "Understand memorization progress, behavior notes, and weekly teacher feedback without switching screens.",
+      highlights: [`Teacher note: ${hifzDetails?.teacher_note || "No teacher feedback yet."}`],
+    },
+    Policy: {
+      eyebrow: "School Policy",
+      title: "Important rules and guidance",
+      description:
+        "Keep uniform policy, attendance rules, fee guidance, and safeguarding details available anytime.",
+      highlights: ["Attendance policy", "Fee and payment rules", "Safety and pickup rules"],
+    },
+    Schedule: {
+      eyebrow: "Daily Plan",
+      title: "Learning Schedule",
+      description: "Detailed breakdown of your child's daily school activities and tasks.",
+      schedule: schedule.length > 0 ? schedule : [{ task_time: "--:--", task_name: "No tasks found" }],
+      highlights: [`Next task: ${schedule[0]?.task_name || "None"}`],
+    },
+    Teachers: {
+      eyebrow: "Our Staff",
+      title: "Teacher Contacts",
+      description: "Direct contact options for your child's Muhaffiz and other staff.",
+      highlights: ["WhatsApp support", "Call verification"],
+    },
+  };
+
+  const currentPage = pages[activePage];
+
+  const bottomPages = [
+    { key: "Home", label: "Home", icon: Home },
+    { key: "Child Summary", label: "Progress", icon: GraduationCap },
+    { key: "Schedule", label: "Schedule", icon: Calendar },
+    { key: "Teachers", label: "Teachers", icon: Users },
+  ];
+
+  return (
+    <div className="parent-shell">
+      <style>{PREMIUM_NOTIFICATION_CSS}</style>
+      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={`parent-drawer ${menuOpen ? 'open' : ''}`}>
+        <SidebarHeader
+          photoUrl={studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"}
+          name={studentProfile?.name || "Student"}
+          arabicName={studentProfile?.arabic_name}
+          tag={`ITS: ${studentProfile?.its || "..."}`}
+        />
+        <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+
+
+        {allProfiles.length > 1 && (
+          <div className="drawer-nav" style={{ paddingBottom: 0 }}>
+            <p className="drawer-section-label">Switch Child</p>
+            <div className="child-switch-list">
+              {allProfiles.map(p => (
+                <button
+                  key={p.student_id}
+                  className={`drawer-link ${String(p.student_id) === String(studentProfile?.student_id) ? "active" : ""}`}
+                  onClick={() => { setSelectedStudentId(p.student_id); setMenuOpen(false); }}
+                >
+                  <User size={16} /> {p.full_name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <nav className="drawer-nav">
+          <p className="drawer-section-label">More Pages</p>
+          <button className={`drawer-link ${activePage === "Inbox" ? "active" : ""}`} onClick={() => { setActivePage("Inbox"); setMenuOpen(false); }}>
+            <Bell size={18} /> Inbox
+          </button>
+          <button className={`drawer-link ${activePage === "Profile" ? "active" : ""}`} onClick={() => { setActivePage("Profile"); setMenuOpen(false); }}>
+            <User size={18} /> My Profile
+          </button>
+          <button className={`drawer-link ${activePage === "Quran Ikhtebar" ? "active" : ""}`} onClick={() => { setActivePage("Quran Ikhtebar"); setMenuOpen(false); }}>
+            <BookOpen size={18} /> Quran Ikhtebar
+          </button>
+          <button className={`drawer-link ${activePage === "Hub Raqam" ? "active" : ""}`} onClick={() => { setActivePage("Hub Raqam"); setMenuOpen(false); }}>
+            <CreditCard size={18} /> Hub Raqam
+          </button>
+          <button className={`drawer-link ${activePage === "Apply Leave" ? "active" : ""}`} onClick={() => { setActivePage("Apply Leave"); setMenuOpen(false); }}>
+            <CalendarX size={18} /> Apply Leave
+          </button>
+          <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
+            <Calendar size={18} /> Jadwal
+          </button>
+          <button className={`drawer-link ${activePage === "Marhala Posts" ? "active" : ""}`} onClick={() => { setActivePage("Marhala Posts"); setMenuOpen(false); }}>
+            <Heart size={18} /> Marhala Posts
+          </button>
+          <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
+            <Settings size={18} /> Settings
+          </button>
+        </nav>
+        <div className="drawer-footer">
+          {assignedRoles.filter(r => r !== 'parents').map((role) => (
+            <button key={role} className="drawer-link" onClick={() => { onRoleChange(role); setMenuOpen(false); }}>
+              <LogOut size={18} /> Switch to {role}
+            </button>
+          ))}
+          <button className="drawer-link logout" onClick={onLogout}>
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
+      </aside>
+
+<header className="parent-topbar">
+        <div className="parent-topbar-left">
+          <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
+            <Menu size={22} />
+          </button>
+          <img src="/logo.png" alt="Logo" className="topbar-logo" />
+          <div>
+            <span className="topbar-brand">Mauze Tahfeez</span>
+            <span className="topbar-sub">Parents Portal</span>
+          </div>
+        </div>
+        {allProfiles.length > 1 && (
+          <div className="topbar-student-switcher">
+            <select
+              className="student-select-minimal"
+              value={studentProfile?.student_id}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+            >
+              {allProfiles.map(p => (
+                <option key={p.student_id} value={p.student_id}>{p.full_name.split(' ')[0]}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <button className="topbar-logout-btn" onClick={onLogout} title="Logout">
+          <LogOut size={22} />
+        </button>
+      </header>
+
+      <main className="parent-main">
+        {actionMessage && (
+          <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+        )}
+        {activePage === "Home" && (
+           <QuickSearch 
+             pages={[
+               { label: "Home Dashboard", value: "Home" },
+               { label: "Daily Schedule", value: "Schedule" },
+               { label: "Progress Report", value: "Progress" },
+               { label: "Announcements", value: "Announcements" },
+               { label: "Teacher Profiles", value: "Teachers" },
+               { label: "Quran Ikhtebar", value: "Quran Ikhtebar" },
+               { label: "Hub Raqam (Fees)", value: "Hub Raqam" },
+               { label: "My Profile", value: "Profile" },
+               { label: "App Settings", value: "Settings" }
+             ]} 
+             onSelect={onSearchSelect} 
+           />
+        )}
+        {activePage === "Schedule" ? (
+          <div className="home-dashboard">
+            <div className="dashboard-section">
+              <div className="section-header">
+                <Calendar size={18} />
+                <h3>Study Schedule</h3>
+              </div>
+              <div className="schedule-list">
+                {currentPage.schedule.map((item, index) => (
+                  <div key={`${item.task_name}-${index}`} className={`schedule-item ${item.is_done ? "done" : ""}`}>
+                    <div className="time-strip">
+                      <Clock size={14} />
+                      {item.task_time}
+                    </div>
+                    <div className="task-info">
+                      <p>{item.task_name}</p>
+                      {item.is_done ? (
+                        <CheckCircle2 size={16} className="status-icon" />
+                      ) : (
+                        <div className="pending-circle" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {activePage === "Home" ? (
+          <div className="home-dashboard">
+            <div className="hifz-stats-premium-strip">
+              {[
+                { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
+                { label: "Daily Status", val: attendance?.status || "Present", sub: getToday(), icon: Clock, color: "#5d4037" },
+                { label: "Current Juz", val: hifzDetails?.juz || "--", sub: hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
+                { label: "My Muhaffiz", val: hifzDetails?.muhaffiz_name || "Pending", sub: "Direct Teacher", icon: GraduationCap, color: "#d4af37" },
+              ].map((stat, i) => (
+                <div key={i} className="premium-stat-pill card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                  <div className="pill-icon" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                    <stat.icon size={18} />
+                  </div>
+                  <div className="pill-info">
+                    <span className="pill-label">{stat.label}</span>
+                    <strong className="pill-value">{stat.val}</strong>
+                    <span className="pill-sub">{stat.sub}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {recentMarhalaPostPreview}
+            
+            <Suspense fallback={null}>
+              <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
+            </Suspense>
+            
+            <div className="dashboard-section">
+              <div className="section-header">
+                <Calendar size={18} />
+                <h3>Today's Schedule</h3>
+              </div>
+              <div className="schedule-list">
+                {pages.Schedule.schedule.map((item, index) => (
+                  <div key={`${item.task_name}-${index}`} className={`schedule-item ${item.is_done ? "done" : ""}`}>
+                    <div className="time-strip">
+                      <Clock size={14} />
+                      {item.task_time}
+                    </div>
+                    <div className="task-info">
+                      <p>{item.task_name}</p>
+                      {item.is_done ? (
+                        <CheckCircle2 size={16} className="status-icon" />
+                      ) : (
+                        <div className="pending-circle" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="dashboard-section">
+              <div className="section-header">
+                <Bell size={18} />
+                <h3>Active Notifications</h3>
+              </div>
+              <div className="announcement-list">
+                {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
+                  const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
+                  return (
+                    <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', position: 'relative' }} onClick={(e) => openNotificationDetail(e, news)}>
+                      <button 
+                        className="card-dismiss-btn" 
+                        title="Clear from home" 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          onDismissHomeNotif(news.id); 
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                      <div style={{ paddingRight: '48px' }}>
+                        <div className="news-meta">
+                          <span className="tag update">
+                            Alert
+                          </span>
+                          <span className="date">{new Date(news.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <h4>{news.title}</h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {activePage === "Profile" && currentPage.childInfo ? (
+          <div className="child-info-card">
+            <div className="card-header">
+              <div className="avatar-placeholder">
+                <User size={32} />
+              </div>
+              <div className="header-text">
+                <h3 style={{ margin: 0 }}>
+                  {currentPage.childInfo.name}
+                </h3>
+                {studentProfile?.arabic_name && (
+                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', marginTop: '4px' }}>
+                    {fixArabicScript(studentProfile.arabic_name)}
+                  </div>
+                )}
+                <p style={{ marginTop: '8px' }}>
+                  <Hash size={12} /> ITS: {currentPage.childInfo.its}
+                </p>
+              </div>
+            </div>
+
+            <div className="info-grid-simple">
+              <div className="info-item">
+                <div className="info-icon">
+                  <BookOpen size={18} />
+                </div>
+                <div className="info-content">
+                  <span className="label">HIFZ INFORMATION</span>
+                  <span className="value">Juz {currentPage.childInfo.hifzJuz}</span>
+                  <span className="sub-value">{currentPage.childInfo.hifzSurat}</span>
+                </div>
+              </div>
+
+              <div className="info-item">
+                <div className="info-icon">
+                  <GraduationCap size={18} />
+                </div>
+                <div className="info-content">
+                  <span className="label">MUHAFFIZ NAME</span>
+                  <span className="value">{currentPage.childInfo.muhaffizName}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {activePage === "Apply Leave" && (
+          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} />
+        )}
+
+        {activePage === "Child Summary" ? (
+          <div className="card-appear">
+            {(() => {
+              const settings = reportSettingsObject;
+              const isLiveMode = settings?.reports_live !== false; // true = Live, false = Hidden
+              const actionTime = settings?.live_at ? new Date(settings.live_at) : null;
+              const now = new Date();
+              
+              let isVisible = false;
+              let emptyMessage = "";
+
+              if (isLiveMode) {
+                // Goal: Be LIVE.
+                if (actionTime && actionTime > now) {
+                  // Wait until actionTime to be live
+                  isVisible = false;
+                  emptyMessage = `This week's progress card will be live on ${actionTime.toLocaleDateString()} at ${actionTime.toLocaleTimeString()}.`;
+                } else {
+                  isVisible = true;
+                }
+              } else {
+                // Goal: Be HIDDEN.
+                if (actionTime && actionTime > now) {
+                  // Wait until actionTime to hide
+                  isVisible = true;
+                } else {
+                  isVisible = false;
+                  emptyMessage = "The results are currently hidden for maintenance at this time. Please check back shortly.";
+                }
+              }
+
+              if (!isVisible) {
+                return (
+                  <div className="empty-state card-appear" style={{ padding: '60px 20px', textAlign: 'center', background: 'var(--white-alpha)', borderRadius: '24px', border: '2px dashed var(--primary-gold)' }}>
+                    <Clock size={48} style={{ color: 'var(--primary-gold)', marginBottom: '20px', opacity: 0.6 }} className="pulse" />
+                    <h3 className="kids-font" style={{ fontSize: '1.8rem', color: 'var(--deep-brown)' }}>Report is being prepared!</h3>
+                    <p style={{ color: 'var(--soft-brown)', maxWidth: '400px', margin: '10px auto' }}>
+                      {emptyMessage}
+                    </p>
+                    <div className="loading-spinner-mini" style={{ marginTop: '20px' }}></div>
+                  </div>
+                );
+              }
+
+              return (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                    <button 
+                      className="action-button premium" 
+                      onClick={handleDownloadReport}
+                      disabled={isGeneratingPDF}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
+                    >
+                      {isGeneratingPDF ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <Download size={18} />
+                      )}
+                      {isGeneratingPDF ? "Generating PDF..." : "Download Report"}
+                    </button>
+                  </div>
+                  <TahfeezReportCard
+                    student={{
+                      name: studentProfile?.name,
+                      arabic_name: studentProfile?.arabic_name,
+                      groupName: studentProfile?.groupName || studentProfile?.class_level,
+                      photoUrl: studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url,
+                      photo_url: studentProfile?.photo_url || studentProfile?.photoUrl || studentProfile?.avatar_url,
+                    }}
+                    weeklyResult={weeklyResult || studentProfile?.latestResult}
+                    settings={settings}
+                    parentViewed={parentViewedStatus}
+                    timerSeconds={secondsSpent}
+                    isParentPortal={true}
+                    rankImproved={rankImproved}
+                  />
+                </>
+              );
+            })()}
+
+            {/* Hidden capture zone for Parent Portal */}
+            <div 
+              id="parent-capture-zone"
+              style={{ 
+                position: 'fixed', 
+                left: '-10000px', 
+                top: '0', 
+                width: '850px', 
+                zIndex: -1000, 
+                background: 'white',
+                overflow: 'hidden',
+                height: isGeneratingPDF ? 'auto' : '1px',
+                visibility: isGeneratingPDF ? 'visible' : 'hidden'
+              }}
+            >
+              {isGeneratingPDF && (
+                <div id="parent-capture-content" style={{ padding: '40px', background: 'white' }}>
+                  <TahfeezReportCard
+                    student={{
+                      name: studentProfile?.name,
+                      arabic_name: studentProfile?.arabic_name,
+                      groupName: studentProfile?.groupName || studentProfile?.class_level,
+                    }}
+                    weeklyResult={weeklyResult || studentProfile?.latestResult}
+                    settings={reportSettingsObject}
+                    parentViewed={parentViewedStatus}
+                    isParentPortal={true}
+                    rankImproved={rankImproved}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Celebration popup for top 3 rank */}
+        {celebrationRank && (
+          <div className="celebration-overlay" onClick={() => setCelebrationRank(null)}>
+            <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+              <div className="celebration-content">
+                <div className="celebration-emoji-row">
+                  <span className="celebration-emoji">ًںژ‰</span>
+                  <span className="celebration-emoji">ًںژ‰</span>
+                  <span className="celebration-emoji">ًںژ‰</span>
+                </div>
+                <h2 className="celebration-title">Mubarak Mohanna! ًںژ‰</h2>
+                <div className="celebration-rank-badge">
+                  <span className="celebration-rank-number">
+                    {celebrationRank}{celebrationRank === 1 ? 'st' : celebrationRank === 2 ? 'nd' : 'rd'}
+                  </span>
+                  <span className="celebration-rank-label">Place</span>
+                </div>
+                <p className="celebration-message">
+                  Your child ranked <strong>{celebrationRank}{celebrationRank === 1 ? 'st' : celebrationRank === 2 ? 'nd' : 'rd'}</strong> in this week's Hifz result!
+                </p>
+                <p className="celebration-submessage">Keep it up! ًں¤©</p>
+                <button className="celebration-close-btn" onClick={() => setCelebrationRank(null)}>
+                  Awesome! ًںژ‰
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {downloadPopup && (
+          <div className="celebration-overlay" onClick={() => setDownloadPopup(null)}>
+            <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+              <div className="celebration-content">
+                <div className="celebration-emoji-row">
+                  <span className="celebration-emoji" style={{fontSize:'36px'}}>&#x2705;</span>
+                </div>
+                <h2 className="celebration-title">Download Completed!</h2>
+                <p className="celebration-message">
+                  Your report has been downloaded successfully.
+                </p>
+                <p style={{fontSize:'0.8rem',color:'var(--soft-brown)',marginBottom:'20px',wordBreak:'break-all'}}>
+                  {downloadPopup.fileName}
+                </p>
+                <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
+                  <button className="celebration-close-btn" onClick={async () => {
+                    try {
+                      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+                      const result = await Filesystem.readFile({
+                        path: downloadPopup.fileName,
+                        directory: Directory.Documents,
+                      });
+                      const byteString = atob(result.data);
+                      const ab = new ArrayBuffer(byteString.length);
+                      const ia = new Uint8Array(ab);
+                      for (let i = 0; i < byteString.length; i++) {
+                        ia[i] = byteString.charCodeAt(i);
+                      }
+                      const blob = new Blob([ab], { type: 'application/pdf' });
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, '_blank');
+                    } catch (e) {
+                      if (showAction) showAction("error", "Could not open file.");
+                    }
+                    setDownloadPopup(null);
+                  }}>
+                    Open
+                  </button>
+                  <button className="celebration-close-btn" style={{background:'var(--glass-bg)',color:'var(--deep-brown)'}} onClick={() => setDownloadPopup(null)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+{activePage === "Jadwal" ? (
+          <Suspense fallback={null}>
+            <LazyJadwalParentView 
+              studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} 
+              teacherName={studentProfile?.teacherName}
+              teacherId={studentProfile?.muhaffiz_id}
+              teacherProfiles={teacherProfiles}
+              showAction={showAction}
+              jadwalSettings={propJadwalSettings}
+              onDownloadComplete={(popup) => setDownloadPopup(popup)}
+            />
+          </Suspense>
+        ) : null}
+
+        {activePage === "Teachers" ? (
+          <div className="card-appear">
+            <div className="section-title-block">
+              <p className="page-eyebrow">Our Professional Staff</p>
+              <h2 className="page-title">Teacher Contacts</h2>
+            </div>
+            <div className="teacher-info-stack">
+              {teacherProfiles
+                .filter(t => {
+                  const assignedName = normalizeText(studentProfile?.teacherName || "");
+                  return assignedName && normalizeText(t.full_name) === assignedName;
+                })
+                .map(teacher => {
+                  const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                  const photo = teacher.photo_url || ASSETS.LOGO;
+                  return (
+                    <article key={teacher.id} className="premium-card teacher-profile-card pinned">
+                      <div className="pin-badge">
+                        <Sparkles size={12} /> My Child's Muhaffiz
+                      </div>
+                      <div className="teacher-card-inner">
+                        <img src={photo} alt={teacher.full_name} className="teacher-photo-square" />
+                        <div className="teacher-details">
+                          <h3>{teacher.full_name}</h3>
+                          <p className="teacher-specialty">Assigned Muhaffiz</p>
+                          <div className="contact-actions">
+                            {teacher.phone_number && (
+                              <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
+                                <Phone size={16} /> Call
+                              </a>
+                            )}
+                            {waNumber && (
+                              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                                <MessageCircle size={16} /> WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+
+              {teacherProfiles
+                .filter(t => {
+                  const assignedName = normalizeText(studentProfile?.teacherName || "");
+                  return !assignedName || normalizeText(t.full_name) !== assignedName;
+                })
+                .map((teacher) => {
+                  const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                  const photo = teacher.photo_url || ASSETS.LOGO;
+                  return (
+                    <article key={teacher.id} className="premium-card teacher-profile-card">
+                      <div className="teacher-card-inner">
+                        <img src={photo} alt={teacher.full_name} className="teacher-photo-square" />
+                        <div className="teacher-details">
+                          <h3>{teacher.full_name}</h3>
+                          <p className="teacher-specialty">Muhaffiz</p>
+                          <div className="contact-actions">
+                            {teacher.phone_number && (
+                              <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
+                                <Phone size={16} /> Call
+                              </a>
+                            )}
+                            {waNumber && (
+                              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                                <MessageCircle size={16} /> WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+            </div>
+            {teacherProfiles.length === 0 && (
+              <div className="empty-state premium-card">
+                <Users size={48} opacity={0.2} />
+                <p>No teacher information available at this moment.</p>
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {activePage === "Hub Raqam" ? (
+          <div className="hub-raqam-container card-appear">
+            <div className="hub-raqam-header">
+              <h1 className="kids-font animate-bounce-subtle">Mauze Tahfeez - Hub Raqam</h1>
+            </div>
+
+            <div className="hub-raqam-content">
+              <div className="payment-guideline-card card-appear">
+                <div className="guideline-header">
+                  <BookOpen size={22} className="gold-icon" />
+                  <h3>Fee Payment Guidelines</h3>
+                </div>
+                <div className="guideline-steps">
+                  <div className="step-item">
+                    <div className="step-number">1</div>
+                    <p>Go to the official Mahad al Zahra payment portal.</p>
+                  </div>
+                  <div className="step-item">
+                    <div className="step-number">2</div>
+                    <p>Enter your child's ITS number to fetch details.</p>
+                  </div>
+                  <div className="step-item">
+                    <div className="step-number">3</div>
+                    <p>Complete the payment and keep the receipt for your records.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="guideline-media card-appear">
+                <div className="media-title">
+                  <Sparkles size={18} className="gold-icon" />
+                  <h4>Visual Step-by-Step Walkthrough</h4>
+                </div>
+                <div className="demo-photo-grid">
+                  <div className="demo-photo-item">
+                    <img src="/payment-guide-1.jpg" alt="Login Step" className="guide-screenshot" />
+                    <p className="guide-caption">Step 1: Open Sidebar & Select Payments</p>
+                  </div>
+                  <div className="demo-photo-item">
+                    <img src="/payment-guide-2.jpg" alt="Payment Step" className="guide-screenshot" />
+                    <p className="guide-caption">Step 2: Read Instructions & Pay Online</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pay-now-section">
+                <a
+                  href="https://www.its52.com/Login.aspx?OneLogin=MAZSTUDENT"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="pay-now-btn-premium"
+                >
+                  <CreditCard size={20} />
+                  <span>Pay Now</span>
+                </a>
+                <p className="payment-secure-note">
+                  <ShieldCheck size={14} /> Official Payment Link Secure
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {activePage === "Quran Ikhtebar" ? (
+          <QuranIkhtebar
+            studentProfile={studentProfile}
+            hifzDetails={hifzDetails}
+          />
+        ) : null}
+
+        {activePage === "Marhala Posts" ? (
+          <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
+            <LazyMarhalaPosts
+              onShowAction={showAction}
+            />
+          </Suspense>
+        ) : null}
+
+        {activePage === "Settings" ? (
+          <SettingsPage 
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
+            appTheme={appTheme}
+            setAppTheme={setAppTheme}
+            user={user}
+            studentProfile={studentProfile}
+            onShowAction={showAction}
+          />
+        ) : null}
+
+
+
+
+        {activePage === "Inbox" && (
+          <div className="inbox-container fade-in mauze-premium-notifications">
+            <div className="section-title-block" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 className="page-title">Notifications</h2>
+                <p className="page-eyebrow">Stay updated with the latest news</p>
+              </div>
+              {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 && (
+                <button className="clear-history-btn" onClick={() => onClearAllNotifs(notifications.filter(n => !dismissedNotifs.includes(n.id)).map(n => n.id))}>
+                  <Trash2 size={16} /> Clear All
+                </button>
+              )}
+            </div>
+            
+            {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 ? (
+              <div className="premium-notifications-list">
+                {notifications.filter(n => !dismissedNotifs.includes(n.id)).map((n, i) => (
+                  <div key={n.id || i} className="premium-notif-card card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                    <button className="card-dismiss-btn" onClick={() => onDismissNotif(n.id)} title="Clear from view">
+                      <X size={14} />
+                    </button>
+                    <div className="notif-card-icon">
+                      <Bell size={20} />
+                    </div>
+                    <div className="notif-card-content">
+                      <div className="notif-card-header">
+                        <span className="notif-date">{new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                        <h3>{n.title}</h3>
+                      </div>
+                      <p className="notif-excerpt">{n.body.length > 80 ? n.body.substring(0, 80) + "..." : n.body}</p>
+                      {n.file_url && (
+                        <div className="notif-attachment-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#d4af37', background: 'rgba(212, 175, 55, 0.08)', padding: '4px 8px', borderRadius: '6px', marginTop: '6px', marginBottom: '8px', fontWeight: 'bold' }}>
+                          <Paperclip size={12} /> Attachment Included
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="notif-view-btn" onClick={(e) => openNotificationDetail(e, n)}>
+                          VIEW <ChevronRight size={14} />
+                        </button>
+                        {n.redirect_page && (
+                          <button 
+                            className="notif-view-btn gold" 
+                            style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              let targetPage = n.redirect_page;
+                              if (targetPage.startsWith("Jadwal")) {
+                                const parts = targetPage.split(":");
+                                if (parts[1]) {
+                                  setSelectedStudentId(parts[1]);
+                                }
+                                targetPage = "Jadwal";
+                              }
+                              setActivePage(resolveRedirectPage(targetPage, "parents"));
+                            }}
+                          >
+                            GO TO PAGE <ChevronRight size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-icon-ring">
+                  <Bell size={40} />
+                </div>
+                <h3>Inbox is empty</h3>
+                <p>Personal alerts and messages will appear here.</p>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {selectedNotification && (
+          <div 
+            className="notif-overlay-backdrop fade-in mauze-notif-detail-modal" 
+            role="presentation"
+            onPointerDown={handleNotificationBackdropPointerDown}
+            onClick={handleNotificationBackdropClick}
+          >
+            <div className="notif-overlay-card card-appear mauze-notif-detail-card" role="dialog" aria-modal="true" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+              <button className="notif-overlay-close" onClick={closeNotificationDetail} aria-label="Close notification detail">
+                <X size={20} />
+              </button>
+              <div className="notif-overlay-header">
+                <div className="notif-badge">New Update</div>
+                <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
+                <h2>{selectedNotification.title}</h2>
+              </div>
+              <div className="notif-overlay-body">
+                <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
+                
+                {selectedNotification.file_url && (
+                  <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
+                    <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                      <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
+                    </h4>
+                    {isImageFile(selectedNotification.file_url) ? (
+                      <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                        <img 
+                          src={selectedNotification.file_url} 
+                          alt="Attachment Preview" 
+                          style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                        <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <FileArchive size={24} />
+                        </div>
+                        <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {getFileNameFromUrl(selectedNotification.file_url)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    <button 
+                      onClick={() => downloadFile(selectedNotification.file_url, getFileNameFromUrl(selectedNotification.file_url))}
+                      className="premium-btn gold" 
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box', border: 'none', cursor: 'pointer' }}
+                    >
+                      <Download size={16} /> Download File
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                {selectedNotification.redirect_page && (
+                  <button 
+                    className="premium-btn gold" 
+                    onClick={() => {
+                      let targetPage = selectedNotification.redirect_page;
+                      if (targetPage.startsWith("Jadwal")) {
+                        const parts = targetPage.split(":");
+                        if (parts[1]) {
+                          setSelectedStudentId(parts[1]);
+                        }
+                        targetPage = "Jadwal";
+                      }
+                      setActivePage(resolveRedirectPage(targetPage, "parents"));
+                      closeNotificationDetail();
+                    }}
+                  >
+                    Go to Page
+                  </button>
+                )}
+                <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={closeNotificationDetail}>Understood</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentPage?.highlights && activePage === "Profile" && <InfoHighlights items={currentPage.highlights} />}
+      </main>
+
+      <nav className="parent-bottom-nav">
+        {bottomPages.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            className={`bottom-nav-btn ${activePage === key ? "active" : ""}`}
+            onClick={() => setActivePage(key)}
+          >
+            <Icon size={22} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+
+
+function AdminLeaveManagement({ onShowAction, students }) {
+  const [leaves, setLeaves] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("Pending");
+
+  useEffect(() => {
+    fetchLeaves();
+  }, []);
+
+  const fetchLeaves = async () => {
+    setLoading(true);
+    console.log("Admin: Fetching all leaves...");
+    const { data, error } = await supabase
+      .from('student_leaves')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Admin Leave Fetch Error:", error);
+      onShowAction("error", "Database Error: " + error.message);
+    } else {
+      console.log("Admin: Leaves fetched:", data?.length);
+      setLeaves(data || []);
+    }
+    setLoading(false);
+  };
+
+  const updateStatus = async (id, newStatus) => {
+    const leaveToUpdate = leaves.find(l => l.id === id);
+    const student = students.find(s => s.allIds.includes(String(leaveToUpdate?.student_id)));
+    
+    const { error } = await supabase
+      .from('student_leaves')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (error) {
+      onShowAction("error", "Failed to update status");
+    } else {
+      onShowAction("success", `Leave ${newStatus.toLowerCase()}!`);
+      
+      // Notify Parent
+      if (leaveToUpdate?.parent_id) {
+        supabase.functions.invoke('fcm-notification', {
+          body: {
+            title: `Leave ${newStatus}`,
+            body: `The leave request for ${student?.name || 'your child'} has been ${newStatus.toLowerCase()}.`,
+            targetRole: 'user',
+            targetUser: leaveToUpdate.parent_id // Matched to Edge Function's expected key
+          }
+        });
+      }
+      
+      fetchLeaves();
+    }
+  };
+
+  const filteredLeaves = leaves.filter(l => l.status === filter);
+
+  return (
+    <div className="admin-leave-portal card-appear">
+      <div className="portal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h2 style={{ color: 'var(--deep-brown)', margin: 0 }}>Student Leave Management</h2>
+        <div className="filter-group" style={{ display: 'flex', gap: '10px' }}>
+          {["Pending", "Approved", "Rejected"].map(s => (
+            <button
+              key={s}
+              onClick={() => setFilter(s)}
+              className={`filter-btn ${filter === s ? 'active' : ''}`}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '20px',
+                border: '1px solid #ddd',
+                background: filter === s ? 'var(--primary-gold)' : 'white',
+                color: filter === s ? 'white' : '#666',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                transition: 'all 0.2s'
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="leave-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+        {loading ? (
+          <div className="loading-state" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px' }}>
+            <Loader2 className="animate-spin" size={32} style={{ color: 'var(--primary-gold)' }} />
+            <p>Loading requests...</p>
+          </div>
+        ) : filteredLeaves.map(leave => {
+          const student = students.find(s => s.allIds.includes(String(leave.student_id)));
+          return (
+            <div key={leave.id} className="premium-card leave-admin-card" style={{ padding: '20px', borderLeft: `4px solid ${leave.status === 'Approved' ? '#4caf50' : leave.status === 'Rejected' ? '#f44336' : '#ff9800'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{student?.name || "Unknown Student"}</h4>
+                  <p style={{ margin: '4px 0', fontSize: '0.8rem', opacity: 0.6 }}>Applied: {new Date(leave.created_at).toLocaleDateString()}</p>
+                </div>
+                <span className={`status-badge ${leave.status.toLowerCase()}`} style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', background: leave.status === 'Approved' ? '#e8f5e9' : leave.status === 'Rejected' ? '#ffebee' : '#fff3e0', color: leave.status === 'Approved' ? '#2e7d32' : leave.status === 'Rejected' ? '#c62828' : '#e65100' }}>
+                  {leave.status}
+                </span>
+              </div>
+              
+              <div style={{ marginTop: '16px', padding: '12px', background: '#f9f9f9', borderRadius: '12px', fontSize: '0.9rem', border: '1px solid #eee' }}>
+                <div style={{ fontWeight: 'bold', color: 'var(--deep-brown)', marginBottom: '4px' }}>Category: {leave.leave_type || "General"}</div>
+                <p style={{ margin: 0, color: '#555', lineHeight: '1.4' }}>{leave.reason || "No details provided."}</p>
+              </div>
+
+              <div style={{ marginTop: '12px', fontSize: '0.85rem', color: '#666' }}>
+                <strong>Leave Date:</strong> {leave.leave_date}
+              </div>
+
+              {leave.attachment_url && (
+                <button 
+                  onClick={() => window.open(leave.attachment_url, '_blank')}
+                  className="view-doc-btn"
+                  style={{ marginTop: '12px', width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)', background: 'transparent', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}
+                >
+                  <FileArchive size={16} /> View Medical Document
+                </button>
+              )}
+
+              {leave.status === "Pending" && (
+                <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                  <button 
+                    onClick={() => updateStatus(leave.id, "Approved")}
+                    style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#4caf50', color: 'white', fontWeight: 'bold', cursor: 'pointer', transition: 'filter 0.2s' }}
+                    onMouseOver={e => e.target.style.filter = 'brightness(1.1)'}
+                    onMouseOut={e => e.target.style.filter = 'none'}
+                  >
+                    Approve
+                  </button>
+                  <button 
+                    onClick={() => updateStatus(leave.id, "Rejected")}
+                    style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#f44336', color: 'white', fontWeight: 'bold', cursor: 'pointer', transition: 'filter 0.2s' }}
+                    onMouseOver={e => e.target.style.filter = 'brightness(1.1)'}
+                    onMouseOut={e => e.target.style.filter = 'none'}
+                  >
+                    Reject
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {filteredLeaves.length === 0 && !loading && (
+          <div className="empty-state" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px', opacity: 0.3 }}>
+            <Calendar size={64} />
+            <h3 style={{ marginTop: '15px' }}>No {filter.toLowerCase()} requests</h3>
+            <p>All student leave applications are up to date.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PortalAccessSuccessModal({ payload, onClose }) {
+  if (!payload) return null;
+
+  const roleLabel = payload.portal_role === "teacher"
+    ? "Teacher Portal"
+    : payload.portal_role === "admin"
+      ? "Admin Portal"
+      : "Parents Portal";
+
+  return (
+    <div className="portal-access-success-overlay" onClick={onClose} role="presentation">
+      <div
+        className="portal-access-success-card card-appear"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="portal-access-success-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="portal-access-success-close"
+          onClick={onClose}
+          aria-label="Close success popup"
+        >
+          أ—
+        </button>
+
+        <div className="portal-access-success-badge">
+          <CheckCircle size={24} />
+        </div>
+
+        <p className="portal-access-success-kicker">Portal Access Granted</p>
+        <h3 id="portal-access-success-title" className="portal-access-success-title">
+          {payload.full_name || "User"} now has access
+        </h3>
+        <p className="portal-access-success-copy">
+          A premium portal account has been created and linked successfully.
+        </p>
+
+        <div className="portal-access-success-grid">
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Name</span>
+            <strong className="portal-access-success-value">{payload.full_name || "N/A"}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Email</span>
+            <strong className="portal-access-success-value">{payload.email || "N/A"}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Role</span>
+            <strong className="portal-access-success-value">{roleLabel}</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Linked Student</span>
+            <strong className="portal-access-success-value">
+              {payload.linkedStudentName || "Not linked"}
+            </strong>
+          </div>
+        </div>
+
+        <div className="portal-access-success-footer">
+          <span className="portal-access-success-meta">
+            Saved at {payload.grantedAt || "just now"}
+          </span>
+          <button type="button" className="portal-access-success-button" onClick={onClose}>
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminPortal({
+  activePage,
+  actionMessage,
+  adminData,
+  adminForms,
+  menuOpen,
+  portalAccess,
+  onAdminFormChange,
+  onCreateAnnouncement,
+  onCreateGroup,
+  onCreateSchedule,
+  onCreatePortalAccess,
+  onLogout,
+  onRecordTeacherAttendance,
+  selectedStudentId,
+  setMenuOpen,
+  setSelectedStudentId,
+  setActivePage,
+  onSearchSelect,
+  onRoleChange,
+  user,
+  onAssignChild,
+  adminTeacherFilter,
+  setAdminTeacherFilter,
+  onDeleteRecord,
+  onUpdateTeacherProfile,
+  onSendCustomNotification,
+  attachedFileUrl,
+  uploadingFile,
+  onTeacherPhotoUpload,
+  uploadingTeacherPhoto,
+  onNotificationFileChange,
+  onClearHistory,
+  notifications,
+  scheduledNotifs,
+  fetchScheduledNotifs,
+  editingSchedule,
+  onEditSchedule,
+  onCancelEditSchedule,
+  onUnassignChild,
+  loadPortalData,
+  portalRole,
+  setSelectedAnnouncement,
+  reportSettings = [],
+  jadwalSettings = [],
+  onSaveJadwalSettings,
+  onShowAction,
+  dismissedNotifs = [],
+  dismissedAnnounces = [],
+  onDismissNotif,
+  onClearAllNotifs,
+  onDismissAnnounce,
+  onClearAllAnnounces,
+  parentViews = [],
+  whatsappConfig,
+  onUpdateWhatsappConfig,
+  portalAccessSuccess,
+  onClosePortalAccessSuccess,
+  onTeacherUnlock,
+  emailSettings,
+  sendingEmail,
+  emailProgress,
+  emailLogs,
+  onUpdateEmailConfig,
+  onSendIndividualEmail,
+  onTriggerEmailNotifications,
+  onMarhalaPostCreated,
+  onSetSendingEmail,
+  onSetEmailProgress,
+  onSetEmailLogs,
+  setAdminForms,
+
+}) {
+  const showAction = onShowAction;
+  const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
+  const [selectedFacultyId, setSelectedFacultyId] = useState("");
+  const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
+  const [jadwalSettingsDraft, setJadwalSettingsDraft] = useState(() => normalizeJadwalSettings(jadwalSettings));
+  const [uploadingReportBackground, setUploadingReportBackground] = useState(false);
+  const [uploadingJadwalBg, setUploadingJadwalBg] = useState(false);
+  const [uploadingJadwalLogo, setUploadingJadwalLogo] = useState(false);
+  const [jadwalSaving, setJadwalSaving] = useState(false);
+
+  useEffect(() => {
+    setReportSettingsDraft(normalizeReportSettings(reportSettings));
+  }, [reportSettings]);
+  useEffect(() => {
+    setJadwalSettingsDraft(normalizeJadwalSettings(jadwalSettings));
+  }, [jadwalSettings]);
+  const [isGeneratingReports, setIsGeneratingReports] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [studentToRender, setStudentToRender] = useState(null);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
+  const [whatsAppLogs, setWhatsAppLogs] = useState([]);
+  const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
+
+  const parseTemplate = (template, student) => {
+    let msg = template || 'Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/';
+    msg = msg.replace(/\{\{child_name\}\}/g, student.name || student.full_name || '');
+    msg = msg.replace(/\{\{group_name\}\}/g, student.groupName || student.group_name || '');
+    msg = msg.replace(/\{\{juz\}\}/g, student.hifz?.juz || student.juz || '');
+    msg = msg.replace(/\{\{surat\}\}/g, student.hifz?.surat || student.surat || '');
+    msg = msg.replace(/\{\{portal_url\}\}/g, 'https://mouze-tahfeez-atfal.vercel.app/');
+    return msg;
+  };
+
+  const sendIndividualWhatsApp = async (phone, message, studentName) => {
+    let formattedPhone = (phone || "").split("").filter((c) => "0123456789".includes(c)).join("");
+    
+    // Automatically convert local Pakistani numbers (03xx...) to international format (923xx...)
+    if (formattedPhone.length === 11 && formattedPhone.startsWith("0")) {
+      formattedPhone = "92" + formattedPhone.substring(1);
+    }
+
+    if (!formattedPhone) {
+      throw new Error("Invalid phone number");
+    }
+
+    const { data, error } = await supabase.functions.invoke("whatsapp-notification", {
+      body: {
+        phone: formattedPhone,
+        message,
+        studentName,
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || "Failed to send WhatsApp message");
+    }
+
+    if (!data?.success) {
+      throw new Error(data?.error || data?.message || "Failed to send WhatsApp message");
+    }
+
+    return true;
+  };
+
+  const triggerWhatsAppNotifications = async (silent = false) => {
+    if (!whatsappConfig) {
+      if (!silent) alert("WhatsApp Configuration is not loaded yet. Please wait a second and try again.");
+      return;
+    }
+    if (!whatsappConfig.enabled || whatsappConfig.provider === 'none') {
+      if (!silent) alert("WhatsApp notifications are disabled or the provider is set to None. Please configure them below.");
+      return;
+    }
+    
+    const targetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
+    
+    if (targetStudents.length === 0) {
+      if (!silent) alert("No students found with a WhatsApp number in their profile!");
+      if (onShowAction) onShowAction("info", "No parents with WhatsApp numbers found to notify.");
+      return;
+    }
+    
+    setSendingWhatsApp(true);
+    setWhatsAppProgress({ current: 0, total: targetStudents.length });
+    setWhatsAppLogs([{ time: new Date().toLocaleTimeString(), text: `Starting WhatsApp notifications for ${targetStudents.length} parents...`, type: 'info' }]);
+    
+    let sentCount = 0;
+    
+    for (let i = 0; i < targetStudents.length; i++) {
+      const student = targetStudents[i];
+      const phone = student.whatsapp_number;
+      const message = parseTemplate(whatsappConfig.message_template, student);
+      
+      setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Sending to ${student.name} (${phone})...`, type: 'sending' }]);
+      
+      try {
+        await sendIndividualWhatsApp(phone, message, student.name);
+        sentCount++;
+        setWhatsAppLogs(prev => [
+          ...prev.slice(0, -1),
+          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! âœ…`, type: 'success' }
+        ]);
+      } catch (err) {
+        console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
+        setWhatsAppLogs(prev => [
+          ...prev.slice(0, -1),
+          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} â‌Œ`, type: 'error' }
+        ]);
+      }
+      
+      setWhatsAppProgress(prev => ({ ...prev, current: i + 1 }));
+      
+      if (i < targetStudents.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `WhatsApp notifications finished! Sent: ${sentCount}/${targetStudents.length} successfully.`, type: 'info' }]);
+  };
+const handleDownloadAllReports = async () => {
+    if (students.length === 0) {
+      if (onShowAction) onShowAction("error", "No students available to download reports.");
+      return;
+    }
+
+    setIsGeneratingReports(true);
+    setGenerationProgress(0);
+    const [html2canvas, jsPDF, JSZip, saveAs] = await Promise.all([
+      loadHtml2Canvas(),
+      loadJsPDF(),
+      loadJSZip(),
+      loadSaveAs(),
+    ]);
+    const zip = new JSZip();
+
+    // Pre-load custom fonts once before the batch loop
+    await loadCustomFontsForCanvas();
+
+    if (onShowAction) onShowAction("success", `Preparing ${students.length} reports... Please wait.`);
+
+    for (let i = 0; i < students.length; i++) {
+      const student = students[i];
+      setStudentToRender(student);
+      setGenerationProgress(i + 1);
+      
+      // Wait for React to render the component and assets (fonts/images) are loaded
+      let element = null;
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 300)); 
+        element = document.getElementById("actual-report-content");
+        if (element) break;
+      }
+
+      if (element) {
+        try {
+          // Extra small delay to ensure images inside the element are settled
+          await new Promise(resolve => setTimeout(resolve, 500)); 
+
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          onclone: async (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent = FONT_FACE_CSS;
+            clonedDoc.head.appendChild(style);
+            const el = clonedDoc.getElementById('actual-report-content');
+            if (el) { el.style.width = '794px'; el.style.boxSizing = 'border-box'; if (el.parentElement) el.parentElement.style.width = '794px'; }
+            if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+              await Promise.race([
+                clonedDoc.fonts.ready,
+                new Promise(resolve => setTimeout(resolve, 3000)),
+              ]);
+            }
+          },
+        });
+          
+          const imgData = canvas.toDataURL("image/jpeg", 0.85);
+          if (imgData.length < 5000) {
+            throw new Error("Captured image is blank or too small.");
+          }
+
+          // Use A4 size and fill the full page
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const imgProps = pdf.getImageProperties(imgData);
+          let imgWidth = pageWidth;
+          let imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+          if (imgHeight > pageHeight) {
+            imgWidth = (imgWidth * pageHeight) / imgHeight;
+            imgHeight = pageHeight;
+          }
+          const xOffset = (pageWidth - imgWidth) / 2;
+          pdf.addImage(imgData, "JPEG", xOffset, 0, imgWidth, imgHeight, undefined, 'FAST');
+          const pdfBlob = pdf.output("blob");
+          const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
+          zip.file(`${i+1}_${safeName}_Report.pdf`, pdfBlob);
+        } catch (err) {
+          console.error(`Error generating PDF for ${student.name}:`, err);
+          if (onShowAction) onShowAction("error", `Skipped ${student.name}: ${err.message}`);
+        }
+      } else {
+        console.error(`Could not find capture element for ${student.name}`);
+        if (onShowAction) onShowAction("error", `Technical Error: Could not render ${student.name}`);
+      }
+    }
+
+    try {
+      const content = await zip.generateAsync({ type: "blob" });
+      if (content.size < 500) {
+        throw new Error("Generated ZIP is empty. Please try again.");
+      }
+      downloadFile(content, `Student_Reports_Bulk_${new Date().toISOString().split('T')[0]}.zip`);
+      if (onShowAction) onShowAction("success", "All reports downloaded successfully!");
+    } catch (err) {
+      console.error("Error generating ZIP:", err);
+      if (onShowAction) onShowAction("error", err.message || "Failed to generate ZIP file.");
+    } finally {
+      setIsGeneratingReports(false);
+      setStudentToRender(null);
+      setGenerationProgress(0);
+    }
+  };
+
+  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
+  const navPages = ["Overview", "Quick Student Access", "Schedule", "Result Tracking"];
+
+  const selectedStudent = selectedStudentId
+    ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
+    : null;
+
+  const reportSettingsObject = normalizeReportSettings(reportSettings);
+  const previewStudent = selectedStudent || students[0] || null;
+
+  const groupedStudents = students.reduce((accumulator, student) => {
+    const key = student.groupName || "Ungrouped";
+    if (!accumulator[key]) {
+      accumulator[key] = [];
+    }
+    accumulator[key].push(student);
+    return accumulator;
+  }, {});
+
+  const teacherSummaries = Object.values(
+    students.reduce((accumulator, student) => {
+      const teacherName = student.teacherName || "Unassigned teacher";
+      if (!accumulator[teacherName]) {
+        accumulator[teacherName] = { teacherName, totalStudents: 0, groups: new Set() };
+      }
+      accumulator[teacherName].totalStudents += 1;
+      accumulator[teacherName].groups.add(student.groupName || "Ungrouped");
+      return accumulator;
+    }, {})
+  ).map((item) => ({
+    teacherName: item.teacherName,
+    totalStudents: item.totalStudents,
+    groups: Array.from(item.groups),
+  }));
+
+  const viewedCount = (parentViews || []).filter(v => v.viewed).length;
+  const stats = [
+    { label: "Students", value: students.length, icon: Users, navigateTo: "Student Registry" },
+    { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap, navigateTo: "Staff Profiles" },
+    { label: "Schedules", value: schedule.length, icon: Calendar, navigateTo: "Schedule" },
+    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye, navigateTo: "Result Tracking" },
+    { label: "Jadwal Tracking", value: teacherSummaries.length, icon: Calendar, navigateTo: "Jadwal Tracking" },
+  ];
+
+  const resultLiveNotificationAlreadySent = async (since) => {
+    if (!since) return false;
+
+    const { data, error } = await supabase
+      .from("system_notifications")
+      .select("target_role")
+      .eq("title", "Results are LIVE!")
+      .in("target_role", ["parents", "teacher"])
+      .gte("created_at", since.toISOString());
+
+    if (error) {
+      console.warn("Could not check previous result-live notifications:", error.message);
+      return false;
+    }
+
+    const notifiedRoles = new Set((data || []).map((notification) => notification.target_role));
+    return notifiedRoles.has("parents") && notifiedRoles.has("teacher");
+  };
+
+  const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
+    const settingsId = reportSettingsObject?.id || 1;
+    const now = new Date();
+    const previousSettings = normalizeReportSettings(reportSettingsObject);
+    const nextSettings = normalizeReportSettings({ ...previousSettings, ...updates });
+    const nextActionTime = getReportActionTime(nextSettings);
+    const previousVisible = isReportVisibleNow(previousSettings, now);
+    const isPastScheduledLive = Boolean(nextActionTime && nextActionTime <= now);
+    const shouldSendResultLiveNotification =
+      notifyLive &&
+      updates.reports_live === true &&
+      isReportVisibleNow(nextSettings, now) &&
+      (!previousVisible || isPastScheduledLive);
+
+    const { error } = await supabase
+      .from("report_settings")
+      .upsert({ id: settingsId, ...updates }, { onConflict: "id" })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      onShowAction("error", "Failed to update settings: " + error.message);
+      return;
+    }
+
+    onShowAction("success", "System settings updated successfully!");
+
+    if (shouldSendResultLiveNotification) {
+      const alreadyNotified = isPastScheduledLive && previousVisible
+        ? await resultLiveNotificationAlreadySent(nextActionTime)
+        : false;
+
+      if (alreadyNotified) {
+        onShowAction("success", "Reports are live. Parents and teachers were already notified for this live time.");
+        loadPortalData(portalRole, user);
+        return;
+      }
+
+      const { error: resetError } = await supabase
+        .from("parent_report_views")
+        .update({ viewed: false, view_duration_seconds: 0, updated_at: new Date().toISOString() })
+        .neq("student_id", "");
+
+      if (resetError) console.warn("Failed to reset parent views on live:", resetError.message);
+
+      const { error: inboxError } = await supabase
+        .from("system_notifications")
+        .insert([
+          {
+            title: "Results are LIVE!",
+            body: "The latest Tahfeez progress reports are now visible in the parent portal.",
+            target_role: "parents",
+            target_user: null,
+            redirect_page: "Progress",
+          },
+          {
+            title: "Results are LIVE!",
+            body: "The latest Tahfeez progress reports are now live for review.",
+            target_role: "teacher",
+            target_user: null,
+            redirect_page: "My Group",
+          },
+        ]);
+
+      if (inboxError) {
+        console.error("Result-live inbox notification error:", inboxError);
+      }
+
+      const pushResult = await broadcastNotification(
+        "Results are LIVE!",
+        "The latest Tahfeez progress reports are now visible in your portal.",
+        "all",
+        null,
+        "Progress",
+        true
+      );
+
+      const notificationFailed = inboxError || pushResult?.fcmError;
+
+      if (notificationFailed) {
+        onShowAction("error", "Reports are live, but some notifications failed. Check console for details.");
+      } else {
+        onShowAction("success", "Reports are live. Parents and teachers have been notified.");
+      }
+
+      triggerWhatsAppNotifications(true).catch((err) => {
+        console.error("WhatsApp notifications failed after reports went live:", err);
+      });
+    } else if (notifyLive && updates.reports_live === true && !isReportVisibleNow(nextSettings, now)) {
+      const actionTime = getReportActionTime(nextSettings);
+      if (actionTime) {
+        onShowAction("success", `Reports are scheduled for ${actionTime.toLocaleString()}. Notifications were not sent early.`);
+      }
+    }
+
+    loadPortalData(portalRole, user);
+  };
+
+  const updateReportDraft = (field) => (event) => {
+    const value = event.target.value;
+    setReportSettingsDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateJadwalDraft = (field) => (event) => {
+    const value = event.target.value;
+    setJadwalSettingsDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleReportBackgroundUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      onShowAction("error", "Please upload an image file for the progress card background.");
+      return;
+    }
+
+    if (file.size > MAX_REPORT_BACKGROUND_SIZE) {
+      onShowAction("error", "Progress card background must be under 5MB.");
+      return;
+    }
+
+    setUploadingReportBackground(true);
+
+    try {
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "png";
+      const safeName = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-z0-9-_]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "progress-card-bg";
+      const filePath = `progress-card/${Date.now()}-${safeName}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .getPublicUrl(filePath);
+
+      const backgroundUrl = publicUrlData?.publicUrl;
+      if (!backgroundUrl) throw new Error("Background image URL was not returned.");
+
+      setReportSettingsDraft((current) => ({
+        ...current,
+        progress_card_background_url: backgroundUrl,
+      }));
+
+      await saveReportSettings({ progress_card_background_url: backgroundUrl });
+    } catch (error) {
+      console.error("Progress card background upload failed:", error);
+      onShowAction("error", `Background upload failed: ${error.message}`);
+    } finally {
+      setUploadingReportBackground(false);
+    }
+  };
+
+  const removeReportBackground = async () => {
+    setReportSettingsDraft((current) => ({
+      ...current,
+      progress_card_background_url: "",
+    }));
+
+    await saveReportSettings({ progress_card_background_url: "" });
+  };
+
+  const handleJadwalBgUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      onShowAction("error", "Please upload an image file for the Jadwal PDF background.");
+      return;
+    }
+
+    if (file.size > MAX_REPORT_BACKGROUND_SIZE) {
+      onShowAction("error", "Jadwal background must be under 5MB.");
+      return;
+    }
+
+    setUploadingJadwalBg(true);
+
+    try {
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "png";
+      const safeName = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-z0-9-_]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "jadwal-bg";
+      const filePath = `jadwal-bg/${Date.now()}-${safeName}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .getPublicUrl(filePath);
+
+      const backgroundUrl = publicUrlData?.publicUrl;
+      if (!backgroundUrl) throw new Error("Background image URL was not returned.");
+
+      setJadwalSettingsDraft((current) => ({
+        ...current,
+        jadwal_pdf_background_url: backgroundUrl,
+      }));
+
+      await onSaveJadwalSettings({ jadwal_pdf_background_url: backgroundUrl });
+    } catch (error) {
+      console.error("Jadwal background upload failed:", error);
+      onShowAction("error", `Jadwal background upload failed: ${error.message}`);
+    } finally {
+      setUploadingJadwalBg(false);
+    }
+  };
+
+  const removeJadwalBg = async () => {
+    setJadwalSettingsDraft((current) => ({
+      ...current,
+      jadwal_pdf_background_url: "",
+    }));
+    await onSaveJadwalSettings({ jadwal_pdf_background_url: "" });
+  };
+
+  const handleJadwalLogoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type?.startsWith("image/")) {
+      onShowAction("error", "Please upload an image file for the Jadwal PDF logo.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      onShowAction("error", "Jadwal logo must be under 2MB.");
+      return;
+    }
+    setUploadingJadwalLogo(true);
+    try {
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "png";
+      const safeName = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-z0-9-_]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "jadwal-logo";
+      const filePath = `jadwal-logo/${Date.now()}-${safeName}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: file.type,
+        });
+      if (uploadError) throw uploadError;
+      const { data: publicUrlData } = supabase.storage
+        .from(REPORT_BACKGROUND_BUCKET)
+        .getPublicUrl(filePath);
+      const logoUrl = publicUrlData?.publicUrl;
+      if (!logoUrl) throw new Error("Logo URL was not returned.");
+      setJadwalSettingsDraft((current) => ({
+        ...current,
+        jadwal_pdf_logo_url: logoUrl,
+      }));
+      await onSaveJadwalSettings({ jadwal_pdf_logo_url: logoUrl });
+    } catch (error) {
+      console.error("Jadwal logo upload failed:", error);
+      onShowAction("error", `Jadwal logo upload failed: ${error.message}`);
+    } finally {
+      setUploadingJadwalLogo(false);
+    }
+  };
+
+  const removeJadwalLogo = async () => {
+    setJadwalSettingsDraft((current) => ({
+      ...current,
+      jadwal_pdf_logo_url: "",
+    }));
+    await onSaveJadwalSettings({ jadwal_pdf_logo_url: "" });
+  };
+
+  return (
+    <div className="admin-shell">
+      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)}></div>}
+      <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
+        <div className="sidebar-header">
+          {(() => {
+            const adminName = portalAccess?.full_name || user?.user_metadata?.full_name || "";
+            const adminProfile = (adminData.teacherProfiles || []).find(t => normalizeText(t.full_name) === normalizeText(adminName));
+            const photo = adminProfile?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || "/logo.png";
+
+            return (
+              <SidebarHeader
+                photoUrl={photo}
+                name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"}
+                arabicName={portalAccess?.arabic_name || user?.user_metadata?.arabic_name}
+                tag="Management Portal"
+              />
+            );
+          })()}
+          <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+
+
+        </div>
+        <nav className="sidebar-nav">
+          <p className="sidebar-category">Main Dashboard</p>
+          {navPages.map(page => {
+            const Icon = NAV_ICONS[page] || Layers3;
+            return (
+              <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
+                <Icon size={18} /> {page}
+              </button>
+            )
+          })}
+
+          <p className="sidebar-category management-cat">Management</p>
+          {sidebarLinks.map(page => {
+            const Icon = NAV_ICONS[page] || Users;
+            return (
+              <button key={page} className={`sidebar-link ${activePage === page ? 'active' : ''}`} onClick={() => { setActivePage(page); setMenuOpen(false); }}>
+                <Icon size={18} /> {page === "Notifications" ? "Send Push Alert" : page}
+              </button>
+            )
+          })}
+
+          <div className="sidebar-system-status">
+            <p className="sidebar-category">System Status</p>
+            <div className="status-item">
+              <Users size={14} /> Students: {students.length}
+            </div>
+            <div className="status-item">
+              <ShieldCheck size={14} /> Portal Users: {portalAccessList.length}
+            </div>
+            <button className="refresh-mini-btn" onClick={() => loadPortalData(portalRole, user)}>
+              <RotateCw size={14} /> Refresh Data
+            </button>
+          </div>
+        </nav>
+        <div className="sidebar-footer">
+          {getAssignedRoles(user).filter(r => r !== 'admin' && r !== 'parents').map((role) => (
+            <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
+              <LogOut size={18} /> Switch to {role}
+            </button>
+          ))}
+          <button className="sidebar-link logout-btn" onClick={onLogout}>
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
+      </aside>
+
+      <main className="admin-main">
+        <header className="topbar admin-topbar-dynamic">
+          <div className="admin-header-left">
+            <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+            <h2 className="page-title">{activePage}</h2>
+          </div>
+          <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
+        </header>
+
+        <section className="admin-content-pad">
+          {activePage === "Overview" && (
+             <QuickSearch 
+               pages={[
+                 { label: "Main Overview", value: "Overview" },
+                 { label: "Student Registry", value: "Student Registry" },
+                 { label: "Staff Profiles", value: "Staff Profiles" },
+                 { label: "Student Assignments", value: "Assignments" },
+                 { label: "Portal Access", value: "Portal Access" },
+                 { label: "Faculty Attendance", value: "Faculty" },
+                  { label: "Notifications Hub", value: "Notifications" },
+                  { label: "Master Schedule", value: "Schedule" },
+                  { label: "App Update Manager", value: "App Update" },
+                  { label: "Support Tickets", value: "User Issues" }
+                ]} 
+              onSelect={onSearchSelect} 
+              />
+          )}
+          {actionMessage && (
+            <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+          )}
+
+          {activePage === "Email Settings" ? (
+            <section className="settings-section premium-card card-appear">
+              <div className="stack-form">
+                <div className="section-header">
+                  <Mail size={20} />
+                  <h3>Email Settings (Resend)</h3>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.target);
+                    const updates = {
+                      enabled: fd.get("em_enabled") === "true",
+                      from_email: fd.get("em_from_email") || "",
+                      subject_template: fd.get("em_subject_template") || "",
+                      message_template: fd.get("em_message_template") || "",
+                    };
+                    await onUpdateEmailConfig(updates);
+                  }}
+                >
+                  <label className="form-group">
+                    <span>Enable Email Notifications</span>
+                    <select name="em_enabled" defaultValue={String(emailSettings?.enabled ?? false)} className="premium-select">
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </label>
+
+                  <label className="form-group">
+                    <span>From Email Address</span>
+                    <input name="em_from_email" type="email" defaultValue={emailSettings?.from_email || ""} placeholder="your-domain@resend.dev" className="premium-input" />
+                  </label>
+
+                  <label className="form-group">
+                    <span>Subject Template</span>
+                    <input name="em_subject_template" type="text" defaultValue={emailSettings?.subject_template || "Tahfeez Progress Report for {{child_name}}"} placeholder="Subject line with placeholders" className="premium-input" />
+                  </label>
+
+                  <label className="form-group">
+                    <span>Message Template</span>
+                    <textarea name="em_message_template" rows="3" className="premium-input"
+                      defaultValue={emailSettings?.message_template || "Salam! Please find attached the weekly Tahfeez progress report for {{child_name}}."} 
+                    />
+                    <span className="hint-text">Placeholders: <code>{'{{child_name}}'}</code>, <code>{'{{group_name}}'}</code></span>
+                  </label>
+
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    <button type="submit" className="action-button" style={{ background: "var(--deep-brown)", color: "white" }}>
+                      <Mail size={16} /> Save Email Settings
+                    </button>
+
+                    <button
+                      type="button"
+                      className="action-button"
+                      onClick={() => onTriggerEmailNotifications(false)}
+                      disabled={sendingEmail}
+                      style={{ background: emailSettings?.enabled ? "var(--primary-gold)" : "#999", color: "white" }}
+                    >
+                      {sendingEmail ? "Sending..." : "Send Bulk Email to All Parents"}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Manual Email Send */}
+                <div style={{ marginTop: "30px", borderTop: "1px solid var(--glass-border)", paddingTop: "20px" }}>
+                  <h4 style={{ margin: "0 0 12px", color: "var(--deep-brown)", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Send size={18} /> Manual Email Send
+                  </h4>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.target);
+                      const to = fd.get("manual_to") || "";
+                      const subj = fd.get("manual_subject") || "";
+                      const msg = fd.get("manual_message") || "";
+                      if (!to || !subj || !msg) {
+                        alert("Please fill in To, Subject, and Message fields.");
+                        return;
+                      }
+                      const html = "<p>" + msg.replace(/\n/g, "<br>") + "</p>";
+                      try {
+                        await onSendIndividualEmail(to, subj, html, "", "", "");
+                        alert("Email sent successfully!");
+                        e.target.reset();
+                      } catch (err) {
+                        alert("Failed to send email: " + err.message);
+                      }
+                    }}
+                  >
+                    <label className="form-group">
+                      <span>To (Email)</span>
+                      <input name="manual_to" type="email" placeholder="parent@example.com" className="premium-input" required />
+                    </label>
+                    <label className="form-group">
+                      <span>Subject</span>
+                      <input name="manual_subject" type="text" placeholder="Email subject" className="premium-input" required />
+                    </label>
+                    <label className="form-group">
+                      <span>Message</span>
+                      <textarea name="manual_message" rows="4" className="premium-input" placeholder="Type your email message here..." required />
+                    </label>
+                    <button type="submit" className="action-button" style={{ background: "#007bff", color: "white" }}>
+                      <Send size={16} /> Send Email
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </section>
+          ) : null}
+          {activePage === "Marhala Posts" ? (
+            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
+              <LazyMarhalaPosts
+                role="admin"
+                students={students}
+                onShowAction={onShowAction}
+                onPostCreated={onMarhalaPostCreated}
+              />
+            </Suspense>
+          ) : null}
+          {activePage === "App Update" ? (
+            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading App Update Manager...</p></div>}>
+              <LazyAppUpdateManager onBroadcastNotification={broadcastNotification} />
+            </Suspense>
+          ) : null}
+          {activePage === "Rank Preview" ? (            <RankPreview students={students} />          ) : null}
+          {activePage === "Student Registry" && (
+            <div className="admin-section fade-in">
+              <div className="section-header">
+                <h2 className="premium-title">Student Registry</h2>
+                <p className="subtitle">Add and manage students in the system</p>
+              </div>
+
+              <div className="assignment-form-complex card-appear">
+                <form className="stack-form" onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const full_name = formData.get("full_name");
+
+                  if (!full_name) return;
+
+                  const itsVal = formData.get("its");
+                  const numericIts = itsVal && !isNaN(itsVal) ? Number(itsVal) : itsVal;
+
+                  const { data, error } = await supabase.from("child_profiles").insert([{
+                    full_name,
+                    arabic_name: formData.get("arabic_name"),
+                    parent_email: formData.get("parent_email"),
+                    whatsapp_number: formData.get("whatsapp_number") ? String(formData.get("whatsapp_number")).trim() : null,
+                    juz: formData.get("juz"),
+                    surat: formData.get("surat"),
+                    photo_url: formData.get("photo_url"),
+                    group_name: formData.get("group_name"),
+                    its: numericIts,
+                    is_active: true
+                  }]).select().single();
+
+                  if (error) {
+                    alert("Error adding student: " + error.message);
+                  } else {
+                    alert("Student added successfully!");
+                    e.target.reset();
+                    // Better than reload: refresh the data in memory
+                    loadPortalData(portalRole, user);
+                  }
+                }}>
+                  <div className="form-row">
+                    <label>
+                      <span>Full Name (English)</span>
+                      <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Arabic Name (اسم الطالب)</span>
+                      <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      <span>Parent Auth Email</span>
+                      <input name="parent_email" type="email" placeholder="parent@example.com" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>WhatsApp Number (Parents)</span>
+                      <input name="whatsapp_number" type="text" placeholder="e.g. 923001234567" className="premium-input" />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      <span>Photo URL</span>
+                      <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                    </label>
+                    <label style={{ opacity: 0, pointerEvents: 'none' }}>
+                      <span>Spacer</span>
+                      <input type="text" className="premium-input" />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      <span>Juz</span>
+                      <input name="juz" type="text" placeholder="e.g. 30" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Surat / Ayat</span>
+                      <input name="surat" type="text" placeholder="e.g. Al-Naba" className="premium-input" />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      <span>ITS Number</span>
+                      <input name="its" type="text" placeholder="ITS" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Group / Class</span>
+                      <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
+                    </label>
+                  </div>
+                  <button type="submit" className="action-button">Add Student to Database</button>
+                </form>
+              </div>
+
+              <div className="assigned-list card-appear" style={{ marginTop: '30px' }}>
+                <h3 className="premium-subtitle">Current Students ({students.length})</h3>
+                <div className="assigned-grid">
+                  {students.map(s => (
+                    <div key={s.student_id} className="assigned-child-card">
+                      <div className="child-info-header">
+                        <StudentAvatar student={s} size="small" />
+                        <div>
+                          <h4>{s.name}</h4>
+                          <p>{s.groupName || 'No Group'}</p>
+                          {s.whatsapp_number && (
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                              <MessageCircle size={12} style={{ color: '#25D366' }} /> {s.whatsapp_number}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="btn-text-only red"
+                        onClick={() => onDeleteRecord("child_profiles", "student_id")(s.student_id)}
+                        style={{ marginTop: '10px' }}
+                      >
+                        Remove Student
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePage === "Overview" && (
+            <div className="portal-stats-strip admin-stats">
+              {stats.map((stat, idx) => {
+                const Icon = stat.icon;
+                const accentColors = [
+                  { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
+                  { icon: 'var(--deep-brown)', bar: '#3d2b1f', glow: 'rgba(61, 43, 31, 0.15)' },
+                  { icon: '#b8860b', bar: '#b8860b', glow: 'rgba(184, 134, 11, 0.2)' },
+                  { icon: '#8b6d31', bar: '#8b6d31', glow: 'rgba(139, 109, 49, 0.15)' },
+                  { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
+                ];
+                const c = accentColors[idx % accentColors.length];
+                const isParentViews = stat.label === "Parent Views";
+                const [numStr, denStr] = isParentViews ? String(stat.value).split('/') : [];
+                const pct = isParentViews ? (parseInt(numStr) / Math.max(parseInt(denStr), 1) * 100) : null;
+                return (
+                  <div
+                    key={stat.label}
+                    className="infographic-card"
+                    onClick={() => stat.navigateTo && setActivePage(stat.navigateTo)}
+                    role={stat.navigateTo ? 'button' : undefined}
+                    tabIndex={stat.navigateTo ? 0 : undefined}
+                    onKeyDown={stat.navigateTo ? (e) => { if (e.key === 'Enter') setActivePage(stat.navigateTo); } : undefined}
+                    style={{ cursor: stat.navigateTo ? 'pointer' : 'default' }}
+                  >
+                    <div className="ig-bg-pattern">
+                      {['✦', '◈', '◆', '◇', '⬟'][idx % 5]}
+                    </div>
+                    <div className="ig-top-row">
+                      <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
+                        {stat.label === "Students" ? (
+                          <lottie-player
+                            src="/75d381a6-1151-11ee-b2bc-779f96f074bf.json"
+                            background="transparent"
+                            speed="1"
+                            style={{ width: "48px", height: "48px" }}
+                            loop
+                            autoplay
+                          ></lottie-player>
+                        ) : (
+                          <Icon size={18} />
+                        )}
+                      </div>
+                      {isParentViews && pct !== null && (
+                        <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
+                          {pct >= 50 ? '↑' : '↓'} {Math.round(pct)}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="ig-value">
+                      {isParentViews ? (
+                        <>
+                          <span className="ig-count-anim">{numStr}</span>
+                          <span style={{ fontSize: '1rem', opacity: 0.4, margin: '0 2px', color: 'var(--soft-brown)' }}>/</span>
+                          <span style={{ fontSize: '1.2rem', opacity: 0.5, color: 'var(--soft-brown)' }}>{denStr}</span>
+                        </>
+                      ) : (
+                        <span className="ig-count-anim">{stat.value}</span>
+                      )}
+                    </div>
+                    <span className="ig-label">{stat.label}</span>
+                    <span className="ig-sub">
+                      {stat.navigateTo || 'Overview'}
+                    </span>
+                    {isParentViews && pct !== null && (
+                      <div className="ig-bar-track" style={{ background: `rgba(197, 160, 89, 0.12)` }}>
+                        <div className="ig-bar-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${c.bar}, ${c.bar}dd)`, boxShadow: `0 0 6px ${c.glow}` }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {activePage === "Quick Student Access" ? (
+            <div className="overview-container fade-in">
+              <div className="overview-selection-header card-appear">
+                <div className="selection-box">
+                  <div className="selection-label">
+                    <Users size={22} className="gold-icon" />
+                    <span>Quick Student Access</span>
+                  </div>
+                  <div className="selection-dropdown-row">
+                    <div className="custom-dropdown-wrapper">
+                      <label htmlFor="student-dropdown">Choose Student (Grouped by Muhaffiz)</label>
+                      <select
+                        id="student-dropdown"
+                        className="premium-select"
+                        value={selectedStudentId || ""}
+                        onChange={(e) => setSelectedStudentId(e.target.value)}
+                      >
+                        <option value="">-- Select Student --</option>
+                        {teacherSummaries.map(teacher => (
+                          <optgroup label={`Muhaffiz: ${teacher.teacherName}`} key={teacher.teacherName}>
+                            {students
+                              .filter(s => (s.teacherName || "Unassigned teacher") === teacher.teacherName)
+                              .map(s => (
+                                <option key={s.student_id} value={s.student_id}>{s.name}</option>
+                              ))
+                            }
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                    <button 
+                      className="assign-report-btn" 
+                      onClick={handleDownloadAllReports}
+                      disabled={isGeneratingReports}
+                      style={{ gap: '10px' }}
+                    >
+                      {isGeneratingReports ? (
+                        <Loader2 size={18} className="spin" />
+                      ) : (
+                        <FileArchive size={18} />
+                      )}
+                      {isGeneratingReports ? `Generating (${generationProgress}/${students.length})...` : "Download Reports"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {selectedStudent ? (
+                <div className="report-vessel card-appear">
+                  <div className="vessel-connection">
+                    <div className="connection-line"></div>
+                    <div className="connection-dot"></div>
+                  </div>
+                  <div className="report-card-inner">
+                    <div className="student-profile-hero">
+                      <StudentAvatar student={selectedStudent} />
+                      <div>
+                        <h3>{selectedStudent.name}</h3>
+                        <p>{selectedStudent.groupName} آ· {selectedStudent.teacherName}</p>
+                        <div className="pill-row">
+                          <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
+                          <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
+                          <span className="mini-pill">Surah: {selectedStudent.hifz?.surat || "Pending"}</span>
+                          {selectedStudent.arabic_name && (
+                            <span className="mini-pill arabic-kanz" style={{ fontSize: '1rem', color: 'var(--primary-gold)' }}>{fixArabicScript(selectedStudent.arabic_name)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <TahfeezReportCard
+                      student={selectedStudent}
+                      weeklyResult={selectedStudent.latestResult}
+                      settings={reportSettingsObject}
+                      parentViewed={(parentViews || []).find(v => String(v.student_id) === String(selectedStudent.student_id))?.viewed ?? false}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-overview card-appear">
+                  <div className="vessel-connection">
+                    <div className="connection-line"></div>
+                  </div>
+                  <BookOpen size={64} className="empty-icon" />
+                  <h3>No Student Selected</h3>
+                  <p>Please select a student from the dropdown above to view their detailed performance report.</p>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {activePage === "Jadwal Tracking" ? (
+            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Jadwal Tracking...</p></div>}>
+              <LazyJadwalTrackingView
+                students={students}
+                onShowAction={onShowAction}
+              />
+            </Suspense>
+          ) : null}
+
+          {activePage === "Result Tracking" ? (
+            <div className="overview-container fade-in">
+              <div className="card-headline headline-with-action card-appear" style={{ marginBottom: '20px', backgroundColor: 'var(--white)', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+                <div className="headline-left">
+                  <Eye size={20} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 style={{ color: 'var(--deep-brown)', margin: 0 }}>Parent Report View Tracking</h3>
+                </div>
+                <div className="headline-right" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)' }}></div>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Viewed</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Not Viewed</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="assigned-list card-appear">
+                <div className="assigned-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
+                  {students.map(s => {
+                    const isViewed = (parentViews || []).find(v => String(v.student_id) === String(s.student_id))?.viewed ?? false;
+                    return (
+                      <div key={s.student_id} className="assigned-child-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', margin: 0 }}>
+                        <div className="child-info-header" style={{ margin: 0, gap: '12px' }}>
+                          <StudentAvatar student={s} size="small" />
+                          <div>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: 'var(--primary-dark)' }}>{s.name}</h4>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--soft-brown)' }}>{s.groupName || 'No Group'}</p>
+                          </div>
+                        </div>
+                        <div 
+                          title={isViewed ? "Parent viewed report" : "Parent has not viewed report"}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            backgroundColor: isViewed ? '#2ec4b6' : '#e71d36',
+                            boxShadow: isViewed 
+                              ? '0 0 12px rgba(46, 196, 182, 0.7)' 
+                              : '0 0 12px rgba(231, 29, 54, 0.7)',
+                            border: '2px solid #ffffff',
+                            flexShrink: 0
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+
+          {activePage === "Notifications" ? (
+            <div className="management-grid two-columns" style={{ alignItems: 'start' }}>
+              {/* Left column — Send / Schedule form */}
+              <section className="form-card card-appear">
+                <div className="card-headline headline-with-action">
+                  <div className="headline-left">
+                    <Send size={18} />
+                    <h3>{editingSchedule ? "Edit Scheduled Notification" : "System Notifications"}</h3>
+                  </div>
+                  <div className="headline-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {editingSchedule && (
+                      <button
+                        type="button"
+                        className="btn-text-only"
+                        onClick={onCancelEditSchedule}
+                        style={{ color: '#e57373', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Cancel Edit
+                      </button>
+                    )}
+                    <button 
+                      type="button"
+                      className="btn-text-only" 
+                      style={{ color: 'var(--primary-gold)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      onClick={async () => {
+                        const fcmService = await loadFcmService();
+                        const result = await fcmService.initialize("admin");
+                        if (result) alert("Notifications active for this device!");
+                        else alert("Failed to activate. Check browser permissions.");
+                      }}
+                    >
+                      <Bell size={14} /> Enable Device Alerts
+                    </button>
+                  </div>
+                </div>
+                <form className="stack-form" onSubmit={onSendCustomNotification}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Target Audience</span>
+                      <select
+                        name="target_audience"
+                        value={adminForms.customNotification.target_audience}
+                        onChange={onAdminFormChange("customNotification")}
+                        className="premium-select"
+                      >
+                        <option value="all">Broadcast to Everyone</option>
+                        <option value="parents">Parents Portal Only</option>
+                        <option value="teacher">Teachers Portal Only</option>
+                        <option value="user">Direct to Specific Email</option>
+                      </select>
+                    </label>
+                    {adminForms.customNotification.target_audience === "user" && (
+                      <label>
+                        <span>Recipient Email</span>
+                        <input
+                          type="email"
+                          name="target_uuid"
+                          value={adminForms.customNotification.target_uuid || ""}
+                          onChange={onAdminFormChange("customNotification")}
+                          placeholder="user@example.com"
+                          required
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <label>
+                    <span>Alert Title</span>
+                    <input
+                      type="text"
+                      name="title"
+                      value={adminForms.customNotification.title}
+                      onChange={onAdminFormChange("customNotification")}
+                      placeholder="e.g. Urgent Update"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>Message Content</span>
+                    <textarea
+                      name="body"
+                      value={adminForms.customNotification.body}
+                      onChange={onAdminFormChange("customNotification")}
+                      placeholder="Write your message here..."
+                      required
+                      rows={4}
+                    />
+                  </label>
+                  <label className="file-upload-label" style={{ display: 'block', marginTop: '15px', marginBottom: '15px' }}>
+                    <span style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Attach Image or File (PDF, Images, etc.)</span>
+                    <div className="custom-file-upload-box" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.8)', border: '1px dashed #d4af37', padding: '12px', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                      <input
+                        type="file"
+                        onChange={onNotificationFileChange}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip"
+                      />
+                      <Paperclip size={18} style={{ color: '#d4af37' }} />
+                      <span style={{ fontSize: '13px', color: '#5c4033' }}>
+                        {uploadingFile ? "Uploading attachment..." : attachedFileUrl ? "Attachment uploaded & linked!" : "Click to select a file to upload..."}
+                      </span>
+                      {uploadingFile && <span className="upload-spinner" style={{ border: '2px solid #f3f3f3', borderTop: '2px solid #d4af37', borderRadius: '50%', width: '14px', height: '14px', animation: 'spin 1s linear infinite', marginLeft: 'auto' }} />}
+                      {!uploadingFile && attachedFileUrl && (
+                        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#2e7d32', fontWeight: 'bold' }}>
+                          <CheckCircle size={16} /> Attached
+                        </span>
+                      )}
+                    </div>
+                  </label>
+
+                  {/* Schedule Section — Premium */}
+                  <div className="schedule-section" style={{
+                    marginTop: '20px',
+                    padding: '20px',
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,248,230,0.7))',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(212,175,55,0.3)',
+                    boxShadow: '0 4px 20px rgba(212,175,55,0.08), inset 0 1px 0 rgba(255,255,255,0.8)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: adminForms.customNotification.schedule_enabled === "true" ? '16px' : '0'
+                    }}>
+                      <span style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontWeight: '700',
+                        color: '#4a3728',
+                        fontSize: '14px',
+                        letterSpacing: '0.3px'
+                      }}>
+                        <Clock size={18} style={{ color: 'var(--primary-gold)' }} />
+                        <span>Schedule Notification</span>
+                        <span style={{
+                          fontSize: '10px',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          background: adminForms.customNotification.schedule_enabled === "true"
+                            ? 'rgba(46,125,50,0.12)'
+                            : 'rgba(158,158,158,0.15)',
+                          color: adminForms.customNotification.schedule_enabled === "true"
+                            ? '#2e7d32'
+                            : '#757575',
+                          fontWeight: '600',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {adminForms.customNotification.schedule_enabled === "true" ? 'Active' : 'Off'}
+                        </span>
+                      </span>
+                      <button
+                        className={`toggle-switch ${adminForms.customNotification.schedule_enabled === "true" ? 'on' : 'off'}`}
+                        onClick={() => {
+                          const newVal = adminForms.customNotification.schedule_enabled === "true" ? "false" : "true";
+                          const fakeEvent = { target: { name: 'schedule_enabled', value: newVal } };
+                          onAdminFormChange("customNotification")(fakeEvent);
+                        }}
+                        aria-label="Toggle schedule notification"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <div className="toggle-thumb" />
+                      </button>
+                    </div>
+
+                    {adminForms.customNotification.schedule_enabled === "true" && (
+                      <>
+                        <div className="form-grid" style={{ gap: '14px' }}>
+                          <label>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#5c4033', marginBottom: '6px' }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                              Repeat
+                            </span>
+                            <select
+                              name="schedule_type"
+                              value={adminForms.customNotification.schedule_type}
+                              onChange={onAdminFormChange("customNotification")}
+                              className="premium-select"
+                            >
+                              <option value="daily">Daily</option>
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
+                            </select>
+                          </label>
+
+                          {adminForms.customNotification.schedule_type === "weekly" ? (
+                            <label>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#5c4033', marginBottom: '6px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+                                Day of Week
+                              </span>
+                              <select
+                                name="schedule_day"
+                                value={adminForms.customNotification.schedule_day}
+                                onChange={onAdminFormChange("customNotification")}
+                                className="premium-select"
+                              >
+                                <option value="0">Sunday</option>
+                                <option value="1">Monday</option>
+                                <option value="2">Tuesday</option>
+                                <option value="3">Wednesday</option>
+                                <option value="4">Thursday</option>
+                                <option value="5">Friday</option>
+                                <option value="6">Saturday</option>
+                              </select>
+                            </label>
+                          ) : adminForms.customNotification.schedule_type === "monthly" ? (
+                            <label>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#5c4033', marginBottom: '6px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+                                Day of Month
+                              </span>
+                              <select
+                                name="schedule_day"
+                                value={adminForms.customNotification.schedule_day}
+                                onChange={onAdminFormChange("customNotification")}
+                                className="premium-select"
+                              >
+                                {Array.from({ length: 28 }, (_, i) => (
+                                  <option key={i + 1} value={i + 1}>{i + 1}{i + 1 === 1 ? 'st' : i + 1 === 2 ? 'nd' : i + 1 === 3 ? 'rd' : 'th'}</option>
+                                ))}
+                              </select>
+                            </label>
+                          ) : null}
+
+                          <label>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#5c4033', marginBottom: '6px' }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                              Time
+                            </span>
+                            <input
+                              type="time"
+                              name="schedule_time"
+                              value={adminForms.customNotification.schedule_time}
+                              onChange={onAdminFormChange("customNotification")}
+                              className="premium-select"
+                              style={{ padding: '8px' }}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Schedule preview */}
+                        <div style={{
+                          marginTop: '14px',
+                          padding: '10px 14px',
+                          background: 'rgba(212,175,55,0.08)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(212,175,55,0.15)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '12px',
+                          color: '#5c4033'
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                          <span>
+                            Will send{' '}
+                            <strong style={{ color: '#4a3728' }}>
+                              {adminForms.customNotification.schedule_type === 'daily' ? 'every day' :
+                               adminForms.customNotification.schedule_type === 'weekly' ?
+                                `every ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][parseInt(adminForms.customNotification.schedule_day) || 0]}` :
+                                `every month on the ${adminForms.customNotification.schedule_day || '1'}${adminForms.customNotification.schedule_day === '1' ? 'st' : adminForms.customNotification.schedule_day === '2' ? 'nd' : adminForms.customNotification.schedule_day === '3' ? 'rd' : 'th'}`}
+                            </strong>{' '}
+                            at{' '}
+                            <strong style={{ color: '#4a3728' }}>
+                              {adminForms.customNotification.schedule_time || '09:00'}
+                            </strong>
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      <span>Destination Page</span>
+                      <select
+                        name="redirect_page"
+                        value={adminForms.customNotification.redirect_page}
+                        onChange={onAdminFormChange("customNotification")}
+                        className="premium-select"
+                      >
+                        {adminForms.customNotification.target_audience === "parents" ? (
+                          <>
+                            <option value="Home">Home</option>
+                            <option value="Child Summary">Progress Reports</option>
+                            <option value="Schedule">Schedule Timetable</option>
+                            <option value="Teachers">Teachers list</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Profile">Profile</option>
+                            <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                            <option value="Hub Raqam">Hub Raqam</option>
+                            <option value="Apply Leave">Apply Leave</option>
+                            <option value="Jadwal">Jadwal (Timetable)</option>
+                            <option value="Settings">Settings</option>
+                          </>
+                        ) : adminForms.customNotification.target_audience === "teacher" ? (
+                          <>
+                            <option value="My Group">My Group</option>
+                            <option value="Jadwal">Jadwal Timetables</option>
+                            <option value="Quran Ikhtebar">Quran Ikhtebar</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Reports">Submit Progress Reports</option>
+                            <option value="Settings">Settings</option>
+                          </>
+                        ) : adminForms.customNotification.target_audience === "admin" ? (
+                          <>
+                            <option value="Overview">Overview</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Schedule">Schedule</option>
+                            <option value="Teacher Attendance">Teacher Attendance</option>
+                            <option value="Custom Groups">Custom Groups</option>
+                            <option value="Portal Access">Portal Access</option>
+                            <option value="Assign Child">Assign Child</option>
+                            <option value="Leave Requests">Leave Requests</option>
+                            <option value="Support Tickets">Support Tickets</option>
+                            <option value="Report Settings">Report Settings</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Home">Home Screen</option>
+                            <option value="Announcements">Announcements</option>
+                            <option value="Inbox">Inbox</option>
+                            <option value="Jadwal">Jadwal (Timetable)</option>
+                            <option value="Progress">Progress Reports</option>
+                          </>
+                        )}
+                      </select>
+                    </label>
+                  </div>
+                  <button type="submit" className="action-button" style={{
+                    background: adminForms.customNotification.schedule_enabled === "true"
+                      ? 'linear-gradient(135deg, #d4af37, #b8962e)'
+                      : undefined
+                  }}>
+                    {adminForms.customNotification.schedule_enabled === "true" ? (
+                      <><Clock size={18} /> Schedule Notification</>
+                    ) : (
+                      <><Send size={18} /> Dispatch Notification</>
+                    )}
+                  </button>
+                </form>
+
+              </section>
+              {/* Right column — History + Scheduled */}
+              <div className="data-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid rgba(212,175,55,0.1)' }}>
+                  <div className="card-headline headline-with-action" style={{ margin: 0 }}>
+                    <div className="headline-left">
+                      <Clock size={18} />
+                      <h3>Sent Alert History</h3>
+                    </div>
+                    <button
+                      className="clear-history-btn"
+                      onClick={() => onClearHistory("system_notifications")()}
+                    >
+                      Clear History
+                    </button>
+                  </div>
+                </div>
+                <div className="record-stack" style={{ padding: '12px 24px 20px', maxHeight: '340px', overflowY: 'auto' }}>
+                  {notifications.map((item, index) => (
+                    <article key={item.id || index} className="record-card flex-row-card" style={{ marginBottom: '8px', borderRadius: '10px', padding: '12px 14px' }}>
+                      <div className="card-primary-info">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px', padding: '2px 8px' }}>
+                            {item.target_role.toUpperCase()}
+                          </span>
+                          <strong style={{ fontSize: '13px' }}>{item.title}</strong>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#666', marginTop: '2px', display: 'block' }}>{item.body.substring(0, 60)}{item.body.length > 60 ? '...' : ''}</span>
+                        <span className="record-date" style={{ fontSize: '11px' }}>{new Date(item.created_at).toLocaleString()}</span>
+                      </div>
+                      <button
+                        className="delete-icon-btn"
+                        onClick={() => onDeleteRecord("system_notifications", "id")(item.id)}
+                        aria-label="Delete notification"
+                      >
+                        <Trash size={15} />
+                      </button>
+                    </article>
+                  ))}
+                  {notifications.length === 0 && (
+                    <div className="empty-state" style={{ padding: '20px 0' }}>No notification history found.</div>
+                  )}
+                </div>
+
+              {/* Scheduled Notifications List — Premium */}
+              <div style={{
+                padding: '16px 24px 24px',
+                borderTop: '1px solid rgba(212,175,55,0.1)',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,248,230,0.8))'
+              }}>
+                <div className="card-headline headline-with-action" style={{ margin: '0 0 12px' }}>
+                  <div className="headline-left">
+                    <Clock size={18} style={{ color: 'var(--primary-gold)' }} />
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>Scheduled Notifications</h3>
+                    {scheduledNotifs.length > 0 && (
+                      <span style={{
+                        fontSize: '11px',
+                        background: 'rgba(212,175,55,0.12)',
+                        color: '#8b6d31',
+                        padding: '2px 10px',
+                        borderRadius: '12px',
+                        fontWeight: '600'
+                      }}>
+                        {scheduledNotifs.length} active
+                      </span>
+                    )}
+                  </div>
+                  {scheduledNotifs.length > 0 && (
+                    <button
+                      className="clear-history-btn"
+                      onClick={() => onClearHistory("scheduled_notifications")()}
+                      style={{ fontSize: '12px' }}
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+                <div className="record-stack">
+                  {scheduledNotifs.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '20px 0', textAlign: 'center' }}>
+                      <Clock size={28} style={{ color: 'rgba(212,175,55,0.3)', marginBottom: '8px' }} />
+                      <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>No scheduled notifications yet.</p>
+                      <p style={{ color: '#bbb', fontSize: '12px', margin: '4px 0 0' }}>Toggle the switch above to schedule one.</p>
+                    </div>
+                  ) : (
+                    scheduledNotifs.map((item) => {
+                      const scheduleLabel =
+                        item.schedule_type === 'daily' ? 'Every day' :
+                        item.schedule_type === 'weekly' ?
+                          `Every ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][item.schedule_day] || 'week'}` :
+                          `Every month on day ${item.schedule_day}`;
+                      return (
+                        <article key={item.id} className="record-card flex-row-card" style={{
+                          marginBottom: '8px',
+                          borderRadius: '10px',
+                          border: item.is_active ? '1px solid rgba(212,175,55,0.15)' : '1px solid rgba(0,0,0,0.06)',
+                          background: item.is_active ? 'rgba(255,255,255,0.85)' : 'rgba(245,245,245,0.5)',
+                          opacity: item.is_active ? 1 : 0.6,
+                          padding: '12px 14px',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <div className="card-primary-info" style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                              <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px', padding: '2px 8px' }}>
+                                {item.target_role === 'all' ? 'All' : item.target_role.toUpperCase()}
+                              </span>
+                              <strong style={{ fontSize: '13px', color: '#3d2b1f' }}>{item.title}</strong>
+                              <span style={{
+                                fontSize: '10px',
+                                color: '#8b6d31',
+                                background: 'rgba(212,175,55,0.1)',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                fontWeight: '600',
+                                textTransform: 'capitalize'
+                              }}>
+                                {item.schedule_type}
+                              </span>
+                              {!item.is_active && (
+                                <span style={{
+                                  fontSize: '9px',
+                                  color: '#999',
+                                  background: 'rgba(158,158,158,0.15)',
+                                  padding: '2px 8px',
+                                  borderRadius: '10px',
+                                  fontWeight: '700',
+                                  letterSpacing: '0.5px'
+                                }}>
+                                  PAUSED
+                                </span>
+                              )}
+                            </div>
+                            <span style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>
+                              {item.body.substring(0, 80)}{item.body.length > 80 ? '...' : ''}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: '#888' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                                {scheduleLabel} at {item.schedule_time?.substring(0, 5) || '—'}
+                              </span>
+                              {item.next_send_at && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                                  Next: {new Date(item.next_send_at).toLocaleDateString()} {new Date(item.next_send_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0, marginLeft: '8px' }}>
+                            <button
+                              className="delete-icon-btn"
+                              onClick={() => onEditSchedule(item)}
+                              title="Edit schedule"
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: editingSchedule?.id === item.id ? 'rgba(212,175,55,0.15)' : 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                color: editingSchedule?.id === item.id ? '#d4af37' : '#aaa'
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button
+                              className="delete-icon-btn"
+                              onClick={async () => {
+                                await supabase.from("scheduled_notifications").update({ is_active: !item.is_active }).eq("id", item.id);
+                                fetchScheduledNotifs();
+                                showAction("success", item.is_active ? "Paused" : "Resumed");
+                              }}
+                              title={item.is_active ? "Pause" : "Resume"}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                color: item.is_active ? '#aaa' : '#2e7d32'
+                              }}
+                            >
+                              {item.is_active ? <Pause size={14} /> : <Play size={14} />}
+                            </button>
+                            <button
+                              className="delete-icon-btn"
+                              onClick={async () => {
+                                if (!window.confirm(`Delete scheduled notification "${item.title}"?`)) return;
+                                await supabase.from("scheduled_notifications").delete().eq("id", item.id);
+                                fetchScheduledNotifs();
+                                showAction("success", "Scheduled notification deleted");
+                              }}
+                              aria-label="Delete scheduled notification"
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                color: '#e57373'
+                              }}
+                            >
+                              <Trash size={14} />
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+              </div>
+
+
+            </div>
+          ) : null}
+
+          {activePage === "Schedule" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card">
+                <div className="card-headline">
+                  <Calendar size={18} />
+                  <h3>Create Schedule</h3>
+                </div>
+                <form className="stack-form" onSubmit={onCreateSchedule}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Student</span>
+                      <select
+                        name="student_id"
+                        value={adminForms.schedule.student_id}
+                        onChange={onAdminFormChange("schedule")}
+                        required
+                      >
+                        <option value="">Select child</option>
+                        {students.map((student) => (
+                          <option key={student.student_id} value={student.student_id}>
+                            {student.name} آ· {student.groupName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      <span>Time</span>
+                      <input
+                        type="time"
+                        name="task_time"
+                        value={adminForms.schedule.task_time}
+                        onChange={onAdminFormChange("schedule")}
+                        required
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    <span>Task Name</span>
+                    <input
+                      type="text"
+                      name="task_name"
+                      value={adminForms.schedule.task_name}
+                      onChange={onAdminFormChange("schedule")}
+                      placeholder="Sabak, Murajaat, revision..."
+                      required
+                    />
+                  </label>
+
+                  <button type="submit" className="action-button">
+                    Create Schedule
+                  </button>
+                </form>
+              </section>
+
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <Clock size={18} />
+                  <h3>Auto Lock Settings</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = {
+                    auto_lock_enabled: formData.get("auto_lock_enabled") === "true",
+                    auto_lock_day: formData.get("auto_lock_day"),
+                    auto_lock_time: formData.get("auto_lock_time"),
+                    auto_unlock_day: formData.get("auto_unlock_day"),
+                    auto_unlock_time: formData.get("auto_unlock_time"),
+                  };
+                  saveReportSettings(updates);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable Auto Lock</span>
+                      <select name="auto_lock_enabled" defaultValue={String(reportSettingsDraft.auto_lock_enabled ?? true)} className="premium-select">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Lock Day</span>
+                      <select name="auto_lock_day" defaultValue={reportSettingsDraft.auto_lock_day || "Saturday"} className="premium-select">
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Lock Time</span>
+                      <input name="auto_lock_time" type="time" defaultValue={reportSettingsDraft.auto_lock_time || "00:00"} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Unlock Day</span>
+                      <select name="auto_unlock_day" defaultValue={reportSettingsDraft.auto_unlock_day || "Friday"} className="premium-select">
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Unlock Time</span>
+                      <input name="auto_unlock_time" type="time" defaultValue={reportSettingsDraft.auto_unlock_time || "16:30"} className="premium-input" />
+                    </label>
+                  </div>
+                  <p className="hint-text" style={{ marginBottom: '20px' }}>
+                    Teachers can fill progress reports during the unlock window (e.g., {reportSettingsDraft.auto_unlock_day || "Friday"} {reportSettingsDraft.auto_unlock_time || "4:30 PM"} to {reportSettingsDraft.auto_lock_day || "Saturday"} {reportSettingsDraft.auto_lock_time || "12:00 AM"}). Outside this window, progress entry is locked.
+                  </p>
+                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
+                    Save Auto Lock Settings
+                  </button>
+                </form>
+              </section>
+
+            </div>
+          ) : null}
+
+
+          {activePage === "Assignments" ? (
+            <div className="management-grid">
+                <div className="card-headline">
+                  <Users size={18} />
+                  <h3>Student Assignment Hub</h3>
+                </div>
+
+                <div className="assignment-form-complex">
+                  <form className="stack-form" onSubmit={(e) => {
+                    e.preventDefault();
+                    const data = {
+                      student_id: e.target.student_id.value,
+                      teacher_id: e.target.teacher_id.value,
+                      parent_id: e.target.parent_id.value,
+                      full_name: e.target.full_name?.value,
+                      arabic_name: e.target.arabic_name?.value,
+                      juz: e.target.juz?.value,
+                      surat: e.target.surat?.value,
+                      photo_url: e.target.photo_url?.value,
+                      group_name: e.target.group_name?.value,
+                      its: e.target.its?.value,
+                      whatsapp_number: e.target.whatsapp_number?.value,
+                    };
+                    if (data.student_id) onAssignChild(data);
+                  }}>
+                    <div className="form-grid">
+                      <label>
+                        <span>Select Student</span>
+                        <select
+                          name="student_id"
+                          className="premium-select"
+                          required
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val) return;
+                            const s = students.find(x => x.allIds.includes(String(val)));
+                            if (s) {
+                              const form = e.target.form;
+                              if (form.full_name) form.full_name.value = s.name || '';
+                              if (form.arabic_name) form.arabic_name.value = s.arabic_name || '';
+                              if (form.group_name) form.group_name.value = s.groupName === 'Ungrouped' ? '' : (s.groupName || '');
+                              if (form.juz) form.juz.value = s.juz || '';
+                              if (form.surat) form.surat.value = s.surat || '';
+                              if (form.photo_url) form.photo_url.value = s.photoUrl || '';
+                              if (form.its) form.its.value = s.its === '...' ? '' : (s.its || '');
+                              if (form.whatsapp_number) form.whatsapp_number.value = s.whatsapp_number || '';
+                              if (form.teacher_id) form.teacher_id.value = s.muhaffiz_id || '';
+                              if (form.parent_id) form.parent_id.value = s.user_id || '';
+                            }
+                          }}
+                        >
+                          <option value="">-- Choose Student --</option>
+                          {students && students.length > 0 ? (
+                            students.map(s => (
+                              <option key={s.student_id} value={s.student_id}>
+                                {s.name || 'Unnamed Student'} {s.arabic_name ? `(${s.arabic_name})` : ''}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="" disabled>No students found in Registry</option>
+                          )}
+                        </select>
+                      </label>
+
+                      <label>
+                        <span>Full Name (English)</span>
+                        <input name="full_name" type="text" placeholder="Update name..." className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>Arabic Name (اسم الطالب)</span>
+                        <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
+                      </label>
+
+                      <label>
+                        <span>Group / Class</span>
+                        <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>Juz</span>
+                        <input name="juz" type="text" placeholder="e.g. 30" className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>Surat / Ayat</span>
+                        <input name="surat" type="text" placeholder="e.g. Al-Naba" className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>Photo URL</span>
+                        <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>ITS Number</span>
+                        <input name="its" type="text" placeholder="ITS" className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>WhatsApp Number</span>
+                        <input name="whatsapp_number" type="text" placeholder="e.g. 923001234567" className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>Muhaffiz (Teacher)</span>
+                        <select name="teacher_id" className="premium-select">
+                          <option value="">-- No Teacher (Unlinked) --</option>
+                          {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
+                            <React.Fragment>
+                              {/* Show users from portal access who are teachers/muhaffiz */}
+                              {portalAccessList
+                                .filter(a =>
+                                  normalizeText(a.portal_role).includes('teacher') ||
+                                  normalizeText(a.portal_role).includes('muhaffiz')
+                                )
+                                .map(p => (
+                                  <option key={`portal-${p.id}`} value={p.user_id || p.email}>
+                                    {p.full_name || p.email}
+                                  </option>
+                                ))
+                              }
+                              {/* Also show from teacher_profiles table if not in portalAccessList */}
+                              {teacherProfiles
+                                .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
+                                .map(tp => (
+                                  <option key={`profile-${tp.id}`} value={tp.user_id}>
+                                    {tp.full_name} (Profile)
+                                  </option>
+                                ))
+                              }
+                            </React.Fragment>
+                          ) : (
+                            <option value="" disabled>No staff found</option>
+                          )}
+                        </select>
+                      </label>
+
+                      <label>
+                        <span>Parent / Guardian</span>
+                        <select name="parent_id" className="premium-select">
+                          <option value="">-- No Parent (Unlinked) --</option>
+                          {portalAccessList && portalAccessList.length > 0 ? (
+                            portalAccessList
+                              .filter(p => {
+                                const r = (p.portal_role || "").toLowerCase();
+                                return r.includes("parent") || r === "" || r === "parents";
+                              })
+                              .map(p => (
+                                <option key={`parent-${p.id}`} value={p.user_id || p.email}>
+                                  {p.full_name || p.email} ({p.portal_role || 'No Role'})
+                                </option>
+                              ))
+                          ) : (
+                            <option value="" disabled>No portal users found</option>
+                          )}
+                        </select>
+                      </label>
+                    </div>
+                    <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--brown-dark)', opacity: 0.6 }}>
+                      Total portal users in system: {portalAccessList?.length || 0}
+                    </div>
+
+                    <div className="form-actions-row" style={{ gridColumn: '1 / -1' }}>
+                      <button type="submit" className="action-button">Save Assignments & Updates</button>
+                      <button
+                        type="button"
+                        className="action-button secondary"
+                        onClick={() => {
+                          const student_id = document.querySelector('select[name="student_id"]').value;
+                          if (student_id) onUnassignChild(student_id);
+                          else alert("Please select a student first.");
+                        }}
+                      >
+                        Clear All Links
+                      </button>
+                    </div>
+                    <p className="hint-text" style={{ marginTop: '12px', fontSize: '0.8rem', opacity: 0.7 }}>
+                      Tip: If names are missing, make sure you have granted them <strong>Portal Access</strong> first.
+                    </p>
+                  </form>
+                </div>
+
+              <section className="data-card card-appear" style={{ marginTop: '20px' }}>
+                <div className="card-headline">
+                  <Layers3 size={18} />
+                  <h3>Assigned Student List</h3>
+                </div>
+
+                <div className="assigned-children-grid">
+                  {students
+                    .filter(s => s.muhaffiz_id || s.user_id)
+                    .map(student => {
+                      const parent = portalAccessList.find(a => a.user_id === student.user_id);
+                      return (
+                        <article key={student.student_id} className="assigned-child-card card-appear">
+                          <div className="child-card-main">
+                            <StudentAvatar student={student} size="small" />
+                            <div className="child-card-info">
+                              <strong>{student.name}</strong>
+
+                              <div className="assignment-details">
+                                <div className="detail-item">
+                                  <span className="detail-label">Teacher:</span>
+                                  <span className="detail-value">{student.teacherName || "None"}</span>
+                                </div>
+                                <div className="detail-item">
+                                  <span className="detail-label">Parent:</span>
+                                  <span className="detail-value">{parent?.full_name || "Unlinked"}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="child-card-actions">
+                            <button
+                              className="unassign-btn"
+                              onClick={() => onUnassignChild(student.student_id)}
+                              title="Unlink student"
+                            >
+                              <UserX size={16} /> Unlink
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  {students.filter(s => s.muhaffiz_id || s.user_id).length === 0 && (
+                    <div className="empty-state">No linked students found.</div>
+                  )}
+                </div>
+              </section>
+
+              <section className="data-card card-appear" style={{ marginTop: '20px', opacity: 0.8 }}>
+                <div className="card-headline">
+                  <UserX size={18} />
+                  <h3>Unassigned Students</h3>
+                </div>
+                <div className="assigned-children-grid">
+                  {students
+                    .filter(s => !s.muhaffiz_id && !s.user_id)
+                    .map(student => (
+                      <article key={student.student_id} className="assigned-child-card unassigned-card">
+                        <div className="child-card-main">
+                          <StudentAvatar student={student} size="small" />
+                          <div className="child-card-info">
+                            <strong>{student.name}</strong>
+                            <p>Ready for assignment</p>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                </div>
+              </section>
+            </div>
+          ) : null}
+
+          {activePage === "Staff Profiles" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <User size={18} />
+                  <h3>Update Staff Profile</h3>
+                </div>
+                <form className="stack-form" onSubmit={onUpdateTeacherProfile}>
+                  <div className="form-section">
+                    <div className="form-section-title">Select Staff Member</div>
+                    <label>
+                      <span>Full Name</span>
+                      <select
+                        name="full_name"
+                        value={adminForms.teacherProfile.full_name}
+                        onChange={(e) => {
+                          const selectedName = e.target.value;
+                          if (!selectedName) {
+                            setAdminForms(curr => ({
+                              ...curr,
+                              teacherProfile: { user_id: "", full_name: "", photo_url: "", phone_number: "", whatsapp_number: "", salary_per_minute: "2.3", show_salary_card: true }
+                            }));
+                            return;
+                          }
+                          const existingProfile = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(selectedName));
+                          const existingAccess = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(selectedName));
+
+                          const rawSalary = existingProfile?.salary_per_minute ?? existingAccess?.salary_per_minute;
+                          const salaryStr = rawSalary != null ? String(rawSalary) : "2.3";
+
+                          setAdminForms(curr => ({
+                            ...curr,
+                            teacherProfile: {
+                              user_id: existingProfile?.user_id || existingAccess?.user_id || "",
+                              full_name: selectedName,
+                              phone_number: existingProfile?.phone_number || "",
+                              whatsapp_number: existingProfile?.whatsapp_number || "",
+                              photo_url: existingProfile?.photo_url || existingAccess?.photo_url || "",
+                              salary_per_minute: salaryStr,
+                              show_salary_card: existingProfile?.show_salary_card ?? existingAccess?.show_salary_card ?? true
+                            }
+                          }));
+                        }}
+                        required
+                        className="premium-select"
+                      >
+                        <option value="">-- Select Teacher --</option>
+                        {(portalAccessList.length > 0 || teacherProfiles.length > 0) &&
+                          portalAccessList.map(a => (
+                            <option key={a.id || a.full_name} value={a.full_name}>{a.full_name}</option>
+                          ))
+                        }
+                        {teacherProfiles.length > 0 && teacherProfiles
+                          .filter(tp => !portalAccessList.some(pa =>
+                            normalizeText(pa.full_name) === normalizeText(tp.full_name)
+                          ))
+                          .map(tp => (
+                            <option key={`tp-${tp.id || tp.full_name}`} value={tp.full_name}>{tp.full_name}</option>
+                          ))
+                        }
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="form-section">
+                    <div className="form-section-title">Contact Information</div>
+                    <div className="form-grid">
+                      <label>
+                        <span><Phone size={14} /> Phone</span>
+                        <input
+                          type="text"
+                          name="phone_number"
+                          value={adminForms.teacherProfile.phone_number}
+                          onChange={onAdminFormChange("teacherProfile")}
+                          placeholder="+92 300 1234567"
+                        />
+                      </label>
+                      <label>
+                        <span><MessageCircle size={14} /> WhatsApp</span>
+                        <input
+                          type="text"
+                          name="whatsapp_number"
+                          value={adminForms.teacherProfile.whatsapp_number}
+                          onChange={onAdminFormChange("teacherProfile")}
+                          placeholder="923001234567"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="form-section">
+                    <div className="form-section-title">Profile Photo</div>
+                    <label>
+                      <div className="photo-upload-row">
+                        <label className="photo-upload-btn">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={onTeacherPhotoUpload}
+                          />
+                          {uploadingTeacherPhoto ? (
+                            <span className="upload-status">
+                              <span className="upload-spinner" />
+                              Uploading...
+                            </span>
+                          ) : (
+                            <span className="upload-status">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                              Upload Photo
+                            </span>
+                          )}
+                        </label>
+                        {adminForms.teacherProfile.photo_url && (
+                          <img
+                            src={adminForms.teacherProfile.photo_url}
+                            alt="Preview"
+                            className="photo-preview-circle"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        name="photo_url"
+                        value={adminForms.teacherProfile.photo_url}
+                        onChange={onAdminFormChange("teacherProfile")}
+                        placeholder="https://example.com/photo.jpg"
+                        className="photo-url-input"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-section">
+                    <div className="form-section-title">Salary Settings</div>
+                    <div className="form-grid">
+                      <label>
+                        <span>Salary per Minute (Rs.)</span>
+                        <div className="input-with-icon">
+                          <span className="input-icon">Rs.</span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            name="salary_per_minute"
+                            value={adminForms.teacherProfile.salary_per_minute || "2.3"}
+                            onChange={onAdminFormChange("teacherProfile")}
+                          />
+                        </div>
+                      </label>
+                    <label className="checkbox-inline">
+                      <input
+                        type="checkbox"
+                        name="show_salary_card"
+                        checked={adminForms.teacherProfile.show_salary_card}
+                        onChange={(e) => {
+                          setAdminForms(curr => ({
+                            ...curr,
+                            teacherProfile: {
+                              ...curr.teacherProfile,
+                              show_salary_card: e.target.checked
+                            }
+                          }));
+                        }}
+                      />
+                      <span>Show Salary Card to Teacher</span>
+                    </label>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="action-button">
+                    <CheckCircle size={16} />
+                    Save Profile
+                  </button>
+                </form>
+              </section>
+
+              <section className="data-card card-appear" style={{ animationDelay: '0.1s' }}>
+                <div className="card-headline">
+                  <ShieldCheck size={18} />
+                  <h3>Existing Profiles</h3>
+                  <span className="badge-count">{teacherProfiles.length}</span>
+                </div>
+
+                {adminForms.teacherProfile.full_name && (() => {
+                  const sel = adminForms.teacherProfile;
+                  const access = portalAccessList.find(a => normalizeText(a.full_name) === normalizeText(sel.full_name));
+                  return (
+                    <div className="preview-card">
+                      <div className="preview-card-header">
+                        <img
+                          src={sel.photo_url || "/default-avatar.png"}
+                          alt=""
+                          className="preview-avatar"
+                          onError={(e) => { e.target.src = "/default-avatar.png"; }}
+                        />
+                        <div className="preview-info">
+                          <strong>{sel.full_name}</strong>
+                          {access && (
+                            <span className="preview-role-badge">{access.portal_role}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="preview-details">
+                        {sel.phone_number && (
+                          <div className="preview-detail-row">
+                            <Phone size={13} />
+                            <span>{sel.phone_number}</span>
+                          </div>
+                        )}
+                        {sel.whatsapp_number && (
+                          <div className="preview-detail-row">
+                            <MessageCircle size={13} />
+                            <span>{sel.whatsapp_number}</span>
+                          </div>
+                        )}
+                        <div className="preview-detail-row">
+                          <span className="preview-salary-label">Salary Rate</span>
+                          <span className="preview-salary-value">Rs. {sel.salary_per_minute || "2.3"} /min</span>
+                        </div>
+                        <div className="preview-detail-row">
+                          <span className="preview-salary-label">Card Visibility</span>
+                          <span className={`preview-status-badge ${sel.show_salary_card ? 'active' : 'inactive'}`}>
+                            {sel.show_salary_card ? "Visible" : "Hidden"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="record-stack">
+                  {teacherProfiles.map(profile => (
+                    <article key={profile.id} className="record-card flex-row-card">
+                      <div className="profile-identity-row">
+                        <img src={profile.photo_url || "/default-avatar.png"} alt="" className="user-dp-badge" />
+                        <div>
+                          <strong>{profile.full_name}</strong>
+                          <p className="record-sub">{profile.whatsapp_number || "No contact"}</p>
+                        </div>
+                      </div>
+                      <button
+                        className="delete-icon-btn"
+                        onClick={() => onDeleteRecord("teacher_profiles", "id")(profile.id)}
+                      >
+                        <Trash size={16} />
+                      </button>
+                    </article>
+                  ))}
+                  {teacherProfiles.length === 0 && (
+                    <p className="empty-state-text">No staff profiles yet. Create one above.</p>
+                  )}
+                </div>
+              </section>
+            </div>
+          ) : null}
+
+          {activePage === "Faculty" ? (
+            <div className="management-grid">
+              <section className="data-card card-appear">
+                <div className="card-headline headline-with-action">
+                  <div className="headline-left">
+                    <Users size={18} />
+                    <h3>Faculty Attendance Management</h3>
+                  </div>
+                </div>
+
+                <div className="record-stack">
+                  {teacherProfiles
+                    .filter(profile => profile.show_salary_card === true)
+                    .map(profile => {
+                      const today = new Date().toISOString().split('T')[0];
+                      const latestAttendance = teacherAttendance.find(a =>
+                        normalizeText(a.teacher_name) === normalizeText(profile.full_name) &&
+                        a.attendance_date === today
+                      );
+
+                      return (
+                        <div key={profile.id} className="faculty-vessel card-appear">
+                          <div className="vessel-connection">
+                            <div className="connection-line"></div>
+                            <div className="connection-dot"></div>
+                          </div>
+                          <article className="premium-faculty-card card-appear">
+                            <div className="p-faculty-header">
+                              <div className="p-faculty-profile">
+                                <div className="p-faculty-avatar-container">
+                                  {profile.photo_url ? (
+                                    <img src={profile.photo_url} alt={profile.full_name} className="p-faculty-img" />
+                                  ) : (
+                                    <div className="p-faculty-avatar-fallback">
+                                      {profile.full_name.charAt(0)}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="p-faculty-meta">
+                                  <div className="name-row">
+                                    <h3 className="p-faculty-name">{profile.full_name}</h3>
+                                    <CheckCircle size={18} className="verified-badge" />
+                                  </div>
+                                  <span className="p-faculty-email">{profile.email || "No Email linked"}</span>
+                                </div>
+                              </div>
+                              <div className={`p-status-badge ${latestAttendance?.status === 'Present' ? 'present' : latestAttendance?.status === 'Absent' ? 'absent' : 'pending'}`}>
+                                {latestAttendance?.status || "Not Marked"}
+                              </div>
+                            </div>
+
+                            <div className="p-faculty-body">
+                              <div className="p-attendance-controls">
+                                <div className="p-minutes-manual card-appear">
+                                  <div className="vessel-label">Daily Minutes</div>
+                                  <input
+                                    type="number"
+                                    id={`mins-${profile.id}`}
+                                    defaultValue="90"
+                                    className="p-minutes-input"
+                                    placeholder="Mins"
+                                  />
+                                </div>
+
+                                <div className="p-action-row">
+                                  <button className={`p-mark-btn p-present ${latestAttendance?.status === 'Present' ? 'active' : ''}`} onClick={() => {
+                                    const mins = document.getElementById(`mins-${profile.id}`).value || 90;
+                                    onRecordTeacherAttendance(null, {
+                                      teacher_name: profile.full_name,
+                                      attendance_date: today,
+                                      minutes_present: Number(mins),
+                                      status: 'Present',
+                                      note: 'Daily Attendance'
+                                    });
+                                  }}>
+                                    <div className="btn-icon-vessel"><UserCheck size={22} /></div>
+                                    <div className="btn-text-vessel">
+                                      <strong>Present</strong>
+                                      <span>Mark with Custom Mins</span>
+                                    </div>
+                                  </button>
+
+                                  <button className={`p-mark-btn p-absent ${latestAttendance?.status === 'Absent' ? 'active' : ''}`} onClick={() => onRecordTeacherAttendance(null, {
+                                    teacher_name: profile.full_name,
+                                    attendance_date: today,
+                                    minutes_present: 0,
+                                    status: 'Absent',
+                                    note: 'Daily Attendance'
+                                  })}>
+                                    <div className="btn-icon-vessel"><UserX size={22} /></div>
+                                    <div className="btn-text-vessel">
+                                      <strong>Absent</strong>
+                                      <span>Mark for Today</span>
+                                    </div>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {latestAttendance && (
+                              <div className="p-attendance-footer">
+                                <Clock size={14} />
+                                <span>Last updated today at {new Date(latestAttendance.created_at).toLocaleTimeString()}</span>
+                              </div>
+                            )}
+                          </article>
+                        </div>
+                      );
+                    })}
+
+                  {teacherProfiles.filter(profile => profile.show_salary_card === true).length === 0 && (
+                    <div className="empty-state">
+                      <Users size={48} opacity={0.2} />
+                      <p>No teachers found with 'Show Salary Card' enabled.</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          ) : null}
+
+          {activePage === "Portal Access" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card">
+                <div className="card-headline">
+                  <ShieldCheck size={18} />
+                  <h3>Grant Portal Access</h3>
+                </div>
+                <form className="stack-form" onSubmit={onCreatePortalAccess}>
+                  <div className="form-grid">
+                    <label>
+                      <span>User Email</span>
+                      <input
+                        type="email"
+                        name="email"
+                        value={adminForms.portalAccess.email}
+                        onChange={onAdminFormChange("portalAccess")}
+                        placeholder="user@example.com"
+                        required
+                      />
+                    </label>
+                    <label>
+                      <span>Full Name</span>
+                      <input
+                        type="text"
+                        name="full_name"
+                        value={adminForms.portalAccess.full_name}
+                        onChange={onAdminFormChange("portalAccess")}
+                        placeholder="Enter name"
+                        required
+                      />
+                    </label>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Portal Role</span>
+                      <select
+                        name="portal_role"
+                        value={adminForms.portalAccess.portal_role}
+                        onChange={onAdminFormChange("portalAccess")}
+                        required
+                      >
+                        <option value="parents">Parents Portal</option>
+                        <option value="teacher">Teacher Portal</option>
+                        <option value="admin">Admin Portal</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Account Password</span>
+                      <input
+                        type="password"
+                        name="password"
+                        value={adminForms.portalAccess.password || ""}
+                        onChange={onAdminFormChange("portalAccess")}
+                        placeholder="Min 6 characters"
+                        required
+                      />
+                    </label>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Link to Student (Parents only)</span>
+                      <select
+                        name="student_id"
+                        value={adminForms.portalAccess.student_id}
+                        onChange={onAdminFormChange("portalAccess")}
+                      >
+                        <option value="">-- No Student Linked --</option>
+                        {students.map((s) => (
+                          <option key={s.student_id} value={s.student_id}>
+                            {s.name} ({s.groupName})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+
+                  <button type="submit" className="action-button">
+                    Grant Access
+                  </button>
+                  <p className="hint-text" style={{ marginTop: "12px", fontSize: "14px", color: "var(--text-secondary)" }}>
+                    The user must first create an account with this email in the app before you can grant them access.
+                  </p>
+                </form>
+              </section>
+
+              <section className="data-card card-appear" style={{ gridColumn: '1 / -1', marginTop: '30px' }}>
+                <div className="card-headline">
+                  <ShieldCheck size={18} />
+                  <h3>System Portal Audit ({portalAccessList?.length || 0})</h3>
+                </div>
+                <div className="portal-access-responsive-container">
+                  <div className="portal-audit-grid header-row hide-mobile">
+                    <div className="audit-col">Name</div>
+                    <div className="audit-col">Email</div>
+                    <div className="audit-col">Role</div>
+                    <div className="audit-col">UUID (user_id)</div>
+                    <div className="audit-col">Action</div>
+                  </div>
+                  <div className="portal-audit-list">
+                    {portalAccessList && portalAccessList.map((access) => (
+                      <div key={access.id} className="portal-audit-item card-appear">
+                        <div className="audit-col name-col">
+                          <span className="mobile-label">Name:</span>
+                          <strong>{access.full_name}</strong>
+                        </div>
+                        <div className="audit-col">
+                          <span className="mobile-label">Email:</span>
+                          {access.email}
+                        </div>
+                        <div className="audit-col">
+                          <span className="mobile-label">Role:</span>
+                          <span className={`badge ${access.portal_role}`}>{access.portal_role}</span>
+                        </div>
+                        <div className="audit-col uuid-col">
+                          <span className="mobile-label">UUID:</span>
+                          <code>{access.user_id || 'NOT LINKED'}</code>
+                        </div>
+                        <div className="audit-col action-col">
+                          <button className="btn-text-only red" onClick={() => onDeleteRecord("user_portal_access", "id")(access.id)}>Remove Access</button>
+                        </div>
+                      </div>
+                    ))}
+                    {(!portalAccessList || portalAccessList.length === 0) && (
+                      <div className="empty-state">
+                        No access records found in the database. Try "Grant Access" above.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            </div>
+          ) : null}
+
+          {/* Rendering zone for report generation - kept off-screen but 'visible' for capture */}
+          <div 
+            id="bulk-capture-hidden-zone"
+            style={{ 
+              position: 'fixed', 
+              left: '-10000px', 
+              top: '0', 
+              width: '850px', 
+              zIndex: -1000, 
+              background: 'white',
+              overflow: 'hidden',
+              height: isGeneratingReports ? 'auto' : '1px',
+              visibility: isGeneratingReports ? 'visible' : 'hidden'
+            }}
+          >
+            {isGeneratingReports && studentToRender && (
+              <div id="actual-report-content" style={{ padding: '40px', background: 'white' }}>
+                <TahfeezReportCard
+                  student={{
+                    name: studentToRender.name,
+                    arabic_name: studentToRender.arabic_name,
+                    groupName: studentToRender.groupName || studentToRender.class_level,
+                  }}
+                  weeklyResult={studentToRender.latestResult}
+                  settings={reportSettingsObject}
+                />
+              </div>
+            )}
+          </div>
+
+          {activePage === "User Issues" ? (
+            <SupportTicketsAdmin tickets={supportTickets} onRefresh={loadPortalData} />
+          ) : null}
+
+          {activePage === "Leave Management" && (
+            <AdminLeaveManagement students={students} onShowAction={onShowAction} />
+          )}
+          {portalAccessSuccess && (
+            <PortalAccessSuccessModal
+              payload={portalAccessSuccess}
+              onClose={onClosePortalAccessSuccess}
+            />
+          )}
+          {activePage === "Report Settings" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <Palette size={18} />
+                  <h3>Report Heading Settings</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  saveReportSettings(reportSettingsDraft);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Main Heading</span>
+                      <input name="main_heading" type="text" value={reportSettingsDraft.main_heading} onChange={updateReportDraft("main_heading")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Sub Heading</span>
+                      <input name="sub_heading" type="text" value={reportSettingsDraft.sub_heading} onChange={updateReportDraft("sub_heading")} className="premium-input" />
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Palette size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Progress Card Theme</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Background Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReportBackgroundUpload}
+                        className="premium-input"
+                        disabled={uploadingReportBackground}
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Upload JPG, PNG, or WebP under 5MB. It will appear behind the progress report card.
+                      </small>
+                    </label>
+                    <label>
+                      <span>Image Position</span>
+                      <select
+                        value={reportSettingsDraft.progress_card_background_position || "center"}
+                        onChange={updateReportDraft("progress_card_background_position")}
+                        className="premium-select"
+                      >
+                        <option value="center">Center</option>
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Text Readability Overlay</span>
+                      <input
+                        name="progress_card_overlay_opacity"
+                        type="range"
+                        min="0.35"
+                        max="0.95"
+                        step="0.05"
+                        value={reportSettingsDraft.progress_card_overlay_opacity ?? 0.82}
+                        onChange={updateReportDraft("progress_card_overlay_opacity")}
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)' }}>
+                        Higher value = cleaner text, softer image.
+                      </small>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+                      {reportSettingsDraft.progress_card_background_url ? (
+                        <button
+                          type="button"
+                          className="btn-text-only"
+                          onClick={removeReportBackground}
+                          disabled={uploadingReportBackground}
+                        >
+                          <Trash2 size={16} /> Remove Background
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--soft-brown)', fontSize: '0.9rem' }}>
+                          No custom background selected.
+                        </span>
+                      )}
+                      {uploadingReportBackground && (
+                        <span style={{ color: 'var(--primary-gold)', fontSize: '0.9rem', fontWeight: 700 }}>
+                          Uploading background...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '16px', padding: '0', border: 'none' }}>
+                    <MessageCircle size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Score Labels</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label><span>Weekly Score</span><input name="weekly_score_heading" type="text" value={reportSettingsDraft.weekly_score_heading} onChange={updateReportDraft("weekly_score_heading")} className="premium-input" /></label>
+                    <label><span>Jumla</span><input name="jumla_heading" type="text" value={reportSettingsDraft.jumla_heading} onChange={updateReportDraft("jumla_heading")} className="premium-input" /></label>
+                    <label><span>Murajah</span><input name="murajazah_heading" type="text" value={reportSettingsDraft.murajazah_heading} onChange={updateReportDraft("murajazah_heading")} className="premium-input" /></label>
+                    <label><span>Juz Hali</span><input name="juz_hali_heading" type="text" value={reportSettingsDraft.juz_hali_heading} onChange={updateReportDraft("juz_hali_heading")} className="premium-input" /></label>
+                    <label><span>Takhteet</span><input name="takhteet_heading" type="text" value={reportSettingsDraft.takhteet_heading} onChange={updateReportDraft("takhteet_heading")} className="premium-input" /></label>
+                    <label><span>Jadeed</span><input name="jadeed_heading" type="text" value={reportSettingsDraft.jadeed_heading} onChange={updateReportDraft("jadeed_heading")} className="premium-input" /></label>
+                    <label><span>Jadeed Safahat</span><input name="jadeed_safahat_heading" type="text" value={reportSettingsDraft.jadeed_safahat_heading} onChange={updateReportDraft("jadeed_safahat_heading")} className="premium-input" /></label>
+                    <label><span>Attendance</span><input name="attendance_heading" type="text" value={reportSettingsDraft.attendance_heading} onChange={updateReportDraft("attendance_heading")} className="premium-input" /></label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '16px', padding: '0', border: 'none' }}>
+                    <BookOpen size={16} />
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Target Sections</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label><span>Matrookah</span><input name="matrookah_heading" type="text" value={reportSettingsDraft.matrookah_heading} onChange={updateReportDraft("matrookah_heading")} className="premium-input" /></label>
+                    <label><span>Zaeefah</span><input name="daeefah_heading" type="text" value={reportSettingsDraft.daeefah_heading} onChange={updateReportDraft("daeefah_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Section</span><input name="wusool_heading" type="text" value={reportSettingsDraft.wusool_heading} onChange={updateReportDraft("wusool_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Juz</span><input name="wusool_juz_heading" type="text" value={reportSettingsDraft.wusool_juz_heading} onChange={updateReportDraft("wusool_juz_heading")} className="premium-input" /></label>
+                    <label><span>Wusool Page</span><input name="wusool_page_heading" type="text" value={reportSettingsDraft.wusool_page_heading} onChange={updateReportDraft("wusool_page_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Target</span><input name="next_week_heading" type="text" value={reportSettingsDraft.next_week_heading} onChange={updateReportDraft("next_week_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Juz</span><input name="next_week_juz_heading" type="text" value={reportSettingsDraft.next_week_juz_heading} onChange={updateReportDraft("next_week_juz_heading")} className="premium-input" /></label>
+                    <label><span>Next Week Page</span><input name="next_week_page_heading" type="text" value={reportSettingsDraft.next_week_page_heading} onChange={updateReportDraft("next_week_page_heading")} className="premium-input" /></label>
+                    <label><span>Target Till</span><input name="istifadah_heading" type="text" value={reportSettingsDraft.istifadah_heading} onChange={updateReportDraft("istifadah_heading")} className="premium-input" /></label>
+                    <label><span>Its Juz</span><input name="istifadah_juz_heading" type="text" value={reportSettingsDraft.istifadah_juz_heading} onChange={updateReportDraft("istifadah_juz_heading")} className="premium-input" /></label>
+                    <label><span>Its Page</span><input name="istifadah_page_heading" type="text" value={reportSettingsDraft.istifadah_page_heading} onChange={updateReportDraft("istifadah_page_heading")} className="premium-input" /></label>
+                  </div>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
+                    Save Report Settings
+                  </button>
+                </form>
+              </section>
+
+              <section className="data-card card-appear">
+                <div className="card-headline">
+                  <Eye size={18} />
+                  <h3>Live Preview</h3>
+                </div>
+                {previewStudent ? (
+                  <TahfeezReportCard
+                    student={previewStudent}
+                    weeklyResult={previewStudent.latestResult}
+                    settings={reportSettingsDraft}
+                    parentViewed={(parentViews || []).find(v => String(v.student_id) === String(previewStudent.student_id))?.viewed ?? false}
+                  />
+                ) : (
+                  <div className="empty-state">
+                    Add students to preview the report headings.
+                  </div>
+                )}
+              </section>
+            </div>
+          ) : null}
+          {activePage === "Jadwal Settings" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <Palette size={18} />
+                  <h3>Jadwal Display & Theme Settings</h3>
+                </div>
+                  <form className="stack-form" onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (jadwalSaving) return;
+                  setJadwalSaving(true);
+                  try {
+                    const updates = {
+                      jadwal_style: jadwalSettingsDraft.jadwal_style,
+                      jadwal_teacher_style: jadwalSettingsDraft.jadwal_teacher_style,
+                      jadwal_pdf_primary_color: jadwalSettingsDraft.jadwal_pdf_primary_color,
+                      jadwal_pdf_accent_color: jadwalSettingsDraft.jadwal_pdf_accent_color,
+                      jadwal_pdf_background_color: jadwalSettingsDraft.jadwal_pdf_background_color,
+                      jadwal_pdf_background_url: jadwalSettingsDraft.jadwal_pdf_background_url,
+                      jadwal_pdf_background_opacity: jadwalSettingsDraft.jadwal_pdf_background_opacity,
+                      jadwal_pdf_font_family: jadwalSettingsDraft.jadwal_pdf_font_family,
+                      jadwal_type: jadwalSettingsDraft.jadwal_type,
+                      jadwal_week_start: jadwalSettingsDraft.jadwal_week_start,
+                      jadwal_week_end: jadwalSettingsDraft.jadwal_week_end,
+                      jadwal_pdf_title: jadwalSettingsDraft.jadwal_pdf_title,
+                      jadwal_pdf_subtitle: jadwalSettingsDraft.jadwal_pdf_subtitle,
+                      jadwal_pdf_academic_portal: jadwalSettingsDraft.jadwal_pdf_academic_portal,
+                      jadwal_pdf_hifz_program: jadwalSettingsDraft.jadwal_pdf_hifz_program,
+                      jadwal_pdf_logo_url: jadwalSettingsDraft.jadwal_pdf_logo_url,
+                      jadwal_notification_enabled: jadwalSettingsDraft.jadwal_notification_enabled,
+                      jadwal_notification_time: jadwalSettingsDraft.jadwal_notification_time,
+                    };
+
+                    const { error } = await supabase
+                      .from("jadwal_settings")
+                      .upsert({ id: 1, ...updates }, { onConflict: "id" })
+                      .select()
+                      .maybeSingle();
+                    if (error) {
+                      onShowAction("error", "Failed to update Jadwal settings: " + error.message);
+                      return;
+                    }
+                    onShowAction("success", "Jadwal settings saved successfully!");
+                    loadPortalData(portalRole, user);
+                  } catch (err) {
+                    onShowAction("error", "Failed to save Jadwal settings: " + err.message);
+                  } finally {
+                    setJadwalSaving(false);
+                  }
+                }}>
+                  <div className="card-headline" style={{ marginTop: '0', padding: '0', border: 'none' }}>
+                    <Calendar size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Jadwal Style</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Display Style</span>
+                      <select name="jadwal_style" value={jadwalSettingsDraft.jadwal_style || 'table'} onChange={updateJadwalDraft("jadwal_style")} className="premium-select">
+                        <option value="table">Table Style</option>
+                        <option value="calendar">Calendar Style</option>
+                        <option value="single_day_card">Single Day Card Style</option>
+                      </select>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Choose how Jadwal is displayed for teachers and parents.
+                      </small>
+                    </label>
+                    <label>
+                      <span>Teacher Input Style</span>
+                      <select name="jadwal_teacher_style" value={jadwalSettingsDraft.jadwal_teacher_style || 'default'} onChange={updateJadwalDraft("jadwal_teacher_style")} className="premium-select">
+                        <option value="default">Default (Full Table)</option>
+                        <option value="compact">Compact (Minimal Input)</option>
+                      </select>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Controls how teachers fill in the Jadwal.
+                      </small>
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Calendar size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Jadwal Type</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Schedule Type</span>
+                      <select name="jadwal_type" value={jadwalSettingsDraft.jadwal_type || 'weekly'} onChange={updateJadwalDraft("jadwal_type")} className="premium-select">
+                        <option value="weekly">Weekly (Fixed 7 Days)</option>
+                        <option value="miqaat">Miqaāt (Custom Date Range)</option>
+                      </select>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Weekly = teacher sees all 7 days (Mon–Sun). Miqaāt = teacher sees only the days in the custom range you set below.
+                      </small>
+                    </label>
+                  </div>
+
+                  {jadwalSettingsDraft.jadwal_type === 'miqaat' ? (
+                  <>
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Calendar size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Miqaāt Date Range</h4>
+                  </div>
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                    <label style={{ flex: '1', minWidth: '200px' }}>
+                      <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>From (Start Date)</span>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <DatePicker
+                          value={jadwalSettingsDraft.jadwal_week_start || ''}
+                          onChange={(e) => updateJadwalDraft('jadwal_week_start')(e)}
+                        />
+                        {jadwalSettingsDraft.jadwal_week_start && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {new Date(jadwalSettingsDraft.jadwal_week_start).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      {jadwalSettingsDraft.jadwal_week_start && (() => {
+                        const fi = getFatemiInfo(jadwalSettingsDraft.jadwal_week_start);
+                        return (
+                          <div style={{ marginTop: '4px', fontSize: '1.2rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
+                            {fi.date} {fi.monthName} {fi.year}
+                          </div>
+                        );
+                      })()}
+                    </label>
+                    <label style={{ flex: '1', minWidth: '200px' }}>
+                      <span style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>To (End Date)</span>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <DatePicker
+                          value={jadwalSettingsDraft.jadwal_week_end || ''}
+                          onChange={(e) => updateJadwalDraft('jadwal_week_end')(e)}
+                        />
+                        {jadwalSettingsDraft.jadwal_week_end && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {new Date(jadwalSettingsDraft.jadwal_week_end).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      {jadwalSettingsDraft.jadwal_week_end && (() => {
+                        const fi = getFatemiInfo(jadwalSettingsDraft.jadwal_week_end);
+                        return (
+                          <div style={{ marginTop: '4px', fontSize: '1.2rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl' }}>
+                            {fi.date} {fi.monthName} {fi.year}
+                          </div>
+                        );
+                      })()}
+                    </label>
+                  </div>
+                  <small style={{ display: 'block', marginTop: '4px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                    The selected date range will appear in Al Kanz font below each day name on the Jadwal.
+                  </small>
+                  {jadwalSettingsDraft.jadwal_week_start && jadwalSettingsDraft.jadwal_week_end ? (() => {
+                    const d1 = new Date(jadwalSettingsDraft.jadwal_week_start + 'T00:00:00Z');
+                    const d2 = new Date(jadwalSettingsDraft.jadwal_week_end + 'T00:00:00Z');
+                    let totalDays = Math.max(0, Math.floor((d2 - d1) / 86400000) + 1);
+                    totalDays = items.length;
+                    if (totalDays < 1) return null;
+                    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                    const items = [];
+                    const cur = new Date(d1);
+                    while (cur <= d2) {
+                      const ds = cur.toISOString().split('T')[0];
+                      items.push(dayNames[cur.getUTCDay()] + ' (' + ds + ')');
+                      cur.setUTCDate(cur.getUTCDate() + 1);
+                    }
+                    if (items.length > 19) {
+                      items.pop();
+                    }
+                    return (
+                      <div style={{ marginTop: '16px', background: 'rgba(212,175,55,0.06)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(212,175,55,0.12)' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary-gold)', fontFamily: "'Cinzel', serif", lineHeight: 1 }}>{totalDays}</span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--soft-brown)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                            Day{totalDays !== 1 ? 's' : ''} — teacher will fill {totalDays} day{totalDays !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {items.map((d, i) => (
+                            <span key={i} style={{ padding: '4px 10px', background: i % 2 === 0 ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.5)', borderRadius: '20px', fontSize: '0.78rem', color: 'var(--text-secondary)', border: '1px solid rgba(212,175,55,0.08)' }}>
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })() : null}
+                  </>
+                  ) : null}
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Download size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>PDF Theme</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Primary Color</span>
+                      <input name="jadwal_pdf_primary_color" type="color" value={jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037'} onChange={updateJadwalDraft("jadwal_pdf_primary_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                    </label>
+                    <label>
+                      <span>Accent / Gold Color</span>
+                      <input name="jadwal_pdf_accent_color" type="color" value={jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'} onChange={updateJadwalDraft("jadwal_pdf_accent_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                    </label>
+                    <label>
+                      <span>Page Background Color</span>
+                      <input name="jadwal_pdf_background_color" type="color" value={jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff'} onChange={updateJadwalDraft("jadwal_pdf_background_color")} className="premium-input" style={{ height: '40px', padding: '4px' }} />
+                    </label>
+                    <label>
+                      <span>Font Family</span>
+                      <select name="jadwal_pdf_font_family" value={jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter'} onChange={updateJadwalDraft("jadwal_pdf_font_family")} className="premium-select">
+                        <option value="Inter">Inter</option>
+                        <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                        <option value="'Times New Roman', serif">Times New Roman</option>
+                        <option value="'Cinzel', serif">Cinzel</option>
+                        <option value="'Courier New', monospace">Courier New</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Image size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>PDF Background Image</h4>
+                  </div>
+                  <div className="form-grid" style={{ marginTop: '12px' }}>
+                    <label>
+                      <span>Background Image</span>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label className="premium-input" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '10px 16px', border: '1px dashed var(--primary-gold)', background: '#fdfaf4', borderRadius: '8px', transition: 'all 0.2s' }}>
+                          <Upload size={18} style={{ color: 'var(--primary-gold)' }} />
+                          <span style={{ color: 'var(--deep-brown)', fontWeight: 500, fontSize: '0.9rem' }}>
+                            {uploadingJadwalBg ? "Uploading..." : "Choose Image"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleJadwalBgUpload}
+                            disabled={uploadingJadwalBg}
+                            style={{ display: 'none' }}
+                          />
+                          {uploadingJadwalBg && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary-gold)' }} />}
+                        </label>
+                        {jadwalSettingsDraft.jadwal_pdf_background_url && (
+                          <button type="button" onClick={removeJadwalBg} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, padding: '6px 10px', borderRadius: '6px' }}>
+                            <XCircle size={16} /> Remove
+                          </button>
+                        )}
+                      </div>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Upload a background image for the Jadwal PDF. Accepted formats: JPG, PNG, GIF, WebP (max 5MB).
+                      </small>
+                      {jadwalSettingsDraft.jadwal_pdf_background_url && (
+                        <div style={{ marginTop: '10px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dfcbb5', maxWidth: '200px' }}>
+                          <img src={jadwalSettingsDraft.jadwal_pdf_background_url} alt="Jadwal background preview" style={{ width: '100%', height: '80px', objectFit: 'cover', display: 'block' }} />
+                        </div>
+                      )}
+                    </label>
+                    <label>
+                      <span>Background Opacity</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="1"
+                          step="0.05"
+                          value={jadwalSettingsDraft.jadwal_pdf_background_opacity ?? 1}
+                          onChange={(e) => updateJadwalDraft("jadwal_pdf_background_opacity")({ target: { value: parseFloat(e.target.value) } })}
+                          style={{ flex: 1 }}
+                        />
+                        <span style={{ minWidth: '40px', fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.95rem' }}>
+                          {Math.round((jadwalSettingsDraft.jadwal_pdf_background_opacity ?? 1) * 100)}%
+                        </span>
+                      </div>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Adjust the visibility of the background image (100% = fully opaque, 10% = barely visible).
+                      </small>
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <FileText size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>PDF Header Text</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Title (e.g. MAUZE TAHFEEZ ATFAL)</span>
+                      <input name="jadwal_pdf_title" type="text" value={jadwalSettingsDraft.jadwal_pdf_title || ''} onChange={updateJadwalDraft("jadwal_pdf_title")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Subtitle (e.g. Weekly Quran Jadwal)</span>
+                      <input name="jadwal_pdf_subtitle" type="text" value={jadwalSettingsDraft.jadwal_pdf_subtitle || ''} onChange={updateJadwalDraft("jadwal_pdf_subtitle")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Academic Portal Label</span>
+                      <input name="jadwal_pdf_academic_portal" type="text" value={jadwalSettingsDraft.jadwal_pdf_academic_portal || ''} onChange={updateJadwalDraft("jadwal_pdf_academic_portal")} className="premium-input" />
+                    </label>
+                    <label>
+                      <span>Hifz Program Label</span>
+                      <input name="jadwal_pdf_hifz_program" type="text" value={jadwalSettingsDraft.jadwal_pdf_hifz_program || ''} onChange={updateJadwalDraft("jadwal_pdf_hifz_program")} className="premium-input" />
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Image size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>PDF Logo</h4>
+                  </div>
+                  <div className="form-grid" style={{ marginTop: '12px' }}>
+                    <label>
+                      <span>Logo Image (appears at top-right corner of PDF)</span>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label className="premium-input" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '10px 16px', border: '1px dashed var(--primary-gold)', background: '#fdfaf4', borderRadius: '8px', transition: 'all 0.2s' }}>
+                          <Upload size={18} style={{ color: 'var(--primary-gold)' }} />
+                          <span style={{ color: 'var(--deep-brown)', fontWeight: 500, fontSize: '0.9rem' }}>
+                            {uploadingJadwalLogo ? "Uploading..." : "Choose Logo PNG"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleJadwalLogoUpload}
+                            disabled={uploadingJadwalLogo}
+                            style={{ display: 'none' }}
+                          />
+                          {uploadingJadwalLogo && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary-gold)' }} />}
+                        </label>
+                        {jadwalSettingsDraft.jadwal_pdf_logo_url && (
+                          <button type="button" onClick={removeJadwalLogo} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, padding: '6px 10px', borderRadius: '6px' }}>
+                            <XCircle size={16} /> Remove
+                          </button>
+                        )}
+                      </div>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Upload a logo (PNG preferred) for the top-right corner of the Jadwal PDF (max 2MB).
+                      </small>
+                      {jadwalSettingsDraft.jadwal_pdf_logo_url && (
+                        <div style={{ marginTop: '10px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dfcbb5', maxWidth: '120px' }}>
+                          <img src={jadwalSettingsDraft.jadwal_pdf_logo_url} alt="Jadwal logo preview" style={{ width: '100%', display: 'block' }} />
+                        </div>
+                      )}
+                    </label>
+                  </div>
+
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Bell size={16} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Daily Reminder Notification</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable Daily Reminder</span>
+                      <label className="premium-switch" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                        <input
+                          name="jadwal_notification_enabled"
+                          type="checkbox"
+                          checked={jadwalSettingsDraft.jadwal_notification_enabled !== false}
+                          onChange={(e) => setJadwalSettingsDraft((c) => ({ ...c, jadwal_notification_enabled: e.target.checked }))}
+                          style={{ width: '20px', height: '20px', accentColor: 'var(--primary-gold)' }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {jadwalSettingsDraft.jadwal_notification_enabled !== false ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </label>
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        Sends a push notification to parents each day with their child's assigned jadwal for the day.
+                      </small>
+                    </label>
+                    <label>
+                      <span>Notification Time</span>
+                      <input
+                        name="jadwal_notification_time"
+                        type="time"
+                        value={jadwalSettingsDraft.jadwal_notification_time || '07:00'}
+                        onChange={(e) => setJadwalSettingsDraft((c) => ({ ...c, jadwal_notification_time: e.target.value }))}
+                        className="premium-input"
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                        The time of day the reminder notification is sent. Uses Indian Standard Time (IST, UTC+5:30).
+                      </small>
+                    </label>
+                  </div>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '20px', position: 'relative', transition: 'all 0.25s ease', opacity: jadwalSaving ? 0.7 : 1 }} disabled={jadwalSaving}>
+                    {jadwalSaving ? (
+                      <><Loader2 size={18} className="animate-spin" style={{ marginRight: '8px' }} /> Saving...</>
+                    ) : (
+                      'Save Jadwal Settings'
+                    )}
+                  </button>
+                </form>
+              </section>
+
+              {(() => {
+                const style = jadwalSettingsDraft.jadwal_style || 'table';
+                const isMiqaat = jadwalSettingsDraft.jadwal_type === 'miqaat' && jadwalSettingsDraft.jadwal_week_start && jadwalSettingsDraft.jadwal_week_end;
+                const getDayObjs = () => {
+                  if (isMiqaat) {
+                    const d1 = new Date(jadwalSettingsDraft.jadwal_week_start + 'T00:00:00Z');
+                    const d2 = new Date(jadwalSettingsDraft.jadwal_week_end + 'T00:00:00Z');
+                    const names = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                    const arr = [];
+                    const cur = new Date(d1);
+                    while (cur <= d2) {
+                      const ds = cur.toISOString().split('T')[0];
+                      arr.push({ name: names[cur.getUTCDay()], date: ds, fi: getFatemiInfo(ds) });
+                      cur.setUTCDate(cur.getUTCDate() + 1);
+                    }
+                    if (arr.length > 19) {
+                      arr.pop();
+                    }
+                    return arr;
+                  }
+                  const base = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
+                  const names = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+                  return base.map((n, i) => ({ name: names[i], date: '', fi: { ...getFatemiInfo(''), date: '...' } }));
+                };
+                const dayObjs = getDayObjs();
+                if (!dayObjs.length) return null;
+                const pCol = jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037';
+                const aCol = jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37';
+                return (
+                <section className="data-card card-appear">
+                  <div className="card-headline">
+                    <Eye size={16} />
+                    <h3>Teacher View Preview ({style === 'table' ? 'Table' : style === 'calendar' ? 'Calendar' : 'Single Day Card'})</h3>
+                  </div>
+                  <div style={{ padding: '16px' }}>
+                    {style === 'table' ? (
+                      <table className="jadwal-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr><th>Day</th><th style={{ textAlign: 'center', color: aCol }}>Fatemi Date</th></tr>
+                        </thead>
+                        <tbody>
+                          {dayObjs.map((d, i) => (
+                            <tr key={i}>
+                              <td style={{ fontWeight: 600, color: pCol }}>{d.name}{d.date ? <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '6px' }}>{d.date}</span> : null}</td>
+                              <td style={{ textAlign: 'center', fontFamily: "'Kanz al Marjaan', serif", color: aCol, direction: 'rtl', fontSize: '0.9rem' }}>
+                                {d.fi.date !== '...' ? `${d.fi.date} ${d.fi.monthName} ${d.fi.year}` : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : style === 'calendar' ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {dayObjs.map((d, i) => (
+                          <div key={i} style={{ flex: '1 1 140px', minWidth: '120px', border: `1px solid ${aCol}30`, borderRadius: '10px', padding: '12px', background: i % 2 === 0 ? 'rgba(253,250,244,0.8)' : '#fff', textAlign: 'center' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: pCol }}>{d.name}</div>
+                            {d.date ? <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>{d.date}</div> : null}
+                            <div style={{ fontSize: '0.8rem', fontFamily: "'Kanz al Marjaan', serif", color: aCol, direction: 'rtl', marginTop: '4px' }}>
+                              {d.fi.date !== '...' ? `${d.fi.date} ${d.fi.monthName} ${d.fi.year}` : '-'}
+                            </div>
+                            <div style={{ marginTop: '8px', padding: '6px', background: '#f9f6f0', borderRadius: '6px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>—</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ maxWidth: '360px', margin: '0 auto', border: `1px solid ${aCol}30`, borderRadius: '14px', padding: '20px', textAlign: 'center', background: '#fdfaf4' }}>
+                        <div style={{ fontWeight: 700, fontSize: '1rem', color: pCol }}>{dayObjs[0]?.name}</div>
+                        {dayObjs[0]?.date ? <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{dayObjs[0].date}</div> : null}
+                        <div style={{ fontSize: '1rem', fontFamily: "'Kanz al Marjaan', serif", color: aCol, direction: 'rtl', margin: '6px 0 12px' }}>
+                          {dayObjs[0]?.fi.date !== '...' ? `${dayObjs[0].fi.date} ${dayObjs[0].fi.monthName} ${dayObjs[0].fi.year}` : '-'}
+                        </div>
+                        <div style={{ padding: '10px', background: '#f9f6f0', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>—</div>
+                        {dayObjs.length > 1 ? <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--soft-brown)' }}>+{dayObjs.length - 1} more day{dayObjs.length > 2 ? 's' : ''}</div> : null}
+                      </div>
+                    )}
+                  </div>
+                </section>
+                );
+              })()}
+
+              <section className="data-card card-appear">
+                <div className="card-headline">
+                  <Eye size={18} />
+                  <h3>Jadwal PDF Preview (A4)</h3>
+                </div>
+                <div style={{
+                  padding: '20px',
+                  fontFamily: (jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter').includes(',') ? jadwalSettingsDraft.jadwal_pdf_font_family : `'${jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter'}', 'Inter', sans-serif`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}>
+                  {/* A4 Preview Wrapper */}
+                  <div style={{ width: '100%', maxWidth: '480px', boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      aspectRatio: '210 / 297',
+                      width: '100%',
+                      border: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                      borderRadius: '4px',
+                          background: jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff',
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}>
+                      {/* Background Image Layer */}
+                      {jadwalSettingsDraft.jadwal_pdf_background_url && (
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundImage: `url(${jadwalSettingsDraft.jadwal_pdf_background_url})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          opacity: jadwalSettingsDraft.jadwal_pdf_background_opacity ?? 1,
+                          pointerEvents: 'none',
+                        }} />
+                      )}
+                      
+                      {/* Content */}
+                      <div style={{
+                        position: 'relative',
+                        zIndex: 1,
+                        padding: 'clamp(10px, 3.5%, 24px)',
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}>
+                        {/* Header */}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          borderBottom: `2px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`,
+                          paddingBottom: 'clamp(6px, 2.5%, 14px)',
+                          marginBottom: 'clamp(8px, 2.5%, 16px)',
+                        }}>
+                          <div>
+                            <div style={{ fontSize: 'clamp(0.55rem, 2.2vw, 0.95rem)', fontWeight: 800, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', letterSpacing: '0.5px' }}>
+                              {jadwalSettingsDraft.jadwal_pdf_title || 'MAUZE TAHFEEZ ATFAL'}
+                            </div>
+                            <div style={{ fontSize: 'clamp(0.4rem, 1.5vw, 0.65rem)', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 600, marginTop: '2px' }}>
+                              {jadwalSettingsDraft.jadwal_pdf_subtitle || 'Weekly Quran Jadwal'}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1.5vw, 10px)' }}>
+                            {jadwalSettingsDraft.jadwal_pdf_logo_url && (
+                              <img src={jadwalSettingsDraft.jadwal_pdf_logo_url} alt="Logo" style={{ height: 'clamp(20px, 6vw, 45px)', width: 'auto', objectFit: 'contain' }} />
+                            )}
+                            <div style={{ fontSize: 'clamp(0.35rem, 1.2vw, 0.55rem)', color: '#888', textAlign: 'right', lineHeight: 1.3 }}>
+                              <div>Generated on</div>
+                              <div style={{ fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{new Date().toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Student Info Badge */}
+                        <div style={{
+                          background: `rgba(212, 175, 55, 0.05)`,
+                          border: `1px solid rgba(212, 175, 55, 0.2)`,
+                          borderRadius: 'clamp(4px, 1.5vw, 8px)',
+                          padding: 'clamp(5px, 2%, 12px) clamp(8px, 2.5%, 16px)',
+                          marginBottom: 'clamp(8px, 2.5%, 16px)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}>
+                          <div>
+                            <div style={{ fontSize: 'clamp(0.3rem, 1.2vw, 0.5rem)', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>STUDENT NAME</div>
+                            <div style={{ fontSize: 'clamp(0.45rem, 2vw, 0.8rem)', color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', fontWeight: 800, marginTop: '1px' }}>Abdullah Ahmad</div>
+                          </div>
+                          <div style={{
+                            fontSize: 'clamp(0.35rem, 1.3vw, 0.6rem)',
+                            fontWeight: 700,
+                            color: '#ffffff',
+                            background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037',
+                            padding: 'clamp(2px, 0.8vw, 6px) clamp(6px, 2vw, 14px)',
+                            borderRadius: 'clamp(6px, 2vw, 14px)',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {jadwalSettingsDraft.jadwal_pdf_hifz_program || 'Hifz Program'}
+                          </div>
+                        </div>
+
+                        {/* Mini Table */}
+                        <div style={{ overflow: 'hidden', borderRadius: 'clamp(3px, 1vw, 6px)', border: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'clamp(0.35rem, 1.3vw, 0.6rem)' }}>
+                            <thead>
+                              <tr style={{ background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#ffffff' }}>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(4px, 1.5vw, 10px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'left', fontWeight: 700, textTransform: 'uppercase' }}>DAYS</th>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(2px, 1vw, 6px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 1</th>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(2px, 1vw, 6px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>MUR 2</th>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(2px, 1vw, 6px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JADEED</th>
+                                <th style={{ padding: 'clamp(3px, 1.2vw, 8px) clamp(2px, 1vw, 6px)', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>JUZHALI</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {[
+                                { day: 'MONDAY', cells: ['1-5', '6-10', '1-3', '1-8'] },
+                                { day: 'TUESDAY', cells: ['11-15', '16-20', '4-6', '9-16'] },
+                                { day: 'WEDNESDAY', cells: ['21-25', '26-30', '7-9', '17-24'] },
+                              ].map((row, idx) => (
+                                <tr key={row.day} style={{ background: idx % 2 === 0 ? (jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff') : `${jadwalSettingsDraft.jadwal_pdf_background_color || '#ffffff'}f2` }}>
+                                  <td style={{ padding: 'clamp(3px, 1vw, 8px) clamp(4px, 1.5vw, 10px)', borderRight: `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, borderBottom: idx < 2 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', fontWeight: 700, color: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037' }}>{row.day}</td>
+                                  {row.cells.map((cell, ci) => (
+                                    <td key={ci} style={{ padding: 'clamp(3px, 1vw, 8px) clamp(2px, 0.8vw, 6px)', borderRight: ci < 4 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', borderBottom: idx < 2 ? `1px solid ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}` : 'none', textAlign: 'center', color: '#333' }}>{cell}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Spacer to push footer down */}
+                        <div style={{ flex: 1 }} />
+
+                        {/* Footer */}
+                        <div style={{ marginTop: 'clamp(6px, 2%, 14px)', borderTop: `1px dashed ${jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37'}`, paddingTop: 'clamp(4px, 1.5%, 10px)', textAlign: 'center' }}>
+                          <div style={{ fontSize: 'clamp(0.3rem, 1.2vw, 0.5rem)', color: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', fontStyle: 'italic', fontWeight: 600 }}>
+                            "And We have indeed made the Quran easy to understand and remember..."
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '14px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: jadwalSettingsDraft.jadwal_pdf_primary_color || '#5d4037', color: '#fff' }}>
+                        Primary
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: jadwalSettingsDraft.jadwal_pdf_accent_color || '#d4af37', color: '#2c1e11' }}>
+                        Accent
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: jadwalSettingsDraft.jadwal_pdf_background_color || '#fff', border: '1px solid #ddd', color: '#666' }}>
+                        Background
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: '#f0f0f0', color: '#555' }}>
+                        {(jadwalSettingsDraft.jadwal_pdf_font_family || 'Inter').replace(/'/g, '')}
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', padding: '3px 10px', borderRadius: '6px', background: '#e8f0fe', color: '#1a56db' }}>
+                        Opacity: {Math.round((jadwalSettingsDraft.jadwal_pdf_background_opacity ?? 1) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="hint-text" style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.75rem' }}>
+                    Preview updates in real-time as you change settings above. Save to apply permanently.
+                  </p>
+                </div>
+              </section>
+            </div>
+          ) : null}
+          {activePage === "Global Settings" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <Settings size={18} />
+                  <h3>Report Card Visibility</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = {
+                    reports_live: formData.get("reports_live") === "true",
+                    live_at: formData.get("live_at") ? new Date(formData.get("live_at")).toISOString() : null,                  };
+                  saveReportSettings(updates, { notifyLive: true });
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Parent Access Mode</span>
+                      <select name="reports_live" defaultValue={String(reportSettingsObject?.reports_live ?? true)} className="premium-select">
+                        <option value="true">Live (Visible to Parents)</option>
+                        <option value="false">Hidden (Maintenance Mode)</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Schedule Action Time</span>
+                      <input 
+                        type="datetime-local" 
+                        name="live_at" 
+                        defaultValue={reportSettingsObject?.live_at ? new Date(new Date(reportSettingsObject.live_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                        className="premium-input"
+                      />
+                    </label>
+                  </div>
+                  <p className="hint-text" style={{ marginBottom: '20px' }}>
+                    If "Live" is selected, the time schedules when the report will become visible. If "Hidden" is selected, the time schedules when the report will be hidden.
+                  </p>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
+                    Save Global Settings
+                  </button>
+                </form>
+              </section>
+
+              {/* WhatsApp Integration Configuration Section */}
+              <section className="form-card card-appear" style={{ marginTop: '20px' }}>
+                <div className="card-headline">
+                  <MessageCircle size={18} />
+                  <h3>WhatsApp Integration</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = {
+                    enabled: formData.get("wa_enabled") === "true",
+                    provider: formData.get("wa_provider"),
+                    api_url: formData.get("wa_api_url"),
+                    api_token: formData.get("wa_api_token"),
+                    account_sid: formData.get("wa_account_sid"),
+                    from_number: formData.get("wa_from_number"),
+                    message_template: formData.get("wa_message_template")
+                  };
+                  onUpdateWhatsappConfig(updates);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable WhatsApp Notifications</span>
+                      <select name="wa_enabled" defaultValue={String(whatsappConfig?.enabled ?? false)} className="premium-select">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>WhatsApp Provider</span>
+                      <select name="wa_provider" defaultValue={whatsappConfig?.provider ?? "none"} className="premium-select">
+                        <option value="none">None / Disabled</option>
+                        <option value="mock">Simulated / Testing Mode (Mock)</option>
+                        <option value="custom">Custom HTTP Gateway</option>
+                        <option value="twilio">Twilio API</option>
+                        <option value="meta">Meta Cloud API</option>
+                      </select>
+                    </label>
+                  </div>
+                  
+                  <div className="form-grid">
+                    <label>
+                      <span>API URL (Custom Gateway only)</span>
+                      <input name="wa_api_url" type="text" defaultValue={whatsappConfig?.api_url || ""} placeholder="https://api.ultramsg.com/instanceXXXX/messages/chat" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>API Token / Auth Token / Access Token</span>
+                      <input name="wa_api_token" type="password" defaultValue={whatsappConfig?.api_token || ""} placeholder="Your secret token..." className="premium-input" />
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      <span>Account SID (Twilio only)</span>
+                      <input name="wa_account_sid" type="text" defaultValue={whatsappConfig?.account_sid || ""} placeholder="ACxxxxxxxxxxxxxx" className="premium-input" />
+                    </label>
+                    <label>
+                      <span>From Number / Phone ID (Twilio/Meta/Custom)</span>
+                      <input name="wa_from_number" type="text" defaultValue={whatsappConfig?.from_number || ""} placeholder="Meta Phone Number ID or sender number" className="premium-input" />
+                    </label>
+                  </div>
+
+                  <label>
+                    <span>Message Template</span>
+                    <textarea 
+                      name="wa_message_template" 
+                      rows={3} 
+                      defaultValue={whatsappConfig?.message_template || 'Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/'} 
+                      className="premium-input"
+                      style={{ resize: 'vertical' }}
+                    />
+                    <span className="hint-text">Placeholders: <code>{"{{child_name}}"}</code>, <code>{"{{group_name}}"}</code>, <code>{"{{juz}}"}</code>, <code>{"{{surat}}"}</code></span>
+                  </label>
+
+                  <button type="submit" className="action-button premium" style={{ marginTop: '10px' }}>
+                    Save WhatsApp Settings
+                  </button>
+                </form>
+              </section>
+
+              <section className="data-card card-appear">
+                <div className="card-headline">
+                  <Info size={18} />
+                  <h3>Current Status</h3>
+                </div>
+                <div className="status-indicator-box" style={{ padding: '20px', textAlign: 'center', background: 'var(--brown-light)', borderRadius: '16px' }}>
+                   <div className={`status-dot-large ${reportSettingsObject?.reports_live !== false ? 'online' : 'offline'}`} />
+                   <h4 style={{ margin: '15px 0 5px' }}>Reports are currently {reportSettingsObject?.reports_live !== false ? 'LIVE' : 'HIDDEN'}</h4>
+                   {reportSettingsObject?.live_at && (
+                     <p style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                       Scheduled for: {new Date(reportSettingsObject.live_at).toLocaleString()}
+                     </p>
+                   )}
+                   <p style={{ fontSize: '0.85rem', marginTop: '6px', color: 'var(--soft-brown)' }}>
+                      Auto lock: {reportSettingsObject?.auto_lock_enabled === false ? 'DISABLED' : `${reportSettingsObject?.auto_unlock_day || "Friday"} ${reportSettingsObject?.auto_unlock_time || "16:30"} â†’ ${reportSettingsObject?.auto_lock_day || "Saturday"} ${reportSettingsObject?.auto_lock_time || "00:00"}`}
+                   </p>
+                </div>
+                <div style={{ marginTop: '20px' }}>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+                    Control exactly when parents can see the weekly progress cards. You can fill results throughout the week and only set them to "Live" once all markings are complete.
+                  </p>
+                </div>
+              </section>
+            </div>
+          ) : null}
+        </section>
+
+
+        {/* WhatsApp Sending Progress Modal */}
+        {sendingWhatsApp && (
+          <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)' }}>
+            <div className="premium-modal-card card-appear" style={{ maxWidth: '600px', width: '90%', padding: '24px', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: '16px', boxShadow: 'var(--premium-shadow)', color: 'var(--text-main)' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--deep-brown)', margin: '0 0 16px' }}>
+                <MessageCircle style={{ color: 'var(--primary-gold)' }} />
+                Sending WhatsApp Notifications
+              </h3>
+              
+              <div className="progress-bar-container" style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
+                <div 
+                  className="progress-bar-fill" 
+                  style={{ 
+                    width: `${(whatsAppProgress.current / Math.max(whatsAppProgress.total, 1)) * 100}%`, 
+                    height: '100%', 
+                    background: 'var(--primary-gold)',
+                    transition: 'width 0.3s ease'
+                  }} 
+                />
+              </div>
+              
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Processing: <strong>{whatsAppProgress.current}</strong> of <strong>{whatsAppProgress.total}</strong> parents
+              </p>
+              
+              <div 
+                className="log-console" 
+                style={{ 
+                  height: '200px', 
+                  overflowY: 'auto', 
+                  background: 'rgba(0,0,0,0.03)', 
+                  border: '1px solid rgba(0,0,0,0.05)', 
+                  borderRadius: '8px', 
+                  padding: '12px', 
+                  fontSize: '0.8rem', 
+                  fontFamily: 'monospace',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}
+              >
+                {whatsAppLogs.map((log, idx) => (
+                  <div key={idx} style={{ 
+                    color: log.type === 'success' ? '#2e7d32' : log.type === 'error' ? '#c62828' : log.type === 'sending' ? '#1565c0' : 'var(--text-main)' 
+                  }}>
+                    [{log.time}] {log.text}
+                  </div>
+                ))}
+        {/* Email Sending Progress Modal */}
+        {sendingEmail && (
+          <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)' }}>
+            <div className="premium-card" style={{ width: '90%', maxWidth: '560px', padding: '24px', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>
+                  Sending Email Notifications
+                </h3>
+                {!sendingEmail && (
+                  <button className="panel-close-btn" onClick={() => { onSetSendingEmail(false); onSetEmailLogs([]); }}>
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+              <div className="progress-bar-container" style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
+                <div 
+                  className="progress-bar-fill" 
+                  style={{ 
+                    width: `${(emailProgress.current / Math.max(emailProgress.total, 1)) * 100}%`, 
+                    height: '100%', 
+                    background: 'linear-gradient(90deg, #007bff, #6610f2)',
+                    transition: 'width 0.3s ease'
+                  }} 
+                />
+              </div>
+              
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                {emailProgress.current} / {emailProgress.total} sent
+              </p>
+              
+              <div className="log-console" style={{ flex: 1, overflow: 'auto', background: '#faf8f4', borderRadius: '8px', padding: '12px', fontSize: '0.85rem', fontFamily: 'monospace', minHeight: '150px' }}>
+                {emailLogs.length === 0 && (
+                  <p style={{ color: '#999' }}>Starting...</p>
+                )}
+                {emailLogs.map((log, i) => (
+                  <div key={i} style={{ 
+                    color: log.type === 'error' ? '#e71d36' : log.type === 'success' ? '#007bff' : log.type === 'sending' ? '#3d2b1f' : '#999', 
+                    marginBottom: '4px', 
+                    lineHeight: 1.4 
+                  }}>
+                    <span style={{ color: '#bbb' }}>[{log.time}]</span> {log.text}
+                  </div>
+                ))}
+              </div>
+              
+              {!sendingEmail && emailLogs.length > 0 && (
+                <button className="action-button" style={{ marginTop: '12px', background: 'var(--deep-brown)', color: 'white' }} onClick={() => { setSendingEmail(false); setEmailLogs([]); }}>
+                  Done
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button 
+                  className="action-button" 
+                  disabled={whatsAppProgress.current < whatsAppProgress.total}
+                  onClick={() => {
+                    setSendingWhatsApp(false);
+                    setWhatsAppLogs([]);
+                  }}
+                >
+                  Close / Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function TeacherPortal({
+  actionMessage,
+  activePage,
+  menuOpen,
+  onLogout,
+  onTeacherFormChange,
+  onTeacherGroupFilterChange,
+  onTeacherResultSubmit,
+  onRoleChange,
+  setActivePage,
+  onSearchSelect,
+  setMenuOpen,
+  teacherData,
+  teacherForms,
+  user,
+  portalAccess,
+  monthlySalary,
+  notifications,
+  loadPortalData,
+  portalRole,
+  setSelectedAnnouncement,
+  reportSettings = [],
+  jadwalSettings = [],
+  parentViews = [],
+  schoolData,
+  teacherProfiles = [],
+  selectedNotification,
+  setSelectedNotification,
+  activeStudentId,
+  setActiveStudentId,
+  dismissedNotifs = [],
+  dismissedAnnounces = [],
+  dismissedHomeNotifs = [],
+  onDismissNotif,
+  onDismissHomeNotif,
+  onClearAllNotifs,
+  onDismissAnnounce,
+  onClearAllAnnounces,
+    autoSaveTimerRef,
+  performAutoSaveRef,
+  currentStudentIdRef,
+  saveStatus,
+  setSaveStatus,
+  saveErrorDetails,
+  setSaveErrorDetails,
+onShowAction,
+  isDarkMode,
+  setIsDarkMode,
+  appTheme,
+  setAppTheme,
+}) {
+  const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
+  const backdropMouseDownRef = useRef(false);
+  const notificationOpenedAtRef = useRef(0);
+
+  const openNotificationDetail = (event, notification) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    event?.nativeEvent?.stopImmediatePropagation?.();
+    if (!notification) return;
+    notificationOpenedAtRef.current = Date.now();
+    setSelectedNotification({ ...notification });
+  };
+
+  const closeNotificationDetail = () => {
+    setSelectedNotification(null);
+  };
+
+  const handleNotificationBackdropPointerDown = (event) => {
+    backdropMouseDownRef.current = event.target === event.currentTarget;
+  };
+
+  const handleNotificationBackdropClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.target !== event.currentTarget) return;
+    if (!backdropMouseDownRef.current) return;
+    if (Date.now() - notificationOpenedAtRef.current < 350) return;
+    closeNotificationDetail();
+  };
+
+  const reportSettingsObject = getReportSettingsObject(reportSettings);
+  const canTeacherFillProgress = reportSettingsObject?.allow_teacher_progress_entry !== false;
+  const selectedStudent =
+    filteredStudents.find(
+      (student) => student.allIds.includes(String(teacherForms.result.student_id))
+    ) || filteredStudents[0] || null;
+
+  // Determine if student is in Juz 26-30 range (show Surah tracking)
+
+  const selectedResultRecord = useMemo(() => {
+    const results = (schoolData.weeklyResults || []).filter(
+      (result) => String(result.student_id) === String(teacherForms.result.student_id)
+    );
+    return results.length > 0
+      ? results.sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0))[0]
+      : null;
+  }, [schoolData.weeklyResults, teacherForms.result.student_id]);
+  const selectedResultLocked = isTeacherResultLocked(reportSettingsObject);
+  const canEditCurrentResult = canTeacherFillProgress && !selectedResultLocked;
+
+  const liveResult = useMemo(() => {
+    if (!selectedStudent) return null;
+    const form = teacherForms.result;
+    const total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(form[f]), 0);
+
+    return {
+      ...selectedStudent.latestResult,
+      ...form,
+      total_score
+    };
+  }, [selectedStudent, teacherForms.result]);
+
+  const [isGeneratingTeacherPDF, setIsGeneratingTeacherPDF] = useState(false);
+  const [teacherDownloadPopup, setTeacherDownloadPopup] = useState(null);
+  const handleTeacherDownloadReport = async () => {
+    if (!selectedStudent) return;
+    setIsGeneratingTeacherPDF(true);
+    if (onShowAction) onShowAction("success", "Preparing report PDF...");
+
+    let element = null;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 400));
+      element = document.getElementById("teacher-capture-content");
+      if (element) break;
+    }
+
+    if (element) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadCustomFontsForCanvas();
+
+        const [html2canvas, jsPDF] = await Promise.all([
+          loadHtml2Canvas(),
+          loadJsPDF(),
+        ]);
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          onclone: async (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent = FONT_FACE_CSS;
+            clonedDoc.head.appendChild(style);
+            const el = clonedDoc.getElementById('teacher-capture-content');
+            if (el) { el.style.width = '794px'; el.style.boxSizing = 'border-box'; if (el.parentElement) el.parentElement.style.width = '794px'; }
+            if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+              await Promise.race([
+                clonedDoc.fonts.ready,
+                new Promise(resolve => setTimeout(resolve, 3000)),
+              ]);
+            }
+          },
+        });
+        
+        const imgData = canvas.toDataURL("image/jpeg", 0.85);
+        if (imgData.length < 5000) throw new Error("Capture failed");
+
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        let imgWidth = pageWidth;
+        let imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+        if (imgHeight > pageHeight) {
+          imgWidth = (imgWidth * pageHeight) / imgHeight;
+          imgHeight = pageHeight;
+        }
+        const xOffset = (pageWidth - imgWidth) / 2;
+        pdf.addImage(imgData, "JPEG", xOffset, 0, imgWidth, imgHeight, undefined, 'FAST');
+        const pdfBlob = pdf.output("blob");
+        const dlResult = await downloadFile(pdfBlob, `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
+        if (dlResult?.type === "native") {
+          setTeacherDownloadPopup({ filePath: dlResult.filePath, fileName: `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf` });
+        } else {
+          if (onShowAction) onShowAction("success", "Report downloaded successfully!");
+        }
+      } catch (err) {
+        console.error("PDF Error:", err);
+        if (onShowAction) onShowAction("error", "Failed to generate PDF.");
+      }
+    } else {
+      if (onShowAction) onShowAction("error", "Capture element not found.");
+    }
+
+    setIsGeneratingTeacherPDF(false);
+  };
+
+  const performAutoSaveTeacherResult = useCallback(async () => {
+    if (!canTeacherFillProgress) return;
+    if (isTeacherResultLocked(reportSettingsObject)) return;
+    if (String(teacherForms.result.student_id) !== String(currentStudentIdRef.current)) return;
+
+    const sId = teacherForms.result.student_id;
+    if (!sId) return;
+    const numericId = sId && !isNaN(sId) ? Number(sId) : sId;
+
+    const f = teacherForms.result;
+    const sMurajazah = toNumber(f.murajazah);
+    const sJuzHali = toNumber(f.juz_hali);
+    const sTakhteet = toNumber(f.takhteet);
+    const sJadeed = toNumber(f.jadeed);
+    const payload = {
+      week_date: f.week_date || getToday(),
+      student_id: numericId,
+      attendance_count: toNumber(f.attendance_count),
+      total_jadeed_pages: f.total_jadeed_pages ?? null,
+      murajazah: sMurajazah,
+      juz_hali: sJuzHali,
+      takhteet: sTakhteet,
+      jadeed: sJadeed,
+      wusool_juz: f.wusool_juz || null,
+      wusool_page: f.wusool_page || null,
+      wusool_surah: f.wusool_surah ?? "",
+      next_week_juz: f.next_week_juz || null,
+      next_week_page: f.next_week_page || null,
+      next_week_surah: f.next_week_surah ?? "",
+      istifadah_juz: f.istifadah_juz || null,
+      istifadah_page: f.istifadah_page || null,
+      istifadah_surah: f.istifadah_surah ?? "",
+      matrookah: f.matrookah || null,
+      daeefah: f.daeefah || null,
+      attendance_note: f.attendance_note || null,
+    };
+
+    if (isTeacherResultLocked(reportSettingsObject)) return;
+
+    setSaveStatus("saving");
+
+    const { data, error } = await supabase
+      .from("weekly_results")
+      .upsert([payload], { onConflict: "student_id,week_date" })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Auto-save error:", error);
+      setSaveErrorDetails("[" + (error.code || "UNKNOWN") + "] " + (error.message || "Unknown error") + " " + (error.details || ""));
+      setSaveStatus("error");
+      setTimeout(() => { setSaveErrorDetails(""); }, 8000);
+      return;
+    }
+
+    setSaveStatus("saved");
+    setTimeout(() => setSaveStatus(""), 2000);
+
+    // Auto-update child's current Juz in child_profiles when wusool_juz is saved
+    const newWusoolJuz = data?.wusool_juz || teacherForms.result.wusool_juz;
+    if (newWusoolJuz && String(newWusoolJuz).trim() !== "" && numericId) {
+      const juzNum = parseInt(newWusoolJuz, 10);
+      if (!isNaN(juzNum) && juzNum >= 1 && juzNum <= 30) {
+        supabase
+          .from("child_profiles")
+          .update({ juz: String(juzNum) })
+          .eq("student_id", numericId)
+          .then(({ error: juzError }) => {
+            if (juzError) {
+              console.warn("Failed to update child juz:", juzError.message);
+            } else {
+              // Also update local state so parent portal reflects it immediately
+              setSchoolData(prev => ({
+                ...prev,
+                students: prev.students.map(s =>
+                  String(s.student_id) === String(numericId)
+                    ? { ...s, juz: String(juzNum) }
+                    : s
+                )
+              }));
+            }
+          });
+      }
+    }
+
+    setSchoolData((current) => {
+      const prevStudent = current.students.find(s => String(s.student_id) === String(data.student_id));
+      const prevRank = prevStudent?.latestResult?.computedRank;
+      const nextWeeklyResults = [
+        data,
+        ...current.weeklyResults.filter((result) =>
+          !(
+            String(result.student_id) === String(data.student_id) &&
+            String(result.week_date) === String(data.week_date)
+          )
+        ),
+      ];
+      const refreshedStudents = current.students.map((student) =>
+        String(student.student_id) === String(data.student_id)
+          ? { ...student, latestResult: prevRank ? { ...data, computedRank: prevRank } : data }
+          : student
+      );
+      return {
+        ...current,
+        weeklyResults: nextWeeklyResults,
+        students: refreshedStudents,
+      };
+    });
+  }, [canTeacherFillProgress, reportSettingsObject, teacherForms.result, schoolData]);
+
+  performAutoSaveRef.current = performAutoSaveTeacherResult;
+
+  // Track current student for stale-guard in auto-save
+  if (teacherForms.result.student_id) {
+    currentStudentIdRef.current = teacherForms.result.student_id;
+  }
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, []);
+
+
+  const parentViewedCount = useMemo(() => {
+    const visibleStudentIds = new Set(
+      filteredStudents.flatMap((student) =>
+        [student.student_id, ...(student.allIds || [])]
+          .filter(Boolean)
+          .map((id) => String(id))
+      )
+    );
+
+    return (parentViews || []).filter(
+      (view) => view?.viewed && visibleStudentIds.has(String(view.student_id))
+    ).length;
+  }, [filteredStudents, parentViews]);
+
+  const recentMarhalaPostPreview = (
+    <Suspense fallback={null}>
+      <LazyMarhalaPosts
+        role="teacher"
+        students={filteredStudents}
+        onShowAction={onShowAction}
+        maxAgeHours={24}
+        limit={3}
+        hideEmpty
+        homePreview
+        className="mp-home-preview"
+      />
+    </Suspense>
+  );
+
+  return (
+    <div className="admin-shell">
+      <style>{PREMIUM_NOTIFICATION_CSS}</style>
+      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)}></div>}
+      <aside className={`admin-sidebar ${!menuOpen ? 'collapsed' : ''}`}>
+        <div className="sidebar-header">
+          <SidebarHeader
+            photoUrl={teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(teacherIdentity))?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url}
+            name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Teacher"}
+            arabicName={portalAccess?.arabic_name}
+            tag="Teacher Portal"
+          />
+          <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+
+
+        </div>
+        <nav className="sidebar-nav">
+          <p className="sidebar-category management-cat">Workplace</p>
+          {[
+            { id: "My Group", label: "Students", icon: Users },
+            { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
+            { id: "Overview", label: "Performance", icon: Layers3 },
+            { id: "Jadwal", label: "Jadwal", icon: Calendar },
+            { id: "Inbox", label: "Inbox", icon: Bell },
+            { id: "Settings", label: "Settings", icon: Settings },
+          ].map(page => (
+            <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
+              <page.icon size={18} /> {page.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          {getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents').map((role) => (
+            <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
+              <LogOut size={18} /> Switch to {role}
+            </button>
+          ))}
+          <button className="sidebar-link logout-btn" onClick={onLogout}>
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
+      </aside>
+
+      <main className="admin-main">
+        <header className="topbar admin-topbar-dynamic">
+          <div className="admin-header-left">
+            <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+            <h2 className="page-title">{activePage}</h2>
+          </div>
+          {portalAccess.show_salary_card && monthlySalary && (
+            <div className="salary-pill">
+              Estimated: <strong>{monthlySalary.amount?.toFixed(0) || "0"}rs</strong>
+            </div>
+          )}
+          <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
+        </header>
+
+        <section className="admin-content-pad">
+          {(activePage === "My Group" || activePage === "Fill Result" || activePage === "Overview") && (
+             <QuickSearch 
+               pages={[
+                 { label: "Student List", value: "My Group" },
+                 { label: "Mark Progress (Result)", value: "Fill Result" },
+                 { label: "Performance Overview", value: "Overview" },
+                 { label: "Announcements", value: "Announcements" },
+                  { label: "My Profile", value: "Profile" }
+                ]} 
+              onSelect={onSearchSelect} 
+              />
+          )}
+          {actionMessage && (
+            <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+          )}
+
+           {activePage === "Jadwal" && (
+              <Suspense fallback={null}>
+                <LazyJadwalTeacherView 
+                  students={filteredStudents} 
+                  onShowAction={onShowAction} 
+                  onBroadcastNotification={broadcastNotification} 
+                  initialStudentId={activeStudentId}
+                  jadwalSettings={jadwalSettings}
+                  onDownloadComplete={(popup) => setTeacherDownloadPopup(popup)}
+                />
+              </Suspense>
+           )}
+
+          {activePage === "My Group" ? (
+            <div className="portal-content">
+              <div className="portal-stats-strip teacher-stats">
+                {[
+                  { label: "Students", value: filteredStudents.length, sub: "In my group", icon: 'Users', pct: 100 },
+                  { label: "Results", value: `${Math.round((filteredStudents.filter(s => s.latestResult).length / Math.max(filteredStudents.length, 1)) * 100) || 0}%`, sub: "Submitted", icon: 'FileText', pct: Math.round((filteredStudents.filter(s => s.latestResult).length / Math.max(filteredStudents.length, 1)) * 100) || 0 },
+                  { label: "Avg Score", value: filteredStudents.length > 0 ? Math.round(filteredStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / filteredStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: filteredStudents.length > 0 ? Math.min(Math.round(filteredStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / filteredStudents.length), 100) : 0 },
+                  { label: "Parent Views", value: `${parentViewedCount}/${filteredStudents.length || 0}`, sub: "Viewed reports", icon: 'Eye', pct: filteredStudents.length ? Math.round((parentViewedCount / filteredStudents.length) * 100) : 0 },
+                  ...(portalAccess?.show_salary_card && monthlySalary ? [{
+                    label: "Salary", value: `Rs. ${monthlySalary.amount?.toFixed(0) || "0"}`, sub: "This month", icon: 'DollarSign', pct: 100
+                  }] : []),
+                ].map((stat, i) => {
+                  const accentColors = [
+                    { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
+                    { icon: 'var(--deep-brown)', bar: '#3d2b1f', glow: 'rgba(61, 43, 31, 0.12)' },
+                    { icon: '#b8860b', bar: '#b8860b', glow: 'rgba(184, 134, 11, 0.18)' },
+                    { icon: '#8b6d31', bar: '#8b6d31', glow: 'rgba(139, 109, 49, 0.12)' },
+                    { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
+                  ];
+                  const c = accentColors[i % accentColors.length];
+                  const isPct = stat.label === "Results";
+                  const isFrac = stat.label === "Parent Views";
+                  const [numStr, denStr] = isFrac ? String(stat.value).split('/') : [];
+                  return (
+                    <div key={stat.label} className="infographic-card">
+                      <div className="ig-bg-pattern">
+                        {['✦', '◈', '◆', '⬢', '◇'][i % 5]}
+                      </div>
+                      <div className="ig-top-row">
+                        <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
+                          {stat.label === "Students" ? (
+                            <lottie-player
+                              src="/75d381a6-1151-11ee-b2bc-779f96f074bf.json"
+                              background="transparent"
+                              speed="1"
+                              style={{ width: "48px", height: "48px" }}
+                              loop
+                              autoplay
+                            ></lottie-player>
+                          ) : stat.icon === 'Users' && <Users size={18} />}
+                          {stat.icon === 'FileText' && <FileText size={18} />}
+                          {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
+                          {stat.icon === 'Eye' && <Eye size={18} />}
+                          {stat.icon === 'DollarSign' && <DollarSign size={18} />}
+                        </div>
+                        {(isPct || isFrac) && (
+                          <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
+                            {stat.pct >= 50 ? '↑' : '↓'} {stat.pct}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="ig-value">
+                        {isFrac ? (
+                          <>
+                            <span className="ig-count-anim">{numStr}</span>
+                            <span style={{ fontSize: '1rem', opacity: 0.4, margin: '0 2px', color: 'var(--soft-brown)' }}>/</span>
+                            <span style={{ fontSize: '1.2rem', opacity: 0.5, color: 'var(--soft-brown)' }}>{denStr}</span>
+                          </>
+                        ) : (
+                          <span className="ig-count-anim">{stat.value}</span>
+                        )}
+                      </div>
+                      <span className="ig-label">{stat.label}</span>
+                      <span className="ig-sub">{stat.sub}</span>
+                      <div className="ig-bar-track" style={{ background: `rgba(197, 160, 89, 0.12)` }}>
+                        <div className="ig-bar-fill" style={{ width: `${stat.pct}%`, background: `linear-gradient(90deg, ${c.bar}, ${c.bar}dd)`, boxShadow: `0 0 6px ${c.glow}` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {portalAccess?.show_salary_card && monthlySalary && (
+                <section className="data-card salary-callout">
+                  <div className="card-headline">
+                    <Sparkles size={18} />
+                    <h3>Monthly Salary Update</h3>
+                  </div>
+                  <div className="salary-flex">
+                    <div className="salary-item">
+                      <span className="salary-label">Total Minutes</span>
+                      <span className="salary-value">{monthlySalary.totalMinutes}</span>
+                    </div>
+                    <div className="salary-item">
+                      <span className="salary-label">{"Rate - Min"}</span>
+                      <span className="salary-value">â‚¹{monthlySalary.rate}</span>
+                    </div>
+                    <div className="salary-item total-item">
+                      <span className="salary-label">Total Amount</span>
+                      <span className="salary-value highlight">â‚¹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
+                    </div>
+                  </div>
+                  <p className="hint-text">Calculated based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
+                </section>
+              )}
+
+
+
+              {recentMarhalaPostPreview}
+              <PremiumHifzCard user={user} />
+
+              <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
+                <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <Bell size={18} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--deep-brown)' }}>Active Notifications</h3>
+                </div>
+                <div className="announcement-list">
+                  {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
+                    const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
+                    return (
+                      <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', marginBottom: '12px', position: 'relative' }} onClick={(e) => openNotificationDetail(e, news)}>
+                        <button 
+                          className="card-dismiss-btn" 
+                          title="Clear from home" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            onDismissHomeNotif(news.id); 
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                        <div style={{ paddingRight: '48px' }}>
+                          <div className="news-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
+                            <span className="tag update" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--primary-gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                              Alert
+                            </span>
+                            <span className="date" style={{ color: 'var(--text-muted)' }}>{new Date(news.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: 'var(--deep-brown)' }}>{news.title}</h4>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                            {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })() : (
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="student-card-grid">
+                {filteredStudents.map((student) => (
+                  <article key={student.student_id} className="student-card">
+                    <div className="student-card-head">
+                      <StudentAvatar student={student} />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <h3 style={{ margin: 0 }}>{student.name}</h3>
+                        {student.arabic_name && (
+                          <span className="arabic-kanz" style={{ fontSize: '1.1rem', color: 'var(--primary-gold)', marginTop: '2px' }}>{student.arabic_name}</span>
+                        )}
+                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{student.groupName}</p>
+                      </div>
+                    </div>
+                    <div className="pill-row">
+                      <span className="mini-pill">Juz: {student.hifz?.juz || "N-A"}</span>
+                      <span className="mini-pill">Surah: {student.hifz?.surat || "Pending"}</span>
+                    </div>
+                    <p className="student-status-copy">{student.hifzStatus}</p>
+                  </article>
+                ))}
+                {filteredStudents.length === 0 ? (
+                  <div className="empty-state">No children found for this teacher filter.</div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {activePage === "Fill Result" ? (
+            <div className="management-grid two-columns">
+              <section className="form-card">
+                <div className="card-headline">
+                  <BookOpen size={18} />
+                  <h3>Fill Tahfeez Report</h3>
+                </div>
+                {!canTeacherFillProgress && (
+                  <div className="status-banner warning" style={{ marginBottom: "16px" }}>
+                    Admin has disabled teacher progress-card filling in Global Settings.
+                  </div>
+                )}
+                {canTeacherFillProgress && selectedResultLocked && (
+                  <div className="status-banner warning" style={{ marginBottom: "16px" }}>
+                    Progress entry is currently locked. Next open window: {reportSettingsObject?.auto_unlock_day || "Friday"} {reportSettingsObject?.auto_unlock_time || "4:30 PM"}.
+                  </div>
+                )}
+                {canTeacherFillProgress && !selectedResultLocked && (
+                  <div className="status-banner success" style={{ marginBottom: "16px" }}>
+                    Progress entry is open until {reportSettingsObject?.auto_lock_day || "Saturday"} {reportSettingsObject?.auto_lock_time || "12:00 AM"}.
+                  </div>
+                )}
+                <div className="stack-form">
+                  <div className="form-grid">
+                    <label>
+                      <span>Child</span>
+                      <select
+                        name="student_id"
+                        value={teacherForms.result.student_id}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                        required
+                      >
+                        <option value="">Select child</option>
+                        {filteredStudents.map((student) => {
+                          const existingResult = (schoolData.weeklyResults || []).find(r =>
+                            String(r.student_id) === String(student.student_id) &&
+                            String(r.week_date) === String(teacherForms.result.week_date)
+                          );
+                          return (
+                            <option key={student.student_id} value={student.student_id}>
+                              {student.name}{existingResult ? " - âœ“ Saved" : ""} - {student.groupName}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+
+                    
+                  </div>
+
+                  <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
+                  <div className="form-grid four-up">
+                    <label>
+                      <span>Murajah</span>
+                      <input
+                        type="number"
+                        min="0"
+                        name="murajazah"
+                        step="0.1"
+                        value={teacherForms.result.murajazah}
+                        onChange={onTeacherFormChange}
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      <span>Juz Hali</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        name="juz_hali"
+                        value={teacherForms.result.juz_hali}
+                        onChange={onTeacherFormChange}
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      <span>Takhteet</span>
+                      <input
+                        type="number"
+                        min="0"
+                        name="takhteet"
+                        step="0.1"
+                        value={teacherForms.result.takhteet}
+                        onChange={onTeacherFormChange}
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      <span>Jadeed</span>
+                      <input
+                        type="number"
+                        min="0"
+                        name="jadeed"
+                        value={teacherForms.result.jadeed}
+                        onChange={onTeacherFormChange}
+                        required
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+
+
+                    <label>
+                      <span>Total Jadeed Pages</span>
+                      <input
+                        type="text"
+                        name="total_jadeed_pages"
+                        value={teacherForms.result.total_jadeed_pages ?? ""}
+                        onChange={onTeacherFormChange}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                    <label>
+                      <span>Wusool Juz</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="wusool_juz"
+                        value={teacherForms.result.wusool_juz}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Juz --</option>
+                        {Array.from({ length: 30 }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Wusool Surah</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="wusool_surah"
+                        value={teacherForms.result.wusool_surah}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
+                      >
+                        <option value="">-- Select Surah --</option>
+                        {SURAH_NAMES_AR.map((name, i) => (
+                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Wusool Page</span>
+                      <input
+                        type="text"
+                        name="wusool_page"
+                        value={teacherForms.result.wusool_page}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      <span>Matrookah <span className="arabic-kanz">متروكة</span></span>
+                      <input
+                        type="text"
+                        name="matrookah"
+                        value={teacherForms.result.matrookah ?? ""}
+                        onChange={onTeacherFormChange}
+                        placeholder="e.g. 1, 2, 5"
+                      />
+                    </label>
+                    <label>
+                      <span>Daeefah <span className="arabic-kanz">ضعيفة</span></span>
+                      <input
+                        type="text"
+                        name="daeefah"
+                        value={teacherForms.result.daeefah ?? ""}
+                        onChange={onTeacherFormChange}
+                        placeholder="e.g. 3, 7"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                    <label>
+                      <span>Next Week Juz</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="next_week_juz"
+                        value={teacherForms.result.next_week_juz}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Juz --</option>
+                        {Array.from({ length: 30 }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Next Week Surah</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="next_week_surah"
+                        value={teacherForms.result.next_week_surah}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
+                      >
+                        <option value="">-- Select Surah --</option>
+                        {SURAH_NAMES_AR.map((name, i) => (
+                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Next Week Page</span>
+                      <input
+                        type="text"
+                        name="next_week_page"
+                        value={teacherForms.result.next_week_page}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                    <label>
+                      <span>Takhteet Juz</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="istifadah_juz"
+                        value={teacherForms.result.istifadah_juz}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      >
+                        <option value="">-- Select Juz --</option>
+                        {Array.from({ length: 30 }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Takhteet Surah</span>
+                      <select
+                        className="premium-select kanz-font"
+                        name="istifadah_surah"
+                        value={teacherForms.result.istifadah_surah}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
+                      >
+                        <option value="">-- Select Surah --</option>
+                        {SURAH_NAMES_AR.map((name, i) => (
+                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Takhteet Page</span>
+                      <input
+                        type="text"
+                        name="istifadah_page"
+                        value={teacherForms.result.istifadah_page}
+                        onChange={onTeacherFormChange}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      <span>Attendance Count</span>
+                      <input
+                        type="number"
+                        min="0"
+                        name="attendance_count"
+                        value={teacherForms.result.attendance_count}
+                        onChange={onTeacherFormChange}
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    <span>{"Attendance-Performance Note"}</span>
+                    <textarea
+                      name="attendance_note"
+                      rows="3"
+                      value={teacherForms.result.attendance_note ?? ""}
+                      onChange={onTeacherFormChange}
+                      placeholder="Behaviour, attendance, or memorization note"
+                    />
+                  </label>
+
+                  </fieldset>
+                  <div className="auto-save-status">
+                    {saveStatus === "validation" && <span className="save-status-validation">Fill all 4 score fields first</span>}
+                    {saveStatus === "saving" && <span className="save-status-saving">Saving...</span>}
+                    {saveStatus === "saved" && <span className="save-status-saved">Saved</span>}
+                    {saveStatus === "error" && (
+                      <div className="save-status-error">
+                        <span>Save failed</span>
+                        {saveErrorDetails && <small style={{ display: "block", fontSize: "10px", marginTop: "4px", opacity: 0.8 }}>{saveErrorDetails}</small>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <section className="data-card">
+                <div className="card-headline">
+                  <Sparkles size={18} />
+                  <h3>Selected Child Preview</h3>
+                </div>
+                {selectedStudent ? (
+                  <>
+                    <div className="student-profile-hero">
+                      <StudentAvatar student={selectedStudent} />
+                      <div>
+                        <h3>{selectedStudent.name}</h3>
+                        <p>
+                          {selectedStudent.groupName} · {selectedStudent.teacherName}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                      <button
+                        className="action-button premium"
+                        onClick={handleTeacherDownloadReport}
+                        disabled={isGeneratingTeacherPDF}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontSize: '13px' }}
+                      >
+                        {isGeneratingTeacherPDF ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Download size={16} />
+                        )}
+                        {isGeneratingTeacherPDF ? "Generating PDF..." : "Download Report PDF"}
+                      </button>
+                    </div>
+                    <div>
+                      <TahfeezReportCard
+                        student={selectedStudent}
+                        weeklyResult={liveResult}
+                        settings={reportSettingsObject}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="empty-state">
+                    Choose a child from your group to fill a result.
+                  </div>
+                )}
+              </section>
+
+              {/* Hidden capture zone for Teacher PDF download */}
+              <div 
+                id="teacher-capture-zone"
+                style={{ 
+                  position: 'fixed', 
+                  left: '-10000px', 
+                  top: '0', 
+                  width: '850px', 
+                  zIndex: -1000, 
+                  background: 'white',
+                  overflow: 'hidden',
+                  height: isGeneratingTeacherPDF ? 'auto' : '1px',
+                  visibility: isGeneratingTeacherPDF ? 'visible' : 'hidden'
+                }}
+              >
+                {isGeneratingTeacherPDF && (
+                  <div id="teacher-capture-content" style={{ padding: '40px', background: 'white' }}>
+                    <TahfeezReportCard
+                      student={selectedStudent}
+                      weeklyResult={liveResult}
+                      settings={reportSettingsObject}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {activePage === "Overview" ? (
+            <div className="management-grid">
+              <div className="data-card">
+                <div className="card-headline">
+                  <Sparkles size={18} />
+                  <h3>Your Students Performance</h3>
+                </div>
+                <div className="record-stack">
+                  {filteredStudents.map((student) => (
+                    <article key={student.student_id} className="record-card">
+                      <div className="card-primary-info">
+                        <strong>{student.name}</strong>
+                        <span>{student.hifzStatus}</span>
+                      </div>
+                      <div className="performance-pill">
+                        Latest Result: {student.latestResult?.weeklyRank || student.latestResult?.computedRank || "pending"}
+                      </div>
+                      <Suspense fallback={null}>
+                        <LazyTakhteetProgress weeklyResult={student.latestResult} />
+                      </Suspense>
+                    </article>
+                  ))}
+                  {filteredStudents.length === 0 && (
+                    <div className="empty-state">No students found in your group.</div>
+                  )}
+                </div>
+              </div>
+
+              {portalAccess?.show_salary_card && (
+                <div className="data-card">
+                  <div className="card-headline">
+                    <Clock size={18} />
+                    <h3>Your Attendance & Salary</h3>
+                  </div>
+                  <div className="record-stack">
+                    {teacherData.attendances
+                      .filter(attendance => normalizeText(attendance.teacher_name) === normalizeText(teacherIdentity))
+                      .sort((a, b) => new Date(b.attendance_date) - new Date(a.attendance_date))
+                      .slice(0, 10)
+                      .map((attendance, index) => {
+                        const teacherProfile = (teacherProfiles || []).find(p =>
+                          normalizeText(p.full_name) === normalizeText(teacherIdentity)
+                        );
+                        const rate = toNumber(teacherProfile?.salary_per_minute || portalAccess.salary_per_minute || 2.3);
+                        const dailySalary = toNumber(attendance.minutes_present) * rate;
+
+                        return (
+                          <article key={`${attendance.attendance_date}-${index}`} className="record-card">
+                            <div className="card-primary-info">
+                              <strong>{new Date(attendance.attendance_date).toLocaleDateString()}</strong>
+                              <span className={`status-badge ${attendance.status?.toLowerCase()}`}>
+                                {attendance.status || "Not Marked"}
+                              </span>
+                            </div>
+                            <div className="attendance-details">
+                              <div className="attendance-info">
+                                <span>Minutes: {attendance.minutes_present}</span>
+                                <span className="salary-amount">Rs. {dailySalary.toFixed(2)}</span>
+                              </div>
+                              {attendance.note && (
+                                <span className="attendance-note">{attendance.note}</span>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    {teacherData.attendances.filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity)).length === 0 && (
+                      <div className="empty-state">No attendance records found.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : activePage === "Inbox" ? (
+            <div className="inbox-container fade-in mauze-premium-notifications">
+              <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2>Notifications Inbox</h2>
+                  <p>Track all system and direct alerts</p>
+                </div>
+                {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 && (
+                  <button className="clear-history-btn" onClick={() => onClearAllNotifs(notifications.filter(n => !dismissedNotifs.includes(n.id)).map(n => n.id))}>
+                    <Trash2 size={16} /> Clear All
+                  </button>
+                )}
+              </div>
+              
+              {notifications.filter(n => !dismissedNotifs.includes(n.id)).length > 0 ? (
+                <div className="premium-notifications-list">
+                  {notifications.filter(n => !dismissedNotifs.includes(n.id)).map((n, i) => (
+                    <div key={n.id || i} className="premium-notif-card card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                      <button className="card-dismiss-btn" onClick={() => onDismissNotif(n.id)} title="Clear from view">
+                        <X size={14} />
+                      </button>
+                      <div className="notif-card-icon">
+                        <Bell size={20} />
+                      </div>
+                      <div className="notif-card-content">
+                        <div className="notif-card-header">
+                          <span className="notif-date">{new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                          <h3>{n.title}</h3>
+                        </div>
+                        <p className="notif-excerpt">{n.body.length > 80 ? n.body.substring(0, 80) + "..." : n.body}</p>
+                        {n.file_url && (
+                          <div className="notif-attachment-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#d4af37', background: 'rgba(212, 175, 55, 0.08)', padding: '4px 8px', borderRadius: '6px', marginTop: '6px', marginBottom: '8px', fontWeight: 'bold' }}>
+                            <Paperclip size={12} /> Attachment Included
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="notif-view-btn" onClick={(e) => openNotificationDetail(e, n)}>
+                            VIEW <ChevronRight size={14} />
+                          </button>
+                          {n.redirect_page && (
+                            <button 
+                              className="notif-view-btn gold" 
+                              style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                let targetPage = n.redirect_page;
+                                if (targetPage.startsWith("Jadwal")) {
+                                  const parts = n.redirect_page.split(":");
+                                  if (parts[1]) {
+                                    setActiveStudentId(parts[1]);
+                                  }
+                                  targetPage = "Jadwal";
+                                }
+                                setActivePage(resolveRedirectPage(targetPage, "teacher"));
+                              }}
+                            >
+                              GO TO PAGE <ChevronRight size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-icon-ring">
+                    <Bell size={40} />
+                  </div>
+                  <h3>Inbox is empty</h3>
+                  <p>System alerts and messages will appear here.</p>
+                </div>
+              )}
+
+            </div>
+          ) : null}
+
+          {selectedNotification && (
+            <div 
+              className="notif-overlay-backdrop fade-in mauze-notif-detail-modal" 
+              role="presentation"
+              onPointerDown={handleNotificationBackdropPointerDown}
+              onClick={handleNotificationBackdropClick}
+            >
+              <div className="notif-overlay-card card-appear mauze-notif-detail-card" role="dialog" aria-modal="true" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                <button className="notif-overlay-close" onClick={closeNotificationDetail} aria-label="Close notification detail">
+                  <X size={20} />
+                </button>
+                <div className="notif-overlay-header">
+                  <div className="notif-badge">Notification Detail</div>
+                  <span className="notif-full-date">{new Date(selectedNotification.created_at).toLocaleString()}</span>
+                  <h2>{selectedNotification.title}</h2>
+                </div>
+                <div className="notif-overlay-body">
+                  <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--deep-brown)' }}>{selectedNotification.body}</p>
+                  
+                  {selectedNotification.file_url && (
+                    <div className="notif-attachment-box" style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed var(--primary-gold)' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                        <Paperclip size={16} style={{ color: 'var(--primary-gold)' }} /> Attached File
+                      </h4>
+                      {isImageFile(selectedNotification.file_url) ? (
+                        <div className="notif-image-preview-container" style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'white', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                          <img 
+                            src={selectedNotification.file_url} 
+                            alt="Attachment Preview" 
+                            style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '6px' }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="notif-file-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                          <div className="file-icon-square" style={{ background: '#fcfaf5', padding: '10px', borderRadius: '8px', color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <FileArchive size={24} />
+                          </div>
+                          <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <span style={{ fontWeight: '600', display: 'block', fontSize: '13px', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {getFileNameFromUrl(selectedNotification.file_url)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      <button 
+                        onClick={() => downloadFile(selectedNotification.file_url, getFileNameFromUrl(selectedNotification.file_url))}
+                        className="premium-btn gold" 
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px', textDecoration: 'none', width: '100%', boxSizing: 'border-box', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Download size={16} /> Download File
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  {selectedNotification.redirect_page && (
+                    <button 
+                      className="premium-btn gold" 
+                      onClick={() => {
+                        let targetPage = selectedNotification.redirect_page;
+                        if (targetPage.startsWith("Jadwal")) {
+                          const parts = targetPage.split(":");
+                          if (parts[1]) {
+                            setActiveStudentId(parts[1]);
+                          }
+                          targetPage = "Jadwal";
+                        }
+                        setActivePage(resolveRedirectPage(targetPage, "teacher"));
+                        closeNotificationDetail();
+                      }}
+                    >
+                      Go to Page
+                    </button>
+                  )}
+                  <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={closeNotificationDetail}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePage === "Settings" ? (
+            <SettingsPage 
+              isDarkMode={isDarkMode}
+              setIsDarkMode={setIsDarkMode}
+              appTheme={appTheme}
+              setAppTheme={setAppTheme}
+              user={user}
+              studentProfile={null}
+              onShowAction={onShowAction}
+              role="teacher"
+            />
+          ) : null}
+
+        </section>
+      </main>
+
+      {teacherDownloadPopup && (
+        <div className="celebration-overlay" onClick={() => setTeacherDownloadPopup(null)}>
+          <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+            <div className="celebration-content">
+              <div className="celebration-emoji-row">
+                <span className="celebration-emoji" style={{fontSize:'36px'}}>&#x2705;</span>
+              </div>
+              <h2 className="celebration-title">Download Completed!</h2>
+              <p className="celebration-message">
+                The report has been downloaded successfully.
+              </p>
+              <p style={{fontSize:'0.8rem',color:'var(--soft-brown)',marginBottom:'20px',wordBreak:'break-all'}}>
+                {teacherDownloadPopup.fileName}
+              </p>
+              <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
+                <button className="celebration-close-btn" onClick={async () => {
+                  try {
+                    const { Share } = await import("@capacitor/share");
+                    await Share.share({
+                      url: teacherDownloadPopup.filePath,
+                      title: "Open Report",
+                    });
+                  } catch (e) {
+                    if (onShowAction) onShowAction("error", "Could not open file.");
+                  }
+                  setTeacherDownloadPopup(null);
+                }}>
+                  Open
+                </button>
+                <button className="celebration-close-btn" style={{background:'var(--glass-bg)',color:'var(--deep-brown)'}} onClick={() => setTeacherDownloadPopup(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Quran Surah Names (Arabic) ---
+const SURAH_NAMES_AR = [
+  "الفاتحة","البقرة","آل عمران","النساء","المائدة",
+  "الأنعام","الأعراف","الأنفال","التوبة","يونس",
+  "هود","يوسف","الرعد","إبراهيم","الحجر",
+  "النحل","الإسراء","الكهف","مريم","طه",
+  "الأنبياء","الحج","المؤمنون","النور","الفرقان",
+  "الشعراء","النمل","القصص","العنكبوت","الروم",
+  "لقمان","السجدة","الأحزاب","سبأ","فاطر",
+  "يس","الصافات","ص","الزمر","غافر",
+  "فصلت","الشورى","الزخرف","الدخان","الجاثية",
+  "الأحقاف","محمد","الفتح","الحجرات","ق",
+  "الذاريات","الطور","النجم","القمر","الرحمن",
+  "الواقعة","الحديد","المجادلة","الحشر","الممتحنة",
+  "الصف","الجمعة","المنافقون","التغابن","الطلاق",
+  "التحريم","الملك","القلم","الحاقة","المعارج",
+  "نوح","الجن","المزمل","المدثر","القيامة",
+  "الإنسان","المرسلات","النبأ","النازعات","عبس",
+  "التكوير","الانفطار","المطففين","الانشقاق","البروج",
+  "الطارق","الأعلى","الغاشية","الفجر","البلد",
+  "الشمس","الليل","الضحى","الشرح","التين",
+  "العلق","القدر","البينة","الزلزلة","العاديات",
+  "القارعة","التكاثر","العصر","الهمزة","الفيل",
+  "قريش","الماعون","الكوثر","الكافرون","النصر",
+  "المسد","الإخلاص","الفلق","الناس"
+];
+
+// --- Juz/Surat Selector Component ---
+export default function App() {
+  const [notificationPermission, setNotificationPermission] = useState(
+    "Notification" in window ? Notification.permission : "denied"
+  );
+  const fcmInitKeyRef = useRef(null);
+  const isInitializingRef = useRef(false);
+  const autoSaveTimerRef = useRef(null);
+  const performAutoSaveRef = useRef(null);
+  const currentStudentIdRef = useRef(null);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [saveErrorDetails, setSaveErrorDetails] = useState("");
+  const [user, setUser] = useState(null);
+  const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
+  const [portalRole, setPortalRole] = useState(() => {
+    if (typeof window === "undefined") {
+      return "parents";
+    }
+
+    return "parents"; // Start with a safe default, will be overridden by auth
+  });
+  const [activePage, setActivePage] = useState(DEFAULT_PAGE_BY_ROLE.parents);
+  const [searchPageLoading, setSearchPageLoading] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleSearchSelect = (page) => {
+    setSearchPageLoading(true);
+    setTimeout(() => setActivePage(page), 50);
+  };
+
+  useEffect(() => {
+    setSearchPageLoading(false);
+  }, [activePage]);
+
+  useEffect(() => {
+    // Cleanup old service workers (like OneSignal) to prevent conflicts with FCM
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          if (!registration.active?.scriptURL.includes('firebase-messaging-sw.js')) {
+            console.log('Unregistering old service worker:', registration.active?.scriptURL);
+            registration.unregister();
+          }
+        }
+      });
+    }
+  }, []);
+
+  const [loading, setLoading] = useState(true);
+  const [actionMessage, setActionMessage] = useState(null);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [activeStudentId, setActiveStudentId] = useState(null);
+  const [attachedFileUrl, setAttachedFileUrl] = useState("");
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadingTeacherPhoto, setUploadingTeacherPhoto] = useState(false);
+  const [parentData, setParentData] = useState(emptyParentData);
+  const [schoolData, setSchoolData] = useState({
+    students: [],
+    weeklyResults: [],
+    announcements: [],
+    schedule: [],
+    portalAccessList: [],
+    teacherProfiles: [],
+  });
+  const [customGroups, setCustomGroups] = useState([]);
+  const [teacherAttendance, setTeacherAttendance] = useState([]);
+  const [teacherGroupFilter, setTeacherGroupFilter] = useState("All");
+  const [adminTeacherFilter, setAdminTeacherFilter] = useState("All");
+  const [teacherProfiles, setTeacherProfiles] = useState([]);
+  const [reportSettings, setReportSettings] = useState([]);
+  const [jadwalSettings, setJadwalSettings] = useState([]);
+  const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
+  const [whatsappConfig, setWhatsappConfig] = useState(null);
+  const [emailSettings, setEmailSettings] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailProgress, setEmailProgress] = useState({ current: 0, total: 0 });
+  const [emailLogs, setEmailLogs] = useState([]);
+  const [selectedNotification, setSelectedNotification] = useState(null);
+  const [parentViews, setParentViews] = useState([]);
+  const [portalAccessSuccess, setPortalAccessSuccess] = useState(null);
+  
+  // Local dismissal state (doesn't affect backend)
+  const [dismissedNotifs, setDismissedNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("mauze-dismissed-notifs") || "[]");
+    } catch (e) { return []; }
+  });
+  const [dismissedAnnounces, setDismissedAnnounces] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("mauze-dismissed-announces") || "[]");
+    } catch (e) { return []; }
+  });
+  const [dismissedHomeNotifs, setDismissedHomeNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("mauze-dismissed-home-notifs") || "[]");
+    } catch (e) { return []; }
+  });
+
+  const dismissHomeNotification = (id) => {
+    const next = [...dismissedHomeNotifs, id];
+    setDismissedHomeNotifs(next);
+    localStorage.setItem("mauze-dismissed-home-notifs", JSON.stringify(next));
+  };
+
+  const dismissNotification = (id) => {
+    const next = [...dismissedNotifs, id];
+    setDismissedNotifs(next);
+    localStorage.setItem("mauze-dismissed-notifs", JSON.stringify(next));
+  };
+
+  const clearAllNotifications = (currentIds) => {
+    const next = [...new Set([...dismissedNotifs, ...currentIds])];
+    setDismissedNotifs(next);
+    localStorage.setItem("mauze-dismissed-notifs", JSON.stringify(next));
+  };
+
+  const dismissAnnouncement = (id) => {
+    const next = [...dismissedAnnounces, id];
+    setDismissedAnnounces(next);
+    localStorage.setItem("mauze-dismissed-announces", JSON.stringify(next));
+  };
+
+  const clearAllAnnouncements = (currentIds) => {
+    const next = [...new Set([...dismissedAnnounces, ...currentIds])];
+    setDismissedAnnounces(next);
+    localStorage.setItem("mauze-dismissed-announces", JSON.stringify(next));
+  };
+
+  useEffect(() => {
+    if (!portalAccessSuccess) return;
+    const timer = setTimeout(() => setPortalAccessSuccess(null), 5000);
+    return () => clearTimeout(timer);
+  }, [portalAccessSuccess]);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem("mauze-dark-mode") === "true";
+  });
+  const [appTheme, setAppTheme] = useState(() => {
+    return localStorage.getItem("mauze-app-theme") || "default";
+  });
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", isDarkMode);
+    localStorage.setItem("mauze-dark-mode", isDarkMode);
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    document.body.setAttribute("data-theme", appTheme);
+    localStorage.setItem("mauze-app-theme", appTheme);
+  }, [appTheme]);
+
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [adminForms, setAdminForms] = useState({
+    announcement: {
+      title: "",
+      type: "Update",
+      target_role: "all",
+      event_date: getToday(),
+    },
+    customNotification: {
+      title: "",
+      body: "",
+      target_audience: "all",
+      target_uuid: "",
+      redirect_page: "Home",
+      schedule_enabled: "false",
+      schedule_type: "daily",
+      schedule_day: "1",
+      schedule_time: "09:00"
+    },
+    schedule: {
+      student_id: "",
+      task_time: "08:00",
+      task_name: "",
+    },
+    teacherAttendance: {
+      teacher_name: "",
+      attendance_date: getToday(),
+      minutes_present: "",
+      status: "Present",
+      note: "",
+    },
+    group: {
+      group_name: "",
+      teacher_name: "",
+    },
+    portalAccess: {
+      email: "",
+      full_name: "",
+      portal_role: "parents",
+      student_id: "",
+      salary_per_minute: "2.3",
+      show_salary_card: false,
+    },
+    assignChild: {
+      student_id: "",
+      teacher_name: "",
+      group_name: "",
+    },
+    assignments: [],
+    teacherProfile: {
+      user_id: "",
+      full_name: "",
+      photo_url: "",
+      phone_number: "",
+      whatsapp_number: "",
+      salary_per_minute: "2.3",
+      show_salary_card: true,
+    },
+  });
+  const [teacherForms, setTeacherForms] = useState({
+    result: createTeacherResultDraft(),
+  });
+  // Auto-select first student for teacher portal on mount
+  const hasAutoSelectedTeacherRef = useRef(false);
+  
+  useEffect(() => {
+    if (portalRole !== "teacher") return;
+    if (!schoolData.students?.length) return;
+    if (hasAutoSelectedTeacherRef.current) return;
+    
+    hasAutoSelectedTeacherRef.current = true;
+    
+    const firstStudent = schoolData.students[0];
+    const studentId = firstStudent.student_id;
+    const numericId = studentId && !isNaN(studentId) ? Number(studentId) : studentId;
+    
+    if (!numericId) return;
+    
+    const studentResults = (schoolData.weeklyResults || [])
+      .filter(r => String(r.student_id) === String(numericId))
+      .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
+    
+    if (studentResults.length > 0) {
+      setTeacherForms(curr => ({
+        ...curr,
+        result: { ...curr.result, ...studentResults[0], wusool_surah: studentResults[0]?.wusool_surah || "", next_week_surah: studentResults[0]?.next_week_surah || "", istifadah_surah: studentResults[0]?.istifadah_surah || "", student_id: numericId }
+      }));
+    } else {
+      setTeacherForms(curr => ({
+        ...curr,
+        result: createTeacherResultDraft({ student_id: numericId })
+      }));
+    }
+  }, [portalRole, schoolData.students, schoolData.weeklyResults]);
+  
+
+
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap";
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+
+
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, []);
+
+  useEffect(() => {
+    setActivePage(DEFAULT_PAGE_BY_ROLE[portalRole] || DEFAULT_PAGE_BY_ROLE.parents);
+    setMenuOpen(false);
+    setActionMessage(null);
+
+    // Check URL for redirectPage from notification click outside the app
+    const params = new URLSearchParams(window.location.search);
+    const redirectFromNotif = params.get('redirectPage');
+    if (redirectFromNotif) {
+      let targetPage = redirectFromNotif;
+      if (targetPage.startsWith("Jadwal:")) {
+        const parts = targetPage.split(":");
+        if (parts[1]) {
+          setSelectedStudentId(parts[1]);
+        }
+        targetPage = "Jadwal";
+      }
+      setActivePage(resolveRedirectPage(targetPage, portalRole));
+      // Clean URL without the redirect parameter
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [portalRole]);
+
+  useEffect(() => {
+    // Handle credential storage from eLearning site
+    const handleMessage = (event) => {
+      if (event.origin === ELEARNING_ORIGIN && event.data.type === 'STORE_CREDENTIALS') {
+        const { email, password, rememberMe } = event.data.credentials;
+        localStorage.setItem('elearning-email', email);
+        localStorage.setItem('elearning-password', password);
+        localStorage.setItem('elearning-remember-me', rememberMe.toString());
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function tryRestoreCachedAuth() {
+      const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
+      const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (!rememberMe || !cachedRaw) return false;
+      try {
+        const cached = JSON.parse(cachedRaw);
+        if (!cached.userId || !cached.role) return false;
+        setUser({ id: cached.userId, email: cached.email });
+        storeRole(cached.role);
+        try {
+          await loadPortalData(cached.role, { id: cached.userId, email: cached.email });
+        } catch (e) {
+          console.warn("Offline: portal data unavailable", e);
+        }
+        setLoading(false);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function initialize() {
+      let session = null;
+      try {
+        const res = await supabase.auth.getSession();
+        session = res?.data?.session ?? null;
+      } catch (e) {
+        console.warn("Session check failed", e);
+        // Clear stale Supabase tokens only when session recovery fails
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        }
+        try { await supabase.auth.signOut(); } catch (_) {}
+      }
+
+      if (!mounted) return;
+
+      if (session) {
+        handleAuthChange("INITIAL_SESSION", session);
+      } else {
+        const restored = await tryRestoreCachedAuth();
+        if (!restored && mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    async function handleAuthChange(event, session) {
+      if (!mounted) return;
+      if (isInitializingRef.current) return;
+      isInitializingRef.current = true;
+      try {
+
+      // Prevent portal flicker by showing loading screen during role resolution
+      setLoading(true);
+
+      if (session) {
+        setUser(session.user);
+        try {
+          const access = await resolveInitialPortal(
+            session.user,
+            window.localStorage.getItem(STORAGE_KEYS.role) || "parents"
+          );
+
+          if (mounted) {
+            if (!access.ok) {
+              await supabase.auth.signOut();
+              setActionMessage({ type: "error", text: access.message });
+              setLoading(false);
+              return;
+            }
+
+            storeRole(access.role);
+            setPortalAccess(access.accessRow || emptyPortalAccess);
+
+            
+
+            // Initialize FCM service once per user + role to prevent duplicate token requests.
+            const fcmInitKey = `${session.user.id}:${access.role}`;
+            if (fcmInitKeyRef.current !== fcmInitKey) {
+              fcmInitKeyRef.current = fcmInitKey;
+              try {
+                const fcmService = await loadFcmService();
+                await fcmService.initialize(access.role);
+              } catch (error) {
+                fcmInitKeyRef.current = null;
+                console.error('FCM initialization failed:', error);
+              }
+            }
+
+            await loadPortalData(access.role, session.user, access.parentProfile);
+          }
+        } catch (err) {
+          console.error("Auth initialization error:", err);
+          if (mounted) setLoading(false);
+        }
+      } else {
+        if (mounted) {
+          setUser(null);
+          setPortalAccess(emptyPortalAccess);
+          setParentData(emptyParentData);
+          setLoading(false);
+        }
+        // Ensure stale Supabase tokens are cleaned up
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        }
+      }
+      } finally {
+        isInitializingRef.current = false;
+      }
+    }
+
+    // Register auth listener FIRST so no SIGNED_OUT events are missed.
+    // Skip INITIAL_SESSION (handled by initialize()) and TOKEN_REFRESHED
+    // (transparent, no data reload needed) to prevent duplicate data loading.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        // Clear stale Supabase tokens on sign out
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        }
+      }
+      if (event !== 'INITIAL_SESSION' && event !== 'TOKEN_REFRESHED') {
+        handleAuthChange(event, session);
+      }
+    });
+
+    initialize();
+
+    function handleOnline() {
+      const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (!user && cachedRaw) {
+        supabase.auth.getSession().then(res => {
+          if (res?.data?.session && mounted) {
+            handleAuthChange("SIGNED_IN", res.data.session);
+          }
+        });
+      }
+    }
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user && portalRole === "parents" && selectedStudentId) {
+      loadPortalData(portalRole, user);
+    }
+  }, [selectedStudentId, portalRole, user]);
+
+  async function loadPortalData(role, currentUser, parentProfileOverride = null) {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      if (role === "parents") {
+        const rawProfiles = parentProfileOverride ? [parentProfileOverride] : (await findParentProfiles(currentUser.id, currentUser.email));
+
+        let nextParentState = {
+          studentProfile: null,
+          allProfiles: [],
+          hifzDetails: null,
+          announcements: [],
+          schedule: [],
+          attendance: null,
+          weeklyResult: null,
+          teacherProfiles: [],
+          reportSettings: null,
+        };
+
+        if (rawProfiles.length > 0) {
+          // AUTO-LINK: If any profile only has email but no ID, link it now
+          const profilesToLink = rawProfiles.filter(p => !p.parent_user_id && p.parent_email && normalizeText(p.parent_email) === normalizeText(currentUser.email));
+          if (profilesToLink.length > 0) {
+            console.log("Auto-linking parent user_id to student profiles:", profilesToLink.length);
+            await Promise.all(profilesToLink.map(p =>
+              supabase.from("child_profiles").update({ parent_user_id: currentUser.id }).eq("student_id", p.student_id)
+            ));
+            // Update local objects to reflect the link immediately
+            profilesToLink.forEach(p => p.parent_user_id = currentUser.id);
+          }
+
+          // Fetch necessary data for all potential students
+          // Fetch necessary data for all potential students using their UUIDs to avoid SQL type errors (uuid = text)
+          const studentQueryIds = rawProfiles.map(p => p.student_id).filter(Boolean);
+
+          const [
+            attendanceResponse,
+            scheduleResponse,
+            resultsResponse,
+            announcementResponse,
+            teacherProfilesResponse,
+            reportSettingsResponse,
+            jadwalSettingsResponse,
+          ] = await Promise.all([
+            supabase
+              .from("attendance")
+              .select("*")
+              .in("student_id", studentQueryIds)
+              .order("attendance_date", { ascending: false }),
+            supabase.from("schedule").select("*").in("student_id", studentQueryIds).order("task_time", { ascending: true }),
+            supabase
+              .from("weekly_results")
+              .select("*")
+              .order("week_date", { ascending: false })
+              .limit(5000),
+            supabase.from("events").select("*").order("event_date", { ascending: false }),
+            supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
+            supabase.from("report_settings").select("*"),
+            supabase.from("jadwal_settings").select("*"),
+          ]);
+
+          // Handle potential missing tables (404) or other fetch errors gracefully
+          if (attendanceResponse.error && attendanceResponse.error.code !== 'PGRST116' && attendanceResponse.error.status !== 404) {
+            console.error("Attendance fetch error:", attendanceResponse.error);
+          }
+          if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
+          if (jadwalSettingsResponse.data) setJadwalSettings(jadwalSettingsResponse.data);
+          if (scheduleResponse.error) throw scheduleResponse.error;
+          if (resultsResponse.error) throw resultsResponse.error;
+          if (announcementResponse.error) throw announcementResponse.error;
+          if (teacherProfilesResponse.error) throw teacherProfilesResponse.error;
+
+          const attendanceData = attendanceResponse.data || [];
+
+          const processedStudents = buildStudents(
+            rawProfiles,
+            resultsResponse.data || [],
+            teacherProfilesResponse.data || []
+          );
+
+          // If multiple students, and none selected, use first
+          const activeStudent = processedStudents.find(p => String(p.student_id) === String(selectedStudentId)) || processedStudents[0];
+          
+          // Bulletproof search for activeResult using the already matched latestResult from buildStudents
+          const activeResult = activeStudent.latestResult;
+          const activeAttendance = (attendanceResponse.data || []).find(a => 
+            activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(a.student_id || "").trim().toLowerCase())
+          );
+          const activeSchedule = (scheduleResponse.data || []).filter(s => 
+            activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(s.student_id || "").trim().toLowerCase())
+          );
+
+          nextParentState = {
+            studentProfile: activeStudent,
+            allProfiles: processedStudents,
+            hifzDetails: {
+              juz: activeStudent.juz || "--",
+              surat: activeStudent.surat || "Pending",
+              muhaffiz_name: activeStudent.teacherName || "Pending",
+            },
+            announcements: announcementResponse.data || [],
+            schedule: activeSchedule,
+            attendance: activeAttendance || null,
+            weeklyResult: activeResult || null,
+            teacherProfiles: teacherProfilesResponse.data || [],
+            reportSettings: reportSettingsResponse.data || [],
+          };
+
+          if (!selectedStudentId) { setSelectedStudentId(activeStudent.student_id); }
+        }
+
+        setParentData(nextParentState);
+        setTeacherProfiles(nextParentState.teacherProfiles || []);
+      } else {
+        const [
+          profilesResponse,
+          resultsResponse,
+          eventsResponse,
+          scheduleResponse,
+          portalAccessResponse,
+          groupsResponse,
+          attendanceResponse,
+          teacherProfilesResponse,
+          reportSettingsResponse,
+          jadwalSettingsResponse,
+          supportTicketsResponse,
+          parentViewsResponse,
+        ] = await Promise.all([
+          supabase.from("child_profiles").select("*").order("full_name", { ascending: true }),
+          supabase.from("weekly_results").select("*").order("week_date", { ascending: false }),
+          supabase.from("events").select("*").order("event_date", { ascending: false }),
+          supabase.from("schedule").select("*").order("task_time", { ascending: true }),
+          supabase.from("user_portal_access").select("*").order("created_at", { ascending: false }),
+          supabase.from("custom_groups").select("*").order("group_name", { ascending: true }),
+          supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }),
+          supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
+          supabase.from("report_settings").select("*"),
+          supabase.from("jadwal_settings").select("*"),
+          supabase.from("portal_issues").select("*").order("created_at", { ascending: false }),
+          supabase.from("parent_report_views").select("*"),
+        ]);
+
+        if (supportTicketsResponse.data) setSupportTickets(supportTicketsResponse.data);
+
+        if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
+        if (jadwalSettingsResponse.data) setJadwalSettings(jadwalSettingsResponse.data);
+
+        if (parentViewsResponse && parentViewsResponse.data) {
+          setParentViews(parentViewsResponse.data);
+        } else {
+          setParentViews([]);
+        }
+
+        const dbErrors = [
+          profilesResponse.error,
+          resultsResponse.error,
+          eventsResponse.error,
+          scheduleResponse.error,
+          portalAccessResponse.error,
+          groupsResponse.error,
+          attendanceResponse.error,
+          teacherProfilesResponse.error
+        ].filter(Boolean);
+
+        if (dbErrors.length > 0) {
+          console.error("Database errors detected:", dbErrors);
+          throw new Error(dbErrors.map(e => e.message).join(" | "));
+        }
+
+        const enrichedProfiles = (teacherProfilesResponse.data || []).map(profile => {
+          const access = (portalAccessResponse.data || []).find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
+          return {
+            ...profile,
+            salary_per_minute: profile.salary_per_minute || access?.salary_per_minute || 2.3,
+            show_salary_card: profile.show_salary_card ?? access?.show_salary_card ?? true
+          };
+        });
+        setTeacherProfiles(enrichedProfiles);
+
+        const students = buildStudents(
+          profilesResponse.data || [],
+          resultsResponse.data || [],
+          enrichedProfiles
+        );
+
+        setTeacherAttendance(attendanceResponse.data || []);
+        setCustomGroups(groupsResponse.data || []);
+
+        if (role === "admin") {
+          const { data: waData, error: waError } = await supabase
+            .from("whatsapp_config")
+            .select("*")
+            .eq("id", 1)
+            .maybeSingle();
+          if (waData) setWhatsappConfig(waData);
+          else if (waError) console.warn("Failed to load whatsapp_config:", waError.message);
+        }
+
+        // Load email settings
+        const { data: emailData, error: emailError } = await supabase
+          .from("email_settings")
+          .select("*")
+          .eq("id", 1)
+          .maybeSingle();
+        if (emailData) setEmailSettings(emailData);
+        else if (emailError) console.warn("Failed to load email_settings:", emailError.message);
+
+        setSchoolData({
+          students,
+          weeklyResults: resultsResponse.data || [],
+          announcements: eventsResponse.data || [],
+          schedule: scheduleResponse.data || [],
+          portalAccessList: portalAccessResponse.data || [],
+          teacherProfiles: enrichedProfiles,
+        });
+
+        if (students.length > 0) {
+          if (role !== "admin") {
+            setSelectedStudentId((current) => current || students[0].student_id);
+          }
+          setAdminForms((current) => ({
+            ...current,
+            schedule: {
+              ...current.schedule,
+              student_id: current.schedule.student_id || students[0].student_id,
+            },
+            teacherAttendance: {
+              ...current.teacherAttendance,
+              teacher_name:
+                current.teacherAttendance.teacher_name || students[0].teacherName || "",
+            },
+          }));
+          setTeacherForms((current) => ({
+            ...current,
+            result: {
+              ...current.result,
+              student_id: current.result.student_id || students[0].student_id,
+            },
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching portal data:", error);
+      setActionMessage({
+        type: "error",
+        text: `Data Error: ${error?.message || "Some data could not be loaded. Please check your table permissions and try again."}`,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const teacherIdentity = useMemo(() => guessTeacherIdentity(user, portalAccess), [user, portalAccess]);
+
+  const teacherData = useMemo(() => {
+    const availableGroups = Array.from(
+      new Set(schoolData.students.map((student) => student.groupName).filter(Boolean))
+    );
+
+    const matchedStudents = schoolData.students.filter((student) => {
+      // Robust filtering: check by muhaffiz_id (UUID) first, then fallback to name matching
+      const idMatch = user?.id && student.muhaffiz_id === user.id;
+      const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
+
+      return idMatch || nameMatch;
+    });
+
+    const filteredStudents = matchedStudents;
+
+    return {
+      availableGroups,
+      teacherIdentity,
+      selectedGroup: teacherGroupFilter,
+      filteredStudents,
+      attendances: teacherAttendance,
+    };
+  }, [schoolData.students, teacherGroupFilter, teacherIdentity, teacherAttendance]);
+
+  const monthlySalary = useMemo(() => {
+    if (portalRole !== "teacher") return null;
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const monthAttendance = (teacherData.attendances || []).filter((a) => {
+      const d = new Date(a.attendance_date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const totalMinutes = monthAttendance.reduce((sum, a) => sum + toNumber(a.minutes_present), 0);
+    const teacherProfile = (teacherProfiles || []).find(p =>
+      normalizeText(p.full_name) === normalizeText(teacherIdentity)
+    );
+    const rate = toNumber(teacherProfile?.salary_per_minute || portalAccess.salary_per_minute || 2.3);
+    const showCard = teacherProfile ? !!teacherProfile.show_salary_card : !!portalAccess.show_salary_card;
+
+    return {
+      totalMinutes,
+      rate,
+      amount: totalMinutes * rate,
+      daysPresent: monthAttendance.length,
+      showCard
+    };
+  }, [teacherData.attendances, portalAccess.salary_per_minute, portalAccess.show_salary_card, portalRole, teacherProfiles, teacherIdentity]);
+
+  function storeRole(role) {
+    setPortalRole(role);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEYS.role, role);
+    }
+  }
+
+  function showAction(type, text) {
+    setActionMessage({ type, text });
+    if (type && text) {
+      setTimeout(() => {
+        setActionMessage(current => {
+          if (current?.type === type && current?.text === text) {
+            return null;
+          }
+          return current;
+        });
+      }, 4000);
+    }
+  }
+
+  const handleLoginSuccess = async (loggedInUser, selectedRole, rememberMe = true) => {
+    try {
+      const access = await authorizePortalAccess(loggedInUser, selectedRole);
+
+      if (!access.ok) {
+        await supabase.auth.signOut();
+        return {
+          ok: false,
+          message: access.message,
+        };
+      }
+
+      storeRole(access.role);
+      setPortalAccess(access.accessRow || emptyPortalAccess);
+      setUser(loggedInUser);
+      await loadPortalData(access.role, loggedInUser, access.parentProfile);
+
+      if (rememberMe) {
+        localStorage.setItem(STORAGE_KEYS.rememberMe, "true");
+        localStorage.setItem(STORAGE_KEYS.cachedAuth, JSON.stringify({
+          userId: loggedInUser.id,
+          email: loggedInUser.email,
+          role: access.role,
+        }));
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.rememberMe);
+        localStorage.removeItem(STORAGE_KEYS.cachedAuth);
+      }
+
+      return { ok: true };
+    } catch (error) {
+      console.error("Portal authorization failed:", error);
+      await supabase.auth.signOut();
+      return {
+        ok: false,
+        message: "We could not verify this account for the selected portal.",
+      };
+    }
+  };
+
+  const handleLogout = async () => {
+    setUser(null);
+    setPortalAccess(emptyPortalAccess);
+    setParentData(emptyParentData);
+    setSchoolData({
+      students: [],
+      weeklyResults: [],
+      announcements: [],
+      schedule: [],
+      portalAccessList: [],
+    });
+    showAction(null, null);
+
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("Logout error:", err);
+    }
+    localStorage.clear();
+    window.location.reload();
+  };
+
+  const handleCreatePortalAccess = async (event) => {
+    event.preventDefault();
+
+    const payload = adminForms.portalAccess;
+    const targetEmail = payload.email.trim().toLowerCase();
+
+    const tempAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+
+    const { data: authData, error: authError } = await tempAuthClient.auth.signUp({
+      email: targetEmail,
+      password: payload.password,
+      options: {
+        data: {
+          full_name: payload.full_name,
+          portal_role: payload.portal_role,
+        },
+      },
+    });
+
+    if (authError && !authError.message.toLowerCase().includes("already registered")) {
+      showAction("error", `Auth Error: ${authError.message}`);
+      return;
+    }
+
+    let createdUserId = authData?.user?.id || null;
+
+    if (!createdUserId) {
+      const { data: lookupData } = await supabase.rpc('get_user_id_by_email', { target_email: targetEmail });
+      if (lookupData) createdUserId = lookupData;
+    }
+
+    let accessRecord = null;
+    if (createdUserId) {
+      const { data, error: upsertError } = await supabase
+        .from("user_portal_access")
+        .upsert({
+          user_id: createdUserId,
+          email: targetEmail,
+          full_name: payload.full_name,
+          portal_role: payload.portal_role,
+          is_active: true
+        }, { onConflict: 'user_id' })
+        .select()
+        .maybeSingle();
+
+      if (upsertError) {
+        console.error("Portal access upsert failed:", upsertError);
+        showAction("error", `Portal access failed: ${upsertError.message}`);
+        return;
+      }
+      accessRecord = data || null;
+    } else {
+      const { data, error: fetchError } = await supabase
+        .from("user_portal_access")
+        .select("*")
+        .eq("email", targetEmail)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Portal access lookup failed:", fetchError);
+        showAction("error", `Portal access lookup failed: ${fetchError.message}`);
+        return;
+      }
+      accessRecord = data || null;
+    }
+
+    const finalUserId = accessRecord?.user_id || createdUserId || null;
+
+    if (payload.portal_role === "parents" && payload.student_id && finalUserId) {
+      await supabase
+        .from("child_profiles")
+        .update({ parent_user_id: finalUserId })
+        .eq("student_id", payload.student_id);
+    }
+
+    const { data: freshList, error: refreshError } = await supabase
+      .from("user_portal_access")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (refreshError) {
+      console.error("Error refreshing portal list:", refreshError);
+    }
+
+    if (freshList) {
+      setSchoolData((current) => ({
+        ...current,
+        portalAccessList: freshList,
+      }));
+    }
+
+    setAdminForms((current) => ({
+      ...current,
+      portalAccess: { email: "", full_name: "", portal_role: "parents", password: "", student_id: "" },
+    }));
+
+    let linkedStudentName = "Not linked";
+    if (payload.student_id) {
+      const { data: stData } = await supabase
+        .from("child_profiles")
+        .select("name")
+        .eq("student_id", payload.student_id)
+        .maybeSingle();
+      if (stData?.name) linkedStudentName = stData.name;
+    }
+
+    (async () => {
+      try {
+        const notifTitle = payload.portal_role === "teacher" ? "New Student Assigned" : "Portal Access Granted";
+        const notifBody = payload.portal_role === "teacher" 
+          ? `${linkedStudentName} has been assigned to your group.` 
+          : `Welcome! ${linkedStudentName} has been successfully linked to your portal account.`;
+
+        broadcastNotification(notifTitle, notifBody, payload.portal_role, finalUserId || targetEmail);
+      } catch (e) {
+        console.warn("Assignment notification failed:", e);
+      }
+    })();
+
+    setPortalAccessSuccess({
+      full_name: payload.full_name,
+      email: targetEmail,
+      portal_role: payload.portal_role,
+      linkedStudentName,
+      grantedAt: new Date().toLocaleString(),
+    });
+
+    showAction("success", "Portal access granted successfully!");
+  };
+
+  const [notificationsList, setNotificationsList] = useState([]);
+  const [scheduledNotifs, setScheduledNotifs] = useState([]);
+  const [editingSchedule, setEditingSchedule] = useState(null);
+  const [activeStatusAlert, setActiveStatusAlert] = useState(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+  const latestNotifIdRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Fetch both notification history and scheduled
+    fetchScheduledNotifs();
+
+    let notificationChannel;
+    let isActive = true;
+    
+    const setupNotifications = async () => {
+      try {
+        // 1. Initial Fetch of History
+        const { data } = await supabase
+          .from("system_notifications")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        if (data) {
+          const myNotifs = data.filter(notif =>
+            portalRole === "admin" ||
+            notif.target_user === user.id ||
+            notif.target_user === user.email ||
+            (!notif.target_user && (
+              notif.target_role === "all" ||
+              notif.target_role === portalRole
+            ))
+          );
+          setNotificationsList(myNotifs);
+          if (myNotifs.length > 0) latestNotifIdRef.current = myNotifs[0].id;
+        }
+
+        // 2. Real-time Subscription for Instant Alerts
+        // Clean up any existing channel with the same name first
+        if (notificationChannel) {
+            await supabase.removeChannel(notificationChannel);
+          }
+        
+        if (!isActive) return;
+
+        notificationChannel = supabase
+          .channel(`notif-sync-${user.id}-${Math.random().toString(36).substring(7)}`)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', table: 'system_notifications', schema: 'public' },
+            (payload) => {
+              const newNotif = payload.new;
+              const isTargeted =
+                portalRole === "admin" ||
+                newNotif.target_user === user.id ||
+                newNotif.target_user === user.email ||
+                (!newNotif.target_user && (
+                  newNotif.target_role === "all" ||
+                  newNotif.target_role === portalRole
+                ));
+
+              if (isTargeted) {
+                setNotificationsList(prev => {
+                  const combined = [newNotif, ...prev];
+                  // Strict unique-by-ID filtering to kill the "double card" bug
+                  const unique = combined.filter((n, idx, self) => 
+                    idx === self.findIndex(t => t.id === n.id)
+                  );
+                  if (unique.length === prev.length && !prev.some(n => n.id === newNotif.id)) {
+                     // This means it was filtered out or something weird happened
+                  }
+                  return unique;
+                });
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', table: 'weekly_results', schema: 'public' },
+            (payload) => {
+              console.log("Real-time result update:", payload.eventType, payload.new?.student_id);
+              
+              if (payload.eventType === 'INSERT' && portalRole === "parents") {
+                showAction("success", "A new progress report has been submitted!");
+              }
+              
+              loadPortalData(portalRole, user);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', table: 'parent_report_views', schema: 'public' },
+            (payload) => {
+              console.log("Real-time parent view update:", payload.eventType, payload.new?.student_id);
+              loadPortalData(portalRole, user);
+            }
+          );
+        
+        notificationChannel.subscribe((status) => {
+          if (status === 'CHANNEL_ERROR') {
+            console.warn("Realtime subscription blocked or failed. This is often caused by ad-blockers.");
+          }
+        });
+      } catch (err) {
+        console.error("Notification setup error:", err);
+      }
+    };
+    
+    setupNotifications();
+
+    return () => {
+      isActive = false;
+      if (notificationChannel) {
+        supabase.removeChannel(notificationChannel);
+      }
+    };
+  }, [user, portalRole]);
+
+  // Client-side scheduler: process due scheduled notifications every 30s
+  // (falls back if pg_cron is not enabled on the Supabase project)
+  useEffect(() => {
+    if (!user || portalRole !== "admin") return;
+    let isActive = true;
+
+    const processDueNotifications = async () => {
+      try {
+        const { data: dueNotifs, error } = await supabase
+          .from("scheduled_notifications")
+          .select("*")
+          .eq("is_active", true)
+          .lte("next_send_at", new Date().toISOString())
+          .limit(10);
+
+        if (error || !dueNotifs?.length) return;
+
+        for (const notif of dueNotifs) {
+          if (!isActive) break;
+
+          await broadcastNotification(
+            notif.title,
+            notif.body,
+            notif.target_role === "user" ? notif.target_role : notif.target_role || "all",
+            notif.target_user || null,
+            notif.redirect_page || "Home",
+            false,
+            notif.file_url || null
+          );
+
+          const nextSend = calculateNextSendTime(
+            notif.schedule_type,
+            notif.schedule_time?.substring(0, 5) || "09:00",
+            notif.schedule_day
+          );
+
+          await supabase
+            .from("scheduled_notifications")
+            .update({
+              last_sent_at: new Date().toISOString(),
+              next_send_at: nextSend,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", notif.id);
+        }
+
+        fetchScheduledNotifs();
+      } catch (e) {
+        console.warn("Scheduled notification processor error:", e);
+      }
+    };
+
+    processDueNotifications();
+    const interval = setInterval(processDueNotifications, 30000);
+
+    return () => {
+      isActive = false;
+      clearInterval(interval);
+    };
+  }, [user, portalRole]);
+
+  const requestNotificationPermission = async () => {
+    if ("Notification" in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === "granted") {
+        showAction("success", "Notifications Enabled!");
+      }
+    }
+  };
+
+  const handleTeacherGroupFilterChange = (group) => {
+    setTeacherGroupFilter(group);
+  };
+
+  const handleAdminTeacherFilterChange = (filter) => {
+    setAdminTeacherFilter(filter);
+  };
+
+  const handleAdminFormChange = (formKey) => (event) => {
+    const { name, value } = event.target;
+    setAdminForms((current) => {
+      const updatedForm = {
+        ...current[formKey],
+        [name]: value,
+      };
+
+      if (formKey === "customNotification" && name === "target_audience") {
+        if (value === "parents") {
+          updatedForm.redirect_page = "Home";
+        } else if (value === "teacher") {
+          updatedForm.redirect_page = "My Group";
+        } else if (value === "admin") {
+          updatedForm.redirect_page = "Overview";
+        } else {
+          updatedForm.redirect_page = "Home";
+        }
+      }
+
+      return {
+        ...current,
+        [formKey]: updatedForm,
+      };
+    });
+  };
+
+  const handleTeacherFormChange = (event) => {
+    const { name, value } = event.target;
+
+    setTeacherForms((current) => ({
+      ...current,
+      result: {
+        ...current.result,
+        [name]: value,
+      },
+    }));
+
+    if (name === "student_id") {
+      const numericId = value && !isNaN(value) ? Number(value) : value;
+      if (numericId) {
+        const today = getToday();
+        const studentResults = (schoolData.weeklyResults || [])
+          .filter(r => String(r.student_id) === String(numericId))
+          .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
+
+        const todayResult = studentResults.find(r => r.week_date === today);
+
+        if (todayResult) {
+          setTeacherForms(curr => ({
+            ...curr,
+            result: { ...curr.result, ...todayResult, wusool_surah: todayResult?.wusool_surah || "", next_week_surah: todayResult?.next_week_surah || "", istifadah_surah: todayResult?.istifadah_surah || "", student_id: numericId }
+          }));
+        } else if (studentResults.length > 0) {
+          setTeacherForms(curr => ({
+            ...curr,
+            result: {
+              ...curr.result,
+              ...studentResults[0],
+              wusool_surah: studentResults[0]?.wusool_surah || "",
+              next_week_surah: studentResults[0]?.next_week_surah || "",
+              istifadah_surah: studentResults[0]?.istifadah_surah || "",
+              student_id: numericId,
+              week_date: today,
+              teacher_edit_count: 0,
+              teacher_locked: false,
+              teacher_locked_at: null,
+            }
+          }));
+        } else {
+          setTeacherForms(curr => ({
+            ...curr,
+            result: createTeacherResultDraft({
+              student_id: numericId,
+            }),
+          }));
+        }
+        setSaveStatus("");
+        setSaveErrorDetails("");
+      }
+      currentStudentIdRef.current = value;
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      setSaveStatus("");
+    } else if (name !== "student_id" && teacherForms.result.student_id) {
+      if (typeof performAutoSaveRef?.current === "function") {
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = setTimeout(() => {
+          performAutoSaveRef.current();
+        }, 1500);
+      }
+    }
+  };
+
+  const handleNotificationFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from("notification_files")
+        .upload(filePath, file);
+
+      if (error) {
+        throw error;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("notification_files")
+        .getPublicUrl(filePath);
+
+      setAttachedFileUrl(publicUrlData.publicUrl);
+      showAction("success", "File uploaded and attached successfully!");
+    } catch (error) {
+      console.error("Upload failed:", error);
+      showAction("error", `File upload failed: ${error.message}`);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleTeacherPhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingTeacherPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `teacher-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from("teacher_photos")
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("teacher_photos")
+        .getPublicUrl(fileName);
+
+      // Update the teacher profile form with the uploaded photo URL
+      setAdminForms(curr => ({
+        ...curr,
+        teacherProfile: {
+          ...curr.teacherProfile,
+          photo_url: publicUrlData.publicUrl
+        }
+      }));
+      showAction("success", "Photo uploaded successfully!");
+    } catch (error) {
+      console.error("Photo upload failed:", error);
+      showAction("error", `Photo upload failed: ${error.message}`);
+    } finally {
+      setUploadingTeacherPhoto(false);
+    }
+  };
+
+  
+// Calculate the next occurrence time for a scheduled notification
+const calculateNextSendTime = (scheduleType, scheduleTime, scheduleDay) => {
+  const now = new Date();
+  const [hours, minutes] = scheduleTime.split(":").map(Number);
+  let candidate = new Date(now);
+  candidate.setHours(hours, minutes, 0, 0);
+
+  if (scheduleType === "weekly") {
+    const targetDay = parseInt(scheduleDay || "0", 10);
+    while (candidate.getDay() !== targetDay) {
+      candidate.setDate(candidate.getDate() + 1);
+    }
+  } else if (scheduleType === "monthly") {
+    const targetDate = Math.min(parseInt(scheduleDay || "1", 10), 28);
+    while (candidate.getDate() !== targetDate) {
+      candidate.setDate(candidate.getDate() + 1);
+    }
+  }
+
+  // If candidate is in the past, advance to next period
+  if (candidate <= now) {
+    if (scheduleType === "daily") {
+      candidate.setDate(candidate.getDate() + 1);
+    } else if (scheduleType === "weekly") {
+      candidate.setDate(candidate.getDate() + 7);
+    } else if (scheduleType === "monthly") {
+      candidate.setMonth(candidate.getMonth() + 1);
+    }
+  }
+
+  return candidate.toISOString();
+};
+
+const handleSendCustomNotification = async (event) => {
+    event.preventDefault();
+    const payload = adminForms.customNotification;
+
+    const notifTitle = payload.title;
+    const notifBody = payload.body;
+    const targetRole = payload.target_audience === "user" ? "user" : payload.target_audience;
+    const targetUser = payload.target_audience === "user" ? payload.target_uuid : null;
+
+    if (payload.schedule_enabled === "true") {
+      // Save as scheduled notification
+      const scheduleTime = payload.schedule_time || "09:00";
+      const scheduleDay = payload.schedule_type === "daily" ? null : parseInt(payload.schedule_day || "1", 10);
+
+      // Calculate the initial next_send_at so it doesn't fire immediately
+      const initialNextSend = calculateNextSendTime(
+        payload.schedule_type,
+        scheduleTime,
+        scheduleDay
+      );
+
+      if (editingSchedule) {
+        // UPDATE existing schedule
+        const { error } = await supabase
+          .from("scheduled_notifications")
+          .update({
+            title: notifTitle,
+            body: notifBody,
+            target_role: targetRole,
+            target_user: targetUser,
+            redirect_page: payload.redirect_page,
+            file_url: attachedFileUrl || null,
+            schedule_type: payload.schedule_type,
+            schedule_time: scheduleTime,
+            schedule_day: scheduleDay,
+            is_active: editingSchedule.is_active,
+            next_send_at: initialNextSend,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingSchedule.id);
+
+        if (error) {
+          showAction("error", "Failed to update scheduled notification: " + error.message);
+          return;
+        }
+
+        showAction("success", "Scheduled notification updated!");
+        setEditingSchedule(null);
+      } else {
+        // INSERT new schedule
+        const { error } = await supabase.from("scheduled_notifications").insert([{
+          title: notifTitle,
+          body: notifBody,
+          target_role: targetRole,
+          target_user: targetUser,
+          redirect_page: payload.redirect_page,
+          file_url: attachedFileUrl || null,
+          schedule_type: payload.schedule_type,
+          schedule_time: scheduleTime,
+          schedule_day: scheduleDay,
+          is_active: true,
+          next_send_at: initialNextSend,
+        }]);
+
+        if (error) {
+          showAction("error", "Failed to schedule notification: " + error.message);
+          return;
+        }
+
+        showAction("success", "Notification scheduled (" + payload.schedule_type + ")!");
+      }
+
+      fetchScheduledNotifs();
+    } else {
+      // Send immediately (existing behavior)
+      await broadcastNotification(
+        notifTitle,
+        notifBody,
+        targetRole,
+        targetUser,
+        payload.redirect_page,
+        false,
+        attachedFileUrl || null
+      );
+
+      showAction("success", "Custom Notification Dispatched!");
+    }
+
+    setAttachedFileUrl("");
+
+    setAdminForms((current) => ({
+      ...current,
+      customNotification: {
+        title: "",
+        body: "",
+        target_audience: "all",
+        target_uuid: "",
+        redirect_page: "Home",
+        schedule_enabled: "false",
+        schedule_type: "daily",
+        schedule_day: "1",
+        schedule_time: "09:00"
+      },
+    }));
+  };
+
+  const handleEditSchedule = (schedule) => {
+    setEditingSchedule(schedule);
+    setAdminForms((current) => ({
+      ...current,
+      customNotification: {
+        title: schedule.title || "",
+        body: schedule.body || "",
+        target_audience: schedule.target_role === "user" ? "user" : (schedule.target_role || "all"),
+        target_uuid: schedule.target_user || "",
+        redirect_page: schedule.redirect_page || "Home",
+        schedule_enabled: "true",
+        schedule_type: schedule.schedule_type || "daily",
+        schedule_day: String(schedule.schedule_day ?? 1),
+        schedule_time: schedule.schedule_time?.substring(0, 5) || "09:00",
+      },
+    }));
+  };
+
+  const handleCancelEditSchedule = () => {
+    setEditingSchedule(null);
+    setAdminForms((current) => ({
+      ...current,
+      customNotification: {
+        title: "",
+        body: "",
+        target_audience: "all",
+        target_uuid: "",
+        redirect_page: "Home",
+        schedule_enabled: "false",
+        schedule_type: "daily",
+        schedule_day: "1",
+        schedule_time: "09:00"
+      },
+    }));
+  };
+
+  const fetchScheduledNotifs = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("scheduled_notifications")
+        .select("*")
+        .order("next_send_at", { ascending: true });
+      if (data) setScheduledNotifs(data);
+    } catch (e) {
+      console.warn("Failed to fetch scheduled notifications:", e);
+    }
+  }, []);
+
+  const handleCreateAnnouncement = async (event) => {
+    event.preventDefault();
+
+    const payload = adminForms.announcement;
+
+    const { data, error } = await supabase.from("events").insert([payload]).select().single();
+
+    if (error) {
+      showAction("error", error.message);
+      return;
+    }
+
+    setSchoolData((current) => ({
+      ...current,
+      announcements: [data, ...current.announcements],
+    }));
+    setAdminForms((current) => ({
+      ...current,
+      announcement: { title: "", type: "Update", target_role: "all", event_date: getToday() },
+    }));
+    showAction("success", "Announcement created successfully.");
+    // skipInbox: true ensures it only goes to Announcement page + Push alert, not Inbox list
+    broadcastNotification("New Announcement!", payload.title, payload.target_role || "all", null, "Announcements", true);
+  };
+
+  const handleCreateSchedule = async (event) => {
+    event.preventDefault();
+
+    const payload = {
+      student_id: String(adminForms.schedule.student_id || "").trim(),
+      task_time: adminForms.schedule.task_time,
+      task_name: adminForms.schedule.task_name,
+      is_done: false,
+    };
+
+    const { data, error } = await supabase.from("schedule").insert([payload]).select().single();
+
+    if (error) {
+      showAction("error", error.message);
+      return;
+    }
+
+    setSchoolData((current) => ({
+      ...current,
+      schedule: [...current.schedule, data],
+    }));
+    setAdminForms((current) => ({
+      ...current,
+      schedule: {
+        ...current.schedule,
+        task_name: "",
+      },
+    }));
+    showAction("success", "Schedule created successfully.");
+    broadcastNotification("Schedule Updated", `New task added: ${payload.task_name}`, "all", null, "Schedule");
+  };
+
+  const handleRecordTeacherAttendance = async (event, quickRecord = null) => {
+    if (event && event.preventDefault) event.preventDefault();
+
+    const record = quickRecord || {
+      teacher_name: adminForms.teacherAttendance.teacher_name,
+      attendance_date: adminForms.teacherAttendance.attendance_date,
+      minutes_present: Number(adminForms.teacherAttendance.minutes_present || 0),
+      status: adminForms.teacherAttendance.status,
+      note: adminForms.teacherAttendance.note,
+    };
+
+    // Check admin attendance limit (3 times per day)
+    const today = new Date().toISOString().split('T')[0];
+    const todayAttendanceCount = teacherAttendance.filter(a =>
+      a.attendance_date === today
+    ).length;
+
+    if (todayAttendanceCount >= 3) {
+      showAction("error", "Daily attendance limit reached (3 records per day).");
+      return;
+    }
+
+    const { data, error } = await supabase.from("teacher_attendance").insert([record]).select().single();
+
+    if (error) {
+      showAction("error", error.message);
+      return;
+    }
+
+    setTeacherAttendance((current) => [data, ...current]);
+    setAdminForms((current) => ({
+      ...current,
+      teacherAttendance: {
+        ...current.teacherAttendance,
+        minutes_present: "",
+        note: "",
+      },
+    }));
+    showAction("success", "Teacher attendance saved.");
+  };
+
+  const handleCreateGroup = async (event) => {
+    event.preventDefault();
+
+    const payload = {
+      group_name: adminForms.group.group_name,
+      teacher_name: adminForms.group.teacher_name,
+    };
+
+    const { data, error } = await supabase.from("custom_groups").insert([payload]).select().single();
+
+    if (error) {
+      showAction("error", error.message);
+      return;
+    }
+
+    setCustomGroups((current) => [data, ...current]);
+    setAdminForms((current) => ({
+      ...current,
+      group: {
+        group_name: "",
+        teacher_name: "",
+      },
+      customNotification: {
+        title: "",
+        body: "",
+        target_audience: "all",
+        target_uuid: "",
+        redirect_page: "Home"
+      }
+    }));
+    showAction("success", "Group added successfully.");
+  };
+
+  const handleAssignChild = async (data) => {
+    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number } = data;
+    if (!student_id) {
+      showAction("error", "Please select a student first.");
+      return;
+    }
+
+    console.log("Linking accounts for student:", student_id, { teacher_id, parent_id });
+
+    // Fix: Use schoolData instead of undefined adminData
+    const teacherRecord =
+      schoolData.portalAccessList.find(a => String(a.user_id) === String(teacher_id) || String(a.email) === String(teacher_id)) ||
+      schoolData.teacherProfiles.find(p => String(p.user_id) === String(teacher_id));
+
+    const parentRecord = schoolData.portalAccessList.find(a => String(a.user_id) === String(parent_id) || String(a.email) === String(parent_id));
+
+    // Detect if parent or teacher actually changed/is new
+    const existingStudent = schoolData.students.find(s => String(s.student_id) === String(student_id));
+    const isNewTeacher = teacherRecord && (!existingStudent || String(existingStudent.muhaffiz_id) !== String(teacherRecord.user_id));
+    const isNewParent = parentRecord && (!existingStudent || String(existingStudent.user_id) !== String(parentRecord.user_id));
+
+    // Update child_profiles table directly
+    const updatePayload = {
+      teacher_name: teacherRecord?.full_name || null,
+      teacher_id: teacherRecord?.user_id || teacher_id || null,
+      parent_user_id: parentRecord?.user_id || (parent_id?.includes('@') ? null : parent_id) || null,
+      parent_email: parentRecord?.email || (parent_id?.includes('@') ? parent_id : null) || null
+    };
+
+    if (full_name && full_name.trim()) updatePayload.full_name = full_name.trim();
+    if (arabic_name && arabic_name.trim()) updatePayload.arabic_name = arabic_name.trim();
+    if (group_name && group_name.trim()) updatePayload.group_name = group_name.trim();
+    if (juz && juz.trim()) updatePayload.juz = juz.trim();
+    if (surat && surat.trim()) updatePayload.surat = surat.trim();
+    if (photo_url && photo_url.trim()) updatePayload.photo_url = photo_url.trim();
+    if (its && its.trim()) updatePayload.its = its.trim();
+    if (whatsapp_number !== undefined) updatePayload.whatsapp_number = whatsapp_number ? whatsapp_number.trim() : null;
+
+    const { error: profileError } = await supabase
+      .from("child_profiles")
+      .update(updatePayload)
+      .eq("student_id", student_id);
+
+    if (profileError) {
+      console.error("Link update error:", profileError);
+      showAction("error", `Connection Failed: ${profileError.message}`);
+      return;
+    }
+
+    // Secondary Check: If we have an ID for parent but it wasn't set, force it
+    if (parentRecord?.user_id && !updatePayload.parent_user_id) {
+      await supabase.from("child_profiles").update({ parent_user_id: parentRecord.user_id }).eq("student_id", student_id);
+    }
+
+    // Push assignment notifications
+    const studentName = full_name || existingStudent?.name || "Child";
+
+    if (isNewTeacher) {
+      const targetTeacherUser = teacherRecord.user_id || teacherRecord.email || teacher_id;
+      if (targetTeacherUser) {
+        broadcastNotification(
+          "New Student Assigned",
+          `${studentName} has been assigned to your group by the Admin.`,
+          "user",
+          targetTeacherUser,
+          "My Group"
+        );
+      }
+    }
+
+    if (isNewParent) {
+      const targetParentUser = parentRecord.user_id || parentRecord.email || parent_id;
+      if (targetParentUser) {
+        broadcastNotification(
+          "Child Linked to Account",
+          `Your child, ${studentName}, has been assigned to you by the Admin.`,
+          "user",
+          targetParentUser,
+          "Home"
+        );
+      }
+    }
+
+    // Refresh school data locally
+    setSchoolData((current) => ({
+      ...current,
+      students: current.students.map((s) =>
+        String(s.student_id) === String(student_id)
+          ? {
+            ...s,
+            teacherName: teacherRecord?.full_name || "Unassigned teacher",
+            groupName: group_name || "Ungrouped",
+            muhaffiz_id: teacherRecord?.user_id || teacher_id || null,
+            user_id: parentRecord?.user_id || null,
+            parent_email: parentRecord?.email || null
+          }
+          : s
+      ),
+    }));
+
+    showAction("success", `Assignment updated successfully.`);
+  };
+
+  const handleUnassignChild = async (studentId) => {
+    if (!window.confirm("Are you sure you want to remove this child from their assigned muhaffiz?")) return;
+
+    const { error: profileError } = await supabase
+      .from("child_profiles")
+      .update({
+        teacher_name: null,
+        group_name: null,
+        teacher_id: null,
+        parent_user_id: null,
+        parent_email: null
+      })
+      .eq("student_id", studentId);
+
+    if (profileError) {
+      showAction("error", `Unassign Failed: ${profileError?.message || 'Unknown error'}`);
+      return;
+    }
+
+    // Refresh school data locally
+    setSchoolData((current) => ({
+      ...current,
+      students: current.students.map((s) =>
+        String(s.student_id) === String(studentId)
+          ? { ...s, teacherName: "Unassigned teacher", groupName: "Ungrouped", muhaffiz_id: null, user_id: null }
+          : s
+      ),
+    }));
+
+    showAction("success", "Student unassigned and unlinked from all accounts.");
+  };
+
+  const handleUpdateWhatsappConfig = async (updates) => {
+    const { error } = await supabase
+      .from("whatsapp_config")
+      .upsert({ id: 1, ...updates });
+
+    if (error) {
+      showAction("error", `Failed to save WhatsApp settings: ${error.message}`);
+      return;
+    }
+
+    setWhatsappConfig((current) => ({ ...(current || {}), ...updates, id: 1 }));
+    showAction("success", "WhatsApp settings saved successfully.");
+  };
+
+  const handleUpdateEmailConfig = async (updates) => {
+    const { error } = await supabase
+      .from("email_settings")
+      .upsert({ id: 1, ...updates });
+
+    if (error) {
+      showAction("error", `Failed to save email settings: ${error.message}`);
+      return;
+    }
+
+    setEmailSettings((current) => ({ ...(current || {}), ...updates, id: 1 }));
+    showAction("success", "Email settings saved successfully.");
+  };
+
+  const sendIndividualEmail = async (to, subject, htmlBody, pdfBase64, pdfFilename, studentName) => {
+    if (!to) {
+      throw new Error("Missing recipient email");
+    }
+    const { data, error } = await supabase.functions.invoke("send-email", {
+      body: {
+        to,
+        subject,
+        html: htmlBody,
+        pdfBase64: pdfBase64 || "",
+        pdfFilename: pdfFilename || "progress-report.pdf",
+        studentName: studentName || "",
+      },
+    });
+    if (error) {
+      // Extract actual error from the function response if available
+      const contextError = error.context?.error || (typeof error.context === "string" ? error.context : null);
+      throw new Error(contextError || error.message || "Failed to send email");
+    }
+    if (!data?.success) {
+      throw new Error(data?.error || data?.message || "Failed to send email");
+    }
+    return data;
+  };
+
+  const triggerEmailNotifications = async (silent = false) => {
+    if (!emailSettings) {
+      if (!silent) alert("Email Configuration is not loaded yet. Please wait a second and try again.");
+      return;
+    }
+    if (!emailSettings.enabled) {
+      if (!silent) alert("Email notifications are disabled. Please enable them in Email Settings below.");
+      return;
+    }
+
+    const targetStudents = schoolData.students.filter(s => s.parent_email && s.parent_email.trim() !== "");
+    if (targetStudents.length === 0) {
+      if (!silent) alert("No students found with a parent email address!");
+      showAction("info", "No parents with email addresses found to notify.");
+      return;
+    }
+
+    setSendingEmail(true);
+    setEmailProgress({ current: 0, total: targetStudents.length });
+    setEmailLogs([{ time: new Date().toLocaleTimeString(), text: "Starting email notifications for " + targetStudents.length + " parents...", type: 'info' }]);
+
+    let sentCount = 0;
+    for (let i = 0; i < targetStudents.length; i++) {
+      const student = targetStudents[i];
+      const parentEmail = student.parent_email;
+
+      const subject = (emailSettings.subject_template || "Tahfeez Progress Report for {{child_name}}")
+        .replace(/{{child_name}}/g, student.name || student.full_name || "")
+        .replace(/{{group_name}}/g, student.groupName || "");
+
+      const body = (emailSettings.message_template || "Salam! Please find attached the weekly Tahfeez progress report for {{child_name}}.")
+        .replace(/{{child_name}}/g, student.name || student.full_name || "")
+        .replace(/{{group_name}}/g, student.groupName || "");
+
+      const htmlBody = "<p>" + body.replace(/\\n/g, "<br>") + "</p>";
+
+      setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Sending to " + student.name + " (" + parentEmail + ")...", type: 'sending' }]);
+
+      try {
+        await sendIndividualEmail(parentEmail, subject, htmlBody, "", "progress-report.pdf", student.name);
+        sentCount++;
+        setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Sent to " + student.name + " successfully!", type: 'success' }]);
+      } catch (err) {
+        console.error("Email failed for " + student.name + ":", err.message);
+        setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Failed for " + student.name + ": " + err.message, type: 'error' }]);
+      }
+
+      setEmailProgress(prev => ({ ...prev, current: i + 1 }));
+
+      // Small delay to avoid overwhelming the API
+      if (i < targetStudents.length - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    setEmailLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: "Email notifications finished! Sent: " + sentCount + "/" + targetStudents.length + " successfully.", type: 'info' }]);
+  };
+
+  const handleTeacherUnlock = async (teacher) => {
+    if (!teacher || !teacher.id) {
+      showAction("error", "Invalid teacher selected.");
+      return;
+    }
+    if (!window.confirm(`Unlock progress entry for "${teacher.full_name || teacher.name}"? This will bypass the auto-lock schedule, allowing them to submit reports now.`)) return;
+
+    setTeacherUnlockStatus(`unlocking-${teacher.id}`);
+
+    try {
+      // Find all child profiles belonging to this teacher
+      const { data: childStudents, error: childError } = await supabase
+        .from("child_profiles")
+        .select("student_id")
+        .eq("teacher_id", teacher.user_id);
+
+      if (childError) throw childError;
+
+      const studentIds = (childStudents || []).map(s => s.student_id).filter(Boolean);
+
+      if (studentIds.length === 0) {
+        setTeacherUnlockStatus(`error-${teacher.id}`);
+        showAction("error", `No students found for this teacher.`);
+        setTimeout(() => setTeacherUnlockStatus(""), 3000);
+        return;
+      }
+
+      // Log the unlock action
+      const { error: logError } = await supabase
+        .from("teacher_unlock_logs")
+        .insert([{
+          teacher_id: teacher.id,
+          teacher_name: teacher.full_name || teacher.name || "Unknown",
+          teacher_user_id: teacher.user_id || null,
+          students_affected: studentIds.length,
+          results_affected: studentIds.length,
+          unlocked_by: user?.id || null,
+          unlocked_at: new Date().toISOString(),
+        }]);
+
+      if (logError) console.error("Unlock logging error:", logError);
+
+      // Refresh data
+      await loadPortalData(portalRole, user, null);
+
+      setTeacherUnlockStatus(`done-${teacher.id}`);
+      showAction("success", `Unlocked progress entry for ${teacher.full_name || teacher.name}. They can now submit reports.`);
+
+      setTimeout(() => setTeacherUnlockStatus(""), 3000);
+    } catch (err) {
+      console.error("Teacher unlock error:", err);
+      setTeacherUnlockStatus(`error-${teacher.id}`);
+      showAction("error", `Unlock failed: ${err.message}`);
+      setTimeout(() => setTeacherUnlockStatus(""), 4000);
+    }
+  };
+
+  const handleDeleteRecord = (table, idField = "id") => async (id) => {
+    if (!window.confirm("Are you sure you want to delete this record?")) return;
+
+    const { error } = await supabase.from(table).delete().eq(idField, id);
+
+    if (error) {
+      showAction("error", error.message);
+      return;
+    }
+
+    // Refresh school data
+    await loadPortalData(portalRole, user, parentData.studentProfile);
+    showAction("success", "Record deleted successfully.");
+  };
+
+  const handleClearHistory = (table) => async () => {
+    let tableLabel;
+    if (table === "events") {
+      tableLabel = "Announcements";
+    } else if (table === "scheduled_notifications") {
+      tableLabel = "Scheduled Notifications";
+    } else {
+      tableLabel = "Notifications";
+    }
+    if (!window.confirm(`Are you sure you want to clear all ${tableLabel}? This action is irreversible.`)) return;
+
+    // Use a filter that is guaranteed to match all rows without causing type mismatch errors
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .not("id", "is", null);
+
+    if (error) {
+      showAction("error", `Clear failed: ${error.message}`);
+      return;
+    }
+
+    // Reload appropriate data
+    if (table === "scheduled_notifications") {
+      await fetchScheduledNotifs();
+    } else {
+      await loadPortalData(portalRole, user, parentData.studentProfile);
+    }
+
+    showAction("success", `${tableLabel} history cleared.`);
+  };
+
+  const handleUpdateTeacherProfile = async (event) => {
+    event.preventDefault();
+    const payload = adminForms.teacherProfile;
+
+    const portalAccessList = schoolData.portalAccessList || [];
+    const selectedAccess = portalAccessList.find(
+      (access) => normalizeText(access.full_name) === normalizeText(payload.full_name)
+    );
+    const selectedProfile = teacherProfiles.find(
+      (tp) => normalizeText(tp.full_name) === normalizeText(payload.full_name)
+    );
+    const resolvedUserId = payload.user_id || selectedAccess?.user_id || selectedProfile?.user_id || null;
+
+    if (!resolvedUserId) {
+      showAction("error", "Could not find a user ID for this staff member. Please ensure they have a Supabase Auth account linked.");
+      return;
+    }
+
+    const { error: profileError } = await supabase
+      .from("teacher_profiles")
+      .upsert(
+        {
+          user_id: resolvedUserId,
+          full_name: payload.full_name,
+          photo_url: payload.photo_url,
+          phone_number: payload.phone_number,
+          whatsapp_number: payload.whatsapp_number,
+          salary_per_minute: Number(payload.salary_per_minute || 2.3),
+          show_salary_card: !!payload.show_salary_card,
+          is_active: true,
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (profileError) {
+      showAction("error", profileError.message);
+      return;
+    }
+
+    if (selectedAccess) {
+      const { error: accessError } = await supabase
+        .from("user_portal_access")
+        .update({
+          photo_url: payload.photo_url,
+          salary_per_minute: Number(payload.salary_per_minute || 2.3),
+          show_salary_card: !!payload.show_salary_card,
+        })
+        .eq("user_id", resolvedUserId);
+
+      if (accessError) {
+        console.warn("Portal access sync warning:", accessError.message);
+      }
+    }
+
+    await loadPortalData(portalRole, user, parentData.studentProfile);
+    setAdminForms(curr => ({
+      ...curr,
+      teacherProfile: {
+        user_id: resolvedUserId,
+        full_name: payload.full_name,
+        photo_url: payload.photo_url || "",
+        phone_number: payload.phone_number || "",
+        whatsapp_number: payload.whatsapp_number || "",
+        salary_per_minute: String(payload.salary_per_minute || "2.3"),
+        show_salary_card: !!payload.show_salary_card,
+      }
+    }));
+    showAction("success", "Teacher profile updated.");
+  };
+
+  const handleTeacherResultSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!canTeacherFillProgress) {
+      showAction("error", "Teacher progress-card filling is disabled in Global Settings.");
+      return;
+    }
+
+    const totalScore = RESULT_NUMERIC_FIELDS.reduce(
+      (sum, field) => sum + toNumber(teacherForms.result[field]),
+      0
+    );
+
+    const sId = teacherForms.result.student_id;
+    const numericId = sId && !isNaN(sId) ? Number(sId) : sId;
+
+    const payload = {
+      ...teacherForms.result,
+      student_id: numericId,
+      attendance_count: toNumber(teacherForms.result.attendance_count),
+      total_jadeed_pages: teacherForms.result.total_jadeed_pages || null,
+      murajazah: toNumber(teacherForms.result.murajazah),
+      juz_hali: toNumber(teacherForms.result.juz_hali),
+      takhteet: toNumber(teacherForms.result.takhteet),
+      jadeed: toNumber(teacherForms.result.jadeed),
+    };
+
+    if (isTeacherResultLocked(reportSettingsObject)) {
+      showAction("error", "Progress entry is currently locked. Please wait until the next open window.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("weekly_results")
+      .upsert([payload], { onConflict: "student_id,week_date" })
+      .select()
+      .single();
+
+    if (error) {
+      showAction("error", error.message);
+      return;
+    }
+
+    setSchoolData((current) => {
+      const prevStudent = current.students.find(s => String(s.student_id) === String(data.student_id));
+      const prevRank = prevStudent?.latestResult?.computedRank;
+      const nextWeeklyResults = [
+        data,
+        ...current.weeklyResults.filter((result) =>
+          !(
+            String(result.student_id) === String(data.student_id) &&
+            String(result.week_date) === String(data.week_date)
+          )
+        ),
+      ];
+      const refreshedStudents = current.students.map((student) =>
+        String(student.student_id) === String(data.student_id)
+          ? { ...student, latestResult: prevRank ? { ...data, computedRank: prevRank } : data }
+          : student
+      );
+
+      return {
+        ...current,
+        weeklyResults: nextWeeklyResults,
+        students: refreshedStudents,
+      };
+    });
+
+    setTeacherForms((current) => ({
+      ...current,
+      result: {
+        ...current.result,
+        ...data,
+      },
+    }));
+    showAction("success", "Progress report saved successfully.");
+    const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
+
+    if (targetStudent) {
+      broadcastNotification(
+        "Tahfeez Report Submitted",
+        `A new progress report has been saved for ${targetStudent?.name || "the student"}.`,
+        "parents",
+        targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email,
+        "Progress"
+      );
+    }
+  };
+
+  const handleMarhalaPostCreated = async (post) => {
+    const studentName = post?.student_name || "a student";
+    const marhalaName = post?.marhala_name ? ` for ${post.marhala_name}` : "";
+    const title = "New Marhala Post";
+    const body = `${studentName} has a new Marhala achievement post${marhalaName}. Open your home page to view and like it.`;
+
+    const [parentResult, teacherResult] = await Promise.all([
+      broadcastNotification(title, body, "parents", null, "Home"),
+      broadcastNotification(title, body, "teacher", null, "Home"),
+    ]);
+
+    if (parentResult?.inboxError || parentResult?.fcmError || teacherResult?.inboxError || teacherResult?.fcmError) {
+      showAction("error", "Post saved, but some Marhala notifications failed.");
+    }
+  };
+
+
+
+  if (loading) {
+    return <LoadingScreen message="Connecting to Mauze Tahfeez..." />;
+  }
+
+  if (!user) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+
+
+  return (
+    <React.Fragment>
+      <AnnouncementDetailsModal
+        announcement={selectedAnnouncement}
+        onClose={() => setSelectedAnnouncement(null)}
+      />
+      <div className="app-portal-wrapper">
+        {portalRole === "parents" ? (
+          <ParentPortal
+            activePage={activePage}
+            appTheme={appTheme}
+            isDarkMode={isDarkMode}
+            loadPortalData={loadPortalData}
+            loading={loading}
+            menuOpen={menuOpen}
+            onLogout={handleLogout}
+            onRoleChange={storeRole}
+            parentData={parentData}
+            portalRole={portalRole}
+            reportSettings={reportSettings}
+            jadwalSettings={jadwalSettings}
+            setActivePage={setActivePage}
+            onSearchSelect={handleSearchSelect}
+            setAppTheme={setAppTheme}
+            setIsDarkMode={setIsDarkMode}
+            setMenuOpen={setMenuOpen}
+            setSelectedAnnouncement={setSelectedAnnouncement}
+            setSelectedStudentId={setSelectedStudentId}
+            showAction={showAction}
+            teacherProfiles={teacherProfiles}
+            user={user}
+            schoolData={schoolData}
+            notifications={notificationsList}
+            selectedNotification={selectedNotification}
+            setSelectedNotification={setSelectedNotification}
+            dismissedNotifs={dismissedNotifs}
+            dismissedAnnounces={dismissedAnnounces}
+            dismissedHomeNotifs={dismissedHomeNotifs}
+            onDismissNotif={dismissNotification}
+            onDismissHomeNotif={dismissHomeNotification}
+            onClearAllNotifs={clearAllNotifications}
+            onDismissAnnounce={dismissAnnouncement}
+            onClearAllAnnounces={clearAllAnnouncements}
+            actionMessage={actionMessage}
+          />
+        ) : portalRole === "admin" ? (
+          <AdminPortal
+            activePage={activePage}
+            adminData={{
+              ...schoolData,
+              customGroups,
+              teacherAttendance,
+              supportTickets,
+            }}
+            parentViews={parentViews}
+            adminForms={adminForms}
+            adminTeacherFilter={adminTeacherFilter}
+            loadPortalData={loadPortalData}
+            menuOpen={menuOpen}
+            notifications={notificationsList}
+            scheduledNotifs={scheduledNotifs}
+            fetchScheduledNotifs={fetchScheduledNotifs}
+            editingSchedule={editingSchedule}
+            onEditSchedule={handleEditSchedule}
+            onCancelEditSchedule={handleCancelEditSchedule}
+            onAdminFormChange={handleAdminFormChange}
+            onAdminTeacherFilterChange={handleAdminTeacherFilterChange}
+            onAssignChild={handleAssignChild}
+            onClearHistory={handleClearHistory}
+            onCreateAnnouncement={handleCreateAnnouncement}
+            onCreateGroup={handleCreateGroup}
+            onCreatePortalAccess={handleCreatePortalAccess}
+            onCreateSchedule={handleCreateSchedule}
+            onDeleteRecord={handleDeleteRecord}
+            onLogout={handleLogout}
+            onRecordTeacherAttendance={handleRecordTeacherAttendance}
+            onRoleChange={storeRole}
+            onSendCustomNotification={handleSendCustomNotification}
+            attachedFileUrl={attachedFileUrl}
+            uploadingFile={uploadingFile}
+            onNotificationFileChange={handleNotificationFileChange}
+            onTeacherPhotoUpload={handleTeacherPhotoUpload}
+            uploadingTeacherPhoto={uploadingTeacherPhoto}
+            onShowAction={showAction}
+            teacherUnlockStatus={teacherUnlockStatus}
+            setTeacherUnlockStatus={setTeacherUnlockStatus}
+            onUnassignChild={handleUnassignChild}
+            onUpdateTeacherProfile={handleUpdateTeacherProfile}
+            portalAccess={portalAccess}
+            portalRole={portalRole}
+            reportSettings={reportSettings}
+            jadwalSettings={jadwalSettings}
+            onSaveJadwalSettings={async function(updates) {
+              const { error } = await supabase
+                .from("jadwal_settings")
+                .upsert({ id: 1, ...updates }, { onConflict: "id" })
+                .select()
+                .maybeSingle();
+              if (error) {
+                onShowAction("error", "Failed to update Jadwal settings: " + error.message);
+                return;
+              }
+              onShowAction("success", "Jadwal settings saved successfully!");
+              loadPortalData(portalRole, user);
+            }}
+            whatsappConfig={whatsappConfig}
+            emailSettings={emailSettings}
+            onUpdateEmailConfig={handleUpdateEmailConfig}
+            onSendIndividualEmail={sendIndividualEmail}
+            sendingEmail={sendingEmail}
+            emailProgress={emailProgress}
+            emailLogs={emailLogs}
+            onTriggerEmailNotifications={triggerEmailNotifications}
+            onMarhalaPostCreated={handleMarhalaPostCreated}
+            onSetSendingEmail={setSendingEmail}
+            onSetEmailProgress={setEmailProgress}
+            onSetEmailLogs={setEmailLogs}
+            onUpdateWhatsappConfig={handleUpdateWhatsappConfig}
+            selectedStudentId={selectedStudentId}
+            setActivePage={setActivePage}
+            onSearchSelect={handleSearchSelect}
+            setAdminForms={setAdminForms}
+            setMenuOpen={setMenuOpen}
+            setSelectedAnnouncement={setSelectedAnnouncement}
+            setSelectedStudentId={setSelectedStudentId}
+            teacherProfiles={teacherProfiles}
+            user={user}
+            dismissedNotifs={dismissedNotifs}
+            dismissedAnnounces={dismissedAnnounces}
+            onDismissNotif={dismissNotification}
+            onClearAllNotifs={clearAllNotifications}
+            onDismissAnnounce={dismissAnnouncement}
+            onClearAllAnnounces={clearAllAnnouncements}
+            portalAccessSuccess={portalAccessSuccess}
+            onClosePortalAccessSuccess={() => setPortalAccessSuccess(null)}
+            onTeacherUnlock={handleTeacherUnlock}
+          />
+        ) : (
+          <TeacherPortal
+            user={user}
+            actionMessage={actionMessage}
+            activePage={activePage}
+            loadPortalData={loadPortalData}
+            menuOpen={menuOpen}
+            monthlySalary={monthlySalary}
+            notifications={notificationsList}
+            onLogout={handleLogout}
+            onRoleChange={storeRole}
+            onTeacherFormChange={handleTeacherFormChange}
+            onTeacherGroupFilterChange={handleTeacherGroupFilterChange}
+            onTeacherResultSubmit={handleTeacherResultSubmit}
+            portalAccess={portalAccess}
+            portalRole={portalRole}
+            reportSettings={reportSettings}
+            jadwalSettings={jadwalSettings}
+            parentViews={parentViews}
+            setActivePage={setActivePage}
+            onSearchSelect={handleSearchSelect}
+            setMenuOpen={setMenuOpen}
+            setSelectedAnnouncement={setSelectedAnnouncement}
+            teacherData={teacherData}
+            teacherForms={teacherForms}
+            teacherProfiles={teacherProfiles}
+            schoolData={schoolData}
+            selectedNotification={selectedNotification}
+            setSelectedNotification={setSelectedNotification}
+            activeStudentId={activeStudentId}
+            setActiveStudentId={setActiveStudentId}
+            dismissedNotifs={dismissedNotifs}
+            dismissedAnnounces={dismissedAnnounces}
+            dismissedHomeNotifs={dismissedHomeNotifs}
+            onDismissNotif={dismissNotification}
+            onDismissHomeNotif={dismissHomeNotification}
+            onClearAllNotifs={clearAllNotifications}
+            onDismissAnnounce={dismissAnnouncement}
+            onClearAllAnnounces={clearAllAnnouncements}
+            onShowAction={showAction}
+            teacherUnlockStatus={teacherUnlockStatus}
+            setTeacherUnlockStatus={setTeacherUnlockStatus}
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
+            appTheme={appTheme}
+                        autoSaveTimerRef={autoSaveTimerRef}
+            performAutoSaveRef={performAutoSaveRef}
+            currentStudentIdRef={currentStudentIdRef}
+            saveStatus={saveStatus}
+            setSaveStatus={setSaveStatus}
+            saveErrorDetails={saveErrorDetails}
+            setSaveErrorDetails={setSaveErrorDetails}
+setAppTheme={setAppTheme}
+          />
+        )}
+
+      </div>
+      {searchPageLoading && (
+        <div className="page-loading-overlay">
+          <lottie-player
+            src="/072d1118-7b5f-4275-8eb5-9fefdce1b391 (2).json"
+            background="transparent"
+            speed="1"
+            style={{ width: "200px", height: "200px" }}
+            loop
+            autoplay
+          ></lottie-player>
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+
+

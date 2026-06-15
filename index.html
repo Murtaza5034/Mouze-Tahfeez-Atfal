@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, user-scalable=no" />
+    <meta http-equiv="Cache-Control" content="public, max-age=31536000, immutable" />
+    <meta http-equiv="Pragma" content="public" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Mauze Tahfeez" />
+    <meta name="theme-color" content="#c5a059" />
+    <meta name="description" content="Educational portal for Quran memorization and Islamic learning" />
+    <meta name="keywords" content="Quran, memorization, Islamic education, tahfeez" />
+    <link rel="apple-touch-icon" href="/LOGO%20ATFAAL.png" />
+    <link rel="icon" type="image/png" href="/LOGO%20ATFAAL.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://supabase.co">
+    <link rel="preconnect" href="https://mawaid-b929a.supabase.co">
+    <link rel="preload" href="/Qilka-Bold.otf" as="font" type="font/otf" crossorigin="anonymous">
+    <link rel="preload" href="/Child-Hood.otf" as="font" type="font/otf" crossorigin="anonymous">
+    <link rel="preload" href="/fonts/al-kanz.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+    <link rel="preload" href="/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+    <script src="https://unpkg.com/wavesurfer.js@7.8.14" defer></script>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@2.0.2/dist/lottie-player.js" defer></script>
+    <title>Mauze Tahfeez - Educational Portal</title>
+    <script>
+      (async () => {
+        try {
+          if (!('serviceWorker' in navigator)) return;
+
+          const cleanupFlag = '__mauze_tahfeez_sw_cleanup__';
+          if (sessionStorage.getItem(cleanupFlag) === '1') {
+            sessionStorage.removeItem(cleanupFlag);
+            return;
+          }
+
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          if (!registrations.length) return;
+
+          // Keep Firebase messaging service worker alive (needed for push notifications)
+          const nonFcmRegs = registrations.filter(r =>
+            !r.active?.scriptURL?.includes('firebase-messaging-sw')
+          );
+          if (!nonFcmRegs.length) return;
+
+          sessionStorage.setItem(cleanupFlag, '1');
+          await Promise.allSettled(nonFcmRegs.map((registration) => registration.unregister()));
+
+          if ('caches' in window) {
+            const cacheKeys = await caches.keys();
+            await Promise.allSettled(cacheKeys.map((key) => caches.delete(key)));
+          }
+
+          const url = new URL(window.location.href);
+          url.searchParams.set('fresh', '1');
+          window.location.replace(url.toString());
+        } catch (error) {
+          console.warn('Service worker cleanup skipped:', error);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <div id="root">
+      <div id="app-shell" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fffdf8;flex-direction:column;gap:16px;padding:20px;box-sizing:border-box;">
+        <div style="width:80px;height:80px;border-radius:50%;border:4px solid #f0e6d3;border-top-color:#d4af37;animation:spin 0.8s linear infinite;"></div>
+        <p style="color:#8a786a;font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;letter-spacing:0.05em;">Loading Mauze Tahfeez...</p>
+      </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    </div>
+    <script type="module" src="/src/index.jsx"></script>
+  </body>
+</html>

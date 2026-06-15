@@ -1,0 +1,20 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "npm install --legacy-peer-deps",
+  "rewrites": [
+    {
+      "source": "/portal/Login.aspx",
+      "destination": "/api/portal-proxy?path=Login.aspx"
+    },
+    {
+      "source": "/portal/:path*",
+      "destination": "/api/portal-proxy?path=:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
