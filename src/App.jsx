@@ -3103,7 +3103,6 @@ function SettingsPage({
                       <option value="Schedule">Daily Schedule</option>
                       <option value="Progress">Progress Report</option>
                       <option value="Teachers">Teacher Contacts</option>
-                      <option value="Quran Ikhtebar">Quran Ikhtebar</option>
                       <option value="Hub Raqam">Hub Raqam (Fees)</option>
                     </>
                   ) : (
@@ -3545,7 +3544,6 @@ const resolveRedirectPage = (page, role) => {
       "Teachers": "Teachers",
       "Inbox": "Inbox",
       "Profile": "Profile",
-      "Quran Ikhtebar": "Quran Ikhtebar",
       "Hub Raqam": "Hub Raqam",
       "Apply Leave": "Apply Leave",
       "Settings": "Settings",
@@ -3856,7 +3854,7 @@ function ParentPortal({
   };
   parentData;
 
-  const pageNames = ["Home", "Schedule", "Progress", "Teachers", "Quran Ikhtebar", "Settings"];
+  const pageNames = ["Home", "Schedule", "Progress", "Teachers", "Settings"];
   const assignedRoles = getAssignedRoles(user);
 
   const navigationMap = {
@@ -3865,7 +3863,6 @@ function ParentPortal({
     "Teachers": "Teachers",
     "Progress": "Child Summary",
     "Profile": "Profile",
-    "Quran Ikhtebar": "Quran Ikhtebar",
     "Settings": "Settings",
   };
 
@@ -4012,9 +4009,6 @@ function ParentPortal({
           <button className={`drawer-link ${activePage === "Profile" ? "active" : ""}`} onClick={() => { setActivePage("Profile"); setMenuOpen(false); }}>
             <User size={18} /> My Profile
           </button>
-          <button className={`drawer-link ${activePage === "Quran Ikhtebar" ? "active" : ""}`} onClick={() => { setActivePage("Quran Ikhtebar"); setMenuOpen(false); }}>
-            <BookOpen size={18} /> Quran Ikhtebar
-          </button>
           <button className={`drawer-link ${activePage === "Hub Raqam" ? "active" : ""}`} onClick={() => { setActivePage("Hub Raqam"); setMenuOpen(false); }}>
             <CreditCard size={18} /> Hub Raqam
           </button>
@@ -4084,8 +4078,7 @@ function ParentPortal({
                { label: "Progress Report", value: "Progress" },
                { label: "Announcements", value: "Announcements" },
                { label: "Teacher Profiles", value: "Teachers" },
-               { label: "Quran Ikhtebar", value: "Quran Ikhtebar" },
-               { label: "Hub Raqam (Fees)", value: "Hub Raqam" },
+                { label: "Hub Raqam (Fees)", value: "Hub Raqam" },
                { label: "My Profile", value: "Profile" },
                { label: "App Settings", value: "Settings" }
              ]} 
@@ -4617,13 +4610,6 @@ function ParentPortal({
               </div>
             </div>
           </div>
-        ) : null}
-
-        {activePage === "Quran Ikhtebar" ? (
-          <QuranIkhtebar
-            studentProfile={studentProfile}
-            hifzDetails={hifzDetails}
-          />
         ) : null}
 
         {activePage === "Marhala Posts" ? (
