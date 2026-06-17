@@ -3823,15 +3823,20 @@ function ParentPortal({
         const imgData = canvas.toDataURL("image/jpeg", 0.75); // reduced quality for smaller size
         if (imgData.length < 5000) throw new Error("Capture failed");
 
-        // Use A4 size and fit the image while preserving aspect ratio
+        // Fit image to A4 page with proper scaling and centering
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
         const imgProps = pdf.getImageProperties(imgData);
-        const imgWidth = pageWidth - 20; // 10mm margin each side
-        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-        const finalHeight = imgHeight > pageHeight - 20 ? pageHeight - 20 : imgHeight;
-        pdf.addImage(imgData, "JPEG", 10, 10, imgWidth, finalHeight, undefined, 'FAST');
+        const margin = 5;
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - margin * 2;
+        const fitScale = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
+        const finalWidth = imgProps.width * fitScale;
+        const finalHeight = imgProps.height * fitScale;
+        const x = (pageWidth - finalWidth) / 2;
+        const y = (pageHeight - finalHeight) / 2;
+        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
         const pdfBlob = pdf.output('blob');
         const dlResult = await downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (dlResult?.type === "native") {
@@ -4348,7 +4353,7 @@ function ParentPortal({
                 position: 'fixed', 
                 left: '-10000px', 
                 top: '0', 
-                width: '850px', 
+                width: '794px', 
                 zIndex: -1000, 
                 background: 'white',
                 overflow: 'hidden',
@@ -4357,7 +4362,7 @@ function ParentPortal({
               }}
             >
               {isGeneratingPDF && (
-                <div id="parent-capture-content" style={{ padding: '40px', background: 'white' }}>
+                <div id="parent-capture-content" style={{ background: 'white' }}>
                   <TahfeezReportCard
                     student={{
                       name: studentProfile?.name,
@@ -5311,18 +5316,20 @@ const handleDownloadAllReports = async () => {
             throw new Error("Captured image is blank or too small.");
           }
 
-          // Use A4 size and fit the image while preserving aspect ratio with margins
+          // Fit image to A4 page with proper scaling and centering
           const pdf = new jsPDF('p', 'mm', 'a4');
           const pageWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
           const imgProps = pdf.getImageProperties(imgData);
-          const margin = 10;
+          const margin = 5;
           const maxWidth = pageWidth - margin * 2;
           const maxHeight = pageHeight - margin * 2;
-          const imgWidth = maxWidth;
-          const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-          const finalHeight = imgHeight > maxHeight ? maxHeight : imgHeight;
-          pdf.addImage(imgData, "JPEG", margin, margin, imgWidth, finalHeight, undefined, 'FAST');
+          const fitScale = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
+          const finalWidth = imgProps.width * fitScale;
+          const finalHeight = imgProps.height * fitScale;
+          const x = (pageWidth - finalWidth) / 2;
+          const y = (pageHeight - finalHeight) / 2;
+          pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
           const pdfBlob = pdf.output("blob");
           const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
           zip.file(`${i+1}_${safeName}_Report.pdf`, pdfBlob);
@@ -7768,20 +7775,20 @@ const handleDownloadAllReports = async () => {
           {/* Rendering zone for report generation - kept off-screen but 'visible' for capture */}
           <div 
             id="bulk-capture-hidden-zone"
-            style={{ 
-              position: 'fixed', 
-              left: '-10000px', 
-              top: '0', 
-              width: '850px', 
-              zIndex: -1000, 
-              background: 'white',
-              overflow: 'hidden',
-              height: isGeneratingReports ? 'auto' : '1px',
-              visibility: isGeneratingReports ? 'visible' : 'hidden'
-            }}
-          >
-            {isGeneratingReports && studentToRender && (
-              <div id="actual-report-content" style={{ padding: '40px', background: 'white' }}>
+              style={{ 
+                position: 'fixed', 
+                left: '-10000px', 
+                top: '0', 
+                width: '794px', 
+                zIndex: -1000, 
+                background: 'white',
+                overflow: 'hidden',
+                height: isGeneratingReports ? 'auto' : '1px',
+                visibility: isGeneratingReports ? 'visible' : 'hidden'
+              }}
+            >
+              {isGeneratingReports && studentToRender && (
+                <div id="actual-report-content" style={{ background: 'white' }}>
                 <TahfeezReportCard
                   student={{
                     name: studentToRender.name,
@@ -9027,16 +9034,20 @@ onShowAction,
         const imgData = canvas.toDataURL("image/jpeg", 0.85);
         if (imgData.length < 5000) throw new Error("Capture failed");
 
+        // Fit image to A4 page with proper scaling and centering
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
-        const margin = 10;
-        const maxWidth = pageWidth - margin * 2;
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgWidth = maxWidth;
-        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
         const pageHeight = pdf.internal.pageSize.getHeight();
-        const finalHeight = imgHeight > pageHeight - margin * 2 ? pageHeight - margin * 2 : imgHeight;
-        pdf.addImage(imgData, "JPEG", margin, margin, imgWidth, finalHeight, undefined, 'FAST');
+        const imgProps = pdf.getImageProperties(imgData);
+        const margin = 5;
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - margin * 2;
+        const fitScale = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
+        const finalWidth = imgProps.width * fitScale;
+        const finalHeight = imgProps.height * fitScale;
+        const x = (pageWidth - finalWidth) / 2;
+        const y = (pageHeight - finalHeight) / 2;
+        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
         const pdfBlob = pdf.output("blob");
         const dlResult = await downloadFile(pdfBlob, `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (dlResult?.type === "native") {
@@ -9829,20 +9840,20 @@ onShowAction,
               {/* Hidden capture zone for Teacher PDF download */}
               <div 
                 id="teacher-capture-zone"
-                style={{ 
-                  position: 'fixed', 
-                  left: '-10000px', 
-                  top: '0', 
-                  width: '850px', 
-                  zIndex: -1000, 
-                  background: 'white',
-                  overflow: 'hidden',
-                  height: isGeneratingTeacherPDF ? 'auto' : '1px',
-                  visibility: isGeneratingTeacherPDF ? 'visible' : 'hidden'
-                }}
-              >
-                {isGeneratingTeacherPDF && (
-                  <div id="teacher-capture-content" style={{ padding: '40px', background: 'white' }}>
+              style={{ 
+                position: 'fixed', 
+                left: '-10000px', 
+                top: '0', 
+                width: '794px', 
+                zIndex: -1000, 
+                background: 'white',
+                overflow: 'hidden',
+                height: isGeneratingTeacherPDF ? 'auto' : '1px',
+                visibility: isGeneratingTeacherPDF ? 'visible' : 'hidden'
+              }}
+            >
+              {isGeneratingTeacherPDF && (
+                <div id="teacher-capture-content" style={{ background: 'white' }}>
                     <TahfeezReportCard
                       student={selectedStudent}
                       weeklyResult={liveResult}
@@ -10481,11 +10492,11 @@ export default function App() {
         if (!cached.userId || !cached.role) return false;
         setUser({ id: cached.userId, email: cached.email });
         storeRole(cached.role);
-        setLoading(false);
         try {
           await loadPortalData(cached.role, { id: cached.userId, email: cached.email });
         } catch (e) {
           console.warn("Offline: portal data unavailable", e);
+          return false;
         }
         return true;
       } catch (e) {
@@ -10494,11 +10505,7 @@ export default function App() {
     }
 
     async function initialize() {
-      // Remove stale Supabase tokens before they trigger recovery errors
-      for (const key of Object.keys(localStorage)) {
-        if (key.startsWith('sb-')) localStorage.removeItem(key);
-      }
-
+      // Check session FIRST before deleting tokens
       let session = null;
       try {
         const res = await supabase.auth.getSession();
@@ -10512,11 +10519,31 @@ export default function App() {
 
       if (session) {
         handleAuthChange("INITIAL_SESSION", session);
-      } else {
-        const restored = await tryRestoreCachedAuth();
-        if (!restored && mounted) {
-          setLoading(false);
+        return;
+      }
+
+      // Try token refresh (tokens still in localStorage)
+      try {
+        const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+        if (refreshedSession && mounted) {
+          handleAuthChange("SIGNED_IN", refreshedSession);
+          return;
         }
+      } catch (e) {
+        console.warn("Token refresh failed", e);
+      }
+
+      if (!mounted) return;
+
+      // Fall back to cached auth
+      const restored = await tryRestoreCachedAuth();
+      if (!restored && mounted) {
+        setLoading(false);
+      }
+
+      // Clean up stale tokens after all recovery attempts
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('sb-')) localStorage.removeItem(key);
       }
     }
 

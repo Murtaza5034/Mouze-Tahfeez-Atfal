@@ -14,22 +14,44 @@ type PlayTrack = typeof PLAY_TRACKS[number]
 
 /**
  * Generate a Google OAuth2 access token using the service account JSON key.
- * Reuses the proven google-auth-library pattern from fcm-notification function.
  */
 async function getPlayAccessToken(): Promise<string> {
   const serviceAccountJson = Deno.env.get('GOOGLE_PLAY_SERVICE_ACCOUNT_KEY')
   if (!serviceAccountJson) {
-    throw new Error('GOOGLE_PLAY_SERVICE_ACCOUNT_KEY environment variable is not set.')
+    throw new Error('GOOGLE_PLAY_SERVICE_ACCOUNT_KEY environment variable is not set. Please add it via Supabase Secrets.')
   }
 
-  const credentials = JSON.parse(serviceAccountJson)
+  let credentials: Record<string, unknown>
+  try {
+    credentials = JSON.parse(serviceAccountJson)
+  } catch {
+    throw new Error('GOOGLE_PLAY_SERVICE_ACCOUNT_KEY is not valid JSON. Make sure the entire JSON is a single-line string.')
+  }
+
   const auth = new GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/androidpublisher'],
   })
   const client = await auth.getClient()
   const token = await client.getAccessToken()
-  return token.token as string
+  if (!token?.token) {
+    throw new Error('Failed to generate Google Play access token. Check your service account key.')
+  }
+  return token.token
+}
+
+/**
+ * Delete an abandoned edit so it doesn't accumulate.
+ */
+async function deleteEdit(accessToken: string, packageName: string, editId: string) {
+  try {
+    await fetch(`${PLAY_API_BASE}/applications/${packageName}/edits/${editId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+  } catch {
+    // Best-effort cleanup — don't throw
+  }
 }
 
 /**
@@ -42,9 +64,11 @@ async function deployToPlayStore(
   aabBytes: Uint8Array,
   versionName: string,
   versionCode: number,
-  releaseNotes: string
+  releaseNotes: string,
+  onStage: (stage: string) => void
 ) {
   // Step 1: Create a new edit
+  onStage('Creating Play Store edit…')
   console.log('Creating edit...')
   const editRes = await fetch(`${PLAY_API_BASE}/applications/${packageName}/edits`, {
     method: 'POST',
@@ -57,89 +81,99 @@ async function deployToPlayStore(
 
   if (!editRes.ok) {
     const err = await editRes.text()
-    throw new Error(`Failed to create edit: ${editRes.status} - ${err}`)
+    throw new Error(`Failed to create edit: ${editRes.status} — ${err}`)
   }
 
   const edit = await editRes.json()
   const editId: string = edit.id
   console.log(`Edit created: ${editId}`)
 
-  // Step 2: Upload the AAB bundle
-  console.log('Uploading AAB bundle...')
-  const uploadUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}/bundles`
-  const uploadRes = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/octet-stream',
-    },
-    body: aabBytes,
-  })
-
-  if (!uploadRes.ok) {
-    const err = await uploadRes.text()
-    throw new Error(`Failed to upload AAB: ${uploadRes.status} - ${err}`)
-  }
-
-  const bundle = await uploadRes.json()
-  const bundleVersionCode: number = bundle.versionCode
-  console.log(`AAB uploaded. Version code: ${bundleVersionCode}`)
-
-  // Step 3: Assign the bundle to the requested track
-  console.log(`Assigning to track: ${track}...`)
-  const trackUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}/tracks/${track}`
-  const trackPayload = {
-    track,
-    releases: [
-      {
-        name: versionName,
-        versionCodes: [bundleVersionCode],
-        releaseNotes: releaseNotes
-          ? [{ language: 'en-US', text: releaseNotes }]
-          : [],
-        status: 'completed',
+  try {
+    // Step 2: Upload the AAB bundle
+    onStage('Uploading bundle to Google Play…')
+    console.log(`Uploading AAB bundle (${(aabBytes.length / (1024 * 1024)).toFixed(1)} MB)...`)
+    const uploadUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}/bundles`
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/octet-stream',
       },
-    ],
-  }
+      body: aabBytes,
+    })
 
-  const trackRes = await fetch(trackUrl, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(trackPayload),
-  })
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text()
+      throw new Error(`Failed to upload AAB: ${uploadRes.status} — ${err}`)
+    }
 
-  if (!trackRes.ok) {
-    const err = await trackRes.text()
-    throw new Error(`Failed to assign to track: ${trackRes.status} - ${err}`)
-  }
+    const bundle = await uploadRes.json()
+    const bundleVersionCode: number = bundle.versionCode
+    console.log(`AAB uploaded. Version code: ${bundleVersionCode}`)
 
-  console.log(`Assigned to track "${track}" successfully.`)
+    // Step 3: Assign the bundle to the requested track
+    onStage('Assigning to track…')
+    console.log(`Assigning to track: ${track}...`)
+    const trackUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}/tracks/${track}`
+    const trackPayload = {
+      track,
+      releases: [
+        {
+          name: versionName,
+          versionCodes: [bundleVersionCode],
+          releaseNotes: releaseNotes
+            ? [{ language: 'en-US', text: releaseNotes }]
+            : [],
+          status: 'completed',
+        },
+      ],
+    }
 
-  // Step 4: Commit the edit
-  console.log('Committing edit...')
-  const commitUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}:commit`
-  const commitRes = await fetch(commitUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  })
+    const trackRes = await fetch(trackUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(trackPayload),
+    })
 
-  if (!commitRes.ok) {
-    const err = await commitRes.text()
-    throw new Error(`Failed to commit edit: ${commitRes.status} - ${err}`)
-  }
+    if (!trackRes.ok) {
+      const err = await trackRes.text()
+      throw new Error(`Failed to assign to track: ${trackRes.status} — ${err}`)
+    }
 
-  const commitResult = await commitRes.json()
-  console.log('Edit committed successfully.')
+    console.log(`Assigned to track "${track}" successfully.`)
 
-  return {
-    editId,
-    bundleVersionCode,
-    commitResult,
+    // Step 4: Commit the edit
+    onStage('Committing release…')
+    console.log('Committing edit...')
+    const commitUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}:commit`
+    const commitRes = await fetch(commitUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!commitRes.ok) {
+      const err = await commitRes.text()
+      throw new Error(`Failed to commit edit: ${commitRes.status} — ${err}`)
+    }
+
+    const commitResult = await commitRes.json()
+    console.log('Edit committed successfully.')
+
+    return {
+      editId,
+      bundleVersionCode,
+      commitResult,
+    }
+  } catch (deployError) {
+    // Clean up the abandoned edit
+    console.log(`Cleaning up edit ${editId}...`)
+    await deleteEdit(accessToken, packageName, editId)
+    throw deployError
   }
 }
 
@@ -172,7 +206,7 @@ Deno.serve(async (req) => {
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) {
-      throw new Error('Unauthorized')
+      throw new Error('Unauthorized — please log in again.')
     }
 
     // Parse the multipart form data (AAB file + metadata)
@@ -186,33 +220,36 @@ Deno.serve(async (req) => {
     const track = formData.get('track') as string | null
     const versionName = formData.get('versionName') as string | null
     const versionCodeStr = formData.get('versionCode') as string | null
-    const releaseNotes = formData.get('releaseNotes') as string || ''
+    const releaseNotes = (formData.get('releaseNotes') as string) || ''
 
     if (!aabFile) throw new Error('AAB file is required')
     if (!track || !PLAY_TRACKS.includes(track as PlayTrack)) {
       throw new Error(`Track must be one of: ${PLAY_TRACKS.join(', ')}`)
     }
-    if (!versionName) throw new Error('Version name is required')
+    if (!versionName?.trim()) throw new Error('Version name is required')
     if (!versionCodeStr) throw new Error('Version code is required')
 
     const versionCode = parseInt(versionCodeStr, 10)
-    if (isNaN(versionCode)) throw new Error('Version code must be a number')
+    if (isNaN(versionCode) || versionCode < 1) {
+      throw new Error('Version code must be a positive integer')
+    }
 
     // Validate file is actually an AAB
     if (!aabFile.name.endsWith('.aab')) {
       throw new Error('File must be an .aab file')
     }
 
-    console.log(`Deploying: ${aabFile.name}, track=${track}, version=${versionName} (${versionCode})`)
+    const fileSizeMB = (aabFile.size / (1024 * 1024)).toFixed(1)
+    console.log(`Deploying: ${aabFile.name} (${fileSizeMB} MB), track=${track}, version=${versionName} (${versionCode})`)
 
     // Insert a pending release record
     const { data: releaseRecord, error: insertError } = await supabase
       .from('app_releases')
       .insert({
-        version_name: versionName,
+        version_name: versionName.trim(),
         version_code: versionCode,
         track,
-        release_notes: releaseNotes,
+        release_notes: releaseNotes.trim(),
         aab_file_name: aabFile.name,
         aab_file_size: aabFile.size,
         status: 'deploying',
@@ -241,12 +278,13 @@ Deno.serve(async (req) => {
         packageName,
         track as PlayTrack,
         aabBytes,
-        versionName,
+        versionName.trim(),
         versionCode,
-        releaseNotes
+        releaseNotes.trim(),
+        (stage) => console.log(stage)
       )
 
-      // Mark as deployed
+      // Mark as live
       await supabase
         .from('app_releases')
         .update({
@@ -259,10 +297,10 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: `App deployed to ${track} track successfully!`,
+          message: `App v${versionName.trim()} deployed to ${track} track successfully!`,
           release: {
             id: releaseId,
-            versionName,
+            versionName: versionName.trim(),
             versionCode,
             track,
             editId,
@@ -288,7 +326,10 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Deploy error:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown deployment error',
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
