@@ -224,7 +224,15 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
 
       clearStageTimers();
 
-      const data = await response.json();
+      let data;
+      try {
+        const text = await response.text();
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(
+          `Server returned an invalid response (${response.status}). Check Supabase Edge Function logs and ensure GOOGLE_PLAY_SERVICE_ACCOUNT_KEY is set correctly.`
+        );
+      }
 
       if (!response.ok) {
         throw new Error(data.error || `Deploy failed (${response.status})`);
