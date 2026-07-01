@@ -79,4 +79,7 @@ android/local.properties
 Mauze-Tahfeez.apk
 Mauze-Tahfeez.aab
 
+# Service account keys (DO NOT COMMIT)
+keys/
+
 .vercel
