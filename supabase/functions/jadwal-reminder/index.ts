@@ -277,7 +277,13 @@ async function sendFCMNotification(token: string, title: string, body: string, a
       },
       android: {
         priority: 'high',
-        notification: { sound: 'default', channel_id: 'mauze-tahfeez-notifications' },
+        notification: {
+          sound: 'default',
+          channel_id: 'mauze-tahfeez-notifications',
+          icon: 'ic_notification',
+          color: '#26A69A',
+          visibility: 'PUBLIC',
+        },
       },
       apns: {
         payload: { aps: { sound: 'default', 'content-available': 1 } },

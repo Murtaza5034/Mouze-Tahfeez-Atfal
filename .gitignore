@@ -31,12 +31,19 @@ Thumbs.db
 
 # Scratch/temp files
 scratch/
+base/
 *.cjs
 test-*.js
 test-*.html
 check-*.cjs
 verify-*.cjs
 verify-*.js
+check_*.sql
+diagnose.sql
+run_proc.sql
+test_immediate.sql
+verify_full.sql
+cleanup.sql
 
 # Scratch/debug files
 _debug_*.txt
@@ -68,7 +75,8 @@ keystore-pass.txt
 # Local Android SDK path (machine-specific)
 android/local.properties
 
-# APK
+# APK / AAB
 Mauze-Tahfeez.apk
+Mauze-Tahfeez.aab
 
 .vercel

@@ -184,6 +184,14 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
     setDeploying(true);
     setDeployStage(0);
 
+    let stageTimer1, stageTimer2, stageTimer3, stageTimer4;
+    const clearStageTimers = () => {
+      clearTimeout(stageTimer1);
+      clearTimeout(stageTimer2);
+      clearTimeout(stageTimer3);
+      clearTimeout(stageTimer4);
+    };
+
     try {
       const formData = new FormData();
       formData.append("aab", selectedFile);
@@ -200,17 +208,10 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
       }
 
       // Simulate stage progression for better UX
-      const stageTimer1 = setTimeout(() => setDeployStage(1), 3000);
-      const stageTimer2 = setTimeout(() => setDeployStage(2), 8000);
-      const stageTimer3 = setTimeout(() => setDeployStage(3), 15000);
-      const stageTimer4 = setTimeout(() => setDeployStage(4), 20000);
-
-      const clearStageTimers = () => {
-        clearTimeout(stageTimer1);
-        clearTimeout(stageTimer2);
-        clearTimeout(stageTimer3);
-        clearTimeout(stageTimer4);
-      };
+      stageTimer1 = setTimeout(() => setDeployStage(1), 3000);
+      stageTimer2 = setTimeout(() => setDeployStage(2), 8000);
+      stageTimer3 = setTimeout(() => setDeployStage(3), 15000);
+      stageTimer4 = setTimeout(() => setDeployStage(4), 20000);
 
       const functionUrl = `${supabaseUrl}/functions/v1/deploy-android-app`;
       const response = await fetch(functionUrl, {

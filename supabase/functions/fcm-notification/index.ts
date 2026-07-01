@@ -192,6 +192,9 @@ async function sendFCMv1Notifications(tokens: string[], title: string, body: str
             notification: {
               sound: 'default',
               channel_id: 'mauze-tahfeez-notifications',
+              icon: 'ic_notification',
+              color: '#26A69A',
+              visibility: 'PUBLIC',
             },
           },
           apns: {

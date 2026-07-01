@@ -23,6 +23,7 @@ import {
   Users,
   Phone,
   MessageCircle,
+  ArrowLeft,
   ArrowRight,
   CheckCircle,
   UserCheck,
@@ -679,8 +680,14 @@ const fixArabicScript = (text) => {
     .replace(/ظپظٹ/g, "ظپغŒ");     // Common character fixing
 };
 
+const getNotificationPermission = () => {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') return 'granted';
+  if (localStorage.getItem('fcm_notification_enabled') === 'true') return 'granted';
+  return typeof Notification !== 'undefined' ? Notification.permission : 'default';
+};
+
 const NotificationStatus = ({ role }) => {
-  const [permission, setPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'default');
+  const [permission, setPermission] = useState(getNotificationPermission);
   const [isInitializing, setIsInitializing] = useState(false);
 
   const requestPermission = async () => {
@@ -689,10 +696,12 @@ const NotificationStatus = ({ role }) => {
     try {
       const fcmService = await loadFcmService();
       const result = await fcmService.initialize(role);
-      setPermission(typeof Notification !== "undefined" ? Notification.permission : (result ? "granted" : "default"));
       if (result) {
+        localStorage.setItem('fcm_notification_enabled', 'true');
+        setPermission("granted");
         alert("Notifications enabled successfully!");
       } else {
+        setPermission(getNotificationPermission());
         if ((typeof Notification !== 'undefined' && Notification.permission === 'denied')) {
           alert("Notifications are blocked in your browser settings. Please click the lock icon in your address bar to allow them.");
         } else {
@@ -2894,6 +2903,7 @@ function SettingsPage({
   role = "parents"
 }) {
   const [activeTab, setActiveTab] = useState("Dark mode");
+  const [selectedSetting, setSelectedSetting] = useState(null);
   const tabs = ["Dark mode", "App themes", "Notifications", "Security", "Support", "About"];
   const [passForm, setPassForm] = useState({ newPassword: "", confirmPassword: "" });
 
@@ -2968,206 +2978,226 @@ function SettingsPage({
     }
   };
 
+  const handleSettingClick = (tab) => {
+    setActiveTab(tab);
+    setSelectedSetting(tab);
+  };
+
+  const settingsMeta = {
+    "Dark mode": { icon: Moon, title: "Appearance", desc: "Switch between light and dark visual modes." },
+    "App themes": { icon: Palette, title: "Premium Themes", desc: "Choose a visual style that matches your preference." },
+    "Notifications": { icon: Bell, title: "Notifications", desc: role === "parents" ? "Control how you receive alerts about your child's progress." : "Control how you receive alerts about students and schedules." },
+    "Security": { icon: Lock, title: "Security & Password", desc: "Update your portal access credentials." },
+    "Support": { icon: LifeBuoy, title: "Technical Support", desc: "Encountering an issue? Let our team know." },
+    "About": { icon: Info, title: "Mauze Tahfeez Atfal", desc: "App info, version & registration." },
+  };
+
   return (
     <div className="settings-page fade-in">
-      <div className="section-title-block">
-        <h2 className="page-title">Portal Settings</h2>
-        <p className="page-eyebrow">Personalize your experience</p>
-      </div>
-      <div className="settings-layout">
-      <div className="settings-tabs">
-        {tabs.map(tab => (
-          <button 
-            key={tab} 
-            className={`settings-tab-btn ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-          >
-            <span className="tab-btn-icon">
-              {tab === "Dark mode" && <Moon size={18} />}
-              {tab === "App themes" && <Palette size={18} />}
-              {tab === "Notifications" && <Bell size={18} />}
-              {tab === "Security" && <Lock size={18} />}
-              {tab === "Support" && <LifeBuoy size={18} />}
-              {tab === "About" && <Info size={18} />}
-            </span>
-            <span className="tab-btn-label">{tab}</span>
-            <ChevronRight size={16} className="tab-btn-chevron" />
-          </button>
-        ))}
-      </div>
-      <div className="settings-content premium-card card-appear">
-        {activeTab === "Dark mode" && (
-          <div className="settings-tab-pane">
-            <h3>Appearance</h3>
-            <p>Switch between light and dark visual modes.</p>
-            <div className="setting-control-row">
-              <div className="control-label">
-                {isDarkMode ? <Moon className="gold-icon" /> : <Sun className="gold-icon" />}
-                <span>Dark Mode Status</span>
-              </div>
-              <button 
-                className={`toggle-switch ${isDarkMode ? 'on' : 'off'}`}
-                onClick={() => setIsDarkMode(!isDarkMode)}
-              >
-                <div className="toggle-thumb" />
-              </button>
-            </div>
+      {selectedSetting === null ? (
+        <>
+          <div className="section-title-block">
+            <h2 className="page-title">Portal Settings</h2>
+            <p className="page-eyebrow">Personalize your experience</p>
           </div>
-        )}
-
-        {activeTab === "Notifications" && (
-          <div className="settings-tab-pane">
-            <h3>Notifications</h3>
-            {role === "parents" ? (
-              <p>Control how you receive alerts about your child's progress.</p>
-            ) : (
-              <p>Control how you receive alerts about students and schedules.</p>
-            )}
-            <NotificationStatus role={role} />
-            <div className="hint-text" style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              <Info size={14} /> If you are still not receiving alerts after enabling, check your browser permissions for this site by clicking the lock icon in the address bar.
-            </div>
-          </div>
-        )}
-
-        {activeTab === "Security" && (
-          <div className="settings-tab-pane">
-            <h3>Security & Password</h3>
-            <p>Update your portal access credentials.</p>
-            <form className="stack-form" onSubmit={handleUpdatePassword}>
-              <label>
-                <span>New Password</span>
-                <input 
-                  type="password" 
-                  className="premium-input" 
-                  value={passForm.newPassword}
-                  onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
-                  placeholder="Min 6 characters"
-                  required
-                />
-              </label>
-              <label>
-                <span>Confirm New Password</span>
-                <input 
-                  type="password" 
-                  className="premium-input" 
-                  value={passForm.confirmPassword}
-                  onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
-                  placeholder="Re-type password"
-                  required
-                />
-              </label>
-              <button type="submit" className="action-button">
-                Update Password
-              </button>
-            </form>
-          </div>
-        )}
-
-        {activeTab === "App themes" && (
-          <div className="settings-tab-pane">
-            <h3>Premium Themes</h3>
-            <p>Choose a visual style that matches your preference.</p>
-            <div className="themes-grid">
-              {themes.map(t => (
-                <div 
-                  key={t.id} 
-                  className={`theme-card ${appTheme === t.id ? 'selected' : ''}`}
-                  onClick={() => setAppTheme(t.id)}
+          <div className="settings-grid">
+            {tabs.map(tab => {
+              const meta = settingsMeta[tab];
+              const IconComp = meta.icon;
+              return (
+                <button
+                  key={tab}
+                  className="setting-card"
+                  onClick={() => handleSettingClick(tab)}
                 >
-                  <div className="theme-preview" style={{ backgroundColor: t.color }}>
-                    {t.premium && <span className="premium-badge"><Lock size={12} /> Premium</span>}
-                    {appTheme === t.id && <CheckCircle size={24} color="white" />}
+                  <span className="setting-card-icon">
+                    <IconComp size={22} />
+                  </span>
+                  <div className="setting-card-info">
+                    <span className="setting-card-title">{meta.title}</span>
+                    <span className="setting-card-desc">{meta.desc}</span>
                   </div>
-                  <div className="theme-info">
-                    <h4>{t.name}</h4>
-                    <p>{t.desc}</p>
+                  <ChevronRight size={18} className="setting-card-arrow" />
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div className="settings-detail">
+          <div className="settings-detail-header">
+            <button className="setting-back-btn" onClick={() => setSelectedSetting(null)}>
+              <ArrowLeft size={22} />
+            </button>
+            <div className="settings-detail-heading">
+              {activeTab === "Dark mode" && <><h3>Appearance</h3><p>Switch between light and dark visual modes.</p></>}
+              {activeTab === "Notifications" && <><h3>Notifications</h3>{role === "parents" ? <p>Control how you receive alerts about your child's progress.</p> : <p>Control how you receive alerts about students and schedules.</p>}</>}
+              {activeTab === "Security" && <><h3>Security & Password</h3><p>Update your portal access credentials.</p></>}
+              {activeTab === "App themes" && <><h3>Premium Themes</h3><p>Choose a visual style that matches your preference.</p></>}
+              {activeTab === "Support" && <><h3>Technical Support</h3><p>Encountering an issue? Let our team know.</p></>}
+              {activeTab === "About" && <><h3>Mauze Tahfeez Atfal</h3><p>App info, version & registration.</p></>}
+            </div>
+          </div>
+          <div className="settings-content premium-card card-appear">
+            {activeTab === "Dark mode" && (
+              <div className="settings-tab-pane">
+                <div className="setting-control-row">
+                  <div className="control-label">
+                    {isDarkMode ? <Moon className="gold-icon" /> : <Sun className="gold-icon" />}
+                    <span>Dark Mode Status</span>
+                  </div>
+                  <button 
+                    className={`toggle-switch ${isDarkMode ? 'on' : 'off'}`}
+                    onClick={() => setIsDarkMode(!isDarkMode)}
+                  >
+                    <div className="toggle-thumb" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "Notifications" && (
+              <div className="settings-tab-pane">
+                <NotificationStatus role={role} />
+                <div className="hint-text" style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  <Info size={14} /> If you are still not receiving alerts after enabling, check your browser permissions for this site by clicking the lock icon in the address bar.
+                </div>
+              </div>
+            )}
+
+            {activeTab === "Security" && (
+              <div className="settings-tab-pane">
+                <form className="stack-form" onSubmit={handleUpdatePassword}>
+                  <label>
+                    <span>New Password</span>
+                    <input 
+                      type="password" 
+                      className="premium-input" 
+                      value={passForm.newPassword}
+                      onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
+                      placeholder="Min 6 characters"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>Confirm New Password</span>
+                    <input 
+                      type="password" 
+                      className="premium-input" 
+                      value={passForm.confirmPassword}
+                      onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
+                      placeholder="Re-type password"
+                      required
+                    />
+                  </label>
+                  <button type="submit" className="action-button">
+                    Update Password
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {activeTab === "App themes" && (
+              <div className="settings-tab-pane">
+                <div className="themes-grid">
+                  {themes.map(t => (
+                    <div 
+                      key={t.id} 
+                      className={`theme-card ${appTheme === t.id ? 'selected' : ''}`}
+                      onClick={() => setAppTheme(t.id)}
+                    >
+                      <div className="theme-preview" style={{ backgroundColor: t.color }}>
+                        {t.premium && <span className="premium-badge"><Lock size={12} /> Premium</span>}
+                        {appTheme === t.id && <CheckCircle size={24} color="white" />}
+                      </div>
+                      <div className="theme-info">
+                        <h4>{t.name}</h4>
+                        <p>{t.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "Support" && (
+              <div className="settings-tab-pane">
+                <form className="stack-form" onSubmit={handleSupportSubmit}>
+                  <label>
+                    <span>Which page has the issue?</span>
+                    <select name="page_issue" className="premium-select" required>
+                      {role === "parents" ? (
+                        <>
+                          <option value="Home">Home Dashboard</option>
+                          <option value="Schedule">Daily Schedule</option>
+                          <option value="Progress">Progress Report</option>
+                          <option value="Teachers">Teacher Contacts</option>
+                          <option value="Hub Raqam">Hub Raqam (Fees)</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Students">Student List</option>
+                          <option value="Mark Progress">Mark Progress</option>
+                          <option value="Performance">Performance Overview</option>
+                          <option value="Jadwal">Jadwal</option>
+                          <option value="Inbox">Notifications Inbox</option>
+                        </>
+                      )}
+                      <option value="Other">Other / General Issue</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Describe your issue</span>
+                    <textarea 
+                      name="description" 
+                      className="premium-input" 
+                      placeholder="Tell us what happened..." 
+                      rows="4" 
+                      required
+                    ></textarea>
+                  </label>
+                  <button type="submit" className="action-button">
+                    <Send size={18} /> Send Support Ticket
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {activeTab === "About" && (
+              <div className="settings-tab-pane about-pane">
+                <div className="about-header">
+                  <img src="/logo.png" alt="Mauze Tahfeez" className="about-logo" />
+                  <h3>Mauze Tahfeez Atfal</h3>
+                  <p>v2.4.0 Premium Portal</p>
+                </div>
+                <div className="about-details">
+                  <p>Mauze Tahfeez is a comprehensive Quran memorization tracking platform designed for the students and parents of Al-Madrasa tus Saifiya tul Burhaniyah.</p>
+                  <div className="program-details">
+                    <h4>Program Features:</h4>
+                    <ul>
+                      <li>Real-time Progress Monitoring</li>
+                      <li>Direct Teacher-Parent Communication</li>
+                      <li>Automated Weekly Performance Reports</li>
+                      <li>Interactive Quran Ikhtebar System</li>
+                    </ul>
+                  </div>
+                  <div className="registration-promo">
+                    <p>Join our specialized memorization programs today.</p>
+                    <a 
+                      href="https://www.mahadalquran.com/quran-programs/" 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="register-btn"
+                    >
+                      Register Now at Mahad al Quran <ArrowRight size={16} />
+                    </a>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "Support" && (
-          <div className="settings-tab-pane">
-            <h3>Technical Support</h3>
-            <p>Encountering an issue? Let our team know.</p>
-            <form className="stack-form" onSubmit={handleSupportSubmit}>
-              <label>
-                <span>Which page has the issue?</span>
-                <select name="page_issue" className="premium-select" required>
-                  {role === "parents" ? (
-                    <>
-                      <option value="Home">Home Dashboard</option>
-                      <option value="Schedule">Daily Schedule</option>
-                      <option value="Progress">Progress Report</option>
-                      <option value="Teachers">Teacher Contacts</option>
-                      <option value="Hub Raqam">Hub Raqam (Fees)</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="Students">Student List</option>
-                      <option value="Mark Progress">Mark Progress</option>
-                      <option value="Performance">Performance Overview</option>
-                      <option value="Jadwal">Jadwal</option>
-                      <option value="Inbox">Notifications Inbox</option>
-                    </>
-                  )}
-                  <option value="Other">Other / General Issue</option>
-                </select>
-              </label>
-              <label>
-                <span>Describe your issue</span>
-                <textarea 
-                  name="description" 
-                  className="premium-input" 
-                  placeholder="Tell us what happened..." 
-                  rows="4" 
-                  required
-                ></textarea>
-              </label>
-              <button type="submit" className="action-button">
-                <Send size={18} /> Send Support Ticket
-              </button>
-            </form>
-          </div>
-        )}
-
-        {activeTab === "About" && (
-          <div className="settings-tab-pane about-pane">
-            <div className="about-header">
-              <img src="/logo.png" alt="Mauze Tahfeez" className="about-logo" />
-              <h3>Mauze Tahfeez Atfal</h3>
-              <p>v2.4.0 Premium Portal</p>
-            </div>
-            <div className="about-details">
-              <p>Mauze Tahfeez is a comprehensive Quran memorization tracking platform designed for the students and parents of Al-Madrasa tus Saifiya tul Burhaniyah.</p>
-              <div className="program-details">
-                <h4>Program Features:</h4>
-                <ul>
-                  <li>Real-time Progress Monitoring</li>
-                  <li>Direct Teacher-Parent Communication</li>
-                  <li>Automated Weekly Performance Reports</li>
-                  <li>Interactive Quran Ikhtebar System</li>
-                </ul>
               </div>
-              <div className="registration-promo">
-                <p>Join our specialized memorization programs today.</p>
-                <a 
-                  href="https://www.mahadalquran.com/quran-programs/" 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className="register-btn"
-                >
-                  Register Now at Mahad al Quran <ArrowRight size={16} />
-                </a>
-              </div>
-            </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -11239,6 +11269,32 @@ export default function App() {
                   }
                   return unique;
                 });
+                // Show OS push notification via service worker
+                if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+                  navigator.serviceWorker.ready.then(reg => {
+                    const notifTitle = newNotif.title || 'Mauze Tahfeez Update';
+                    const notifBody = newNotif.body || '';
+                    const redirectPath = newNotif.redirect_page || '';
+                    reg.showNotification(notifTitle, {
+                      body: notifBody,
+                      icon: '/LOGO ATFAAL.png',
+                      badge: '/LOGO ATFAAL.png',
+                      vibrate: [200, 100, 200],
+                      data: {
+                        redirectPage: redirectPath,
+                        url: redirectPath ? '/?redirectPage=' + encodeURIComponent(redirectPath) : '/'
+                      },
+                      tag: 'mauze-tahfeez-notification',
+                      renotify: true,
+                      requireInteraction: true,
+                      actions: [
+                        { action: 'open', title: 'Open Portal', icon: '/LOGO ATFAAL.png' },
+                        { action: 'dismiss', title: 'Dismiss' }
+                      ]
+                    });
+                  }).catch(() => {});
+                  import('./fcmService.js').then(mod => mod.default.playPremiumChime()).catch(() => {});
+                }
               }
             }
           )
