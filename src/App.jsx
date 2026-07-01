@@ -950,7 +950,7 @@ function writeLocalArray(key, value) {
 
 
 
-const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Home", skipInbox = false, fileUrl = null) => {
+const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Inbox", skipInbox = false, fileUrl = null) => {
   const dbPayload = {
     title,
     body,
@@ -10357,7 +10357,7 @@ export default function App() {
       body: "",
       target_audience: "all",
       target_uuid: "",
-      redirect_page: "Home",
+      redirect_page: "Inbox",
       schedule_enabled: "false",
       schedule_type: "daily",
       schedule_day: "1",
@@ -11365,7 +11365,7 @@ export default function App() {
             notif.body,
             notif.target_role === "user" ? notif.target_role : notif.target_role || "all",
             notif.target_user || null,
-            notif.redirect_page || "Home",
+            notif.redirect_page || "Inbox",
             false,
             notif.file_url || null
           );
@@ -11429,13 +11429,13 @@ export default function App() {
 
       if (formKey === "customNotification" && name === "target_audience") {
         if (value === "parents") {
-          updatedForm.redirect_page = "Home";
+          updatedForm.redirect_page = "Inbox";
         } else if (value === "teacher") {
           updatedForm.redirect_page = "My Group";
         } else if (value === "admin") {
           updatedForm.redirect_page = "Overview";
         } else {
-          updatedForm.redirect_page = "Home";
+          updatedForm.redirect_page = "Inbox";
         }
       }
 
@@ -11714,7 +11714,7 @@ const handleSendCustomNotification = async (event) => {
         body: "",
         target_audience: "all",
         target_uuid: "",
-        redirect_page: "Home",
+        redirect_page: "Inbox",
         schedule_enabled: "false",
         schedule_type: "daily",
         schedule_day: "1",
@@ -11732,7 +11732,7 @@ const handleSendCustomNotification = async (event) => {
         body: schedule.body || "",
         target_audience: schedule.target_role === "user" ? "user" : (schedule.target_role || "all"),
         target_uuid: schedule.target_user || "",
-        redirect_page: schedule.redirect_page || "Home",
+        redirect_page: schedule.redirect_page || "Inbox",
         schedule_enabled: "true",
         schedule_type: schedule.schedule_type || "daily",
         schedule_day: String(schedule.schedule_day ?? 1),
@@ -11750,7 +11750,7 @@ const handleSendCustomNotification = async (event) => {
         body: "",
         target_audience: "all",
         target_uuid: "",
-        redirect_page: "Home",
+        redirect_page: "Inbox",
         schedule_enabled: "false",
         schedule_type: "daily",
         schedule_day: "1",
@@ -11896,7 +11896,7 @@ const handleSendCustomNotification = async (event) => {
         body: "",
         target_audience: "all",
         target_uuid: "",
-        redirect_page: "Home"
+        redirect_page: "Inbox"
       }
     }));
     showAction("success", "Group added successfully.");

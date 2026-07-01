@@ -161,8 +161,11 @@ class FCMService {
     PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
       console.log('Capacitor notification action:', action);
       const data = action.notification?.data || {};
-      const url = data?.url || data?.redirectPage || '/';
-      // Navigate to the URL
+      const redirectPage = data?.redirectPage || '';
+      let url = '/';
+      if (redirectPage) {
+        url = '/?redirectPage=' + encodeURIComponent(redirectPage);
+      }
       window.location.href = url;
     });
 
@@ -440,7 +443,11 @@ class FCMService {
   // Handle notification click
   handleNotificationClick(data) {
     try {
-      const url = data?.url || data?.redirectPage || '/';
+      const redirectPage = data?.redirectPage || '';
+      let url = '/';
+      if (redirectPage) {
+        url = '/?redirectPage=' + encodeURIComponent(redirectPage);
+      }
       console.log('Navigating to:', url);
 
       if (window.focus && !window.document.hidden) {
@@ -450,7 +457,7 @@ class FCMService {
       }
     } catch (error) {
       console.error('Error handling notification click:', error);
-      window.location.href = data?.url || data?.redirectPage || '/';
+      window.location.href = '/';
     }
   }
 
