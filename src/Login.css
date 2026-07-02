@@ -32,9 +32,11 @@
   width: 100%;
   max-width: 440px;
   max-height: 96vh;
-  background: linear-gradient(160deg, #ffffff 0%, #fefcf9 100%);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-radius: 28px;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(197, 160, 89, 0.08);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.1);
   position: relative;
   z-index: 2;
   display: flex;
