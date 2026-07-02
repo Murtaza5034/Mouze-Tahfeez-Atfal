@@ -23,7 +23,7 @@
   content: '';
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, rgba(26, 18, 10, 0.3), rgba(0, 0, 0, 0.2));
   z-index: 1;
   pointer-events: none;
 }
@@ -32,9 +32,9 @@
   width: 100%;
   max-width: 440px;
   max-height: 96vh;
-  background: #fff;
+  background: linear-gradient(160deg, #ffffff 0%, #fefcf9 100%);
   border-radius: 28px;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(197, 160, 89, 0.08);
   position: relative;
   z-index: 2;
   display: flex;

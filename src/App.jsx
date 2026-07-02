@@ -9289,11 +9289,6 @@ onShowAction,
             </button>
             <h2 className="page-title">{activePage}</h2>
           </div>
-          {monthlySalary?.showCard && (
-            <div className="salary-pill">
-              <strong>{monthlySalary.totalMinutes || "0"} min</strong> this month
-            </div>
-          )}
           <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
         </header>
 
