@@ -2735,8 +2735,20 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   border: 1px solid rgba(197, 160, 89, 0.08) !important;
 }
 
-[data-theme="classic-pro"] a:not(.no-theme) { color: var(--primary-gold) !important; }
-[data-theme="classic-pro"] a:hover:not(.no-theme) { color: var(--dark-gold) !important; }
+[data-theme="classic-pro"] a:not(.no-theme):not(.golden-gradient-btn):not([class*="btn"]):not([class*="button"]) { color: var(--primary-gold) !important; }
+[data-theme="classic-pro"] a:hover:not(.no-theme):not(.golden-gradient-btn):not([class*="btn"]):not([class*="button"]) { color: var(--dark-gold) !important; }
+
+[data-theme="classic-pro"] .premium-hifz-card {
+  background: linear-gradient(135deg, #1a1a1a 0%, #3d2b1f 100%) !important;
+}
+[data-theme="classic-pro"] .golden-gradient-btn {
+  color: #1a1a1a !important;
+  background: linear-gradient(90deg, #c5a059 0%, #d4af37 50%, #c5a059 100%) !important;
+  background-size: 200% auto !important;
+}
+[data-theme="classic-pro"] .golden-gradient-btn:hover {
+  background-position: right center !important;
+}
 
 [data-theme="classic-pro"] .toggle-switch { background: rgba(197, 160, 89, 0.2) !important; }
 [data-theme="classic-pro"] .toggle-switch.on { background: var(--primary-gold) !important; }
