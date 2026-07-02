@@ -2936,6 +2936,7 @@ function SettingsPage({
     { id: "men", name: "Executive Dark", desc: "Professional and sleek", color: "#263238" },
     { id: "women", name: "Royal Grace", desc: "Sophisticated and soft tones", color: "#8e24aa" },
     { id: "ashara", name: "Ashara Mode", desc: "Aashra Mubarakah — Mourning for Imam Hussain (AS)", color: "#0a5c36", premium: true },
+    { id: "classic-pro", name: "Classic Pro", desc: "Premium frosted glass with classic gold tones", color: "#c5a059", premium: true },
     { id: "plutonium", name: "Plutonium", desc: "Dark neon — where darkness meets the web", color: "#f81ce5", premium: true },
   ];
 

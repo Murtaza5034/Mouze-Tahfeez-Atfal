@@ -2462,6 +2462,266 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   border: 1px solid rgba(248, 28, 229, 0.3) !important;
 }
 
+/* ============================================
+   CLASSIC PRO — Premium Frosted Glass Theme
+   Frosted glass effects with classic gold/brown
+   ============================================ */
+
+[data-theme="classic-pro"] {
+  --primary-gold: #c5a059 !important;
+  --deep-brown: #3d2b1f !important;
+  --cream-bg: rgba(253, 250, 242, 0.55) !important;
+  --soft-brown: #5c3d2e !important;
+  --text-main: #2c1810 !important;
+  --text-muted: #6b5a4c !important;
+  --premium-white: rgba(255, 255, 255, 0.72) !important;
+  --off-white: rgba(250, 248, 242, 0.5) !important;
+  --glass-bg: rgba(255, 255, 255, 0.55) !important;
+  --glass-border: rgba(197, 160, 89, 0.2) !important;
+  --shadow-premium: 0 12px 40px rgba(61, 43, 31, 0.08) !important;
+  --shadow-gold: 0 8px 24px rgba(197, 160, 89, 0.1) !important;
+  --accent-gold: #d4af37 !important;
+  --dark-gold: #b8941e !important;
+  --light-gold: rgba(255, 251, 235, 0.6) !important;
+  --bg-gradient: linear-gradient(135deg, rgba(250, 248, 242, 0.5) 0%, rgba(245, 240, 230, 0.5) 100%) !important;
+}
+
+[data-theme="classic-pro"] ::selection {
+  background: rgba(197, 160, 89, 0.25) !important;
+  color: #2c1810 !important;
+}
+
+[data-theme="classic-pro"] body {
+  backdrop-filter: blur(10px) !important;
+}
+
+[data-theme="classic-pro"] .admin-shell,
+[data-theme="classic-pro"] .app-shell,
+[data-theme="classic-pro"] .portal-shell {
+  backdrop-filter: blur(8px) saturate(120%) !important;
+}
+
+[data-theme="classic-pro"] ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+[data-theme="classic-pro"] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(197, 160, 89, 0.4), rgba(212, 175, 55, 0.3)) !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+}
+[data-theme="classic-pro"] ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(197, 160, 89, 0.6), rgba(212, 175, 55, 0.5)) !important;
+}
+
+[data-theme="classic-pro"] .premium-card,
+[data-theme="classic-pro"] .dashboard-card,
+[data-theme="classic-pro"] .settings-tab-pane,
+[data-theme="classic-pro"] .glass-card {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  border: 1px solid rgba(197, 160, 89, 0.12) !important;
+  box-shadow: 0 8px 32px rgba(61, 43, 31, 0.06) !important;
+}
+[data-theme="classic-pro"] .premium-card:hover {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-color: rgba(197, 160, 89, 0.25) !important;
+  box-shadow: 0 16px 48px rgba(61, 43, 31, 0.1) !important;
+  transform: translateY(-2px);
+}
+[data-theme="classic-pro"] .premium-card::before {
+  background: linear-gradient(90deg, var(--primary-gold), rgba(212, 175, 55, 0.4), transparent) !important;
+}
+
+[data-theme="classic-pro"] .data-card,
+[data-theme="classic-pro"] .form-card,
+[data-theme="classic-pro"] .dashboard-section {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(16px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(150%) !important;
+  border: 1px solid rgba(197, 160, 89, 0.1) !important;
+}
+[data-theme="classic-pro"] .data-card:hover,
+[data-theme="classic-pro"] .dashboard-section:hover {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(197, 160, 89, 0.2) !important;
+}
+
+[data-theme="classic-pro"] .admin-sidebar,
+[data-theme="classic-pro"] .sidebar {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-right: 1px solid rgba(197, 160, 89, 0.1) !important;
+}
+[data-theme="classic-pro"] .sidebar-link:hover {
+  background: rgba(197, 160, 89, 0.1) !important;
+  backdrop-filter: blur(4px) !important;
+}
+[data-theme="classic-pro"] .sidebar-link.active {
+  background: rgba(197, 160, 89, 0.15) !important;
+  box-shadow: inset 3px 0 0 var(--primary-gold) !important;
+}
+[data-theme="classic-pro"] .sidebar-link.active svg { color: var(--primary-gold) !important; }
+[data-theme="classic-pro"] .sidebar-link svg { color: var(--soft-brown) !important; opacity: 0.7 !important; }
+[data-theme="classic-pro"] .sidebar-category { color: var(--primary-gold) !important; }
+[data-theme="classic-pro"] .sidebar-category::after {
+  background: linear-gradient(90deg, var(--primary-gold), transparent) !important;
+  opacity: 0.3 !important;
+}
+[data-theme="classic-pro"] .sidebar-footer { border-top-color: rgba(197, 160, 89, 0.15) !important; }
+[data-theme="classic-pro"] .sidebar-link.logout-btn:hover {
+  background: rgba(220, 38, 38, 0.08) !important;
+  color: #dc2626 !important;
+}
+
+[data-theme="classic-pro"] .topbar,
+[data-theme="classic-pro"] .admin-topbar-dynamic {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(197, 160, 89, 0.08) !important;
+}
+[data-theme="classic-pro"] .topbar-menu-btn {
+  background: rgba(255, 255, 255, 0.5) !important;
+  border: 1px solid rgba(197, 160, 89, 0.12) !important;
+}
+[data-theme="classic-pro"] .topbar-menu-btn:hover {
+  background: rgba(197, 160, 89, 0.12) !important;
+}
+
+[data-theme="classic-pro"] h1,
+[data-theme="classic-pro"] h2,
+[data-theme="classic-pro"] h3,
+[data-theme="classic-pro"] h4,
+[data-theme="classic-pro"] h5,
+[data-theme="classic-pro"] .page-title {
+  color: var(--deep-brown) !important;
+}
+[data-theme="classic-pro"] .section-title::after {
+  background: linear-gradient(90deg, var(--primary-gold), transparent) !important;
+  opacity: 0.3 !important;
+}
+
+[data-theme="classic-pro"] button:not(.no-theme):not([class*="toggle-"]):not(.swiper-button-next):not(.swiper-button-prev) {
+  background: rgba(197, 160, 89, 0.15) !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid rgba(197, 160, 89, 0.12) !important;
+  color: var(--deep-brown) !important;
+}
+[data-theme="classic-pro"] button:not(.no-theme):not([class*="toggle-"]):not(.swiper-button-next):not(.swiper-button-prev):hover {
+  background: rgba(197, 160, 89, 0.25) !important;
+  border-color: rgba(197, 160, 89, 0.25) !important;
+}
+
+[data-theme="classic-pro"] input,
+[data-theme="classic-pro"] select,
+[data-theme="classic-pro"] textarea {
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid rgba(197, 160, 89, 0.12) !important;
+  color: var(--deep-brown) !important;
+}
+[data-theme="classic-pro"] input:focus,
+[data-theme="classic-pro"] select:focus,
+[data-theme="classic-pro"] textarea:focus {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-color: var(--primary-gold) !important;
+  box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.1) !important;
+}
+
+[data-theme="classic-pro"] .performance-pill {
+  background: rgba(197, 160, 89, 0.12) !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid rgba(197, 160, 89, 0.1) !important;
+  color: var(--dark-gold) !important;
+}
+
+[data-theme="classic-pro"] .status-badge.present {
+  background: rgba(34, 197, 94, 0.1) !important;
+  backdrop-filter: blur(4px) !important;
+  color: #16a34a !important;
+}
+[data-theme="classic-pro"] .status-badge.absent {
+  background: rgba(239, 68, 68, 0.1) !important;
+  backdrop-filter: blur(4px) !important;
+  color: #dc2626 !important;
+}
+[data-theme="classic-pro"] .status-badge.pending {
+  background: rgba(234, 179, 8, 0.1) !important;
+  backdrop-filter: blur(4px) !important;
+  color: #ca8a04 !important;
+}
+
+[data-theme="classic-pro"] .login-card {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 1px solid rgba(197, 160, 89, 0.12) !important;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+[data-theme="classic-pro"] .login-container::after {
+  background: linear-gradient(135deg, rgba(197, 160, 89, 0.08), rgba(0, 0, 0, 0.2)) !important;
+}
+[data-theme="classic-pro"] .portal-tab {
+  background: rgba(255, 255, 255, 0.35) !important;
+  backdrop-filter: blur(4px) !important;
+}
+[data-theme="classic-pro"] .portal-tab.active {
+  background: rgba(197, 160, 89, 0.15) !important;
+  color: var(--deep-brown) !important;
+}
+
+[data-theme="classic-pro"] .settings-tabs {
+  background: rgba(255, 255, 255, 0.35) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(197, 160, 89, 0.08) !important;
+}
+[data-theme="classic-pro"] .settings-tab-btn {
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="classic-pro"] .settings-tab-btn:hover {
+  background: rgba(197, 160, 89, 0.08) !important;
+}
+[data-theme="classic-pro"] .settings-tab-btn.active {
+  background: rgba(197, 160, 89, 0.15) !important;
+  color: var(--deep-brown) !important;
+  box-shadow: inset 3px 0 0 var(--primary-gold) !important;
+}
+[data-theme="classic-pro"] .setting-card {
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(197, 160, 89, 0.08) !important;
+}
+[data-theme="classic-pro"] .setting-card:hover {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(197, 160, 89, 0.18) !important;
+}
+
+[data-theme="classic-pro"] .premium-notif-card {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(197, 160, 89, 0.08) !important;
+}
+
+[data-theme="classic-pro"] .premium-attendance-card {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(197, 160, 89, 0.08) !important;
+}
+
+[data-theme="classic-pro"] a:not(.no-theme) { color: var(--primary-gold) !important; }
+[data-theme="classic-pro"] a:hover:not(.no-theme) { color: var(--dark-gold) !important; }
+
+[data-theme="classic-pro"] .toggle-switch { background: rgba(197, 160, 89, 0.2) !important; }
+[data-theme="classic-pro"] .toggle-switch.on { background: var(--primary-gold) !important; }
+[data-theme="classic-pro"] .toggle-thumb { background: #fff !important; }
+
+[data-theme="classic-pro"] .premium-badge {
+  background: linear-gradient(135deg, #c5a059, #d4af37) !important;
+}
+
 /* ---- Premium badge on theme card ---- */
 .premium-badge {
   display: inline-flex;
