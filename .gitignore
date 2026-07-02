@@ -29,6 +29,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Plutionium (separate Next.js project)
+plutonium-1.0.0/
+
 # Scratch/temp files
 scratch/
 base/
