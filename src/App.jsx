@@ -2937,6 +2937,7 @@ function SettingsPage({
     { id: "women", name: "Royal Grace", desc: "Sophisticated and soft tones", color: "#8e24aa" },
     { id: "ashara", name: "Ashara Mode", desc: "Aashra Mubarakah — Mourning for Imam Hussain (AS)", color: "#0a5c36", premium: true },
     { id: "glass", name: "Frosted Glass", desc: "Elegant translucent glass design with blur", color: "rgba(197,160,89,0.25)", premium: true },
+    { id: "plutonium", name: "Plutonium", desc: "Dark neon — where darkness meets the web", color: "#f81ce5", premium: true },
   ];
 
   const handleSupportSubmit = async (e) => {

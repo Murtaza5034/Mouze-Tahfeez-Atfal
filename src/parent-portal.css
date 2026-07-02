@@ -1877,6 +1877,358 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   color: var(--accent-gold) !important;
 }
 
+/* ============================================
+   PLUTONIUM MODE — Dark Neon Theme
+   "where darkness meets the web"
+   Electric pink / fuchsia / purple / indigo
+   ============================================ */
+
+/* ---- Plutonium CSS Variables ---- */
+[data-theme="plutonium"] {
+  --primary-gold: #f81ce5 !important;
+  --accent-gold: #a855f7 !important;
+  --dark-gold: #c026d3 !important;
+  --light-gold: rgba(248, 28, 229, 0.1) !important;
+  --deep-brown: #f1f5f9 !important;
+  --soft-brown: rgba(148, 163, 184, 0.8) !important;
+  --text-main: #e2e8f0 !important;
+  --text-muted: rgba(148, 163, 184, 0.6) !important;
+  --premium-white: #1e1e2e !important;
+  --off-white: #181825 !important;
+  --cream-bg: #11111b !important;
+  --glass-bg: rgba(30, 30, 46, 0.85) !important;
+  --glass-border: rgba(248, 28, 229, 0.15) !important;
+  --shadow-premium: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
+  --shadow-gold: 0 8px 24px rgba(248, 28, 229, 0.2) !important;
+  --shadow-gold-lg: 0 16px 48px rgba(248, 28, 229, 0.25) !important;
+  --bg-gradient: linear-gradient(135deg, #11111b 0%, #1e1e2e 50%, #181825 100%) !important;
+}
+
+[data-theme="plutonium"] ::selection {
+  background: #f81ce5 !important;
+  color: #fff !important;
+}
+
+/* ---- Body & Shell ---- */
+[data-theme="plutonium"] body {
+  background: #11111b !important;
+}
+
+[data-theme="plutonium"] .admin-shell,
+[data-theme="plutonium"] .app-shell,
+[data-theme="plutonium"] .portal-shell {
+  background: var(--bg-gradient) !important;
+}
+
+/* ---- Scrollbar ---- */
+[data-theme="plutonium"] ::-webkit-scrollbar-track {
+  background: #181825 !important;
+}
+
+[data-theme="plutonium"] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #f81ce5, #a855f7) !important;
+  border-radius: 10px !important;
+}
+
+[data-theme="plutonium"] ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #ff49f0, #c084fc) !important;
+}
+
+/* ---- Cards ---- */
+[data-theme="plutonium"] .premium-card {
+  background: linear-gradient(145deg, #1e1e2e, #252540) !important;
+  border: 1px solid rgba(248, 28, 229, 0.12) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(248, 28, 229, 0.05) inset !important;
+}
+
+[data-theme="plutonium"] .premium-card:hover {
+  border-color: rgba(248, 28, 229, 0.3) !important;
+  box-shadow: 0 16px 48px rgba(248, 28, 229, 0.12), 0 0 0 1px rgba(248, 28, 229, 0.08) inset !important;
+}
+
+[data-theme="plutonium"] .premium-card::before {
+  background: linear-gradient(90deg, transparent, #f81ce5, #a855f7, #f81ce5, transparent) !important;
+}
+
+[data-theme="plutonium"] .data-card,
+[data-theme="plutonium"] .form-card,
+[data-theme="plutonium"] .dashboard-section {
+  background: linear-gradient(145deg, #1e1e2e, #252540) !important;
+  border: 1px solid rgba(248, 28, 229, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25) !important;
+}
+
+[data-theme="plutonium"] .data-card:hover,
+[data-theme="plutonium"] .dashboard-section:hover {
+  border-color: rgba(248, 28, 229, 0.2) !important;
+}
+
+/* ---- Sidebar ---- */
+[data-theme="plutonium"] .admin-sidebar,
+[data-theme="plutonium"] .sidebar {
+  background: linear-gradient(180deg, #1e1e2e 0%, #181825 100%) !important;
+  border-right: 1px solid rgba(248, 28, 229, 0.1) !important;
+  box-shadow: 10px 0 40px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="plutonium"] .sidebar-link:hover {
+  background: rgba(248, 28, 229, 0.08) !important;
+}
+
+[data-theme="plutonium"] .sidebar-link.active {
+  background: linear-gradient(90deg, rgba(248, 28, 229, 0.12) 0%, transparent 100%) !important;
+  border-left: 4px solid #f81ce5 !important;
+  box-shadow: inset 0 1px 0 rgba(248, 28, 229, 0.08) !important;
+}
+
+[data-theme="plutonium"] .sidebar-link.active svg {
+  filter: drop-shadow(0 0 8px rgba(248, 28, 229, 0.4)) !important;
+}
+
+[data-theme="plutonium"] .sidebar-link svg {
+  color: #f81ce5 !important;
+}
+
+[data-theme="plutonium"] .sidebar-category {
+  color: rgba(248, 28, 229, 0.5) !important;
+}
+
+[data-theme="plutonium"] .sidebar-category::after {
+  background: linear-gradient(90deg, rgba(248, 28, 229, 0.15), transparent) !important;
+}
+
+[data-theme="plutonium"] .sidebar-footer {
+  border-top-color: rgba(248, 28, 229, 0.08) !important;
+  background: linear-gradient(0deg, rgba(248, 28, 229, 0.03), transparent) !important;
+}
+
+[data-theme="plutonium"] .sidebar-link.logout-btn {
+  color: rgba(248, 113, 113, 0.8) !important;
+}
+
+[data-theme="plutonium"] .sidebar-link.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #f87171 !important;
+}
+
+/* ---- Topbar ---- */
+[data-theme="plutonium"] .topbar,
+[data-theme="plutonium"] .admin-topbar-dynamic {
+  background: rgba(30, 30, 46, 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(248, 28, 229, 0.1) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2) !important;
+}
+
+[data-theme="plutonium"] .topbar-menu-btn {
+  background: rgba(248, 28, 229, 0.05) !important;
+  border-color: rgba(248, 28, 229, 0.12) !important;
+  color: var(--text-main) !important;
+}
+
+[data-theme="plutonium"] .topbar-menu-btn:hover {
+  background: rgba(248, 28, 229, 0.12) !important;
+  border-color: #f81ce5 !important;
+}
+
+/* ---- Headings ---- */
+[data-theme="plutonium"] h1,
+[data-theme="plutonium"] h2,
+[data-theme="plutonium"] h3,
+[data-theme="plutonium"] h4,
+[data-theme="plutonium"] h5,
+[data-theme="plutonium"] .page-title {
+  color: var(--deep-brown) !important;
+}
+
+[data-theme="plutonium"] .section-title::after {
+  background: linear-gradient(90deg, rgba(248, 28, 229, 0.2), transparent) !important;
+}
+
+/* ---- Buttons ---- */
+[data-theme="plutonium"] button:not(.no-theme):not([class*="toggle-"]):not(.swiper-button-next):not(.swiper-button-prev) {
+  background: rgba(248, 28, 229, 0.08) !important;
+  border: 1px solid rgba(248, 28, 229, 0.15) !important;
+  color: var(--text-main) !important;
+}
+
+[data-theme="plutonium"] button:not(.no-theme):not([class*="toggle-"]):not(.swiper-button-next):not(.swiper-button-prev):hover {
+  background: rgba(248, 28, 229, 0.15) !important;
+  border-color: #f81ce5 !important;
+  box-shadow: 0 0 20px rgba(248, 28, 229, 0.15) !important;
+}
+
+/* ---- Inputs ---- */
+[data-theme="plutonium"] input,
+[data-theme="plutonium"] select,
+[data-theme="plutonium"] textarea {
+  background: rgba(30, 30, 46, 0.8) !important;
+  border: 1px solid rgba(248, 28, 229, 0.12) !important;
+  color: var(--text-main) !important;
+}
+
+[data-theme="plutonium"] input:focus,
+[data-theme="plutonium"] select:focus,
+[data-theme="plutonium"] textarea:focus {
+  border-color: #f81ce5 !important;
+  box-shadow: 0 0 0 4px rgba(248, 28, 229, 0.1) !important;
+}
+
+/* ---- Performance Pill ---- */
+[data-theme="plutonium"] .performance-pill {
+  background: rgba(248, 28, 229, 0.1) !important;
+  border-color: rgba(248, 28, 229, 0.15) !important;
+  color: #f81ce5 !important;
+}
+
+/* ---- Status Badges ---- */
+[data-theme="plutonium"] .status-badge.present {
+  background: rgba(34, 197, 94, 0.15) !important;
+  color: #4ade80 !important;
+}
+
+[data-theme="plutonium"] .status-badge.absent {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+}
+
+[data-theme="plutonium"] .status-badge.pending {
+  background: rgba(234, 179, 8, 0.15) !important;
+  color: #fbbf24 !important;
+}
+
+/* ---- Login ---- */
+[data-theme="plutonium"] .login-card {
+  background: linear-gradient(160deg, #1e1e2e, #252540) !important;
+  border: 1px solid rgba(248, 28, 229, 0.12) !important;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(248, 28, 229, 0.05) inset !important;
+}
+
+[data-theme="plutonium"] .login-card-accent {
+  background: linear-gradient(90deg, transparent, #f81ce5, #a855f7, #f81ce5, transparent) !important;
+  box-shadow: 0 0 20px rgba(248, 28, 229, 0.3) !important;
+}
+
+[data-theme="plutonium"] .login-container {
+  background: #0a0a0f !important;
+}
+
+[data-theme="plutonium"] .login-container::after {
+  background: linear-gradient(135deg, rgba(248, 28, 229, 0.05), rgba(168, 85, 247, 0.05)) !important;
+}
+
+[data-theme="plutonium"] .portal-tab {
+  background: rgba(248, 28, 229, 0.05) !important;
+  border-color: rgba(248, 28, 229, 0.1) !important;
+  color: var(--text-muted) !important;
+}
+
+[data-theme="plutonium"] .portal-tab.active {
+  background: rgba(248, 28, 229, 0.15) !important;
+  border-color: rgba(248, 28, 229, 0.25) !important;
+  color: #f81ce5 !important;
+}
+
+[data-theme="plutonium"] .input-with-icon input {
+  background: rgba(30, 30, 46, 0.8) !important;
+}
+
+[data-theme="plutonium"] .input-with-icon > svg:first-child {
+  color: #f81ce5 !important;
+}
+
+[data-theme="plutonium"] .input-group label {
+  color: rgba(248, 28, 229, 0.6) !important;
+}
+
+[data-theme="plutonium"] .login-button {
+  background: linear-gradient(135deg, #f81ce5, #a855f7) !important;
+  box-shadow: 0 8px 24px rgba(248, 28, 229, 0.25) !important;
+}
+
+[data-theme="plutonium"] .login-button:hover {
+  box-shadow: 0 12px 32px rgba(248, 28, 229, 0.35) !important;
+}
+
+[data-theme="plutonium"] .login-logo-img {
+  background: rgba(248, 28, 229, 0.08) !important;
+  border-color: rgba(248, 28, 229, 0.15) !important;
+}
+
+/* ---- Settings ---- */
+[data-theme="plutonium"] .settings-tabs {
+  background: rgba(30, 30, 46, 0.8) !important;
+  border: 1px solid rgba(248, 28, 229, 0.08) !important;
+}
+
+[data-theme="plutonium"] .settings-tab-btn {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="plutonium"] .settings-tab-btn:hover {
+  background: rgba(248, 28, 229, 0.06) !important;
+  color: var(--text-main) !important;
+}
+
+[data-theme="plutonium"] .settings-tab-btn.active {
+  background: rgba(248, 28, 229, 0.1) !important;
+  color: #f81ce5 !important;
+}
+
+[data-theme="plutonium"] .settings-tab-btn.active .tab-btn-icon svg {
+  color: #f81ce5 !important;
+}
+
+[data-theme="plutonium"] .setting-card {
+  background: rgba(30, 30, 46, 0.8) !important;
+  border: 1px solid rgba(248, 28, 229, 0.08) !important;
+}
+
+[data-theme="plutonium"] .setting-card:hover {
+  background: rgba(248, 28, 229, 0.06) !important;
+  border-color: rgba(248, 28, 229, 0.2) !important;
+}
+
+/* ---- Notifications ---- */
+[data-theme="plutonium"] .premium-notif-card {
+  background: rgba(30, 30, 46, 0.9) !important;
+  border-color: rgba(248, 28, 229, 0.08) !important;
+}
+
+/* ---- Attendance Card ---- */
+[data-theme="plutonium"] .premium-attendance-card {
+  background: linear-gradient(145deg, #1e1e2e, #252540) !important;
+  border-color: rgba(248, 28, 229, 0.12) !important;
+}
+
+/* ---- Link ---- */
+[data-theme="plutonium"] a:not(.no-theme) {
+  color: #f81ce5 !important;
+}
+
+[data-theme="plutonium"] a:hover:not(.no-theme) {
+  color: #ff49f0 !important;
+}
+
+/* ---- Toggle ---- */
+[data-theme="plutonium"] .toggle-switch {
+  background: rgba(248, 28, 229, 0.15) !important;
+}
+
+[data-theme="plutonium"] .toggle-switch.on {
+  background: linear-gradient(135deg, #f81ce5, #a855f7) !important;
+}
+
+[data-theme="plutonium"] .toggle-thumb {
+  background: #fff !important;
+}
+
+/* ---- Premium badge override ---- */
+[data-theme="plutonium"] .premium-badge {
+  background: linear-gradient(135deg, #f81ce5, #a855f7) !important;
+  border: 1px solid rgba(248, 28, 229, 0.3) !important;
+}
+
 /* ---- Premium badge on theme card ---- */
 .premium-badge {
   display: inline-flex;
