@@ -1187,16 +1187,631 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
    SETTINGS & THEMES & SUPPORT
    ======================================== */
 
-/* Dark Mode Variables */
+/* ============================================
+   DARK MODE — Premium Dark Theme
+   Full system dark mode like mobile OS
+   ============================================ */
+
+/* ---- Dark Mode Variables ---- */
 .dark-mode {
-  --cream-bg: #1a1412 !important;
-  --premium-white: #2a2220 !important;
-  --glass-bg: rgba(42, 34, 32, 0.8) !important;
-  --text-main: #e0d0c0 !important;
+  --cream-bg: #121212 !important;
+  --premium-white: #1e1e1e !important;
+  --off-white: #1a1a1a !important;
+  --glass-bg: rgba(30, 30, 30, 0.88) !important;
+  --glass-border: rgba(255, 255, 255, 0.08) !important;
+  --text-main: #e8e0d8 !important;
   --text-muted: #a09080 !important;
-  --glass-border: rgba(255, 255, 255, 0.1) !important;
   --deep-brown: #d4af37 !important;
   --soft-brown: #a09080 !important;
+  --primary-gold: #d4af37 !important;
+  --accent-gold: #e6c84a !important;
+  --dark-gold: #c5a059 !important;
+  --light-gold: rgba(212, 175, 55, 0.1) !important;
+  --shadow-premium: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
+  --shadow-gold: 0 8px 24px rgba(212, 175, 55, 0.1) !important;
+  --bg-gradient: linear-gradient(135deg, #121212 0%, #1a1a1a 50%, #121212 100%) !important;
+}
+
+/* ---- Dark Mode Selection ---- */
+.dark-mode ::selection {
+  background: rgba(212, 175, 55, 0.3) !important;
+  color: #fff !important;
+}
+
+/* ---- Dark Mode Body & Shell ---- */
+.dark-mode .admin-shell,
+.dark-mode .app-shell,
+.dark-mode .portal-shell {
+  background: var(--bg-gradient) !important;
+}
+
+/* ---- Dark Mode Scrollbar ---- */
+.dark-mode ::-webkit-scrollbar-track {
+  background: #1a1a1a !important;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-gold) !important;
+}
+
+/* ---- Dark Mode Cards (white backgrounds) ---- */
+.dark-mode .data-card,
+.dark-mode .form-card,
+.dark-mode .dashboard-section,
+.dark-mode .child-info-card,
+.dark-mode .notification-status-card,
+.dark-mode .news-card,
+.dark-mode .announce-card,
+.dark-mode .settings-tab-pane,
+.dark-mode .empty-state-card,
+.dark-mode .search-results-dropdown,
+.dark-mode .photo-placeholder,
+.dark-mode .payment-guideline-card,
+.dark-mode .schedule-item,
+.dark-mode .student-row,
+.dark-mode .group-card,
+.dark-mode .record-card,
+.dark-mode .empty-state,
+.dark-mode .history-card-premium,
+.dark-mode .history-card,
+.dark-mode .premium-faculty-card,
+.dark-mode .report-vessel,
+.dark-mode .h-page-view,
+.dark-mode .live-mistake-panel,
+.dark-mode .notif-overlay-card,
+.dark-mode .notifications-panel {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-mode .history-card-premium {
+  box-shadow: var(--shadow-premium) !important;
+}
+
+/* ---- Dark Mode Cards with special backgrounds ---- */
+.dark-mode .premium-card {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--shadow-premium) !important;
+}
+
+.dark-mode .premium-card:hover {
+  box-shadow: var(--shadow-gold) !important;
+  border-color: var(--primary-gold) !important;
+}
+
+/* ---- Dark Mode Bottom Nav ---- */
+.dark-mode .bottom-nav-bar {
+  background: var(--premium-white) !important;
+  border-top-color: var(--glass-border) !important;
+}
+
+.dark-mode .bottom-nav-bar .nav-link {
+  background: transparent !important;
+}
+
+/* ---- Dark Mode Chat ---- */
+.dark-mode .chat-body {
+  background: var(--cream-bg) !important;
+}
+
+.dark-mode .received .msg-bubble {
+  background: var(--premium-white) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+.dark-mode .chat-footer {
+  background: var(--premium-white) !important;
+  border-top-color: var(--glass-border) !important;
+}
+
+.dark-mode .bot-bubble {
+  background: var(--premium-white) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+/* ---- Dark Mode Sidebar ---- */
+.dark-mode .sidebar,
+.dark-mode .admin-sidebar {
+  background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%) !important;
+  border-right-color: var(--glass-border) !important;
+}
+
+.dark-mode .sidebar-link.active {
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.12) 0%, transparent 100%) !important;
+}
+
+.dark-mode .sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark-mode .sidebar-link.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.dark-mode .sidebar-footer {
+  border-top-color: var(--glass-border) !important;
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.02), transparent) !important;
+}
+
+.dark-mode .sidebar-close-btn,
+.dark-mode .drawer-close {
+  background: var(--premium-white) !important;
+  color: var(--text-main) !important;
+}
+
+/* ---- Dark Mode Topbar ---- */
+.dark-mode .topbar {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) !important;
+  border-bottom-color: var(--glass-border) !important;
+}
+
+.dark-mode .topbar-menu-btn {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--glass-border) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode .topbar-menu-btn:hover {
+  background: var(--light-gold) !important;
+  color: var(--primary-gold) !important;
+  border-color: var(--primary-gold) !important;
+}
+
+.dark-mode .topbar-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* ---- Dark Mode Buttons ---- */
+.dark-mode button:not(.no-theme):not([class*="toggle-"]):not(.swiper-button-next):not(.swiper-button-prev):not(.premium-dismiss):not(.card-dismiss-btn) {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode button:not(.no-theme):not([class*="toggle-"]):not(.swiper-button-next):not(.swiper-button-prev):not(.premium-dismiss):not(.card-dismiss-btn):hover {
+  background: var(--light-gold) !important;
+  border-color: var(--primary-gold) !important;
+}
+
+.dark-mode .action-button.secondary {
+  background: var(--premium-white) !important;
+}
+
+.dark-mode .clear-history-btn {
+  background: var(--premium-white) !important;
+}
+
+.dark-mode .clear-history-btn:hover {
+  background: var(--light-gold) !important;
+}
+
+.dark-mode .card-dismiss-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* ---- Dark Mode Nav Link ---- */
+.dark-mode .nav-link {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark-mode .nav-link:hover {
+  background: var(--light-gold) !important;
+}
+
+.dark-mode .nav-link.active {
+  background: linear-gradient(135deg, var(--light-gold), transparent) !important;
+}
+
+/* ---- Dark Mode Inputs ---- */
+.dark-mode input,
+.dark-mode select,
+.dark-mode textarea,
+.dark-mode .premium-select,
+.dark-mode .premium-input-mini {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--glass-border) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode input:focus,
+.dark-mode select:focus,
+.dark-mode textarea:focus,
+.dark-mode .premium-select:focus {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: var(--primary-gold) !important;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.08) !important;
+}
+
+.dark-mode .input-with-icon input {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark-mode .input-with-icon input:focus {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: var(--primary-gold) !important;
+}
+
+.dark-mode .premium-select option {
+  background: var(--premium-white) !important;
+  color: var(--text-main) !important;
+}
+
+/* ---- Dark Mode Status Badges ---- */
+.dark-mode .status-badge.present {
+  background: rgba(34, 197, 94, 0.15) !important;
+  color: #4ade80 !important;
+}
+
+.dark-mode .status-badge.absent {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+}
+
+.dark-mode .status-badge.pending {
+  background: rgba(234, 179, 8, 0.15) !important;
+  color: #fbbf24 !important;
+}
+
+.dark-mode .status-badge.open {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #fca5a5 !important;
+}
+
+.dark-mode .status-badge.rejected {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #fca5a5 !important;
+}
+
+.dark-mode .status-pill.open {
+  background: rgba(234, 179, 8, 0.12) !important;
+  color: #fbbf24 !important;
+}
+
+.dark-mode .status-pill.pending {
+  background: rgba(234, 179, 8, 0.12) !important;
+  color: #fbbf24 !important;
+}
+
+.dark-mode .status-pill.closed {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #fca5a5 !important;
+}
+
+.dark-mode .status-pill.rejected {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #fca5a5 !important;
+}
+
+.dark-mode .status-banner.error {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+/* ---- Dark Mode Performance Pill ---- */
+.dark-mode .performance-pill {
+  background: var(--light-gold) !important;
+  border-color: rgba(212, 175, 55, 0.15) !important;
+}
+
+/* ---- Dark Mode Settings ---- */
+.dark-mode .setting-card {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-mode .setting-card:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--primary-gold) !important;
+}
+
+.dark-mode .settings-tabs {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-mode .settings-tab-btn {
+  color: var(--text-muted) !important;
+}
+
+.dark-mode .settings-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode .settings-tab-btn.active {
+  background: var(--light-gold) !important;
+  color: var(--primary-gold) !important;
+}
+
+.dark-mode .settings-tab-btn.active .tab-btn-icon svg {
+  color: var(--primary-gold) !important;
+}
+
+/* ---- Dark Mode Toggle Switch ---- */
+.dark-mode .toggle-switch {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark-mode .toggle-switch.on {
+  background: rgba(212, 175, 55, 0.4) !important;
+}
+
+.dark-mode .toggle-thumb {
+  background: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* ---- Dark Mode Notifications ---- */
+.dark-mode .premium-notif-card {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-mode .notification-bell-btn {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark-mode .notif-overlay-card {
+  background: var(--premium-white) !important;
+}
+
+.dark-mode .notif-overlay-close:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* ---- Dark Mode Hero / Chips ---- */
+.dark-mode .hero-chip {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark-mode .top-status {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* ---- Dark Mode Loading Screen ---- */
+.dark-mode .loading-screen {
+  background: var(--cream-bg) !important;
+}
+
+/* ---- Dark Mode Filter Buttons ---- */
+.dark-mode .filter-btn {
+  background: var(--premium-white) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode .filter-btn:hover {
+  background: var(--light-gold) !important;
+  color: var(--primary-gold) !important;
+}
+
+.dark-mode .filter-btn.active {
+  background: var(--light-gold) !important;
+  color: var(--primary-gold) !important;
+  border-color: var(--primary-gold) !important;
+}
+
+/* ---- Dark Mode Action Buttons ---- */
+.dark-mode .action-btn-mini {
+  background: var(--premium-white) !important;
+}
+
+.dark-mode .action-btn-mini.absent {
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.dark-mode .unassign-btn {
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.dark-mode .p-mark-btn {
+  background: var(--premium-white) !important;
+}
+
+.dark-mode .btn-text-only.red {
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+/* ---- Dark Mode Target Boxes ---- */
+.dark-mode .target-box {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark-mode .target-box.highlight-wusool {
+  background: rgba(212, 175, 55, 0.08) !important;
+}
+
+.dark-mode .target-box.highlight-matrookah {
+  background: rgba(239, 68, 68, 0.06) !important;
+}
+
+/* ---- Dark Mode Mistake / Error States ---- */
+.dark-mode .q-word.has-mistake {
+  background: rgba(239, 68, 68, 0.12) !important;
+}
+
+.dark-mode .h-word.has-mistake.ahkam {
+  background: rgba(234, 179, 8, 0.12) !important;
+}
+
+.dark-mode .mistake-pill {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.dark-mode .diff-badge.medium {
+  background: rgba(234, 179, 8, 0.12) !important;
+  color: #fbbf24 !important;
+}
+
+.dark-mode .diff-badge.hard {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #fca5a5 !important;
+}
+
+.dark-mode .diff-btn.active.medium {
+  background: rgba(234, 179, 8, 0.15) !important;
+  color: #fbbf24 !important;
+}
+
+.dark-mode .diff-btn.active.hard {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #fca5a5 !important;
+}
+
+.dark-mode .mistake-badge-counter {
+  background: rgba(239, 68, 68, 0.12) !important;
+}
+
+.dark-mode .tag.urgent {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #fca5a5 !important;
+}
+
+/* ---- Dark Mode Login ---- */
+.dark-mode .login-container {
+  background: #0a0a0a !important;
+}
+
+.dark-mode .login-card {
+  background: var(--premium-white) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+.dark-mode .login-card-accent {
+  background: linear-gradient(90deg, transparent, var(--primary-gold), var(--accent-gold), var(--primary-gold), transparent) !important;
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.2) !important;
+}
+
+.dark-mode .portal-tab {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--glass-border) !important;
+  color: var(--text-muted) !important;
+}
+
+.dark-mode .portal-tab.active {
+  background: var(--light-gold) !important;
+  border-color: var(--primary-gold) !important;
+  color: var(--primary-gold) !important;
+}
+
+.dark-mode .input-with-icon input {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark-mode .input-with-icon input:focus {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark-mode .portal-tab-icon {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark-mode .login-logo-img {
+  background: rgba(212, 175, 55, 0.08) !important;
+  border-color: rgba(212, 175, 55, 0.2) !important;
+}
+
+.dark-mode .error-message {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+  color: #fca5a5 !important;
+}
+
+/* ---- Dark Mode Link ---- */
+.dark-mode a:not(.no-theme) {
+  color: var(--primary-gold) !important;
+}
+
+.dark-mode a:hover:not(.no-theme) {
+  color: var(--accent-gold) !important;
+}
+
+/* ---- Dark Mode Premium Notif Card ---- */
+.dark-mode .portal-audit-item {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark-mode .portal-audit-item:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ---- Dark Mode Attendance Stars ---- */
+.dark-mode .attendance-star.filled {
+  color: var(--primary-gold) !important;
+}
+
+.dark-mode .attendance-star.empty {
+  color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* ---- Dark Mode Score Circle ---- */
+.dark-mode .score-display {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+}
+
+/* ---- Dark Mode Assignment Form ---- */
+.dark-mode .assignment-form-complex {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* ---- Dark Mode Premium Attendance Card ---- */
+.dark-mode .premium-attendance-card {
+  background: linear-gradient(145deg, #1a1a1a, #222222) !important;
+  border-color: rgba(212, 175, 55, 0.15) !important;
+}
+
+.dark-mode .premium-attendance-card .record-card {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ---- Dark Mode PWA refinements ---- */
+.dark-mode .pinned {
+  background: rgba(212, 175, 55, 0.08) !important;
+}
+
+.dark-mode .role-teacher {
+  background: rgba(212, 175, 55, 0.08) !important;
+}
+
+.dark-mode .role-admin {
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+/* ---- Dark Mode FAB / Bottom Action ---- */
+.dark-mode .fab-button {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ---- Dark Mode Separators ---- */
+.dark-mode hr,
+.dark-mode .divider {
+  border-color: var(--glass-border) !important;
+}
+
+/* ---- Dark Mode Badges ---- */
+.dark-mode .badge.admin {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+.dark-mode .badge.info {
+  background: rgba(234, 179, 8, 0.1) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(234, 179, 8, 0.2) !important;
+}
+
+.dark-mode .badge.parents {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #93c5fd !important;
+  border-color: rgba(59, 130, 246, 0.2) !important;
 }
 
 [data-theme="childish"] {
