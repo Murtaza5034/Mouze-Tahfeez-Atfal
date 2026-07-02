@@ -9289,9 +9289,9 @@ onShowAction,
             </button>
             <h2 className="page-title">{activePage}</h2>
           </div>
-          {portalAccess.show_salary_card && monthlySalary && (
+          {monthlySalary?.showCard && (
             <div className="salary-pill">
-              Estimated: <strong>{monthlySalary.amount?.toFixed(0) || "0"}rs</strong>
+              <strong>{monthlySalary.totalMinutes || "0"} min</strong> this month
             </div>
           )}
           <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
@@ -9335,8 +9335,8 @@ onShowAction,
                   { label: "Results", value: `${Math.round((filteredStudents.filter(s => s.latestResult).length / Math.max(filteredStudents.length, 1)) * 100) || 0}%`, sub: "Submitted", icon: 'FileText', pct: Math.round((filteredStudents.filter(s => s.latestResult).length / Math.max(filteredStudents.length, 1)) * 100) || 0 },
                   { label: "Avg Score", value: filteredStudents.length > 0 ? Math.round(filteredStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / filteredStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: filteredStudents.length > 0 ? Math.min(Math.round(filteredStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / filteredStudents.length), 100) : 0 },
                   { label: "Parent Views", value: `${parentViewedCount}/${filteredStudents.length || 0}`, sub: "Viewed reports", icon: 'Eye', pct: filteredStudents.length ? Math.round((parentViewedCount / filteredStudents.length) * 100) : 0 },
-                  ...(portalAccess?.show_salary_card && monthlySalary ? [{
-                    label: "Salary", value: `Rs. ${monthlySalary.amount?.toFixed(0) || "0"}`, sub: "This month", icon: 'DollarSign', pct: 100
+                  ...(monthlySalary?.showCard ? [{
+                    label: "Minutes", value: `${monthlySalary.totalMinutes || "0"}`, sub: "This month", icon: 'Clock', pct: Math.min(monthlySalary.totalMinutes / 100, 100)
                   }] : []),
                 ].map((stat, i) => {
                   const accentColors = [
@@ -9371,6 +9371,7 @@ onShowAction,
                           {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
                           {stat.icon === 'Eye' && <Eye size={18} />}
                           {stat.icon === 'DollarSign' && <DollarSign size={18} />}
+                          {stat.icon === 'Clock' && <Clock size={18} />}
                         </div>
                         {(isPct || isFrac) && (
                           <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
@@ -9398,27 +9399,46 @@ onShowAction,
                   );
                 })}
               </div>
-              {portalAccess?.show_salary_card && monthlySalary && (
-                <section className="data-card salary-callout">
+              {monthlySalary?.showCard && (
+                <section className="data-card salary-callout premium-attendance-card">
                   <div className="card-headline">
                     <Sparkles size={18} />
-                    <h3>Monthly Salary Update</h3>
+                    <h3>Monthly Attendance</h3>
                   </div>
-                  <div className="salary-flex">
-                    <div className="salary-item">
-                      <span className="salary-label">Total Minutes</span>
-                      <span className="salary-value">{monthlySalary.totalMinutes}</span>
-                    </div>
-                    <div className="salary-item">
-                      <span className="salary-label">{"Rate - Min"}</span>
-                      <span className="salary-value">â‚¹{monthlySalary.rate}</span>
-                    </div>
-                    <div className="salary-item total-item">
-                      <span className="salary-label">Total Amount</span>
-                      <span className="salary-value highlight">â‚¹{monthlySalary.amount?.toFixed(2) || "0.00"}</span>
-                    </div>
+                  <div className="attendance-cumulative-strip">
+                    {(() => {
+                      const sorted = (teacherData.attendances || [])
+                        .filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity))
+                        .filter(a => {
+                          const d = new Date(a.attendance_date);
+                          const now = new Date();
+                          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                        })
+                        .sort((a, b) => new Date(a.attendance_date) - new Date(b.attendance_date))
+                        .slice(-7);
+                      let running = 0;
+                      return sorted.map((a, i) => {
+                        const mins = toNumber(a.minutes_present);
+                        running += mins;
+                        const date = new Date(a.attendance_date);
+                        const dayLabel = date.toLocaleDateString("en-US", { weekday: "short" });
+                        const dateLabel = date.getDate();
+                        return (
+                          <div key={a.id || i} className={`cumulative-day ${a.status?.toLowerCase() === "present" ? "day-present" : "day-absent"}`}>
+                            <span className="day-name">{dayLabel}</span>
+                            <span className="day-date">{dateLabel}</span>
+                            <span className="day-mins">{mins} min</span>
+                            <span className="day-running">{running} total</span>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
-                  <p className="hint-text">Calculated based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
+                  <div className="attendance-total-row">
+                    <span className="total-label">Total Minutes This Month</span>
+                    <span className="total-value">{monthlySalary.totalMinutes}</span>
+                  </div>
+                  <p className="hint-text">Based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
                 </section>
               )}
 
@@ -9909,47 +9929,63 @@ onShowAction,
                 </div>
               </div>
 
-              {portalAccess?.show_salary_card && (
-                <div className="data-card">
+              {monthlySalary?.showCard && (
+                <div className="data-card premium-attendance-card">
                   <div className="card-headline">
                     <Clock size={18} />
-                    <h3>Your Attendance & Salary</h3>
+                    <h3>Attendance Log</h3>
                   </div>
                   <div className="record-stack">
-                    {teacherData.attendances
-                      .filter(attendance => normalizeText(attendance.teacher_name) === normalizeText(teacherIdentity))
-                      .sort((a, b) => new Date(b.attendance_date) - new Date(a.attendance_date))
-                      .slice(0, 10)
-                      .map((attendance, index) => {
-                        const teacherProfile = (teacherProfiles || []).find(p =>
-                          normalizeText(p.full_name) === normalizeText(teacherIdentity)
-                        );
-                        const rate = toNumber(teacherProfile?.salary_per_minute || portalAccess.salary_per_minute || 2.3);
-                        const dailySalary = toNumber(attendance.minutes_present) * rate;
-
-                        return (
-                          <article key={`${attendance.attendance_date}-${index}`} className="record-card">
-                            <div className="card-primary-info">
-                              <strong>{new Date(attendance.attendance_date).toLocaleDateString()}</strong>
-                              <span className={`status-badge ${attendance.status?.toLowerCase()}`}>
-                                {attendance.status || "Not Marked"}
-                              </span>
-                            </div>
-                            <div className="attendance-details">
-                              <div className="attendance-info">
-                                <span>Minutes: {attendance.minutes_present}</span>
-                                <span className="salary-amount">Rs. {dailySalary.toFixed(2)}</span>
+                    {(() => {
+                      const sorted = (teacherData.attendances || [])
+                        .filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity))
+                        .sort((a, b) => new Date(a.attendance_date) - new Date(b.attendance_date));
+                      let running = 0;
+                      const month = new Date().getMonth();
+                      const year = new Date().getFullYear();
+                      return sorted
+                        .filter(a => {
+                          const d = new Date(a.attendance_date);
+                          return d.getMonth() === month && d.getFullYear() === year;
+                        })
+                        .reverse()
+                        .slice(0, 15)
+                        .reverse()
+                        .map((a, i) => {
+                          const mins = toNumber(a.minutes_present);
+                          running += mins;
+                          const date = new Date(a.attendance_date);
+                          const dayLabel = date.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
+                          return (
+                            <article key={a.id || i} className={`record-card ${a.status?.toLowerCase() === "present" ? "" : "absent-row"}`}>
+                              <div className="card-primary-info">
+                                <strong>{dayLabel}</strong>
+                                <span className={`status-badge ${a.status?.toLowerCase()}`}>
+                                  {a.status || "Not Marked"}
+                                </span>
                               </div>
-                              {attendance.note && (
-                                <span className="attendance-note">{attendance.note}</span>
-                              )}
-                            </div>
-                          </article>
-                        );
-                      })}
-                    {teacherData.attendances.filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity)).length === 0 && (
-                      <div className="empty-state">No attendance records found.</div>
-                    )}
+                              <div className="attendance-details">
+                                <div className="attendance-info">
+                                  <span className="minutes-badge">{mins} min</span>
+                                  <span className="running-total">Running: {running} min</span>
+                                </div>
+                                {a.note && (
+                                  <span className="attendance-note">{a.note}</span>
+                                )}
+                              </div>
+                            </article>
+                          );
+                        });
+                    })()}
+                    {(() => {
+                      const count = (teacherData.attendances || [])
+                        .filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity))
+                        .filter(a => {
+                          const d = new Date(a.attendance_date);
+                          return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
+                        }).length;
+                      return count === 0 && <div className="empty-state">No attendance records this month.</div>;
+                    })()}
                   </div>
                 </div>
               )}
