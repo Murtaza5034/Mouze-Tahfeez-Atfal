@@ -418,10 +418,12 @@ const PREMIUM_NOTIFICATION_CSS = `
 
   .mauze-notif-detail-card {
     width: min(680px, 100%);
-    max-height: min(82vh, 760px);
+    max-height: min(90vh, 800px);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     border-radius: 28px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(253,249,241,0.96));
+    background: #ffffff;
     border: 1px solid rgba(212,175,55,0.32);
     box-shadow: 0 36px 100px rgba(0,0,0,0.30);
     position: relative;
@@ -454,9 +456,9 @@ const PREMIUM_NOTIFICATION_CSS = `
 
   .mauze-notif-detail-card .notif-full-date {
     display: block;
-    opacity: 0.76;
-    font-size: 12px;
-    margin-bottom: 8px;
+    opacity: 0.9;
+    font-size: 13px;
+    margin-bottom: 10px;
   }
 
   .mauze-notif-detail-card .notif-overlay-header h2 {
@@ -468,14 +470,16 @@ const PREMIUM_NOTIFICATION_CSS = `
   }
 
   .mauze-notif-detail-card .notif-overlay-body {
-    padding: 24px 30px;
-    max-height: 46vh;
-    overflow: auto;
+    flex: 1;
+    min-height: 0;
+    padding: 28px 30px;
+    overflow-y: auto;
   }
 
   .mauze-notif-detail-card .notif-overlay-body p {
-    font-size: 1rem;
-    line-height: 1.75 !important;
+    font-size: 1.05rem;
+    line-height: 1.8 !important;
+    color: inherit;
   }
 
   .mauze-notif-detail-card .notif-overlay-footer {
@@ -526,8 +530,8 @@ const PREMIUM_NOTIFICATION_CSS = `
   }
 
   @media (max-width: 640px) {
-    .mauze-notif-detail-modal { padding: 12px; align-items: end; }
-    .mauze-notif-detail-card { max-height: 88vh; border-radius: 24px 24px 0 0; }
+    .mauze-notif-detail-modal { padding: 16px; }
+    .mauze-notif-detail-card { max-height: 90vh; border-radius: 28px; }
     .mauze-notif-detail-card .notif-overlay-header,
     .mauze-notif-detail-card .notif-overlay-body,
     .mauze-notif-detail-card .notif-overlay-footer { padding-left: 20px; padding-right: 20px; }

@@ -2576,8 +2576,6 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
   border-right: 1px solid rgba(197, 160, 89, 0.1) !important;
   isolation: isolate !important;
-  -webkit-transform: translateZ(0) !important;
-  transform: translateZ(0) !important;
 }
 [data-theme="classic-pro"] .sidebar {
   background: rgba(255, 255, 255, 0.6) !important;
@@ -2585,8 +2583,6 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
   border-right: 1px solid rgba(197, 160, 89, 0.1) !important;
   isolation: isolate !important;
-  -webkit-transform: translateZ(0) !important;
-  transform: translateZ(0) !important;
 }
 [data-theme="classic-pro"] .sidebar-link:hover {
   background: rgba(197, 160, 89, 0.1) !important;
