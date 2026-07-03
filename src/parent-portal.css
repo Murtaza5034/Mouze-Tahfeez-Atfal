@@ -2522,7 +2522,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
 [data-theme="classic-pro"] .admin-shell,
 [data-theme="classic-pro"] .app-shell,
 [data-theme="classic-pro"] .portal-shell {
-  backdrop-filter: blur(8px) saturate(120%) !important;
+  /* backdrop-filter removed to prevent breaking position:fixed on sidebar */
 }
 
 [data-theme="classic-pro"] ::-webkit-scrollbar-track {

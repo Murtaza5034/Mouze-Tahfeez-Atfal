@@ -59,7 +59,8 @@ import {
   XCircle,
   FileText,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  Crown
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -665,6 +666,14 @@ const LazyJadwalTeacherView = React.lazy(() =>
 
 const LazyJadwalParentView = React.lazy(() =>
   import("./Jadwal").then((mod) => ({ default: mod.JadwalParentView }))
+);
+
+const LazySelfJadwalParentView = React.lazy(() =>
+  import("./SelfJadwal").then((mod) => ({ default: mod.SelfJadwalParentView }))
+);
+
+const LazySelfJadwalTeacherView = React.lazy(() =>
+  import("./SelfJadwal").then((mod) => ({ default: mod.SelfJadwalTeacherView }))
 );
 
 const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
@@ -3584,6 +3593,7 @@ const resolveRedirectPage = (page, role) => {
       "Apply Leave": "Apply Leave",
       "Settings": "Settings",
       "Jadwal": "Jadwal",
+      "Self Jadwal": "Self Jadwal",
       "Home": "Home"
     };
     return parentMap[page] || "Home";
@@ -3596,6 +3606,7 @@ const resolveRedirectPage = (page, role) => {
       "Home": "My Group",
       "My Group": "My Group",
       "Jadwal": "Jadwal",
+      "Self Jadwal": "Self Jadwal",
       "Quran Ikhtebar": "Quran Ikhtebar",
       "Inbox": "Inbox",
       "Settings": "Settings"
@@ -4054,6 +4065,9 @@ function ParentPortal({
           <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
             <Calendar size={18} /> Jadwal
           </button>
+          <button className={`drawer-link ${activePage === "Self Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Self Jadwal"); setMenuOpen(false); }}>
+            <Crown size={18} /> Self Jadwal
+          </button>
           <button className={`drawer-link ${activePage === "Marhala Posts" ? "active" : ""}`} onClick={() => { setActivePage("Marhala Posts"); setMenuOpen(false); }}>
             <Heart size={18} /> Marhala Posts
           </button>
@@ -4115,12 +4129,13 @@ function ParentPortal({
                { label: "Announcements", value: "Announcements" },
                { label: "Teacher Profiles", value: "Teachers" },
                 { label: "Hub Raqam (Fees)", value: "Hub Raqam" },
-               { label: "My Profile", value: "Profile" },
-               { label: "App Settings", value: "Settings" }
-             ]} 
-             onSelect={onSearchSelect} 
-           />
-        )}
+                { label: "My Profile", value: "Profile" },
+                { label: "Self Jadwal", value: "Self Jadwal" },
+                { label: "App Settings", value: "Settings" }
+              ]} 
+              onSelect={onSearchSelect} 
+            />
+         )}
         {activePage === "Schedule" ? (
           <div className="home-dashboard">
             <div className="dashboard-section">
@@ -4496,6 +4511,16 @@ function ParentPortal({
               showAction={showAction}
               jadwalSettings={propJadwalSettings}
               onDownloadComplete={(popup) => setDownloadPopup(popup)}
+            />
+          </Suspense>
+        ) : null}
+
+        {activePage === "Self Jadwal" ? (
+          <Suspense fallback={null}>
+            <LazySelfJadwalParentView
+              userId={user?.id}
+              userEmail={user?.email}
+              showAction={showAction}
             />
           </Suspense>
         ) : null}
@@ -9267,6 +9292,7 @@ onShowAction,
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
             { id: "Jadwal", label: "Jadwal", icon: Calendar },
+            { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
             { id: "Inbox", label: "Inbox", icon: Bell },
             { id: "Settings", label: "Settings", icon: Settings },
           ].map(page => (
@@ -9301,13 +9327,14 @@ onShowAction,
         <section className="admin-content-pad">
           {(activePage === "My Group" || activePage === "Fill Result" || activePage === "Overview") && (
              <QuickSearch 
-               pages={[
-                 { label: "Student List", value: "My Group" },
-                 { label: "Mark Progress (Result)", value: "Fill Result" },
-                 { label: "Performance Overview", value: "Overview" },
-                 { label: "Announcements", value: "Announcements" },
-                  { label: "My Profile", value: "Profile" }
-                ]} 
+                pages={[
+                  { label: "Student List", value: "My Group" },
+                  { label: "Mark Progress (Result)", value: "Fill Result" },
+                  { label: "Performance Overview", value: "Overview" },
+                  { label: "Announcements", value: "Announcements" },
+                   { label: "My Profile", value: "Profile" },
+                   { label: "Self Jadwal", value: "Self Jadwal" }
+                 ]} 
               onSelect={onSearchSelect} 
               />
           )}
@@ -9324,6 +9351,15 @@ onShowAction,
                   initialStudentId={activeStudentId}
                   jadwalSettings={jadwalSettings}
                   onDownloadComplete={(popup) => setTeacherDownloadPopup(popup)}
+                />
+              </Suspense>
+           )}
+
+           {activePage === "Self Jadwal" && (
+              <Suspense fallback={null}>
+                <LazySelfJadwalTeacherView
+                  showAction={onShowAction}
+                  onBroadcastNotification={broadcastNotification}
                 />
               </Suspense>
            )}
@@ -11621,34 +11657,57 @@ export default function App() {
   };
 
   
-// Calculate the next occurrence time for a scheduled notification
+// Calculate the next occurrence time for a scheduled notification in IST.
 const calculateNextSendTime = (scheduleType, scheduleTime, scheduleDay) => {
   const now = new Date();
   const [hours, minutes] = scheduleTime.split(":").map(Number);
-  let candidate = new Date(now);
-  candidate.setHours(hours, minutes, 0, 0);
+
+  const getISTParts = (date) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const get = (type) => Number(parts.find((part) => part.type === type)?.value);
+    return { year: get("year"), month: get("month"), day: get("day") };
+  };
+
+  const addISTDays = ({ year, month, day }, days) => {
+    const date = new Date(Date.UTC(year, month - 1, day + days));
+    return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
+  };
+
+  const getISTWeekday = ({ year, month, day }) => new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const makeDateFromIST = ({ year, month, day }) => new Date(Date.UTC(year, month - 1, day, hours - 5, minutes - 30, 0, 0));
+
+  let candidateParts = getISTParts(now);
 
   if (scheduleType === "weekly") {
     const targetDay = parseInt(scheduleDay || "0", 10);
-    while (candidate.getDay() !== targetDay) {
-      candidate.setDate(candidate.getDate() + 1);
+    while (getISTWeekday(candidateParts) !== targetDay) {
+      candidateParts = addISTDays(candidateParts, 1);
     }
   } else if (scheduleType === "monthly") {
     const targetDate = Math.min(parseInt(scheduleDay || "1", 10), 28);
-    while (candidate.getDate() !== targetDate) {
-      candidate.setDate(candidate.getDate() + 1);
+    while (candidateParts.day !== targetDate) {
+      candidateParts = addISTDays(candidateParts, 1);
     }
   }
+
+  let candidate = makeDateFromIST(candidateParts);
 
   // If candidate is in the past, advance to next period
   if (candidate <= now) {
     if (scheduleType === "daily") {
-      candidate.setDate(candidate.getDate() + 1);
+      candidateParts = addISTDays(candidateParts, 1);
     } else if (scheduleType === "weekly") {
-      candidate.setDate(candidate.getDate() + 7);
+      candidateParts = addISTDays(candidateParts, 7);
     } else if (scheduleType === "monthly") {
-      candidate.setMonth(candidate.getMonth() + 1);
+      candidateParts = addISTDays({ ...candidateParts, day: 1 }, 32);
+      candidateParts = { ...candidateParts, day: Math.min(parseInt(scheduleDay || "1", 10), 28) };
     }
+    candidate = makeDateFromIST(candidateParts);
   }
 
   return candidate.toISOString();
@@ -12685,6 +12744,5 @@ setAppTheme={setAppTheme}
     </React.Fragment>
   );
 }
-
 
 
