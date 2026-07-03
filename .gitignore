@@ -50,6 +50,7 @@ cleanup.sql
 
 # Scratch/debug files
 _debug_*.txt
+temp_debug.txt
 _edit_*.py
 _extract_*.js
 _tp_*.txt

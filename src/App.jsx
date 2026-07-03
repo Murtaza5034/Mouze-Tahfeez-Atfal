@@ -62,7 +62,8 @@ import {
   FileText,
   TrendingUp,
   DollarSign,
-  Crown
+  Crown,
+  KeyRound
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -131,6 +132,9 @@ const REPORT_SETTING_DEFAULTS = {
   auto_lock_time: "00:00",
   auto_unlock_day: "Friday",
   auto_unlock_time: "16:30",
+  auto_clear_enabled: false,
+  auto_clear_day: "Friday",
+  auto_clear_time: "11:30",
 };
 
 const JADWAL_SETTING_DEFAULTS = {
@@ -2348,8 +2352,15 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     }
   });
 
-  // Calculate Global Rank among all students' latest results
-  const latestResultsArray = Array.from(latestResultMap.values());
+  // Calculate Global Rank among only active students in childProfiles
+  const activeStudentIds = new Set(
+    childProfiles.map(p => String(p.student_id || p.its || p.id || "").trim().toLowerCase()).filter(Boolean)
+  );
+  const latestResultsArray = Array.from(latestResultMap.values())
+    .filter(r => {
+      const rId = String(r.student_id || "").trim().toLowerCase();
+      return activeStudentIds.has(rId);
+    });
   latestResultsArray.sort((a, b) => {
     const scoreDiff = b.effectiveScore - a.effectiveScore;
     if (scoreDiff !== 0) return scoreDiff;
@@ -5669,7 +5680,36 @@ const handleDownloadAllReports = async () => {
   const updateReportDraft = (field) => (event) => {
     const value = event.target.value;
     setReportSettingsDraft((current) => ({ ...current, [field]: value }));
-  };
+  }
+
+  const handleClearAllMarks = async () => {
+    try {
+      const { data, error } = await supabase.rpc("trigger_clear_all_marks");
+      if (error) {
+        onShowAction("error", "Failed to clear marks: " + error.message);
+        return;
+      }
+      if (data?.success) {
+        onShowAction("success", data?.message || "All teacher marks cleared successfully!");
+        // Broadcast notification to all teachers, parents and admins
+        broadcastNotification(
+          "Progress Marks Cleared",
+          "All progress marks have been cleared by the admin. Teachers can now fill new marks for the current week.",
+          "all",
+          null,
+          "Home",
+          false
+        );
+        // Refresh data to reflect the cleared state
+        loadPortalData(portalRole, user);
+        onRefreshTeacherData?.();
+      } else {
+        onShowAction("error", data?.message || "Failed to clear marks. Please try again.");
+      }
+    } catch (err) {
+      onShowAction("error", "An unexpected error occurred: " + err.message);
+    }
+  };;
 
   const updateJadwalDraft = (field) => (event) => {
     const value = event.target.value;
@@ -7149,6 +7189,70 @@ const handleDownloadAllReports = async () => {
                 </form>
               </section>
 
+              {/* ── Auto Clear Progress Settings ── */}
+              <section className="form-card card-appear">
+                <div className="card-headline">
+                  <Trash2 size={18} />
+                  <h3>Auto Clear Progress</h3>
+                </div>
+                <form className="stack-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = {
+                    auto_clear_enabled: formData.get("auto_clear_enabled") === "true",
+                    auto_clear_day: formData.get("auto_clear_day"),
+                    auto_clear_time: formData.get("auto_clear_time"),
+                  };
+                  saveReportSettings(updates);
+                }}>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable Auto Clear</span>
+                      <select name="auto_clear_enabled" defaultValue={String(reportSettingsDraft.auto_clear_enabled ?? false)} className="premium-select">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Clear Day</span>
+                      <select name="auto_clear_day" defaultValue={reportSettingsDraft.auto_clear_day || "Friday"} className="premium-select">
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Clear Time</span>
+                      <input name="auto_clear_time" type="time" defaultValue={reportSettingsDraft.auto_clear_time || "11:30"} className="premium-input" />
+                    </label>
+                  </div>
+                  <p className="hint-text" style={{ marginBottom: '20px' }}>
+                    When enabled, all teacher marks/progress will be automatically cleared every {reportSettingsDraft.auto_clear_day || "Friday"} at {reportSettingsDraft.auto_clear_time || "11:30"} so teachers can fill new progress for the next week. Uses the {reportSettingsDraft.auto_clear_day || "Friday"} time.
+                  </p>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <button type="submit" className="action-button premium">
+                      Save Auto Clear Settings
+                    </button>
+                    <button
+                      type="button"
+                      className="action-button"
+                      style={{ background: '#dc2626', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      onClick={async () => {
+                        if (!window.confirm("Are you sure you want to immediately clear ALL teacher progress marks? This will reset all filled scores for all teachers and cannot be undone.")) return;
+                        if (!window.confirm("FINAL WARNING: This action will clear ALL murajah, juz hali, takhteet, jadeed, and attendance records for all teachers. Proceed?")) return;
+                        await handleClearAllMarks();
+                      }}
+                    >
+                      <Trash2 size={16} />
+                      Clear All Marks Now
+                    </button>
+                  </div>
+                </form>
+              </section>
             </div>
           ) : null}
 
@@ -7647,12 +7751,22 @@ const handleDownloadAllReports = async () => {
                           <p className="record-sub">{profile.whatsapp_number || "No contact"}</p>
                         </div>
                       </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <button
                         className="delete-icon-btn"
                         onClick={() => onDeleteRecord("teacher_profiles", "id")(profile.id)}
                       >
                         <Trash size={16} />
                       </button>
+                      <button
+                        className="action-button mini"
+                        style={{ background: 'var(--primary-gold)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => setResetPasswordTarget(profile)}
+                      >
+                        <KeyRound size={12} />
+                        Reset Password
+                      </button>
+                      </div>
                     </article>
                   ))}
                   {teacherProfiles.length === 0 && (
@@ -8296,7 +8410,110 @@ const handleDownloadAllReports = async () => {
                             </span>
                           ))}
                         </div>
+      
+                {/* Staff Password Reset Modal */}
+                {resetPasswordTarget && (
+                  <div className="notifications-panel-overlay" onClick={() => setResetPasswordTarget(null)}>
+                    <div className="notifications-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', padding: '24px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--deep-brown)' }}>
+                          <KeyRound size={18} /> Reset Password
+                        </h3>
+                        <button className="panel-close-btn" onClick={() => setResetPasswordTarget(null)}><X size={18} /></button>
                       </div>
+                      <p style={{ fontSize: '13px', color: 'var(--soft-brown)', marginBottom: '16px' }}>
+                        Resetting password for: <strong>{resetPasswordTarget.full_name}</strong>
+                      </p>
+                      <div className="input-group" style={{ marginBottom: '12px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-gold)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                          <Lock size={12} /> New Password
+                        </label>
+                        <input
+                          type="password"
+                          className="premium-input"
+                          placeholder="Enter new password (min 6 chars)"
+                          value={resetPasswordNewPass}
+                          onChange={e => setResetPasswordNewPass(e.target.value)}
+                          style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--glass-border)', fontSize: '14px' }}
+                        />
+                      </div>
+                      <div className="input-group" style={{ marginBottom: '16px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-gold)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                          <Lock size={12} /> Confirm Password
+                        </label>
+                        <input
+                          type="password"
+                          className="premium-input"
+                          placeholder="Confirm new password"
+                          value={resetPasswordConfirm}
+                          onChange={e => setResetPasswordConfirm(e.target.value)}
+                          style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--glass-border)', fontSize: '14px' }}
+                        />
+                      </div>
+                      {resetPasswordError && (
+                        <div className="error-message" style={{ marginBottom: '12px' }}>
+                          <AlertCircle size={14} />
+                          <span>{resetPasswordError}</span>
+                        </div>
+                      )}
+                      {resetPasswordMessage && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0fdf4', color: '#16a34a', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, marginBottom: '12px', border: '1px solid #dcfce7' }}>
+                          <CheckCircle2 size={16} />
+                          <span>{resetPasswordMessage}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          className="action-button"
+                          style={{ flex: 1, background: 'var(--primary-gold)', color: '#fff', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                          disabled={resetPasswordLoading}
+                          onClick={async () => {
+                            setResetPasswordError("");
+                            setResetPasswordMessage("");
+                            if (!resetPasswordNewPass || resetPasswordNewPass.length < 6) {
+                              setResetPasswordError("Password must be at least 6 characters.");
+                              return;
+                            }
+                            if (resetPasswordNewPass !== resetPasswordConfirm) {
+                              setResetPasswordError("Passwords do not match.");
+                              return;
+                            }
+                            setResetPasswordLoading(true);
+                            try {
+                              const { data, error } = await supabase.rpc("reset_user_password", {
+                                target_email: resetPasswordTarget.email,
+                                new_password: resetPasswordNewPass
+                              });
+                              if (error) {
+                                setResetPasswordError(error.message || "RPC call failed.");
+                              } else if (data?.success) {
+                                setResetPasswordMessage(data?.message || "Password reset successfully!");
+                                setTimeout(() => setResetPasswordTarget(null), 2000);
+                              } else {
+                                setResetPasswordError(data?.message || "Password reset failed.");
+                              }
+                            } catch (err) {
+                              setResetPasswordError("An unexpected error occurred.");
+                            } finally {
+                              setResetPasswordLoading(false);
+                            }
+                          }}
+                        >
+                          {resetPasswordLoading ? <Loader2 size={16} className="spinner" /> : <KeyRound size={16} />}
+                          {resetPasswordLoading ? "Resetting..." : "Reset Password"}
+                        </button>
+                        <button
+                          className="action-button"
+                          style={{ background: 'transparent', color: 'var(--soft-brown)', border: '1px solid var(--glass-border)', padding: '10px 16px', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                          onClick={() => setResetPasswordTarget(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                </div>
                     );
                   })() : null}
                   </>
@@ -10434,6 +10651,12 @@ export default function App() {
   const [attachedFileUrl, setAttachedFileUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadingTeacherPhoto, setUploadingTeacherPhoto] = useState(false);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState(null);
+  const [resetPasswordNewPass, setResetPasswordNewPass] = useState("");
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [resetPasswordMessage, setResetPasswordMessage] = useState("");
+  const [resetPasswordError, setResetPasswordError] = useState("");
   const [parentData, setParentData] = useState(emptyParentData);
   const [schoolData, setSchoolData] = useState({
     students: [],
