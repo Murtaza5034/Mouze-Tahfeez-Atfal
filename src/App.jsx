@@ -25,6 +25,8 @@ import {
   MessageCircle,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
   CheckCircle,
   UserCheck,
   UserX,
@@ -2331,6 +2333,21 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     }
   });
 
+  // Build previous week rank map for rank change tracking
+  const previousRankMap = new Map();
+  const seenStudents = new Set();
+  sortedByDate.forEach((result) => {
+    const resId = String(result.student_id || "").trim().toLowerCase();
+    if (resId) {
+      if (!seenStudents.has(resId)) {
+        seenStudents.add(resId);
+      } else if (!previousRankMap.has(resId)) {
+        const prevRank = rankMap.get(`${resId}-${result.week_date}`);
+        if (prevRank) previousRankMap.set(resId, prevRank);
+      }
+    }
+  });
+
   // Calculate Global Rank among all students' latest results
   const latestResultsArray = Array.from(latestResultMap.values());
   latestResultsArray.sort((a, b) => {
@@ -2371,6 +2388,11 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       (profile.teacher_id && (t.id === profile.teacher_id || t.user_id === profile.teacher_id))
     );
 
+    const prevWeekRank = latestResult ? (() => {
+      const lrId = String(latestResult.student_id || "").trim().toLowerCase();
+      return previousRankMap.get(lrId) || null;
+    })() : null;
+
     return {
       ...profile,
       id: profile.id,
@@ -2380,6 +2402,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       arabic_name: fixArabicScript(profile.arabic_name),
       its: profile.its || "...",
       latestResult,
+      previousWeekRank: prevWeekRank,
       teacherName: profile.teacher_name || teacherInProfiles?.full_name || "Unassigned teacher",
       groupName: profile.group_name || "Ungrouped",
       muhaffiz_id: profile.teacher_id || null,
@@ -2542,7 +2565,7 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
   );
 }
 
-function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false, rankImproved = false }) {
+function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false, rankImproved = false, rankChange = null }) {
   const report = normalizeReportSettings(settings);
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
   const hMain = report.main_heading;
@@ -2692,9 +2715,30 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '10px 0' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, color: '#c5a059', textTransform: 'uppercase', letterSpacing: '1.5px' }} className="child-hood-font">Rank</span>
-              <span style={{ fontSize: '48px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 6px rgba(0,0,0,0.12)', lineHeight: '1' }}>
-                <span className="kanz-font">{toArabicDigits(weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank || "-")}</span>
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '48px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 6px rgba(0,0,0,0.12)', lineHeight: '1' }}>
+                  <span className="kanz-font">{toArabicDigits(weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank || "-")}</span>
+                </span>
+                {rankChange === 'up' && (
+                  <ArrowUp
+                    size={28}
+                    strokeWidth={3}
+                    className="rank-arrow-premium rank-arrow-up"
+                  />
+                )}
+                {rankChange === 'down' && (
+                  <ArrowDown
+                    size={28}
+                    strokeWidth={3}
+                    className="rank-arrow-premium rank-arrow-down"
+                  />
+                )}
+              </div>
+              {rankChange === 'same' && (
+                <span style={{ fontSize: '0.8rem', color: '#999', fontStyle: 'italic', marginTop: '4px' }} className="kanz-font">
+                  Same rank from the previous week.
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -2791,11 +2835,25 @@ function RankPreview({ students }) {
       return b.attendance - a.attendance;
     });
 
-    return withScores.map((s, idx) => ({
-      ...s,
-      rank: idx + 1,
-      tieInfo: getTieInfo(withScores, s, idx),
-    }));
+    return withScores.map((s, idx) => {
+      const currentRank = idx + 1;
+      let rankChange = null;
+      if (s.previousWeekRank) {
+        if (currentRank < s.previousWeekRank) {
+          rankChange = 'up';
+        } else if (currentRank > s.previousWeekRank) {
+          rankChange = 'down';
+        } else {
+          rankChange = 'same';
+        }
+      }
+      return {
+        ...s,
+        rank: currentRank,
+        rankChange,
+        tieInfo: getTieInfo(withScores, s, idx),
+      };
+    });
   }, [students]);
 
   return (
@@ -2849,7 +2907,18 @@ function RankPreview({ students }) {
                         )}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 600, color: '#3d2b1f' }}>{s.name || s.full_name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 600, color: '#3d2b1f' }}>{s.name || s.full_name}</span>
+                          {s.rankChange === 'up' && (
+                            <ArrowUp size={16} strokeWidth={3} className="rank-arrow-premium rank-arrow-up" />
+                          )}
+                          {s.rankChange === 'down' && (
+                            <ArrowDown size={16} strokeWidth={3} className="rank-arrow-premium rank-arrow-down" />
+                          )}
+                          {s.rankChange === 'same' && (
+                            <span style={{ fontSize: '0.7rem', color: '#999', fontStyle: 'italic' }}>Same</span>
+                          )}
+                        </div>
                         {s.arabic_name && <div style={{ fontSize: '0.8rem', color: '#d4af37' }}>{s.arabic_name}</div>}
                       </div>
                     </div>
@@ -3695,7 +3764,18 @@ function ParentPortal({
   const currentRank = weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank;
   const studentId = studentProfile?.student_id;
   let rankImproved = false;
-  if (currentRank && studentId) {
+  let rankChange = null;
+  const prevWeekRank = studentProfile?.previousWeekRank;
+  if (currentRank && prevWeekRank) {
+    if (currentRank < prevWeekRank) {
+      rankImproved = true;
+      rankChange = 'up';
+    } else if (currentRank > prevWeekRank) {
+      rankChange = 'down';
+    } else {
+      rankChange = 'same';
+    }
+  } else if (currentRank && studentId) {
     const studentResults = (schoolData.weeklyResults || []).filter(r =>
       String(r.student_id).trim().toLowerCase() === String(studentId).trim().toLowerCase()
     ).sort((a, b) => new Date(b.week_date) - new Date(a.week_date));
@@ -3714,7 +3794,14 @@ function ParentPortal({
       );
       if (prevIdx >= 0) {
         const previousRank = prevIdx + 1;
-        if (currentRank < previousRank) rankImproved = true;
+        if (currentRank < previousRank) {
+          rankImproved = true;
+          rankChange = 'up';
+        } else if (currentRank > previousRank) {
+          rankChange = 'down';
+        } else {
+          rankChange = 'same';
+        }
       }
     }
   }
@@ -4385,6 +4472,7 @@ function ParentPortal({
                     timerSeconds={secondsSpent}
                     isParentPortal={true}
                     rankImproved={rankImproved}
+                    rankChange={rankChange}
                   />
                 </>
               );
@@ -4418,6 +4506,7 @@ function ParentPortal({
                     parentViewed={parentViewedStatus}
                     isParentPortal={true}
                     rankImproved={rankImproved}
+                    rankChange={rankChange}
                   />
                 </div>
               )}
@@ -5203,6 +5292,15 @@ function AdminPortal({
   const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
   const [whatsAppLogs, setWhatsAppLogs] = useState([]);
   const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
+
+  const computeRankChange = (student, wr) => {
+    const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
+    const prevWeekRank = student?.previousWeekRank;
+    if (!currentRank || !prevWeekRank) return null;
+    if (currentRank < prevWeekRank) return 'up';
+    if (currentRank > prevWeekRank) return 'down';
+    return 'same';
+  };
 
   const parseTemplate = (template, student) => {
     let msg = template || 'Salam! The weekly Tahfeez result for {{child_name}} is now live. View it here: https://mouze-tahfeez-atfal.vercel.app/';
@@ -6268,6 +6366,7 @@ const handleDownloadAllReports = async () => {
                       weeklyResult={selectedStudent.latestResult}
                       settings={reportSettingsObject}
                       parentViewed={(parentViews || []).find(v => String(v.student_id) === String(selectedStudent.student_id))?.viewed ?? false}
+                      rankChange={computeRankChange(selectedStudent, selectedStudent.latestResult)}
                     />
                   </div>
                 </div>
@@ -7844,6 +7943,7 @@ const handleDownloadAllReports = async () => {
                   }}
                   weeklyResult={studentToRender.latestResult}
                   settings={reportSettingsObject}
+                  rankChange={computeRankChange(studentToRender, studentToRender.latestResult)}
                 />
               </div>
             )}
@@ -8004,6 +8104,7 @@ const handleDownloadAllReports = async () => {
                     weeklyResult={previewStudent.latestResult}
                     settings={reportSettingsDraft}
                     parentViewed={(parentViews || []).find(v => String(v.student_id) === String(previewStudent.student_id))?.viewed ?? false}
+                    rankChange={computeRankChange(previewStudent, previewStudent.latestResult)}
                   />
                 ) : (
                   <div className="empty-state">
@@ -9037,6 +9138,15 @@ onShowAction,
     };
   }, [selectedStudent, teacherForms.result]);
 
+  const computeRankChange = (student, wr) => {
+    const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
+    const prevWeekRank = student?.previousWeekRank;
+    if (!currentRank || !prevWeekRank) return null;
+    if (currentRank < prevWeekRank) return 'up';
+    if (currentRank > prevWeekRank) return 'down';
+    return 'same';
+  };
+
   const [isGeneratingTeacherPDF, setIsGeneratingTeacherPDF] = useState(false);
   const [teacherDownloadPopup, setTeacherDownloadPopup] = useState(null);
   const handleTeacherDownloadReport = async () => {
@@ -9900,6 +10010,7 @@ onShowAction,
                         student={selectedStudent}
                         weeklyResult={liveResult}
                         settings={reportSettingsObject}
+                        rankChange={computeRankChange(selectedStudent, liveResult)}
                       />
                     </div>
                   </>
@@ -9931,6 +10042,7 @@ onShowAction,
                       student={selectedStudent}
                       weeklyResult={liveResult}
                       settings={reportSettingsObject}
+                      rankChange={computeRankChange(selectedStudent, liveResult)}
                     />
                   </div>
                 )}
