@@ -9473,12 +9473,42 @@ onShowAction,
     const form = teacherForms.result;
     const total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(form[f]), 0);
 
-    return {
+    const merged = {
       ...selectedStudent.latestResult,
       ...form,
       total_score
     };
-  }, [selectedStudent, teacherForms.result]);
+
+    const getEffScore = (r) => {
+      if (!r) return 0;
+      if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
+      return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
+    };
+    const allStudents = schoolData.students || [];
+    const myId = String(selectedStudent.student_id);
+    const myEffScore = getEffScore(merged);
+    const myJadeed = Number(merged.jadeed) || 0;
+    const myAttendance = Number(merged.attendance_count) || 0;
+
+    let computedRank = 1;
+    allStudents.forEach(s => {
+      if (!s.latestResult) return;
+      if (String(s.student_id) === myId) return;
+      const sScore = getEffScore(s.latestResult);
+      if (sScore > myEffScore) { computedRank++; return; }
+      if (sScore < myEffScore) return;
+      const sJadeed = Number(s.latestResult.jadeed) || 0;
+      if (sJadeed > myJadeed) { computedRank++; return; }
+      if (sJadeed < myJadeed) return;
+      const sAttendance = Number(s.latestResult.attendance_count) || 0;
+      if (sAttendance > myAttendance) { computedRank++; }
+    });
+
+    return {
+      ...merged,
+      computedRank
+    };
+  }, [selectedStudent, teacherForms.result, schoolData.students]);
 
   const computeRankChange = (student, wr) => {
     const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
