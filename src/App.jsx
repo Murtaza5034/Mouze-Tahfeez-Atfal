@@ -9468,17 +9468,22 @@ onShowAction,
   const selectedResultLocked = isTeacherResultLocked(reportSettingsObject);
   const canEditCurrentResult = canTeacherFillProgress && !selectedResultLocked;
 
-  const liveResult = useMemo(() => {
+  const [liveResult, setLiveResult] = useState(null);
+
+  // Compute merged data + local rank synchronously
+  const mergedResult = useMemo(() => {
     if (!selectedStudent) return null;
     const form = teacherForms.result;
     const total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(form[f]), 0);
-
-    const merged = {
+    return {
       ...selectedStudent.latestResult,
       ...form,
       total_score
     };
+  }, [selectedStudent, teacherForms.result]);
 
+  const localRank = useMemo(() => {
+    if (!selectedStudent || !mergedResult) return null;
     const getEffScore = (r) => {
       if (!r) return 0;
       if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
@@ -9486,29 +9491,39 @@ onShowAction,
     };
     const allStudents = schoolData.students || [];
     const myId = String(selectedStudent.student_id);
-    const myEffScore = getEffScore(merged);
-    const myJadeed = Number(merged.jadeed) || 0;
-    const myAttendance = Number(merged.attendance_count) || 0;
-
-    let computedRank = 1;
-    allStudents.forEach(s => {
-      if (!s.latestResult) return;
-      if (String(s.student_id) === myId) return;
-      const sScore = getEffScore(s.latestResult);
-      if (sScore > myEffScore) { computedRank++; return; }
-      if (sScore < myEffScore) return;
-      const sJadeed = Number(s.latestResult.jadeed) || 0;
-      if (sJadeed > myJadeed) { computedRank++; return; }
-      if (sJadeed < myJadeed) return;
-      const sAttendance = Number(s.latestResult.attendance_count) || 0;
-      if (sAttendance > myAttendance) { computedRank++; }
+    const withScores = [];
+    for (let i = 0; i < allStudents.length; i++) {
+      const s = allStudents[i];
+      const isMe = String(s.student_id) === myId;
+      const result = isMe ? mergedResult : s.latestResult;
+      if (!result) continue;
+      withScores.push({
+        id: String(s.student_id),
+        isMe,
+        score: getEffScore(result),
+        jadeed: Number(result.jadeed) || 0,
+        attendance: Number(result.attendance_count) || 0,
+      });
+    }
+    withScores.sort((a, b) => {
+      const scoreDiff = b.score - a.score;
+      if (scoreDiff !== 0) return scoreDiff;
+      const jadeedDiff = b.jadeed - a.jadeed;
+      if (jadeedDiff !== 0) return jadeedDiff;
+      return b.attendance - a.attendance;
     });
+    const myRank = withScores.findIndex(s => s.isMe) + 1;
+    return myRank > 0 ? myRank : null;
+  }, [selectedStudent, mergedResult, schoolData.students]);
 
-    return {
-      ...merged,
-      computedRank
-    };
-  }, [selectedStudent, teacherForms.result, schoolData.students]);
+  // Use localRank synced with admin RankPreview logic (all students' latest results)
+  useEffect(() => {
+    if (!selectedStudent || !mergedResult) {
+      setLiveResult(null);
+      return;
+    }
+    setLiveResult({ ...mergedResult, computedRank: localRank });
+  }, [selectedStudent, mergedResult, localRank]);
 
   const computeRankChange = (student, wr) => {
     const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
