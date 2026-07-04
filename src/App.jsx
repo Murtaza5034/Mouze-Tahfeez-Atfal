@@ -11030,7 +11030,7 @@ export default function App() {
       if (mounted) setLoading(false);
     }, 5000);
 
-    async function tryRestoreCachedAuth() {
+    async function tryRestoreCachedAuth(retries = 2) {
       const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
       const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
       if (!rememberMe || !cachedRaw) return false;
@@ -11039,13 +11039,18 @@ export default function App() {
         if (!cached.userId || !cached.role) return false;
         setUser({ id: cached.userId, email: cached.email });
         storeRole(cached.role);
-        try {
-          await loadPortalData(cached.role, { id: cached.userId, email: cached.email });
-        } catch (e) {
-          console.warn("Offline: portal data unavailable", e);
-          return false;
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          try {
+            await loadPortalData(cached.role, { id: cached.userId, email: cached.email });
+            return true;
+          } catch (e) {
+            console.warn(`Offline: portal data unavailable (attempt ${attempt + 1}/${retries + 1})`, e);
+            if (attempt < retries) {
+              await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+            }
+          }
         }
-        return true;
+        return false;
       } catch (e) {
         return false;
       }
@@ -11181,13 +11186,51 @@ export default function App() {
     }
     window.addEventListener('online', handleOnline);
 
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible' && user && mounted) {
+        const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw);
+            loadPortalData(cached.role || portalRole, user, null).catch(() => {});
+          } catch (_) {}
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    window.addEventListener('pageshow', function(e) {
+      if (e.persisted && user && mounted) {
+        const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw);
+            loadPortalData(cached.role || portalRole, user, null).catch(() => {});
+          } catch (_) {}
+        }
+      }
+    });
+
     return () => {
       mounted = false;
       clearTimeout(failsafe);
       subscription.unsubscribe();
       window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (cachedRaw) {
+        try {
+          const cached = JSON.parse(cachedRaw);
+          if (cached.role) storeRole(cached.role);
+        } catch (_) {}
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user && portalRole === "parents" && selectedStudentId) {
