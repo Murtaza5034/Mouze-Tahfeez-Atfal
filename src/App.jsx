@@ -2352,33 +2352,8 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     }
   });
 
-  // Calculate Global Rank among only active students in childProfiles
-  const activeStudentIds = new Set(
-    childProfiles.map(p => String(p.student_id || p.its || p.id || "").trim().toLowerCase()).filter(Boolean)
-  );
-  const latestResultsArray = Array.from(latestResultMap.values())
-    .filter(r => {
-      const rId = String(r.student_id || "").trim().toLowerCase();
-      return activeStudentIds.has(rId);
-    });
-  latestResultsArray.sort((a, b) => {
-    const scoreDiff = b.effectiveScore - a.effectiveScore;
-    if (scoreDiff !== 0) return scoreDiff;
-    const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
-    if (jadeedDiff !== 0) return jadeedDiff;
-    return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
-  });
-
-  // Unique sequential global ranks (no ties)
-  latestResultsArray.forEach((result, idx) => {
-    const resId = String(result.student_id || "").trim().toLowerCase();
-    const resultInMap = latestResultMap.get(resId);
-    if (resultInMap) {
-      resultInMap.computedRank = idx + 1;
-    }
-  });
-
-  return childProfiles.map((profile) => {
+  // Build the full student list with all matched results
+  const builtStudents = childProfiles.map((profile) => {
     const sId = profile.student_id || profile.its || profile.id;
     const numericId = !isNaN(sId) ? Number(sId) : sId;
     
@@ -2428,6 +2403,25 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       hifzStatus: profile.surat ? `Memorizing ${profile.surat}` : "Status pending",
     };
   });
+
+  // Compute global computedRank among only students that have a latestResult
+  // Sorts by Score desc -> Jadeed desc -> Attendance desc (matches RankPreview)
+  const rankable = [...builtStudents.filter(s => s.latestResult)];
+  rankable.sort((a, b) => {
+    const scoreA = a.latestResult.effectiveScore || getEffectiveScore(a.latestResult);
+    const scoreB = b.latestResult.effectiveScore || getEffectiveScore(b.latestResult);
+    const scoreDiff = scoreB - scoreA;
+    if (scoreDiff !== 0) return scoreDiff;
+    const jadeedDiff = (Number(b.latestResult.jadeed) || 0) - (Number(a.latestResult.jadeed) || 0);
+    if (jadeedDiff !== 0) return jadeedDiff;
+    return (Number(b.latestResult.attendance_count) || 0) - (Number(a.latestResult.attendance_count) || 0);
+  });
+
+  rankable.forEach((s, idx) => {
+    s.latestResult.computedRank = idx + 1;
+  });
+
+  return builtStudents;
 }
 
 const recalculateComputedRanks = (students) => {
