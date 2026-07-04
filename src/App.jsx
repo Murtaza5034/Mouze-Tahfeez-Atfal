@@ -2430,6 +2430,42 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
   });
 }
 
+const recalculateComputedRanks = (students) => {
+  const getScore = (r) => {
+    if (!r) return 0;
+    if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
+    return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
+  };
+  const withScores = students
+    .filter(s => s.latestResult)
+    .map(s => ({
+      ...s,
+      _effScore: getScore(s.latestResult),
+      _jadeed: Number(s.latestResult.jadeed) || 0,
+      _attendance: Number(s.latestResult.attendance_count) || 0,
+    }));
+  withScores.sort((a, b) => {
+    const scoreDiff = b._effScore - a._effScore;
+    if (scoreDiff !== 0) return scoreDiff;
+    const jadeedDiff = b._jadeed - a._jadeed;
+    if (jadeedDiff !== 0) return jadeedDiff;
+    return b._attendance - a._attendance;
+  });
+  const studentRanks = {};
+  withScores.forEach((s, idx) => {
+    studentRanks[String(s.student_id)] = idx + 1;
+  });
+  if (Object.keys(studentRanks).length === 0) return students;
+  return students.map(s => {
+    const sid = String(s.student_id);
+    const newRank = studentRanks[sid];
+    if (newRank && s.latestResult) {
+      return { ...s, latestResult: { ...s.latestResult, computedRank: newRank } };
+    }
+    return s;
+  });
+};
+
 function LoadingScreen({ message }) {
   return (
     <div className="skeleton-screen">
@@ -2747,7 +2783,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               </div>
               {rankChange === 'same' && (
                 <span style={{ fontSize: '0.8rem', color: '#999', fontStyle: 'italic', marginTop: '4px' }} className="kanz-font">
-                  Same rank from the previous week.
+                  The rank remains the same as last week.
                 </span>
               )}
             </div>
@@ -2807,6 +2843,17 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
 function RankPreview({ students }) {
   const studentList = students || [];
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshedStatus, setRefreshedStatus] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const tableRef = useRef(null);
+
+  const handleRefresh = () => {
+    setRefreshKey(k => k + 1);
+    setRefreshedStatus('Ranks refreshed!');
+    setTimeout(() => setRefreshedStatus(null), 2500);
+  };
+
   const getEffectiveScore = (r) => {
     if (!r) return 0;
     if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
@@ -2865,12 +2912,96 @@ function RankPreview({ students }) {
         tieInfo: getTieInfo(withScores, s, idx),
       };
     });
-  }, [students]);
+  }, [students, refreshKey]);
+
+  const handleDownloadPDF = async () => {
+    if (!tableRef.current || rankedStudents.length === 0) return;
+    setDownloadingPdf(true);
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(tableRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+      const fitScale = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+      const imgWidth = canvas.width * fitScale;
+      const imgHeight = canvas.height * fitScale;
+      const x = (pageWidth - imgWidth) / 2;
+      const y = (pageHeight - imgHeight) / 2;
+      pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight, undefined, 'FAST');
+
+      const pdfBlob = pdf.output('blob');
+      const fileName = `Rank_Preview_${new Date().toISOString().split('T')[0]}.pdf`;
+      await import("./downloadUtils").then(m => m.downloadFile(pdfBlob, fileName));
+    } catch (err) {
+      console.error("PDF download error:", err);
+    }
+    setDownloadingPdf(false);
+  };
 
   return (
     <div className="fade-in" style={{ padding: '20px 0' }}>
       <div className="page-header">
-        <h2 className="premium-title">Rank Preview & Tie-Breaking Analysis</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h2 className="premium-title" style={{ margin: 0 }}>Rank Preview & Tie-Breaking Analysis</h2>
+            {refreshedStatus && (
+              <span style={{
+                fontSize: '13px', color: '#2e7d32', fontWeight: 600, fontFamily: 'Inter, sans-serif',
+                background: '#e8f5e9', padding: '4px 12px', borderRadius: '8px',
+                animation: 'fadeIn 0.3s ease',
+              }}>
+                {refreshedStatus}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleRefresh}
+              style={{
+                padding: '8px 18px', borderRadius: '10px', border: '1px solid #d4af37',
+                background: 'linear-gradient(135deg, #d4af37, #b8962e)', color: '#fff',
+                fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.1)'}
+              onMouseLeave={e => e.currentTarget.style.filter = 'none'}
+            >
+              <RotateCw size={16} /> Refresh Ranks
+            </button>
+            {rankedStudents.length > 0 && (
+              <button
+                onClick={handleDownloadPDF}
+                disabled={downloadingPdf}
+                style={{
+                  padding: '8px 18px', borderRadius: '10px', border: '1px solid #5d4037',
+                  background: 'linear-gradient(135deg, #5d4037, #3d2b1f)', color: '#fff',
+                  fontSize: '13px', fontWeight: 700, cursor: downloadingPdf ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  transition: 'all 0.2s', opacity: downloadingPdf ? 0.7 : 1,
+                }}
+                onMouseEnter={e => { if (!downloadingPdf) e.currentTarget.style.filter = 'brightness(1.15)'; }}
+                onMouseLeave={e => e.currentTarget.style.filter = 'none'}
+              >
+                {downloadingPdf ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                {downloadingPdf ? 'Generating...' : 'Download PDF'}
+              </button>
+            )}
+          </div>
+        </div>
         <p className="subtitle">
           Students sorted by <strong>Score</strong> \u2193 \u2192 <strong>Jadeed</strong> \u2193 \u2192 <strong>Attendance</strong> \u2193
           \u2014 ranks are unique sequential (no ties)
@@ -2883,7 +3014,7 @@ function RankPreview({ students }) {
           <p>No student results available for ranking</p>
         </div>
       ) : (
-        <div style={{ overflowX: 'auto', borderRadius: '16px', border: '1px solid var(--glass-border)', background: '#fff' }}>
+        <div ref={tableRef} style={{ overflowX: 'auto', borderRadius: '16px', border: '1px solid var(--glass-border)', background: '#fff' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
             <thead>
               <tr style={{ background: 'linear-gradient(135deg, #3d2b1f, #5d4037)', color: '#fff' }}>
@@ -9526,8 +9657,6 @@ onShowAction,
     }
 
     setSchoolData((current) => {
-      const prevStudent = current.students.find(s => String(s.student_id) === String(data.student_id));
-      const prevRank = prevStudent?.latestResult?.computedRank;
       const nextWeeklyResults = [
         data,
         ...current.weeklyResults.filter((result) =>
@@ -9537,15 +9666,15 @@ onShowAction,
           )
         ),
       ];
-      const refreshedStudents = current.students.map((student) =>
+      const updatedStudents = current.students.map((student) =>
         String(student.student_id) === String(data.student_id)
-          ? { ...student, latestResult: prevRank ? { ...data, computedRank: prevRank } : data }
+          ? { ...student, latestResult: data }
           : student
       );
       return {
         ...current,
         weeklyResults: nextWeeklyResults,
-        students: refreshedStudents,
+        students: recalculateComputedRanks(updatedStudents),
       };
     });
   }, [canTeacherFillProgress, reportSettingsObject, teacherForms.result, schoolData]);
@@ -12797,8 +12926,6 @@ const handleSendCustomNotification = async (event) => {
     }
 
     setSchoolData((current) => {
-      const prevStudent = current.students.find(s => String(s.student_id) === String(data.student_id));
-      const prevRank = prevStudent?.latestResult?.computedRank;
       const nextWeeklyResults = [
         data,
         ...current.weeklyResults.filter((result) =>
@@ -12808,16 +12935,16 @@ const handleSendCustomNotification = async (event) => {
           )
         ),
       ];
-      const refreshedStudents = current.students.map((student) =>
+      const updatedStudents = current.students.map((student) =>
         String(student.student_id) === String(data.student_id)
-          ? { ...student, latestResult: prevRank ? { ...data, computedRank: prevRank } : data }
+          ? { ...student, latestResult: data }
           : student
       );
 
       return {
         ...current,
         weeklyResults: nextWeeklyResults,
-        students: refreshedStudents,
+        students: recalculateComputedRanks(updatedStudents),
       };
     });
 
