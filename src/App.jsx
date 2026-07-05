@@ -11719,7 +11719,14 @@ export default function App() {
       return idMatch || nameMatch;
     });
 
-    const filteredStudents = matchedStudents;
+    const filteredStudents = [...matchedStudents].sort((a, b) => {
+      const rA = a.latestResult?.computedRank;
+      const rB = b.latestResult?.computedRank;
+      if (rA && rB) return rA - rB;
+      if (rA) return -1;
+      if (rB) return 1;
+      return 0;
+    });
 
     return {
       availableGroups,
