@@ -159,6 +159,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  font-size: 17px;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -252,12 +256,12 @@ h1, h2, h3, h4, h5 {
   margin: 0 0 0.5em;
 }
 
-h1 { font-size: 1.75rem; }
-h2 { font-size: 1.4rem; }
-h3 { font-size: 1.15rem; }
+h1 { font-size: 2rem; }
+h2 { font-size: 1.6rem; }
+h3 { font-size: 1.3rem; }
 
 .section-title {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: var(--deep-brown);
   display: flex;
@@ -1475,7 +1479,7 @@ h3 { font-size: 1.15rem; }
 }
 
 .school-info h4 {
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   margin: 0 0 4px;
   color: var(--deep-brown);
   letter-spacing: 0.05em;
@@ -1483,7 +1487,7 @@ h3 { font-size: 1.15rem; }
 
 .school-info p {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--soft-brown);
   font-weight: 700;
   text-transform: uppercase;
@@ -1496,12 +1500,12 @@ h3 { font-size: 1.15rem; }
 }
 
 .report-badge .arabic-kanz {
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   color: var(--dark-gold);
 }
 
 .report-badge span:not(.arabic-kanz) {
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 800;
   color: var(--text-muted);
   letter-spacing: 0.15em;
@@ -1518,7 +1522,7 @@ h3 { font-size: 1.15rem; }
   margin: 0;
   font-weight: 800;
   color: var(--soft-brown);
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .result-main {
@@ -1537,7 +1541,7 @@ h3 { font-size: 1.15rem; }
 }
 
 .score-title {
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 800;
   color: var(--primary-gold);
   letter-spacing: 0.1em;
@@ -1546,20 +1550,20 @@ h3 { font-size: 1.15rem; }
 
 .jumla-label {
   font-family: 'Kanz al Marjaan', serif;
-  font-size: 2rem;
+  font-size: 2.2rem;
   color: #8b0000;
   margin: 4px 0;
 }
 
 .score-circle {
-  width: 100px;
-  height: 100px;
+  width: 110px;
+  height: 110px;
   border: 4px solid var(--light-gold);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.8rem;
+  font-size: 3.2rem;
   font-weight: 900;
   color: var(--dark-gold);
   margin-bottom: 8px;
@@ -1569,7 +1573,7 @@ h3 { font-size: 1.15rem; }
 }
 
 .max-score {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-muted);
   font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
@@ -1599,14 +1603,14 @@ h3 { font-size: 1.15rem; }
 
 .arabic-label {
   font-family: 'Kanz al Marjaan', serif;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   color: var(--dark-gold);
 }
 
 .score-val {
   font-weight: 800;
   color: var(--text-main);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
@@ -1631,7 +1635,7 @@ h3 { font-size: 1.15rem; }
 
 .target-box h5 {
   margin: 0 0 14px;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 800;
   text-transform: uppercase;
   color: var(--primary-gold);
@@ -1640,7 +1644,7 @@ h3 { font-size: 1.15rem; }
 
 .target-box p {
   margin: 6px 0;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-main);
 }
@@ -1649,11 +1653,11 @@ h3 { font-size: 1.15rem; }
   margin-top: 24px;
   background: linear-gradient(135deg, var(--accent-gold) 0%, var(--dark-gold) 100%);
   color: white;
-  padding: 12px;
+  padding: 14px;
   text-align: center;
   border-radius: 16px;
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 1.1rem;
   box-shadow: 0 8px 16px rgba(138, 101, 21, 0.2);
 }
 
@@ -2172,7 +2176,7 @@ h3 { font-size: 1.15rem; }
 
 @media (max-width: 480px) {
   html {
-    font-size: 14px;
+    font-size: 15px;
   }
 
   .app-shell {
@@ -2425,13 +2429,13 @@ h3 { font-size: 1.15rem; }
 }
 
 .attendance-label-big {
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   font-weight: 800;
   color: var(--deep-brown);
 }
 
 .attendance-sub-label {
-  font-size: 0.9rem;
+  font-size: 1rem;
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -2909,7 +2913,7 @@ h3 { font-size: 1.15rem; }
 }
 
 .meta-label {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -2917,7 +2921,7 @@ h3 { font-size: 1.15rem; }
 }
 
 .meta-val {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 900;
   color: var(--deep-brown);
   font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
@@ -4714,7 +4718,7 @@ body {
 .premium-hifz-card .header-text h2 {
   font-family: 'Kanz al Marjaan', serif;
   color: var(--primary-gold);
-  font-size: 2rem;
+  font-size: 2.2rem;
   margin: 0 0 12px 0;
   display: flex;
   align-items: center;
@@ -4725,7 +4729,7 @@ body {
   color: #d0d0d0;
   line-height: 1.6;
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   max-width: 600px;
 }
 
@@ -4741,7 +4745,7 @@ body {
 
 .track-number {
   display: block;
-  font-size: 2.2rem;
+  font-size: 2.4rem;
   font-weight: 800;
   color: var(--accent-gold);
   line-height: 1;
@@ -4749,7 +4753,7 @@ body {
 }
 
 .track-label {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--primary-gold);
