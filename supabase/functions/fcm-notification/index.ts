@@ -262,8 +262,11 @@ Deno.serve(async (req) => {
       throw new Error("Missing title or body in request");
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set')
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     if (targetUser && targetUser.includes('@')) {

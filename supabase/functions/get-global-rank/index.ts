@@ -23,22 +23,56 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { student_id, week_date, preview }: RankRequest = await req.json()
+    const bodyText = await req.text().catch(() => '{}')
+    const { student_id, week_date, preview }: RankRequest = JSON.parse(bodyText)
 
     if (!student_id || !week_date) {
       throw new Error('Missing required fields: student_id, week_date')
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set')
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: results, error } = await supabase
+    const { data: rawResults, error } = await supabase
       .from('weekly_results')
       .select('student_id, murajazah, juz_hali, takhteet, jadeed, attendance_count, total_score')
-      .eq('week_date', week_date)
+      .order('week_date', { ascending: false })
 
     if (error) throw error
+    const latestResultMap = new Map<string, any>()
+
+    for (const result of rawResults || []) {
+      const resultId = String(result.student_id || '').trim().toLowerCase()
+      if (resultId && !latestResultMap.has(resultId)) {
+        latestResultMap.set(resultId, result)
+      }
+    }
+
+    const targetKey = String(student_id).trim().toLowerCase()
+    const existingTarget = latestResultMap.get(targetKey)
+
+    if (preview) {
+      latestResultMap.set(targetKey, {
+        ...(existingTarget || {}),
+        student_id,
+        murajazah: preview.murajazah ?? 0,
+        juz_hali: preview.juz_hali ?? 0,
+        takhteet: preview.takhteet ?? 0,
+        jadeed: preview.jadeed ?? 0,
+        attendance_count: preview.attendance_count ?? 0,
+        total_score: (preview.murajazah ?? 0) +
+          (preview.juz_hali ?? 0) +
+          (preview.takhteet ?? 0) +
+          (preview.jadeed ?? 0),
+      })
+    }
+
+    const results = Array.from(latestResultMap.values())
+
     if (!results || results.length === 0) {
       return new Response(
         JSON.stringify({ rank: null, total: 0 }),
@@ -70,17 +104,34 @@ Deno.serve(async (req) => {
         return b.attendance - a.attendance
       })
 
-    const targetIdx = ranked.findIndex(r => r.isTarget)
+    let targetRank = null;
+    let currentRank = 1;
+    let prevRank = 1;
+    for (let i = 0; i < ranked.length; i++) {
+      const r = ranked[i];
+      currentRank = i + 1;
+      if (i > 0) {
+        const prev = ranked[i - 1];
+        if (prev.totalScore === r.totalScore && prev.jadeed === r.jadeed && prev.attendance === r.attendance) {
+          currentRank = prevRank;
+        }
+      }
+      prevRank = currentRank;
+      if (r.isTarget) {
+        targetRank = currentRank;
+        break;
+      }
+    }
 
-    if (targetIdx === -1) {
+    if (targetRank === null) {
       return new Response(
-        JSON.stringify({ rank: null, total: ranked.length, message: 'Student not found for this week' }),
+        JSON.stringify({ rank: null, total: ranked.length, message: 'Student not found in latest results' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       )
     }
 
     return new Response(
-      JSON.stringify({ rank: targetIdx + 1, total: ranked.length }),
+      JSON.stringify({ rank: targetRank, total: ranked.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {

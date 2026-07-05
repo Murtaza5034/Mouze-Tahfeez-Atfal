@@ -11,6 +11,12 @@ DAYS.forEach(day => {
 
 const NO_VALUE = 'NO';
 
+const getCellEdited = (editHistory, day, field) => {
+  if (!editHistory) return false;
+  const ts = editHistory[`${day}_${field}`];
+  return ts && (Date.now() - new Date(ts).getTime() < 30000);
+};
+
 const SURAH_AYAH_DATA = [
   { number: 1, nameEn: 'Al-Fatiha', nameAr: 'الفاتحة', ayahCount: 7 },
   { number: 2, nameEn: "Al-Baqarah", nameAr: 'البقرة', ayahCount: 286 },
@@ -613,7 +619,7 @@ const SurahRangePicker = ({ value, onChange }) => {
   );
 };
 
-const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) => {
+const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, editHistory }) => {
   const defaultJadeedSurah = React.useMemo(() => {
     for (const day of DAYS) {
       const row = scheduleData[day] || {};
@@ -694,11 +700,11 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) =>
               <td className="day-cell">{day}</td>
               {mode === 'juz-wise' ? (
                 <>
-                  {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
+                      {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
                     const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
                     const juzVal = row[juz] || '';
                     return (
-                      <td key={juz} data-label={label}>
+                      <td key={juz} data-label={label} className={getCellEdited(editHistory, day, juz) ? 'jadwal-cell-edited' : ''}>
                         {readOnly ? (
                           <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(juzVal) || '-'}</span>
                         ) : (
@@ -710,7 +716,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) =>
                       </td>
                     );
                   })}
-                    <td data-label="Jadeed">
+                    <td data-label="Jadeed" className={getCellEdited(editHistory, day, 'jadeed') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
                       <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
@@ -728,7 +734,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) =>
                       </div>
                     )}
                   </td>
-                  <td data-label="Juzhali">
+                  <td data-label="Juzhali" className={getCellEdited(editHistory, day, 'juzhali') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
                       <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
@@ -750,7 +756,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) =>
                 </>
               ) : (
                 <>
-                  <td data-label="Murajah">
+                  <td data-label="Murajah" className={getCellEdited(editHistory, day, 'murajah') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
                       <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
                     ) : (
@@ -767,7 +773,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) =>
                       </div>
                     )}
                   </td>
-                  <td data-label="Jadeed">
+                  <td data-label="Jadeed" className={getCellEdited(editHistory, day, 'jadeed') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
                       <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
@@ -785,7 +791,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly }) =>
                       </div>
                     )}
                   </td>
-                  <td data-label="Juzhali">
+                  <td data-label="Juzhali" className={getCellEdited(editHistory, day, 'juzhali') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
                       <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
@@ -880,13 +886,65 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('My Schedule');
+  const [hasUnseenChanges, setHasUnseenChanges] = useState(false);
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
+  const [editHistory, setEditHistory] = useState({});
+
+  const autoSaveTimerRef = useRef(null);
+  const lastSavedSnapshotRef = useRef('');
 
   useEffect(() => {
     if (userId) {
-      fetchSelfJadwal();
+      fetchSelfJadwal().then(() => markAsViewed());
       fetchUserName();
+      checkWelcomePopup();
     }
   }, [userId]);
+
+  // Auto-save whenever schedule or mode changes
+  useEffect(() => {
+    if (!userId || loading) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    const currentSnapshot = JSON.stringify({ data: scheduleData, mode });
+    if (currentSnapshot === lastSavedSnapshotRef.current) return;
+
+    autoSaveTimerRef.current = setTimeout(async () => {
+      const now = Date.now();
+      const mergedHistory = { ...(scheduleData._editHistory || {}), ...editHistory };
+      const cleanHistory = {};
+      for (const [key, ts] of Object.entries(mergedHistory)) {
+        if (now - new Date(ts).getTime() < 60000) cleanHistory[key] = ts;
+      }
+      const { error } = await supabase
+        .from('self_jadwal')
+        .upsert({
+          user_id: userId,
+          schedule_data: { ...scheduleData, _mode: mode, _editHistory: cleanHistory },
+          updated_at: new Date().toISOString(),
+          parent_viewed_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (!error) {
+        lastSavedSnapshotRef.current = currentSnapshot;
+        try {
+          await supabase.functions.invoke('fcm-notification', {
+            body: {
+              title: 'Self Jadwal Updated ✏️',
+              body: `${userName} has updated their Self Jadwal schedule.`,
+              targetRole: null,
+              targetUser: userId,
+              data: { redirectPage: 'Self Jadwal', timestamp: new Date().toISOString() }
+            }
+          });
+        } catch (_) {}
+      }
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [scheduleData, mode, userId, loading]);
 
   const fetchUserName = async () => {
     try {
@@ -906,8 +964,8 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
   const fetchSelfJadwal = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('self_jadawal')
-      .select('schedule_data')
+      .from('self_jadwal')
+      .select('schedule_data, has_unseen_changes')
       .eq('user_id', userId)
       .single();
 
@@ -916,11 +974,79 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
     } else if (data && data.schedule_data) {
       const savedMode = data.schedule_data._mode || 'juz-wise';
       setMode(savedMode);
-      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
+      const history = data.schedule_data._editHistory || {};
+      setEditHistory(history);
+      const loaded = { ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode };
+      setScheduleData(loaded);
+      setHasUnseenChanges(data.has_unseen_changes || false);
+      lastSavedSnapshotRef.current = JSON.stringify({ data: loaded, mode: savedMode });
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
+      setHasUnseenChanges(false);
+      setEditHistory({});
+      lastSavedSnapshotRef.current = JSON.stringify({ data: DEFAULT_SCHEDULE, mode: 'juz-wise' });
     }
     setLoading(false);
+  };
+
+  const checkWelcomePopup = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('self_jadwal_notifications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('notification_type', 'welcome')
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // No record found, show popup
+        setShowWelcomePopup(true);
+      }
+    } catch (e) {
+      console.error('Failed to check welcome popup:', e);
+    }
+  };
+
+  const dismissWelcomePopup = async () => {
+    setShowWelcomePopup(false);
+    try {
+      await supabase
+        .from('self_jadwal_notifications')
+        .insert({
+          user_id: userId,
+          notification_type: 'welcome',
+          dismissed_at: new Date().toISOString()
+        });
+    } catch (e) {
+      console.error('Failed to dismiss welcome popup:', e);
+    }
+  };
+
+  const markAsViewed = async () => {
+    try {
+      await supabase
+        .from('self_jadwal')
+        .update({
+          has_unseen_changes: false,
+          parent_viewed_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+      setHasUnseenChanges(false);
+    } catch (e) {
+      console.error('Failed to mark as viewed:', e);
+    }
+  };
+
+  const handleCellChange = (day, field, value) => {
+    setScheduleData(prev => ({
+      ...prev,
+      [day]: {
+        ...(prev[day] || {}),
+        [field]: value
+      }
+    }));
+    const key = `${day}_${field}`;
+    setEditHistory(prev => ({ ...prev, [key]: new Date().toISOString() }));
   };
 
   if (loading) {
@@ -940,66 +1066,164 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
   }
 
   return (
-    <div className="jadwal-container parent-view">
-      <div style={premiumHeaderStyle}>
-        <div style={premiumHeaderGlow} />
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <div style={premiumTitleStyle}>
-              <Crown size={24} style={{ color: '#d4af37' }} />
-              <span>Self Jadwal Schedule</span>
-            </div>
-            <span style={premiumBadgeStyle}>
-              <Gem size={12} /> Premium
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
-              <Star size={14} style={{ color: '#d4af37' }} />
-              <span style={{ color: '#e8d5a3', fontSize: '14px', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
-                {userName}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
-              <Award size={14} style={{ color: '#d4af37' }} />
-              <span style={{ color: '#e8d5a3', fontSize: '13px', fontFamily: 'Inter, sans-serif', opacity: 0.8 }}>
-                Personal Timetable
-              </span>
+    <>
+      {showWelcomePopup && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            padding: '32px',
+            borderRadius: '20px',
+            maxWidth: '500px',
+            width: '90%',
+            border: '2px solid #d4af37',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <Crown size={48} style={{ color: '#d4af37', marginBottom: '16px' }} />
+              <h2 style={{
+                color: '#d4af37',
+                fontSize: '24px',
+                fontWeight: 700,
+                marginBottom: '12px',
+                fontFamily: 'Inter, sans-serif'
+              }}>
+                Welcome to Self Jadwal!
+              </h2>
+              <p style={{
+                color: '#e8d5a3',
+                fontSize: '16px',
+                lineHeight: 1.6,
+                marginBottom: '24px',
+                fontFamily: 'Inter, sans-serif'
+              }}>
+                Create your personal Quran study schedule. Teachers can also help you set up and edit your timetable.
+              </p>
+              <button
+                onClick={dismissWelcomePopup}
+                style={{
+                  padding: '12px 32px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #d4af37, #b8962e)',
+                  color: '#1a1a2e',
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: 'Inter, sans-serif',
+                  transition: 'transform 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                Get Started
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
+      <div className="jadwal-container parent-view">
+        <div style={premiumHeaderStyle}>
+          <div style={premiumHeaderGlow} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={premiumTitleStyle}>
+                <Crown size={24} style={{ color: '#d4af37' }} />
+                <span>Self Jadwal Schedule</span>
+              </div>
+              <span style={premiumBadgeStyle}>
+                <Gem size={12} /> Premium
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
+                <Star size={14} style={{ color: '#d4af37' }} />
+                <span style={{ color: '#e8d5a3', fontSize: '14px', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
+                  {userName}
+                </span>
+                {hasUnseenChanges && (
+                  <div style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: '#4ade80',
+                    boxShadow: '0 0 8px #4ade80',
+                    animation: 'pulse 2s infinite'
+                  }} />
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
+                <Award size={14} style={{ color: '#d4af37' }} />
+                <span style={{ color: '#e8d5a3', fontSize: '13px', fontFamily: 'Inter, sans-serif', opacity: 0.8 }}>
+                  Personal Timetable
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-      <div style={premiumCardStyle}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Mode:</label>
-            <select
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              className="premium-select"
-              style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
-            >
-              <option value="juz-wise">Juz Wise</option>
-              <option value="surah-wise">Surah Wise</option>
-            </select>
+        <div style={premiumCardStyle}>
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Mode:</label>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value)}
+                className="premium-select"
+                style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
+              >
+                <option value="juz-wise">Juz Wise</option>
+                <option value="surah-wise">Surah Wise</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {hasUnseenChanges && (
+                <button
+                  onClick={markAsViewed}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #4ade80',
+                    background: '#f0fdf4',
+                    color: '#16a34a',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'Inter, sans-serif'
+                  }}
+                >
+                  ✓ Mark as Viewed
+                </button>
+              )}
+              <span style={{ fontSize: '12px', color: '#5d4037', fontStyle: 'italic', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>✏️ Auto-saved</span>
+            </div>
           </div>
-          <span style={{ fontSize: '12px', color: '#8b6d31', fontStyle: 'italic', fontFamily: 'Inter, sans-serif' }}>Read-only view</span>
-        </div>
-        <div style={{ padding: '20px' }}>
-          <SelfJadwalTableStyle
-            mode={mode}
-            scheduleData={scheduleData}
-            onCellChange={() => {}}
-            readOnly
-          />
+          <div style={{ padding: '20px' }}>
+            <SelfJadwalTableStyle
+              mode={mode}
+              scheduleData={scheduleData}
+              onCellChange={handleCellChange}
+              editHistory={editHistory}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
-export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) => {
+
+export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification, students = [] }) => {
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
@@ -1007,6 +1231,8 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) =
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedUserName, setSelectedUserName] = useState('');
+  const [editHistory, setEditHistory] = useState({});
+  const [resolvedUserId, setResolvedUserId] = useState('');
 
   const autoSaveTimerRef = useRef(null);
   const lastSavedSnapshotRef = useRef('');
@@ -1017,27 +1243,46 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) =
 
   useEffect(() => {
     if (selectedUserId) {
-      fetchSelfJadwal();
+      const child = students.find(s => String(s.student_id) === String(selectedUserId) || String(s.id) === String(selectedUserId));
+      if (child) {
+        setSelectedUserName(child.name || child.full_name || 'Child');
+        const parentUserId = child.user_id || selectedUserId;
+        setResolvedUserId(parentUserId);
+        fetchSelfJadwalByChildId(parentUserId);
+      } else {
+        setResolvedUserId(selectedUserId);
+        fetchSelfJadwal();
+      }
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
+      setResolvedUserId('');
     }
   }, [selectedUserId]);
 
   useEffect(() => {
-    if (!selectedUserId) return;
+    if (!resolvedUserId) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     const currentSnapshot = JSON.stringify({ data: scheduleData, mode });
     if (currentSnapshot === lastSavedSnapshotRef.current) return;
 
     autoSaveTimerRef.current = setTimeout(async () => {
-      if (!selectedUserId) return;
+      if (!resolvedUserId) return;
+      const now = Date.now();
+      const mergedHistory = { ...(scheduleData._editHistory || {}), ...editHistory };
+      const cleanHistory = {};
+      for (const [key, ts] of Object.entries(mergedHistory)) {
+        if (now - new Date(ts).getTime() < 60000) cleanHistory[key] = ts;
+      }
       const { error } = await supabase
-        .from('self_jadawal')
+        .from('self_jadwal')
         .upsert({
-          user_id: selectedUserId,
-          schedule_data: { ...scheduleData, _mode: mode },
-          updated_at: new Date().toISOString()
+          user_id: resolvedUserId,
+          schedule_data: { ...scheduleData, _mode: mode, _editHistory: cleanHistory },
+          updated_at: new Date().toISOString(),
+          has_unseen_changes: true,
+          last_updated_by: resolvedUserId,
+          teacher_updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 
       if (error) {
@@ -1050,7 +1295,32 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) =
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [scheduleData, mode, selectedUserId]);
+  }, [scheduleData, mode, resolvedUserId]);
+
+  const fetchSelfJadwalByChildId = async (childId) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('self_jadwal')
+      .select('schedule_data')
+      .eq('user_id', childId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Failed to fetch self Jadwal:', error);
+    } else if (data && data.schedule_data) {
+      const savedMode = data.schedule_data._mode || 'juz-wise';
+      setMode(savedMode);
+      const history = data.schedule_data._editHistory || {};
+      setEditHistory(history);
+      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
+      lastSavedSnapshotRef.current = JSON.stringify({ data: { ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode }, mode: savedMode });
+    } else {
+      setScheduleData(DEFAULT_SCHEDULE);
+      setEditHistory({});
+      lastSavedSnapshotRef.current = JSON.stringify({ data: DEFAULT_SCHEDULE, mode: 'juz-wise' });
+    }
+    setLoading(false);
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -1076,7 +1346,7 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) =
     }
 
     const { data, error } = await supabase
-      .from('self_jadawal')
+      .from('self_jadwal')
       .select('schedule_data')
       .eq('user_id', selectedUserId)
       .single();
@@ -1086,10 +1356,13 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) =
     } else if (data && data.schedule_data) {
       const savedMode = data.schedule_data._mode || 'juz-wise';
       setMode(savedMode);
+      const history = data.schedule_data._editHistory || {};
+      setEditHistory(history);
       setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
       lastSavedSnapshotRef.current = JSON.stringify({ data: { ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode }, mode: savedMode });
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
+      setEditHistory({});
       lastSavedSnapshotRef.current = JSON.stringify({ data: DEFAULT_SCHEDULE, mode: 'juz-wise' });
     }
     setLoading(false);
@@ -1103,6 +1376,8 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) =
         [field]: value
       }
     }));
+    const key = `${day}_${field}`;
+    setEditHistory(prev => ({ ...prev, [key]: new Date().toISOString() }));
   };
 
   const handleNotifyUser = async () => {
@@ -1157,10 +1432,23 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) =
               className="premium-select"
               style={{ flex: 1, minWidth: '250px', padding: '10px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
             >
-              <option value="">-- Select Parent / User --</option>
-              {users.map(u => (
-                <option key={u.user_id} value={u.user_id}>{u.full_name || u.email}</option>
-              ))}
+              <option value="">-- Select Child / User --</option>
+              {students.length > 0 && (
+                <optgroup label="👦 Group Children">
+                  {students.map(s => (
+                    <option key={`child-${s.student_id || s.id}`} value={s.student_id || s.id}>
+                      {s.name || s.full_name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {users.length > 0 && (
+                <optgroup label="👨‍👩‍👦 Parents / Users">
+                  {users.map(u => (
+                    <option key={u.user_id} value={u.user_id}>{u.full_name || u.email}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             {selectedUserId && (
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -1204,6 +1492,7 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification }) =
                 mode={mode}
                 scheduleData={scheduleData}
                 onCellChange={handleCellChange}
+                editHistory={editHistory}
               />
             </div>
           </>

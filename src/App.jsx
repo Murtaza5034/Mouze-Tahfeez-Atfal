@@ -210,6 +210,12 @@ const createTeacherResultDraft = (overrides = {}) => ({
   ...overrides,
 });
 
+const calculateEffectiveScore = (r) => {
+  if (!r) return 0;
+  if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
+  return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
+};
+
 const isTeacherResultLocked = (settings) => {
   if (settings?.auto_lock_enabled === false) return false;
   const now = new Date();
@@ -2293,7 +2299,6 @@ function getStudentStatus(student) {
 }
 
 function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles = []) {
-  // Calculate dynamic ranks per week
   const resultsByWeek = {};
   weeklyResults.forEach(r => {
     if (!r.week_date) return;
@@ -2301,43 +2306,47 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     resultsByWeek[r.week_date].push(r);
   });
 
-  const rankMap = new Map(); // key: student_id + week_date
+  const rankMap = new Map();
   Object.keys(resultsByWeek).forEach(week => {
     const weekResults = resultsByWeek[week];
     const sorted = [...weekResults].sort((a, b) => {
-      const scoreDiff = (Number(b.total_score) || 0) - (Number(a.total_score) || 0);
+      const scoreDiff = calculateEffectiveScore(b) - calculateEffectiveScore(a);
       if (scoreDiff !== 0) return scoreDiff;
       const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
       if (jadeedDiff !== 0) return jadeedDiff;
       return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
     });
 
-    // Unique sequential ranks sorted by total_score descending (no ties)
+    let prevRank = 1;
     sorted.forEach((result, idx) => {
+      let currentRank = idx + 1;
+      if (idx > 0) {
+        const prev = sorted[idx - 1];
+        if (
+          calculateEffectiveScore(prev) === calculateEffectiveScore(result) &&
+          (Number(prev.jadeed) || 0) === (Number(result.jadeed) || 0) &&
+          (Number(prev.attendance_count) || 0) === (Number(result.attendance_count) || 0)
+        ) {
+          currentRank = prevRank;
+        }
+      }
+      prevRank = currentRank;
       const resId = String(result.student_id || "").trim().toLowerCase();
-      rankMap.set(`${resId}-${week}`, idx + 1);
+      rankMap.set(`${resId}-${week}`, currentRank);
     });
   });
 
   const latestResultMap = new Map();
-  // Sort by date descending to get the latest result first
   const sortedByDate = [...weeklyResults].sort((a, b) => new Date(b.week_date) - new Date(a.week_date));
-
-  const getEffectiveScore = (r) => {
-    if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
-    return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
-  };
 
   sortedByDate.forEach((result) => {
     const resId = String(result.student_id || "").trim().toLowerCase();
     if (resId && !latestResultMap.has(resId)) {
-      // For now, we'll use the weekly rank if it exists, but we'll recalculate global rank below
       const weeklyRank = rankMap.get(`${resId}-${result.week_date}`);
-      latestResultMap.set(resId, { ...result, weeklyRank, effectiveScore: getEffectiveScore(result) });
+      latestResultMap.set(resId, { ...result, weeklyRank, effectiveScore: calculateEffectiveScore(result) });
     }
   });
 
-  // Build previous week rank map for rank change tracking
   const previousRankMap = new Map();
   const seenStudents = new Set();
   sortedByDate.forEach((result) => {
@@ -2352,7 +2361,6 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     }
   });
 
-  // Build the full student list with all matched results
   const builtStudents = childProfiles.map((profile) => {
     const sId = profile.student_id || profile.its || profile.id;
     const numericId = !isNaN(sId) ? Number(sId) : sId;
@@ -2404,12 +2412,10 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     };
   });
 
-  // Compute global computedRank among only students that have a latestResult
-  // Sorts by Score desc -> Jadeed desc -> Attendance desc (matches RankPreview)
   const rankable = [...builtStudents.filter(s => s.latestResult)];
   rankable.sort((a, b) => {
-    const scoreA = a.latestResult.effectiveScore || getEffectiveScore(a.latestResult);
-    const scoreB = b.latestResult.effectiveScore || getEffectiveScore(b.latestResult);
+    const scoreA = calculateEffectiveScore(a.latestResult);
+    const scoreB = calculateEffectiveScore(b.latestResult);
     const scoreDiff = scoreB - scoreA;
     if (scoreDiff !== 0) return scoreDiff;
     const jadeedDiff = (Number(b.latestResult.jadeed) || 0) - (Number(a.latestResult.jadeed) || 0);
@@ -2417,24 +2423,34 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     return (Number(b.latestResult.attendance_count) || 0) - (Number(a.latestResult.attendance_count) || 0);
   });
 
+  let globalPrevRank = 1;
   rankable.forEach((s, idx) => {
-    s.latestResult.computedRank = idx + 1;
+    let currentRank = idx + 1;
+    if (idx > 0) {
+      const prev = rankable[idx - 1];
+      const scorePrev = calculateEffectiveScore(prev.latestResult);
+      const scoreCurr = calculateEffectiveScore(s.latestResult);
+      if (
+        scorePrev === scoreCurr &&
+        (Number(prev.latestResult.jadeed) || 0) === (Number(s.latestResult.jadeed) || 0) &&
+        (Number(prev.latestResult.attendance_count) || 0) === (Number(s.latestResult.attendance_count) || 0)
+      ) {
+        currentRank = globalPrevRank;
+      }
+    }
+    globalPrevRank = currentRank;
+    s.latestResult.computedRank = currentRank;
   });
 
   return builtStudents;
 }
 
 const recalculateComputedRanks = (students) => {
-  const getScore = (r) => {
-    if (!r) return 0;
-    if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
-    return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
-  };
   const withScores = students
     .filter(s => s.latestResult)
     .map(s => ({
       ...s,
-      _effScore: getScore(s.latestResult),
+      _effScore: calculateEffectiveScore(s.latestResult),
       _jadeed: Number(s.latestResult.jadeed) || 0,
       _attendance: Number(s.latestResult.attendance_count) || 0,
     }));
@@ -2446,8 +2462,17 @@ const recalculateComputedRanks = (students) => {
     return b._attendance - a._attendance;
   });
   const studentRanks = {};
+  let prevRank = 1;
   withScores.forEach((s, idx) => {
-    studentRanks[String(s.student_id)] = idx + 1;
+    let currentRank = idx + 1;
+    if (idx > 0) {
+      const prev = withScores[idx - 1];
+      if (prev._effScore === s._effScore && prev._jadeed === s._jadeed && prev._attendance === s._attendance) {
+        currentRank = prevRank;
+      }
+    }
+    prevRank = currentRank;
+    studentRanks[String(s.student_id)] = currentRank;
   });
   if (Object.keys(studentRanks).length === 0) return students;
   return students.map(s => {
@@ -2848,12 +2873,6 @@ function RankPreview({ students }) {
     setTimeout(() => setRefreshedStatus(null), 2500);
   };
 
-  const getEffectiveScore = (r) => {
-    if (!r) return 0;
-    if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
-    return (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0);
-  };
-
   const getTieInfo = (sorted, student, idx) => {
     if (idx === 0) return 'Leader';
     const prev = sorted[idx - 1];
@@ -2874,7 +2893,7 @@ function RankPreview({ students }) {
       .filter(s => s.latestResult)
       .map(s => ({
         ...s,
-        score: getEffectiveScore(s.latestResult),
+        score: calculateEffectiveScore(s.latestResult),
         jadeed: Number(s.latestResult.jadeed) || 0,
         attendance: Number(s.latestResult.attendance_count) || 0,
       }));
@@ -2887,8 +2906,17 @@ function RankPreview({ students }) {
       return b.attendance - a.attendance;
     });
 
+    let prevRank = 1;
     return withScores.map((s, idx) => {
-      const currentRank = idx + 1;
+      let currentRank = idx + 1;
+      if (idx > 0) {
+        const prev = withScores[idx - 1];
+        if (prev.score === s.score && prev.jadeed === s.jadeed && prev.attendance === s.attendance) {
+          currentRank = prevRank;
+        }
+      }
+      prevRank = currentRank;
+
       let rankChange = null;
       if (s.previousWeekRank) {
         if (currentRank < s.previousWeekRank) {
@@ -3897,7 +3925,7 @@ function ParentPortal({
 
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData || {};
 
-  const currentRank = weeklyResult?.weeklyRank || weeklyResult?.computedRank || weeklyResult?.rank;
+  const currentRank = weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank;
   const studentId = studentProfile?.student_id;
   let rankImproved = false;
   let rankChange = null;
@@ -3993,7 +4021,7 @@ function ParentPortal({
                       setParentViewedStatus(true);
                       if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
                       // Check if child ranked in top 3 and trigger celebration + notifications
-                      const rankForCelebration = studentProfile?.latestResult?.weeklyRank || studentProfile?.latestResult?.computedRank;
+                      const rankForCelebration = studentProfile?.latestResult?.computedRank || studentProfile?.latestResult?.weeklyRank;
                       if (rankForCelebration && rankForCelebration >= 1 && rankForCelebration <= 3) {
                         setCelebrationRank(rankForCelebration);
                         const ordinalMap = { 1: "1st", 2: "2nd", 3: "3rd" };
@@ -4221,7 +4249,8 @@ function ParentPortal({
       title: "Learning Schedule",
       description: "Detailed breakdown of your child's daily school activities and tasks.",
       schedule: schedule.length > 0 ? schedule : [{ task_time: "--:--", task_name: "No tasks found" }],
-      highlights: [`Next task: ${schedule[0]?.task_name || "None"}`],
+      highlights: [
+        `Next task: ${schedule[0]?.task_name || "None"}`],
     },
     Teachers: {
       eyebrow: "Our Staff",
@@ -5429,6 +5458,12 @@ function AdminPortal({
   const [whatsAppLogs, setWhatsAppLogs] = useState([]);
   const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
 
+  const [resetPasswordTarget, setResetPasswordTarget] = useState(null);
+  const [resetPasswordNewPass, setResetPasswordNewPass] = useState("");
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [resetPasswordMessage, setResetPasswordMessage] = useState("");
+  const [resetPasswordError, setResetPasswordError] = useState("");
   const computeRankChange = (student, wr) => {
     const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
     const prevWeekRank = student?.previousWeekRank;
@@ -8375,8 +8410,27 @@ const handleDownloadAllReports = async () => {
                       jadwal_pdf_background_opacity: jadwalSettingsDraft.jadwal_pdf_background_opacity,
                       jadwal_pdf_font_family: jadwalSettingsDraft.jadwal_pdf_font_family,
                       jadwal_type: jadwalSettingsDraft.jadwal_type,
-                      jadwal_week_start: jadwalSettingsDraft.jadwal_week_start,
-                      jadwal_week_end: jadwalSettingsDraft.jadwal_week_end,
+                      jadwal_week_start: jadwalSettingsDraft.jadwal_type === 'weekly'
+                        ? (() => {
+                            const n = new Date();
+                            const t = n.getDay();
+                            let sat;
+                            if (t === 5) { sat = new Date(n); sat.setDate(n.getDate() + 1); }
+                            else { const db = (t - 6 + 7) % 7; sat = new Date(n); sat.setDate(n.getDate() - db); }
+                            return sat.toISOString().split('T')[0];
+                          })()
+                        : jadwalSettingsDraft.jadwal_week_start,
+                      jadwal_week_end: jadwalSettingsDraft.jadwal_type === 'weekly'
+                        ? (() => {
+                            const n = new Date();
+                            const t = n.getDay();
+                            let sat;
+                            if (t === 5) { sat = new Date(n); sat.setDate(n.getDate() + 1); }
+                            else { const db = (t - 6 + 7) % 7; sat = new Date(n); sat.setDate(n.getDate() - db); }
+                            const fri = new Date(sat); fri.setDate(sat.getDate() + 6);
+                            return fri.toISOString().split('T')[0];
+                          })()
+                        : jadwalSettingsDraft.jadwal_week_end,
                       jadwal_pdf_title: jadwalSettingsDraft.jadwal_pdf_title,
                       jadwal_pdf_subtitle: jadwalSettingsDraft.jadwal_pdf_subtitle,
                       jadwal_pdf_academic_portal: jadwalSettingsDraft.jadwal_pdf_academic_portal,
@@ -8506,9 +8560,6 @@ const handleDownloadAllReports = async () => {
                   {jadwalSettingsDraft.jadwal_week_start && jadwalSettingsDraft.jadwal_week_end ? (() => {
                     const d1 = new Date(jadwalSettingsDraft.jadwal_week_start + 'T00:00:00Z');
                     const d2 = new Date(jadwalSettingsDraft.jadwal_week_end + 'T00:00:00Z');
-                    let totalDays = Math.max(0, Math.floor((d2 - d1) / 86400000) + 1);
-                    totalDays = items.length;
-                    if (totalDays < 1) return null;
                     const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
                     const items = [];
                     const cur = new Date(d1);
@@ -8520,6 +8571,9 @@ const handleDownloadAllReports = async () => {
                     if (items.length > 19) {
                       items.pop();
                     }
+                    let totalDays = Math.max(0, Math.floor((d2 - d1) / 86400000) + 1);
+                    totalDays = items.length;
+                    if (totalDays < 1) return null;
                     return (
                       <div style={{ marginTop: '16px', background: 'rgba(212,175,55,0.06)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(212,175,55,0.12)' }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '10px' }}>
@@ -9470,19 +9524,36 @@ onShowAction,
 
   const [liveResult, setLiveResult] = useState(null);
 
-  // Compute merged data + local rank synchronously
+  // Compute merged data + fallback rank synchronously
   const mergedResult = useMemo(() => {
     if (!selectedStudent) return null;
     const form = teacherForms.result;
-    const total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(form[f]), 0);
-    return {
-      ...selectedStudent.latestResult,
-      ...form,
-      total_score
-    };
+    const latest = selectedStudent.latestResult || {};
+
+    const hasFormEntry = RESULT_NUMERIC_FIELDS.some(f => form[f] !== "" && form[f] !== undefined && form[f] !== null);
+
+    let total_score;
+    if (hasFormEntry) {
+      total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(form[f]), 0);
+    } else if (latest.total_score !== undefined && latest.total_score !== null && latest.total_score !== "") {
+      total_score = Number(latest.total_score);
+    } else {
+      total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(latest[f]), 0);
+    }
+
+    // Merge: only override db values with non-empty form values
+    const merged = { ...latest };
+    for (const key of Object.keys(form)) {
+      if (form[key] !== "" && form[key] !== undefined && form[key] !== null) {
+        merged[key] = form[key];
+      }
+    }
+    merged.total_score = total_score;
+
+    return merged;
   }, [selectedStudent, teacherForms.result]);
 
-  const localRank = useMemo(() => {
+  const fallbackRank = useMemo(() => {
     if (!selectedStudent || !mergedResult) return null;
     const getEffScore = (r) => {
       if (!r) return 0;
@@ -9512,18 +9583,84 @@ onShowAction,
       if (jadeedDiff !== 0) return jadeedDiff;
       return b.attendance - a.attendance;
     });
-    const myRank = withScores.findIndex(s => s.isMe) + 1;
-    return myRank > 0 ? myRank : null;
+    let currentRank = 1;
+    let prevRank = 1;
+    for (let i = 0; i < withScores.length; i++) {
+      const s = withScores[i];
+      currentRank = i + 1;
+      if (i > 0) {
+        const prev = withScores[i - 1];
+        if (prev.score === s.score && prev.jadeed === s.jadeed && prev.attendance === s.attendance) {
+          currentRank = prevRank;
+        }
+      }
+      prevRank = currentRank;
+      if (s.isMe) return currentRank;
+    }
+    return null;
   }, [selectedStudent, mergedResult, schoolData.students]);
 
-  // Use localRank synced with admin RankPreview logic (all students' latest results)
+  const [globalRank, setGlobalRank] = useState(null);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const loadGlobalRank = async () => {
+      if (!selectedStudent || !mergedResult?.week_date) {
+        setGlobalRank(null);
+        return;
+      }
+
+      const preview = {
+        murajazah: toNumber(mergedResult.murajazah),
+        juz_hali: toNumber(mergedResult.juz_hali),
+        takhteet: toNumber(mergedResult.takhteet),
+        jadeed: toNumber(mergedResult.jadeed),
+        attendance_count: toNumber(mergedResult.attendance_count),
+      };
+
+      const { data, error } = await supabase.functions.invoke("get-global-rank", {
+        body: {
+          student_id: selectedStudent.student_id,
+          week_date: mergedResult.week_date,
+          preview,
+        },
+      });
+
+      if (!isCurrent) return;
+      if (error) {
+        console.warn("Global rank lookup failed; using local fallback rank:", error.message || error);
+        setGlobalRank(null);
+        return;
+      }
+
+      setGlobalRank(data?.rank || null);
+    };
+
+    loadGlobalRank();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedStudent, mergedResult]);
+
+  // For the rank in the report card:
+  // - If the teacher form has unsaved new scores → use recalculated rank (globalRank / fallbackRank)
+  // - Otherwise → use the computedRank already set on the student by buildStudents
+  //   (this is the exact same rank shown on the Rank Preview page)
   useEffect(() => {
     if (!selectedStudent || !mergedResult) {
       setLiveResult(null);
       return;
     }
-    setLiveResult({ ...mergedResult, computedRank: localRank });
-  }, [selectedStudent, mergedResult, localRank]);
+    const form = teacherForms.result;
+    const hasFormEntry = RESULT_NUMERIC_FIELDS.some(
+      (f) => form[f] !== "" && form[f] !== undefined && form[f] !== null
+    );
+    const savedRank = selectedStudent.latestResult?.computedRank || null;
+    const rankToUse = globalRank || savedRank || fallbackRank;
+    setLiveResult({ ...mergedResult, computedRank: rankToUse });
+  }, [selectedStudent, mergedResult, globalRank, fallbackRank, teacherForms.result]);
 
   const computeRankChange = (student, wr) => {
     const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
@@ -9855,6 +9992,7 @@ onShowAction,
                 <LazySelfJadwalTeacherView
                   showAction={onShowAction}
                   onBroadcastNotification={broadcastNotification}
+                  students={filteredStudents}
                 />
               </Suspense>
            )}
@@ -10450,7 +10588,7 @@ onShowAction,
                         <span>{student.hifzStatus}</span>
                       </div>
                       <div className="performance-pill">
-                        Latest Result: {student.latestResult?.weeklyRank || student.latestResult?.computedRank || "pending"}
+                        Latest Result: {student.latestResult?.computedRank || student.latestResult?.weeklyRank || "pending"}
                       </div>
                       <Suspense fallback={null}>
                         <LazyTakhteetProgress weeklyResult={student.latestResult} />
@@ -10819,12 +10957,6 @@ export default function App() {
   const [attachedFileUrl, setAttachedFileUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadingTeacherPhoto, setUploadingTeacherPhoto] = useState(false);
-  const [resetPasswordTarget, setResetPasswordTarget] = useState(null);
-  const [resetPasswordNewPass, setResetPasswordNewPass] = useState("");
-  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
-  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
-  const [resetPasswordMessage, setResetPasswordMessage] = useState("");
-  const [resetPasswordError, setResetPasswordError] = useState("");
   const [parentData, setParentData] = useState(emptyParentData);
   const [schoolData, setSchoolData] = useState({
     students: [],
@@ -10850,7 +10982,39 @@ export default function App() {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [parentViews, setParentViews] = useState([]);
   const [portalAccessSuccess, setPortalAccessSuccess] = useState(null);
-  
+  const [selfJadwalPopup, setSelfJadwalPopup] = useState(null);
+  const lastUnseenRef = useRef(false);
+
+  useEffect(() => {
+    if (!user || !portalRole) return;
+    let isCurrent = true;
+    const check = async () => {
+      try {
+        const lastCheck = localStorage.getItem('sj_last_check_' + user.id);
+        const since = lastCheck || new Date(0).toISOString();
+        if (portalRole === 'parents') {
+          const { data } = await supabase.from('self_jadwal').select('has_unseen_changes, teacher_updated_at, updated_at').eq('user_id', user.id).single();
+          if (!isCurrent) return;
+          const currentlyUnseen = !!data?.has_unseen_changes;
+          if (currentlyUnseen && !lastUnseenRef.current) {
+            setSelfJadwalPopup({ type: 'teacher_edit', at: data.teacher_updated_at || data.updated_at });
+          }
+          lastUnseenRef.current = currentlyUnseen;
+        } else if (portalRole === 'teacher') {
+          const { data } = await supabase.from('system_notifications').select('id, created_at').eq('target_user', user.id).eq('title', 'Self Jadwal Updated').gte('created_at', since).limit(1);
+          if (!isCurrent) return;
+          if (data && data.length > 0) {
+            setSelfJadwalPopup({ type: 'parent_edit' });
+          }
+        }
+      } catch (_) {}
+      if (isCurrent) localStorage.setItem('sj_last_check_' + user.id, new Date().toISOString());
+    };
+    check();
+    const interval = setInterval(check, 30000);
+    return () => { isCurrent = false; clearInterval(interval); };
+  }, [user?.id, portalRole]);
+
   // Local dismissal state (doesn't affect backend)
   const [dismissedNotifs, setDismissedNotifs] = useState(() => {
     try {
@@ -11861,7 +12025,8 @@ export default function App() {
         if (!isActive) return;
 
         notificationChannel = supabase
-          .channel(`notif-sync-${user.id}-${Math.random().toString(36).substring(7)}`)
+          .channel(
+            `notif-sync-${user.id}-${Math.random().toString(36).substring(7)}`)
           .on(
             'postgres_changes',
             { event: 'INSERT', table: 'system_notifications', schema: 'public' },
@@ -12467,7 +12632,8 @@ const handleSendCustomNotification = async (event) => {
       },
     }));
     showAction("success", "Schedule created successfully.");
-    broadcastNotification("Schedule Updated", `New task added: ${payload.task_name}`, "all", null, "Schedule");
+    broadcastNotification("Schedule Updated", 
+      `New task added: ${payload.task_name}`, "all", null, "Schedule");
   };
 
   const handleRecordTeacherAttendance = async (event, quickRecord = null) => {
@@ -12812,7 +12978,8 @@ const handleSendCustomNotification = async (event) => {
 
       if (studentIds.length === 0) {
         setTeacherUnlockStatus(`error-${teacher.id}`);
-        showAction("error", `No students found for this teacher.`);
+        showAction("error", 
+          `No students found for this teacher.`);
         setTimeout(() => setTeacherUnlockStatus(""), 3000);
         return;
       }
@@ -13273,6 +13440,74 @@ setAppTheme={setAppTheme}
         )}
 
       </div>
+      {selfJadwalPopup && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 99999, backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            padding: '36px', borderRadius: '24px', maxWidth: '480px', width: '90%',
+            border: '2px solid #d4af37', boxShadow: '0 12px 48px rgba(0,0,0,0.4)',
+            position: 'relative', overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute', top: '-50%', left: '-20%', width: '140%', height: '200%',
+              background: 'radial-gradient(ellipse at center, rgba(212, 175, 55, 0.06) 0%, transparent 70%)',
+              pointerEvents: 'none'
+            }} />
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+                <span style={{
+                  width: '14px', height: '14px', borderRadius: '50%',
+                  background: '#4ade80', boxShadow: '0 0 12px rgba(74, 222, 128, 0.8)',
+                  animation: 'pulse 1.2s ease-in-out infinite', flexShrink: 0
+                }} />
+                <h2 style={{ color: '#d4af37', fontSize: '22px', fontWeight: 700, margin: 0, fontFamily: 'Inter, sans-serif' }}>
+                  Self Jadwal Updated
+                </h2>
+              </div>
+              <p style={{ color: '#e8d5a3', fontSize: '15px', lineHeight: 1.7, marginBottom: '24px', fontFamily: 'Inter, sans-serif' }}>
+                {selfJadwalPopup.type === 'teacher_edit'
+                  ? 'Your teacher has updated your Self Jadwal schedule. New changes are highlighted with a green glow.'
+                  : `Self Jadwal records have been updated. New changes are highlighted with a green glow.`
+                }
+              </p>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    setSelfJadwalPopup(null);
+                    setActivePage('Self Jadwal');
+                  }}
+                  style={{
+                    flex: 1, padding: '12px 24px', borderRadius: '12px', border: 'none',
+                    background: 'linear-gradient(135deg, #d4af37, #b8962e)',
+                    color: '#1a1a2e', fontSize: '15px', fontWeight: 700, cursor: 'pointer',
+                    fontFamily: 'Inter, sans-serif', transition: 'transform 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  View Changes
+                </button>
+                <button
+                  onClick={() => setSelfJadwalPopup(null)}
+                  style={{
+                    padding: '12px 20px', borderRadius: '12px', border: '1px solid rgba(212, 175, 55, 0.3)',
+                    background: 'transparent', color: '#d4af37', fontSize: '14px', fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(212, 175, 55, 0.1)'; }}
+                  onMouseOut={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {searchPageLoading && (
         <div className="page-loading-overlay">
           <lottie-player
@@ -13288,5 +13523,7 @@ setAppTheme={setAppTheme}
     </React.Fragment>
   );
 }
+
+
 
 

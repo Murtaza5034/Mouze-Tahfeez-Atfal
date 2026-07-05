@@ -191,8 +191,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set')
+    }
     const packageName = Deno.env.get('GOOGLE_PLAY_PACKAGE_NAME') || 'com.mauzetahfeez.myapp'
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)

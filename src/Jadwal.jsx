@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator } from 'lucide-react';
 import { jsPDF } from "jspdf";
@@ -678,6 +678,9 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   const bgCss = t.backgroundUrl
     ? `background-image:linear-gradient(rgba(${bgRgb},${1 - (t.backgroundOpacity ?? 1)}),rgba(${bgRgb},${1 - (t.backgroundOpacity ?? 1)})),url('${t.backgroundUrl}');background-size:cover;background-position:center;`
     : '';
+  const { weekStart: pdfWeekStart, weekEnd: pdfWeekEnd } = t.jadwalType === 'weekly'
+    ? getCurrentWeekRange()
+    : { weekStart: null, weekEnd: null };
   const customDays = t.jadwalType === 'miqaat' && t.weekStart && t.weekEnd ? (() => {
     const start = new Date(t.weekStart + 'T00:00:00Z');
     const end = new Date(t.weekEnd + 'T00:00:00Z');
@@ -689,6 +692,16 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       const dateStr = current.toISOString().split('T')[0];
       days.push({ dayName: names[current.getUTCDay()], date: dateStr, fatemiDate: getFatemiDateStr(dateStr) });
       current.setUTCDate(current.getUTCDate() + 1);
+    }
+    return days;
+  })() : t.jadwalType === 'weekly' && pdfWeekStart ? (() => {
+    const names = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(pdfWeekStart);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      days.push({ dayName: names[d.getUTCDay()], date: dateStr, fatemiDate: getFatemiDateStr(dateStr) });
     }
     return days;
   })() : null;
@@ -1550,6 +1563,23 @@ const getDayDate = (weekStart, dayIndex) => {
   return getFatemiDateStr(d.toISOString().split('T')[0]);
 };
 
+const getCurrentWeekRange = () => {
+  const now = new Date();
+  const today = now.getDay();
+  let sat;
+  if (today === 5) {
+    sat = new Date(now);
+    sat.setDate(now.getDate() + 1);
+  } else {
+    const daysBack = (today - 6 + 7) % 7;
+    sat = new Date(now);
+    sat.setDate(now.getDate() - daysBack);
+  }
+  const fri = new Date(sat);
+  fri.setDate(sat.getDate() + 6);
+  return { weekStart: sat.toISOString().split('T')[0], weekEnd: fri.toISOString().split('T')[0] };
+};
+
 const getDaysFromRange = (startStr, endStr) => {
   if (!startStr || !endStr) return null;
   const start = new Date(startStr + 'T00:00:00Z');
@@ -1589,8 +1619,11 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const teacherStyle = settings?.jadwal_teacher_style || 'default';
   const isCompact = teacherStyle === 'compact';
   const theme = getJadwalThemeFromSettings(settings);
-  const dayDates = theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : [];
-  const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd) : null;
+  const weekRange = useMemo(() => theme.jadwalType === 'weekly' ? getCurrentWeekRange() : null, [theme.jadwalType]);
+  const dayDates = weekRange ? DAYS.map((_, idx) => getDayDate(weekRange.weekStart, idx)) : (theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : []);
+  const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd)
+    : theme.jadwalType === 'weekly' && weekRange ? getDaysFromRange(weekRange.weekStart, weekRange.weekEnd)
+    : null;
 
   useEffect(() => {
     if (initialStudentId) {
@@ -1814,6 +1847,18 @@ onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacher
         <div className="loading-spinner">Loading...</div>
       ) : selectedStudentId ? (
         <>
+          {weekRange && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(212,175,55,0.02))',
+              border: '1px solid rgba(212,175,55,0.25)', borderRadius: '12px',
+              padding: '12px 20px', marginBottom: '16px', textAlign: 'center',
+              fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl'
+            }}>
+              <span style={{ fontSize: '15px', color: '#8b6d31', fontWeight: 600 }}>
+                من {getFatemiDateStr(weekRange.weekStart)} إلى {getFatemiDateStr(weekRange.weekEnd)}
+              </span>
+            </div>
+          )}
           <div className="jadwal-mode-row">
             <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Schedule Mode:</label>
             <select
@@ -1865,8 +1910,11 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
 
   const displayStyle = settings?.jadwal_style || 'table';
   const theme = getJadwalThemeFromSettings(settings);
-  const dayDates = theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : [];
-  const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd) : null;
+  const weekRange = theme.jadwalType === 'weekly' ? getCurrentWeekRange() : null;
+  const dayDates = weekRange ? DAYS.map((_, idx) => getDayDate(weekRange.weekStart, idx)) : (theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : []);
+  const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd)
+    : theme.jadwalType === 'weekly' && weekRange ? getDaysFromRange(weekRange.weekStart, weekRange.weekEnd)
+    : null;
 
   useEffect(() => {
     if (studentId) {
@@ -1973,6 +2021,18 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
           <Download size={16} /> Download PDF
         </button>
       </div>
+      {weekRange && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(212,175,55,0.02))',
+          border: '1px solid rgba(212,175,55,0.25)', borderRadius: '12px',
+          padding: '12px 20px', marginBottom: '16px', textAlign: 'center',
+          fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl'
+        }}>
+          <span style={{ fontSize: '15px', color: '#8b6d31', fontWeight: 600 }}>
+            من {getFatemiDateStr(weekRange.weekStart)} إلى {getFatemiDateStr(weekRange.weekEnd)}
+          </span>
+        </div>
+      )}
       {renderJadwalContent()}
 
       <JadwalNotes
