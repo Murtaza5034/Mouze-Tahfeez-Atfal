@@ -13670,13 +13670,13 @@ function QuickAccessPagesUI({ supabase: sb }) {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: 40 }}>
-        <div className="spinner" /><p style={{ marginTop: 12, color: 'var(--text-muted)' }}>Loading pages...</p>
+        <div className="spinner" /><p style={{ marginTop: 12, color: '#666' }}>Loading pages...</p>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 660, margin: '0 auto', padding: '20px 0' }}>
+    <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 0' }}>
       {feedback && (
         <div className={`status-banner ${feedback.type}`} style={{ marginBottom: 16 }}>{feedback.text}</div>
       )}
@@ -13684,81 +13684,101 @@ function QuickAccessPagesUI({ supabase: sb }) {
       {tabs.map(tab => {
         const isOpen = openTab === tab.key;
         const Icon = tab.icon;
+        const visibleCount = tab.pages.filter(p => p.visible).length;
         return (
-          <div key={tab.key} className="card-appear" style={{ marginBottom: 16 }}>
+          <div key={tab.key} style={{ marginBottom: 16 }}>
             <button
               onClick={() => setOpenTab(isOpen ? null : tab.key)}
               style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                padding: '18px 22px', background: isOpen
-                  ? 'linear-gradient(135deg, rgba(212,175,55,0.12), rgba(184,134,11,0.06))'
-                  : 'var(--card-gradient, linear-gradient(135deg, #1e1e2f, #2a2a40))',
+                width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+                padding: '18px 22px', background: '#fff',
                 border: isOpen
-                  ? '1px solid rgba(212,175,55,0.35)'
-                  : '1px solid var(--border-color, rgba(212,175,55,0.15))',
-                borderRadius: 16, cursor: 'pointer', outline: 'none',
-                transition: 'all 0.3s ease', textAlign: 'left',
-                boxShadow: isOpen ? '0 4px 24px rgba(212,175,55,0.15), 0 8px 32px rgba(0,0,0,0.2)' : '0 8px 32px rgba(0,0,0,0.2)',
+                  ? '2px solid #d4af37'
+                  : '1px solid #e8e0d0',
+                borderRadius: 14, cursor: 'pointer', outline: 'none',
+                transition: 'all 0.25s ease', textAlign: 'left',
+                boxShadow: isOpen
+                  ? '0 4px 20px rgba(212,175,55,0.2)'
+                  : '0 2px 8px rgba(0,0,0,0.04)',
               }}
-              onMouseEnter={e => { if (!isOpen) e.currentTarget.style.borderColor = 'rgba(212,175,55,0.3)'; }}
-              onMouseLeave={e => { if (!isOpen) e.currentTarget.style.borderColor = 'var(--border-color, rgba(212,175,55,0.15))'; }}
+              onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.borderColor = '#d4af37'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(212,175,55,0.12)'; } }}
+              onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.borderColor = '#e8e0d0'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'; } }}
             >
               <div style={{
-                width: 42, height: 42, borderRadius: 12,
-                background: isOpen ? 'linear-gradient(135deg, #d4af37, #b8860b)' : 'rgba(212,175,55,0.12)',
+                width: 44, height: 44, borderRadius: 12,
+                background: isOpen ? 'linear-gradient(135deg, #d4af37, #b8860b)' : '#f5f0e8',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: isOpen ? '#fff' : 'var(--primary-gold, #d4af37)',
-                transition: 'all 0.3s ease', flexShrink: 0,
+                color: isOpen ? '#fff' : '#b8860b',
+                transition: 'all 0.25s ease', flexShrink: 0,
               }}>
                 <Icon size={20} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: isOpen ? 'var(--primary-gold, #d4af37)' : 'var(--text-primary, #f0f0f0)' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2a1f0e' }}>
                   {tab.label}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #888)', marginTop: 2 }}>
-                  {tab.pages.filter(p => p.visible).length} / {tab.pages.length} pages visible
+                <div style={{ fontSize: '0.78rem', color: '#8a7a5a', marginTop: 2 }}>
+                  {visibleCount} / {tab.pages.length} pages visible
                 </div>
               </div>
-              <ChevronDown size={20} style={{
-                color: isOpen ? 'var(--primary-gold, #d4af37)' : 'var(--text-muted, #888)',
-                transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.3s ease', flexShrink: 0,
-              }} />
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <span style={{
+                  fontSize: '0.7rem', fontWeight: 600, color: '#b8860b',
+                  background: '#f5f0e8', padding: '3px 10px', borderRadius: 20,
+                }}>
+                  {visibleCount === tab.pages.length ? 'All visible' : `${tab.pages.length - visibleCount} hidden`}
+                </span>
+                <ChevronDown size={18} style={{
+                  color: isOpen ? '#d4af37' : '#b8860b',
+                  transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.3s ease', flexShrink: 0,
+                }} />
+              </div>
             </button>
 
             <div style={{
               maxHeight: isOpen ? '2000px' : '0px',
               overflow: 'hidden',
-              transition: 'max-height 0.4s ease, opacity 0.3s ease',
+              transition: 'max-height 0.35s ease, opacity 0.25s ease',
               opacity: isOpen ? 1 : 0,
             }}>
               <div style={{
-                padding: isOpen ? '8px 22px 22px' : '0 22px',
-                background: 'rgba(0,0,0,0.15)',
-                border: isOpen ? '1px solid rgba(212,175,55,0.15)' : 'none',
+                padding: isOpen ? '6px 22px 22px' : '0 22px',
+                background: '#fff',
+                border: isOpen ? '1px solid #e8e0d0' : 'none',
                 borderTop: 'none',
-                borderRadius: '0 0 16px 16px',
-                transition: 'padding 0.3s ease',
+                borderRadius: '0 0 14px 14px',
               }}>
-                {tab.pages.map(page => {
+                {tab.pages.map((page, i) => {
                   const key = `${page.role}:${page.page_key}`;
                   const isUpdating = updating[key];
                   return (
-                    <div key={page.id || page.page_key} className="quick-access-page-row" style={{
+                    <div key={page.id || page.page_key} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '10px 14px', borderRadius: 10, marginTop: 8,
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(255,255,255,0.06)',
+                      background: i % 2 === 0 ? '#faf8f5' : '#fff',
+                      border: '1px solid #f0ebe4',
                       transition: 'all 0.2s',
                       opacity: isUpdating ? 0.5 : 1,
-                    }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary, #f0f0f0)' }}>
-                        {page.label}
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888)', marginLeft: 8, fontWeight: 400 }}>
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#d4af37'; e.currentTarget.style.background = '#fcf9f5'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#f0ebe4'; e.currentTarget.style.background = i % 2 === 0 ? '#faf8f5' : '#fff'; }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 6, height: 6, borderRadius: '50%',
+                          background: page.visible ? '#4caf50' : '#ccc',
+                          transition: 'background 0.3s',
+                        }} />
+                        <span style={{ fontSize: '0.92rem', fontWeight: 500, color: '#2a1f0e' }}>
+                          {page.label}
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#b0a090', fontWeight: 400, background: '#f5f2ed', padding: '1px 8px', borderRadius: 8 }}>
                           {page.page_key}
                         </span>
-                      </span>
+                      </div>
                       <button
                         className={`premium-toggle ${page.visible ? 'active' : ''}`}
                         onClick={() => toggle(page.page_key, page.role, page.visible, page.label)}
@@ -13773,8 +13793,8 @@ function QuickAccessPagesUI({ supabase: sb }) {
                   );
                 })}
                 {tab.pages.length === 0 && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: 20 }}>
-                    No pages configured.
+                  <p style={{ color: '#b0a090', fontSize: '0.85rem', textAlign: 'center', padding: 20 }}>
+                    No pages configured. Run the Supabase migration to seed data.
                   </p>
                 )}
               </div>
