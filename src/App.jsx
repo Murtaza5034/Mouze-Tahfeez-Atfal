@@ -13640,12 +13640,12 @@ function QuickAccessPagesUI({ supabase: sb }) {
 
   useEffect(() => { fetchVis(); }, [fetchVis]);
 
-  const toggle = async (pageKey, role, currentVisible) => {
+  const toggle = async (pageKey, role, currentVisible, label) => {
     const key = `${role}:${pageKey}`;
     setUpdating(p => ({ ...p, [key]: true }));
     setFeedback({ type: 'info', text: `Updating ${pageKey}...` });
     const { error } = await sb.from('page_visibility').upsert({
-      page_key: pageKey, role,
+      page_key: pageKey, role, label,
       visible: !currentVisible,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'page_key,role' });
@@ -13761,7 +13761,7 @@ function QuickAccessPagesUI({ supabase: sb }) {
                       </span>
                       <button
                         className={`premium-toggle ${page.visible ? 'active' : ''}`}
-                        onClick={() => toggle(page.page_key, page.role, page.visible)}
+                        onClick={() => toggle(page.page_key, page.role, page.visible, page.label)}
                         disabled={isUpdating}
                         aria-label={`Toggle ${page.label}`}
                       >
