@@ -904,7 +904,7 @@ const NAV_ICONS = {
   "Messages": MessageCircle,
   "Email Settings": Mail,
   "Marhala Posts": Heart,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,
 };
 
 const emptyParentData = {
@@ -3896,6 +3896,28 @@ function ParentPortal({
   const [celebrationRank, setCelebrationRank] = useState(null); // 1, 2, or 3 for celebration popup
   const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
   const [secondsSpent, setSecondsSpent] = useState(0);
+  const [pageVisibility, setPageVisibility] = useState({});
+
+  useEffect(() => {
+    supabase.from('page_visibility')
+      .select('page_key, visible')
+      .eq('role', 'parents')
+      .then(({ data }) => {
+        if (data) {
+          const map = {};
+          data.forEach(p => { map[p.page_key] = p.visible; });
+          setPageVisibility(map);
+        }
+      });
+  }, []);
+
+  // Redirect away from hidden pages
+  useEffect(() => {
+    if (!pageVisibility || Object.keys(pageVisibility).length === 0) return;
+    if (pageVisibility[activePage] === false) {
+      setActivePage('Home');
+    }
+  }, [activePage, pageVisibility]);
 
   const openNotificationDetail = (event, notification) => {
     event?.preventDefault?.();
@@ -4262,12 +4284,13 @@ function ParentPortal({
 
   const currentPage = pages[activePage];
 
-  const bottomPages = [
+  const allBottomPages = [
     { key: "Home", label: "Home", icon: Home },
     { key: "Child Summary", label: "Progress", icon: GraduationCap },
     { key: "Schedule", label: "Schedule", icon: Calendar },
     { key: "Teachers", label: "Teachers", icon: Users },
   ];
+  const bottomPages = allBottomPages.filter(p => pageVisibility[p.key] !== false);
 
   return (
     <div className="parent-shell">
@@ -4302,30 +4325,46 @@ function ParentPortal({
         )}
         <nav className="drawer-nav">
           <p className="drawer-section-label">More Pages</p>
-          <button className={`drawer-link ${activePage === "Inbox" ? "active" : ""}`} onClick={() => { setActivePage("Inbox"); setMenuOpen(false); }}>
-            <Bell size={18} /> Inbox
-          </button>
-          <button className={`drawer-link ${activePage === "Profile" ? "active" : ""}`} onClick={() => { setActivePage("Profile"); setMenuOpen(false); }}>
-            <User size={18} /> My Profile
-          </button>
-          <button className={`drawer-link ${activePage === "Hub Raqam" ? "active" : ""}`} onClick={() => { setActivePage("Hub Raqam"); setMenuOpen(false); }}>
-            <CreditCard size={18} /> Hub Raqam
-          </button>
-          <button className={`drawer-link ${activePage === "Apply Leave" ? "active" : ""}`} onClick={() => { setActivePage("Apply Leave"); setMenuOpen(false); }}>
-            <CalendarX size={18} /> Apply Leave
-          </button>
-          <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
-            <Calendar size={18} /> Jadwal
-          </button>
-          <button className={`drawer-link ${activePage === "Self Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Self Jadwal"); setMenuOpen(false); }}>
-            <Crown size={18} /> Self Jadwal
-          </button>
-          <button className={`drawer-link ${activePage === "Marhala Posts" ? "active" : ""}`} onClick={() => { setActivePage("Marhala Posts"); setMenuOpen(false); }}>
-            <Heart size={18} /> Marhala Posts
-          </button>
-          <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
-            <Settings size={18} /> Settings
-          </button>
+          {pageVisibility["Inbox"] !== false && (
+            <button className={`drawer-link ${activePage === "Inbox" ? "active" : ""}`} onClick={() => { setActivePage("Inbox"); setMenuOpen(false); }}>
+              <Bell size={18} /> Inbox
+            </button>
+          )}
+          {pageVisibility["Profile"] !== false && (
+            <button className={`drawer-link ${activePage === "Profile" ? "active" : ""}`} onClick={() => { setActivePage("Profile"); setMenuOpen(false); }}>
+              <User size={18} /> My Profile
+            </button>
+          )}
+          {pageVisibility["Hub Raqam"] !== false && (
+            <button className={`drawer-link ${activePage === "Hub Raqam" ? "active" : ""}`} onClick={() => { setActivePage("Hub Raqam"); setMenuOpen(false); }}>
+              <CreditCard size={18} /> Hub Raqam
+            </button>
+          )}
+          {pageVisibility["Apply Leave"] !== false && (
+            <button className={`drawer-link ${activePage === "Apply Leave" ? "active" : ""}`} onClick={() => { setActivePage("Apply Leave"); setMenuOpen(false); }}>
+              <CalendarX size={18} /> Apply Leave
+            </button>
+          )}
+          {pageVisibility["Jadwal"] !== false && (
+            <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
+              <Calendar size={18} /> Jadwal
+            </button>
+          )}
+          {pageVisibility["Self Jadwal"] !== false && (
+            <button className={`drawer-link ${activePage === "Self Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Self Jadwal"); setMenuOpen(false); }}>
+              <Crown size={18} /> Self Jadwal
+            </button>
+          )}
+          {pageVisibility["Marhala Posts"] !== false && (
+            <button className={`drawer-link ${activePage === "Marhala Posts" ? "active" : ""}`} onClick={() => { setActivePage("Marhala Posts"); setMenuOpen(false); }}>
+              <Heart size={18} /> Marhala Posts
+            </button>
+          )}
+          {pageVisibility["Settings"] !== false && (
+            <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
+              <Settings size={18} /> Settings
+            </button>
+          )}
         </nav>
         <div className="drawer-footer">
           {assignedRoles.filter(r => r !== 'parents').map((role) => (
@@ -5677,7 +5716,7 @@ const handleDownloadAllReports = async () => {
   };
 
   const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
-  const navPages = ["Overview", "Quick Student Access", "Schedule", "Result Tracking"];
+  const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
@@ -6580,6 +6619,27 @@ const handleDownloadAllReports = async () => {
                   <p>Please select a student from the dropdown above to view their detailed performance report.</p>
                 </div>
               )}
+            </div>
+          ) : null}
+
+          {activePage === "Quick Access Pages" ? (
+            <div className="overview-container fade-in">
+              <div className="overview-selection-header card-appear">
+                <div className="selection-box">
+                  <div className="selection-label">
+                    <Eye size={22} className="gold-icon" />
+                    <span>Quick Access Pages</span>
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                    Toggle visibility of portal pages for Parents and Teachers
+                  </p>
+                </div>
+              </div>
+              <QuickAccessPagesUI
+                supabase={supabase}
+                currentRole={currentPortalRole}
+                onShowAction={onShowAction}
+              />
             </div>
           ) : null}
 
@@ -9504,6 +9564,24 @@ onShowAction,
 
   const reportSettingsObject = getReportSettingsObject(reportSettings);
   const canTeacherFillProgress = reportSettingsObject?.allow_teacher_progress_entry !== false;
+
+  const [pageVisibility, setPageVisibility] = useState({});
+  useEffect(() => {
+    supabase.from('page_visibility').select('page_key, visible').eq('role', 'teacher').then(({ data }) => {
+      if (data) {
+        const map = {};
+        data.forEach(p => { map[p.page_key] = p.visible; });
+        setPageVisibility(map);
+      }
+    });
+  }, []);
+  useEffect(() => {
+    if (!pageVisibility || Object.keys(pageVisibility).length === 0) return;
+    if (pageVisibility[activePage] === false) {
+      setActivePage('My Group');
+    }
+  }, [activePage, pageVisibility]);
+
   const selectedStudent =
     filteredStudents.find(
       (student) => student.allIds.includes(String(teacherForms.result.student_id))
@@ -9927,7 +10005,7 @@ onShowAction,
             { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
             { id: "Inbox", label: "Inbox", icon: Bell },
             { id: "Settings", label: "Settings", icon: Settings },
-          ].map(page => (
+          ].filter(p => pageVisibility[p.id] !== false).map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
               <page.icon size={18} /> {page.label}
             </button>
@@ -13547,6 +13625,128 @@ setAppTheme={setAppTheme}
         </div>
       )}
     </React.Fragment>
+  );
+}
+
+function QuickAccessPagesUI({ supabase: sb }) {
+  const [visData, setVisData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState({});
+  const [feedback, setFeedback] = useState(null);
+
+  const fetchVis = useCallback(async () => {
+    setLoading(true);
+    const { data } = await sb.from('page_visibility').select('*').order('role').order('label');
+    if (data) setVisData(data);
+    setLoading(false);
+  }, [sb]);
+
+  useEffect(() => { fetchVis(); }, [fetchVis]);
+
+  const toggle = async (pageKey, role, currentVisible) => {
+    const key = `${role}:${pageKey}`;
+    setUpdating(p => ({ ...p, [key]: true }));
+    setFeedback({ type: 'info', text: `Updating ${pageKey}...` });
+    const { error } = await sb.from('page_visibility').upsert({
+      page_key: pageKey, role,
+      visible: !currentVisible,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'page_key,role' });
+    setUpdating(p => ({ ...p, [key]: false }));
+    if (error) {
+      setFeedback({ type: 'error', text: `Failed: ${error.message}` });
+    } else {
+      setFeedback({ type: 'success', text: `${pageKey} ${currentVisible ? 'hidden' : 'visible'}` });
+      fetchVis();
+    }
+    setTimeout(() => setFeedback(null), 2000);
+  };
+
+  const parentPages = visData.filter(d => d.role === 'parents');
+  const teacherPages = visData.filter(d => d.role === 'teacher');
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 40 }}>
+        <div className="spinner" /><p style={{ marginTop: 12, color: 'var(--text-muted)' }}>Loading pages...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 660, margin: '0 auto', padding: '20px 0' }}>
+      {feedback && (
+        <div className={`status-banner ${feedback.type}`} style={{ marginBottom: 16 }}>{feedback.text}</div>
+      )}
+
+      <SectionCards title="Parents Portal" icon={<Users size={18} />} pages={parentPages} toggle={toggle} updating={updating} />
+      <div style={{ height: 20 }} />
+      <SectionCards title="Teacher Portal" icon={<GraduationCap size={18} />} pages={teacherPages} toggle={toggle} updating={updating} />
+    </div>
+  );
+}
+
+function SectionCards({ title, icon, pages, toggle, updating }) {
+  return (
+    <div className="card-appear" style={{
+      background: 'var(--card-gradient, linear-gradient(135deg, #1e1e2f, #2a2a40))',
+      borderRadius: 16, padding: '20px 24px',
+      border: '1px solid var(--border-color, rgba(212,175,55,0.15))',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    }}>
+      <div className="vessel-connection">
+        <div className="connection-line" /><div className="connection-dot" />
+      </div>
+      <h3 style={{
+        margin: '0 0 16px', fontSize: '1rem', fontWeight: 700,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <span style={{ color: 'var(--primary-gold, #d4af37)' }}>{icon}</span>
+        <span style={{ color: 'var(--primary-gold, #d4af37)' }}>{title}</span>
+        <span style={{
+          marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted, #888)',
+          background: 'rgba(212,175,55,0.1)', padding: '2px 10px', borderRadius: 10,
+        }}>{pages.filter(p => p.visible).length} / {pages.length} visible</span>
+      </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {pages.map(page => {
+          const key = `${page.role}:${page.page_key}`;
+          const isUpdating = updating[key];
+          return (
+            <div key={page.id || page.page_key} className="quick-access-page-row" style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 14px', borderRadius: 10,
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              transition: 'all 0.2s',
+              opacity: isUpdating ? 0.5 : 1,
+            }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary, #f0f0f0)' }}>
+                {page.label}
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888)', marginLeft: 8, fontWeight: 400 }}>
+                  {page.page_key}
+                </span>
+              </span>
+              <button
+                className={`premium-toggle ${page.visible ? 'active' : ''}`}
+                onClick={() => toggle(page.page_key, page.role, page.visible)}
+                disabled={isUpdating}
+                aria-label={`Toggle ${page.label}`}
+              >
+                <div className="premium-toggle-track">
+                  <div className="premium-toggle-thumb" />
+                </div>
+              </button>
+            </div>
+          );
+        })}
+        {pages.length === 0 && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: 20 }}>
+            No pages configured.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
