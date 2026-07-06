@@ -48,7 +48,7 @@ import {
   Unlock,
   CalendarX,
   AlertCircle,
-  ChevronRight,
+  ChevronDown, ChevronRight,
   Paperclip,
   Trash2,
   Pause,
@@ -13629,6 +13629,7 @@ function QuickAccessPagesUI({ supabase: sb }) {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState({});
   const [feedback, setFeedback] = useState(null);
+  const [openTab, setOpenTab] = useState(null);
 
   const fetchVis = useCallback(async () => {
     setLoading(true);
@@ -13661,6 +13662,11 @@ function QuickAccessPagesUI({ supabase: sb }) {
   const parentPages = visData.filter(d => d.role === 'parents');
   const teacherPages = visData.filter(d => d.role === 'teacher');
 
+  const tabs = [
+    { key: 'teacher', label: 'Teacher Portal', icon: GraduationCap, pages: teacherPages },
+    { key: 'parents', label: 'Parents Portal', icon: Users, pages: parentPages },
+  ];
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: 40 }}>
@@ -13675,73 +13681,107 @@ function QuickAccessPagesUI({ supabase: sb }) {
         <div className={`status-banner ${feedback.type}`} style={{ marginBottom: 16 }}>{feedback.text}</div>
       )}
 
-      <SectionCards title="Parents Portal" icon={<Users size={18} />} pages={parentPages} toggle={toggle} updating={updating} />
-      <div style={{ height: 20 }} />
-      <SectionCards title="Teacher Portal" icon={<GraduationCap size={18} />} pages={teacherPages} toggle={toggle} updating={updating} />
-    </div>
-  );
-}
-
-function SectionCards({ title, icon, pages, toggle, updating }) {
-  return (
-    <div className="card-appear" style={{
-      background: 'var(--card-gradient, linear-gradient(135deg, #1e1e2f, #2a2a40))',
-      borderRadius: 16, padding: '20px 24px',
-      border: '1px solid var(--border-color, rgba(212,175,55,0.15))',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-    }}>
-      <div className="vessel-connection">
-        <div className="connection-line" /><div className="connection-dot" />
-      </div>
-      <h3 style={{
-        margin: '0 0 16px', fontSize: '1rem', fontWeight: 700,
-        display: 'flex', alignItems: 'center', gap: 8,
-      }}>
-        <span style={{ color: 'var(--primary-gold, #d4af37)' }}>{icon}</span>
-        <span style={{ color: 'var(--primary-gold, #d4af37)' }}>{title}</span>
-        <span style={{
-          marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted, #888)',
-          background: 'rgba(212,175,55,0.1)', padding: '2px 10px', borderRadius: 10,
-        }}>{pages.filter(p => p.visible).length} / {pages.length} visible</span>
-      </h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {pages.map(page => {
-          const key = `${page.role}:${page.page_key}`;
-          const isUpdating = updating[key];
-          return (
-            <div key={page.id || page.page_key} className="quick-access-page-row" style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 14px', borderRadius: 10,
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              transition: 'all 0.2s',
-              opacity: isUpdating ? 0.5 : 1,
-            }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary, #f0f0f0)' }}>
-                {page.label}
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888)', marginLeft: 8, fontWeight: 400 }}>
-                  {page.page_key}
-                </span>
-              </span>
-              <button
-                className={`premium-toggle ${page.visible ? 'active' : ''}`}
-                onClick={() => toggle(page.page_key, page.role, page.visible)}
-                disabled={isUpdating}
-                aria-label={`Toggle ${page.label}`}
-              >
-                <div className="premium-toggle-track">
-                  <div className="premium-toggle-thumb" />
+      {tabs.map(tab => {
+        const isOpen = openTab === tab.key;
+        const Icon = tab.icon;
+        return (
+          <div key={tab.key} className="card-appear" style={{ marginBottom: 16 }}>
+            <button
+              onClick={() => setOpenTab(isOpen ? null : tab.key)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                padding: '18px 22px', background: isOpen
+                  ? 'linear-gradient(135deg, rgba(212,175,55,0.12), rgba(184,134,11,0.06))'
+                  : 'var(--card-gradient, linear-gradient(135deg, #1e1e2f, #2a2a40))',
+                border: isOpen
+                  ? '1px solid rgba(212,175,55,0.35)'
+                  : '1px solid var(--border-color, rgba(212,175,55,0.15))',
+                borderRadius: 16, cursor: 'pointer', outline: 'none',
+                transition: 'all 0.3s ease', textAlign: 'left',
+                boxShadow: isOpen ? '0 4px 24px rgba(212,175,55,0.15), 0 8px 32px rgba(0,0,0,0.2)' : '0 8px 32px rgba(0,0,0,0.2)',
+              }}
+              onMouseEnter={e => { if (!isOpen) e.currentTarget.style.borderColor = 'rgba(212,175,55,0.3)'; }}
+              onMouseLeave={e => { if (!isOpen) e.currentTarget.style.borderColor = 'var(--border-color, rgba(212,175,55,0.15))'; }}
+            >
+              <div style={{
+                width: 42, height: 42, borderRadius: 12,
+                background: isOpen ? 'linear-gradient(135deg, #d4af37, #b8860b)' : 'rgba(212,175,55,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: isOpen ? '#fff' : 'var(--primary-gold, #d4af37)',
+                transition: 'all 0.3s ease', flexShrink: 0,
+              }}>
+                <Icon size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: isOpen ? 'var(--primary-gold, #d4af37)' : 'var(--text-primary, #f0f0f0)' }}>
+                  {tab.label}
                 </div>
-              </button>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #888)', marginTop: 2 }}>
+                  {tab.pages.filter(p => p.visible).length} / {tab.pages.length} pages visible
+                </div>
+              </div>
+              <ChevronDown size={20} style={{
+                color: isOpen ? 'var(--primary-gold, #d4af37)' : 'var(--text-muted, #888)',
+                transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.3s ease', flexShrink: 0,
+              }} />
+            </button>
+
+            <div style={{
+              maxHeight: isOpen ? '2000px' : '0px',
+              overflow: 'hidden',
+              transition: 'max-height 0.4s ease, opacity 0.3s ease',
+              opacity: isOpen ? 1 : 0,
+            }}>
+              <div style={{
+                padding: isOpen ? '8px 22px 22px' : '0 22px',
+                background: 'rgba(0,0,0,0.15)',
+                border: isOpen ? '1px solid rgba(212,175,55,0.15)' : 'none',
+                borderTop: 'none',
+                borderRadius: '0 0 16px 16px',
+                transition: 'padding 0.3s ease',
+              }}>
+                {tab.pages.map(page => {
+                  const key = `${page.role}:${page.page_key}`;
+                  const isUpdating = updating[key];
+                  return (
+                    <div key={page.id || page.page_key} className="quick-access-page-row" style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '10px 14px', borderRadius: 10, marginTop: 8,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      transition: 'all 0.2s',
+                      opacity: isUpdating ? 0.5 : 1,
+                    }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary, #f0f0f0)' }}>
+                        {page.label}
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #888)', marginLeft: 8, fontWeight: 400 }}>
+                          {page.page_key}
+                        </span>
+                      </span>
+                      <button
+                        className={`premium-toggle ${page.visible ? 'active' : ''}`}
+                        onClick={() => toggle(page.page_key, page.role, page.visible)}
+                        disabled={isUpdating}
+                        aria-label={`Toggle ${page.label}`}
+                      >
+                        <div className="premium-toggle-track">
+                          <div className="premium-toggle-thumb" />
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
+                {tab.pages.length === 0 && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: 20 }}>
+                    No pages configured.
+                  </p>
+                )}
+              </div>
             </div>
-          );
-        })}
-        {pages.length === 0 && (
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: 20 }}>
-            No pages configured.
-          </p>
-        )}
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
