@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator } from 'lucide-react';
+import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator, Info } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { JadwalNotes } from "./JadwalNotes";
+import { useFatemiCalendar, summarizeMiqaats } from './fatemiCalendarApi';
+import MiqaatPopup from './MiqaatPopup';
 import './jadwal.css';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -939,9 +941,10 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   }
 };
 
-const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays }) => {
+const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays, onMiqaatClick }) => {
   const daysToRender = customDays || DAYS.map((day, idx) => ({ dayName: day, fatemiDate: dayDates?.[idx] || '' }));
   
+
   const defaultJadeedSurah = React.useMemo(() => {
     for (const dayObj of daysToRender) {
       const day = dayObj.dayName;
@@ -1024,8 +1027,20 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
             const row = scheduleData[dataKey] || scheduleData[day] || {};
             return (
             <tr key={`${day}-${idx}`}>
-              <td className="day-cell">{day}{dayObj.fatemiDate ? <div className="day-fatemi-date">{dayObj.fatemiDate}</div> : null}</td>
-              {mode === 'juz-wise' ? (
+              <td className="day-cell">
+                <div className="day-cell-content">
+                  <span className="day-cell-name">{day}</span>
+                   {dayObj.miqaats && dayObj.miqaats.length > 0 && (
+                     <span className="miqaat-badge" data-tooltip={dayObj.miqaatSummary?.summary || dayObj.miqaats.map(e => e.name).join(', ')}
+                       onClick={(e) => { e.stopPropagation(); onMiqaatClick && onMiqaatClick(dayObj); }}>
+                       <Sparkles size={10} className="miqaat-icon-pulse" />
+                       <span className="miqaat-text">Miqaat</span>
+                     </span>
+                   )}
+                 </div>
+                 {dayObj.fatemiDate ? <div className="day-fatemi-date">{dayObj.fatemiDate}</div> : null}
+               </td>
+               {mode === 'juz-wise' ? (
                 <>
                   {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
                     const label = juz.charAt(0).toUpperCase() + juz.slice(1).replace(/\d/, ' $&');
@@ -1151,7 +1166,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
   );
 };
 
-const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compact, customDays, onRepeatPattern }) => {
+const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compact, customDays, onRepeatPattern, onMiqaatClick, fatemiData }) => {
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
 
   const getWeekDays = () => {
@@ -1169,6 +1184,22 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
   const weekDays = getWeekDays();
   const fatemiDates = weekDays.map(d => getFatemiDateStr(d.toISOString().split('T')[0]));
 
+  // Enriched day objects for week navigation so miqaat badges show
+  const enrichedWeekDays = React.useMemo(() => {
+    return DAYS.map((day, idx) => {
+      const dateStr = weekDays[idx]?.toISOString().split('T')[0];
+      if (!dateStr) return { dayName: day, miqaats: [], miqaatSummary: null };
+      const apiData = fatemiData?.[dateStr];
+      return {
+        dayName: day,
+        fatemiDate: fatemiDates[idx],
+        date: dateStr,
+        miqaats: apiData?.miqaats || [],
+        miqaatSummary: (apiData?.miqaats && apiData.miqaats.length > 0) ? summarizeMiqaats(apiData.miqaats) : null,
+      };
+    });
+  }, [DAYS, weekDays, fatemiDates, fatemiData]);
+
   const defaultJadeedSurah = React.useMemo(() => {
     const daysArr = customDays || weekDays.map((d, i) => ({ dayName: DAYS[i] }));
     for (const dayObj of daysArr) {
@@ -1183,7 +1214,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
     return '';
   }, [scheduleData, customDays, weekDays]);
 
-  const renderDayCell = (day, dateObj, customFatemi, idx) => {
+  const renderDayCell = (day, dateObj, customFatemi, idx, dayObj) => {
     const dayKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
     const row = scheduleData[dayKey] || scheduleData[day] || {};
     const dateStr = customDays
@@ -1195,7 +1226,16 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
     return (
       <div key={`${day}-${idx}`} className={`jadwal-calendar-card ${isToday ? 'today' : ''}`}>
         <div className="jadwal-calendar-card-header">
-          <span className="jadwal-calendar-day-name">{day}</span>
+          <span className="jadwal-calendar-day-name">
+            {day}
+            {dayObj && dayObj.miqaats && dayObj.miqaats.length > 0 && (
+              <span className="miqaat-badge miqaat-badge-inline" data-tooltip={dayObj.miqaatSummary?.summary || dayObj.miqaats.map(e => e.name).join(', ')}
+                onClick={(e) => { e.stopPropagation(); onMiqaatClick && onMiqaatClick(dayObj); }}>
+                <Sparkles size={9} className="miqaat-icon-pulse" />
+                <span className="miqaat-text">Miqaat</span>
+              </span>
+            )}
+          </span>
           {dateStr ? <span className="jadwal-calendar-date">{dateStr}</span> : null}
         </div>
         {fatemi ? (
@@ -1327,7 +1367,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
           <span>Showing <strong>{customDays.length}</strong> day{customDays.length !== 1 ? 's' : ''} — {customDays[0]?.date} to {customDays[customDays.length - 1]?.date}</span>
         </div>
         <div className="jadwal-calendar-grid">
-          {customDays.map((d, idx) => renderDayCell(d.dayName, d, d.fatemiDate, idx))}
+          {customDays.map((d, idx) => renderDayCell(d.dayName, d, d.fatemiDate, idx, d))}
         </div>
       </div>
     );
@@ -1347,13 +1387,13 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
         </button>
       </div>
       <div className="jadwal-calendar-grid">
-        {DAYS.map((day, idx) => renderDayCell(day, weekDays[idx], null, idx))}
+        {enrichedWeekDays.map((dayObj, idx) => renderDayCell(dayObj.dayName, weekDays[idx], null, idx, dayObj))}
       </div>
     </div>
   );
 };
 
-const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays, onRepeatPattern }) => {
+const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates, customDays, onRepeatPattern, onMiqaatClick }) => {
   const daysList = customDays || DAYS.map((day, idx) => ({ dayName: day, date: '', fatemiDate: dayDates?.[idx] || '' }));
   const maxIdx = daysList.length - 1;
   const [currentDayIndex, setCurrentDayIndex] = useState(() => {
@@ -1390,7 +1430,16 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
           <ChevronLeft size={18} /> {getNavDayName(-1)}
         </button>
         <div className="jadwal-single-day-title">
-          <h3>{date ? `${day} - ${date}` : day}</h3>
+          <h3>
+            {date ? `${day} - ${date}` : day}
+            {dayObj && dayObj.miqaats && dayObj.miqaats.length > 0 && (
+              <span className="miqaat-badge miqaat-badge-inline" data-tooltip={dayObj.miqaatSummary?.summary || dayObj.miqaats.map(e => e.name).join(', ')}
+                onClick={(e) => { e.stopPropagation(); onMiqaatClick && onMiqaatClick(dayObj); }}>
+                <Sparkles size={9} className="miqaat-icon-pulse" />
+                <span className="miqaat-text">Miqaat</span>
+              </span>
+            )}
+          </h3>
           {fatemiDate && <span style={{ fontSize: '0.75rem', fontFamily: "'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl', display: 'block', marginTop: '2px' }}>{fatemiDate}</span>}
           {customDays ? null : <span className="jadwal-single-day-subtitle">Current Day View</span>}
         </div>
@@ -1619,11 +1668,40 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
   const teacherStyle = settings?.jadwal_teacher_style || 'default';
   const isCompact = teacherStyle === 'compact';
   const theme = getJadwalThemeFromSettings(settings);
+  const [miqaatPopup, setMiqaatPopup] = useState(null);
   const weekRange = useMemo(() => theme.jadwalType === 'weekly' ? getCurrentWeekRange() : null, [theme.jadwalType]);
   const dayDates = weekRange ? DAYS.map((_, idx) => getDayDate(weekRange.weekStart, idx)) : (theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : []);
   const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd)
     : theme.jadwalType === 'weekly' && weekRange ? getDaysFromRange(weekRange.weekStart, weekRange.weekEnd)
     : null;
+
+  // Fatemi calendar & miqaat API
+  const apiWeekStart = theme.jadwalType === 'miqaat' ? theme.weekStart : (weekRange?.weekStart || null);
+  const apiWeekEnd = theme.jadwalType === 'miqaat' ? theme.weekEnd : (weekRange?.weekEnd || null);
+  const { loading: fatemiLoading, fatemiData } = useFatemiCalendar(apiWeekStart, apiWeekEnd);
+  // Compute enriched days directly from fatemiData using useMemo
+  const enrichedDays = useMemo(() => {
+    if (!customDays || !fatemiData || Object.keys(fatemiData).length === 0) {
+      console.log('\u{1F50D} JadwalTeacherView: useMemo skipping (no data)');
+      return null;
+    }
+    console.log('\u{1F50D} JadwalTeacherView: useMemo enriching', { daysCount: customDays.length });
+    const enriched = customDays.map(day => {
+      const apiData = fatemiData[day.date];
+      if (apiData && apiData.hijri) {
+        return {
+          ...day,
+          fatemiDate: apiData.hijri.date_arabic || day.fatemiDate,
+          miqaats: apiData.miqaats || [],
+          miqaatSummary: summarizeMiqaats(apiData.miqaats),
+        };
+      }
+      return { ...day, miqaats: [], miqaatSummary: null };
+    });
+    const miqaatDays = enriched.filter(d => d.miqaats && d.miqaats.length > 0);
+    console.log('\u{1F50D} JadwalTeacherView: useMemo done', enriched.length, 'days,', miqaatDays.length, 'with miqaats');
+    return enriched;
+  }, [customDays, fatemiData]);
 
   useEffect(() => {
     if (initialStudentId) {
@@ -1764,7 +1842,16 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
     });
   };
 
+  const handleMiqaatClick = (dayObj) => {
+    setMiqaatPopup({
+      events: dayObj.miqaats || [],
+      dayName: dayObj.dayName,
+      fatemiDate: dayObj.fatemiDate || '',
+    });
+  };
+
   const renderJadwalContent = () => {
+    const days = enrichedDays || customDays;
     switch (teacherDisplayStyle) {
       case 'calendar':
         return (
@@ -1774,8 +1861,10 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             onCellChange={handleCellChange}
             compact={isCompact}
             dayDates={dayDates}
-            customDays={customDays}
+            customDays={days}
             onRepeatPattern={handleRepeatPattern}
+            onMiqaatClick={handleMiqaatClick}
+            fatemiData={fatemiData}
           />
         );
       case 'single_day_card':
@@ -1785,8 +1874,9 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             scheduleData={scheduleData}
             onCellChange={handleCellChange}
             dayDates={dayDates}
-            customDays={customDays}
+            customDays={days}
             onRepeatPattern={handleRepeatPattern}
+            onMiqaatClick={handleMiqaatClick}
           />
         );
       default:
@@ -1796,7 +1886,8 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             scheduleData={scheduleData}
             onCellChange={handleCellChange}
             dayDates={dayDates}
-            customDays={customDays}
+            customDays={days}
+            onMiqaatClick={handleMiqaatClick}
           />
         );
     }
@@ -1897,6 +1988,15 @@ onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacher
           showAction={onShowAction}
         />
       )}
+
+      {miqaatPopup && (
+        <MiqaatPopup
+          events={miqaatPopup.events}
+          dayName={miqaatPopup.dayName}
+          fatemiDate={miqaatPopup.fatemiDate}
+          onClose={() => setMiqaatPopup(null)}
+        />
+      )}
     </div>
   );
 };
@@ -1907,6 +2007,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
   const [studentName, setStudentName] = useState('Student');
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(true);
+  const [miqaatPopup, setMiqaatPopup] = useState(null);
 
   const displayStyle = settings?.jadwal_style || 'table';
   const theme = getJadwalThemeFromSettings(settings);
@@ -1915,6 +2016,34 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
   const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd)
     : theme.jadwalType === 'weekly' && weekRange ? getDaysFromRange(weekRange.weekStart, weekRange.weekEnd)
     : null;
+
+  // Fatemi calendar & miqaat API
+  const apiWeekStart = theme.jadwalType === 'miqaat' ? theme.weekStart : (weekRange?.weekStart || null);
+  const apiWeekEnd = theme.jadwalType === 'miqaat' ? theme.weekEnd : (weekRange?.weekEnd || null);
+  const { loading: fatemiLoading, fatemiData } = useFatemiCalendar(apiWeekStart, apiWeekEnd);
+  // Compute enriched days directly from fatemiData using useMemo
+  const enrichedDays = useMemo(() => {
+    if (!customDays || !fatemiData || Object.keys(fatemiData).length === 0) {
+      console.log('\u{1F50D} JadwalTeacherView: useMemo skipping (no data)');
+      return null;
+    }
+    console.log('\u{1F50D} JadwalTeacherView: useMemo enriching', { daysCount: customDays.length });
+    const enriched = customDays.map(day => {
+      const apiData = fatemiData[day.date];
+      if (apiData && apiData.hijri) {
+        return {
+          ...day,
+          fatemiDate: apiData.hijri.date_arabic || day.fatemiDate,
+          miqaats: apiData.miqaats || [],
+          miqaatSummary: summarizeMiqaats(apiData.miqaats),
+        };
+      }
+      return { ...day, miqaats: [], miqaatSummary: null };
+    });
+    const miqaatDays = enriched.filter(d => d.miqaats && d.miqaats.length > 0);
+    console.log('\u{1F50D} JadwalTeacherView: useMemo done', enriched.length, 'days,', miqaatDays.length, 'with miqaats');
+    return enriched;
+  }, [customDays, fatemiData]);
 
   useEffect(() => {
     if (studentId) {
@@ -1957,8 +2086,17 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
     setLoading(false);
   };
 
+  const handleMiqaatClick = (dayObj) => {
+    setMiqaatPopup({
+      events: dayObj.miqaats || [],
+      dayName: dayObj.dayName,
+      fatemiDate: dayObj.fatemiDate || '',
+    });
+  };
+
   const renderJadwalContent = () => {
     const noop = () => {};
+    const days = enrichedDays || customDays;
     switch (displayStyle) {
       case 'calendar':
         return (
@@ -1968,7 +2106,9 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             onCellChange={noop}
             readOnly
             dayDates={dayDates}
-            customDays={customDays}
+            customDays={days}
+            onMiqaatClick={handleMiqaatClick}
+            fatemiData={fatemiData}
           />
         );
       case 'single_day_card':
@@ -1979,7 +2119,8 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             onCellChange={noop}
             readOnly
             dayDates={dayDates}
-            customDays={customDays}
+            customDays={days}
+            onMiqaatClick={handleMiqaatClick}
           />
         );
       default:
@@ -1990,7 +2131,8 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
             onCellChange={noop}
             readOnly
             dayDates={dayDates}
-            customDays={customDays}
+            customDays={days}
+            onMiqaatClick={handleMiqaatClick}
           />
         );
     }
@@ -2034,6 +2176,15 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
         </div>
       )}
       {renderJadwalContent()}
+
+      {miqaatPopup && (
+        <MiqaatPopup
+          events={miqaatPopup.events}
+          dayName={miqaatPopup.dayName}
+          fatemiDate={miqaatPopup.fatemiDate}
+          onClose={() => setMiqaatPopup(null)}
+        />
+      )}
 
       <JadwalNotes
         role="parent"

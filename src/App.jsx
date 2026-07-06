@@ -9530,23 +9530,23 @@ onShowAction,
     const form = teacherForms.result;
     const latest = selectedStudent.latestResult || {};
 
-    const hasFormEntry = RESULT_NUMERIC_FIELDS.some(f => form[f] !== "" && form[f] !== undefined && form[f] !== null);
-
-    let total_score;
-    if (hasFormEntry) {
-      total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(form[f]), 0);
-    } else if (latest.total_score !== undefined && latest.total_score !== null && latest.total_score !== "") {
-      total_score = Number(latest.total_score);
-    } else {
-      total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(latest[f]), 0);
-    }
-
     // Merge: only override db values with non-empty form values
     const merged = { ...latest };
     for (const key of Object.keys(form)) {
       if (form[key] !== "" && form[key] !== undefined && form[key] !== null) {
         merged[key] = form[key];
       }
+    }
+
+    // Compute total_score from merged values so it reflects the actual preview data
+    const hasFormEntry = RESULT_NUMERIC_FIELDS.some(f => form[f] !== "" && form[f] !== undefined && form[f] !== null);
+    let total_score;
+    if (hasFormEntry) {
+      total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(merged[f]), 0);
+    } else if (latest.total_score !== undefined && latest.total_score !== null && latest.total_score !== "") {
+      total_score = Number(latest.total_score);
+    } else {
+      total_score = RESULT_NUMERIC_FIELDS.reduce((sum, f) => sum + toNumber(latest[f]), 0);
     }
     merged.total_score = total_score;
 
@@ -11536,7 +11536,26 @@ export default function App() {
           const activeStudent = processedStudents.find(p => String(p.student_id) === String(selectedStudentId)) || processedStudents[0];
           
           // Bulletproof search for activeResult using the already matched latestResult from buildStudents
-          const activeResult = activeStudent.latestResult;
+          let activeResult = activeStudent.latestResult;
+
+          // Get global rank from Edge Function (bypasses RLS) so the parent sees
+          // the exact same rank as the admin's Rank Preview page
+          if (activeResult) {
+            try {
+              const { data: rankData, error: rankError } = await supabase.functions.invoke("get-global-rank", {
+                body: {
+                  student_id: String(activeStudent.student_id),
+                  week_date: activeResult.week_date || getToday(),
+                },
+              });
+              if (!rankError && rankData?.rank) {
+                activeResult = { ...activeResult, computedRank: rankData.rank };
+              }
+            } catch (_e) {
+              // Fall back to sibling rank from buildStudents
+            }
+          }
+
           const activeAttendance = (attendanceResponse.data || []).find(a => 
             activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(a.student_id || "").trim().toLowerCase())
           );

@@ -1,9 +1,79 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator, Crown, Star, Award, Lock, Gem } from 'lucide-react';
+import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator, Crown, Star, Award, Lock, Gem, Info } from 'lucide-react';
+import { useFatemiCalendar, summarizeMiqaats } from './fatemiCalendarApi';
+import MiqaatPopup from './MiqaatPopup';
 import './jadwal.css';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+
+const getFatemiDateStr = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
+      day: 'numeric', month: 'numeric', year: 'numeric'
+    }).formatToParts(date);
+    let d = parseInt(parts.find(p => p.type === 'day').value);
+    let m = parseInt(parts.find(p => p.type === 'month').value);
+    let y = parseInt(parts.find(p => p.type === 'year').value);
+    const arabicMonths = [
+      "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
+      "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
+      "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
+    ];
+    if (m === 12 && d === 30) {
+      return `1 ${arabicMonths[0]} ${y + 1}`;
+    }
+    if (m === 1) d++;
+    return `${d} ${arabicMonths[m - 1] || ''} ${y}`;
+  } catch { return ''; }
+};
+
+const getCurrentWeekRange = () => {
+  const now = new Date();
+  const today = now.getDay();
+  let sat;
+  if (today === 5) {
+    sat = new Date(now);
+    sat.setDate(now.getDate() + 1);
+  } else {
+    const daysBack = (today - 6 + 7) % 7;
+    sat = new Date(now);
+    sat.setDate(now.getDate() - daysBack);
+  }
+  const fri = new Date(sat);
+  fri.setDate(sat.getDate() + 6);
+  return { weekStart: sat.toISOString().split('T')[0], weekEnd: fri.toISOString().split('T')[0] };
+};
+
+const getDayDate = (weekStart, dayIndex) => {
+  if (!weekStart) return '';
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + dayIndex);
+  return getFatemiDateStr(d.toISOString().split('T')[0]);
+};
+
+const getDaysFromRange = (startStr, endStr) => {
+  if (!startStr || !endStr) return null;
+  const start = new Date(startStr + 'T00:00:00Z');
+  const end = new Date(endStr + 'T00:00:00Z');
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return null;
+  const DAY_NAMES = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+  const days = [];
+  const current = new Date(start);
+  while (current <= end) {
+    const dateStr = current.toISOString().split('T')[0];
+    days.push({
+      dayName: DAY_NAMES[current.getUTCDay()],
+      date: dateStr,
+      fatemiDate: getFatemiDateStr(dateStr)
+    });
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return days;
+};
+
 const DEFAULT_SCHEDULE = {};
 DAYS.forEach(day => {
   DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', murajah: '', juzhali: '', jadeed: '', star: '' };
@@ -619,16 +689,19 @@ const SurahRangePicker = ({ value, onChange }) => {
   );
 };
 
-const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, editHistory }) => {
+const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, editHistory, dayDates, customDays, onMiqaatClick }) => {
+  const daysToRender = React.useMemo(() => customDays || DAYS.map((day, idx) => ({ dayName: day, fatemiDate: dayDates?.[idx] || '' })), [dayDates, customDays]);
+
   const defaultJadeedSurah = React.useMemo(() => {
-    for (const day of DAYS) {
+    for (const dayObj of daysToRender) {
+      const day = dayObj.dayName;
       const row = scheduleData[day] || {};
       if (row && row.jadeed) {
         return row.jadeed.split(':')[0];
       }
     }
     return '';
-  }, [scheduleData]);
+  }, [scheduleData, daysToRender]);
 
   return (
     <div className="jadwal-table-wrapper">
@@ -693,11 +766,27 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, edit
           )}
         </thead>
         <tbody>
-          {DAYS.map((day, idx) => {
+          {daysToRender.map((dayObj, idx) => {
+            const day = dayObj.dayName;
             const row = scheduleData[day] || {};
             return (
-            <tr key={day}>
-              <td className="day-cell">{day}</td>
+            <tr key={`${day}-${idx}`}>
+              <td className="day-cell">
+                <div className="day-cell-content">
+                  <span className="day-cell-name">{day}</span>
+                  {dayObj.miqaats && dayObj.miqaats.length > 0 && (
+                    <span
+                      className="miqaat-badge"
+                      data-tooltip={dayObj.miqaatSummary?.summary || dayObj.miqaats.map(e => e.name).join(', ')}
+                      onClick={(e) => { e.stopPropagation(); onMiqaatClick && onMiqaatClick(dayObj); }}
+                    >
+                      <Sparkles size={10} className="miqaat-icon-pulse" />
+                      <span className="miqaat-text">Miqaat</span>
+                    </span>
+                  )}
+                </div>
+                {dayObj.fatemiDate ? <div className="day-fatemi-date">{dayObj.fatemiDate}</div> : null}
+              </td>
               {mode === 'juz-wise' ? (
                 <>
                       {['juz1', 'juz2', 'juz3', 'juz4'].map(juz => {
@@ -889,9 +978,44 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
   const [hasUnseenChanges, setHasUnseenChanges] = useState(false);
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
   const [editHistory, setEditHistory] = useState({});
+  const [miqaatPopup, setMiqaatPopup] = useState(null);
 
   const autoSaveTimerRef = useRef(null);
   const lastSavedSnapshotRef = useRef('');
+
+  const weekRange = useMemo(() => getCurrentWeekRange(), []);
+  const dayDates = useMemo(() => weekRange ? DAYS.map((_, idx) => getDayDate(weekRange.weekStart, idx)) : [], [weekRange]);
+  const customDays = useMemo(() => weekRange ? getDaysFromRange(weekRange.weekStart, weekRange.weekEnd) : null, [weekRange]);
+
+  // Fatemi calendar & miqaat API (like aajnodin.com)
+  const { loading: fatemiLoading, fatemiData } = useFatemiCalendar(
+    weekRange?.weekStart,
+    weekRange?.weekEnd
+  );
+
+  // Compute enriched days directly from fatemiData (no useEffect needed)
+  const enrichedDays = useMemo(() => {
+    if (!customDays || !fatemiData || Object.keys(fatemiData).length === 0) {
+      console.log('🔍 SelfJadwalParentView: useMemo skipping (no data)');
+      return null;
+    }
+    console.log('🔍 SelfJadwalParentView: useMemo enriching', { daysCount: customDays.length, dataKeys: Object.keys(fatemiData) });
+    const enriched = customDays.map(day => {
+      const apiData = fatemiData[day.date];
+      if (apiData && apiData.hijri) {
+        return {
+          ...day,
+          fatemiDate: apiData.hijri.date_arabic || day.fatemiDate,
+          miqaats: apiData.miqaats || [],
+          miqaatSummary: summarizeMiqaats(apiData.miqaats),
+        };
+      }
+      return { ...day, miqaats: [], miqaatSummary: null };
+    });
+    const miqaatDays = enriched.filter(d => d.miqaats && d.miqaats.length > 0);
+    console.log('🔍 SelfJadwalParentView: useMemo done', enriched.length, 'days,', miqaatDays.length, 'with miqaats', miqaatDays.map(d => ({ day: d.dayName, date: d.date, count: d.miqaats.length })));
+    return enriched;
+  }, [customDays, fatemiData]);
 
   useEffect(() => {
     if (userId) {
@@ -1047,6 +1171,14 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
     }));
     const key = `${day}_${field}`;
     setEditHistory(prev => ({ ...prev, [key]: new Date().toISOString() }));
+  };
+
+  const handleMiqaatClick = (dayObj) => {
+    setMiqaatPopup({
+      events: dayObj.miqaats || [],
+      dayName: dayObj.dayName,
+      fatemiDate: dayObj.fatemiDate || '',
+    });
   };
 
   if (loading) {
@@ -1208,22 +1340,34 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
               <span style={{ fontSize: '12px', color: '#5d4037', fontStyle: 'italic', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>✏️ Auto-saved</span>
             </div>
           </div>
-          <div style={{ padding: '20px' }}>
-            <SelfJadwalTableStyle
+          <div style={{ padding: '20px' }}>            <SelfJadwalTableStyle
               mode={mode}
               scheduleData={scheduleData}
               onCellChange={handleCellChange}
               editHistory={editHistory}
+              dayDates={dayDates}
+              customDays={enrichedDays || customDays}
+              onMiqaatClick={handleMiqaatClick}
             />
           </div>
         </div>
       </div>
+
+      {miqaatPopup && (
+        <MiqaatPopup
+          events={miqaatPopup.events}
+          dayName={miqaatPopup.dayName}
+          fatemiDate={miqaatPopup.fatemiDate}
+          onClose={() => setMiqaatPopup(null)}
+        />
+      )}
     </>
   );
 };
 
 
-export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification, students = [] }) => {
+export const SelfJadwalTeacherView
+ = ({ showAction, onBroadcastNotification, students = [] }) => {
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
@@ -1233,9 +1377,44 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification, stu
   const [selectedUserName, setSelectedUserName] = useState('');
   const [editHistory, setEditHistory] = useState({});
   const [resolvedUserId, setResolvedUserId] = useState('');
+  const [miqaatPopup, setMiqaatPopup] = useState(null);
 
   const autoSaveTimerRef = useRef(null);
   const lastSavedSnapshotRef = useRef('');
+
+  const weekRange = useMemo(() => getCurrentWeekRange(), []);
+  const dayDates = useMemo(() => weekRange ? DAYS.map((_, idx) => getDayDate(weekRange.weekStart, idx)) : [], [weekRange]);
+  const customDays = useMemo(() => weekRange ? getDaysFromRange(weekRange.weekStart, weekRange.weekEnd) : null, [weekRange]);
+
+  // Fatemi calendar & miqaat API (like aajnodin.com)
+  const { loading: fatemiLoading, fatemiData } = useFatemiCalendar(
+    weekRange?.weekStart,
+    weekRange?.weekEnd
+  );
+
+  // Compute enriched days directly from fatemiData using useMemo
+  const enrichedDays = useMemo(() => {
+    if (!customDays || !fatemiData || Object.keys(fatemiData).length === 0) {
+      console.log('🔍 SelfJadwalTeacherView: useMemo skipping (no data)');
+      return null;
+    }
+    console.log('🔍 SelfJadwalTeacherView: useMemo enriching', { daysCount: customDays.length });
+    const enriched = customDays.map(day => {
+      const apiData = fatemiData[day.date];
+      if (apiData && apiData.hijri) {
+        return {
+          ...day,
+          fatemiDate: apiData.hijri.date_arabic || day.fatemiDate,
+          miqaats: apiData.miqaats || [],
+          miqaatSummary: summarizeMiqaats(apiData.miqaats),
+        };
+      }
+      return { ...day, miqaats: [], miqaatSummary: null };
+    });
+    const miqaatDays = enriched.filter(d => d.miqaats && d.miqaats.length > 0);
+    console.log('🔍 SelfJadwalTeacherView: useMemo done', enriched.length, 'days,', miqaatDays.length, 'with miqaats');
+    return enriched;
+  }, [customDays, fatemiData]);
 
   useEffect(() => {
     fetchUsers();
@@ -1380,6 +1559,14 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification, stu
     setEditHistory(prev => ({ ...prev, [key]: new Date().toISOString() }));
   };
 
+  const handleMiqaatClick = (dayObj) => {
+    setMiqaatPopup({
+      events: dayObj.miqaats || [],
+      dayName: dayObj.dayName,
+      fatemiDate: dayObj.fatemiDate || '',
+    });
+  };
+
   const handleNotifyUser = async () => {
     if (!selectedUserId) return;
     setSaving(true);
@@ -1493,6 +1680,9 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification, stu
                 scheduleData={scheduleData}
                 onCellChange={handleCellChange}
                 editHistory={editHistory}
+                dayDates={dayDates}
+                customDays={enrichedDays || customDays}
+                onMiqaatClick={handleMiqaatClick}
               />
             </div>
           </>
@@ -1503,6 +1693,15 @@ export const SelfJadwalTeacherView = ({ showAction, onBroadcastNotification, stu
           </div>
         )}
       </div>
+
+      {miqaatPopup && (
+        <MiqaatPopup
+          events={miqaatPopup.events}
+          dayName={miqaatPopup.dayName}
+          fatemiDate={miqaatPopup.fatemiDate}
+          onClose={() => setMiqaatPopup(null)}
+        />
+      )}
     </div>
   );
 };

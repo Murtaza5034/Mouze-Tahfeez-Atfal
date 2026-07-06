@@ -83,7 +83,9 @@ Deno.serve(async (req) => {
     const ranked = results
       .map(r => {
         const isTarget = String(r.student_id) === String(student_id)
-        let totalScore = Number(r.total_score) || 0
+        let totalScore = (r.total_score !== undefined && r.total_score !== null && r.total_score !== "")
+          ? Number(r.total_score)
+          : (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0)
         let jadeedVal = Number(r.jadeed) || 0
         let attendanceVal = Number(r.attendance_count) || 0
 

@@ -5836,3 +5836,298 @@ n/* --- Full Width Label Helper --- */
   color: #dc2626;
 }
 
+/* ===== PREMIUM SCROLL REVEAL ANIMATIONS ===== */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scroll-reveal-left {
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal-left.revealed {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.scroll-reveal-right {
+  opacity: 0;
+  transform: translateX(30px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal-right.revealed {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.scroll-reveal-scale {
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal-scale.revealed {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Staggered children reveal */
+.stagger-children > .stagger-item {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stagger-children.revealed > .stagger-item.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== MICRO-INTERACTIONS ===== */
+.micro-bounce {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.micro-bounce:active {
+  transform: scale(0.95);
+}
+
+.micro-bounce:hover {
+  transform: translateY(-2px);
+}
+
+.micro-lift {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.micro-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(61, 43, 31, 0.12);
+}
+
+.micro-lift:active {
+  transform: translateY(-1px);
+}
+
+.micro-pulse {
+  animation: microPulse 2s ease-in-out infinite;
+}
+
+@keyframes microPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+.micro-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.micro-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerSweep 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmerSweep {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.micro-glow {
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+}
+
+.micro-glow:hover {
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 30px rgba(197, 160, 89, 0.15),
+              0 8px 24px rgba(61, 43, 31, 0.08);
+}
+
+.micro-rotate {
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.micro-rotate:hover {
+  transform: rotate(3deg) scale(1.02);
+}
+
+/* Click ripple effect */
+.micro-ripple {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.micro-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.micro-ripple:active::after {
+  opacity: 1;
+  animation: rippleFade 0.4s ease-out;
+}
+
+@keyframes rippleFade {
+  0% { transform: scale(0.3); opacity: 0.5; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+/* Slide-in entrance animation */
+.slide-in-up {
+  animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.slide-in-down {
+  animation: slideInDown 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Stagger delay utility classes */
+.delay-1 { transition-delay: 0.05s !important; animation-delay: 0.05s !important; }
+.delay-2 { transition-delay: 0.1s !important; animation-delay: 0.1s !important; }
+.delay-3 { transition-delay: 0.15s !important; animation-delay: 0.15s !important; }
+.delay-4 { transition-delay: 0.2s !important; animation-delay: 0.2s !important; }
+.delay-5 { transition-delay: 0.25s !important; animation-delay: 0.25s !important; }
+.delay-6 { transition-delay: 0.3s !important; animation-delay: 0.3s !important; }
+.delay-7 { transition-delay: 0.35s !important; animation-delay: 0.35s !important; }
+.delay-8 { transition-delay: 0.4s !important; animation-delay: 0.4s !important; }
+.delay-9 { transition-delay: 0.45s !important; animation-delay: 0.45s !important; }
+.delay-10 { transition-delay: 0.5s !important; animation-delay: 0.5s !important; }
+
+/* Smooth scroll behavior for the whole page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Card appear animation (entrance) */
+.card-appear {
+  animation: cardAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Fade in animation */
+.fade-in {
+  animation: fadeIn 0.4s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Gentle floating for decorative elements */
+.float-gentle {
+  animation: floatGentle 4s ease-in-out infinite;
+}
+
+@keyframes floatGentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Border glow on focus for inputs */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary-gold) !important;
+  box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.12), 0 0 20px rgba(197, 160, 89, 0.06) !important;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* Smooth number transitions */
+.number-transition {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Button press feedback */
+button:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Smooth image loading */
+img {
+  transition: opacity 0.3s ease;
+}
+
+img[loading] {
+  opacity: 0;
+}
+
+img[loading].loaded,
+img:not([loading]) {
+  opacity: 1;
+}
+
