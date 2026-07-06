@@ -6635,11 +6635,7 @@ const handleDownloadAllReports = async () => {
                   </p>
                 </div>
               </div>
-              <QuickAccessPagesUI
-                supabase={supabase}
-                currentRole={currentPortalRole}
-                onShowAction={onShowAction}
-              />
+              <QuickAccessPagesUI supabase={supabase} />
             </div>
           ) : null}
 
