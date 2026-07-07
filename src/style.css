@@ -420,6 +420,8 @@ h3 { font-size: 1.3rem; }
 .admin-content-pad {
   padding: 32px;
   flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 @media (max-width: 768px) {
@@ -427,6 +429,7 @@ h3 { font-size: 1.3rem; }
     padding: 20px 16px;
   }
 }
+
 
 .performance-pill {
   background: linear-gradient(135deg, var(--light-gold), #f5edd8);

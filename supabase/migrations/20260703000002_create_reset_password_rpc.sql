@@ -2,6 +2,8 @@
 -- and Admin Portal Staff Profile password reset).
 -- SECURITY DEFINER lets this function modify auth.users when called by anon role.
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE OR REPLACE FUNCTION reset_user_password(
   target_email TEXT,
   new_password TEXT

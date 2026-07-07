@@ -651,3 +651,272 @@
     max-width: 480px;
   }
 }
+
+/* ── Premium OTP Verification Styling ── */
+.otp-shield-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(197, 160, 89, 0.1);
+  border: 2px solid rgba(197, 160, 89, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 24px rgba(197, 160, 89, 0.15);
+  animation: pulseGold 2s infinite ease-in-out;
+}
+
+@keyframes pulseGold {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(197, 160, 89, 0.4);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 12px rgba(197, 160, 89, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(197, 160, 89, 0);
+  }
+}
+
+.otp-shield-icon {
+  color: var(--primary-gold);
+}
+
+.otp-info-card {
+  background: rgba(197, 160, 89, 0.05);
+  border: 1px solid rgba(197, 160, 89, 0.15);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.otp-info-card.success {
+  background: rgba(22, 163, 74, 0.05);
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+.otp-info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--soft-brown);
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.otp-info-value {
+  font-size: 15px;
+  color: var(--deep-brown);
+  word-break: break-all;
+  font-weight: 700;
+}
+
+.otp-input-field {
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 26px !important;
+  letter-spacing: 8px !important;
+  text-align: center !important;
+  text-transform: uppercase !important;
+  font-weight: 800 !important;
+  color: var(--deep-brown) !important;
+  padding-left: 18px !important;
+}
+
+.otp-success-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0fdf4;
+  color: #16a34a;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  margin-bottom: 18px;
+  border: 1px solid #dcfce7;
+  font-weight: 600;
+  animation: fadeSlideIn 0.3s ease;
+}
+
+.otp-resend-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.otp-resend-btn {
+  background: none;
+  border: none;
+  color: var(--primary-gold);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.otp-resend-btn:hover:not(:disabled) {
+  color: var(--dark-gold);
+  background: rgba(197, 160, 89, 0.06);
+}
+
+.otp-resend-btn:disabled {
+  color: var(--soft-brown);
+  text-decoration: none;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.otp-send-view {
+  animation: fadeSlideIn 0.3s ease;
+}
+
+/* ── Secret Key Display & Timer ── */
+.secret-key-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #8a6515 0%, #c4a54d 100%);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 24px rgba(197, 160, 89, 0.3);
+  color: #fff;
+}
+
+.secret-key-display svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.secret-key-code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 10px;
+  color: #ffffff;
+  user-select: all;
+}
+
+.secret-key-timer-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(197, 160, 89, 0.15);
+  border-radius: 4px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.secret-key-timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c4a54d, #f0d080);
+  border-radius: 4px;
+  transition: width 1s linear;
+}
+
+.secret-key-timer-text {
+  text-align: center;
+  font-size: 12px;
+  color: var(--soft-brown);
+  margin-bottom: 18px;
+}
+
+.secret-key-timer-text strong {
+  color: var(--deep-brown);
+}
+
+.secret-key-expired {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+/* ── OTP Modal Overlay ── */
+.otp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px 24px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: otpOverlayFadeIn 0.25s ease;
+  overflow-y: auto;
+}
+
+@keyframes otpOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.otp-modal-card {
+  width: 100%;
+  max-width: 440px;
+  margin-top: 24px;
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: 0 48px 120px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+  animation: otpModalRise 0.3s ease-out;
+}
+
+.otp-modal-card .login-card-accent {
+  position: relative;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-gold), #f0d080, var(--primary-gold));
+  flex-shrink: 0;
+  box-shadow: 0 0 20px rgba(197, 160, 89, 0.4);
+}
+
+@keyframes otpModalRise {
+  from {
+    opacity: 0;
+    transform: translateY(32px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.otp-modal-card .login-logo {
+  padding: 20px 24px 4px;
+}
+
+.otp-modal-card .login-body {
+  padding: 12px 24px 24px;
+}
+
+@media (max-width: 480px) {
+  .otp-modal-overlay {
+    padding: 16px 12px;
+    align-items: center;
+  }
+
+  .otp-modal-card {
+    margin-top: 0;
+    border-radius: 22px;
+  }
+
+  .otp-modal-card .login-logo {
+    padding: 16px 20px 2px;
+  }
+
+  .otp-modal-card .login-body {
+    padding: 8px 20px 20px;
+  }
+}
+

@@ -31,11 +31,13 @@ const ROLE_OPTIONS = [
   },
 ];
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, initialUser = null, initialRole = "parents", onCancel = null }) {
   const [selectedRole, setSelectedRole] = useState(() => {
+    if (initialUser && initialRole) return initialRole;
     return localStorage.getItem("mauze-saved-role") || "parents";
   });
   const [email, setEmail] = useState(() => {
+    if (initialUser?.email) return initialUser.email;
     return localStorage.getItem("mauze-saved-email") || "";
   });
   const [password, setPassword] = useState(() => {
@@ -59,12 +61,60 @@ export default function Login({ onLoginSuccess }) {
     return saved !== "false";
   });
 
+  // Secret key flow states
+  const [step, setStep] = useState(initialUser ? "otp" : "login");
+  const [tempUser, setTempUser] = useState(initialUser || null);
+  const [secretKey, setSecretKey] = useState("");
+  const [keyInput, setKeyInput] = useState("");
+  const [keyLoading, setKeyLoading] = useState(false);
+  const [keyTimer, setKeyTimer] = useState(60);
+  const [keyError, setKeyError] = useState("");
+
+  const generateAlphanumericOtp = (length = 6) => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Easily readable uppercase alphanumeric
+    let code = "";
+    for (let i = 0; i < length; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  // Auto-generate secret key when OTP step mounts
+  useEffect(() => {
+    if (step !== "otp") return;
+    setSecretKey(generateAlphanumericOtp(6));
+    setKeyInput("");
+    setKeyError("");
+    setKeyTimer(60);
+  }, [step]);
+
+  // 1-minute countdown timer — auto-expires and cancels
+  useEffect(() => {
+    if (step !== "otp") return;
+    if (keyTimer <= 0) {
+      setSecretKey("");
+      setKeyInput("");
+      setKeyError("");
+      setStep("login");
+      setTempUser(null);
+      setError(null);
+      supabase.auth.signOut().catch(() => {});
+      if (onCancel) onCancel();
+      return;
+    }
+    const interval = setInterval(() => {
+      setKeyTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [keyTimer, step]);
+
   useEffect(() => {
     const savedTheme = localStorage.getItem("mauze-app-theme") || "default";
     document.body.setAttribute("data-theme", savedTheme);
   }, []);
 
   useEffect(() => {
+    if (step !== "login") return; // Only load animation in login step
     if (!welcomeRef.current) return;
     let anim = null;
     const timer = setTimeout(() => {
@@ -84,7 +134,7 @@ export default function Login({ onLoginSuccess }) {
       clearTimeout(timer);
       if (anim) anim.destroy();
     };
-  }, []);
+  }, [step]);
 
   useEffect(() => {
     if (rememberMe && email && password) {
@@ -107,6 +157,12 @@ export default function Login({ onLoginSuccess }) {
     setLoading(true);
     setError(null);
 
+    // For admin login, set a flag BEFORE authenticating so the App.jsx auth
+    // listener knows to pause auto-resolve and let the OTP modal appear.
+    if (selectedRole === "admin") {
+      sessionStorage.setItem("mauze-admin-otp-flow", "true");
+    }
+
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -114,6 +170,20 @@ export default function Login({ onLoginSuccess }) {
 
     if (authError) {
       setError(authError.message);
+      setLoading(false);
+      if (selectedRole === "admin") {
+        sessionStorage.removeItem("mauze-admin-otp-flow");
+      }
+      return;
+    }
+
+    if (selectedRole === "admin") {
+      // Show OTP screen immediately after successful authentication.
+      // Full portal authorization (portal_access table + metadata roles)
+      // happens in onLoginSuccess after OTP verification.
+      setTempUser(data.user);
+      setStep("otp");
+      setPassword("");
       setLoading(false);
       return;
     }
@@ -127,6 +197,59 @@ export default function Login({ onLoginSuccess }) {
     }
   };
 
+  const handleVerifySecretKey = async (event) => {
+    if (event) event.preventDefault();
+    setKeyLoading(true);
+    setKeyError("");
+
+    if (!keyInput.trim()) {
+      setKeyError("Please enter the secret key.");
+      setKeyLoading(false);
+      return;
+    }
+
+    if (keyInput.trim().toUpperCase() !== secretKey) {
+      setKeyError("Invalid secret key. Please check and try again.");
+      setKeyLoading(false);
+      return;
+    }
+
+    try {
+      sessionStorage.setItem("mauze-admin-otp-verified", "true");
+      const result = await onLoginSuccess(tempUser, "admin", rememberMe);
+
+      if (result?.ok) {
+        sessionStorage.removeItem("mauze-admin-otp-flow");
+        setKeyLoading(false);
+      } else {
+        setKeyError(result?.message || "This account cannot access the admin portal.");
+        setKeyLoading(false);
+        sessionStorage.removeItem("mauze-admin-otp-verified");
+      }
+    } catch (err) {
+      console.error("Success login trigger failure:", err);
+      setKeyError("Portal authorization failed. Please try again.");
+      setKeyLoading(false);
+    }
+  };
+
+  const handleOtpCancel = async () => {
+    sessionStorage.removeItem("mauze-admin-otp-flow");
+    setSecretKey("");
+    setKeyInput("");
+    setKeyError("");
+    setKeyTimer(60);
+    setStep("login");
+    setTempUser(null);
+    setError(null);
+    
+    await supabase.auth.signOut();
+    
+    if (onCancel) {
+      onCancel();
+    }
+  };
+
   const handleRoleSwitch = (roleId) => {
     setSelectedRole(roleId);
     setError(null);
@@ -135,6 +258,20 @@ export default function Login({ onLoginSuccess }) {
       setPassword("");
     }
   };
+
+  // Escape key closes the OTP modal (defined after handleOtpCancel for hoisting)
+  useEffect(() => {
+    if (step !== "otp") return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        handleOtpCancel();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [step, handleOtpCancel]);
+
+  // OTP rendered as modal overlay inside the login page below
 
   return (
     <div className="login-container">
@@ -450,6 +587,103 @@ export default function Login({ onLoginSuccess }) {
           )}
         </div>
       </div>
+
+      {/* ── OTP Secret Key Modal Overlay ── */}
+      {step === "otp" && (
+        <div className="otp-modal-overlay">
+          <div className="otp-modal-card">
+            <div className="login-card-accent" />
+
+            <div className="login-logo">
+              <img src="/logo.png" alt="Mauze Tahfeez" className="login-logo-img" />
+            </div>
+
+            <div className="login-body">
+              <div className="content-header">
+                <div className="otp-shield-badge">
+                  <ShieldCheck size={32} className="otp-shield-icon" />
+                </div>
+                <h1 className="content-title">Admin Verification</h1>
+                <p className="content-desc">
+                  A secure secret key has been generated. Enter it below to access the Admin portal.
+                </p>
+              </div>
+
+              {/* Timer bar */}
+              <div className="secret-key-timer-bar">
+                <div
+                  className="secret-key-timer-fill"
+                  style={{ width: `${(keyTimer / 60) * 100}%` }}
+                />
+              </div>
+              <div className="secret-key-timer-text">
+                {keyTimer > 0 ? (
+                  <span>Key expires in <strong>{keyTimer}s</strong></span>
+                ) : (
+                  <span className="secret-key-expired">Key expired — please cancel and log in again</span>
+                )}
+              </div>
+
+              {/* Secret key display */}
+              <div className="secret-key-display">
+                <KeyRound size={22} />
+                <span className="secret-key-code">{secretKey}</span>
+              </div>
+
+              <form onSubmit={handleVerifySecretKey} className="login-form">
+                <div className="input-group">
+                  <label htmlFor="key-input">Enter Secret Key</label>
+                  <div className="input-with-icon">
+                    <KeyRound size={18} />
+                    <input
+                      id="key-input"
+                      type="text"
+                      className="otp-input-field"
+                      placeholder="ENTER 6-DIGIT KEY"
+                      value={keyInput}
+                      onChange={(e) => setKeyInput(e.target.value.toUpperCase().slice(0, 6))}
+                      required
+                      autoComplete="off"
+                      maxLength={6}
+                      disabled={keyTimer <= 0}
+                    />
+                  </div>
+                </div>
+
+                {keyError && (
+                  <div className="error-message">
+                    <AlertCircle size={16} />
+                    <span>{keyError}</span>
+                  </div>
+                )}
+
+                <button type="submit" className="login-button" disabled={keyLoading || keyTimer <= 0}>
+                  {keyLoading ? (
+                    <>
+                      <Loader2 size={18} className="spinner" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={18} />
+                      Verify & Access Admin
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <button
+                type="button"
+                className="forgot-cancel-btn"
+                onClick={handleOtpCancel}
+                style={{ marginTop: "16px" }}
+              >
+                <X size={14} /> Cancel & Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

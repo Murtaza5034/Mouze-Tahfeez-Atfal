@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { Calendar, Users, X, ChevronRight, CheckCircle, AlertCircle, Loader2, GraduationCap, Sparkles, Eye, BookOpen, Repeat, Calculator, Download } from 'lucide-react';
+import {
+  Calendar, Users, X, ChevronRight, CheckCircle, AlertCircle, Loader2,
+  GraduationCap, Sparkles, Eye, BookOpen, Repeat, Download, User,
+  BarChart3, Info
+} from 'lucide-react';
 
 const SURAH_AYAH_DATA = [
   { number: 1, nameEn: 'Al-Fatiha', nameAr: 'الفاتحة', ayahCount: 7 },
@@ -47,7 +51,7 @@ const SURAH_AYAH_DATA = [
   { number: 42, nameEn: "Ash-Shura", nameAr: 'الشورى', ayahCount: 53 },
   { number: 43, nameEn: "Az-Zukhruf", nameAr: 'الزخرف', ayahCount: 89 },
   { number: 44, nameEn: "Ad-Dukhan", nameAr: 'الدخان', ayahCount: 59 },
-  { number: 45, nameEn: "Al-Jathiyah", nameAr: 'الجاثية', ayahCount: 35 },
+  { number: 45, nameEn: "Al-Jathiyah", nameAr: 'الجاثية', ayahCount: 37 },
   { number: 46, nameEn: "Al-Ahqaf", nameAr: 'الأحقاف', ayahCount: 35 },
   { number: 47, nameEn: "Muhammad", nameAr: 'محمد', ayahCount: 38 },
   { number: 48, nameEn: "Al-Fath", nameAr: 'الفتح', ayahCount: 29 },
@@ -120,6 +124,8 @@ const SURAH_AYAH_DATA = [
 ];
 
 const NO_VALUE = 'NO';
+const CACHE_PREFIX = 'jadwal_tracking_';
+const CACHE_DURATION = 120000;
 
 const toArabicNum = (n) => {
   const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
@@ -171,48 +177,22 @@ const formatJuzhali = (val) => {
   return `${toArabicNum(val)} صــ`;
 };
 
+const isFieldFilled = (val) => val && val.toString().trim() !== '';
 
-const getDayKeys = (scheduleData, settings) => {
-  if (!scheduleData) return [];
-  const keys = Object.keys(scheduleData).filter(k => k !== '_mode' && k !== '_star');
-  if (!keys.length) return keys;
-
-  if (settings?.jadwal_week_start && settings?.jadwal_week_end) {
-    const start = new Date(settings.jadwal_week_start + 'T00:00:00Z');
-    const end = new Date(settings.jadwal_week_end + 'T00:00:00Z');
-    const DAY_NAMES = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
-    const ordered = [];
-    const current = new Date(start);
-    let skipIdx = 0;
-    while (current <= end) {
-      const dateStr = current.toISOString().split('T')[0];
-      const dayName = DAY_NAMES[current.getUTCDay()];
-      ordered.push(skipIdx >= 6 ? `${dayName}_${skipIdx}` : dayName);
-      skipIdx++;
-      current.setUTCDate(current.getUTCDate() + 1);
-    }
-    // Remove only the very last day if the range exceeds 19 (per user request)
-    if (ordered.length > 19) {
-      ordered.pop();
-    }
-    return ordered;
+const getDayCompletion = (dayData, mode) => {
+  if (!dayData) return { completed: false, total: 0, filled: 0 };
+  if (mode === 'juz-wise') {
+    const fields = ['juz1', 'juz2', 'juz3', 'juz4', 'jadeed', 'juzhali'];
+    const filled = fields.filter(f => isFieldFilled(dayData[f])).length;
+    return { completed: filled === fields.length, total: fields.length, filled };
   }
-
-  return keys.sort((a, b) => {
-    const aParts = a.split('_');
-    const bParts = b.split('_');
-    const DAY_ORDER = { MONDAY:0, TUESDAY:1, WEDNESDAY:2, THURSDAY:3, FRIDAY:4, SATURDAY:5, SUNDAY:6 };
-    const aIdx = aParts.length > 1 ? Number(aParts[1]) : DAY_ORDER[aParts[0]] ?? 99;
-    const bIdx = bParts.length > 1 ? Number(bParts[1]) : DAY_ORDER[bParts[0]] ?? 99;
-    return aIdx - bIdx;
-  });
+  const fields = ['murajah', 'jadeed', 'juzhali'];
+  const filled = fields.filter(f => isFieldFilled(dayData[f])).length;
+  return { completed: filled === fields.length, total: fields.length, filled };
 };
 
-const getBaseDayKey = (dayKey) => String(dayKey || '').split('_')[0];
-
-const getDayData = (scheduleData, dayKey) => {
-  if (!scheduleData || !dayKey) return null;
-  return scheduleData[dayKey] || scheduleData[getBaseDayKey(dayKey)] || null;
+const getScheduleMode = (scheduleData) => {
+  return scheduleData?._mode || 'juz-wise';
 };
 
 const getFatemiDateStr = (dateStr) => {
@@ -238,134 +218,209 @@ const getFatemiDateStr = (dateStr) => {
   } catch { return ''; }
 };
 
-const isFieldFilled = (val) => val && val.toString().trim() !== '';
-
-const getDayCompletion = (dayData, mode) => {
-  if (!dayData) return { completed: false, total: 0, filled: 0 };
-  if (mode === 'juz-wise') {
-    const fields = ['juz1', 'juz2', 'juz3', 'juz4', 'jadeed', 'juzhali'];
-    const filled = fields.filter(f => isFieldFilled(dayData[f])).length;
-    return { completed: filled === fields.length, total: fields.length, filled };
+const getWeekRange = (mode, settings) => {
+  if (mode === 'miqaat' && settings?.jadwal_week_start && settings?.jadwal_week_end) {
+    return { start: settings.jadwal_week_start, end: settings.jadwal_week_end };
   }
-  const fields = ['murajah', 'jadeed', 'juzhali'];
-  const filled = fields.filter(f => isFieldFilled(dayData[f])).length;
-  return { completed: filled === fields.length, total: fields.length, filled };
+  const now = new Date();
+  const day = now.getDay();
+  const monOffset = day === 0 ? -6 : 1 - day;
+  const start = new Date(now);
+  start.setDate(now.getDate() + monOffset);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0],
+  };
 };
 
-const getScheduleMode = (scheduleData) => {
-  return scheduleData?._mode || 'juz-wise';
+const getDayDateStrings = (range) => {
+  if (!range?.start || !range?.end) return [];
+  const start = new Date(range.start + 'T00:00:00Z');
+  const end = new Date(range.end + 'T00:00:00Z');
+  const dates = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    dates.push(cur.toISOString().split('T')[0]);
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  if (dates.length > 19) dates.pop();
+  return dates;
 };
 
-const JadwalTrackingView = ({ students, onShowAction }) => {
+const getDayKeys = (scheduleData, dayDateStrings) => {
+  if (!scheduleData) return [];
+  const keys = Object.keys(scheduleData).filter(k => k !== '_mode' && k !== '_star' && k !== '_editHistory');
+  if (!keys.length) return keys;
+
+  const DAY_NAMES = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+  if (dayDateStrings?.length) {
+    const ordered = [];
+    dayDateStrings.forEach((dateStr, idx) => {
+      const d = new Date(dateStr + 'T00:00:00Z');
+      const dayName = DAY_NAMES[d.getUTCDay()];
+      const key = idx >= 6 ? `${dayName}_${idx}` : dayName;
+      if (keys.includes(key)) ordered.push(key);
+    });
+    return ordered;
+  }
+  return keys.sort((a, b) => {
+    const aParts = a.split('_');
+    const bParts = b.split('_');
+    const DAY_ORDER = { MONDAY:0, TUESDAY:1, WEDNESDAY:2, THURSDAY:3, FRIDAY:4, SATURDAY:5, SUNDAY:6 };
+    const aIdx = aParts.length > 1 ? Number(aParts[1]) : DAY_ORDER[aParts[0]] ?? 99;
+    const bIdx = bParts.length > 1 ? Number(bParts[1]) : DAY_ORDER[bParts[0]] ?? 99;
+    return aIdx - bIdx;
+  });
+};
+
+const getDayData = (scheduleData, dayKey) => {
+  if (!scheduleData || !dayKey) return null;
+  return scheduleData[dayKey] || null;
+};
+
+const getCache = (key) => {
+  try {
+    const raw = sessionStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_DURATION) {
+      sessionStorage.removeItem(CACHE_PREFIX + key);
+      return null;
+    }
+    return data;
+  } catch { return null; }
+};
+
+const setCache = (key, data) => {
+  try {
+    sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ data, ts: Date.now() }));
+  } catch { }
+};
+
+const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
+  const [viewMode, setViewMode] = useState('miqaat');
   const [jadwalData, setJadwalData] = useState({});
+  const [selfJadwalData, setSelfJadwalData] = useState({});
+  const [portalUserMap, setPortalUserMap] = useState({});
   const [loading, setLoading] = useState(true);
-  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null);
   const [expandedStudent, setExpandedStudent] = useState(null);
   const [jadwalSettings, setJadwalSettings] = useState(null);
 
-  const dayDateStrings = useMemo(() => {
-    if (!jadwalSettings?.jadwal_week_start || !jadwalSettings?.jadwal_week_end) return [];
-    const start = new Date(jadwalSettings.jadwal_week_start + 'T00:00:00Z');
-    const end = new Date(jadwalSettings.jadwal_week_end + 'T00:00:00Z');
-    const dates = [];
-    const cur = new Date(start);
-    while (cur <= end) {
-      dates.push(cur.toISOString().split('T')[0]);
-      cur.setUTCDate(cur.getUTCDate() + 1);
-    }
-    // Remove only the very last day if the range exceeds 19 (per user request: Zilhaj 26-29 + Muharram 1-15 = 19 days max)
-    if (dates.length > 19) {
-      dates.pop();
-    }
-    return dates;
-  }, [jadwalSettings?.jadwal_week_start, jadwalSettings?.jadwal_week_end]);
+  const range = useMemo(() => getWeekRange(viewMode, jadwalSettings), [viewMode, jadwalSettings]);
+  const dayDateStrings = useMemo(() => getDayDateStrings(range), [range]);
 
   useEffect(() => {
-    fetchAllJadwal();
-    fetchJadwalSettings();
+    if (portalAccessList?.length) {
+      const map = {};
+      portalAccessList.forEach(a => { if (a.user_id) map[a.user_id] = a.full_name || a.email || a.user_id; });
+      setPortalUserMap(map);
+    }
+  }, [portalAccessList]);
+
+  useEffect(() => {
+    loadAllData();
   }, []);
 
+  const loadAllData = async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchJadwalSettings(),
+      fetchTeacherJadwal(),
+      fetchSelfJadwal(),
+    ]);
+    setLoading(false);
+  };
+
   const fetchJadwalSettings = async () => {
+    let data = getCache('settings');
+    if (data) { setJadwalSettings(data); return; }
     try {
-      const { data } = await supabase
+      const { data: result } = await supabase
         .from('jadwal_settings')
         .select('*')
         .eq('id', 1)
         .single();
-      if (data) setJadwalSettings(data);
-    } catch (e) {
-      // settings not critical
+      if (result) {
+        setCache('settings', result);
+        setJadwalSettings(result);
+      }
+    } catch { }
+  };
+
+  const fetchTeacherJadwal = async () => {
+    let data = getCache('teacher_jadwal');
+    if (data) { setJadwalData(data); return; }
+    try {
+      const { data: result, error } = await supabase
+        .from('jadawal')
+        .select('student_id, schedule_data');
+      if (error) {
+        if (onShowAction) onShowAction('error', 'Failed to fetch teacher jadwal');
+        return;
+      }
+      const jadwalMap = {};
+      (result || []).forEach(item => {
+        const sid = String(item.student_id).trim();
+        jadwalMap[sid] = item.schedule_data;
+      });
+      setCache('teacher_jadwal', jadwalMap);
+      setJadwalData(jadwalMap);
+    } catch (err) {
+      console.error("Teacher jadwal fetch error:", err);
     }
   };
 
-  const fetchAllJadwal = async () => {
-    setLoading(true);
+  const fetchSelfJadwal = async () => {
+    let data = getCache('self_jadwal');
+    if (data) { setSelfJadwalData(data); return; }
     try {
-      const { data, error } = await supabase
-        .from('jadawal')
-        .select('student_id, schedule_data');
-
+      const { data: result, error } = await supabase
+        .from('self_jadwal')
+        .select('user_id, schedule_data');
       if (error) {
-        console.error("Failed to fetch Jadwal data:", error);
-        if (onShowAction) onShowAction('error', 'Failed to fetch Jadwal tracking data');
-      } else {
-        const jadwalMap = {};
-        (data || []).forEach(item => {
-          const sid = String(item.student_id).trim();
-          jadwalMap[sid] = item.schedule_data;
-        });
-        setJadwalData(jadwalMap);
+        console.warn("Self jadwal fetch (RLS may apply):", error?.message);
+        return;
       }
+      const jadwalMap = {};
+      (result || []).forEach(item => {
+        jadwalMap[item.user_id] = item.schedule_data;
+      });
+      setCache('self_jadwal', jadwalMap);
+      setSelfJadwalData(jadwalMap);
     } catch (err) {
-      console.error("Jadwal fetch error:", err);
-    } finally {
-      setLoading(false);
+      console.error("Self jadwal fetch error:", err);
     }
   };
 
   const teacherJadwalStats = useMemo(() => {
     const teacherMap = {};
-
     students.forEach(student => {
       const teacherName = student.teacherName || "Unassigned teacher";
       if (!teacherMap[teacherName]) {
-        teacherMap[teacherName] = {
-          teacherName,
-          children: [],
-          totalStudents: 0,
-        };
+        teacherMap[teacherName] = { teacherName, children: [], totalStudents: 0 };
       }
-
       const sid = String(student.student_id || '').trim();
       const studentIds = student.allIds || [sid];
       let scheduleData = null;
       for (const id of studentIds) {
-        if (jadwalData[id]) {
-          scheduleData = jadwalData[id];
-          break;
-        }
+        if (jadwalData[id]) { scheduleData = jadwalData[id]; break; }
       }
-
       const mode = getScheduleMode(scheduleData);
-      const dayKeys = getDayKeys(scheduleData, jadwalSettings);
+      const dayKeys = getDayKeys(scheduleData, dayDateStrings);
       const totalDays = dayKeys.length;
       let totalFilled = 0;
       let totalFields = 0;
-
       const dayDetails = dayKeys.map(dayKey => {
         const dayData = getDayData(scheduleData, dayKey);
         const completion = getDayCompletion(dayData, mode);
         totalFilled += completion.filled;
         totalFields += completion.total;
-        return {
-          dayKey,
-          ...completion,
-          dayData,
-        };
+        return { dayKey, ...completion, dayData };
       });
-
       const fillPercent = totalFields > 0 ? Math.round((totalFilled / totalFields) * 100) : 0;
-
       teacherMap[teacherName].children.push({
         student_id: student.student_id,
         name: student.name || 'Unnamed',
@@ -379,7 +434,6 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
       });
       teacherMap[teacherName].totalStudents += 1;
     });
-
     return Object.values(teacherMap).map(teacher => ({
       ...teacher,
       jadwalFilledCount: teacher.children.filter(c => c.hasJadwal).length,
@@ -387,32 +441,83 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
         ? Math.round(teacher.children.reduce((sum, c) => sum + c.fillPercent, 0) / teacher.children.length)
         : 0,
     }));
-  }, [students, jadwalData, jadwalSettings]);
+  }, [students, jadwalData, dayDateStrings]);
 
-  const totalTeachersWithJadwal = teacherJadwalStats.filter(t => t.jadwalFilledCount > 0).length;
+  const selfJadwalStats = useMemo(() => {
+    const teacherMap = {};
+    students.forEach(student => {
+      const teacherName = student.teacherName || "Unassigned teacher";
+      if (!teacherMap[teacherName]) {
+        teacherMap[teacherName] = { teacherName, children: [], totalStudents: 0 };
+      }
+      const userId = student.user_id;
+      const scheduleData = userId && selfJadwalData[userId] ? selfJadwalData[userId] : null;
+      const mode = getScheduleMode(scheduleData);
+      const dayKeys = getDayKeys(scheduleData, dayDateStrings);
+      const totalDays = dayKeys.length;
+      let totalFilled = 0;
+      let totalFields = 0;
+      const dayDetails = dayKeys.map(dayKey => {
+        const dayData = getDayData(scheduleData, dayKey);
+        const completion = getDayCompletion(dayData, mode);
+        totalFilled += completion.filled;
+        totalFields += completion.total;
+        return { dayKey, ...completion, dayData };
+      });
+      const fillPercent = totalFields > 0 ? Math.round((totalFilled / totalFields) * 100) : 0;
+      teacherMap[teacherName].children.push({
+        student_id: student.student_id,
+        name: student.name || 'Unnamed',
+        groupName: student.groupName || 'Ungrouped',
+        fillPercent,
+        hasJadwal: scheduleData !== null,
+        mode,
+        dayDetails,
+        totalDays,
+        scheduleData,
+        userId,
+        parentName: portalUserMap[userId] || null,
+      });
+      teacherMap[teacherName].totalStudents += 1;
+    });
+    return Object.values(teacherMap).map(teacher => ({
+      ...teacher,
+      jadwalFilledCount: teacher.children.filter(c => c.hasJadwal).length,
+      avgFillPercent: teacher.children.length > 0
+        ? Math.round(teacher.children.reduce((sum, c) => sum + c.fillPercent, 0) / teacher.children.length)
+        : 0,
+    }));
+  }, [students, selfJadwalData, dayDateStrings, portalUserMap]);
+
+  const activeStats = viewMode === 'miqaat' ? teacherJadwalStats : selfJadwalStats;
+  const totalWithData = activeStats.reduce((s, t) => s + t.jadwalFilledCount, 0);
+  const totalStudents = activeStats.reduce((s, t) => s + t.totalStudents, 0);
+  const overallAvg = activeStats.length > 0
+    ? Math.round(activeStats.reduce((sum, t) => sum + t.avgFillPercent, 0) / activeStats.length)
+    : 0;
 
   const downloadCSV = () => {
     const BOM = '\uFEFF';
     let maxDays = 0;
-    teacherJadwalStats.forEach(t => {
+    activeStats.forEach(t => {
       t.children.forEach(c => {
         if (c.dayDetails.length > maxDays) maxDays = c.dayDetails.length;
       });
     });
-
-    const headers = ['Student Name', 'Teacher Group', 'Mode'];
+    const headers = ['Student Name', 'Teacher Group', 'Mode', 'Parent User'];
     for (let d = 0; d < maxDays; d++) {
       const dateStr = dayDateStrings[d] || '';
-      const engDate = dateStr ? new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }) : `Day ${d + 1}`;
-      headers.push(`Day ${d + 1} - Murajah (${engDate})`);
+      const engDate = dateStr
+        ? new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' })
+        : `Day ${d + 1}`;
+      headers.push(`Day ${d + 1} (${engDate}) - Murajah`);
       headers.push(`Day ${d + 1} - Jadeed`);
       headers.push(`Day ${d + 1} - Juzhali`);
     }
-
     const rows = [];
-    teacherJadwalStats.forEach(t => {
+    activeStats.forEach(t => {
       t.children.forEach(c => {
-        const row = [c.name, c.groupName, c.mode === 'juz-wise' ? 'Juz Wise' : 'Surah Wise'];
+        const row = [c.name, c.groupName, c.mode === 'juz-wise' ? 'Juz Wise' : 'Surah Wise', c.parentName || ''];
         for (let d = 0; d < maxDays; d++) {
           const dd = c.dayDetails[d];
           if (dd && dd.dayData) {
@@ -432,25 +537,18 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
         rows.push(row);
       });
     });
-
     const esc = (val) => {
       const s = String(val || '');
-      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-        return '"' + s.replace(/"/g, '""') + '"';
-      }
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
       return s;
     };
-
     const csvContent = BOM + [headers, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    import("./downloadUtils").then(m => m.downloadFile(blob, `Jadwal_Tracking_${new Date().toISOString().split('T')[0]}.csv`));
+    import("./downloadUtils").then(m => m.downloadFile(blob, `Jadwal_Tracking_${viewMode}_${new Date().toISOString().split('T')[0]}.csv`));
   };
 
   const renderDayCell = (dayDetail, mode) => {
     const dayData = dayDetail.dayData || {};
-    const isCompletelyFilled = dayDetail.completed;
-    const partialFill = dayDetail.filled > 0 && !dayDetail.completed;
-
     if (mode === 'juz-wise') {
       const juzVals = ['juz1', 'juz2', 'juz3', 'juz4'].map(j => dayData[j]).filter(v => v).join(', ');
       return (
@@ -467,7 +565,6 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
         </div>
       );
     }
-
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', lineHeight: 1.3 }}>
         <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', color: isFieldFilled(dayData.murajah) ? '#2e7d32' : '#ccc' }}>
@@ -487,29 +584,28 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
     return (
       <div className="overview-container fade-in" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="skeleton-el" style={{ height: '52px', borderRadius: '14px' }} />
-          <div className="skeleton-el" style={{ height: '80px', borderRadius: '12px' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="skeleton-el" style={{ height: '100px', borderRadius: '12px' }} />
-            ))}
-          </div>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="skeleton-el" style={{ height: i === 0 ? '52px' : '80px', borderRadius: '14px' }} />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="overview-container fade-in">
-      <div className="overview-selection-header card-appear" style={{ marginBottom: '24px' }}>
-        <div className="selection-box" style={{ border: 'none', padding: '20px 24px' }}>
+    <div className="overview-container fade-in" style={{ paddingTop: '8px', paddingBottom: '32px' }}>
+      <div className="overview-selection-header card-appear" style={{ marginBottom: '16px' }}>
+        <div className="selection-box" style={{ border: 'none', padding: '18px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Calendar size={28} className="gold-icon" />
               <div>
-                <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.3rem' }}>Jadwal Tracking</h3>
+                <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.3rem' }}>
+                  {viewMode === 'miqaat' ? 'Miqaat Jadwal Tracking' : 'Weekly Jadwal Tracking'}
+                </h3>
                 <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  {totalTeachersWithJadwal} of {teacherJadwalStats.length} teachers · {teacherJadwalStats.reduce((s, t) => s + t.jadwalFilledCount, 0)} students with Jadwal
+                  {activeStats.length} teachers · {totalWithData}/{totalStudents} with data · Avg {overallAvg}% filled
+                  {dayDateStrings.length > 0 && ` · ${dayDateStrings[0]} to ${dayDateStrings[dayDateStrings.length - 1]}`}
                 </p>
               </div>
             </div>
@@ -523,7 +619,7 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
               </button>
               <button
                 className="action-button"
-                onClick={fetchAllJadwal}
+                onClick={loadAllData}
                 style={{ background: 'var(--soft-brown)', color: 'white', padding: '8px 16px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
               >
                 <Loader2 size={14} /> Refresh
@@ -533,12 +629,139 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
         </div>
       </div>
 
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', padding: '0 4px' }}>
+        <button
+          onClick={() => { setViewMode('miqaat'); setSelectedGroup(null); setExpandedStudent(null); }}
+          style={{
+            flex: 1,
+            padding: '12px 16px',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontWeight: viewMode === 'miqaat' ? 700 : 500,
+            fontSize: '0.88rem',
+            background: viewMode === 'miqaat'
+              ? 'linear-gradient(135deg, #d4af37, #b8941f)'
+              : 'rgba(0,0,0,0.04)',
+            color: viewMode === 'miqaat' ? 'white' : 'var(--text-muted)',
+            transition: 'all 0.2s ease',
+            boxShadow: viewMode === 'miqaat' ? '0 4px 16px rgba(212,175,55,0.3)' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <Sparkles size={18} />
+          <span>Miqaat Jadwal</span>
+          {viewMode === 'miqaat' && (
+            <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: '20px', padding: '2px 10px', fontSize: '0.7rem', fontWeight: 600 }}>
+              Teacher Jadwal
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => { setViewMode('weekly'); setSelectedGroup(null); setExpandedStudent(null); }}
+          style={{
+            flex: 1,
+            padding: '12px 16px',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontWeight: viewMode === 'weekly' ? 700 : 500,
+            fontSize: '0.88rem',
+            background: viewMode === 'weekly'
+              ? 'linear-gradient(135deg, #5d4037, #4e342e)'
+              : 'rgba(0,0,0,0.04)',
+            color: viewMode === 'weekly' ? 'white' : 'var(--text-muted)',
+            transition: 'all 0.2s ease',
+            boxShadow: viewMode === 'weekly' ? '0 4px 16px rgba(93,64,55,0.3)' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <Calendar size={18} />
+          <span>Weekly Jadwal</span>
+          {viewMode === 'weekly' && (
+            <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '20px', padding: '2px 10px', fontSize: '0.7rem', fontWeight: 600 }}>
+              Self Jadwal
+            </span>
+          )}
+        </button>
+      </div>
+
+      {viewMode === 'miqaat' && selfJadwalData && Object.keys(selfJadwalData).length === 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fff8e1, #fff3cd)',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontSize: '0.82rem',
+          color: '#856404',
+          border: '1px solid #ffeeba',
+        }}>
+          <Info size={18} />
+          Self Jadwal data may require admin RLS policy. Run the migration at <code>supabase/migrations/20260709000000_add_admin_self_jadwal_policy.sql</code> to enable admin access.
+        </div>
+      )}
+
+      <div className="jadwal-summary-cards" style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '12px',
+        marginBottom: '20px',
+      }}>
+        <div className="premium-card card-appear" style={{ padding: '16px 18px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(212,175,55,0.02))', border: '1px solid rgba(212,175,55,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <GraduationCap size={20} style={{ color: 'var(--primary-gold)' }} />
+            <div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Teachers</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--deep-brown)' }}>{activeStats.length}</div>
+            </div>
+          </div>
+        </div>
+        <div className="premium-card card-appear" style={{ padding: '16px 18px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(46,125,50,0.08), rgba(46,125,50,0.02))', border: '1px solid rgba(46,125,50,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Users size={20} style={{ color: '#2e7d32' }} />
+            <div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>With Data</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2e7d32' }}>{totalWithData}/{totalStudents}</div>
+            </div>
+          </div>
+        </div>
+        <div className="premium-card card-appear" style={{ padding: '16px 18px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(245,127,23,0.08), rgba(245,127,23,0.02))', border: '1px solid rgba(245,127,23,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <BarChart3 size={20} style={{ color: '#f57f17' }} />
+            <div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Avg Fill</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f57f17' }}>{overallAvg}%</div>
+            </div>
+          </div>
+        </div>
+        <div className="premium-card card-appear" style={{ padding: '16px 18px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(33,150,243,0.08), rgba(33,150,243,0.02))', border: '1px solid rgba(33,150,243,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Calendar size={20} style={{ color: '#2196f3' }} />
+            <div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Days</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2196f3' }}>{dayDateStrings.length}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="jadwal-teacher-grid" style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))',
         gap: '16px',
+        width: '100%',
+        boxSizing: 'border-box',
       }}>
-        {teacherJadwalStats.map(teacher => (
+        {activeStats.map(teacher => (
           <div
             key={teacher.teacherName}
             className="premium-card card-appear"
@@ -546,12 +769,16 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
               padding: '20px',
               cursor: 'pointer',
               transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-              borderLeft: teacher.jadwalFilledCount > 0 ? '4px solid var(--primary-gold)' : '4px solid #e0d6c8',
+              borderLeft: teacher.jadwalFilledCount > 0
+                ? '4px solid var(--primary-gold)'
+                : '4px solid #e0d6c8',
               borderRadius: '14px',
               background: 'var(--premium-white)',
               boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+              position: 'relative',
+              overflow: 'hidden',
             }}
-            onClick={() => setSelectedTeacher(teacher)}
+            onClick={() => setSelectedGroup(teacher)}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
               e.currentTarget.style.boxShadow = '0 12px 30px rgba(0,0,0,0.1)';
@@ -561,11 +788,24 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
               e.currentTarget.style.boxShadow = '';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '80px',
+              height: '80px',
+              borderRadius: '0 14px 0 80px',
+              background: teacher.avgFillPercent >= 80
+                ? 'rgba(46,125,50,0.06)'
+                : teacher.avgFillPercent >= 50
+                  ? 'rgba(245,127,23,0.06)'
+                  : 'rgba(198,40,40,0.05)',
+            }} />
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '44px',
-                  height: '44px',
+                  width: '46px',
+                  height: '46px',
                   borderRadius: '12px',
                   background: teacher.jadwalFilledCount > 0
                     ? 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.08))'
@@ -579,16 +819,15 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                 <div>
                   <h4 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '0.95rem' }}>{teacher.teacherName}</h4>
                   <p style={{ margin: '2px 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    {teacher.totalStudents} students · {teacher.jadwalFilledCount} with Jadwal
+                    {teacher.totalStudents} students · {teacher.jadwalFilledCount} with data
                   </p>
                 </div>
               </div>
               <ChevronRight size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             </div>
-
-            <div style={{ marginTop: '14px' }}>
+            <div style={{ marginTop: '14px', position: 'relative', zIndex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Content Fill Rate</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Fill Rate</span>
                 <span style={{
                   fontSize: '0.85rem',
                   fontWeight: 'bold',
@@ -598,14 +837,14 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                 </span>
               </div>
               <div style={{
-                height: '6px',
-                borderRadius: '3px',
+                height: '8px',
+                borderRadius: '4px',
                 background: 'rgba(0,0,0,0.06)',
                 overflow: 'hidden',
               }}>
                 <div style={{
                   height: '100%',
-                  borderRadius: '3px',
+                  borderRadius: '4px',
                   width: `${teacher.avgFillPercent}%`,
                   background: teacher.avgFillPercent >= 80
                     ? 'linear-gradient(90deg, #66bb6a, #43a047)'
@@ -615,42 +854,63 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                   transition: 'width 0.8s ease',
                 }} />
               </div>
+              {teacher.jadwalFilledCount > 0 && (
+                <div style={{ marginTop: '8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    background: teacher.avgFillPercent >= 80 ? 'rgba(46,125,50,0.1)' : 'rgba(245,127,23,0.1)',
+                    color: teacher.avgFillPercent >= 80 ? '#2e7d32' : '#e65100',
+                    padding: '2px 8px',
+                    borderRadius: '20px',
+                    fontWeight: 600,
+                  }}>
+                    {teacher.jadwalFilledCount}/{teacher.totalStudents} filled
+                  </span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    background: 'rgba(33,150,243,0.1)',
+                    color: '#1565c0',
+                    padding: '2px 8px',
+                    borderRadius: '20px',
+                    fontWeight: 600,
+                  }}>
+                    {Math.round(teacher.children.reduce((s, c) => s + c.dayDetails.filter(d => d.completed).length, 0) / Math.max(1, teacher.children.length))}/{teacher.children[0]?.dayDetails.length || 0} days avg
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         ))}
       </div>
 
-      {teacherJadwalStats.length === 0 && (
+      {activeStats.length === 0 && (
         <div className="empty-overview card-appear" style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <Calendar size={64} className="empty-icon" />
-          <h3>No Teachers Found</h3>
-          <p>No teachers or students are configured in the system yet.</p>
+          {viewMode === 'miqaat' ? <Sparkles size={64} className="empty-icon" /> : <Calendar size={64} className="empty-icon" />}
+          <h3>No {viewMode === 'miqaat' ? 'Miqaat' : 'Weekly'} Jadwal Data</h3>
+          <p>No teachers or students found for {viewMode === 'miqaat' ? 'the miqaat period' : 'the current week'}.</p>
         </div>
       )}
 
-      {selectedTeacher && (
+      {selectedGroup && (
         <div
           className="notifications-panel-overlay"
-          style={{ zIndex: 9999 }}
-          onClick={() => { setSelectedTeacher(null); setExpandedStudent(null); }}
+          style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}
+          onClick={() => { setSelectedGroup(null); setExpandedStudent(null); }}
         >
           <div
             className="premium-card"
             style={{
-              position: 'fixed',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
+              position: 'relative',
               width: 'min(1100px, 94vw)',
               maxHeight: '88vh',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
               padding: 0,
-              zIndex: 10000,
               borderRadius: '20px',
               boxShadow: '0 30px 80px rgba(0,0,0,0.25)',
-              animation: 'fadeIn 0.2s ease',
+              animation: 'modalScaleIn 0.2s ease',
+              background: 'white',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -666,15 +926,15 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
                   <GraduationCap size={22} style={{ color: 'var(--primary-gold)' }} />
                   <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.15rem' }}>
-                    {selectedTeacher.teacherName}
+                    {selectedGroup.teacherName}
                   </h3>
                 </div>
                 <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  {selectedTeacher.children.length} students · {selectedTeacher.jadwalFilledCount} with Jadwal · Avg {selectedTeacher.avgFillPercent}% filled
+                  {selectedGroup.children.length} students · {selectedGroup.jadwalFilledCount} with data · Avg {selectedGroup.avgFillPercent}% filled
                 </p>
               </div>
               <button
-                onClick={() => { setSelectedTeacher(null); setExpandedStudent(null); }}
+                onClick={() => { setSelectedGroup(null); setExpandedStudent(null); }}
                 style={{
                   background: 'rgba(0,0,0,0.04)',
                   border: 'none',
@@ -691,17 +951,11 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                 <X size={18} />
               </button>
             </div>
-
-            <div style={{
-              overflow: 'auto',
-              padding: '16px 24px 20px',
-              flex: 1,
-            }}>
+            <div style={{ overflow: 'auto', padding: '16px 24px 20px', flex: 1 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {selectedTeacher.children.map((child, childIdx) => {
+                {selectedGroup.children.map((child, childIdx) => {
                   const isExpanded = expandedStudent === child.student_id;
                   const dayKeys = child.dayDetails;
-
                   return (
                     <div key={child.student_id} style={{
                       borderRadius: '12px',
@@ -728,8 +982,8 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                           <div style={{
-                            width: '34px',
-                            height: '34px',
+                            width: '36px',
+                            height: '36px',
                             borderRadius: '10px',
                             display: 'grid',
                             placeItems: 'center',
@@ -760,22 +1014,24 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                             }}>
                               {child.name}
                             </div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                               <span>{child.groupName}</span>
                               <span style={{ color: '#d4af37' }}>·</span>
-                              <span style={{
-                                fontFamily: "'Kanz al Marjaan', serif",
-                                direction: 'rtl',
-                                fontSize: '0.75rem',
-                              }}>
+                              <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '0.75rem' }}>
                                 {child.mode === 'juz-wise' ? 'جزء wise' : 'سورة wise'}
                               </span>
+                              {child.parentName && (
+                                <>
+                                  <span style={{ color: '#d4af37' }}>·</span>
+                                  <User size={11} style={{ color: 'var(--text-muted)' }} />
+                                  <span>{child.parentName}</span>
+                                </>
+                              )}
                               <span style={{ color: '#d4af37' }}>·</span>
                               <span>{child.totalDays} days</span>
                             </div>
                           </div>
                         </div>
-
                         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <div>
                             <div style={{
@@ -802,7 +1058,6 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                           )}
                         </div>
                       </div>
-
                       {isExpanded && child.hasJadwal && (
                         <div style={{
                           borderTop: '1px solid rgba(0,0,0,0.05)',
@@ -817,170 +1072,80 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                             paddingBottom: '4px',
                           }}>
                             <div style={{
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              color: 'var(--text-muted)',
-                              padding: '6px 8px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              borderBottom: '2px solid var(--primary-gold)',
+                              fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
+                              letterSpacing: '0.05em', color: 'var(--text-muted)',
+                              padding: '6px 8px', display: 'flex', alignItems: 'center',
+                              gap: '4px', borderBottom: '2px solid var(--primary-gold)',
                             }}>
                               <Eye size={12} /> Day
                             </div>
                             {dayKeys.map((dd, dIdx) => {
                               const dateStr = dayDateStrings[dIdx] || '';
-                              const engDate = dateStr ? new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+                              const engDate = dateStr
+                                ? new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' })
+                                : '—';
                               const fatemiDate = getFatemiDateStr(dateStr);
                               return (
                                 <div key={dd.dayKey} style={{
-                                  fontSize: '10px',
-                                  fontWeight: 700,
-                                  color: 'var(--deep-brown)',
-                                  padding: '6px 8px',
-                                  textAlign: 'center',
+                                  fontSize: '10px', fontWeight: 700, color: 'var(--deep-brown)',
+                                  padding: '6px 8px', textAlign: 'center',
                                   borderBottom: '2px solid var(--primary-gold)',
                                   background: dd.completed ? 'rgba(46,125,50,0.05)' : dd.filled > 0 ? 'rgba(245,127,23,0.05)' : 'rgba(198,40,40,0.04)',
                                   borderRadius: '4px 4px 0 0',
                                 }}>
                                   <div>Day {dIdx + 1}</div>
-                                  <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px' }}>
-                                    {engDate}
-                                  </div>
+                                  <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px' }}>{engDate}</div>
                                   <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl' }}>
                                     {fatemiDate}
                                   </div>
-                                  <div style={{
-                                    width: '6px',
-                                    height: '6px',
-                                    borderRadius: '50%',
-                                    background: dd.completed ? '#43a047' : dd.filled > 0 ? '#ffb300' : '#ef5350',
-                                    margin: '2px auto 0',
-                                    display: 'inline-block',
-                                  }} />
+                                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: dd.completed ? '#43a047' : dd.filled > 0 ? '#ffb300' : '#ef5350', margin: '2px auto 0', display: 'inline-block' }} />
                                 </div>
                               );
                             })}
-
-                            <div style={{
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              color: 'var(--deep-brown)',
-                              padding: '6px 8px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--deep-brown)', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <BookOpen size={12} />
                               {child.mode === 'juz-wise' ? 'Juz' : 'Murajah'}
                             </div>
-                            {dayKeys.map((dd) => {
+                            {dayKeys.map(dd => {
                               const d = dd.dayData || {};
                               if (child.mode === 'juz-wise') {
                                 const vals = ['juz1', 'juz2', 'juz3', 'juz4'].map(j => d[j]).filter(v => v);
                                 return (
-                                  <div key={dd.dayKey} style={{
-                                    fontSize: '12px',
-                                    fontFamily: "'Al-Kanz', serif",
-                                    direction: 'rtl',
-                                    padding: '6px 8px',
-                                    textAlign: 'center',
-                                    background: vals.length > 0 ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)',
-                                    borderRadius: '4px',
-                                    color: vals.length > 0 ? '#2e7d32' : '#ccc',
-                                  }}>
+                                  <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Al-Kanz', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: vals.length > 0 ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: vals.length > 0 ? '#2e7d32' : '#ccc' }}>
                                     {vals.length > 0 ? vals.join(', ') : '—'}
                                   </div>
                                 );
                               }
                               return (
-                                <div key={dd.dayKey} style={{
-                                  fontSize: '12px',
-                                  fontFamily: "'Kanz al Marjaan', serif",
-                                  direction: 'rtl',
-                                  padding: '6px 8px',
-                                  textAlign: 'center',
-                                  background: isFieldFilled(d.murajah) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)',
-                                  borderRadius: '4px',
-                                  color: isFieldFilled(d.murajah) ? '#2e7d32' : '#ccc',
-                                }}>
+                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.murajah) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.murajah) ? '#2e7d32' : '#ccc' }}>
                                   {isFieldFilled(d.murajah) ? formatMurajah(d.murajah) : '—'}
                                 </div>
                               );
                             })}
-
-                            <div style={{
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              color: 'var(--deep-brown)',
-                              padding: '6px 8px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--deep-brown)', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Sparkles size={12} /> Jadeed
                             </div>
-                            {dayKeys.map((dd) => {
+                            {dayKeys.map(dd => {
                               const d = dd.dayData || {};
                               return (
-                                <div key={dd.dayKey} style={{
-                                  fontSize: '12px',
-                                  fontFamily: "'Kanz al Marjaan', serif",
-                                  direction: 'rtl',
-                                  padding: '6px 8px',
-                                  textAlign: 'center',
-                                  background: isFieldFilled(d.jadeed) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)',
-                                  borderRadius: '4px',
-                                  color: isFieldFilled(d.jadeed) ? '#5d4037' : '#ccc',
-                                  lineHeight: 1.3,
-                                }}>
+                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.jadeed) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.jadeed) ? '#5d4037' : '#ccc', lineHeight: 1.3 }}>
                                   {isFieldFilled(d.jadeed) ? formatJadeed(d.jadeed) : '—'}
                                 </div>
                               );
                             })}
-
-                            <div style={{
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              color: 'var(--deep-brown)',
-                              padding: '6px 8px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--deep-brown)', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Repeat size={12} /> Juzhali
                             </div>
-                            {dayKeys.map((dd) => {
+                            {dayKeys.map(dd => {
                               const d = dd.dayData || {};
                               return (
-                                <div key={dd.dayKey}                                style={{
-                                  fontSize: '12px',
-                                  fontFamily: "'Kanz al Marjaan', serif",
-                                  direction: 'rtl',
-                                  padding: '6px 8px',
-                                  textAlign: 'center',
-                                  background: isFieldFilled(d.juzhali) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)',
-                                  borderRadius: '4px',
-                                  color: isFieldFilled(d.juzhali) ? '#5d4037' : '#ccc',
-                                }}>
+                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.juzhali) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.juzhali) ? '#5d4037' : '#ccc' }}>
                                   {isFieldFilled(d.juzhali) ? formatJuzhali(d.juzhali) : '—'}
                                 </div>
                               );
                             })}
                           </div>
-
-                          <div style={{
-                            marginTop: '10px',
-                            display: 'flex',
-                            gap: '12px',
-                            flexWrap: 'wrap',
-                            fontSize: '0.72rem',
-                            color: 'var(--text-muted)',
-                            borderTop: '1px solid rgba(0,0,0,0.04)',
-                            paddingTop: '10px',
-                          }}>
+                          <div style={{ marginTop: '10px', display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.72rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: '10px' }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#43a047', display: 'inline-block' }} /> Complete
                             </span>
@@ -990,6 +1155,9 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#ef5350', display: 'inline-block' }} /> Empty
                             </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#f44336', display: 'inline-block' }} /> NO (explicit skip)
+                            </span>
                           </div>
                         </div>
                       )}
@@ -998,26 +1166,20 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
                 })}
               </div>
             </div>
-
             <div style={{
-              padding: '10px 24px',
-              borderTop: '1px solid rgba(0,0,0,0.06)',
-              background: 'rgba(252,250,245,0.8)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: '0.78rem',
-              color: 'var(--text-muted)',
-              flexShrink: 0,
+              padding: '10px 24px', borderTop: '1px solid rgba(0,0,0,0.06)',
+              background: 'rgba(252,250,245,0.8)', display: 'flex',
+              justifyContent: 'space-between', alignItems: 'center',
+              fontSize: '0.78rem', color: 'var(--text-muted)', flexShrink: 0,
             }}>
               <span>
                 <Sparkles size={14} style={{ verticalAlign: 'middle', marginRight: '4px', color: 'var(--primary-gold)' }} />
-                Avg fill: {selectedTeacher.avgFillPercent}%
+                Avg fill: {selectedGroup.avgFillPercent}%
               </span>
               <span style={{ display: 'flex', gap: '12px' }}>
-                <span>{selectedTeacher.jadwalFilledCount}/{selectedTeacher.totalStudents} with Jadwal</span>
+                <span>{selectedGroup.jadwalFilledCount}/{selectedGroup.totalStudents} with data</span>
                 <span style={{ color: '#d4af37' }}>·</span>
-                <span>{selectedTeacher.children.reduce((s, c) => s + c.dayDetails.filter(d => d.completed).length, 0)}/{selectedTeacher.children.reduce((s, c) => s + c.dayDetails.length, 0)} days complete</span>
+                <span>{selectedGroup.children.reduce((s, c) => s + c.dayDetails.filter(d => d.completed).length, 0)}/{selectedGroup.children.reduce((s, c) => s + c.dayDetails.length, 0)} days complete</span>
               </span>
             </div>
           </div>
@@ -1025,9 +1187,9 @@ const JadwalTrackingView = ({ students, onShowAction }) => {
       )}
 
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
-          to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        @keyframes modalScaleIn {
+          from { opacity: 0; transform: scale(0.96); }
+          to { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </div>

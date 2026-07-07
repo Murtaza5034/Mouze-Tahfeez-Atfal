@@ -63,7 +63,8 @@ import {
   TrendingUp,
   DollarSign,
   Crown,
-  KeyRound
+  KeyRound,
+  LogIn
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -904,7 +905,7 @@ const NAV_ICONS = {
   "Messages": MessageCircle,
   "Email Settings": Mail,
   "Marhala Posts": Heart,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,
 };
 
 const emptyParentData = {
@@ -5480,6 +5481,20 @@ function AdminPortal({
   const [jadwalSettingsDraft, setJadwalSettingsDraft] = useState(() => normalizeJadwalSettings(jadwalSettings));
   const [uploadingReportBackground, setUploadingReportBackground] = useState(false);
   const [uploadingJadwalBg, setUploadingJadwalBg] = useState(false);
+  const [teacherAdminAccessList, setTeacherAdminAccessList] = useState(() => {
+    try {
+      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+      return JSON.parse(row.teacher_admin_access || '[]');
+    } catch { return []; }
+  });
+  const [teacherAccessDirty, setTeacherAccessDirty] = useState(false);
+
+  useEffect(() => {
+    try {
+      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+      setTeacherAdminAccessList(JSON.parse(row.teacher_admin_access || '[]'));
+    } catch {}
+  }, [jadwalSettings]);
   const [uploadingJadwalLogo, setUploadingJadwalLogo] = useState(false);
   const [jadwalSaving, setJadwalSaving] = useState(false);
 
@@ -5489,6 +5504,14 @@ function AdminPortal({
   useEffect(() => {
     setJadwalSettingsDraft(normalizeJadwalSettings(jadwalSettings));
   }, [jadwalSettings]);
+
+  useEffect(() => {
+    const mainEl = document.querySelector('.admin-main');
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+  }, [activePage]);
+
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [studentToRender, setStudentToRender] = useState(null);
@@ -5715,7 +5738,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
+  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const selectedStudent = selectedStudentId
@@ -5756,7 +5779,6 @@ const handleDownloadAllReports = async () => {
     { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap, navigateTo: "Staff Profiles" },
     { label: "Schedules", value: schedule.length, icon: Calendar, navigateTo: "Schedule" },
     { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye, navigateTo: "Result Tracking" },
-    { label: "Jadwal Tracking", value: teacherSummaries.length, icon: Calendar, navigateTo: "Jadwal Tracking" },
   ];
 
   const resultLiveNotificationAlreadySent = async (since) => {
@@ -6457,6 +6479,7 @@ const handleDownloadAllReports = async () => {
           )}
 
           {activePage === "Overview" && (
+            <>
             <div className="portal-stats-strip admin-stats">
               {stats.map((stat, idx) => {
                 const Icon = stat.icon;
@@ -6529,6 +6552,160 @@ const handleDownloadAllReports = async () => {
                 );
               })}
             </div>
+
+            <div className="overview-container fade-in" style={{ marginTop: '24px' }}>
+              <div className="premium-card card-appear" style={{ padding: '24px', borderRadius: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                  <div style={{
+                    width: '42px', height: '42px', borderRadius: '12px',
+                    background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.06))',
+                    display: 'grid', placeItems: 'center', flexShrink: 0,
+                  }}>
+                    <ShieldCheck size={20} style={{ color: 'var(--primary-gold)' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.05rem', fontWeight: 700 }}>
+                      Teacher Admin Access
+                    </h3>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      Allow teachers to access the Admin Portal from their header
+                    </p>
+                  </div>
+                  {teacherAccessDirty && (
+                    <span style={{
+                      marginLeft: 'auto', fontSize: '0.7rem', fontWeight: 600,
+                      background: 'rgba(245,127,23,0.1)', color: '#e65100',
+                      padding: '4px 12px', borderRadius: '20px',
+                    }}>
+                      Unsaved changes
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {(portalAccessList || []).filter(a => a.portal_role === 'teacher').map(teacher => {
+                    const isOn = teacherAdminAccessList.includes(teacher.email);
+                    return (
+                      <div key={teacher.user_id} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 14px', borderRadius: '10px',
+                        background: isOn ? 'rgba(212,175,55,0.05)' : 'rgba(0,0,0,0.02)',
+                        border: '1px solid',
+                        borderColor: isOn ? 'rgba(212,175,55,0.2)' : 'transparent',
+                        transition: 'all 0.2s ease',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                          <div style={{
+                            width: '34px', height: '34px', borderRadius: '10px',
+                            background: isOn ? 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.06))' : 'rgba(0,0,0,0.04)',
+                            display: 'grid', placeItems: 'center',
+                            color: isOn ? 'var(--primary-gold)' : '#bbb',
+                            fontSize: '0.8rem', fontWeight: 'bold',
+                          }}>
+                            {teacher.full_name ? teacher.full_name.charAt(0).toUpperCase() : '?'}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{
+                              fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>
+                              {teacher.full_name || 'Unknown Teacher'}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              {teacher.email || 'No email'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const list = isOn
+                              ? teacherAdminAccessList.filter(e => e !== teacher.email)
+                              : [...teacherAdminAccessList, teacher.email];
+                            setTeacherAdminAccessList(list);
+                            setTeacherAccessDirty(true);
+                          }}
+                          style={{
+                            width: '48px', height: '26px', borderRadius: '13px',
+                            border: 'none', cursor: 'pointer', position: 'relative',
+                            background: isOn ? 'linear-gradient(135deg, #d4af37, #b8941f)' : 'rgba(0,0,0,0.12)',
+                            transition: 'all 0.25s ease', flexShrink: 0,
+                            boxShadow: isOn ? '0 2px 8px rgba(212,175,55,0.3)' : 'none',
+                          }}
+                        >
+                          <div style={{
+                            width: '20px', height: '20px', borderRadius: '50%',
+                            background: 'white', position: 'absolute', top: '3px',
+                            left: isOn ? '25px' : '3px',
+                            transition: 'left 0.25s ease',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                          }} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {(!portalAccessList || portalAccessList.filter(a => a.portal_role === 'teacher').length === 0) && (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      No teachers found in portal access list.
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginTop: '16px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  {teacherAccessDirty && (
+                    <>
+                      <button
+                        onClick={() => {
+                          let parsed = [];
+                          try {
+                            const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+                            parsed = JSON.parse(row.teacher_admin_access || '[]');
+                          } catch { parsed = []; }
+                          setTeacherAdminAccessList(parsed);
+                          setTeacherAccessDirty(false);
+                        }}
+                        style={{
+                          padding: '10px 20px', fontSize: '0.82rem', fontWeight: 600,
+                          border: '1px solid rgba(0,0,0,0.1)', borderRadius: '10px',
+                          background: 'white', cursor: 'pointer', color: 'var(--text-muted)',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase
+                              .from('jadwal_settings')
+                              .upsert({ id: 1, teacher_admin_access: JSON.stringify(teacherAdminAccessList) }, { onConflict: 'id' });
+                            if (error) {
+                              if (onShowAction) onShowAction('error', 'Failed to save: ' + error.message);
+                            } else {
+                              setTeacherAccessDirty(false);
+                              setJadwalSettings(prev => {
+                                if (!prev || !prev.length) return [{ id: 1, teacher_admin_access: JSON.stringify(teacherAdminAccessList) }];
+                                return prev.map(s => s.id === 1 ? { ...s, teacher_admin_access: JSON.stringify(teacherAdminAccessList) } : s);
+                              });
+                              if (onShowAction) onShowAction('success', 'Teacher admin access updated');
+                            }
+                          } catch (err) {
+                            if (onShowAction) onShowAction('error', 'Save failed');
+                          }
+                        }}
+                        style={{
+                          padding: '10px 24px', fontSize: '0.82rem', fontWeight: 700,
+                          border: 'none', borderRadius: '10px', cursor: 'pointer',
+                          background: 'linear-gradient(135deg, #d4af37, #b8941f)',
+                          color: 'white', boxShadow: '0 4px 12px rgba(212,175,55,0.25)',
+                        }}
+                      >
+                        Save Changes
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            </>
           )}
 
           {activePage === "Quick Student Access" ? (
@@ -6644,6 +6821,7 @@ const handleDownloadAllReports = async () => {
               <LazyJadwalTrackingView
                 students={students}
                 onShowAction={onShowAction}
+                portalAccessList={portalAccessList}
               />
             </Suspense>
           ) : null}
@@ -9522,7 +9700,8 @@ function TeacherPortal({
   setSaveStatus,
   saveErrorDetails,
   setSaveErrorDetails,
-onShowAction,
+ onShowAction,
+  onRequestAdminAccess,
   isDarkMode,
   setIsDarkMode,
   appTheme,
@@ -10027,6 +10206,33 @@ onShowAction,
             </button>
             <h2 className="page-title">{activePage}</h2>
           </div>
+          {(() => {
+            const jadwalArr = Array.isArray(jadwalSettings) ? jadwalSettings : [];
+            let allowed = [];
+            try {
+              const row = jadwalArr.find(s => s.id === 1) || jadwalArr[0] || {};
+              allowed = JSON.parse(row.teacher_admin_access || '[]');
+            } catch {}
+            return Array.isArray(allowed) && allowed.includes(user?.email) ? (
+              <button
+                onClick={() => { if (onRequestAdminAccess) onRequestAdminAccess(); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 14px', border: 'none', borderRadius: '10px', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #d4af37, #b8941f)',
+                  color: 'white', fontWeight: 600, fontSize: '0.78rem',
+                  boxShadow: '0 2px 10px rgba(212,175,55,0.3)',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(-50%) translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(212,175,55,0.4)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateX(-50%)'; e.currentTarget.style.boxShadow = ''; }}
+              >
+                <ShieldCheck size={16} /> Admin
+              </button>
+            ) : null;
+          })()}
           <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
         </header>
 
@@ -10989,6 +11195,8 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState("");
   const [saveErrorDetails, setSaveErrorDetails] = useState("");
   const [user, setUser] = useState(null);
+  const [pendingAdminSession, setPendingAdminSession] = useState(null);
+  const [teacherAdminAuth, setTeacherAdminAuth] = useState(null);
   const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
   const [portalRole, setPortalRole] = useState(() => {
     if (typeof window === "undefined") {
@@ -11067,7 +11275,7 @@ export default function App() {
         const lastCheck = localStorage.getItem('sj_last_check_' + user.id);
         const since = lastCheck || new Date(0).toISOString();
         if (portalRole === 'parents') {
-          const { data } = await supabase.from('self_jadwal').select('has_unseen_changes, teacher_updated_at, updated_at').eq('user_id', user.id).single();
+          const { data } = await supabase.from('self_jadwal').select('has_unseen_changes, teacher_updated_at, updated_at').eq('user_id', user.id).maybeSingle();
           if (!isCurrent) return;
           const currentlyUnseen = !!data?.has_unseen_changes;
           if (currentlyUnseen && !lastUnseenRef.current) {
@@ -11320,6 +11528,12 @@ export default function App() {
       try {
         const cached = JSON.parse(cachedRaw);
         if (!cached.userId || !cached.role) return false;
+
+        // Require OTP for admin, even from cached auth
+        if (cached.role === "admin" && !sessionStorage.getItem("mauze-admin-otp-verified")) {
+          return false;
+        }
+
         setUser({ id: cached.userId, email: cached.email });
         storeRole(cached.role);
         for (let attempt = 0; attempt <= retries; attempt++) {
@@ -11340,6 +11554,8 @@ export default function App() {
     }
 
     async function initialize() {
+      // Reset OTP flag so admin always requires secret key on fresh app load
+      sessionStorage.removeItem("mauze-admin-otp-verified");
       // Check session FIRST before deleting tokens
       let session = null;
       try {
@@ -11404,6 +11620,18 @@ export default function App() {
               return;
             }
 
+            // Admin OTP gating: require secret key for admin on fresh app load
+            // (INITIAL_SESSION or SIGNED_IN from initialize), but not on
+            // TOKEN_REFRESHED during an already-active session
+            if (access.role === "admin" &&
+                (event === "INITIAL_SESSION" || event === "SIGNED_IN") &&
+                !sessionStorage.getItem("mauze-admin-otp-verified")) {
+              setUser(null);
+              setPendingAdminSession({ user: session.user, access });
+              setLoading(false);
+              return;
+            }
+
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
 
@@ -11451,6 +11679,15 @@ export default function App() {
         for (const key of Object.keys(localStorage)) {
           if (key.startsWith('sb-')) localStorage.removeItem(key);
         }
+      }
+      // When admin OTP flow is active, skip auto-resolve so Login.jsx
+      // can show the secret key modal before portal authorization.
+      // Clear stale OTP flag from possible page refresh during admin OTP flow
+      if (event !== 'SIGNED_IN') {
+        sessionStorage.removeItem('mauze-admin-otp-flow');
+      }
+      if (event === 'SIGNED_IN' && sessionStorage.getItem('mauze-admin-otp-flow') === 'true') {
+        return;
       }
       handleAuthChange(event, session);
     });
@@ -11865,6 +12102,78 @@ export default function App() {
     }
   }
 
+  const generateOtp = (length = 6) => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < length; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  useEffect(() => {
+    if (!teacherAdminAuth || teacherAdminAuth.step !== 'otp') return;
+    if (teacherAdminAuth.timer <= 0) {
+      setTeacherAdminAuth(null);
+      return;
+    }
+    const interval = setInterval(() => {
+      setTeacherAdminAuth(prev => {
+        if (!prev || prev.step !== 'otp' || prev.timer <= 1) return null;
+        return { ...prev, timer: prev.timer - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [teacherAdminAuth]);
+
+  const handleTeacherAdminLogin = async () => {
+    if (!teacherAdminAuth || teacherAdminAuth.step !== 'login') return;
+    if (!teacherAdminAuth.email.trim() || !teacherAdminAuth.password.trim()) {
+      setTeacherAdminAuth(prev => ({ ...prev, error: 'Enter the admin email and password.' }));
+      return;
+    }
+    try {
+      sessionStorage.setItem('mauze-admin-otp-flow', 'true');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: teacherAdminAuth.email,
+        password: teacherAdminAuth.password,
+      });
+      if (error) {
+        sessionStorage.removeItem('mauze-admin-otp-flow');
+        throw error;
+      }
+      if (!data?.user) {
+        sessionStorage.removeItem('mauze-admin-otp-flow');
+        throw new Error('Unable to verify user.');
+      }
+      const adminAccess = await authorizePortalAccess(data.user, 'admin');
+      if (!adminAccess.ok) {
+        sessionStorage.removeItem('mauze-admin-otp-flow');
+        setTeacherAdminAuth(prev => ({ ...prev, error: adminAccess.message || 'This account does not have admin access.' }));
+        return;
+      }
+      localStorage.setItem('teacher-admin-authenticated', teacherAdminAuth.email);
+      const key = generateOtp(6);
+      setTeacherAdminAuth({ step: 'otp', secretKey: key, input: '', timer: 60, error: null });
+    } catch (err) {
+      sessionStorage.removeItem('mauze-admin-otp-flow');
+      setTeacherAdminAuth(prev => ({ ...prev, error: err.message || 'Login failed.' }));
+    }
+  };
+
+  const handleTeacherAdminOtpVerify = () => {
+    if (!teacherAdminAuth || teacherAdminAuth.step !== 'otp') return false;
+    if (teacherAdminAuth.input.toUpperCase() === teacherAdminAuth.secretKey) {
+      sessionStorage.setItem("mauze-admin-otp-verified", "true");
+      sessionStorage.removeItem('mauze-admin-otp-flow');
+      setTeacherAdminAuth(null);
+      storeRole("admin");
+      return true;
+    }
+    setTeacherAdminAuth(prev => prev ? { ...prev, error: "Invalid key. Try again." } : null);
+    return false;
+  };
+
   function showAction(type, text) {
     setActionMessage({ type, text });
     if (type && text) {
@@ -11917,6 +12226,18 @@ export default function App() {
         message: "We could not verify this account for the selected portal.",
       };
     }
+  };
+
+  const handlePendingAdminLoginSuccess = async (loggedInUser, selectedRole, rememberMe = true) => {
+    const result = await handleLoginSuccess(loggedInUser, selectedRole, rememberMe);
+    if (result?.ok) {
+      setPendingAdminSession(null);
+    }
+    return result;
+  };
+
+  const handlePendingAdminCancel = () => {
+    setPendingAdminSession(null);
   };
 
   const handleLogout = async () => {
@@ -13336,9 +13657,21 @@ const handleSendCustomNotification = async (event) => {
 
 
 
+  if (pendingAdminSession) {
+    return (
+      <Login
+        onLoginSuccess={handlePendingAdminLoginSuccess}
+        initialUser={pendingAdminSession.user}
+        initialRole="admin"
+        onCancel={handlePendingAdminCancel}
+      />
+    );
+  }
+
   if (loading) {
     return <LoadingScreen message="Connecting to Mauze Tahfeez..." />;
   }
+
 
   if (!user) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
@@ -13523,6 +13856,14 @@ const handleSendCustomNotification = async (event) => {
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
             onShowAction={showAction}
+            onRequestAdminAccess={() => {
+              if (localStorage.getItem('teacher-admin-authenticated')) {
+                const key = generateOtp(6);
+                setTeacherAdminAuth({ step: 'otp', secretKey: key, input: '', timer: 60, error: null });
+              } else {
+                setTeacherAdminAuth({ step: 'login', password: '', error: null, email: '' });
+              }
+            }}
             teacherUnlockStatus={teacherUnlockStatus}
             setTeacherUnlockStatus={setTeacherUnlockStatus}
             isDarkMode={isDarkMode}
@@ -13608,6 +13949,200 @@ setAppTheme={setAppTheme}
           </div>
         </div>
       )}
+      {teacherAdminAuth && (() => {
+        const isLogin = teacherAdminAuth.step === 'login';
+        const isOtp = teacherAdminAuth.step === 'otp';
+        return (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 999999, backdropFilter: 'blur(6px)', padding: '20px',
+        }}>
+          <div style={{
+            background: 'white', borderRadius: '24px', padding: '40px 36px 32px',
+            maxWidth: '440px', width: '100%', textAlign: 'center',
+            boxShadow: '0 30px 80px rgba(0,0,0,0.35)', animation: 'modalScaleIn 0.25s ease',
+            position: 'relative', overflow: 'hidden',
+          }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #d4af37, #b8941f)' }} />
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{
+                width: '56px', height: '56px', borderRadius: '16px',
+                background: isLogin
+                  ? 'linear-gradient(135deg, rgba(93,64,55,0.15), rgba(93,64,55,0.05))'
+                  : 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.06))',
+                display: 'grid', placeItems: 'center', margin: '0 auto 14px',
+              }}>
+                {isLogin ? <LogIn size={24} style={{ color: 'var(--deep-brown)' }} /> : <ShieldCheck size={28} style={{ color: 'var(--primary-gold)' }} />}
+              </div>
+              <h2 style={{ margin: '0 0 4px', color: 'var(--deep-brown)', fontSize: '1.3rem', fontWeight: 700 }}>
+                {isLogin ? 'Confirm Your Identity' : 'Admin Access'}
+              </h2>
+              <p style={{ margin: '0', color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                {isLogin
+                  ? `Enter the admin email and password to proceed.`
+                  : `Enter the secure key to access the Admin Portal. This key expires in `}
+                {isOtp && <strong style={{ color: teacherAdminAuth.timer <= 10 ? '#c62828' : 'var(--deep-brown)' }}>{teacherAdminAuth.timer}s</strong>}.
+              </p>
+            </div>
+
+            {isLogin && (
+              <>
+              <div style={{ textAlign: 'left', marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>Email</label>
+                <input
+                  type="email"
+                  placeholder="Enter admin email"
+                  value={teacherAdminAuth.email || ''}
+                  onChange={(e) => setTeacherAdminAuth(prev => prev ? { ...prev, email: e.target.value, error: null } : null)}
+                  style={{
+                    width: '100%', padding: '12px 14px', fontSize: '0.9rem',
+                    borderRadius: '10px', border: `2px solid ${teacherAdminAuth.error ? '#ef5350' : 'rgba(0,0,0,0.1)'}`,
+                    outline: 'none', boxSizing: 'border-box',
+                    background: teacherAdminAuth.error ? 'rgba(239,83,80,0.04)' : 'white',
+                    transition: 'border-color 0.2s ease',
+                  }}
+                />
+              </div>
+              <div style={{ textAlign: 'left', marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>Password</label>
+                <input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={teacherAdminAuth.password || ''}
+                  onChange={(e) => setTeacherAdminAuth(prev => prev ? { ...prev, password: e.target.value, error: null } : null)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleTeacherAdminLogin(); }}
+                  autoFocus
+                  style={{
+                    width: '100%', padding: '12px 14px', fontSize: '0.9rem',
+                    border: `2px solid ${teacherAdminAuth.error ? '#ef5350' : 'rgba(0,0,0,0.1)'}`,
+                    borderRadius: '10px', outline: 'none',
+                    background: teacherAdminAuth.error ? 'rgba(239,83,80,0.04)' : 'white',
+                    boxSizing: 'border-box', transition: 'border-color 0.2s ease',
+                  }}
+                />
+              </div>
+              {teacherAdminAuth.error && (
+                <p style={{ margin: '-8px 0 14px', color: '#c62828', fontSize: '0.8rem', fontWeight: 500, textAlign: 'left' }}>
+                  {teacherAdminAuth.error}
+                </p>
+              )}
+              <button
+                onClick={handleTeacherAdminLogin}
+                disabled={!teacherAdminAuth.email?.trim() || !teacherAdminAuth.password?.trim()}
+                style={{
+                  width: '100%', padding: '14px', fontSize: '0.95rem', fontWeight: 700,
+                  border: 'none', borderRadius: '12px', cursor: teacherAdminAuth.email?.trim() && teacherAdminAuth.password?.trim() ? 'pointer' : 'not-allowed',
+                  background: teacherAdminAuth.email?.trim() && teacherAdminAuth.password?.trim()
+                    ? 'linear-gradient(135deg, #5d4037, #4e342e)'
+                    : 'rgba(0,0,0,0.08)',
+                  color: teacherAdminAuth.email?.trim() && teacherAdminAuth.password?.trim() ? 'white' : '#999',
+                  transition: 'all 0.2s ease', marginBottom: '10px',
+                  boxShadow: teacherAdminAuth.email?.trim() && teacherAdminAuth.password?.trim() ? '0 4px 16px rgba(93,64,55,0.25)' : 'none',
+                }}
+              >
+                <LogIn size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                Continue
+              </button>
+              </>
+            )}
+
+            {isOtp && (
+              <>
+              <div style={{
+                background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
+                borderRadius: '14px', padding: '20px', marginBottom: '20px',
+                position: 'relative',
+              }}>
+                <div style={{
+                  position: 'absolute', top: '-60%', left: '-10%', width: '120%', height: '200%',
+                  background: 'radial-gradient(ellipse at center, rgba(212,175,55,0.08), transparent 70%)',
+                  pointerEvents: 'none',
+                }} />
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <div style={{
+                    fontFamily: "'SF Mono', 'Fira Code', monospace", fontSize: '1.8rem',
+                    letterSpacing: '10px', color: '#d4af37', fontWeight: 700,
+                    textAlign: 'center', userSelect: 'all',
+                  }}>
+                    {teacherAdminAuth.secretKey}
+                  </div>
+                  <div style={{
+                    marginTop: '10px', height: '4px', borderRadius: '2px',
+                    background: 'rgba(255,255,255,0.1)', overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      height: '100%', borderRadius: '2px', width: `${(teacherAdminAuth.timer / 60) * 100}%`,
+                      background: teacherAdminAuth.timer <= 10
+                        ? 'linear-gradient(90deg, #ef5350, #d32f2f)'
+                        : 'linear-gradient(90deg, #d4af37, #b8941f)',
+                      transition: 'width 1s linear',
+                    }} />
+                  </div>
+                </div>
+              </div>
+              <input
+                type="text"
+                maxLength={6}
+                placeholder="ENTER 6-DIGIT KEY"
+                value={teacherAdminAuth.input || ''}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                  setTeacherAdminAuth(prev => prev ? { ...prev, input: val, error: null } : null);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleTeacherAdminOtpVerify(); }}
+                autoFocus
+                style={{
+                  width: '100%', padding: '14px 16px', fontSize: '1.2rem',
+                  textAlign: 'center', letterSpacing: '6px', textTransform: 'uppercase',
+                  border: `2px solid ${teacherAdminAuth.error ? '#ef5350' : 'rgba(0,0,0,0.1)'}`,
+                  borderRadius: '12px', outline: 'none', marginBottom: '12px',
+                  fontFamily: "'SF Mono', 'Fira Code', monospace", fontWeight: 700,
+                  background: teacherAdminAuth.error ? 'rgba(239,83,80,0.04)' : 'white',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {teacherAdminAuth.error && (
+                <p style={{ margin: '-8px 0 12px', color: '#c62828', fontSize: '0.8rem', fontWeight: 500 }}>
+                  {teacherAdminAuth.error}
+                </p>
+              )}
+              <button
+                onClick={handleTeacherAdminOtpVerify}
+                disabled={(teacherAdminAuth.input || '').length < 6}
+                style={{
+                  width: '100%', padding: '14px', fontSize: '0.95rem', fontWeight: 700,
+                  border: 'none', borderRadius: '12px', cursor: (teacherAdminAuth.input || '').length >= 6 ? 'pointer' : 'not-allowed',
+                  background: (teacherAdminAuth.input || '').length >= 6
+                    ? 'linear-gradient(135deg, #d4af37, #b8941f)'
+                    : 'rgba(0,0,0,0.08)',
+                  color: (teacherAdminAuth.input || '').length >= 6 ? 'white' : '#999',
+                  transition: 'all 0.2s ease', marginBottom: '10px',
+                  boxShadow: (teacherAdminAuth.input || '').length >= 6 ? '0 4px 16px rgba(212,175,55,0.3)' : 'none',
+                }}
+              >
+                Verify & Access Admin
+              </button>
+              </>
+            )}
+
+            <button
+              onClick={() => setTeacherAdminAuth(null)}
+              style={{
+                width: '100%', padding: '12px', fontSize: '0.85rem',
+                border: 'none', borderRadius: '10px', cursor: 'pointer',
+                background: 'transparent', color: 'var(--text-muted)',
+                transition: 'color 0.2s ease',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--deep-brown)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+        );
+      })()}
       {searchPageLoading && (
         <div className="page-loading-overlay">
           <lottie-player

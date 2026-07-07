@@ -21,22 +21,26 @@ create table if not exists marhala_posts (
 alter table marhala_posts enable row level security;
 
 -- Policies: all authenticated users can read
+drop policy if exists "Anyone authenticated can view marhala posts" on marhala_posts;
 create policy "Anyone authenticated can view marhala posts"
   on marhala_posts for select
   to authenticated
   using (true);
 
 -- Only admin can insert/update/delete
+drop policy if exists "Admin can insert marhala posts" on marhala_posts;
 create policy "Admin can insert marhala posts"
   on marhala_posts for insert
   to authenticated
   with check (true);
 
+drop policy if exists "Admin can update marhala posts" on marhala_posts;
 create policy "Admin can update marhala posts"
   on marhala_posts for update
   to authenticated
   using (true);
 
+drop policy if exists "Admin can delete marhala posts" on marhala_posts;
 create policy "Admin can delete marhala posts"
   on marhala_posts for delete
   to authenticated

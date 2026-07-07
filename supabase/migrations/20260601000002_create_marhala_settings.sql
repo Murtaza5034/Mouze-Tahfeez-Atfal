@@ -13,17 +13,20 @@ on conflict (id) do nothing;
 alter table marhala_settings enable row level security;
 
 -- All authenticated users can read
+drop policy if exists "Anyone authenticated can view marhala_settings" on marhala_settings;
 create policy "Anyone authenticated can view marhala_settings"
   on marhala_settings for select
   to authenticated
   using (true);
 
 -- Only admin can update
+drop policy if exists "Admin can insert marhala_settings" on marhala_settings;
 create policy "Admin can insert marhala_settings"
   on marhala_settings for insert
   to authenticated
   with check (true);
 
+drop policy if exists "Admin can update marhala_settings" on marhala_settings;
 create policy "Admin can update marhala_settings"
   on marhala_settings for update
   to authenticated

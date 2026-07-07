@@ -1400,3 +1400,173 @@
     padding: 8px 10px;
   }
 }
+
+/* ========================================
+   ADMIN PORTAL — Jadwal Tracking Page Fixes
+   These rules scope fixes to when the Jadwal
+   component is rendered inside admin-content-pad.
+   ======================================== */
+
+/* Remove the extra top margin & default card styling
+   so it blends into the admin layout cleanly */
+.admin-content-pad .jadwal-container {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Keep the inner header visible but tighten it up */
+.admin-content-pad .jadwal-header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--glass-border, #e0d5c8);
+}
+
+.admin-content-pad .jadwal-header h2 {
+  font-size: 1.4rem;
+  color: var(--deep-brown, #2f2118);
+}
+
+/* Student selector: ensure the select fits the admin layout */
+.admin-content-pad .student-selector {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-content-pad .student-selector .premium-select {
+  min-width: 180px;
+  max-width: 280px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--glass-border, #e0d5c8);
+  border-radius: 12px;
+  font-size: 14px;
+  background: var(--off-white, #faf8f5);
+  color: var(--text-main, #2c1e11);
+  transition: border-color 0.2s;
+}
+
+.admin-content-pad .student-selector .premium-select:focus {
+  border-color: var(--primary-gold, #d4af37);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+  outline: none;
+}
+
+/* Actions row — keep buttons in a tidy row */
+.admin-content-pad .jadwal-actions-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Mode row tweaks inside admin */
+.admin-content-pad .jadwal-mode-row {
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: var(--off-white, #faf8f5);
+  border: 1px solid var(--glass-border, #e0d5c8);
+  border-radius: 12px;
+}
+
+/* Table wrapper — allow full width, clean border */
+.admin-content-pad .jadwal-table-wrapper {
+  border-radius: 14px;
+  border: 1px solid var(--glass-border, #e0d5c8);
+  overflow-x: auto;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(61, 43, 31, 0.04);
+}
+
+.admin-content-pad .jadwal-table {
+  width: 100%;
+  min-width: 580px;
+}
+
+/* Table header cells get the admin-brand treatment */
+.admin-content-pad .jadwal-table th {
+  background: linear-gradient(135deg, var(--light-gold, #f9f4e8) 0%, rgba(249, 244, 232, 0.4) 100%);
+  color: var(--dark-gold, #b8860b);
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  padding: 14px 12px;
+}
+
+.admin-content-pad .jadwal-table td {
+  padding: 12px;
+}
+
+.admin-content-pad .jadwal-table td.day-cell {
+  background: var(--off-white, #faf8f5);
+  min-width: 110px;
+}
+
+/* Calendar grid fits the wider admin panel */
+.admin-content-pad .jadwal-calendar-container {
+  padding: 0;
+  background: transparent;
+}
+
+.admin-content-pad .jadwal-calendar-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+/* Status / loading */
+.admin-content-pad .jadwal-empty {
+  border-radius: 14px;
+  border: 1px dashed var(--glass-border, #e0d5c8);
+  background: var(--off-white, #faf8f5);
+  color: var(--soft-brown, #8b6d31);
+}
+
+.admin-content-pad .loading-spinner {
+  padding: 60px 20px;
+  font-size: 15px;
+}
+
+/* Responsive adjustments within admin */
+@media (max-width: 900px) {
+  .admin-content-pad .jadwal-calendar-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-content-pad .jadwal-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .admin-content-pad .student-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-content-pad .student-selector .premium-select {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .admin-content-pad .jadwal-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-content-pad .jadwal-actions-row > button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-content-pad .jadwal-mode-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-content-pad .jadwal-mode-row select {
+    width: 100%;
+  }
+}

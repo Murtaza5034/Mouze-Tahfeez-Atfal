@@ -153,18 +153,21 @@ SELECT cron.schedule(
 ALTER TABLE scheduled_notifications ENABLE ROW LEVEL SECURITY;
 
 -- Allow any authenticated user (admin) to read scheduled notifications
+DROP POLICY IF EXISTS "Authenticated users can read scheduled notifications" ON scheduled_notifications;
 CREATE POLICY "Authenticated users can read scheduled notifications"
   ON scheduled_notifications FOR SELECT
   TO authenticated
   USING (true);
 
 -- Allow any authenticated user (admin) to insert scheduled notifications
+DROP POLICY IF EXISTS "Authenticated users can insert scheduled notifications" ON scheduled_notifications;
 CREATE POLICY "Authenticated users can insert scheduled notifications"
   ON scheduled_notifications FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
 -- Allow any authenticated user (admin) to update scheduled notifications (pause/resume/edit)
+DROP POLICY IF EXISTS "Authenticated users can update scheduled notifications" ON scheduled_notifications;
 CREATE POLICY "Authenticated users can update scheduled notifications"
   ON scheduled_notifications FOR UPDATE
   TO authenticated
@@ -172,6 +175,7 @@ CREATE POLICY "Authenticated users can update scheduled notifications"
   WITH CHECK (true);
 
 -- Allow any authenticated user (admin) to delete scheduled notifications
+DROP POLICY IF EXISTS "Authenticated users can delete scheduled notifications" ON scheduled_notifications;
 CREATE POLICY "Authenticated users can delete scheduled notifications"
   ON scheduled_notifications FOR DELETE
   TO authenticated
@@ -192,6 +196,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_scheduled_notifications_set_next_send ON scheduled_notifications;
 CREATE TRIGGER trg_scheduled_notifications_set_next_send
   BEFORE INSERT ON scheduled_notifications
   FOR EACH ROW

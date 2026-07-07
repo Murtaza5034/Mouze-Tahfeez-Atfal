@@ -10,21 +10,25 @@ values (
 on conflict (id) do nothing;
 
 -- Allow authenticated users to view/upload photos
+drop policy if exists "Anyone can view marhala post photos" on storage.objects;
 create policy "Anyone can view marhala post photos"
   on storage.objects for select
   to authenticated
   using (bucket_id = 'marhala_post_photos');
 
+drop policy if exists "Admin can upload marhala post photos" on storage.objects;
 create policy "Admin can upload marhala post photos"
   on storage.objects for insert
   to authenticated
   with check (bucket_id = 'marhala_post_photos');
 
+drop policy if exists "Admin can update marhala post photos" on storage.objects;
 create policy "Admin can update marhala post photos"
   on storage.objects for update
   to authenticated
   using (bucket_id = 'marhala_post_photos');
 
+drop policy if exists "Admin can delete marhala post photos" on storage.objects;
 create policy "Admin can delete marhala post photos"
   on storage.objects for delete
   to authenticated

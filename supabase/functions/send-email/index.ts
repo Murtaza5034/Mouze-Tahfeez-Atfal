@@ -13,11 +13,13 @@ interface EmailPayload {
   pdfBase64?: string
   pdfFilename?: string
   studentName?: string
+  isOtp?: boolean
 }
 
 interface EmailSettings {
   enabled: boolean
   from_email: string
+  from_name: string
   subject_template: string
   message_template: string
 }
@@ -35,6 +37,7 @@ Deno.serve(async (req) => {
     const text = payload.text || ""
     const pdfBase64 = payload.pdfBase64 || ""
     const pdfFilename = payload.pdfFilename || "progress-report.pdf"
+    const isOtp = payload.isOtp === true
 
     if (!to) {
       throw new Error("Missing recipient email address")
@@ -57,7 +60,16 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Load email settings
+    // Get email API key — using Resend (switch to MAILERSEND_API_KEY once available)
+    const emailApiKey = Deno.env.get("MAILERSEND_API_KEY") || Deno.env.get("RESEND_API_KEY")
+    if (!emailApiKey) {
+      throw new Error("No email API key configured (MAILERSEND_API_KEY or RESEND_API_KEY)")
+    }
+    const useMailerSend = !!Deno.env.get("MAILERSEND_API_KEY")
+
+    // Load email settings (non-fatal for OTP)
+    let fromEmail = "onboarding@resend.dev"
+    let fromName = "Mauze Tahfeez"
     const { data: config, error: configError } = await supabase
       .from("email_settings")
       .select("*")
@@ -65,64 +77,80 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (configError) {
-      throw new Error(`Failed to load email settings: ${configError.message}`)
-    }
+      if (!isOtp) {
+        throw new Error(`Failed to load email settings: ${configError.message}`)
+      }
+      console.warn("Could not load email settings (using defaults):", configError.message)
+    } else if (config) {
+      const emailSettings = config as EmailSettings
 
-    if (!config) {
+      // For regular emails, enforce the enabled flag
+      if (!isOtp && !emailSettings.enabled) {
+        throw new Error("Email notifications are disabled in the admin portal")
+      }
+
+      // Use configured from details if available
+      if (emailSettings.from_email) {
+        fromEmail = emailSettings.from_email
+      }
+      if (emailSettings.from_name) {
+        fromName = emailSettings.from_name
+      }
+    } else if (!isOtp) {
       throw new Error("Email settings are missing. Save them in the admin portal first.")
     }
 
-    const emailSettings = config as EmailSettings
-
-    if (!emailSettings.enabled) {
-      throw new Error("Email notifications are disabled in the admin portal")
-    }
-
-    // Get Resend API key from environment
-    const resendApiKey = Deno.env.get("RESEND_API_KEY")
-    if (!resendApiKey) {
-      throw new Error("RESEND_API_KEY environment variable is not set")
-    }
-
-    const fromEmail = emailSettings.from_email || "onboarding@resend.dev"
-
-    // Build Resend API request payload
-    const resendPayload: Record<string, unknown> = {
-      from: fromEmail,
-      to: [to],
+    // Build MailerLite Transactional API payload
+    const mailerPayload: Record<string, unknown> = {
+      from: {
+        email: fromEmail,
+        name: fromName,
+      },
+      to: [{ email: to }],
       subject: subject,
     }
 
     // Set body content
     if (html) {
-      resendPayload.html = html
+      mailerPayload.html = html
     } else {
-      resendPayload.text = text
+      mailerPayload.text = text
     }
 
     // Add PDF attachment if provided
     if (pdfBase64) {
-      resendPayload.attachments = [
+      mailerPayload.attachments = [
         {
           filename: pdfFilename,
           content: pdfBase64,
+          disposition: "attachment",
         },
       ]
     }
 
-    // Send email via Resend API
-    const response = await fetch("https://api.resend.com/emails", {
+    // Send email — auto-selects MailerSend or Resend based on available keys
+    const apiUrl = useMailerSend
+      ? "https://api.mailersend.com/v1/email"
+      : "https://api.resend.com/emails"
+
+    // Resend uses a flat `from` string, MailerSend uses object
+    const sendPayload = useMailerSend
+      ? mailerPayload
+      : { ...mailerPayload, from: `${fromName} <${fromEmail}>`, to: [to] }
+
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${resendApiKey}`,
+        Authorization: `Bearer ${emailApiKey}`,
         "Content-Type": "application/json",
+        Accept: "application/json",
       },
-      body: JSON.stringify(resendPayload),
+      body: JSON.stringify(sendPayload),
     })
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "")
-      throw new Error(`Resend API Error (${response.status}): ${errorBody.slice(0, 400)}`)
+      throw new Error(`Email API Error (${response.status}): ${errorBody.slice(0, 500)}`)
     }
 
     const result = await response.json().catch(() => ({}))
@@ -144,7 +172,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        id: result.id || null,
+        id: result.id || result.message_id || null,
         to,
         subject,
       }),
