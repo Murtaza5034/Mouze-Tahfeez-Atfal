@@ -37,15 +37,16 @@
 }
 
 .salary-value {
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-size: 1.35rem;
+  font-weight: 900;
   color: var(--dark-gold);
 }
 
 .salary-value.highlight {
   color: var(--accent-gold) !important;
-  font-size: 1.75rem;
+  font-size: 1.9rem;
   letter-spacing: -0.02em;
+  font-weight: 900;
 }
 
 .badge {

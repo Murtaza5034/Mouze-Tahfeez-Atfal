@@ -265,9 +265,9 @@
 
 .mp-title {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   color: var(--deep-brown);
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -0.03em;
 }
 
@@ -350,18 +350,18 @@
   padding: 10px 22px;
   border: none;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--primary-gold), #b88a1d);
+  background: linear-gradient(135deg, var(--deep-brown), #5d4037);
   color: #fff;
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
+  box-shadow: 0 8px 20px rgba(61, 43, 31, 0.3);
 }
 
 .mp-create-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(212, 175, 55, 0.4);
+  box-shadow: 0 12px 28px rgba(61, 43, 31, 0.4);
 }
 
 /* ==========================================
@@ -809,7 +809,8 @@
   font-family: 'Kanz al Marjaan', serif;
   color: var(--deep-brown);
   margin: 0 0 8px;
-  font-size: 1.3rem;
+  font-size: 1.5rem;
+  font-weight: 900;
 }
 
 .mp-empty p {
@@ -1075,11 +1076,11 @@
 /* Student name - large gold text */
 .mp-cert-student-name {
   font-family: 'Kanz al Marjaan', serif;
-  font-size: 2.2rem;
-  font-weight: 800;
+  font-size: 2.6rem;
+  font-weight: 900;
   color: var(--deep-brown);
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.15;
   letter-spacing: normal;
   text-align: right;
 }
@@ -1678,6 +1679,8 @@
     width: 100%;
     justify-content: center;
   }
+
+  .mp-title { font-size: 1.3rem; }
 }
 
 /* === Live Badge Styles === */

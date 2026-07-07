@@ -150,11 +150,12 @@
 }
 
 .content-title {
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 28px;
+  font-weight: 900;
   color: var(--deep-brown);
   margin: 0 0 6px;
   letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .content-desc {
@@ -399,7 +400,7 @@
 
 .login-button {
   width: 100%;
-  background: linear-gradient(135deg, var(--accent-gold) 0%, var(--dark-gold) 100%);
+  background: linear-gradient(135deg, var(--deep-brown) 0%, #5d4037 100%);
   color: white;
   border: none;
   padding: 16px;
@@ -412,12 +413,12 @@
   gap: 12px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--shadow-gold);
+  box-shadow: 0 8px 24px rgba(61, 43, 31, 0.25);
 }
 
 .login-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(138, 101, 21, 0.3);
+  box-shadow: 0 12px 28px rgba(61, 43, 31, 0.35);
 }
 
 .login-button:active {

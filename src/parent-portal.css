@@ -236,8 +236,8 @@
 }
 
 .drawer-name {
-  font-size: 1.15rem;
-  font-weight: 800;
+  font-size: 1.25rem;
+  font-weight: 900;
   color: var(--deep-brown);
   margin: 0 0 2px;
   white-space: nowrap;
@@ -553,12 +553,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 1.1rem;
-  font-weight: 800;
+  font-size: 1.4rem;
+  font-weight: 900;
   color: var(--deep-brown);
   margin-bottom: 20px;
   border-bottom: 2px solid var(--light-gold);
   padding-bottom: 10px;
+  line-height: 1.2;
 }
 
 .setup-form {
@@ -1161,16 +1162,16 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   padding: 20px;
   font-size: 1.2rem;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--primary-gold) 0%, #b8860b 100%);
+  background: linear-gradient(135deg, var(--deep-brown) 0%, #5d4037 100%);
   color: white;
   border: none;
   border-radius: 18px;
   cursor: pointer;
-  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+  box-shadow: 0 10px 30px rgba(61, 43, 31, 0.3);
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.generate-btn-lively:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 15px 40px rgba(212, 175, 55, 0.4); }
+.generate-btn-lively:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 15px 40px rgba(61, 43, 31, 0.4); }
 
 .premium-select {
   padding: 15px 20px;
@@ -3482,4 +3483,9 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   .settings-detail-heading h3 {
     font-size: 1.2rem;
   }
+}
+
+/* Mobile heading overrides */
+@media (max-width: 480px) {
+  .section-title { font-size: 1.15rem; }
 }

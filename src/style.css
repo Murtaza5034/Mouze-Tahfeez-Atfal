@@ -161,6 +161,9 @@
 
 html {
   font-size: 17px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -169,8 +172,11 @@ body {
   font-family: 'Inter', 'Kanz al Marjaan', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--cream-bg);
   color: var(--text-main);
-  line-height: 1.6;
+  line-height: 1.7;
   overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button, input, select, textarea {
@@ -251,31 +257,63 @@ button, input, select, textarea {
 /* --- Professional Typography --- */
 h1, h2, h3, h4, h5 {
   color: var(--deep-brown);
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -0.02em;
   margin: 0 0 0.5em;
+  line-height: 1.15;
 }
 
-h1 { font-size: 2rem; }
-h2 { font-size: 1.6rem; }
-h3 { font-size: 1.3rem; }
+h1 { font-size: 2.6rem; }
+h2 { font-size: 2rem; }
+h3 { font-size: 1.5rem; }
+
+/* Premium heading refinement */
+h1, .page-card h2 {
+  color: var(--deep-brown);
+  background: linear-gradient(135deg, var(--deep-brown) 0%, var(--soft-brown) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Readable line-length control for body text */
+p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*="cell"]):not([class*="row"]):not([class*="item"]):not([class*="stat"]):not([class*="pill"]):not([class*="pill"]):not(.mp-):not([class*="step"]):not([class*="badge"]):not([class*="tag"]):not([class*="chip"]),
+.page-description, .notif-excerpt, .issue-description, .bot-bubble, .notification-item p {
+  max-width: 65ch;
+}
+
+/* Helpers for rich text */
+.readable-text {
+  max-width: 65ch;
+  line-height: 1.7;
+}
+
+.readable-text-wide {
+  max-width: 75ch;
+  line-height: 1.7;
+}
 
 .section-title {
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-size: 1.4rem;
+  font-weight: 900;
   color: var(--deep-brown);
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 18px;
   letter-spacing: -0.02em;
+  line-height: 1.2;
+  background: linear-gradient(135deg, var(--deep-brown) 0%, var(--soft-brown) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .section-title::after {
   content: '';
   flex: 1;
-  height: 1.5px;
-  background: linear-gradient(90deg, var(--glass-border), transparent);
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary-gold), var(--glass-border), transparent);
   margin-left: 8px;
 }
 
@@ -2325,6 +2363,12 @@ h3 { font-size: 1.3rem; }
     width: min(300px, 88vw);
     padding: 20px 16px;
   }
+
+  /* Mobile heading size overrides */
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.6rem; }
+  h3 { font-size: 1.25rem; }
+  .section-title { font-size: 1.15rem; }
 }
 
 .card-primary-info {
