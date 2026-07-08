@@ -1461,9 +1461,8 @@ function WaveSurferPlayer({ url }) {
   );
 }
 
-function QuranIkhtebar({ studentProfile, hifzDetails }) {
-  const marhalaLibrary = {
-    "Marhala Ula": {
+const MARHALA_LIBRARY = {
+  "Marhala Ula": {
       range: "Juz 30",
       easy: [{ text: "Surah Al-Naba (Ayat 1-5)", page: 582 }, { text: "Surah Al-Ala (Ayat 1-4)", page: 591 }, { text: "Surah Al-Ghashiyah (Ayat 1-8)", page: 592 }],
       medium: [{ text: "Surah Al-Inshiqaq (Ayat 10-15)", page: 589 }, { text: "Surah Al-Mutaffifin (Ayat 20-25)", page: 588 }, { text: "Surah Al-Infitar (Ayat 1-5)", page: 587 }],
@@ -1513,6 +1512,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     }
   };
 
+function QuranIkhtebar({ studentProfile, hifzDetails }) {
   const [selectedMarhalaName, setSelectedMarhalaName] = useState("Marhala Ula");
   const [difficulty, setDifficulty] = useState("medium");
   const [testMode, setTestMode] = useState("teacher");
@@ -1580,7 +1580,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
     setVersesData([]);
     setSurahInfo(null);
 
-    const pool = marhalaLibrary[selectedMarhalaName][difficulty];
+    const pool = MARHALA_LIBRARY[selectedMarhalaName][difficulty];
     const q = pool[Math.floor(Math.random() * pool.length)];
     setCurrentQuestion(q);
     setMistakes([]);
@@ -1800,8 +1800,8 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
                   onChange={(e) => setSelectedMarhalaName(e.target.value)}
                   className="premium-select"
                 >
-                  {Object.keys(marhalaLibrary).map(name => (
-                    <option key={name} value={name}>{name} ({marhalaLibrary[name].range})</option>
+                  {Object.keys(MARHALA_LIBRARY).map(name => (
+                    <option key={name} value={name}>{name} ({MARHALA_LIBRARY[name].range})</option>
                   ))}
                 </select>
               </label>
@@ -6183,7 +6183,23 @@ const handleDownloadAllReports = async () => {
           </div>
         </nav>
         <div className="sidebar-footer">
-          {getAssignedRoles(user).filter(r => r !== 'admin' && r !== 'parents').map((role) => (
+          {(function() {
+            const metaRoles = getAssignedRoles(user);
+            const hasTeacherPortalAccess = (portalAccessList || []).some(a =>
+              a.is_active &&
+              a.portal_role === 'teacher' &&
+              (a.email || '').toLowerCase() === (user?.email || '').toLowerCase()
+            );
+            const hasTeacherProfile = (teacherProfiles || []).some(p =>
+              p.user_id === user?.id ||
+              (p.email || '').toLowerCase() === (user?.email || '').toLowerCase()
+            );
+            const available = [...metaRoles];
+            if ((hasTeacherPortalAccess || hasTeacherProfile) && !available.includes('teacher')) {
+              available.push('teacher');
+            }
+            return available.filter(r => r !== 'admin' && r !== 'parents');
+          })().map((role) => (
             <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
               <LogOut size={18} /> Switch to {role}
             </button>
@@ -10187,11 +10203,27 @@ function TeacherPortal({
           ))}
         </nav>
         <div className="sidebar-footer">
-          {getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents').map((role) => (
-            <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
-              <LogOut size={18} /> Switch to {role}
-            </button>
-          ))}
+          {(() => {
+            const assignedRoles = getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents');
+            const jadwalArr = Array.isArray(jadwalSettings) ? jadwalSettings : [];
+            let teacherAdminAllowed = false;
+            try {
+              const row = jadwalArr.find(s => s.id === 1) || jadwalArr[0] || {};
+              teacherAdminAllowed = JSON.parse(row.teacher_admin_access || '[]').includes(user?.email);
+            } catch {}
+            const showAdminViaSettings = teacherAdminAllowed && !assignedRoles.includes('admin');
+            return assignedRoles.map((role) => (
+              <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
+                <LogOut size={18} /> Switch to {role}
+              </button>
+            )).concat(
+              showAdminViaSettings ? (
+                <button key="admin-otp" className="sidebar-link" onClick={() => { if (onRequestAdminAccess) onRequestAdminAccess(); }}>
+                  <LogOut size={18} /> Switch to admin
+                </button>
+              ) : []
+            );
+          })()}
           <button className="sidebar-link logout-btn" onClick={onLogout}>
             <LogOut size={18} /> Logout
           </button>
@@ -11530,7 +11562,7 @@ export default function App() {
         if (!cached.userId || !cached.role) return false;
 
         // Require OTP for admin, even from cached auth
-        if (cached.role === "admin" && !sessionStorage.getItem("mauze-admin-otp-verified")) {
+        if (cached.role === "admin" && !sessionStorage.getItem("mauze-admin-otp-verified") && !localStorage.getItem("mauze-admin-otp-verified")) {
           return false;
         }
 
@@ -11554,7 +11586,8 @@ export default function App() {
     }
 
     async function initialize() {
-      // Reset OTP flag so admin always requires secret key on fresh app load
+      // Keep OTP flag across refreshes for teacher-admin-authenticated users
+      // Only clear from sessionStorage if it was stored there in a previous version
       sessionStorage.removeItem("mauze-admin-otp-verified");
       // Check session FIRST before deleting tokens
       let session = null;
@@ -11589,12 +11622,12 @@ export default function App() {
       // Fall back to cached auth
       const restored = await tryRestoreCachedAuth();
       if (!restored && mounted) {
+        // Clean up stale tokens only when no recovery method worked
+        // (don't delete sb- tokens if cached auth was restored — they're still needed for API calls)
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        }
         setLoading(false);
-      }
-
-      // Clean up stale tokens after all recovery attempts
-      for (const key of Object.keys(localStorage)) {
-        if (key.startsWith('sb-')) localStorage.removeItem(key);
       }
     }
 
@@ -11620,12 +11653,22 @@ export default function App() {
               return;
             }
 
+            // Auto-restore admin role for OTP-verified teachers on refresh
+            if (localStorage.getItem("mauze-admin-otp-verified") &&
+                localStorage.getItem('teacher-admin-authenticated') === session.user.email &&
+                window.localStorage.getItem(STORAGE_KEYS.role) === "admin" &&
+                access.role !== "admin") {
+              access.role = "admin";
+              access.ok = true;
+              access.assignedRoles = ["admin", ...(access.assignedRoles || [])];
+            }
+
             // Admin OTP gating: require secret key for admin on fresh app load
             // (INITIAL_SESSION or SIGNED_IN from initialize), but not on
             // TOKEN_REFRESHED during an already-active session
             if (access.role === "admin" &&
                 (event === "INITIAL_SESSION" || event === "SIGNED_IN") &&
-                !sessionStorage.getItem("mauze-admin-otp-verified")) {
+                !localStorage.getItem("mauze-admin-otp-verified")) {
               setUser(null);
               setPendingAdminSession({ user: session.user, access });
               setLoading(false);
@@ -12164,10 +12207,13 @@ export default function App() {
   const handleTeacherAdminOtpVerify = () => {
     if (!teacherAdminAuth || teacherAdminAuth.step !== 'otp') return false;
     if (teacherAdminAuth.input.toUpperCase() === teacherAdminAuth.secretKey) {
-      sessionStorage.setItem("mauze-admin-otp-verified", "true");
+      localStorage.setItem("mauze-admin-otp-verified", "true");
+      localStorage.setItem('teacher-admin-authenticated', user?.email || '');
       sessionStorage.removeItem('mauze-admin-otp-flow');
+      localStorage.setItem('teacher-admin-otp-login-done', 'true');
       setTeacherAdminAuth(null);
       storeRole("admin");
+      if (user) loadPortalData("admin", user);
       return true;
     }
     setTeacherAdminAuth(prev => prev ? { ...prev, error: "Invalid key. Try again." } : null);
@@ -12258,7 +12304,9 @@ export default function App() {
     } catch (err) {
       console.warn("Logout error:", err);
     }
+    const adminLoginDone = localStorage.getItem('teacher-admin-otp-login-done');
     localStorage.clear();
+    if (adminLoginDone) localStorage.setItem('teacher-admin-otp-login-done', adminLoginDone);
     window.location.reload();
   };
 
@@ -13857,11 +13905,11 @@ const handleSendCustomNotification = async (event) => {
             onClearAllAnnounces={clearAllAnnouncements}
             onShowAction={showAction}
             onRequestAdminAccess={() => {
-              if (localStorage.getItem('teacher-admin-authenticated')) {
+              if (localStorage.getItem('teacher-admin-otp-login-done')) {
                 const key = generateOtp(6);
                 setTeacherAdminAuth({ step: 'otp', secretKey: key, input: '', timer: 60, error: null });
               } else {
-                setTeacherAdminAuth({ step: 'login', password: '', error: null, email: '' });
+                setTeacherAdminAuth({ step: 'login', email: '', password: '', error: null });
               }
             }}
             teacherUnlockStatus={teacherUnlockStatus}

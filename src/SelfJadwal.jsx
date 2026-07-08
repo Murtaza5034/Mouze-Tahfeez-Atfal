@@ -1368,7 +1368,6 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
 
 export const SelfJadwalTeacherView
  = ({ showAction, onBroadcastNotification, students = [] }) => {
-  const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [mode, setMode] = useState('juz-wise');
@@ -1417,10 +1416,6 @@ export const SelfJadwalTeacherView
   }, [customDays, fatemiData]);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  useEffect(() => {
     if (selectedUserId) {
       const child = students.find(s => String(s.student_id) === String(selectedUserId) || String(s.id) === String(selectedUserId));
       if (child) {
@@ -1428,9 +1423,6 @@ export const SelfJadwalTeacherView
         const parentUserId = child.user_id || selectedUserId;
         setResolvedUserId(parentUserId);
         fetchSelfJadwalByChildId(parentUserId);
-      } else {
-        setResolvedUserId(selectedUserId);
-        fetchSelfJadwal();
       }
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
@@ -1482,52 +1474,6 @@ export const SelfJadwalTeacherView
       .from('self_jadwal')
       .select('schedule_data')
       .eq('user_id', childId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Failed to fetch self Jadwal:', error);
-    } else if (data && data.schedule_data) {
-      const savedMode = data.schedule_data._mode || 'juz-wise';
-      setMode(savedMode);
-      const history = data.schedule_data._editHistory || {};
-      setEditHistory(history);
-      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
-      lastSavedSnapshotRef.current = JSON.stringify({ data: { ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode }, mode: savedMode });
-    } else {
-      setScheduleData(DEFAULT_SCHEDULE);
-      setEditHistory({});
-      lastSavedSnapshotRef.current = JSON.stringify({ data: DEFAULT_SCHEDULE, mode: 'juz-wise' });
-    }
-    setLoading(false);
-  };
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('user_portal_access')
-        .select('user_id, full_name, email')
-        .eq('portal_role', 'parents');
-
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (e) {
-      console.error('Failed to fetch users for self Jadwal:', e);
-    }
-    setLoading(false);
-  };
-
-  const fetchSelfJadwal = async () => {
-    setLoading(true);
-    const selectedUser = users.find(u => u.user_id === selectedUserId);
-    if (selectedUser) {
-      setSelectedUserName(selectedUser.full_name || selectedUser.email || 'User');
-    }
-
-    const { data, error } = await supabase
-      .from('self_jadwal')
-      .select('schedule_data')
-      .eq('user_id', selectedUserId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -1619,20 +1565,13 @@ export const SelfJadwalTeacherView
               className="premium-select"
               style={{ flex: 1, minWidth: '250px', padding: '10px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
             >
-              <option value="">-- Select Child / User --</option>
+              <option value="">-- Select Child --</option>
               {students.length > 0 && (
                 <optgroup label="👦 Group Children">
                   {students.map(s => (
                     <option key={`child-${s.student_id || s.id}`} value={s.student_id || s.id}>
                       {s.name || s.full_name}
                     </option>
-                  ))}
-                </optgroup>
-              )}
-              {users.length > 0 && (
-                <optgroup label="👨‍👩‍👦 Parents / Users">
-                  {users.map(u => (
-                    <option key={u.user_id} value={u.user_id}>{u.full_name || u.email}</option>
                   ))}
                 </optgroup>
               )}

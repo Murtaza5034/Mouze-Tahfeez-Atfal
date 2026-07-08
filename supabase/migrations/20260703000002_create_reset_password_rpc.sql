@@ -11,12 +11,11 @@ CREATE OR REPLACE FUNCTION reset_user_password(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = 'public'
 AS $$
 DECLARE
   target_uid UUID;
   user_exists BOOLEAN;
-  result JSONB;
 BEGIN
   -- Trim inputs
   target_email := TRIM(target_email);
