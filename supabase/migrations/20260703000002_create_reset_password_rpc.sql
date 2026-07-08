@@ -2,7 +2,7 @@
 -- and Admin Portal Staff Profile password reset).
 -- SECURITY DEFINER lets this function modify auth.users when called by anon role.
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
 CREATE OR REPLACE FUNCTION reset_user_password(
   target_email TEXT,
@@ -11,17 +11,14 @@ CREATE OR REPLACE FUNCTION reset_user_password(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = 'public'
 AS $$
 DECLARE
   target_uid UUID;
   user_exists BOOLEAN;
 BEGIN
-  -- Trim inputs
   target_email := TRIM(target_email);
   new_password := TRIM(new_password);
 
-  -- Validate inputs
   IF target_email = '' THEN
     RETURN jsonb_build_object('success', false, 'message', 'Email is required');
   END IF;
@@ -30,22 +27,18 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'message', 'Password must be at least 6 characters');
   END IF;
 
-  -- Check if user exists with this email
   SELECT EXISTS(SELECT 1 FROM auth.users WHERE email = target_email) INTO user_exists;
   
   IF NOT user_exists THEN
     RETURN jsonb_build_object('success', false, 'message', 'No account found with this email address');
   END IF;
   
-  -- Get the user ID
   SELECT id INTO target_uid FROM auth.users WHERE email = target_email;
   
-  -- Update password using crypt hashing (same method Supabase uses)
   UPDATE auth.users 
   SET 
-    encrypted_password = crypt(new_password, gen_salt('bf')),
+    encrypted_password = public.crypt(new_password, public.gen_salt('bf')),
     updated_at = NOW(),
-    -- Ensure the user can login (in case email was not confirmed)
     email_confirmed_at = COALESCE(email_confirmed_at, NOW())
   WHERE id = target_uid;
   
@@ -56,3 +49,6 @@ BEGIN
   );
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION reset_user_password TO anon;
+GRANT EXECUTE ON FUNCTION reset_user_password TO authenticated;
