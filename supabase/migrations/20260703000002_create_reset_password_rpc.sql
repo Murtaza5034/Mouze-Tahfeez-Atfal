@@ -2,7 +2,7 @@
 -- and Admin Portal Staff Profile password reset).
 -- SECURITY DEFINER lets this function modify auth.users when called by anon role.
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 CREATE OR REPLACE FUNCTION reset_user_password(
   target_email TEXT,
@@ -37,7 +37,7 @@ BEGIN
   
   UPDATE auth.users 
   SET 
-    encrypted_password = public.crypt(new_password, public.gen_salt('bf')),
+    encrypted_password = extensions.crypt(new_password, extensions.gen_salt('bf')),
     updated_at = NOW(),
     email_confirmed_at = COALESCE(email_confirmed_at, NOW())
   WHERE id = target_uid;
