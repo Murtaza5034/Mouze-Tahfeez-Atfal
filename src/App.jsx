@@ -11829,7 +11829,8 @@ export default function App() {
       // When admin OTP flow is active, skip auto-resolve so Login.jsx
       // can show the secret key modal before portal authorization.
       // Clear stale OTP flag from possible page refresh during admin OTP flow
-      if (event !== 'SIGNED_IN') {
+      // Don't clear on SIGNED_OUT — it's part of the signInWithPassword sequence during OTP flow
+      if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') {
         sessionStorage.removeItem('mauze-admin-otp-flow');
       }
       if (event === 'SIGNED_IN' && sessionStorage.getItem('mauze-admin-otp-flow') === 'true') {
@@ -12332,7 +12333,7 @@ export default function App() {
     }
   };
 
-  const handleTeacherAdminOtpVerify = () => {
+  const handleTeacherAdminOtpVerify = async () => {
     if (!teacherAdminAuth || teacherAdminAuth.step !== 'otp') return false;
     if (teacherAdminAuth.input.toUpperCase() === teacherAdminAuth.secretKey) {
       sessionStorage.setItem("mauze-admin-otp-verified", "true");
@@ -12342,7 +12343,21 @@ export default function App() {
       localStorage.setItem('teacher-admin-otp-login-done', 'true');
       setTeacherAdminAuth(null);
       storeRole("admin");
-      if (user) loadPortalData("admin", user);
+      // Update cachedAuth so the user-restore effect (line ~11889) doesn't override admin back to teacher
+      let currentUser = user;
+      if (!currentUser) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          currentUser = session.user;
+        }
+      }
+      localStorage.setItem(STORAGE_KEYS.cachedAuth, JSON.stringify({
+        role: "admin",
+        userId: currentUser?.id || user?.id || '',
+        email: currentUser?.email || user?.email || '',
+      }));
+      if (currentUser) loadPortalData("admin", currentUser);
       return true;
     }
     setTeacherAdminAuth(prev => prev ? { ...prev, error: "Invalid key. Try again." } : null);
