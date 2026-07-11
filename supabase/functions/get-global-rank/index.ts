@@ -79,7 +79,23 @@ Deno.serve(async (req) => {
       )
     }
 
-    const ranked = results
+    // Restrict ranking to only students that exist in child_profiles so the rank
+    // set matches what buildStudents() and RankPreview compute locally.
+    const { data: childProfiles } = await supabase
+      .from('child_profiles')
+      .select('student_id')
+    const validStudentIds = new Set<string>()
+    if (childProfiles) {
+      for (const p of childProfiles) {
+        const id = String(p.student_id || '').trim().toLowerCase()
+        if (id) validStudentIds.add(id)
+      }
+    }
+    const filteredResults = validStudentIds.size > 0
+      ? results.filter(r => validStudentIds.has(String(r.student_id || '').trim().toLowerCase()))
+      : results
+
+    const ranked = filteredResults
       .map(r => {
         let totalScore = (r.total_score !== undefined && r.total_score !== null && r.total_score !== "")
           ? Number(r.total_score)
@@ -88,7 +104,7 @@ Deno.serve(async (req) => {
         let jadeedPagesVal = Number(String(r.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0
         let attendanceVal = Number(r.attendance_count) || 0
 
-        if (preview && student_id && String(r.student_id) === String(student_id)) {
+        if (preview && student_id && String(r.student_id).trim() === String(student_id).trim()) {
           totalScore = (preview.murajazah ?? r.murajazah ?? 0) +
             (preview.juz_hali ?? r.juz_hali ?? 0) +
             (preview.takhteet ?? r.takhteet ?? 0) +
@@ -119,7 +135,7 @@ Deno.serve(async (req) => {
         }
       }
       globalPrevRank = currentRank
-      allRanks[String(r.student_id).toLowerCase()] = currentRank
+      allRanks[String(r.student_id).trim().toLowerCase()] = currentRank
     })
 
     // return_all mode: send back all ranks at once

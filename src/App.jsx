@@ -10154,6 +10154,28 @@ function TeacherPortal({
       };
     });
 
+    // Re-apply global rank after local re-rank so teacher sees same rank as admin
+    try {
+      const { data: allRanksData } = await supabase.functions.invoke("get-global-rank", {
+        body: { return_all: true },
+      });
+      if (allRanksData?.ranks) {
+        setSchoolData(prev => ({
+          ...prev,
+          students: prev.students.map(s => {
+            const sid = String(s.student_id).trim().toLowerCase();
+            const globalRank = allRanksData.ranks[sid];
+            if (globalRank && s.latestResult) {
+              return { ...s, latestResult: { ...s.latestResult, computedRank: globalRank } };
+            }
+            return s;
+          }),
+        }));
+      }
+    } catch (_e) {
+      // Keep the local rank from recalculateComputedRanks as fallback
+    }
+
     // Final rank notification: check if all students have results for this week
     try {
       const weekDate = data?.week_date;
