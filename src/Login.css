@@ -298,6 +298,12 @@
   opacity: 0.3;
 }
 
+.forgot-divider-light {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(180, 150, 50, 0.15), transparent);
+  margin: 16px 0;
+}
+
 .forgot-title {
   font-size: 15px;
   font-weight: 800;

@@ -47,11 +47,13 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [forgotCurrentPassword, setForgotCurrentPassword] = useState("");
   const [forgotNewPassword, setForgotNewPassword] = useState("");
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState("");
   const [forgotError, setForgotError] = useState("");
+  const [showForgotCurrent, setShowForgotCurrent] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirm, setShowForgotConfirm] = useState(false);
   const welcomeRef = useRef(null);
@@ -415,6 +417,7 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                     onClick={() => {
                       setForgotPasswordMode(false);
                       setForgotSuccess("");
+                      setForgotCurrentPassword("");
                       setForgotNewPassword("");
                       setForgotConfirmPassword("");
                     }}
@@ -430,7 +433,7 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                     <KeyRound size={16} /> Reset Your Password
                   </h4>
                   <p className="forgot-desc">
-                    Enter your email, new password, and confirm it below.
+                    Verify your identity with your current password, then set a new one.
                   </p>
 
                   <div className="input-group">
@@ -447,6 +450,32 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                       />
                     </div>
                   </div>
+
+                  <div className="input-group">
+                    <label htmlFor="forgot-current-password">Current Password</label>
+                    <div className="input-with-icon">
+                      <Lock size={18} />
+                      <input
+                        id="forgot-current-password"
+                        type={showForgotCurrent ? "text" : "password"}
+                        value={forgotCurrentPassword}
+                        onChange={(e) => setForgotCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle-btn"
+                        onClick={() => setShowForgotCurrent((prev) => !prev)}
+                        tabIndex={-1}
+                        aria-label={showForgotCurrent ? "Hide current password" : "Show current password"}
+                      >
+                        {showForgotCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="forgot-divider-light" />
 
                   <div className="input-group">
                     <label htmlFor="forgot-new-password">New Password</label>
@@ -515,39 +544,55 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                         setForgotError("Please enter your email address.");
                         return;
                       }
+                      if (!forgotCurrentPassword) {
+                        setForgotError("Please enter your current password.");
+                        return;
+                      }
                       if (!forgotNewPassword || forgotNewPassword.length < 6) {
                         setForgotError("New password must be at least 6 characters.");
                         return;
                       }
                       if (forgotNewPassword !== forgotConfirmPassword) {
-                        setForgotError("Passwords do not match.");
+                        setForgotError("New passwords do not match.");
+                        return;
+                      }
+                      if (forgotNewPassword === forgotCurrentPassword) {
+                        setForgotError("New password must be different from current password.");
                         return;
                       }
 
                       setForgotLoading(true);
                       try {
-                        const { data, error: rpcError } = await supabase.rpc(
-                          "reset_user_password",
-                          {
-                            target_email: email.trim(),
-                            new_password: forgotNewPassword,
-                          }
-                        );
+                        // 1. Verify identity by signing in with current credentials
+                        const { error: signInError } = await supabase.auth.signInWithPassword({
+                          email: email.trim(),
+                          password: forgotCurrentPassword,
+                        });
 
-                        if (rpcError) {
-                          setForgotError(rpcError.message || "Failed to reset password. Please try again.");
-                        } else if (data?.success) {
-                          setForgotSuccess(
-                            data?.message ||
-                              "Your password has been reset successfully! You can now login with your new password."
-                          );
-                          setPassword(forgotNewPassword);
-                        } else {
-                          setForgotError(
-                            data?.message ||
-                              "Failed to reset password. Please ensure your email is correct."
-                          );
+                        if (signInError) {
+                          setForgotError("Current password is incorrect. Please try again.");
+                          setForgotLoading(false);
+                          return;
                         }
+
+                        // 2. Update to new password via Supabase Auth
+                        const { error: updateError } = await supabase.auth.updateUser({
+                          password: forgotNewPassword,
+                        });
+
+                        if (updateError) {
+                          setForgotError(updateError.message || "Failed to update password. Please try again.");
+                          setForgotLoading(false);
+                          return;
+                        }
+
+                        // 3. Sign out so user returns to login page
+                        await supabase.auth.signOut();
+
+                        setForgotSuccess(
+                          "Your password has been changed successfully! You can now login with your new password."
+                        );
+                        setPassword(forgotNewPassword);
                       } catch (err) {
                         setForgotError("An unexpected error occurred. Please try again.");
                       } finally {
@@ -559,12 +604,12 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                     {forgotLoading ? (
                       <>
                         <Loader2 size={18} className="spinner" />
-                        Resetting Password...
+                        Changing Password...
                       </>
                     ) : (
                       <>
                         <KeyRound size={18} />
-                        Reset Password
+                        Change Password
                       </>
                     )}
                   </button>
@@ -575,6 +620,7 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                     onClick={() => {
                       setForgotPasswordMode(false);
                       setForgotError("");
+                      setForgotCurrentPassword("");
                       setForgotNewPassword("");
                       setForgotConfirmPassword("");
                     }}
