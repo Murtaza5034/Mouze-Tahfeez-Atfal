@@ -11688,9 +11688,9 @@ export default function App() {
     }
 
     async function initialize() {
-      // Keep OTP flag across refreshes for teacher-admin-authenticated users
-      // Only clear from sessionStorage if it was stored there in a previous version
-      sessionStorage.removeItem("mauze-admin-otp-verified");
+      // OTP flag in sessionStorage persists across page refreshes (no OTP prompt)
+      // but is automatically cleared when the tab/browser closes (OTP prompt shown).
+      // localStorage keeps a copy for tryRestoreCachedAuth fallback.
       // Check session FIRST before deleting tokens
       let session = null;
       try {
@@ -11767,10 +11767,11 @@ export default function App() {
 
             // Admin OTP gating: require secret key for admin on fresh app load
             // (INITIAL_SESSION or SIGNED_IN from initialize), but not on
-            // TOKEN_REFRESHED during an already-active session
+            // TOKEN_REFRESHED during an already-active session.
+            // sessionStorage survives refreshes (no OTP), cleared on close (OTP shown).
             if (access.role === "admin" &&
                 (event === "INITIAL_SESSION" || event === "SIGNED_IN") &&
-                !localStorage.getItem("mauze-admin-otp-verified")) {
+                !sessionStorage.getItem("mauze-admin-otp-verified")) {
               setUser(null);
               setPendingAdminSession({ user: session.user, access });
               setLoading(false);
@@ -12334,6 +12335,7 @@ export default function App() {
   const handleTeacherAdminOtpVerify = () => {
     if (!teacherAdminAuth || teacherAdminAuth.step !== 'otp') return false;
     if (teacherAdminAuth.input.toUpperCase() === teacherAdminAuth.secretKey) {
+      sessionStorage.setItem("mauze-admin-otp-verified", "true");
       localStorage.setItem("mauze-admin-otp-verified", "true");
       localStorage.setItem('teacher-admin-authenticated', user?.email || '');
       sessionStorage.removeItem('mauze-admin-otp-flow');
