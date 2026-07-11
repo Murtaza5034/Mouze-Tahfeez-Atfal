@@ -87,3 +87,5 @@ Mauze-Tahfeez.aab
 keys/
 
 .vercel
+*.py
+public/*.jpg
