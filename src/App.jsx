@@ -2315,6 +2315,8 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       if (scoreDiff !== 0) return scoreDiff;
       const jadeedDiff = (Number(b.jadeed) || 0) - (Number(a.jadeed) || 0);
       if (jadeedDiff !== 0) return jadeedDiff;
+      const jadeedPagesADiff = (Number(String(b.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0) - (Number(String(a.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0);
+      if (jadeedPagesADiff !== 0) return jadeedPagesADiff;
       return (Number(b.attendance_count) || 0) - (Number(a.attendance_count) || 0);
     });
 
@@ -2326,6 +2328,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
         if (
           calculateEffectiveScore(prev) === calculateEffectiveScore(result) &&
           (Number(prev.jadeed) || 0) === (Number(result.jadeed) || 0) &&
+          (Number(String(prev.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0) === (Number(String(result.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0) &&
           (Number(prev.attendance_count) || 0) === (Number(result.attendance_count) || 0)
         ) {
           currentRank = prevRank;
@@ -2421,6 +2424,8 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     if (scoreDiff !== 0) return scoreDiff;
     const jadeedDiff = (Number(b.latestResult.jadeed) || 0) - (Number(a.latestResult.jadeed) || 0);
     if (jadeedDiff !== 0) return jadeedDiff;
+    const jadeedPagesADiff = (Number(String(b.latestResult.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0) - (Number(String(a.latestResult.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0);
+    if (jadeedPagesADiff !== 0) return jadeedPagesADiff;
     return (Number(b.latestResult.attendance_count) || 0) - (Number(a.latestResult.attendance_count) || 0);
   });
 
@@ -2434,6 +2439,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       if (
         scorePrev === scoreCurr &&
         (Number(prev.latestResult.jadeed) || 0) === (Number(s.latestResult.jadeed) || 0) &&
+        (Number(String(prev.latestResult.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0) === (Number(String(s.latestResult.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0) &&
         (Number(prev.latestResult.attendance_count) || 0) === (Number(s.latestResult.attendance_count) || 0)
       ) {
         currentRank = globalPrevRank;
@@ -2453,6 +2459,7 @@ const recalculateComputedRanks = (students) => {
       ...s,
       _effScore: calculateEffectiveScore(s.latestResult),
       _jadeed: Number(s.latestResult.jadeed) || 0,
+      _jadeedPages: Number(String(s.latestResult.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0,
       _attendance: Number(s.latestResult.attendance_count) || 0,
     }));
   withScores.sort((a, b) => {
@@ -2460,6 +2467,8 @@ const recalculateComputedRanks = (students) => {
     if (scoreDiff !== 0) return scoreDiff;
     const jadeedDiff = b._jadeed - a._jadeed;
     if (jadeedDiff !== 0) return jadeedDiff;
+    const jadeedPagesDiff = b._jadeedPages - a._jadeedPages;
+    if (jadeedPagesDiff !== 0) return jadeedPagesDiff;
     return b._attendance - a._attendance;
   });
   const studentRanks = {};
@@ -2468,7 +2477,7 @@ const recalculateComputedRanks = (students) => {
     let currentRank = idx + 1;
     if (idx > 0) {
       const prev = withScores[idx - 1];
-      if (prev._effScore === s._effScore && prev._jadeed === s._jadeed && prev._attendance === s._attendance) {
+      if (prev._effScore === s._effScore && prev._jadeed === s._jadeed && prev._jadeedPages === s._jadeedPages && prev._attendance === s._attendance) {
         currentRank = prevRank;
       }
     }
@@ -2879,10 +2888,13 @@ function RankPreview({ students }) {
     const prev = sorted[idx - 1];
     if (prev.score === student.score) {
       if (prev.jadeed === student.jadeed) {
-        if (prev.attendance === student.attendance) {
-          return "Tied on Score, Jadeed & Attendance";
+        if (prev.jadeedPages === student.jadeedPages) {
+          if (prev.attendance === student.attendance) {
+            return "Tied on all criteria";
+          }
+          return "Tied on Score, Jadeed & Pages \u2192 Attendance broke tie";
         }
-        return "Tied on Score & Jadeed \u2192 Attendance broke tie";
+        return "Tied on Score & Jadeed \u2192 Jadeed Pages broke tie";
       }
       return "Tied on Score \u2192 Jadeed broke tie";
     }
@@ -2896,6 +2908,7 @@ function RankPreview({ students }) {
         ...s,
         score: calculateEffectiveScore(s.latestResult),
         jadeed: Number(s.latestResult.jadeed) || 0,
+        jadeedPages: Number(String(s.latestResult.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0,
         attendance: Number(s.latestResult.attendance_count) || 0,
       }));
     
@@ -2904,6 +2917,8 @@ function RankPreview({ students }) {
       if (scoreDiff !== 0) return scoreDiff;
       const jadeedDiff = b.jadeed - a.jadeed;
       if (jadeedDiff !== 0) return jadeedDiff;
+      const jadeedPagesDiff = b.jadeedPages - a.jadeedPages;
+      if (jadeedPagesDiff !== 0) return jadeedPagesDiff;
       return b.attendance - a.attendance;
     });
 
@@ -2912,7 +2927,7 @@ function RankPreview({ students }) {
       let currentRank = idx + 1;
       if (idx > 0) {
         const prev = withScores[idx - 1];
-        if (prev.score === s.score && prev.jadeed === s.jadeed && prev.attendance === s.attendance) {
+        if (prev.score === s.score && prev.jadeed === s.jadeed && prev.jadeedPages === s.jadeedPages && prev.attendance === s.attendance) {
           currentRank = prevRank;
         }
       }
@@ -3026,8 +3041,8 @@ function RankPreview({ students }) {
           </div>
         </div>
         <p className="subtitle">
-          Students sorted by <strong>Score</strong> \u2193 \u2192 <strong>Jadeed</strong> \u2193 \u2192 <strong>Attendance</strong> \u2193
-          \u2014 ranks are unique sequential (no ties)
+          Students sorted by <strong>Score</strong> \u2193 \u2192 <strong>Jadeed</strong> \u2193 \u2192 <strong>Jadeed Pages</strong> \u2193 \u2192 <strong>Attendance</strong> \u2193
+          \u2014 live ranking updates as teachers enter marks
         </p>
       </div>
 
@@ -3045,6 +3060,7 @@ function RankPreview({ students }) {
                 <th style={{ padding: '14px 16px', textAlign: 'left' }}>Student</th>
                 <th style={{ padding: '14px 16px', textAlign: 'center' }}>Score</th>
                 <th style={{ padding: '14px 16px', textAlign: 'center' }}>Jadeed</th>
+                <th style={{ padding: '14px 16px', textAlign: 'center' }}>Jadeed Pages</th>
                 <th style={{ padding: '14px 16px', textAlign: 'center' }}>Attendance</th>
                 <th style={{ padding: '14px 16px', textAlign: 'left' }}>Tie-Break Info</th>
               </tr>
@@ -3103,6 +3119,10 @@ function RankPreview({ students }) {
                     <span style={{ color: s.jadeed >= 15 ? '#2e7d32' : '#3d2b1f' }}>{s.jadeed}</span>
                     <div style={{ fontSize: '0.7rem', color: '#aaa' }}>max 20</div>
                   </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600 }}>
+                    <span style={{ color: s.jadeedPages >= 3 ? '#b8860b' : '#3d2b1f' }}>{s.jadeedPages}</span>
+                    <div style={{ fontSize: '0.7rem', color: '#aaa' }}>pages</div>
+                  </td>
                   <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '3px' }}>
                       {Array.from({ length: 6 }, (_, j) => (
@@ -3128,7 +3148,8 @@ function RankPreview({ students }) {
         <strong style={{ color: '#3d2b1f' }}>Tie-Breaking Order:</strong>
         <ol style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
           <li><strong>Total Score</strong> (descending) \u2014 highest marks first</li>
-          <li><strong>Jadeed (New Pages)</strong> (descending) \u2014 more new pages = higher rank</li>
+          <li><strong>Jadeed (New Lines)</strong> (descending) \u2014 more new lines = higher rank</li>
+          <li><strong>Jadeed Pages (Safahat)</strong> (descending) \u2014 more pages covered = higher rank</li>
           <li><strong>Attendance Count</strong> (descending) \u2014 better attendance = higher rank</li>
         </ol>
         <p style={{ marginTop: '8px', fontStyle: 'italic' }}>Ranks are unique and sequential \u2014 no two students share the same rank.</p>
@@ -9726,6 +9747,7 @@ function TeacherPortal({
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const backdropMouseDownRef = useRef(false);
   const notificationOpenedAtRef = useRef(0);
+  const finalRankNotifiedRef = useRef({});
 
   const openNotificationDetail = (event, notification) => {
     event?.preventDefault?.();
@@ -9807,6 +9829,11 @@ function TeacherPortal({
       }
     }
 
+    // Merge total_jadeed_pages from form into merged
+    if (form.total_jadeed_pages !== "" && form.total_jadeed_pages !== undefined && form.total_jadeed_pages !== null) {
+      merged.total_jadeed_pages = form.total_jadeed_pages;
+    }
+
     // Compute total_score from merged values so it reflects the actual preview data
     const hasFormEntry = RESULT_NUMERIC_FIELDS.some(f => form[f] !== "" && form[f] !== undefined && form[f] !== null);
     let total_score;
@@ -9842,6 +9869,7 @@ function TeacherPortal({
         isMe,
         score: getEffScore(result),
         jadeed: Number(result.jadeed) || 0,
+        jadeedPages: Number(String(result.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0,
         attendance: Number(result.attendance_count) || 0,
       });
     }
@@ -9850,6 +9878,8 @@ function TeacherPortal({
       if (scoreDiff !== 0) return scoreDiff;
       const jadeedDiff = b.jadeed - a.jadeed;
       if (jadeedDiff !== 0) return jadeedDiff;
+      const jadeedPagesDiff = b.jadeedPages - a.jadeedPages;
+      if (jadeedPagesDiff !== 0) return jadeedPagesDiff;
       return b.attendance - a.attendance;
     });
     let currentRank = 1;
@@ -9859,7 +9889,7 @@ function TeacherPortal({
       currentRank = i + 1;
       if (i > 0) {
         const prev = withScores[i - 1];
-        if (prev.score === s.score && prev.jadeed === s.jadeed && prev.attendance === s.attendance) {
+        if (prev.score === s.score && prev.jadeed === s.jadeed && prev.jadeedPages === s.jadeedPages && prev.attendance === s.attendance) {
           currentRank = prevRank;
         }
       }
@@ -9885,6 +9915,7 @@ function TeacherPortal({
         juz_hali: toNumber(mergedResult.juz_hali),
         takhteet: toNumber(mergedResult.takhteet),
         jadeed: toNumber(mergedResult.jadeed),
+        total_jadeed_pages: mergedResult.total_jadeed_pages ?? "",
         attendance_count: toNumber(mergedResult.attendance_count),
       };
 
@@ -10122,6 +10153,38 @@ function TeacherPortal({
         students: recalculateComputedRanks(updatedStudents),
       };
     });
+
+    // Final rank notification: check if all students have results for this week
+    try {
+      const weekDate = data?.week_date;
+      if (weekDate && schoolData?.students?.length > 0) {
+        const allStudents = schoolData.students;
+        const allHaveResults = allStudents.every(
+          s => {
+            const thisStudentId = String(s.student_id);
+            const thisResult = String(thisStudentId) === String(numericId)
+              ? { week_date: weekDate }
+              : s.latestResult;
+            return thisResult && String(thisResult.week_date) === String(weekDate);
+          }
+        );
+        if (allHaveResults) {
+          const notified = finalRankNotifiedRef.current;
+          if (!notified[weekDate]) {
+            notified[weekDate] = true;
+            broadcastNotification(
+              "Final Ranks Calculated",
+              "All students have been graded this week. Final ranks are live in the Rank Preview page.",
+              "teacher",
+              null,
+              "Overview"
+            );
+          }
+        }
+      }
+    } catch (_e) {
+      // Final rank notification check failed silently
+    }
   }, [canTeacherFillProgress, reportSettingsObject, teacherForms.result, schoolData]);
 
   performAutoSaveRef.current = performAutoSaveTeacherResult;
@@ -13658,6 +13721,32 @@ const handleSendCustomNotification = async (event) => {
           ? { ...student, latestResult: data }
           : student
       );
+
+      // Final rank notification check inline
+      try {
+        const allHaveResults = updatedStudents.every(
+          s => s.latestResult && String(s.latestResult.week_date) === String(data?.week_date)
+        );
+        if (allHaveResults) {
+          const weekDate = data?.week_date;
+          if (weekDate) {
+            const key = `final_rank_${weekDate}`;
+            if (!window.__finalRankNotified) window.__finalRankNotified = {};
+            if (!window.__finalRankNotified[key]) {
+              window.__finalRankNotified[key] = true;
+              setTimeout(() => {
+                broadcastNotification(
+                  "Final Ranks Calculated",
+                  "All students have been graded this week. Final ranks are live in the Rank Preview page.",
+                  "teacher",
+                  null,
+                  "Overview"
+                );
+              }, 100);
+            }
+          }
+        }
+      } catch (_e) {}
 
       return {
         ...current,

@@ -1054,16 +1054,16 @@
 
 @media (max-width: 768px) {
   .jadwal-container {
-    padding: 16px;
-    margin-top: 12px;
-    border-radius: 16px;
+    padding: 14px;
+    margin-top: 10px;
+    border-radius: 14px;
   }
 
   .jadwal-header {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 12px;
   }
 
   .jadwal-header h2 {
@@ -1105,7 +1105,7 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   /* ---------- Table Style: stacked card layout on mobile ---------- */
   .jadwal-table-wrapper {
     overflow: visible;
@@ -1327,6 +1327,21 @@
     width: 100%;
     font-size: 12px;
     padding: 8px 12px;
+  }
+
+  /* ---------- SelfJadwal specific overrides ---------- */
+  /* Premium header - compact on mobile */
+  .jadwal-container > div:first-child:not(.jadwal-header) {
+    padding: 16px 18px !important;
+    margin-bottom: 14px !important;
+  }
+  /* Premium card inner body - reduce padding */
+  .jadwal-container > div:first-child:not(.jadwal-header) + div > div:last-child {
+    padding: 12px !important;
+  }
+  /* Premium card header row - compact */
+  .jadwal-container > div:first-child:not(.jadwal-header) + div > div:first-child {
+    padding: 14px 16px !important;
   }
 }
 

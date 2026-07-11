@@ -13,6 +13,7 @@ interface RankRequest {
     juz_hali?: number
     takhteet?: number
     jadeed?: number
+    total_jadeed_pages?: number | string
     attendance_count?: number
   }
 }
@@ -39,10 +40,11 @@ Deno.serve(async (req) => {
 
     const { data: rawResults, error } = await supabase
       .from('weekly_results')
-      .select('student_id, murajazah, juz_hali, takhteet, jadeed, attendance_count, total_score')
+      .select('student_id, murajazah, juz_hali, takhteet, jadeed, total_jadeed_pages, attendance_count, total_score')
       .order('week_date', { ascending: false })
 
     if (error) throw error
+
     const latestResultMap = new Map<string, any>()
 
     for (const result of rawResults || []) {
@@ -63,6 +65,7 @@ Deno.serve(async (req) => {
         juz_hali: preview.juz_hali ?? 0,
         takhteet: preview.takhteet ?? 0,
         jadeed: preview.jadeed ?? 0,
+        total_jadeed_pages: preview.total_jadeed_pages ?? (existingTarget?.total_jadeed_pages ?? ""),
         attendance_count: preview.attendance_count ?? 0,
         total_score: (preview.murajazah ?? 0) +
           (preview.juz_hali ?? 0) +
@@ -87,6 +90,7 @@ Deno.serve(async (req) => {
           ? Number(r.total_score)
           : (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0)
         let jadeedVal = Number(r.jadeed) || 0
+        let jadeedPagesVal = Number(String(r.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0
         let attendanceVal = Number(r.attendance_count) || 0
 
         if (isTarget && preview) {
@@ -95,14 +99,16 @@ Deno.serve(async (req) => {
             (preview.takhteet ?? r.takhteet ?? 0) +
             (preview.jadeed ?? r.jadeed ?? 0)
           jadeedVal = preview.jadeed ?? jadeedVal
+          jadeedPagesVal = Number(String(preview.total_jadeed_pages ?? r.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0
           attendanceVal = preview.attendance_count ?? attendanceVal
         }
 
-        return { student_id: r.student_id, totalScore, jadeed: jadeedVal, attendance: attendanceVal, isTarget }
+        return { student_id: r.student_id, totalScore, jadeed: jadeedVal, jadeedPages: jadeedPagesVal, attendance: attendanceVal, isTarget }
       })
       .sort((a, b) => {
         if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore
         if (b.jadeed !== a.jadeed) return b.jadeed - a.jadeed
+        if (b.jadeedPages !== a.jadeedPages) return b.jadeedPages - a.jadeedPages
         return b.attendance - a.attendance
       })
 
@@ -114,7 +120,7 @@ Deno.serve(async (req) => {
       currentRank = i + 1;
       if (i > 0) {
         const prev = ranked[i - 1];
-        if (prev.totalScore === r.totalScore && prev.jadeed === r.jadeed && prev.attendance === r.attendance) {
+        if (prev.totalScore === r.totalScore && prev.jadeed === r.jadeed && prev.jadeedPages === r.jadeedPages && prev.attendance === r.attendance) {
           currentRank = prevRank;
         }
       }

@@ -431,7 +431,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  height: var(--header-height);
+  height: calc(var(--header-height) + var(--safe-top));
   background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -708,7 +708,14 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   .topbar {
     padding: 14px;
     gap: 12px;
-    align-items: flex-start;
+    align-items: center;
+  }
+
+  .parent-topbar {
+    padding: 14px;
+    gap: 12px;
+    align-items: center;
+    height: calc(var(--header-height) + var(--safe-top));
   }
 
   .top-status {
@@ -2227,6 +2234,17 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   .topbar {
     padding: 12px;
     border-radius: 18px;
+  }
+
+  .parent-topbar {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .topbar-menu-btn,
+  .topbar-logout-btn {
+    width: 44px;
+    height: 44px;
   }
 
   .menu-button {

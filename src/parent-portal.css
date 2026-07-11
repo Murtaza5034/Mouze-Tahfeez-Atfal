@@ -327,7 +327,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  height: var(--header-height);
+  height: calc(var(--header-height) + var(--safe-top));
   background: var(--glass-bg);
   backdrop-filter: blur(16px);
   position: sticky;
