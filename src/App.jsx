@@ -11955,22 +11955,27 @@ export default function App() {
           // Bulletproof search for activeResult using the already matched latestResult from buildStudents
           let activeResult = activeStudent.latestResult;
 
-          // Get global rank from Edge Function (bypasses RLS) so the parent sees
-          // the exact same rank as the admin's Rank Preview page
-          if (activeResult) {
-            try {
-              const { data: rankData, error: rankError } = await supabase.functions.invoke("get-global-rank", {
-                body: {
-                  student_id: String(activeStudent.student_id),
-                  week_date: activeResult.week_date || getToday(),
-                },
+          // Get global ranks from Edge Function (bypasses RLS) so ALL portals see
+          // the exact same global rank as the admin's Rank Preview page
+          try {
+            const { data: allRanksData, error: allRanksError } = await supabase.functions.invoke("get-global-rank", {
+              body: { return_all: true },
+            });
+            if (!allRanksError && allRanksData?.ranks) {
+              const globalRanks = allRanksData.ranks;
+              processedStudents.forEach(s => {
+                const sid = String(s.student_id).trim().toLowerCase();
+                const globalRank = globalRanks[sid];
+                if (globalRank && s.latestResult) {
+                  s.latestResult.computedRank = globalRank;
+                }
               });
-              if (!rankError && rankData?.rank) {
-                activeResult = { ...activeResult, computedRank: rankData.rank };
-              }
-            } catch (_e) {
-              // Fall back to sibling rank from buildStudents
+              // Re-find active result after rank override
+              const updatedActive = processedStudents.find(p => String(p.student_id) === String(selectedStudentId)) || processedStudents[0];
+              activeResult = updatedActive?.latestResult || activeResult;
             }
+          } catch (_e) {
+            // Fall back to buildStudents rank
           }
 
           const activeAttendance = (attendanceResponse.data || []).find(a => 
@@ -12094,6 +12099,26 @@ export default function App() {
           .maybeSingle();
         if (emailData) setEmailSettings(emailData);
         else if (emailError) console.warn("Failed to load email_settings:", emailError.message);
+
+        // Fetch global ranks from Edge Function (bypasses RLS) so ALL portals see
+        // the exact same global rank as the admin's Rank Preview page
+        try {
+          const { data: allRanksData, error: allRanksError } = await supabase.functions.invoke("get-global-rank", {
+            body: { return_all: true },
+          });
+          if (!allRanksError && allRanksData?.ranks) {
+            const globalRanks = allRanksData.ranks;
+            students.forEach(s => {
+              const sid = String(s.student_id).trim().toLowerCase();
+              const globalRank = globalRanks[sid];
+              if (globalRank && s.latestResult) {
+                s.latestResult.computedRank = globalRank;
+              }
+            });
+          }
+        } catch (_e) {
+          // Fall back to buildStudents ranks
+        }
 
         setSchoolData({
           students,

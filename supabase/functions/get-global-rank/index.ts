@@ -6,8 +6,9 @@ const corsHeaders = {
 }
 
 interface RankRequest {
-  student_id: string
-  week_date: string
+  student_id?: string
+  week_date?: string
+  return_all?: boolean
   preview?: {
     murajazah?: number
     juz_hali?: number
@@ -25,11 +26,7 @@ Deno.serve(async (req) => {
 
   try {
     const bodyText = await req.text().catch(() => '{}')
-    const { student_id, week_date, preview }: RankRequest = JSON.parse(bodyText)
-
-    if (!student_id || !week_date) {
-      throw new Error('Missing required fields: student_id, week_date')
-    }
+    const { student_id, week_date, return_all, preview }: RankRequest = JSON.parse(bodyText)
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -54,10 +51,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    const targetKey = String(student_id).trim().toLowerCase()
-    const existingTarget = latestResultMap.get(targetKey)
-
-    if (preview) {
+    if (preview && student_id) {
+      const targetKey = String(student_id).trim().toLowerCase()
+      const existingTarget = latestResultMap.get(targetKey)
       latestResultMap.set(targetKey, {
         ...(existingTarget || {}),
         student_id,
@@ -78,14 +74,13 @@ Deno.serve(async (req) => {
 
     if (!results || results.length === 0) {
       return new Response(
-        JSON.stringify({ rank: null, total: 0 }),
+        JSON.stringify({ rank: null, ranks: {}, total: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       )
     }
 
     const ranked = results
       .map(r => {
-        const isTarget = String(r.student_id) === String(student_id)
         let totalScore = (r.total_score !== undefined && r.total_score !== null && r.total_score !== "")
           ? Number(r.total_score)
           : (Number(r.murajazah) || 0) + (Number(r.juz_hali) || 0) + (Number(r.takhteet) || 0) + (Number(r.jadeed) || 0)
@@ -93,7 +88,7 @@ Deno.serve(async (req) => {
         let jadeedPagesVal = Number(String(r.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0
         let attendanceVal = Number(r.attendance_count) || 0
 
-        if (isTarget && preview) {
+        if (preview && student_id && String(r.student_id) === String(student_id)) {
           totalScore = (preview.murajazah ?? r.murajazah ?? 0) +
             (preview.juz_hali ?? r.juz_hali ?? 0) +
             (preview.takhteet ?? r.takhteet ?? 0) +
@@ -103,7 +98,7 @@ Deno.serve(async (req) => {
           attendanceVal = preview.attendance_count ?? attendanceVal
         }
 
-        return { student_id: r.student_id, totalScore, jadeed: jadeedVal, jadeedPages: jadeedPagesVal, attendance: attendanceVal, isTarget }
+        return { student_id: r.student_id, totalScore, jadeed: jadeedVal, jadeedPages: jadeedPagesVal, attendance: attendanceVal }
       })
       .sort((a, b) => {
         if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore
@@ -112,24 +107,35 @@ Deno.serve(async (req) => {
         return b.attendance - a.attendance
       })
 
-    let targetRank = null;
-    let currentRank = 1;
-    let prevRank = 1;
-    for (let i = 0; i < ranked.length; i++) {
-      const r = ranked[i];
-      currentRank = i + 1;
-      if (i > 0) {
-        const prev = ranked[i - 1];
+    // Build global ranks map for ALL students
+    const allRanks: Record<string, number> = {}
+    let globalPrevRank = 1
+    ranked.forEach((r, idx) => {
+      let currentRank = idx + 1
+      if (idx > 0) {
+        const prev = ranked[idx - 1]
         if (prev.totalScore === r.totalScore && prev.jadeed === r.jadeed && prev.jadeedPages === r.jadeedPages && prev.attendance === r.attendance) {
-          currentRank = prevRank;
+          currentRank = globalPrevRank
         }
       }
-      prevRank = currentRank;
-      if (r.isTarget) {
-        targetRank = currentRank;
-        break;
-      }
+      globalPrevRank = currentRank
+      allRanks[String(r.student_id).toLowerCase()] = currentRank
+    })
+
+    // return_all mode: send back all ranks at once
+    if (return_all) {
+      return new Response(
+        JSON.stringify({ ranks: allRanks, total: ranked.length }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      )
     }
+
+    // Single-student mode: find and return just one rank
+    if (!student_id) {
+      throw new Error('Missing required field: student_id')
+    }
+
+    const targetRank = allRanks[String(student_id).trim().toLowerCase()] || null
 
     if (targetRank === null) {
       return new Response(
