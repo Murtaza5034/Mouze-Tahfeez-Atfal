@@ -11651,6 +11651,23 @@ export default function App() {
           return false;
         }
 
+        // Re-authenticate with Supabase if no valid session exists, so subsequent
+        // loadPortalData queries (which require RLS auth) don't fail.
+        const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        if (!sessionData?.session) {
+          const savedEmail = localStorage.getItem("mauze-saved-email");
+          const savedPassword = localStorage.getItem("mauze-saved-password");
+          if (savedEmail && savedPassword) {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+              email: savedEmail,
+              password: savedPassword,
+            });
+            if (signInError) return false;
+          } else {
+            return false;
+          }
+        }
+
         setUser({ id: cached.userId, email: cached.email });
         storeRole(cached.role);
         for (let attempt = 0; attempt <= retries; attempt++) {
@@ -12415,8 +12432,19 @@ export default function App() {
       console.warn("Logout error:", err);
     }
     const adminLoginDone = localStorage.getItem('teacher-admin-otp-login-done');
+    // Preserve saved credentials so "Remember Me" still works on next visit
+    const savedEmail = localStorage.getItem("mauze-saved-email");
+    const savedPassword = localStorage.getItem("mauze-saved-password");
+    const savedRole = localStorage.getItem("mauze-saved-role");
+    const rememberMe = localStorage.getItem("mauze-remember-me");
     localStorage.clear();
     if (adminLoginDone) localStorage.setItem('teacher-admin-otp-login-done', adminLoginDone);
+    if (rememberMe === "true") {
+      if (savedEmail) localStorage.setItem("mauze-saved-email", savedEmail);
+      if (savedPassword) localStorage.setItem("mauze-saved-password", savedPassword);
+      if (savedRole) localStorage.setItem("mauze-saved-role", savedRole);
+      localStorage.setItem("mauze-remember-me", "true");
+    }
     window.location.reload();
   };
 
