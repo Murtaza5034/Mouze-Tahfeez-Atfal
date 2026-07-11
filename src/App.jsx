@@ -12212,13 +12212,13 @@ export default function App() {
       new Set(schoolData.students.map((student) => student.groupName).filter(Boolean))
     );
 
-    const matchedStudents = schoolData.students.filter((student) => {
-      // Robust filtering: check by muhaffiz_id (UUID) first, then fallback to name matching
-      const idMatch = user?.id && student.muhaffiz_id === user.id;
-      const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
-
-      return idMatch || nameMatch;
-    });
+    const matchedStudents = portalRole === "admin"
+      ? [...schoolData.students]
+      : schoolData.students.filter((student) => {
+          const idMatch = user?.id && student.muhaffiz_id === user.id;
+          const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
+          return idMatch || nameMatch;
+        });
 
     const filteredStudents = [...matchedStudents].sort((a, b) => {
       const rA = a.latestResult?.computedRank;
@@ -12236,7 +12236,7 @@ export default function App() {
       filteredStudents,
       attendances: teacherAttendance,
     };
-  }, [schoolData.students, teacherGroupFilter, teacherIdentity, teacherAttendance]);
+  }, [schoolData.students, teacherGroupFilter, teacherIdentity, teacherAttendance, portalRole]);
 
   const monthlySalary = useMemo(() => {
     if (portalRole !== "teacher") return null;
