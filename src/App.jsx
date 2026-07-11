@@ -5762,6 +5762,12 @@ const handleDownloadAllReports = async () => {
   const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
+  const userAssignedRoles = user ? getAssignedRoles(user) : [];
+  const isOtpTeacher = !userAssignedRoles.includes('admin');
+  const rankPreviewStudents = isOtpTeacher
+    ? students.filter(s => String(s.muhaffiz_id) === String(user?.id))
+    : students;
+
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
     : null;
@@ -6389,7 +6395,7 @@ const handleDownloadAllReports = async () => {
               <LazyAppUpdateManager onBroadcastNotification={broadcastNotification} />
             </Suspense>
           ) : null}
-          {activePage === "Rank Preview" ? (            <RankPreview students={students} />          ) : null}
+          {activePage === "Rank Preview" ? (            <RankPreview students={rankPreviewStudents} />          ) : null}
           {activePage === "Student Registry" && (
             <div className="admin-section fade-in">
               <div className="section-header">
@@ -6620,7 +6626,10 @@ const handleDownloadAllReports = async () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {(portalAccessList || []).filter(a => a.portal_role === 'teacher').map(teacher => {
+                  {(portalAccessList || [])
+                    .filter(a => a.portal_role === 'teacher')
+                    .filter(t => !isOtpTeacher || t.email === user?.email || t.user_id === user?.id)
+                    .map(teacher => {
                     const isOn = teacherAdminAccessList.includes(teacher.email);
                     return (
                       <div key={teacher.user_id} style={{
@@ -12338,12 +12347,10 @@ export default function App() {
     if (teacherAdminAuth.input.toUpperCase() === teacherAdminAuth.secretKey) {
       sessionStorage.setItem("mauze-admin-otp-verified", "true");
       localStorage.setItem("mauze-admin-otp-verified", "true");
-      localStorage.setItem('teacher-admin-authenticated', user?.email || '');
       sessionStorage.removeItem('mauze-admin-otp-flow');
       localStorage.setItem('teacher-admin-otp-login-done', 'true');
-      setTeacherAdminAuth(null);
       storeRole("admin");
-      // Update cachedAuth so the user-restore effect (line ~11889) doesn't override admin back to teacher
+      // Resolve current user (may be null from SIGNED_OUT during OTP sign-in)
       let currentUser = user;
       if (!currentUser) {
         const { data: { session } } = await supabase.auth.getSession();
@@ -12352,11 +12359,15 @@ export default function App() {
           currentUser = session.user;
         }
       }
+      // Persist admin identity so refresh/reopen keeps admin role
+      const adminEmail = currentUser?.email || user?.email || '';
+      localStorage.setItem('teacher-admin-authenticated', adminEmail);
       localStorage.setItem(STORAGE_KEYS.cachedAuth, JSON.stringify({
         role: "admin",
         userId: currentUser?.id || user?.id || '',
-        email: currentUser?.email || user?.email || '',
+        email: adminEmail,
       }));
+      setTeacherAdminAuth(null);
       if (currentUser) loadPortalData("admin", currentUser);
       return true;
     }
