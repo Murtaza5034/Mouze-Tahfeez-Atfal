@@ -2117,8 +2117,85 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 
 .student-profile-hero p,
 .student-status-copy {
-  margin: 0;
+  margin: 0 0 14px;
   color: #7a6335;
+}
+
+.attendance-section {
+  border-top: 1px solid rgba(183, 137, 31, 0.12);
+  padding-top: 12px;
+}
+
+.attendance-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.att-stat {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.att-stat.present {
+  color: #2e7d32;
+}
+
+.att-stat.absent {
+  color: #c62828;
+}
+
+.att-stat.total {
+  color: #8b6d31;
+  font-weight: 400;
+}
+
+.attendance-btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+.att-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(0,0,0,0.04);
+  color: #666;
+}
+
+.att-btn.present:hover:not(:disabled) {
+  background: rgba(46, 125, 50, 0.08);
+  border-color: rgba(46, 125, 50, 0.25);
+  color: #2e7d32;
+}
+
+.att-btn.present.active {
+  background: rgba(46, 125, 50, 0.12);
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+
+.att-btn.absent:hover:not(:disabled) {
+  background: rgba(198, 40, 40, 0.08);
+  border-color: rgba(198, 40, 40, 0.25);
+  color: #c62828;
+}
+
+.att-btn.absent.active {
+  background: rgba(198, 40, 40, 0.12);
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.att-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .student-card-grid {

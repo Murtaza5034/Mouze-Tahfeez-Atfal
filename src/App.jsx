@@ -9758,6 +9758,77 @@ function TeacherPortal({
   const notificationOpenedAtRef = useRef(0);
   const finalRankNotifiedRef = useRef({});
 
+  const [studentAttendance, setStudentAttendance] = useState({});
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const weekDays = useMemo(() => {
+    const days = [];
+    const today = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  }, []);
+
+  useEffect(() => {
+    const teacherId = user?.id || teacherIdentity;
+    if (!teacherId || filteredStudents.length === 0) return;
+    setAttendanceLoading(true);
+    const startDate = weekDays[0];
+    const endDate = weekDays[weekDays.length - 1];
+    supabase
+      .from("student_daily_attendance")
+      .select("*")
+      .in("student_id", filteredStudents.map(s => String(s.student_id)))
+      .gte("attendance_date", startDate)
+      .lte("attendance_date", endDate)
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const map = {};
+          data.forEach(rec => {
+            const sid = String(rec.student_id).trim().toLowerCase();
+            if (!map[sid]) map[sid] = {};
+            map[sid][rec.attendance_date] = rec.status;
+          });
+          setStudentAttendance(map);
+        }
+        setAttendanceLoading(false);
+      });
+  }, [filteredStudents, weekDays, user?.id, teacherIdentity]);
+
+  const handleMarkAttendance = async (studentId, date, status) => {
+    const sid = String(studentId).trim().toLowerCase();
+    const existing = studentAttendance[sid]?.[date];
+    const teacherId = user?.id || teacherIdentity;
+
+    if (existing === status) return;
+
+    if (existing) {
+      const { error } = await supabase
+        .from("student_daily_attendance")
+        .update({ status })
+        .eq("student_id", String(studentId))
+        .eq("attendance_date", date);
+      if (error) { if (onShowAction) onShowAction("error", error.message); return; }
+    } else {
+      const { error } = await supabase
+        .from("student_daily_attendance")
+        .upsert(
+          { student_id: String(studentId), teacher_id: String(teacherId), attendance_date: date, status },
+          { onConflict: "student_id,attendance_date" }
+        );
+      if (error) { if (onShowAction) onShowAction("error", error.message); return; }
+    }
+
+    setStudentAttendance(prev => {
+      const next = { ...prev };
+      if (!next[sid]) next[sid] = {};
+      next[sid] = { ...next[sid], [date]: status };
+      return next;
+    });
+  };
+
   const openNotificationDetail = (event, notification) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
@@ -10581,6 +10652,44 @@ function TeacherPortal({
                       <span className="mini-pill">Surah: {student.hifz?.surat || "Pending"}</span>
                     </div>
                     <p className="student-status-copy">{student.hifzStatus}</p>
+                    <div className="attendance-section">
+                      {(() => {
+                        const sid = String(student.student_id).trim().toLowerCase();
+                        const att = studentAttendance[sid] || {};
+                        let present = 0, absent = 0;
+                        weekDays.forEach(d => {
+                          if (att[d] === 'present') present++;
+                          else if (att[d] === 'absent') absent++;
+                        });
+                        const today = weekDays[weekDays.length - 1];
+                        const todayStatus = att[today];
+                        return (
+                          <>
+                            <div className="attendance-stats-row">
+                              <span className="att-stat present">Present: {present}</span>
+                              <span className="att-stat absent">Absent: {absent}</span>
+                              <span className="att-stat total">/ 6 days</span>
+                            </div>
+                            <div className="attendance-btn-row">
+                              <button
+                                className={`att-btn present ${todayStatus === 'present' ? 'active' : ''}`}
+                                onClick={() => handleMarkAttendance(student.student_id, today, 'present')}
+                                disabled={attendanceLoading}
+                              >
+                                {todayStatus === 'present' ? '✓' : ''} Present
+                              </button>
+                              <button
+                                className={`att-btn absent ${todayStatus === 'absent' ? 'active' : ''}`}
+                                onClick={() => handleMarkAttendance(student.student_id, today, 'absent')}
+                                disabled={attendanceLoading}
+                              >
+                                {todayStatus === 'absent' ? '✕' : ''} Absent
+                              </button>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
                   </article>
                 ))}
                 {filteredStudents.length === 0 ? (
