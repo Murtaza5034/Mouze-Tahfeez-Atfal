@@ -5526,7 +5526,7 @@ function AdminPortal({
         if (showAction) showAction("error", `Badal update failed: ${updateErr.message}`);
         return;
       }
-      if (loadPortalData) loadPortalData(portalRole, user);
+      if (loadPortalData) await loadPortalData(portalRole, user);
       if (showAction) showAction(
         "success",
         newBadalTeacherId
