@@ -9747,9 +9747,19 @@ const handleDownloadAllReports = async () => {
                 style={{ width: "100%", marginBottom: "18px" }}
               >
                 <option value="">Choose a teacher...</option>
-                {portalAccessList.filter(a => a.role === 'teacher' || a.role === 'muhaffiz').map(t => (
-                  <option key={t.user_id} value={t.user_id}>{t.full_name} {t.arabic_name ? `(${t.arabic_name})` : ""}</option>
-                ))}
+                {portalAccessList
+                  .filter(a =>
+                    normalizeText(a.portal_role).includes('teacher') ||
+                    normalizeText(a.portal_role).includes('muhaffiz')
+                  )
+                  .map(t => (
+                    <option key={t.user_id} value={t.user_id}>{t.full_name} {t.arabic_name ? `(${t.arabic_name})` : ""}</option>
+                  ))}
+                {teacherProfiles
+                  .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
+                  .map(tp => (
+                    <option key={`tp-${tp.id}`} value={tp.user_id || tp.full_name}>{tp.full_name} {tp.arabic_name ? `(${tp.arabic_name})` : ""}</option>
+                  ))}
               </select>
               <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
                 <button className="premium-btn cancel-btn" onClick={() => { setBadalModal({ open: false, student: null }); setBadalTeacherId(""); }}>
