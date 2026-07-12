@@ -7997,7 +7997,20 @@ const handleDownloadAllReports = async () => {
                               <select
                                 className="premium-select badal-inline-select"
                                 value={student.badal_teacher_id || ""}
-                                onChange={e => handleBadalTeacherChange(student, e.target.value)}
+                                onChange={e => {
+                                  const rawVal = e.target.value;
+                                  /* Resolve the selected value to a user_id (UUID) so badal_teacher_id
+                                     stores a UUID, not an email — critical for teacher portal matching */
+                                  let resolvedId = rawVal;
+                                  if (rawVal && !rawVal.includes('@')) {
+                                    resolvedId = rawVal; // already a user_id
+                                  } else if (rawVal) {
+                                    /* rawVal might be an email — look up the user_id */
+                                    const portalMatch = portalAccessList.find(p => p.email === rawVal);
+                                    if (portalMatch?.user_id) resolvedId = portalMatch.user_id;
+                                  }
+                                  handleBadalTeacherChange(student, resolvedId);
+                                }}
                               >
                                 <option value="">-- No Badal --</option>
                                 {portalAccessList
@@ -13036,14 +13049,28 @@ export default function App() {
      *   - Badal teacher (badal_teacher_id === user.id): can EDIT badal progress
      *   - Original teacher (otherwise): can only VIEW badal progress (read-only)
      */
+    /*
+     * BADAL FLOW - Build all possible IDs for the current teacher
+     * (user.id, teacherIdentity, portalAccess matches, teacherProfiles matches)
+     */
+    const rawId = user?.id || teacherIdentity;
+    const allTeacherIds = [];
+    if (rawId) allTeacherIds.push(String(rawId));
+    if (user?.id && teacherIdentity && String(user.id) !== String(teacherIdentity)) allTeacherIds.push(String(teacherIdentity));
+    (Array.isArray(schoolData?.portalAccessList) ? schoolData.portalAccessList : [])
+      .filter(a => { const m = String(a.user_id) === String(rawId) || (a.full_name && normalizeText(a.full_name) === normalizeText(teacherIdentity)); return m && a.user_id; })
+      .forEach(a => { if (!allTeacherIds.includes(String(a.user_id))) allTeacherIds.push(String(a.user_id)); });
+    (Array.isArray(teacherProfiles) ? teacherProfiles : [])
+      .filter(p => { const m = String(p.user_id) === String(rawId) || (p.full_name && normalizeText(p.full_name) === normalizeText(teacherIdentity)); return m && p.user_id; })
+      .forEach(p => { if (!allTeacherIds.includes(String(p.user_id))) allTeacherIds.push(String(p.user_id)); });
+
     const matchedStudents = portalRole === "admin"
       ? [...schoolData.students]
       : schoolData.students.filter((student) => {
-          const userId = user?.id;
-          const idMatch = userId && (
-            student.muhaffiz_id === userId ||
-            student.original_teacher_id === userId ||
-            student.badal_teacher_id === userId
+          const idMatch = allTeacherIds.some(uid =>
+            String(student.muhaffiz_id) === String(uid) ||
+            String(student.original_teacher_id) === String(uid) ||
+            String(student.badal_teacher_id) === String(uid)
           );
           const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
           return idMatch || nameMatch;
@@ -13065,7 +13092,7 @@ export default function App() {
       filteredStudents,
       attendances: teacherAttendance,
     };
-  }, [schoolData.students, teacherGroupFilter, teacherIdentity, teacherAttendance, portalRole]);
+  }, [schoolData, teacherGroupFilter, teacherIdentity, teacherAttendance, portalRole, teacherProfiles]);
 
   const monthlySalary = useMemo(() => {
     if (portalRole !== "teacher") return null;
