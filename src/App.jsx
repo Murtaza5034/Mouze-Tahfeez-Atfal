@@ -5518,7 +5518,7 @@ function AdminPortal({
             if (restoreErr) throw restoreErr;
           }
         }
-        if (loadPortalData) loadPortalData();
+        if (loadPortalData) loadPortalData(portalRole, user);
         if (showAction) showAction("success", "Badal assignment removed. Child restored to original teacher.");
         return;
       }
@@ -5542,7 +5542,7 @@ function AdminPortal({
         }
         if (ins) setAdminBadalAssignments(prev => [...prev, ins]);
       }
-      if (loadPortalData) loadPortalData();
+      if (loadPortalData) loadPortalData(portalRole, user);
       if (showAction) showAction("success", "Badal assigned! Child shifted to the badal teacher. Teachers should refresh their portal.");
       try {
         const childName = student.name || student.full_name || "a child";
