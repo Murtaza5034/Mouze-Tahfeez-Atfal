@@ -9829,6 +9829,37 @@ function TeacherPortal({
     });
   };
 
+  const handleMarkAllAttendance = async (date, status) => {
+    if (!date || filteredStudents.length === 0) return;
+    const teacherId = user?.id || teacherIdentity;
+    setAttendanceLoading(true);
+    const records = filteredStudents.map(s => ({
+      student_id: String(s.student_id),
+      teacher_id: String(teacherId),
+      attendance_date: date,
+      status,
+    }));
+    const { error } = await supabase
+      .from("student_daily_attendance")
+      .upsert(records, { onConflict: "student_id,attendance_date" });
+    if (error) {
+      if (onShowAction) onShowAction("error", error.message);
+      setAttendanceLoading(false);
+      return;
+    }
+    setStudentAttendance(prev => {
+      const next = { ...prev };
+      filteredStudents.forEach(s => {
+        const sid = String(s.student_id).trim().toLowerCase();
+        if (!next[sid]) next[sid] = {};
+        next[sid] = { ...next[sid], [date]: status };
+      });
+      return next;
+    });
+    setAttendanceLoading(false);
+    if (onShowAction) onShowAction("success", `Marked all as ${status}`);
+  };
+
   const openNotificationDetail = (event, notification) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
@@ -10634,6 +10665,20 @@ function TeacherPortal({
                 </div>
               </div>
 
+              <div className="bulk-attendance-row">
+                <span className="bulk-label">Quick Mark All:</span>
+                {(() => {
+                  const today = weekDays[weekDays.length - 1];
+                  return (
+                    <>
+                      <button className={`bulk-att-btn present`} onClick={() => handleMarkAllAttendance(today, 'present')} disabled={attendanceLoading}>✓ All Present</button>
+                      <button className={`bulk-att-btn absent`} onClick={() => handleMarkAllAttendance(today, 'absent')} disabled={attendanceLoading}>✕ All Absent</button>
+                      <button className={`bulk-att-btn holiday`} onClick={() => handleMarkAllAttendance(today, 'holiday')} disabled={attendanceLoading}>☾ Holiday</button>
+                    </>
+                  );
+                })()}
+              </div>
+
               <div className="student-card-grid">
                 {filteredStudents.map((student) => (
                   <article key={student.student_id} className="student-card">
@@ -10656,10 +10701,11 @@ function TeacherPortal({
                       {(() => {
                         const sid = String(student.student_id).trim().toLowerCase();
                         const att = studentAttendance[sid] || {};
-                        let present = 0, absent = 0;
+                        let present = 0, absent = 0, holiday = 0;
                         weekDays.forEach(d => {
                           if (att[d] === 'present') present++;
                           else if (att[d] === 'absent') absent++;
+                          else if (att[d] === 'holiday') holiday++;
                         });
                         const today = weekDays[weekDays.length - 1];
                         const todayStatus = att[today];
@@ -10668,6 +10714,7 @@ function TeacherPortal({
                             <div className="attendance-stats-row">
                               <span className="att-stat present">Present: {present}</span>
                               <span className="att-stat absent">Absent: {absent}</span>
+                              {holiday > 0 && <span className="att-stat holiday">Holiday: {holiday}</span>}
                               <span className="att-stat total">/ 6 days</span>
                             </div>
                             <div className="attendance-btn-row">
@@ -10684,6 +10731,13 @@ function TeacherPortal({
                                 disabled={attendanceLoading}
                               >
                                 {todayStatus === 'absent' ? '✕' : ''} Absent
+                              </button>
+                              <button
+                                className={`att-btn holiday ${todayStatus === 'holiday' ? 'active' : ''}`}
+                                onClick={() => handleMarkAttendance(student.student_id, today, 'holiday')}
+                                disabled={attendanceLoading}
+                              >
+                                {todayStatus === 'holiday' ? '☾' : ''} Holiday
                               </button>
                             </div>
                           </>

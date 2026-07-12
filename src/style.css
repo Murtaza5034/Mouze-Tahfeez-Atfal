@@ -2193,7 +2193,78 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   color: #c62828;
 }
 
+.att-btn.holiday:hover:not(:disabled) {
+  background: rgba(156, 39, 176, 0.08);
+  border-color: rgba(156, 39, 176, 0.25);
+  color: #7b1fa2;
+}
+
+.att-btn.holiday.active {
+  background: rgba(156, 39, 176, 0.12);
+  border-color: #7b1fa2;
+  color: #7b1fa2;
+}
+
+.att-stat.holiday {
+  color: #7b1fa2;
+}
+
 .att-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bulk-attendance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  background: rgba(183, 137, 31, 0.06);
+  border-radius: 14px;
+  border: 1px solid rgba(183, 137, 31, 0.12);
+  flex-wrap: wrap;
+}
+
+.bulk-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--deep-brown, #5d4037);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.bulk-att-btn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(0,0,0,0.04);
+  color: #666;
+}
+
+.bulk-att-btn.present:hover:not(:disabled) {
+  background: rgba(46, 125, 50, 0.08);
+  border-color: rgba(46, 125, 50, 0.25);
+  color: #2e7d32;
+}
+
+.bulk-att-btn.absent:hover:not(:disabled) {
+  background: rgba(198, 40, 40, 0.08);
+  border-color: rgba(198, 40, 40, 0.25);
+  color: #c62828;
+}
+
+.bulk-att-btn.holiday:hover:not(:disabled) {
+  background: rgba(156, 39, 176, 0.08);
+  border-color: rgba(156, 39, 176, 0.25);
+  color: #7b1fa2;
+}
+
+.bulk-att-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
