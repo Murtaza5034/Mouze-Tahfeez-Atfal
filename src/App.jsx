@@ -2404,6 +2404,9 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       teacherName: profile.teacher_name || teacherInProfiles?.full_name || "Unassigned teacher",
       groupName: profile.group_name || "Ungrouped",
       muhaffiz_id: profile.teacher_id || null,
+      /* Badal fields: original_teacher_id = permanent teacher, badal_teacher_id = substitute (nullable) */
+      original_teacher_id: profile.original_teacher_id || null,
+      badal_teacher_id: profile.badal_teacher_id || null,
       user_id: profile.parent_user_id || null,
       parent_email: profile.parent_email || null,
       photoUrl: profile.photo_url || "",
@@ -5497,59 +5500,47 @@ function AdminPortal({
 }) {
   const showAction = onShowAction;
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
-  const [adminBadalAssignments, setAdminBadalAssignments] = useState([]);
-  useEffect(() => {
-    supabase.from("badal_assignments").select("*").eq("status", "active").then(({ data }) => {
-      if (data) setAdminBadalAssignments(data);
-    });
-  }, []);
-  const handleAssignBadalInline = async (student, teacherId) => {
+
+  /*
+   * BADAL FLOW - handleBadalTeacherChange (Admin inline badal assignment)
+   *
+   * This is called when admin changes the "Badal Teacher" dropdown on a child card.
+   * It directly updates child_profiles.badal_teacher_id.
+   *
+   * Teacher Portal visibility (handled in matchedStudents / overviewStudents):
+   *   - A teacher sees children where: teacher_id === teacher.id (original) OR badal_teacher_id === teacher.id (substitute)
+   *   - Badal teacher = can EDIT progress (badal_progress table)
+   *   - Original teacher = can VIEW (read-only) badal progress
+   */
+  const handleBadalTeacherChange = async (student, newBadalTeacherId) => {
     const sidStr = String(student.student_id);
     const sidNum = Number(student.student_id);
     const sidVal = isNaN(sidNum) ? sidStr : sidNum;
     try {
-      if (!teacherId) {
-        const existing = adminBadalAssignments.find(a => String(a.student_id) === sidStr && a.status === "active");
-        if (existing) {
-          await supabase.from("badal_assignments").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", existing.id);
-          setAdminBadalAssignments(prev => prev.filter(a => a.id !== existing.id));
-          if (existing.original_teacher_id) {
-            const { error: restoreErr } = await supabase.from("child_profiles").update({ teacher_id: existing.original_teacher_id }).eq("student_id", sidVal);
-            if (restoreErr) throw restoreErr;
-          }
-        }
-        if (loadPortalData) loadPortalData(portalRole, user);
-        if (showAction) showAction("success", "Badal assignment removed. Child restored to original teacher.");
+      const { error: updateErr } = await supabase
+        .from("child_profiles")
+        .update({ badal_teacher_id: newBadalTeacherId || null })
+        .eq("student_id", sidVal);
+      if (updateErr) {
+        console.error("badal_teacher_id update error:", updateErr);
+        if (showAction) showAction("error", `Badal update failed: ${updateErr.message}`);
         return;
       }
-      const existing = adminBadalAssignments.find(a => String(a.student_id) === sidStr && a.status === "active");
-      const originalTeacherId = existing?.original_teacher_id || student.muhaffiz_id || null;
-      const { error: updateErr } = await supabase.from("child_profiles").update({ teacher_id: teacherId }).eq("student_id", sidVal);
-      if (updateErr) {
-        console.error("child_profiles update error:", updateErr);
-        if (showAction) showAction("error", `child_profiles update failed: ${updateErr.message}`);
-        throw updateErr;
-      }
-      if (existing) {
-        await supabase.from("badal_assignments").update({ teacher_id: teacherId, assigned_by: user?.id, original_teacher_id: originalTeacherId, updated_at: new Date().toISOString() }).eq("id", existing.id);
-        setAdminBadalAssignments(prev => prev.map(a => a.id === existing.id ? { ...a, teacher_id: teacherId } : a));
-      } else {
-        const { data: ins, error: insErr } = await supabase.from("badal_assignments").insert({ student_id: sidStr, teacher_id: teacherId, assigned_by: user?.id, original_teacher_id: originalTeacherId, status: "active" }).select().single();
-        if (insErr) {
-          console.error("badal_assignments insert error:", insErr);
-          if (showAction) showAction("error", `badal_assignments insert failed: ${insErr.message}`);
-          throw insErr;
-        }
-        if (ins) setAdminBadalAssignments(prev => [...prev, ins]);
-      }
       if (loadPortalData) loadPortalData(portalRole, user);
-      if (showAction) showAction("success", "Badal assigned! Child shifted to the badal teacher. Teachers should refresh their portal.");
-      try {
-        const childName = student.name || student.full_name || "a child";
-        await supabase.functions.invoke('fcm-notification', {
-          body: { title: "New Badal Assignment", body: `You have been assigned as badal for ${childName}`, targetUser: teacherId, data: { type: "badal_assignment", childName } }
-        });
-      } catch (fcmErr) { console.error("Badal assignment FCM error:", fcmErr); }
+      if (showAction) showAction(
+        "success",
+        newBadalTeacherId
+          ? "Badal teacher assigned! Child will appear in both teachers' portals."
+          : "Badal teacher removed. Child will only appear in the original teacher's portal."
+      );
+      if (newBadalTeacherId) {
+        try {
+          const childName = student.name || student.full_name || "a child";
+          await supabase.functions.invoke('fcm-notification', {
+            body: { title: "New Badal Assignment", body: `You have been assigned as badal for ${childName}`, targetUser: newBadalTeacherId, data: { type: "badal_assignment", childName } }
+          });
+        } catch (fcmErr) { console.error("Badal FCM error:", fcmErr); }
+      }
     } catch (err) {
       console.error("Badal assignment error:", err);
       if (showAction) showAction("error", `Badal assignment failed: ${err.message || err}`);
@@ -7960,14 +7951,24 @@ const handleDownloadAllReports = async () => {
                             </div>
                           </div>
                           <div className="assignment-details">
+                            {/* BADAL FLOW: Original Teacher dropdown - sets the permanent teacher */}
                             <div className="detail-item">
-                              <span className="detail-label">Teacher:</span>
+                              <span className="detail-label">Original Teacher:</span>
                               <select
                                 className="premium-select badal-inline-select"
                                 value={student.muhaffiz_id || ""}
                                 onChange={e => {
                                   const tid = e.target.value;
-                                  if (tid) onAssignChild({ student_id: student.student_id, teacher_id: tid });
+                                  if (tid) {
+                                    /* When admin sets the original teacher, also pass original_teacher_id
+                                       and preserve any existing badal_teacher_id */
+                                    onAssignChild({
+                                      student_id: student.student_id,
+                                      teacher_id: tid,
+                                      original_teacher_id: student.original_teacher_id || tid,
+                                      badal_teacher_id: student.badal_teacher_id || null
+                                    });
+                                  }
                                 }}
                               >
                                 <option value="">-- Select Teacher --</option>
@@ -7990,15 +7991,13 @@ const handleDownloadAllReports = async () => {
                                   ))}
                               </select>
                             </div>
+                            {/* BADAL FLOW: Badal Teacher dropdown - optional substitute teacher */}
                             <div className="detail-item">
-                              <span className="detail-label">Badal:</span>
+                              <span className="detail-label">Badal Teacher:</span>
                               <select
                                 className="premium-select badal-inline-select"
-                                value={(() => {
-                                  const ba = adminBadalAssignments.find(a => String(a.student_id) === String(student.student_id) && a.status === "active");
-                                  return ba ? String(ba.teacher_id) : "";
-                                })()}
-                                onChange={e => handleAssignBadalInline(student, e.target.value)}
+                                value={student.badal_teacher_id || ""}
+                                onChange={e => handleBadalTeacherChange(student, e.target.value)}
                               >
                                 <option value="">-- No Badal --</option>
                                 {portalAccessList
@@ -9953,40 +9952,83 @@ function TeacherPortal({
       });
   }, [overviewStudents, weekDays, user?.id, teacherIdentity]);
 
+  /*
+   * BADAL FLOW - fetchBadalData
+   * Fetches badal-related data for the current teacher from two sources:
+   *   1. badal_assignments table (legacy, for backward compatibility)
+   *   2. child_profiles.badal_teacher_id (new model - direct field on child record)
+   *
+   * The progress data (badal_progress) is used by both the Badal teacher (editing)
+   * and the Original teacher (viewing).
+   */
   const fetchBadalData = useCallback(() => {
-    supabase
-      .from("badal_assignments")
-      .select("*")
-      .eq("status", "active")
-      .then(({ data }) => {
-        if (data) {
-          setBadalAssignments(data);
-          const studentIds = data.map(a => { const n = Number(a.student_id); return isNaN(n) ? String(a.student_id) : n; });
-          if (studentIds.length > 0) {
-            supabase
-              .from("badal_progress")
-              .select("*")
-              .in("student_id", studentIds.map(s => String(s)))
-              .order("week_date", { ascending: false })
-              .then(({ data: pData }) => {
-                if (pData) setBadalProgress(pData);
-              });
-            supabase
-              .from("child_profiles")
-              .select("*")
-              .in("student_id", studentIds)
-              .then(({ data: cData }) => {
-                if (cData) setBadalStudentProfiles(cData.map(c => ({ ...c, name: c.full_name || c.name || "" })));
-              });
-          } else {
-            setBadalStudentProfiles([]);
+    const rawId = user?.id || teacherIdentity;
+    const idMatches = [];
+    if (rawId) idMatches.push(String(rawId));
+    if (user?.id && teacherIdentity && String(user.id) !== String(teacherIdentity)) idMatches.push(String(teacherIdentity));
+    const teacherIdFilter = idMatches.length > 0 ? idMatches : [""];
+
+    /* Fetch from both sources in parallel */
+    Promise.all([
+      supabase.from("badal_assignments").select("*").eq("status", "active"),
+      supabase.from("child_profiles").select("student_id, full_name, original_teacher_id, badal_teacher_id")
+        .or(teacherIdFilter.map(id => `badal_teacher_id.eq.${id}`).join(","))
+    ]).then(([assignmentsRes, childProfilesRes]) => {
+      let combined = [];
+      /* Legacy: use badal_assignments table */
+      if (assignmentsRes.data) {
+        combined = assignmentsRes.data.map(a => ({
+          ...a,
+          _source: "badal_assignments"
+        }));
+      }
+      /* New model: use child_profiles.badal_teacher_id */
+      if (childProfilesRes.data) {
+        const fromProfiles = childProfilesRes.data
+          .filter(cp => cp.badal_teacher_id && teacherIdFilter.some(tid => String(cp.badal_teacher_id) === String(tid)))
+          .map(cp => ({
+            student_id: String(cp.student_id),
+            teacher_id: cp.badal_teacher_id,
+            original_teacher_id: cp.original_teacher_id,
+            status: "active",
+            _source: "child_profiles"
+          }));
+        /* Merge: prefer records from child_profiles, fall back to badal_assignments */
+        const seen = new Set(combined.map(a => String(a.student_id)));
+        fromProfiles.forEach(fp => {
+          if (!seen.has(String(fp.student_id))) {
+            combined.push(fp);
+            seen.add(String(fp.student_id));
           }
-        } else {
-          setBadalAssignments([]);
-          setBadalStudentProfiles([]);
-        }
-      });
-  }, []);
+        });
+      }
+      setBadalAssignments(combined);
+
+      const studentIds = combined.map(a => { const n = Number(a.student_id); return isNaN(n) ? String(a.student_id) : n; });
+      if (studentIds.length > 0) {
+        supabase
+          .from("badal_progress")
+          .select("*")
+          .in("student_id", studentIds.map(s => String(s)))
+          .order("week_date", { ascending: false })
+          .then(({ data: pData }) => {
+            if (pData) setBadalProgress(pData);
+          });
+        supabase
+          .from("child_profiles")
+          .select("*")
+          .in("student_id", studentIds)
+          .then(({ data: cData }) => {
+            if (cData) setBadalStudentProfiles(cData.map(c => ({ ...c, name: c.full_name || c.name || "" })));
+          });
+      } else {
+        setBadalStudentProfiles([]);
+      }
+    }).catch(() => {
+      setBadalAssignments([]);
+      setBadalStudentProfiles([]);
+    });
+  }, [user?.id, teacherIdentity]);
 
   useEffect(() => { fetchBadalData(); }, [fetchBadalData]);
 
@@ -10032,17 +10074,18 @@ function TeacherPortal({
         delete next[studentId];
         return next;
       });
+      /* BADAL FLOW: Notify the original teacher that badal progress was updated */
       try {
         const sid = String(studentId);
-        const assignment = badalAssignments.find(a => String(a.student_id) === sid && a.status === "active");
-        if (assignment?.original_teacher_id) {
-          const childName = filteredStudents.find(s => String(s.student_id) === sid)?.name
-            || (schoolData?.students || []).find(s => String(s.student_id) === sid)?.name
-            || badalStudentProfiles.find(s => String(s.student_id) === sid)?.name
-            || "a child";
+        const student = filteredStudents.find(s => String(s.student_id) === sid)
+          || (schoolData?.students || []).find(s => String(s.student_id) === sid)
+          || badalStudentProfiles.find(s => String(s.student_id) === sid);
+        const originalTeacherId = student?.original_teacher_id || student?.muhaffiz_id || (badalAssignments.find(a => String(a.student_id) === sid && a.status === "active")?.original_teacher_id);
+        if (originalTeacherId) {
+          const childName = student?.name || "a child";
           const badalTeacherName = teacherProfiles.find(p => p.user_id === teacherId)?.full_name || "Badal Teacher";
           await supabase.functions.invoke('fcm-notification', {
-            body: { title: "Badal Progress Update", body: `${badalTeacherName} updated progress for ${childName}`, targetUser: assignment.original_teacher_id, data: { type: "badal_progress_update", studentId: sid } }
+            body: { title: "Badal Progress Update", body: `${badalTeacherName} updated progress for ${childName}`, targetUser: originalTeacherId, data: { type: "badal_progress_update", studentId: sid } }
           });
         }
       } catch (fcmErr) { console.error("Badal progress FCM error:", fcmErr); }
@@ -10936,10 +10979,15 @@ function TeacherPortal({
               <div className="student-card-grid">
                 {overviewStudents.map((student) => {
                   const sid = String(student.student_id).trim().toLowerCase();
-                  const badalAssignment = badalAssignments.find(a => String(a.student_id) === sid && a.status === "active");
-                  const isBadalTeacher = badalAssignment && String(badalAssignment.teacher_id) === (user?.id || teacherIdentity);
-                  const isOriginalTeacher = badalAssignment && String(badalAssignment.original_teacher_id) === (user?.id || teacherIdentity);
-                  const badalTeacherInfo = badalAssignment ? teacherProfiles.find(p => p.user_id === badalAssignment.teacher_id) : null;
+                  /* BADAL FLOW: Determine if this student has a badal teacher, and what role the current teacher plays.
+                   * Uses the badal_teacher_id and original_teacher_id directly from the student object
+                   * (populated from child_profiles by buildStudents).
+                   */
+                  const hasBadal = !!student.badal_teacher_id;
+                  const currentUserId = user?.id || teacherIdentity;
+                  const isBadalTeacher = hasBadal && String(student.badal_teacher_id) === String(currentUserId);
+                  const isOriginalTeacher = hasBadal && String(student.original_teacher_id || student.muhaffiz_id) === String(currentUserId);
+                  const badalTeacherInfo = hasBadal ? teacherProfiles.find(p => p.user_id === student.badal_teacher_id) : null;
                   const badalProgressData = badalProgress
                     .filter(p => String(p.student_id) === sid)
                     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -11440,24 +11488,26 @@ function TeacherPortal({
                     .filter(p => { const match = String(p.user_id) === String(rawId) || (p.full_name && normalizeText(p.full_name) === normalizeText(teacherIdentity)); return match && p.user_id; })
                     .forEach(p => { if (!allUserIds.includes(String(p.user_id))) allUserIds.push(String(p.user_id)); });
 
-                  const myBadalStudents = badalAssignments
-                    .filter(a => a.status === "active" && allUserIds.some(uid => String(a.teacher_id) === String(uid)))
-                    .map(a => {
-                      const sid = String(a.student_id);
-                      const student = filteredStudents.find(s => String(s.student_id) === sid)
-                        || (schoolData?.students || []).find(s => String(s.student_id) === sid)
-                        || badalStudentProfiles.find(s => String(s.student_id) === sid);
-                      return { ...a, student };
-                    });
-                  const originalStudents = badalAssignments
-                    .filter(a => a.status === "active" && allUserIds.some(uid => String(a.original_teacher_id) === String(uid)))
-                    .map(a => {
-                      const sid = String(a.student_id);
-                      const student = filteredStudents.find(s => String(s.student_id) === sid)
-                        || (schoolData?.students || []).find(s => String(s.student_id) === sid)
-                        || badalStudentProfiles.find(s => String(s.student_id) === sid);
-                      const badalTeacherInfo = teacherProfiles.find(p => p.user_id === a.teacher_id);
-                      return { ...a, student, badalTeacherInfo };
+                  /*
+                   * BADAL FLOW - Badal page student lists
+                   *
+                   * myBadalStudents: Students where THIS teacher is the BADAL teacher.
+                   *   - These show the EDIT form (can update Juz, Juz Hali, Jadeed progress).
+                   *   - Uses student.badal_teacher_id (from child_profiles).
+                   *
+                   * originalStudents: Students where THIS teacher is the ORIGINAL teacher
+                   * AND they have a badal teacher assigned.
+                   *   - These show READ-ONLY progress (view what the badal teacher entered).
+                   *   - Uses student.original_teacher_id from child_profiles.
+                   */
+                  const myBadalStudents = filteredStudents
+                    .filter(s => s.badal_teacher_id && allUserIds.some(uid => String(s.badal_teacher_id) === String(uid)))
+                    .map(s => ({ student: s, student_id: s.student_id, teacher_id: s.badal_teacher_id, original_teacher_id: s.original_teacher_id || s.muhaffiz_id }));
+                  const originalStudents = filteredStudents
+                    .filter(s => s.badal_teacher_id && allUserIds.some(uid => String(s.original_teacher_id || s.muhaffiz_id) === String(uid)))
+                    .map(s => {
+                      const badalTeacherInfo = teacherProfiles.find(p => p.user_id === s.badal_teacher_id);
+                      return { student: s, student_id: s.student_id, teacher_id: s.badal_teacher_id, original_teacher_id: s.original_teacher_id || s.muhaffiz_id, badalTeacherInfo };
                     });
                   return (
                     <>
@@ -12971,10 +13021,27 @@ export default function App() {
       new Set(schoolData.students.map((student) => student.groupName).filter(Boolean))
     );
 
+    /*
+     * BADAL FLOW - Teacher Portal student visibility
+     * A teacher sees a child if ANY of these is true:
+     *   1. The teacher is the child's assigned teacher (muhaffiz_id / teacher_id)
+     *   2. The teacher is the child's original teacher (original_teacher_id)
+     *   3. The teacher is the child's badal/substitute teacher (badal_teacher_id)
+     *   4. Fallback: teacher name matches child's teacherName
+     *
+     * Permissions (applied elsewhere):
+     *   - Badal teacher (badal_teacher_id === user.id): can EDIT badal progress
+     *   - Original teacher (otherwise): can only VIEW badal progress (read-only)
+     */
     const matchedStudents = portalRole === "admin"
       ? [...schoolData.students]
       : schoolData.students.filter((student) => {
-          const idMatch = user?.id && student.muhaffiz_id === user.id;
+          const userId = user?.id;
+          const idMatch = userId && (
+            student.muhaffiz_id === userId ||
+            student.original_teacher_id === userId ||
+            student.badal_teacher_id === userId
+          );
           const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
           return idMatch || nameMatch;
         });
@@ -14094,16 +14161,26 @@ const handleSendCustomNotification = async (event) => {
     showAction("success", "Group added successfully.");
   };
 
+  /*
+   * BADAL FLOW - handleAssignChild
+   * When admin saves the Assign Child form:
+   *   1. teacher_id = the "Original Teacher" (permanent teacher)
+   *   2. original_teacher_id = same as teacher_id (set once, never changes unless admin changes)
+   *   3. badal_teacher_id = optional substitute teacher (can be updated from Badal Update page)
+   *
+   * Teacher Portal visibility:
+   *   A teacher sees a child if: child.teacher_id === teacher.id (original) OR child.badal_teacher_id === teacher.id (substitute)
+   *   Badal teacher = can EDIT progress; Original teacher = can VIEW only (read-only for badal data)
+   */
   const handleAssignChild = async (data) => {
-    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number } = data;
+    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number, original_teacher_id, badal_teacher_id } = data;
     if (!student_id) {
       showAction("error", "Please select a student first.");
       return;
     }
 
-    console.log("Linking accounts for student:", student_id, { teacher_id, parent_id });
+    console.log("Linking accounts for student:", student_id, { teacher_id, parent_id, original_teacher_id, badal_teacher_id });
 
-    // Fix: Use schoolData instead of undefined adminData
     const teacherRecord =
       schoolData.portalAccessList.find(a => String(a.user_id) === String(teacher_id) || String(a.email) === String(teacher_id)) ||
       schoolData.teacherProfiles.find(p => String(p.user_id) === String(teacher_id));
@@ -14116,9 +14193,13 @@ const handleSendCustomNotification = async (event) => {
     const isNewParent = parentRecord && (!existingStudent || String(existingStudent.user_id) !== String(parentRecord.user_id));
 
     // Update child_profiles table directly
+    // original_teacher_id: set on first assignment, preserved thereafter
+    // badal_teacher_id: optional substitute teacher (null = no badal)
     const updatePayload = {
       teacher_name: teacherRecord?.full_name || null,
       teacher_id: teacherRecord?.user_id || teacher_id || null,
+      original_teacher_id: original_teacher_id || teacherRecord?.user_id || teacher_id || null,
+      badal_teacher_id: badal_teacher_id || null,
       parent_user_id: parentRecord?.user_id || (parent_id?.includes('@') ? null : parent_id) || null,
       parent_email: parentRecord?.email || (parent_id?.includes('@') ? parent_id : null) || null
     };
@@ -14164,6 +14245,16 @@ const handleSendCustomNotification = async (event) => {
       }
     }
 
+    if (badal_teacher_id && badal_teacher_id !== teacherRecord?.user_id) {
+      broadcastNotification(
+        "Badal Assignment",
+        `${studentName} has been assigned to you as a Badal (substitute) student by the Admin.`,
+        "user",
+        badal_teacher_id,
+        "My Group"
+      );
+    }
+
     if (isNewParent) {
       const targetParentUser = parentRecord.user_id || parentRecord.email || parent_id;
       if (targetParentUser) {
@@ -14187,6 +14278,8 @@ const handleSendCustomNotification = async (event) => {
             teacherName: teacherRecord?.full_name || "Unassigned teacher",
             groupName: group_name || "Ungrouped",
             muhaffiz_id: teacherRecord?.user_id || teacher_id || null,
+            original_teacher_id: original_teacher_id || teacherRecord?.user_id || teacher_id || null,
+            badal_teacher_id: badal_teacher_id || null,
             user_id: parentRecord?.user_id || null,
             parent_email: parentRecord?.email || null
           }
