@@ -9969,10 +9969,13 @@ function TeacherPortal({
     const teacherIdFilter = idMatches.length > 0 ? idMatches : [""];
 
     /* Fetch from both sources in parallel */
+    const badalProfileQuery = teacherIdFilter[0]
+      ? supabase.from("child_profiles").select("student_id, full_name, original_teacher_id, badal_teacher_id")
+          .or(teacherIdFilter.map(id => `badal_teacher_id.eq.${id}`).join(","))
+      : Promise.resolve({ data: null, error: null });
     Promise.all([
       supabase.from("badal_assignments").select("*").eq("status", "active"),
-      supabase.from("child_profiles").select("student_id, full_name, original_teacher_id, badal_teacher_id")
-        .or(teacherIdFilter.map(id => `badal_teacher_id.eq.${id}`).join(","))
+      badalProfileQuery
     ]).then(([assignmentsRes, childProfilesRes]) => {
       let combined = [];
       /* Legacy: use badal_assignments table */
@@ -11008,10 +11011,10 @@ function TeacherPortal({
                       <span className="mini-pill">Surah: {student.latestResult?.wusool_surah || student.hifz?.surat || "Pending"}</span>
                     </div>
                     <p className="student-status-copy">{student.hifzStatus}</p>
-                    {badalAssignment && (
+                    {hasBadal && (
                       <div className="badal-info-section">
                         <div className="badal-info-badge">
-                          <RotateCw size={12} /> {isBadalTeacher ? "You are Badal for this child" : isOriginalTeacher ? `Badal Active — ${badalTeacherInfo?.full_name || badalAssignment.teacher_id}` : `Badal: ${badalTeacherInfo?.full_name || "Assigned"}`}
+                          <RotateCw size={12} /> {isBadalTeacher ? "You are Badal for this child" : isOriginalTeacher ? `Badal Active — ${badalTeacherInfo?.full_name || student.badal_teacher_id}` : `Badal: ${badalTeacherInfo?.full_name || "Assigned"}`}
                         </div>
                         {badalProgressData.length > 0 && (
                           <div className="badal-progress-mini">
