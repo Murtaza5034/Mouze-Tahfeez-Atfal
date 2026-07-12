@@ -10693,8 +10693,8 @@ function TeacherPortal({
                       </div>
                     </div>
                     <div className="pill-row">
-                      <span className="mini-pill">Juz: {student.hifz?.juz || "N-A"}</span>
-                      <span className="mini-pill">Surah: {student.hifz?.surat || "Pending"}</span>
+                      <span className="mini-pill">Juz: {student.latestResult?.wusool_juz || student.hifz?.juz || "N-A"}</span>
+                      <span className="mini-pill">Surah: {student.latestResult?.wusool_surah || student.hifz?.surat || "Pending"}</span>
                     </div>
                     <p className="student-status-copy">{student.hifzStatus}</p>
                     <div className="attendance-section">
