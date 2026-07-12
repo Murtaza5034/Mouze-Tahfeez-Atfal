@@ -7922,13 +7922,11 @@ const handleDownloadAllReports = async () => {
                             <StudentAvatar student={student} size="small" />
                             <div className="child-card-info">
                               <strong>{student.name}</strong>
-                              {student.arabic_name && (
-                                <span className="arabic-kanz" style={{ fontSize: '1rem', color: 'var(--primary-gold)', display: 'block', marginTop: '2px' }}>{student.arabic_name}</span>
-                              )}
-                              <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{student.groupName}</p>
+                              {student.arabic_name && <span className="child-card-arabic">{student.arabic_name}</span>}
+                              <p className="child-card-group">{student.groupName}</p>
                             </div>
                           </div>
-                          <div className="assignment-details" style={{ marginTop: '10px' }}>
+                          <div className="assignment-details">
                             <div className="detail-item">
                               <span className="detail-label">Teacher:</span>
                               <select
@@ -7994,7 +7992,7 @@ const handleDownloadAllReports = async () => {
                               <span className="detail-value">{parent?.full_name || "Unlinked"}</span>
                             </div>
                           </div>
-                          <div className="child-card-actions" style={{ marginTop: '10px' }}>
+                          <div className="child-card-actions">
                             <button
                               className="unassign-btn"
                               onClick={() => onUnassignChild(student.student_id)}

@@ -2410,25 +2410,6 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   background: rgba(0,0,0,0.08);
 }
 
-.badal-inline-select {
-  font-size: 0.78rem !important;
-  padding: 5px 8px !important;
-  border-radius: 8px !important;
-  min-width: 160px;
-}
-
-.assigned-child-card .assignment-details .detail-item {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-.assigned-child-card .assignment-details .detail-label {
-  min-width: 55px;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
 .student-card-grid {
   margin-top: 24px;
   display: grid;
@@ -4009,13 +3990,13 @@ body {
 
 .assigned-child-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: var(--premium-white);
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #fffefb 0%, #f8efd8 100%);
   border-radius: 22px;
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-premium);
+  border: 1px solid rgba(183, 137, 31, 0.15);
+  box-shadow: 0 2px 12px rgba(183, 137, 31, 0.06);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -4045,6 +4026,20 @@ body {
   font-weight: 500;
 }
 
+.child-card-arabic {
+  font-size: 1rem;
+  color: var(--primary-gold);
+  display: block;
+  margin-top: 2px;
+  font-family: 'Kanz al Marjaan', serif;
+}
+
+.child-card-group {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .teacher-tag {
   display: inline-block;
   margin-top: 6px;
@@ -4054,6 +4049,49 @@ body {
   background: var(--light-gold);
   padding: 2px 8px;
   border-radius: 6px;
+}
+
+.assignment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-item {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.detail-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.detail-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.badal-inline-select {
+  font-size: 0.8rem !important;
+  padding: 6px 10px !important;
+  border-radius: 10px !important;
+  width: 100%;
+  background: white;
+  border: 1.5px solid rgba(183, 137, 31, 0.2);
+  color: var(--deep-brown);
+}
+
+.child-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .unassign-btn {
@@ -4169,32 +4207,6 @@ body {
   display: flex;
   gap: 12px;
   margin-top: 24px;
-}
-
-.assignment-details {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.03);
-  border-radius: 6px;
-}
-
-.detail-label {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.detail-value {
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 .group-tag {
