@@ -5497,35 +5497,30 @@ function AdminPortal({
 }) {
   const showAction = onShowAction;
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
-  const [badalModal, setBadalModal] = useState({ open: false, student: null });
-  const [badalTeacherId, setBadalTeacherId] = useState("");
-  const [badalAssigning, setBadalAssigning] = useState(false);
-  const handleAssignBadal = async () => {
-    if (!badalModal.student || !badalTeacherId) return;
-    setBadalAssigning(true);
-    const sid = String(badalModal.student.student_id);
-    const { data: existing } = await supabase
-      .from("badal_assignments")
-      .select("id")
-      .eq("student_id", sid)
-      .eq("status", "active")
-      .maybeSingle();
-    let error;
-    if (existing) {
-      ({ error } = await supabase
-        .from("badal_assignments")
-        .update({ teacher_id: badalTeacherId, assigned_by: user?.id, original_teacher_id: badalModal.student.muhaffiz_id || null, updated_at: new Date().toISOString() })
-        .eq("id", existing.id));
-    } else {
-      ({ error } = await supabase
-        .from("badal_assignments")
-        .insert({ student_id: sid, teacher_id: badalTeacherId, assigned_by: user?.id, original_teacher_id: badalModal.student.muhaffiz_id || null, status: "active" }));
+  const [adminBadalAssignments, setAdminBadalAssignments] = useState([]);
+  useEffect(() => {
+    supabase.from("badal_assignments").select("*").eq("status", "active").then(({ data }) => {
+      if (data) setAdminBadalAssignments(data);
+    });
+  }, []);
+  const handleAssignBadalInline = async (student, teacherId) => {
+    const sid = String(student.student_id);
+    if (!teacherId) {
+      const existing = adminBadalAssignments.find(a => String(a.student_id) === sid && a.status === "active");
+      if (existing) {
+        await supabase.from("badal_assignments").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", existing.id);
+        setAdminBadalAssignments(prev => prev.filter(a => a.id !== existing.id));
+      }
+      return;
     }
-    if (error) { if (showAction) showAction("error", error.message); }
-    else { if (showAction) showAction("success", `Badal assigned for ${badalModal.student.name}`); }
-    setBadalAssigning(false);
-    setBadalModal({ open: false, student: null });
-    setBadalTeacherId("");
+    const existing = adminBadalAssignments.find(a => String(a.student_id) === sid && a.status === "active");
+    if (existing) {
+      await supabase.from("badal_assignments").update({ teacher_id: teacherId, assigned_by: user?.id, original_teacher_id: student.muhaffiz_id || null, updated_at: new Date().toISOString() }).eq("id", existing.id);
+      setAdminBadalAssignments(prev => prev.map(a => a.id === existing.id ? { ...a, teacher_id: teacherId } : a));
+    } else {
+      const { data: ins } = await supabase.from("badal_assignments").insert({ student_id: sid, teacher_id: teacherId, assigned_by: user?.id, original_teacher_id: student.muhaffiz_id || null, status: "active" }).select().single();
+      if (ins) setAdminBadalAssignments(prev => [...prev, ins]);
+    }
   };
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
   const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
@@ -7927,33 +7922,85 @@ const handleDownloadAllReports = async () => {
                             <StudentAvatar student={student} size="small" />
                             <div className="child-card-info">
                               <strong>{student.name}</strong>
-
-                              <div className="assignment-details">
-                                <div className="detail-item">
-                                  <span className="detail-label">Teacher:</span>
-                                  <span className="detail-value">{student.teacherName || "None"}</span>
-                                </div>
-                                <div className="detail-item">
-                                  <span className="detail-label">Parent:</span>
-                                  <span className="detail-value">{parent?.full_name || "Unlinked"}</span>
-                                </div>
-                              </div>
+                              {student.arabic_name && (
+                                <span className="arabic-kanz" style={{ fontSize: '1rem', color: 'var(--primary-gold)', display: 'block', marginTop: '2px' }}>{student.arabic_name}</span>
+                              )}
+                              <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{student.groupName}</p>
                             </div>
                           </div>
-                          <div className="child-card-actions">
+                          <div className="assignment-details" style={{ marginTop: '10px' }}>
+                            <div className="detail-item">
+                              <span className="detail-label">Teacher:</span>
+                              <select
+                                className="premium-select badal-inline-select"
+                                value={student.muhaffiz_id || ""}
+                                onChange={e => {
+                                  const tid = e.target.value;
+                                  if (tid) onAssignChild({ student_id: student.student_id, teacher_id: tid });
+                                }}
+                              >
+                                <option value="">-- Select Teacher --</option>
+                                {portalAccessList
+                                  .filter(a =>
+                                    normalizeText(a.portal_role).includes('teacher') ||
+                                    normalizeText(a.portal_role).includes('muhaffiz')
+                                  )
+                                  .map(p => (
+                                    <option key={`portal-${p.id}`} value={p.user_id || p.email}>
+                                      {p.full_name || p.email}
+                                    </option>
+                                  ))}
+                                {teacherProfiles
+                                  .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
+                                  .map(tp => (
+                                    <option key={`tp-${tp.id}`} value={tp.user_id || tp.full_name}>
+                                      {tp.full_name}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">Badal:</span>
+                              <select
+                                className="premium-select badal-inline-select"
+                                value={(() => {
+                                  const ba = adminBadalAssignments.find(a => String(a.student_id) === String(student.student_id) && a.status === "active");
+                                  return ba ? String(ba.teacher_id) : "";
+                                })()}
+                                onChange={e => handleAssignBadalInline(student, e.target.value)}
+                              >
+                                <option value="">-- No Badal --</option>
+                                {portalAccessList
+                                  .filter(a =>
+                                    normalizeText(a.portal_role).includes('teacher') ||
+                                    normalizeText(a.portal_role).includes('muhaffiz')
+                                  )
+                                  .map(p => (
+                                    <option key={`badal-portal-${p.id}`} value={p.user_id || p.email}>
+                                      {p.full_name || p.email}
+                                    </option>
+                                  ))}
+                                {teacherProfiles
+                                  .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
+                                  .map(tp => (
+                                    <option key={`badal-tp-${tp.id}`} value={tp.user_id || tp.full_name}>
+                                      {tp.full_name}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">Parent:</span>
+                              <span className="detail-value">{parent?.full_name || "Unlinked"}</span>
+                            </div>
+                          </div>
+                          <div className="child-card-actions" style={{ marginTop: '10px' }}>
                             <button
                               className="unassign-btn"
                               onClick={() => onUnassignChild(student.student_id)}
                               title="Unlink student"
                             >
                               <UserX size={16} /> Unlink
-                            </button>
-                            <button
-                              className="badal-assign-btn"
-                              onClick={() => setBadalModal({ open: true, student })}
-                              title="Assign as Badal (temporary substitute teacher)"
-                            >
-                              Assign Badal
                             </button>
                           </div>
                         </article>
@@ -9734,55 +9781,7 @@ const handleDownloadAllReports = async () => {
           </div>
         )}
 
-        {badalModal.open && (
-          <div className="modal-overlay" onClick={() => { setBadalModal({ open: false, student: null }); setBadalTeacherId(""); }}>
-            <div className="badal-modal-content" onClick={e => e.stopPropagation()}>
-              <h4 style={{ margin: "0 0 16px 0", color: "var(--deep-brown)" }}>
-                Assign Badal Teacher
-              </h4>
-              <p style={{ margin: "0 0 12px 0", fontSize: "0.9rem", color: "var(--text-muted)" }}>
-                Student: <strong>{badalModal.student?.name}</strong>
-                {badalModal.student?.arabic_name && (
-                  <span className="arabic-kanz" style={{ marginLeft: "8px", fontSize: "1rem" }}>
-                    {badalModal.student.arabic_name}
-                  </span>
-                )}
-              </p>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600, fontSize: "0.85rem", color: "var(--deep-brown)" }}>
-                Select Badal Teacher (Muhaffiz)
-              </label>
-              <select
-                value={badalTeacherId}
-                onChange={e => setBadalTeacherId(e.target.value)}
-                className="premium-input"
-                style={{ width: "100%", marginBottom: "18px" }}
-              >
-                <option value="">Choose a teacher...</option>
-                {portalAccessList
-                  .filter(a =>
-                    normalizeText(a.portal_role).includes('teacher') ||
-                    normalizeText(a.portal_role).includes('muhaffiz')
-                  )
-                  .map(t => (
-                    <option key={t.user_id} value={t.user_id}>{t.full_name} {t.arabic_name ? `(${t.arabic_name})` : ""}</option>
-                  ))}
-                {teacherProfiles
-                  .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
-                  .map(tp => (
-                    <option key={`tp-${tp.id}`} value={tp.user_id || tp.full_name}>{tp.full_name} {tp.arabic_name ? `(${tp.arabic_name})` : ""}</option>
-                  ))}
-              </select>
-              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-                <button className="premium-btn cancel-btn" onClick={() => { setBadalModal({ open: false, student: null }); setBadalTeacherId(""); }}>
-                  Cancel
-                </button>
-                <button className="premium-btn" onClick={handleAssignBadal} disabled={!badalTeacherId || badalAssigning} style={{ background: "linear-gradient(135deg, #8e24aa, #6a1b9a)" }}>
-                  {badalAssigning ? "Assigning..." : "Confirm Badal"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
       </main>
     </div>
   );

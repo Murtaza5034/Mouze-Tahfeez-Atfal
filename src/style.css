@@ -2410,6 +2410,25 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   background: rgba(0,0,0,0.08);
 }
 
+.badal-inline-select {
+  font-size: 0.78rem !important;
+  padding: 5px 8px !important;
+  border-radius: 8px !important;
+  min-width: 160px;
+}
+
+.assigned-child-card .assignment-details .detail-item {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.assigned-child-card .assignment-details .detail-label {
+  min-width: 55px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 .student-card-grid {
   margin-top: 24px;
   display: grid;
