@@ -5503,13 +5503,24 @@ function AdminPortal({
   const handleAssignBadal = async () => {
     if (!badalModal.student || !badalTeacherId) return;
     setBadalAssigning(true);
-    const { error } = await supabase.from("badal_assignments").upsert({
-      student_id: String(badalModal.student.student_id),
-      teacher_id: badalTeacherId,
-      assigned_by: user?.id,
-      original_teacher_id: badalModal.student.muhaffiz_id || null,
-      status: "active",
-    }, { onConflict: "student_id" });
+    const sid = String(badalModal.student.student_id);
+    const { data: existing } = await supabase
+      .from("badal_assignments")
+      .select("id")
+      .eq("student_id", sid)
+      .eq("status", "active")
+      .maybeSingle();
+    let error;
+    if (existing) {
+      ({ error } = await supabase
+        .from("badal_assignments")
+        .update({ teacher_id: badalTeacherId, assigned_by: user?.id, original_teacher_id: badalModal.student.muhaffiz_id || null, updated_at: new Date().toISOString() })
+        .eq("id", existing.id));
+    } else {
+      ({ error } = await supabase
+        .from("badal_assignments")
+        .insert({ student_id: sid, teacher_id: badalTeacherId, assigned_by: user?.id, original_teacher_id: badalModal.student.muhaffiz_id || null, status: "active" }));
+    }
     if (error) { if (showAction) showAction("error", error.message); }
     else { if (showAction) showAction("success", `Badal assigned for ${badalModal.student.name}`); }
     setBadalAssigning(false);
@@ -9840,6 +9851,7 @@ function TeacherPortal({
   const [badalProgress, setBadalProgress] = useState([]);
   const [badalProgressDraft, setBadalProgressDraft] = useState({});
   const [savingBadal, setSavingBadal] = useState({});
+  const [badalStudentProfiles, setBadalStudentProfiles] = useState([]);
   const weekDays = useMemo(() => {
     const days = [];
     const today = new Date();
@@ -9877,12 +9889,12 @@ function TeacherPortal({
       });
   }, [filteredStudents, weekDays, user?.id, teacherIdentity]);
 
-  useEffect(() => {
+  const fetchBadalData = useCallback(() => {
     const teacherId = user?.id || teacherIdentity;
     if (!teacherId) return;
     supabase
       .from("badal_assignments")
-      .select("*, teacher_profiles!teacher_id(*)")
+      .select("*")
       .or(`teacher_id.eq.${teacherId},original_teacher_id.eq.${teacherId}`)
       .eq("status", "active")
       .then(({ data }) => {
@@ -9898,10 +9910,28 @@ function TeacherPortal({
               .then(({ data: pData }) => {
                 if (pData) setBadalProgress(pData);
               });
+            supabase
+              .from("child_profiles")
+              .select("*")
+              .in("student_id", studentIds)
+              .then(({ data: cData }) => {
+                if (cData) setBadalStudentProfiles(cData.map(c => ({ ...c, name: c.full_name || c.name || "" })));
+              });
+          } else {
+            setBadalStudentProfiles([]);
           }
+        } else {
+          setBadalAssignments([]);
+          setBadalStudentProfiles([]);
         }
       });
   }, [user?.id, teacherIdentity]);
+
+  useEffect(() => { fetchBadalData(); }, [fetchBadalData]);
+
+  useEffect(() => {
+    if (activePage === "Badal") fetchBadalData();
+  }, [activePage, fetchBadalData]);
 
   const handleSaveBadalProgress = async (studentId) => {
     const draft = badalProgressDraft[studentId];
@@ -11327,8 +11357,10 @@ function TeacherPortal({
                   const myBadalStudents = badalAssignments
                     .filter(a => String(a.teacher_id) === (user?.id || teacherIdentity) && a.status === "active")
                     .map(a => {
-                      const student = filteredStudents.find(s => String(s.student_id) === String(a.student_id))
-                        || schoolData.students.find(s => String(s.student_id) === String(a.student_id));
+                      const sid = String(a.student_id);
+                      const student = filteredStudents.find(s => String(s.student_id) === sid)
+                        || (schoolData?.students || []).find(s => String(s.student_id) === sid)
+                        || badalStudentProfiles.find(s => String(s.student_id) === sid);
                       return { ...a, student };
                     });
                   if (myBadalStudents.length === 0) {
