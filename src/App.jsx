@@ -7999,17 +7999,19 @@ const handleDownloadAllReports = async () => {
                                 value={student.badal_teacher_id || ""}
                                 onChange={e => {
                                   const rawVal = e.target.value;
-                                  /* Resolve the selected value to a user_id (UUID) so badal_teacher_id
-                                     stores a UUID, not an email — critical for teacher portal matching */
-                                  let resolvedId = rawVal;
-                                  if (rawVal && !rawVal.includes('@')) {
-                                    resolvedId = rawVal; // already a user_id
-                                  } else if (rawVal) {
-                                    /* rawVal might be an email — look up the user_id */
-                                    const portalMatch = portalAccessList.find(p => p.email === rawVal);
-                                    if (portalMatch?.user_id) resolvedId = portalMatch.user_id;
-                                  }
-                                  handleBadalTeacherChange(student, resolvedId);
+                                  if (!rawVal) { handleBadalTeacherChange(student, ""); return; }
+                                  /* CRITICAL: Resolve the selected option to the teacher's user_id (UUID).
+                                     The option value can be user_id, email, or full_name depending on
+                                     what's available. We must always store a UUID so the matchedStudents
+                                     filter can match student.badal_teacher_id === user.id. */
+                                  const byUserId = portalAccessList.find(p => String(p.user_id) === String(rawVal));
+                                  if (byUserId?.user_id) { handleBadalTeacherChange(student, byUserId.user_id); return; }
+                                  const byEmail = portalAccessList.find(p => p.email === rawVal);
+                                  if (byEmail?.user_id) { handleBadalTeacherChange(student, byEmail.user_id); return; }
+                                  const byName = portalAccessList.find(p => normalizeText(p.full_name) === normalizeText(rawVal));
+                                  if (byName?.user_id) { handleBadalTeacherChange(student, byName.user_id); return; }
+                                  const tpMatch = teacherProfiles.find(tp => String(tp.user_id) === String(rawVal) || normalizeText(tp.full_name) === normalizeText(rawVal));
+                                  handleBadalTeacherChange(student, tpMatch?.user_id || rawVal);
                                 }}
                               >
                                 <option value="">-- No Badal --</option>
