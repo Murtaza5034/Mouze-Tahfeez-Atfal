@@ -5497,6 +5497,25 @@ function AdminPortal({
 }) {
   const showAction = onShowAction;
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
+  const [badalModal, setBadalModal] = useState({ open: false, student: null });
+  const [badalTeacherId, setBadalTeacherId] = useState("");
+  const [badalAssigning, setBadalAssigning] = useState(false);
+  const handleAssignBadal = async () => {
+    if (!badalModal.student || !badalTeacherId) return;
+    setBadalAssigning(true);
+    const { error } = await supabase.from("badal_assignments").upsert({
+      student_id: String(badalModal.student.student_id),
+      teacher_id: badalTeacherId,
+      assigned_by: user?.id,
+      original_teacher_id: badalModal.student.muhaffiz_id || null,
+      status: "active",
+    }, { onConflict: "student_id" });
+    if (error) { if (showAction) showAction("error", error.message); }
+    else { if (showAction) showAction("success", `Badal assigned for ${badalModal.student.name}`); }
+    setBadalAssigning(false);
+    setBadalModal({ open: false, student: null });
+    setBadalTeacherId("");
+  };
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
   const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
   const [jadwalSettingsDraft, setJadwalSettingsDraft] = useState(() => normalizeJadwalSettings(jadwalSettings));
@@ -7918,6 +7937,13 @@ const handleDownloadAllReports = async () => {
                             >
                               <UserX size={16} /> Unlink
                             </button>
+                            <button
+                              className="badal-assign-btn"
+                              onClick={() => setBadalModal({ open: true, student })}
+                              title="Assign as Badal (temporary substitute teacher)"
+                            >
+                              Assign Badal
+                            </button>
                           </div>
                         </article>
                       );
@@ -9696,6 +9722,46 @@ const handleDownloadAllReports = async () => {
             </div>
           </div>
         )}
+
+        {badalModal.open && (
+          <div className="modal-overlay" onClick={() => { setBadalModal({ open: false, student: null }); setBadalTeacherId(""); }}>
+            <div className="badal-modal-content" onClick={e => e.stopPropagation()}>
+              <h4 style={{ margin: "0 0 16px 0", color: "var(--deep-brown)" }}>
+                Assign Badal Teacher
+              </h4>
+              <p style={{ margin: "0 0 12px 0", fontSize: "0.9rem", color: "var(--text-muted)" }}>
+                Student: <strong>{badalModal.student?.name}</strong>
+                {badalModal.student?.arabic_name && (
+                  <span className="arabic-kanz" style={{ marginLeft: "8px", fontSize: "1rem" }}>
+                    {badalModal.student.arabic_name}
+                  </span>
+                )}
+              </p>
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600, fontSize: "0.85rem", color: "var(--deep-brown)" }}>
+                Select Badal Teacher (Muhaffiz)
+              </label>
+              <select
+                value={badalTeacherId}
+                onChange={e => setBadalTeacherId(e.target.value)}
+                className="premium-input"
+                style={{ width: "100%", marginBottom: "18px" }}
+              >
+                <option value="">Choose a teacher...</option>
+                {portalAccessList.filter(a => a.role === 'teacher' || a.role === 'muhaffiz').map(t => (
+                  <option key={t.user_id} value={t.user_id}>{t.full_name} {t.arabic_name ? `(${t.arabic_name})` : ""}</option>
+                ))}
+              </select>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                <button className="premium-btn cancel-btn" onClick={() => { setBadalModal({ open: false, student: null }); setBadalTeacherId(""); }}>
+                  Cancel
+                </button>
+                <button className="premium-btn" onClick={handleAssignBadal} disabled={!badalTeacherId || badalAssigning} style={{ background: "linear-gradient(135deg, #8e24aa, #6a1b9a)" }}>
+                  {badalAssigning ? "Assigning..." : "Confirm Badal"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -9760,6 +9826,10 @@ function TeacherPortal({
 
   const [studentAttendance, setStudentAttendance] = useState({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [badalAssignments, setBadalAssignments] = useState([]);
+  const [badalProgress, setBadalProgress] = useState([]);
+  const [badalProgressDraft, setBadalProgressDraft] = useState({});
+  const [savingBadal, setSavingBadal] = useState({});
   const weekDays = useMemo(() => {
     const days = [];
     const today = new Date();
@@ -9796,6 +9866,69 @@ function TeacherPortal({
         setAttendanceLoading(false);
       });
   }, [filteredStudents, weekDays, user?.id, teacherIdentity]);
+
+  useEffect(() => {
+    const teacherId = user?.id || teacherIdentity;
+    if (!teacherId) return;
+    supabase
+      .from("badal_assignments")
+      .select("*, teacher_profiles!teacher_id(*)")
+      .or(`teacher_id.eq.${teacherId},original_teacher_id.eq.${teacherId}`)
+      .eq("status", "active")
+      .then(({ data }) => {
+        if (data) {
+          setBadalAssignments(data);
+          const studentIds = data.map(a => String(a.student_id));
+          if (studentIds.length > 0) {
+            supabase
+              .from("badal_progress")
+              .select("*")
+              .in("student_id", studentIds)
+              .order("week_date", { ascending: false })
+              .then(({ data: pData }) => {
+                if (pData) setBadalProgress(pData);
+              });
+          }
+        }
+      });
+  }, [user?.id, teacherIdentity]);
+
+  const handleSaveBadalProgress = async (studentId) => {
+    const draft = badalProgressDraft[studentId];
+    if (!draft) return;
+    const teacherId = user?.id || teacherIdentity;
+    setSavingBadal(prev => ({ ...prev, [studentId]: true }));
+    const { error } = await supabase.from("badal_progress").insert({
+      student_id: String(studentId),
+      teacher_id: String(teacherId),
+      juz: draft.juz || null,
+      juz_hali: draft.juz_hali || null,
+      jadeed_surah_ayat: draft.jadeed_surah_ayat || null,
+      week_date: new Date().toISOString().slice(0, 10),
+      notes: draft.notes || null,
+    });
+    if (error) { if (onShowAction) onShowAction("error", error.message); }
+    else {
+      if (onShowAction) onShowAction("success", "Badal progress saved!");
+      setBadalProgress(prev => [{
+        id: Date.now().toString(),
+        student_id: String(studentId),
+        teacher_id: String(teacherId),
+        juz: draft.juz || null,
+        juz_hali: draft.juz_hali || null,
+        jadeed_surah_ayat: draft.jadeed_surah_ayat || null,
+        week_date: new Date().toISOString().slice(0, 10),
+        notes: draft.notes || null,
+        created_at: new Date().toISOString(),
+      }, ...prev]);
+      setBadalProgressDraft(prev => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
+    }
+    setSavingBadal(prev => ({ ...prev, [studentId]: false }));
+  };
 
   const handleMarkAttendance = async (studentId, date, status) => {
     const sid = String(studentId).trim().toLowerCase();
@@ -10391,6 +10524,7 @@ function TeacherPortal({
             { id: "Jadwal", label: "Jadwal", icon: Calendar },
             { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
             { id: "Inbox", label: "Inbox", icon: Bell },
+            { id: "Badal", label: "Badal Update", icon: RotateCw },
             { id: "Settings", label: "Settings", icon: Settings },
           ].filter(p => pageVisibility[p.id] !== false).map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
@@ -10697,6 +10831,33 @@ function TeacherPortal({
                       <span className="mini-pill">Surah: {student.latestResult?.wusool_surah || student.hifz?.surat || "Pending"}</span>
                     </div>
                     <p className="student-status-copy">{student.hifzStatus}</p>
+                    {(() => {
+                      const sid = String(student.student_id).trim().toLowerCase();
+                      const badalAssignment = badalAssignments.find(a => String(a.student_id) === sid && a.status === "active");
+                      if (!badalAssignment) return null;
+                      const badalTeacherInfo = portalAccessList.find(p => p.user_id === badalAssignment.teacher_id)
+                        || teacherProfiles.find(p => p.user_id === badalAssignment.teacher_id);
+                      const badalProgressData = badalProgress
+                        .filter(p => String(p.student_id) === sid)
+                        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                      const isOriginalTeacher = badalAssignment.original_teacher_id === (user?.id || teacherIdentity);
+                      return (
+                        <div className="badal-info-section">
+                          <div className="badal-info-badge">
+                            <RotateCw size={12} /> Badal Active — {badalTeacherInfo?.full_name || badalAssignment.teacher_id}
+                          </div>
+                          {isOriginalTeacher && badalProgressData.length > 0 && (
+                            <div className="badal-progress-mini">
+                              <span className="badal-progress-mini-label">Badal Progress:</span>
+                              {badalProgressData[0].juz && <span>Juz: {badalProgressData[0].juz}</span>}
+                              {badalProgressData[0].juz_hali && <span>Hali: {badalProgressData[0].juz_hali}</span>}
+                              {badalProgressData[0].jadeed_surah_ayat && <span>Jadeed: {badalProgressData[0].jadeed_surah_ayat}</span>}
+                              <span className="badal-progress-mini-date">{new Date(badalProgressData[0].created_at).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div className="attendance-section">
                       {(() => {
                         const sid = String(student.student_id).trim().toLowerCase();
@@ -11138,6 +11299,103 @@ function TeacherPortal({
                     />
                   </div>
                 )}
+              </div>
+            </div>
+          ) : null}
+
+          {activePage === "Badal" ? (
+            <div className="management-grid" style={{ maxWidth: "900px", margin: "0 auto" }}>
+              <div className="data-card" style={{ padding: "24px" }}>
+                <div className="card-headline" style={{ marginBottom: "20px" }}>
+                  <RotateCw size={20} style={{ color: "var(--primary-gold)" }} />
+                  <h3 style={{ margin: 0 }}>Badal Update</h3>
+                </div>
+                <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "20px" }}>
+                  Children assigned to you as Badal (temporary substitute). Update their daily Tahfeez progress.
+                </p>
+                {(() => {
+                  const myBadalStudents = badalAssignments
+                    .filter(a => String(a.teacher_id) === (user?.id || teacherIdentity) && a.status === "active")
+                    .map(a => {
+                      const student = filteredStudents.find(s => String(s.student_id) === String(a.student_id))
+                        || schoolData.students.find(s => String(s.student_id) === String(a.student_id));
+                      return { ...a, student };
+                    });
+                  if (myBadalStudents.length === 0) {
+                    return (
+                      <div className="empty-state" style={{ padding: "40px 0", textAlign: "center" }}>
+                        <RotateCw size={40} style={{ opacity: 0.2, marginBottom: "12px" }} />
+                        <p>No badal assignments yet. Admin will assign children to you here.</p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                      {myBadalStudents.map(({ student, student_id, original_teacher_id }) => {
+                        if (!student) return null;
+                        const latestProgress = badalProgress
+                          .filter(p => String(p.student_id) === String(student_id))
+                          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                        const sid = String(student_id);
+                        const draft = badalProgressDraft[sid] || {};
+                        return (
+                          <article key={sid} className="badal-student-card">
+                            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
+                              <StudentAvatar student={student} size="small" />
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: "1rem" }}>{student.name}</h4>
+                                {student.arabic_name && (
+                                  <span className="arabic-kanz" style={{ fontSize: "1rem", color: "var(--primary-gold)" }}>{student.arabic_name}</span>
+                                )}
+                              </div>
+                              {original_teacher_id && (
+                                <span className="badal-original-badge">
+                                  Original: {portalAccessList.find(p => p.user_id === original_teacher_id)?.full_name || teacherProfiles.find(p => p.user_id === original_teacher_id)?.full_name || "Unknown"}
+                                </span>
+                              )}
+                            </div>
+                            <div className="badal-progress-grid">
+                              <label className="badal-field">
+                                <span>Juz</span>
+                                <input className="premium-input" placeholder="e.g. 1, 2, 30" value={draft.juz ?? latestProgress[0]?.juz ?? ""} onChange={e => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], juz: e.target.value } }))} />
+                              </label>
+                              <label className="badal-field">
+                                <span>Juz Hali (Marks)</span>
+                                <input className="premium-input" placeholder="e.g. 15 / 20" value={draft.juz_hali ?? latestProgress[0]?.juz_hali ?? ""} onChange={e => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], juz_hali: e.target.value } }))} />
+                              </label>
+                              <label className="badal-field">
+                                <span>Jadeed Surah Ayat</span>
+                                <input className="premium-input" placeholder="e.g. Surah Baqarah 1-10" value={draft.jadeed_surah_ayat ?? latestProgress[0]?.jadeed_surah_ayat ?? ""} onChange={e => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], jadeed_surah_ayat: e.target.value } }))} />
+                              </label>
+                              <label className="badal-field full-width">
+                                <span>Notes</span>
+                                <input className="premium-input" placeholder="Optional notes" value={draft.notes ?? ""} onChange={e => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], notes: e.target.value } }))} />
+                              </label>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "14px" }}>
+                              <button className="premium-btn" onClick={() => handleSaveBadalProgress(student_id)} disabled={savingBadal[sid] || (!draft.juz && !draft.juz_hali && !draft.jadeed_surah_ayat)}>
+                                {savingBadal[sid] ? "Saving..." : "Save Progress"}
+                              </button>
+                            </div>
+                            {latestProgress.length > 0 && (
+                              <div className="badal-history" style={{ marginTop: "14px", borderTop: "1px solid rgba(183,137,31,0.12)", paddingTop: "12px" }}>
+                                <p style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", margin: "0 0 8px 0" }}>Previous Updates:</p>
+                                {latestProgress.slice(0, 3).map(p => (
+                                  <div key={p.id} className="badal-history-row">
+                                    <span className="badal-history-date">{new Date(p.created_at).toLocaleDateString()}</span>
+                                    <span>{p.juz ? `Juz: ${p.juz}` : ""}</span>
+                                    <span>{p.juz_hali ? `Hali: ${p.juz_hali}` : ""}</span>
+                                    <span>{p.jadeed_surah_ayat ? `Jadeed: ${p.jadeed_surah_ayat}` : ""}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ) : null}
