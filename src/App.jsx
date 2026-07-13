@@ -46,6 +46,7 @@ import {
   Loader2,
   Lock,
   Unlock,
+  CalendarCheck,
   CalendarX,
   AlertCircle,
   ChevronDown, ChevronRight,
@@ -905,7 +906,7 @@ const NAV_ICONS = {
   "Messages": MessageCircle,
   "Email Settings": Mail,
   "Marhala Posts": Heart,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,
 };
 
 const emptyParentData = {
@@ -5499,7 +5500,7 @@ function AdminPortal({
 
 }) {
   const showAction = onShowAction;
-  const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [] } = adminData;
+  const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [], weeklyResultsArchive = [] } = adminData;
 
   /*
    * BADAL FLOW - handleBadalTeacherChange (Admin inline badal assignment)
@@ -5589,6 +5590,12 @@ function AdminPortal({
   const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
   const [whatsAppLogs, setWhatsAppLogs] = useState([]);
   const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
+  const [archiveChildId, setArchiveChildId] = useState("");
+  const [archiveMonth, setArchiveMonth] = useState("");
+  const [attSelChild, setAttSelChild] = useState("");
+  const [attMonth, setAttMonth] = useState("");
+  const [attLoading, setAttLoading] = useState(false);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
 
   const [resetPasswordTarget, setResetPasswordTarget] = useState(null);
   const [resetPasswordNewPass, setResetPasswordNewPass] = useState("");
@@ -5596,6 +5603,69 @@ function AdminPortal({
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordMessage, setResetPasswordMessage] = useState("");
   const [resetPasswordError, setResetPasswordError] = useState("");
+
+  useEffect(() => {
+    if (!attSelChild && students.length > 0 && weeklyResultsArchive.length > 0) {
+      const hasArchive = students.some(s => weeklyResultsArchive.some(a => String(a.student_id) === String(s.student_id)));
+      if (hasArchive) {
+        const first = students.find(s => weeklyResultsArchive.some(a => String(a.student_id) === String(s.student_id)));
+        if (first) setAttSelChild(String(first.student_id));
+      }
+    }
+  }, [students.length, weeklyResultsArchive.length]);
+
+  /* Auto-restore expired teacher leave badals on any admin page load */
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    supabase.from("teacher_leave_badals").select("*").eq("active", true).lte("to_date", today).then(({ data: expired }) => {
+      if (expired && expired.length > 0) {
+        expired.forEach(b => {
+          const sid = String(b.student_id);
+          const sidNum = Number(b.student_id);
+          const sidVal = isNaN(sidNum) ? sid : sidNum;
+          supabase.from("child_profiles").update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
+            supabase.from("teacher_leave_badals").update({ active: false }).eq("id", b.id);
+          });
+        });
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!attSelChild) return;
+    setAttLoading(true);
+    const allDates = [];
+    const now = new Date();
+    for (let m = 0; m < 6; m++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const start = `${year}-${String(month).padStart(2, '0')}-01`;
+      const end = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+      allDates.push({ year, month, start, end });
+    }
+    Promise.all(
+      allDates.map(range =>
+        supabase
+          .from("student_daily_attendance")
+          .select("*")
+          .eq("student_id", String(attSelChild))
+          .gte("attendance_date", range.start)
+          .lte("attendance_date", range.end)
+      )
+    ).then(responses => {
+      const merged = {};
+      responses.forEach(({ data, error }) => {
+        if (!error && data) {
+          data.forEach(r => { merged[r.attendance_date] = r.status; });
+        }
+      });
+      setAttendanceRecords(merged);
+      setAttLoading(false);
+    });
+  }, [attSelChild]);
+
   const computeRankChange = (student, wr) => {
     const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
     const prevWeekRank = student?.previousWeekRank;
@@ -5808,7 +5878,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
+  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
@@ -6675,13 +6745,12 @@ const handleDownloadAllReports = async () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {(portalAccessList || [])
-                    .filter(a => a.portal_role === 'teacher')
-                    .filter(t => !isOtpTeacher || t.email === user?.email || t.user_id === user?.id)
+                  {(teacherProfiles || [])
+                    .filter(t => t.email)
                     .map(teacher => {
                     const isOn = teacherAdminAccessList.includes(teacher.email);
                     return (
-                      <div key={teacher.user_id} style={{
+                      <div key={teacher.user_id || teacher.email} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         padding: '10px 14px', borderRadius: '10px',
                         background: isOn ? 'rgba(212,175,55,0.05)' : 'rgba(0,0,0,0.02)',
@@ -6738,9 +6807,9 @@ const handleDownloadAllReports = async () => {
                       </div>
                     );
                   })}
-                  {(!portalAccessList || portalAccessList.filter(a => a.portal_role === 'teacher').length === 0) && (
+                  {(!teacherProfiles || teacherProfiles.filter(t => t.email).length === 0) && (
                     <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      No teachers found in portal access list.
+                      No teachers found with email addresses.
                     </div>
                   )}
                 </div>
@@ -6919,6 +6988,515 @@ const handleDownloadAllReports = async () => {
                 portalAccessList={portalAccessList}
               />
             </Suspense>
+          ) : null}
+
+          {activePage === "Results Archive" ? (
+            <div className="overview-container fade-in">
+              <div className="section-header">
+                <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <FileArchive size={24} style={{ color: 'var(--primary-gold)' }} />
+                  Results Archive
+                </h2>
+                <p className="subtitle">Permanent historical record of all weekly results — data is preserved even after clearing marks</p>
+              </div>
+
+              {(() => {
+                const ScoreField = ({ label, value, max }) => (
+                  <div style={{ background: '#f9f6f0', borderRadius: '8px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--soft-brown)' }}>{label}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '1.05rem' }}>
+                      {toArabicDigits(value != null ? value : 0)} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/ {max}</span>
+                    </span>
+                  </div>
+                );
+                const InfoField = ({ label, value }) => (
+                  <div style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--soft-brown)' }}>{label}:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--deep-brown)' }}>{value != null ? value : '-'}</span>
+                  </div>
+                );
+
+                const archive = weeklyResultsArchive;
+                const studentsList = students.filter(s => archive.some(a => String(a.student_id) === String(s.student_id)));
+                const selChildId = archiveChildId || (studentsList.length > 0 ? String(studentsList[0].student_id) : "");
+                const setSelChildId = (v) => { setArchiveChildId(v); setArchiveMonth(""); };
+                const selMonth = archiveMonth;
+                const setSelMonth = setArchiveMonth;
+
+                const childArchive = archive.filter(a => String(a.student_id) === String(selChildId) && (a.murajazah != null || a.juz_hali != null || a.takhteet != null || a.jadeed != null || a.total_jadeed_pages != null));
+
+                const monthGroups = {};
+                childArchive.forEach(a => {
+                  if (!a.week_date) return;
+                  const d = new Date(a.week_date);
+                  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                  const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                  if (!monthGroups[key]) monthGroups[key] = { label, weeks: [] };
+                  if (!monthGroups[key].weeks.some(w => w.week_date === a.week_date)) {
+                    monthGroups[key].weeks.push(a);
+                  }
+                });
+                const sortedMonths = Object.keys(monthGroups).sort((a, b) => b.localeCompare(a));
+
+                const selectedStudent = studentsList.find(s => String(s.student_id) === String(selChildId));
+
+                return (
+                  <div className="archive-container card-appear" style={{ padding: '24px', borderRadius: '16px', background: 'var(--white)' }}>
+                    {studentsList.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                        No archived results found. Data appears here after teachers save weekly progress.
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ marginBottom: '24px' }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.9rem' }}>Select Child</span>
+                            <select
+                              className="premium-select"
+                              value={selChildId}
+                              onChange={e => { setSelChildId(e.target.value); }}
+                              style={{ maxWidth: '400px' }}
+                            >
+                              {studentsList.map(s => (
+                                <option key={s.student_id} value={String(s.student_id)}>
+                                  {s.name || s.full_name} {s.groupName ? `(${s.groupName})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+
+                        {selChildId && selectedStudent && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', padding: '16px', borderRadius: '12px', background: '#f9f6f0' }}>
+                            <StudentAvatar student={selectedStudent} />
+                            <div>
+                              <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.2rem' }}>{selectedStudent.name || selectedStudent.full_name}</h3>
+                              <p style={{ margin: '4px 0 0', color: 'var(--soft-brown)', fontSize: '0.85rem' }}>
+                                {childArchive.length} week{childArchive.length !== 1 ? 's' : ''} archived
+                                {selectedStudent.groupName ? ` \u2022 ${selectedStudent.groupName}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {sortedMonths.length > 0 && (
+                          <div style={{ marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', borderBottom: '2px solid #eee', paddingBottom: '12px' }}>
+                              {sortedMonths.map(key => (
+                                <button
+                                  key={key}
+                                  className={`premium-tab ${selMonth === key ? 'active' : ''}`}
+                                  onClick={() => setSelMonth(key)}
+                                  style={{
+                                    padding: '8px 18px',
+                                    borderRadius: '8px',
+                                    border: selMonth === key ? '2px solid var(--primary-gold)' : '2px solid transparent',
+                                    background: selMonth === key ? 'var(--primary-gold)' : '#f5f0e8',
+                                    color: selMonth === key ? '#fff' : 'var(--deep-brown)',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                  }}
+                                >
+                                  {monthGroups[key].label}
+                                  <span style={{ marginLeft: '6px', opacity: 0.7, fontSize: '0.75rem' }}>({monthGroups[key].weeks.length})</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {selMonth && monthGroups[selMonth] ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            {monthGroups[selMonth].weeks
+                              .sort((a, b) => new Date(b.week_date) - new Date(a.week_date))
+                              .map(wr => {
+                                const fi = getFatemiInfo(wr.week_date);
+                                const scoreTotal = wr.total_score ?? (Number(wr.murajazah || 0) + Number(wr.juz_hali || 0) + Number(wr.takhteet || 0) + Number(wr.jadeed || 0));
+                                return (
+                                  <div key={wr.week_date + '_' + (wr.archived_at || '')} className="result-card-premium" style={{ padding: '20px', borderRadius: '12px', border: '1px solid #e8e0d4', background: '#fffaf0' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px dashed #d4c9b0' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div style={{ background: 'var(--primary-gold)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontWeight: 700, fontSize: '0.8rem' }}>
+                                          Week {fi.week}
+                                        </div>
+                                        <div>
+                                          <div style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.95rem' }}>{fi.date} {fi.monthName} {fi.year}</div>
+                                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(wr.week_date).toLocaleDateString('en-GB')}</div>
+                                        </div>
+                                      </div>
+                                      <div style={{ background: '#4a3410', color: '#d4af37', borderRadius: '50%', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.1rem' }}>
+                                        {toArabicDigits(scoreTotal)}
+                                      </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                      <ScoreField label="Murajah" value={wr.murajazah} max={30} />
+                                      <ScoreField label="Juz Hali" value={wr.juz_hali} max={30} />
+                                      <ScoreField label="Takhteet" value={wr.takhteet} max={20} />
+                                      <ScoreField label="Jadeed" value={wr.jadeed} max={20} />
+                                    </div>
+
+                                    {(wr.matrookah || wr.daeefah || wr.attendance_count != null || wr.total_jadeed_pages) && (
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '12px', padding: '12px', background: '#f5f0e8', borderRadius: '8px' }}>
+                                        {wr.matrookah != null && <InfoField label="Matrookah" value={wr.matrookah} />}
+                                        {wr.daeefah != null && <InfoField label="Daeefah" value={wr.daeefah} />}
+                                        {wr.attendance_count != null && <InfoField label="Attendance" value={`${wr.attendance_count}/6`} />}
+                                        {wr.total_jadeed_pages && <InfoField label="Jadeed Pages" value={wr.total_jadeed_pages} />}
+                                      </div>
+                                    )}
+
+                                    {(wr.wusool_juz || wr.wusool_surah || wr.wusool_page) && (
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                                        <InfoField label="Wusool Juz" value={wr.wusool_juz || '-'} />
+                                        <InfoField label="Wusool Surah" value={wr.wusool_surah || '-'} />
+                                        <InfoField label="Wusool Page" value={wr.wusool_page || '-'} />
+                                      </div>
+                                    )}
+
+                                    {(wr.next_week_juz || wr.next_week_surah || wr.next_week_page) && (
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                                        <InfoField label="Next Juz" value={wr.next_week_juz || '-'} />
+                                        <InfoField label="Next Surah" value={wr.next_week_surah || '-'} />
+                                        <InfoField label="Next Page" value={wr.next_week_page || '-'} />
+                                      </div>
+                                    )}
+
+                                    {(wr.istifadah_juz || wr.istifadah_surah || wr.istifadah_page) && (
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', padding: '10px', background: '#f0f4e8', borderRadius: '8px' }}>
+                                        <InfoField label="Target Juz" value={wr.istifadah_juz || '-'} />
+                                        <InfoField label="Target Surah" value={wr.istifadah_surah || '-'} />
+                                        <InfoField label="Target Page" value={wr.istifadah_page || '-'} />
+                                      </div>
+                                    )}
+
+                                    {wr.attendance_note && (
+                                      <div style={{ marginTop: '8px', padding: '8px 12px', background: '#fff3cd', borderRadius: '6px', fontSize: '0.85rem', color: '#856404' }}>
+                                        Note: {wr.attendance_note}
+                                      </div>
+                                    )}
+
+                                    {wr.archived_at && (
+                                      <div style={{ marginTop: '8px', fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                                        Archived: {new Date(wr.archived_at).toLocaleString()}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        ) : sortedMonths.length > 0 && !selMonth ? (
+                          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                            Select a month above to view weekly results
+                          </div>
+                        ) : selChildId ? (
+                          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                            No archived weekly results for this child
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <style>{`
+                .premium-tab.active {
+                  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+                }
+                .premium-tab:not(.active):hover {
+                  background: #ede5d8;
+                }
+              `}</style>
+            </div>
+          ) : null}
+
+          {activePage === "Attendance Records" ? (
+            <div className="overview-container fade-in">
+              <div className="section-header">
+                <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <CalendarCheck size={24} style={{ color: 'var(--primary-gold)' }} />
+                  Attendance Records
+                </h2>
+                <p className="subtitle">Weekly attendance history for all children — Saturday to Friday cycle with Sunday auto-marked as Holiday</p>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <button
+                    onClick={async () => {
+                      const selMonth = document.getElementById('att-download-btn').getAttribute('data-month');
+                      if (!selMonth) return;
+                      const [y, m] = selMonth.split('-').map(Number);
+                      const daysInMonth = new Date(y, m, 0).getDate();
+                      const startDate = `${selMonth}-01`;
+                      const endDate = `${selMonth}-${String(daysInMonth).padStart(2, '0')}`;
+                      const { data: attData } = await supabase
+                        .from("student_daily_attendance")
+                        .select("*")
+                        .gte("attendance_date", startDate)
+                        .lte("attendance_date", endDate);
+                      const attMap = {};
+                      if (attData) {
+                        attData.forEach(r => {
+                          const sid = String(r.student_id).trim().toLowerCase();
+                          if (!attMap[sid]) attMap[sid] = {};
+                          attMap[sid][r.attendance_date] = r.status;
+                        });
+                      }
+                      const dateHeaders = [];
+                      for (let day = 1; day <= daysInMonth; day++) {
+                        dateHeaders.push(`${selMonth}-${String(day).padStart(2, '0')}`);
+                      }
+                      const escapeCsv = v => `"${String(v).replace(/"/g, '""')}"`;
+                      const header = `Student Name,Group,${dateHeaders.map(d => escapeCsv(d)).join(',')},Present,Absent,Holiday`;
+                      const rows = students.map(s => {
+                        const sid = String(s.student_id).trim().toLowerCase();
+                        const recs = attMap[sid] || {};
+                        let present = 0, absent = 0, holiday = 0;
+                        const vals = dateHeaders.map(d => {
+                          const st = recs[d];
+                          if (st === 'present') present++;
+                          else if (st === 'absent') absent++;
+                          else if (st === 'holiday') holiday++;
+                          return st || '';
+                        });
+                        return `${escapeCsv(s.name || s.full_name)},${escapeCsv(s.groupName || '')},${vals.map(v => escapeCsv(v)).join(',')},${present},${absent},${holiday}`;
+                      }).join('\n');
+                      const csvContent = header + '\n' + rows;
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `attendance_${selMonth}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    id="att-download-btn"
+                    data-month={attMonth || ''}
+                    disabled={!attMonth}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '8px 16px', borderRadius: '8px', border: attMonth ? '1px solid var(--primary-gold)' : '1px solid #ddd',
+                      background: attMonth ? 'linear-gradient(135deg, #fcf8f0, #f5edd9)' : '#f5f5f5',
+                      color: attMonth ? 'var(--deep-brown)' : '#aaa',
+                      fontWeight: 700, fontSize: '0.8rem', cursor: attMonth ? 'pointer' : 'default',
+                      transition: 'all 0.2s',
+                    }}
+                    title="Download monthly attendance CSV for all children"
+                  >
+                    <Download size={16} style={{ color: attMonth ? 'var(--primary-gold)' : '#aaa' }} />
+                    CSV
+                  </button>
+                </div>
+              </div>
+
+              {(() => {
+                const DAY_LABELS = { 0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat' };
+                const getWeekId = (dateStr) => {
+                  const d = new Date(dateStr + 'T00:00:00');
+                  const day = d.getDay();
+                  const satOffset = day === 6 ? 0 : -(day + 1);
+                  const sat = new Date(d);
+                  sat.setDate(d.getDate() + satOffset);
+                  return sat.toISOString().slice(0, 10);
+                };
+
+                const attStudentsList = students;
+
+                const childRecs = attendanceRecords;
+
+                const getMonthWeeks = (year, month) => {
+                  const weeks = {};
+                  const daysInMonth = new Date(year, month, 0).getDate();
+                  for (let day = 1; day <= daysInMonth; day++) {
+                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const weekId = getWeekId(dateStr);
+                    if (!weeks[weekId]) weeks[weekId] = [];
+                    weeks[weekId].push(dateStr);
+                  }
+                  return weeks;
+                };
+
+                const months = [];
+                const now = new Date();
+                for (let m = 0; m < 6; m++) {
+                  const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+                  months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+                }
+
+                const selStudent = attStudentsList.find(s => String(s.student_id) === String(attSelChild));
+
+                return (
+                  <div className="archive-container card-appear" style={{ padding: '24px', borderRadius: '16px', background: 'var(--white)' }}>
+                    <div style={{ marginBottom: '24px' }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.9rem' }}>Select Child</span>
+                        <select
+                          className="premium-select"
+                          value={attSelChild}
+                          onChange={e => { setAttSelChild(e.target.value); setAttMonth(""); }}
+                          style={{ maxWidth: '400px' }}
+                        >
+                          {attStudentsList.map(s => (
+                            <option key={s.student_id} value={String(s.student_id)}>
+                              {s.name || s.full_name} {s.groupName ? `(${s.groupName})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    {selStudent && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', padding: '16px', borderRadius: '12px', background: '#f9f6f0' }}>
+                        <StudentAvatar student={selStudent} />
+                        <div>
+                          <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.2rem' }}>{selStudent.name || selStudent.full_name}</h3>
+                          <p style={{ margin: '4px 0 0', color: 'var(--soft-brown)', fontSize: '0.85rem' }}>
+                            {selStudent.groupName ? selStudent.groupName : ''}
+                            {attLoading && ' \u2022 Loading...'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', borderBottom: '2px solid #eee', paddingBottom: '12px', marginBottom: '20px' }}>
+                      {months.map(({ year, month }) => {
+                        const label = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+                        const key = `${year}-${String(month).padStart(2, '0')}`;
+                        return (
+                          <button
+                            key={key}
+                            className={`premium-tab ${attMonth === key ? 'active' : ''}`}
+                            onClick={() => setAttMonth(attMonth === key ? "" : key)}
+                            style={{
+                              padding: '8px 18px',
+                              borderRadius: '8px',
+                              border: attMonth === key ? '2px solid var(--primary-gold)' : '2px solid transparent',
+                              background: attMonth === key ? 'var(--primary-gold)' : '#f5f0e8',
+                              color: attMonth === key ? '#fff' : 'var(--deep-brown)',
+                              fontWeight: 600,
+                              fontSize: '0.85rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {attMonth ? (
+                      (() => {
+                        const [y, m] = attMonth.split('-').map(Number);
+                        const weeks = getMonthWeeks(y, m);
+                        const sortedWeeks = Object.keys(weeks).sort((a, b) => b.localeCompare(a));
+                        const mPresent = Object.entries(childRecs).filter(([date, st]) => date.startsWith(attMonth) && st === 'present').length;
+                        const mAbsent = Object.entries(childRecs).filter(([date, st]) => date.startsWith(attMonth) && st === 'absent').length;
+                        const mHoliday = Object.entries(childRecs).filter(([date, st]) => date.startsWith(attMonth) && st === 'holiday').length;
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{
+                              display: 'flex', gap: '16px', justifyContent: 'center', alignItems: 'center',
+                              padding: '18px 20px', borderRadius: '12px',
+                              background: 'linear-gradient(135deg, #fcf8f0, #f5edd9)',
+                              border: '1px solid #d4c9b0',
+                              boxShadow: '0 2px 12px rgba(212,175,55,0.08)',
+                            }}>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--primary-gold)', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '8px' }}>Monthly</div>
+                              <div style={{ width: '1px', height: '32px', background: '#d4c9b0' }} />
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '50px' }}>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#155724', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Present</span>
+                                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#155724' }}>{mPresent}</span>
+                              </div>
+                              <div style={{ width: '1px', height: '32px', background: '#d4c9b0' }} />
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '50px' }}>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#721c24', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Absent</span>
+                                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#721c24' }}>{mAbsent}</span>
+                              </div>
+                              <div style={{ width: '1px', height: '32px', background: '#d4c9b0' }} />
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '50px' }}>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#856404', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Holiday</span>
+                                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#856404' }}>{mHoliday}</span>
+                              </div>
+                            </div>
+                            {sortedWeeks.map(weekStart => {
+                              const weekDays = weeks[weekStart];
+                              const satDate = new Date(weekStart + 'T00:00:00');
+                              const friDate = new Date(satDate);
+                              friDate.setDate(satDate.getDate() + 6);
+                              const weekLabel = `${satDate.toLocaleDateString('en-GB')} - ${friDate.toLocaleDateString('en-GB')}`;
+                              let present = 0, absent = 0, holiday = 0;
+
+                              return (
+                                <div key={weekStart} className="result-card-premium" style={{ padding: '20px', borderRadius: '12px', border: '1px solid #e8e0d4', background: '#fffaf0' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px dashed #d4c9b0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                      <div style={{ background: 'var(--primary-gold)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontWeight: 700, fontSize: '0.8rem' }}>
+                                        Week
+                                      </div>
+                                      <div style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.95rem' }}>{weekLabel}</div>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                                    {weekDays.map(dateStr => {
+                                      const d = new Date(dateStr + 'T00:00:00');
+                                      const dayName = DAY_LABELS[d.getDay()];
+                                      const isSunday = d.getDay() === 0;
+                                      const status = isSunday ? 'holiday' : (childRecs[dateStr] || null);
+                                      if (status === 'present') present++;
+                                      else if (status === 'absent') absent++;
+                                      else if (status === 'holiday') holiday++;
+
+                                      const statusColors = {
+                                        present: { bg: '#d4edda', text: '#155724', border: '#c3e6cb', icon: '✓' },
+                                        absent: { bg: '#f8d7da', text: '#721c24', border: '#f5c6cb', icon: '✕' },
+                                        holiday: { bg: '#fff3cd', text: '#856404', border: '#ffeeba', icon: '☾' },
+                                        null: { bg: '#f8f9fa', text: '#6c757d', border: '#dee2e6', icon: '—' },
+                                      };
+                                      const sc = statusColors[status] || statusColors.null;
+
+                                      return (
+                                        <div key={dateStr} style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          padding: '10px 4px',
+                                          borderRadius: '8px',
+                                          background: sc.bg,
+                                          border: `1px solid ${sc.border}`,
+                                        }}>
+                                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--soft-brown)', textTransform: 'uppercase' }}>{dayName}</span>
+                                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--deep-brown)' }}>{d.getDate()}</span>
+                                          <span style={{ fontSize: '1rem', color: sc.text, fontWeight: 700 }}>{sc.icon}</span>
+                                          {isSunday && <span style={{ fontSize: '0.6rem', color: '#856404', fontWeight: 600 }}>Holiday</span>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', padding: '10px', background: '#f5f0e8', borderRadius: '8px' }}>
+                                    <span style={{ color: '#155724', fontWeight: 600, fontSize: '0.85rem' }}>Present: {present}</span>
+                                    <span style={{ color: '#721c24', fontWeight: 600, fontSize: '0.85rem' }}>Absent: {absent}</span>
+                                    <span style={{ color: '#856404', fontWeight: 600, fontSize: '0.85rem' }}>Holiday: {holiday}</span>
+                                    <span style={{ color: 'var(--soft-brown)', fontWeight: 600, fontSize: '0.85rem' }}>/ 6 days</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                        Select a month above to view weekly attendance
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           ) : null}
 
           {activePage === "Result Tracking" ? (
@@ -8639,6 +9217,236 @@ const handleDownloadAllReports = async () => {
           {activePage === "Leave Management" && (
             <AdminLeaveManagement students={students} onShowAction={onShowAction} />
           )}
+          {activePage === "Teacher Leaves" ? (
+            <div className="overview-container fade-in">
+              <div className="section-header">
+                <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <CalendarX size={24} style={{ color: 'var(--primary-gold)' }} />
+                  Teacher Leave Approvals
+                </h2>
+                <p className="subtitle">Review and manage teacher leave applications with badal teacher assignment</p>
+              </div>
+              {(function() {
+                const [tlLeaves, setTlLeaves] = useState([]);
+                const [tlLoading, setTlLoading] = useState(true);
+                const [tlFilter, setTlFilter] = useState("pending");
+                const [tlBadalModal, setTlBadalModal] = useState(null);
+                const [tlAssignments, setTlAssignments] = useState({});
+                const [tlSubmitting, setTlSubmitting] = useState(false);
+                const [tlComment, setTlComment] = useState("");
+
+                const fetchTlLeaves = () => {
+                  setTlLoading(true);
+                  supabase.from("teacher_leaves").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+                    if (!error) setTlLeaves(data || []);
+                    setTlLoading(false);
+                  });
+                };
+
+                useEffect(() => { fetchTlLeaves(); }, []);
+
+                /* Auto-restore expired leaves on load */
+                useEffect(() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  supabase.from("teacher_leave_badals").select("*").eq("active", true).lte("to_date", today).then(({ data: expired }) => {
+                    if (expired && expired.length > 0) {
+                      expired.forEach(b => {
+                        const sid = String(b.student_id);
+                        const sidNum = Number(b.student_id);
+                        const sidVal = isNaN(sidNum) ? sid : sidNum;
+                        supabase.from("child_profiles").update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
+                          supabase.from("teacher_leave_badals").update({ active: false }).eq("id", b.id);
+                        });
+                      });
+                    }
+                  });
+                }, []);
+
+                const handleTlApprove = async (lv) => {
+                  if (!tlComment.trim()) {
+                    if (onShowAction) onShowAction("error", "Please enter an admin comment before approving.");
+                    return;
+                  }
+                  setTlSubmitting(true);
+                  const myStudents = students.filter(s => String(s.muhaffiz_id) === String(lv.teacher_id) || String(s.user_id) === String(lv.teacher_id));
+                  if (myStudents.length === 0) {
+                    if (onShowAction) onShowAction("error", "No children found for this teacher.");
+                    setTlSubmitting(false);
+                    return;
+                  }
+                  const initialAssign = {};
+                  myStudents.forEach(s => { initialAssign[String(s.student_id)] = ""; });
+                  setTlAssignments(initialAssign);
+                  setTlBadalModal({ leave: lv, students: myStudents });
+                  setTlSubmitting(false);
+                };
+
+                const handleTlConfirmBadal = async () => {
+                  const modal = tlBadalModal;
+                  if (!modal) return;
+                  setTlSubmitting(true);
+                  const lv = modal.leave;
+                  const myStudents = modal.students;
+                  const assigned = myStudents.filter(s => tlAssignments[String(s.student_id)]);
+                  if (assigned.length === 0) {
+                    if (onShowAction) onShowAction("error", "Assign at least one child to a badal teacher.");
+                    setTlSubmitting(false);
+                    return;
+                  }
+                  await supabase.from("teacher_leaves").update({ status: "approved", admin_comment: tlComment }).eq("id", lv.id);
+                  for (const s of assigned) {
+                    const badalId = tlAssignments[String(s.student_id)];
+                    const sid = String(s.student_id);
+                    const sidNum = Number(s.student_id);
+                    const sidVal = isNaN(sidNum) ? sid : sidNum;
+                    const badalTeacher = teacherProfiles.find(p => p.user_id === badalId);
+                    const studentName = s.name || s.full_name || "";
+                    await supabase.from("child_profiles").update({ badal_teacher_id: badalId }).eq("student_id", sidVal);
+                    await supabase.from("teacher_leave_badals").insert({
+                      leave_id: lv.id, student_id: sidVal, student_name: studentName,
+                      original_teacher_id: String(lv.teacher_id), badal_teacher_id: badalId,
+                      badal_teacher_name: badalTeacher?.full_name || badalId,
+                      from_date: lv.from_date, to_date: lv.to_date, active: true
+                    });
+                    await supabase.from("badal_assignments").upsert(
+                      { student_id: sidVal, teacher_id: badalId, original_teacher_id: String(lv.teacher_id), status: "active" },
+                      { onConflict: "student_id" }
+                    );
+                    const childName = s.name || s.full_name || "a child";
+                    try {
+                      await supabase.functions.invoke('fcm-notification', {
+                        body: { title: "New Badal Assignment", body: `You have been assigned as badal for ${childName} during leave`, targetUser: badalId, data: { type: "badal_assignment_leave", childName } }
+                      });
+                    } catch (_) {}
+                  }
+                  setTlBadalModal(null);
+                  setTlAssignments({});
+                  setTlComment("");
+                  setTlSubmitting(false);
+                  fetchTlLeaves();
+                  if (loadPortalData) await loadPortalData(portalRole, user);
+                  if (onShowAction) onShowAction("success", `Leave approved! ${assigned.length} child(ren) assigned to badal teachers.`);
+                };
+
+                const handleTlReject = async (lv) => {
+                  if (!tlComment.trim()) {
+                    if (onShowAction) onShowAction("error", "Please enter an admin comment before rejecting.");
+                    return;
+                  }
+                  await supabase.from("teacher_leaves").update({ status: "rejected", admin_comment: tlComment }).eq("id", lv.id);
+                  setTlComment("");
+                  fetchTlLeaves();
+                  if (onShowAction) onShowAction("success", "Leave rejected.");
+                };
+
+                const filteredTl = tlLeaves.filter(l => l.status === tlFilter);
+                const teacherProfilesList = teacherProfiles || [];
+
+                return (
+                  <>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '12px' }}>
+                      {["pending", "approved", "rejected"].map(f => (
+                        <button key={f} onClick={() => setTlFilter(f)}
+                          style={{
+                            padding: '8px 20px', borderRadius: '20px', border: tlFilter === f ? '2px solid var(--primary-gold)' : '1px solid #ddd',
+                            background: tlFilter === f ? 'var(--primary-gold)' : 'white',
+                            color: tlFilter === f ? 'white' : '#666', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
+                            textTransform: 'capitalize'
+                          }}
+                        >{f}</button>
+                      ))}
+                    </div>
+
+                    {tlLoading ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading...</div>
+                    ) : filteredTl.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No {tlFilter} leave applications.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {filteredTl.map(lv => {
+                          const teacherName = lv.teacher_name || lv.teacher_id;
+                          const fromD = new Date(lv.from_date);
+                          const toD = new Date(lv.to_date);
+                          const days = Math.max(0, Math.floor((toD - fromD) / 86400000) + 1);
+                          return (
+                            <div key={lv.id} className="result-card-premium" style={{ padding: '18px', borderRadius: '12px', border: '1px solid #e8e0d4', background: '#fffaf0' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '1rem' }}>{teacherName}</div>
+                                  <div style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginTop: '4px' }}>
+                                    {lv.from_date} → {lv.to_date} <span style={{ fontWeight: 600, color: 'var(--primary-gold)' }}>({days} day{days > 1 ? 's' : ''})</span>
+                                  </div>
+                                  {lv.reason && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>"{lv.reason}"</div>}
+                                  {lv.admin_comment && <div style={{ fontSize: '0.75rem', color: 'var(--soft-brown)', marginTop: '2px' }}>Admin: {lv.admin_comment}</div>}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  {lv.status === 'pending' && (
+                                    <>
+                                      <input type="text" placeholder="Admin comment..." value={tlComment}
+                                        onChange={e => setTlComment(e.target.value)}
+                                        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '0.8rem', width: '180px' }}
+                                      />
+                                      <button onClick={() => handleTlApprove(lv)} disabled={tlSubmitting}
+                                        style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#fff', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                                      >Approve</button>
+                                      <button onClick={() => handleTlReject(lv)} disabled={tlSubmitting}
+                                        style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', color: '#721c24', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                                      >Reject</button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Badal Assignment Modal */}
+                    {tlBadalModal && (
+                      <div className="celebration-overlay" onClick={() => setTlBadalModal(null)}>
+                        <div className="celebration-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                          <div className="celebration-content" style={{ textAlign: 'left' }}>
+                            <h2 style={{ color: 'var(--deep-brown)', marginBottom: '12px', fontSize: '1.2rem' }}>Assign Badal Teachers</h2>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginBottom: '16px' }}>
+                              {tlBadalModal.leave.teacher_name}'s leave: {tlBadalModal.leave.from_date} → {tlBadalModal.leave.to_date}
+                            </p>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                              Select a substitute teacher for each child. The child will appear in the badal teacher's portal during the leave period and auto-restore when leave ends.
+                            </p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                              {tlBadalModal.students.map(s => (
+                                <div key={s.student_id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '8px', background: '#f9f6f0' }}>
+                                  <span style={{ flex: 1, fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem' }}>{s.name || s.full_name}</span>
+                                  <select className="premium-select" value={tlAssignments[String(s.student_id)] || ""}
+                                    onChange={e => setTlAssignments(prev => ({ ...prev, [String(s.student_id)]: e.target.value }))}
+                                    style={{ flex: '1', minWidth: '150px', fontSize: '0.8rem' }}
+                                  >
+                                    <option value="">Select badal teacher...</option>
+                                    {teacherProfilesList.filter(p => String(p.user_id) !== String(tlBadalModal.leave.teacher_id)).map(p => (
+                                      <option key={p.user_id} value={p.user_id}>{p.full_name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                              <button onClick={() => setTlBadalModal(null)}
+                                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', color: '#666', fontWeight: 600, cursor: 'pointer' }}
+                              >Cancel</button>
+                              <button onClick={handleTlConfirmBadal} disabled={tlSubmitting}
+                                style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+                              >{tlSubmitting ? 'Assigning...' : 'Confirm & Approve'}</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          ) : null}
           {portalAccessSuccess && (
             <PortalAccessSuccessModal
               payload={portalAccessSuccess}
@@ -9891,6 +10699,18 @@ function TeacherPortal({
 
   const [studentAttendance, setStudentAttendance] = useState({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [histStudentId, setHistStudentId] = useState("");
+  const [histDate, setHistDate] = useState(new Date().toISOString().slice(0, 10));
+  const [histStatus, setHistStatus] = useState(null);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histRecords, setHistRecords] = useState({});
+  const [attHistEnabled, setAttHistEnabled] = useState(() => localStorage.getItem('teacher_attendance_history_enabled') !== 'false');
+  const [leaveFrom, setLeaveFrom] = useState("");
+  const [leaveTo, setLeaveTo] = useState("");
+  const [leaveReason, setLeaveReason] = useState("");
+  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+  const [myLeaves, setMyLeaves] = useState([]);
+  const [leavesLoading, setLeavesLoading] = useState(true);
   const [badalAssignments, setBadalAssignments] = useState([]);
   const [badalProgress, setBadalProgress] = useState([]);
   const [badalProgressDraft, setBadalProgressDraft] = useState({});
@@ -9900,16 +10720,20 @@ function TeacherPortal({
   const weekDays = useMemo(() => {
     const days = [];
     const today = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
+    const dayOfWeek = today.getDay();
+    const satOffset = dayOfWeek === 6 ? 0 : -(dayOfWeek + 1);
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() + satOffset);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(saturday);
+      d.setDate(saturday.getDate() + i);
       days.push(d.toISOString().slice(0, 10));
     }
     return days;
   }, []);
 
   const badalOverviewStudents = useMemo(() => {
-    if (badalAssignments.length === 0) return [];
+    /* Also directly check child_profiles.badal_teacher_id for the new approach */
     const rawId = user?.id || teacherIdentity;
     const matchedIds = [];
     if (rawId) matchedIds.push(String(rawId));
@@ -9922,6 +10746,28 @@ function TeacherPortal({
       .forEach(p => { if (!matchedIds.includes(String(p.user_id))) matchedIds.push(String(p.user_id)); });
     const existingIds = new Set(filteredStudents.map(s => String(s.student_id).trim().toLowerCase()));
     const allSchoolStudents = schoolData?.students || [];
+    
+    /* NEW APPROACH: Also get students from child_profiles.badal_teacher_id where badal_teacher_id matches the teacher */
+    const fromBadalColumn = allSchoolStudents.filter(s => {
+      const sid = String(s.student_id).trim().toLowerCase();
+      if (existingIds.has(sid)) return false;
+      return s.badal_teacher_id && matchedIds.some(uid => String(s.badal_teacher_id).trim() === String(uid).trim());
+    });
+    
+    /* OLD APPROACH: Also check the old badal_assignments table */
+    if (badalAssignments.length === 0) return fromBadalColumn;
+    /* Reuse variables from above - they are already declared in this scope */
+    matchedIds.length = 0;
+    if (rawId) matchedIds.push(String(rawId));
+    if (user?.id && teacherIdentity && String(user.id) !== String(teacherIdentity)) matchedIds.push(String(teacherIdentity));
+    (Array.isArray(schoolData?.portalAccessList) ? schoolData.portalAccessList : [])
+      .filter(a => { const m = String(a.user_id) === String(rawId) || (a.full_name && teacherIdentity && normalizeText(a.full_name) === normalizeText(teacherIdentity)); return m && a.user_id; })
+      .forEach(a => { if (!matchedIds.includes(String(a.user_id))) matchedIds.push(String(a.user_id)); });
+    (Array.isArray(teacherProfiles) ? teacherProfiles : [])
+      .filter(p => { const m = String(p.user_id) === String(rawId) || (p.full_name && teacherIdentity && normalizeText(p.full_name) === normalizeText(teacherIdentity)); return m && p.user_id; })
+      .forEach(p => { if (!matchedIds.includes(String(p.user_id))) matchedIds.push(String(p.user_id)); });
+    existingIds.clear();
+    filteredStudents.forEach(s => existingIds.add(String(s.student_id).trim().toLowerCase()));
     return badalAssignments
       .filter(a => a.status === "active" && matchedIds.some(uid => String(a.teacher_id) === String(uid)))
       .filter(a => {
@@ -9967,6 +10813,65 @@ function TeacherPortal({
       });
   }, [overviewStudents, weekDays, user?.id, teacherIdentity]);
 
+  useEffect(() => {
+    if (!histStudentId) return;
+    setHistLoading(true);
+    const endDate = new Date().toISOString().slice(0, 10);
+    const start = new Date();
+    start.setDate(start.getDate() - 28);
+    const startDate = start.toISOString().slice(0, 10);
+    supabase
+      .from("student_daily_attendance")
+      .select("*")
+      .eq("student_id", String(histStudentId))
+      .gte("attendance_date", startDate)
+      .lte("attendance_date", endDate)
+      .then(({ data, error }) => {
+        const map = {};
+        if (!error && data) {
+          data.forEach(r => { map[r.attendance_date] = r.status; });
+        }
+        setHistRecords(map);
+        setHistLoading(false);
+      });
+  }, [histStudentId]);
+
+  useEffect(() => {
+    if (overviewStudents.length > 0 && !histStudentId) {
+      setHistStudentId(String(overviewStudents[0].student_id));
+    }
+  }, [overviewStudents.length]);
+
+  const teacherIdForLeave = user?.id || teacherIdentity;
+
+  const loadMyLeaves = useCallback(() => {
+    if (!teacherIdForLeave) return;
+    setLeavesLoading(true);
+    supabase.from("teacher_leaves").select("*").eq("teacher_id", String(teacherIdForLeave)).order("created_at", { ascending: false }).then(({ data }) => {
+      setMyLeaves(data || []);
+      setLeavesLoading(false);
+    });
+  }, [teacherIdForLeave]);
+
+  useEffect(() => { loadMyLeaves(); }, [teacherIdForLeave]);
+
+  useEffect(() => {
+    if (!teacherIdForLeave) return;
+    const today = new Date().toISOString().slice(0, 10);
+    supabase.from("teacher_leave_badals").select("*").eq("original_teacher_id", String(teacherIdForLeave)).eq("active", true).lte("to_date", today).then(({ data: endedBadals }) => {
+      if (endedBadals && endedBadals.length > 0) {
+        endedBadals.forEach(b => {
+          const sid = String(b.student_id);
+          const sidNum = Number(b.student_id);
+          const sidVal = isNaN(sidNum) ? sid : sidNum;
+          supabase.from("child_profiles").update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
+            supabase.from("teacher_leave_badals").update({ active: false }).eq("id", b.id);
+          });
+        });
+      }
+    });
+  }, [teacherIdForLeave]);
+
   /*
    * BADAL FLOW - fetchBadalData
    * Fetches badal-related data for the current teacher from two sources:
@@ -9983,24 +10888,28 @@ function TeacherPortal({
     if (user?.id && teacherIdentity && String(user.id) !== String(teacherIdentity)) idMatches.push(String(teacherIdentity));
     const teacherIdFilter = idMatches.length > 0 ? idMatches : [""];
 
-    /* Fetch from both sources in parallel */
     const badalProfileQuery = teacherIdFilter[0]
       ? supabase.from("child_profiles").select("student_id, full_name, original_teacher_id, badal_teacher_id")
           .or(teacherIdFilter.map(id => `badal_teacher_id.eq.${id}`).join(","))
-      : Promise.resolve({ data: null, error: null });
+      : Promise.resolve({ data: null });
+    /* Also fetch original-teacher students (current teacher is original, someone else is badal) */
+    const originalProfileQuery = teacherIdFilter[0]
+      ? supabase.from("child_profiles").select("student_id, full_name, original_teacher_id, badal_teacher_id")
+          .or(teacherIdFilter.map(id => `original_teacher_id.eq.${id}`).join(","))
+          .not("badal_teacher_id", "is", null)
+      : Promise.resolve({ data: null });
     Promise.all([
       supabase.from("badal_assignments").select("*").eq("status", "active"),
-      badalProfileQuery
-    ]).then(([assignmentsRes, childProfilesRes]) => {
+      badalProfileQuery,
+      originalProfileQuery
+    ]).then(([assignmentsRes, childProfilesRes, originalProfilesRes]) => {
       let combined = [];
-      /* Legacy: use badal_assignments table */
       if (assignmentsRes.data) {
         combined = assignmentsRes.data.map(a => ({
           ...a,
           _source: "badal_assignments"
         }));
       }
-      /* New model: use child_profiles.badal_teacher_id */
       if (childProfilesRes.data) {
         const fromProfiles = childProfilesRes.data
           .filter(cp => cp.badal_teacher_id && teacherIdFilter.some(tid => String(cp.badal_teacher_id) === String(tid)))
@@ -10011,7 +10920,6 @@ function TeacherPortal({
             status: "active",
             _source: "child_profiles"
           }));
-        /* Merge: prefer records from child_profiles, fall back to badal_assignments */
         const seen = new Set(combined.map(a => String(a.student_id)));
         fromProfiles.forEach(fp => {
           if (!seen.has(String(fp.student_id))) {
@@ -10022,7 +10930,16 @@ function TeacherPortal({
       }
       setBadalAssignments(combined);
 
-      const studentIds = combined.map(a => { const n = Number(a.student_id); return isNaN(n) ? String(a.student_id) : n; });
+      /* Collect all student IDs that need progress shown: badal students + original-teacher students with badal */
+      const allProgressIds = new Set(combined.map(a => { const n = Number(a.student_id); return isNaN(n) ? String(a.student_id) : n; }));
+      if (originalProfilesRes.data) {
+        originalProfilesRes.data.forEach(cp => {
+          const n = Number(cp.student_id);
+          const sid = isNaN(n) ? String(cp.student_id) : n;
+          allProgressIds.add(sid);
+        });
+      }
+      const studentIds = [...allProgressIds];
       if (studentIds.length > 0) {
         supabase
           .from("badal_progress")
@@ -10706,6 +11623,8 @@ function TeacherPortal({
             { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
             { id: "Inbox", label: "Inbox", icon: Bell },
             { id: "Badal", label: "Badal Update", icon: RotateCw },
+            { id: "Attendance History", label: "Attendance History", icon: CalendarCheck },
+            { id: "Apply Leave", label: "Apply Leave", icon: CalendarX },
             { id: "Settings", label: "Settings", icon: Settings },
           ].filter(p => pageVisibility[p.id] !== false).map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
@@ -10992,6 +11911,14 @@ function TeacherPortal({
                     </>
                   );
                 })()}
+                <button
+                  className="bulk-att-btn premium"
+                  onClick={() => { setActivePage("Attendance History"); setMenuOpen(false); }}
+                  style={{ background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.8rem', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}
+                  title="Mark attendance for any past date"
+                >
+                  <CalendarCheck size={16} /> Past Attendance
+                </button>
               </div>
 
               <div className="student-card-grid">
@@ -11046,43 +11973,56 @@ function TeacherPortal({
                       {(() => {
                         const att = studentAttendance[sid] || {};
                         let present = 0, absent = 0, holiday = 0;
-                        weekDays.forEach(d => {
-                          if (att[d] === 'present') present++;
-                          else if (att[d] === 'absent') absent++;
-                          else if (att[d] === 'holiday') holiday++;
-                        });
                         const today = weekDays[weekDays.length - 1];
-                        const todayStatus = att[today];
+                        weekDays.forEach((d, idx) => {
+                          const isSunday = new Date(d).getDay() === 0;
+                          const effectiveStatus = isSunday ? 'holiday' : (att[d] || null);
+                          if (effectiveStatus === 'present') present++;
+                          else if (effectiveStatus === 'absent') absent++;
+                          else if (effectiveStatus === 'holiday') holiday++;
+                        });
+                        const todayIsSunday = new Date(today).getDay() === 0;
+                        const todayStatus = todayIsSunday ? 'holiday' : (att[today] || null);
+                        const todayDate = new Date(today);
+                        const todayLabel = todayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+                        const workingDays = 6;
                         return (
                           <>
                             <div className="attendance-stats-row">
                               <span className="att-stat present">Present: {present}</span>
                               <span className="att-stat absent">Absent: {absent}</span>
-                              {holiday > 0 && <span className="att-stat holiday">Holiday: {holiday}</span>}
-                              <span className="att-stat total">/ 6 days</span>
+                              <span className="att-stat holiday">Holiday: {holiday}</span>
+                              <span className="att-stat total">/ {workingDays} days</span>
                             </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--soft-brown)', fontWeight: 600, marginBottom: '6px', textAlign: 'center' }}>{todayLabel}</div>
                             <div className="attendance-btn-row">
-                              <button
-                                className={`att-btn present ${todayStatus === 'present' ? 'active' : ''}`}
-                                onClick={() => handleMarkAttendance(student.student_id, today, 'present')}
-                                disabled={attendanceLoading}
-                              >
-                                {todayStatus === 'present' ? '✓' : ''} Present
-                              </button>
-                              <button
-                                className={`att-btn absent ${todayStatus === 'absent' ? 'active' : ''}`}
-                                onClick={() => handleMarkAttendance(student.student_id, today, 'absent')}
-                                disabled={attendanceLoading}
-                              >
-                                {todayStatus === 'absent' ? '✕' : ''} Absent
-                              </button>
-                              <button
-                                className={`att-btn holiday ${todayStatus === 'holiday' ? 'active' : ''}`}
-                                onClick={() => handleMarkAttendance(student.student_id, today, 'holiday')}
-                                disabled={attendanceLoading}
-                              >
-                                {todayStatus === 'holiday' ? '☾' : ''} Holiday
-                              </button>
+                              {todayIsSunday ? (
+                                <span className="att-btn holiday active" style={{ cursor: 'default', opacity: 0.7 }}>☾ Sunday (Holiday)</span>
+                              ) : (
+                                <>
+                                  <button
+                                    className={`att-btn present ${todayStatus === 'present' ? 'active' : ''}`}
+                                    onClick={() => handleMarkAttendance(student.student_id, today, 'present')}
+                                    disabled={attendanceLoading}
+                                  >
+                                    {todayStatus === 'present' ? '✓' : ''} Present
+                                  </button>
+                                  <button
+                                    className={`att-btn absent ${todayStatus === 'absent' ? 'active' : ''}`}
+                                    onClick={() => handleMarkAttendance(student.student_id, today, 'absent')}
+                                    disabled={attendanceLoading}
+                                  >
+                                    {todayStatus === 'absent' ? '✕' : ''} Absent
+                                  </button>
+                                  <button
+                                    className={`att-btn holiday ${todayStatus === 'holiday' ? 'active' : ''}`}
+                                    onClick={() => handleMarkAttendance(student.student_id, today, 'holiday')}
+                                    disabled={attendanceLoading}
+                                  >
+                                    {todayStatus === 'holiday' ? '☾' : ''} Holiday
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </>
                         );
@@ -11796,6 +12736,204 @@ function TeacherPortal({
             </div>
           ) : null}
 
+          {activePage === "Attendance History" ? (
+            <div className="management-grid fade-in">
+              {(function() {
+                const isEnabled = localStorage.getItem('teacher_attendance_history_enabled') !== 'false';
+                const histStudents = overviewStudents;
+
+                const handleHistMark = async (date, status) => {
+                  const sid = String(histStudentId).trim().toLowerCase();
+                  const existing = histRecords[date];
+                  const teacherId = user?.id || teacherIdentity;
+
+                  if (existing === status) return;
+
+                  if (existing) {
+                    await supabase
+                      .from("student_daily_attendance")
+                      .update({ status })
+                      .eq("student_id", String(histStudentId))
+                      .eq("attendance_date", date);
+                  } else {
+                    await supabase
+                      .from("student_daily_attendance")
+                      .upsert(
+                        { student_id: String(histStudentId), teacher_id: String(teacherId), attendance_date: date, status },
+                        { onConflict: "student_id,attendance_date" }
+                      );
+                  }
+
+                  setHistRecords(prev => ({ ...prev, [date]: status }));
+                  setHistStatus(status);
+                  if (onShowAction) onShowAction("success", `Attendance marked as ${status} for ${date}`);
+                };
+
+                const selStudent = histStudents.find(s => String(s.student_id) === String(histStudentId));
+
+                if (!isEnabled) {
+                  return (
+                    <section className="form-card card-appear" style={{ textAlign: 'center', padding: '40px' }}>
+                      <CalendarCheck size={48} style={{ color: 'var(--text-muted)', marginBottom: '16px', opacity: 0.4 }} />
+                      <h3 style={{ color: 'var(--text-muted)', marginBottom: '12px' }}>Attendance History is Disabled</h3>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '400px', margin: '0 auto 20px' }}>
+                        Enable it in <strong>Settings → Attendance History (PREMIUM)</strong> to mark attendance for any past date.
+                      </p>
+                      <button className="action-button" onClick={() => setActivePage("Settings")}>
+                        Go to Settings
+                      </button>
+                    </section>
+                  );
+                }
+
+                return (
+                  <section className="form-card card-appear" style={{ width: '100%' }}>
+                    <div className="card-headline headline-with-action" style={{ marginBottom: '24px' }}>
+                      <div className="headline-left">
+                        <CalendarCheck size={22} style={{ color: 'var(--primary-gold)' }} />
+                        <h3>Attendance History <span style={{ fontSize: '0.65rem', background: 'var(--primary-gold)', color: '#fff', padding: '2px 8px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, verticalAlign: 'middle' }}>PREMIUM</span></h3>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                      <label style={{ flex: '1', minWidth: '200px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>Select Student</span>
+                        <select className="premium-select" value={histStudentId} onChange={e => { setHistStudentId(e.target.value); setHistDate(new Date().toISOString().slice(0, 10)); setHistStatus(null); }}>
+                          {histStudents.map(s => (
+                            <option key={s.student_id} value={String(s.student_id)}>{s.name || s.full_name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label style={{ flex: '1', minWidth: '200px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>Select Date</span>
+                        <input type="date" className="premium-input" value={histDate} max={new Date().toISOString().slice(0, 10)} onChange={e => { setHistDate(e.target.value); setHistStatus(null); }} />
+                      </label>
+                    </div>
+
+                    {selStudent && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', padding: '14px', borderRadius: '10px', background: '#f9f6f0' }}>
+                        <StudentAvatar student={selStudent} />
+                        <div>
+                          <h4 style={{ margin: 0, color: 'var(--deep-brown)' }}>{selStudent.name || selStudent.full_name}</h4>
+                          <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--soft-brown)' }}>{selStudent.groupName || ''} · {histDate}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(() => {
+                      const tPresent = Object.values(histRecords).filter(v => v === 'present').length;
+                      const tAbsent = Object.values(histRecords).filter(v => v === 'absent').length;
+                      const tHoliday = Object.values(histRecords).filter(v => v === 'holiday').length;
+                      const tTotal = tPresent + tAbsent + tHoliday;
+                      if (!tTotal) return null;
+                      return (
+                        <div style={{
+                          display: 'flex', gap: '16px', justifyContent: 'center', alignItems: 'center',
+                          padding: '18px 20px', borderRadius: '12px', marginBottom: '20px',
+                          background: 'linear-gradient(135deg, #fcf8f0, #f5edd9)',
+                          border: '1px solid #d4c9b0',
+                          boxShadow: '0 2px 12px rgba(212,175,55,0.08)',
+                        }}>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--primary-gold)', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '8px' }}>Monthly</div>
+                          <div style={{ width: '1px', height: '32px', background: '#d4c9b0' }} />
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '50px' }}>
+                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#155724', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Present</span>
+                            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#155724' }}>{tPresent}</span>
+                          </div>
+                          <div style={{ width: '1px', height: '32px', background: '#d4c9b0' }} />
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '50px' }}>
+                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#721c24', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Absent</span>
+                            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#721c24' }}>{tAbsent}</span>
+                          </div>
+                          <div style={{ width: '1px', height: '32px', background: '#d4c9b0' }} />
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '50px' }}>
+                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#856404', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Holiday</span>
+                            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#856404' }}>{tHoliday}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+                      {['present', 'absent', 'holiday'].map(status => {
+                        const currentStatus = histRecords[histDate];
+                        const isActive = currentStatus === status;
+                        const colors = { present: { bg: '#d4edda', text: '#155724', border: '#c3e6cb', icon: '✓', label: 'Present' }, absent: { bg: '#f8d7da', text: '#721c24', border: '#f5c6cb', icon: '✕', label: 'Absent' }, holiday: { bg: '#fff3cd', text: '#856404', border: '#ffeeba', icon: '☾', label: 'Holiday' } };
+                        const c = colors[status];
+                        return (
+                          <button key={status} onClick={() => !histLoading && handleHistMark(histDate, status)} disabled={histLoading}
+                            style={{
+                              flex: 1, padding: '12px 20px', borderRadius: '10px', border: `2px solid ${isActive ? c.border : '#e0d8cc'}`, cursor: 'pointer', fontWeight: 700, fontSize: '0.95rem', transition: 'all 0.2s',
+                              background: isActive ? c.bg : '#faf8f5', color: isActive ? c.text : 'var(--text-muted)',
+                              boxShadow: isActive ? `0 2px 12px ${c.border}` : 'none',
+                            }}
+                          >
+                            {c.icon} {c.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ marginTop: '20px' }}>
+                      <h4 style={{ color: 'var(--deep-brown)', marginBottom: '12px', fontSize: '0.95rem' }}>Last 4 Weeks Overview</h4>
+                      {histLoading ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Loading...</div>
+                      ) : (
+                        (() => {
+                          const weeks = [];
+                          const saturday = new Date();
+                          const dow = saturday.getDay();
+                          saturday.setDate(saturday.getDate() + (dow === 6 ? 0 : -(dow + 1)));
+                          for (let w = 0; w < 4; w++) {
+                            const weekStart = new Date(saturday);
+                            weekStart.setDate(saturday.getDate() - w * 7);
+                            const days = [];
+                            for (let d = 0; d < 7; d++) {
+                              const date = new Date(weekStart);
+                              date.setDate(weekStart.getDate() + d);
+                              const dateStr = date.toISOString().slice(0, 10);
+                              const isSunday = d === 1;
+                              const status = isSunday ? 'holiday' : (histRecords[dateStr] || null);
+                              days.push({ dateStr, dayName: ['Sat','Sun','Mon','Tue','Wed','Thu','Fri'][d], dayNum: date.getDate(), status, isSunday, isPast: date <= new Date() });
+                            }
+                            weeks.push({ start: weekStart, days });
+                          }
+                          return weeks.map((week, wi) => (
+                            <div key={wi} style={{ marginBottom: '16px', padding: '14px', borderRadius: '10px', background: '#faf8f5', border: '1px solid #eee' }}>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--soft-brown)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                                {week.start.toLocaleDateString('en-GB')} — {new Date(week.start.getTime() + 6*86400000).toLocaleDateString('en-GB')}
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                                {week.days.map((day, di) => {
+                                  const sc = { present: { bg: '#d4edda', text: '#155724', icon: '✓', label: 'Present' }, absent: { bg: '#f8d7da', text: '#721c24', icon: '✕', label: 'Absent' }, holiday: { bg: '#fff3cd', text: '#856404', icon: '☾', label: 'Holiday' }, null: { bg: '#f0f0f0', text: '#aaa', icon: '—', label: '' } };
+                                  const s = sc[day.status] || sc.null;
+                                  const isSelected = day.dateStr === histDate;
+                                  return (
+                                    <button key={di} onClick={() => { setHistDate(day.dateStr); setHistStatus(null); }}
+                                      style={{
+                                        padding: '8px 4px', borderRadius: '8px', border: isSelected ? '2px solid var(--primary-gold)' : '1px solid #e0d8cc', cursor: 'pointer', textAlign: 'center',
+                                        background: isSelected ? '#fff8e7' : sc.null.bg, transition: 'all 0.15s', opacity: day.isPast ? 1 : 0.5,
+                                      }}
+                                    >
+                                      <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--soft-brown)', textTransform: 'uppercase' }}>{day.dayName}</div>
+                                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--deep-brown)' }}>{day.dayNum}</div>
+                                      <div style={{ fontSize: '0.85rem', color: s.text, fontWeight: 700 }}>{s.icon}</div>
+                                      {s.label && <div style={{ fontSize: '0.55rem', color: s.text, fontWeight: 600, marginTop: '2px', lineHeight: 1.2 }}>{s.label}</div>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ));
+                        })()
+                      )}
+                    </div>
+                  </section>
+                );
+              })()}
+            </div>
+          ) : null}
+
           {activePage === "Overview" ? (
             <div className="management-grid">
               <div className="data-card">
@@ -12043,16 +13181,254 @@ function TeacherPortal({
           )}
 
           {activePage === "Settings" ? (
-            <SettingsPage 
-              isDarkMode={isDarkMode}
-              setIsDarkMode={setIsDarkMode}
-              appTheme={appTheme}
-              setAppTheme={setAppTheme}
-              user={user}
-              studentProfile={null}
-              onShowAction={onShowAction}
-              role="teacher"
-            />
+            <>
+              <SettingsPage 
+                isDarkMode={isDarkMode}
+                setIsDarkMode={setIsDarkMode}
+                appTheme={appTheme}
+                setAppTheme={setAppTheme}
+                user={user}
+                studentProfile={null}
+                onShowAction={onShowAction}
+                role="teacher"
+              />
+              {(function() {
+                const toggleAttHist = () => {
+                  const next = !attHistEnabled;
+                  setAttHistEnabled(next);
+                  localStorage.setItem('teacher_attendance_history_enabled', String(next));
+                };
+                return (
+                  <div className="management-grid" style={{ marginTop: '20px' }}>
+                    <section className="form-card card-appear">
+                      <div className="card-headline headline-with-action">
+                        <div className="headline-left">
+                          <CalendarCheck size={20} style={{ color: 'var(--primary-gold)' }} />
+                          <h3>Attendance History <span style={{ fontSize: '0.7rem', background: 'var(--primary-gold)', color: '#fff', padding: '2px 8px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, verticalAlign: 'middle' }}>PREMIUM</span></h3>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                        Enable marking attendance for any past date. Useful if you forgot to mark a day — you can go back and update it anytime from the Attendance History page.
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button
+                          onClick={toggleAttHist}
+                          style={{
+                            width: '52px', height: '28px', borderRadius: '14px', border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.3s',
+                            background: attHistEnabled ? 'var(--primary-gold)' : '#ccc',
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute', top: '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'all 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                            left: attHistEnabled ? '27px' : '3px',
+                          }} />
+                        </button>
+                        <span style={{ fontWeight: 600, color: attHistEnabled ? 'var(--deep-brown)' : 'var(--text-muted)', fontSize: '0.95rem' }}>
+                          {attHistEnabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                    </section>
+                  </div>
+                );
+              })()}
+            </>
+          ) : null}
+
+          {activePage === "Apply Leave" ? (
+            <div className="management-grid fade-in">
+              {(function() {
+                const teacherId = user?.id || teacherIdentity;
+                const handleLeaveSubmit = async () => {
+                  if (!leaveFrom || !leaveTo || !teacherId) return;
+                  setLeaveSubmitting(true);
+                  const teacherName = teacherIdentity || user?.email || "";
+                  const { error } = await supabase.from("teacher_leaves").insert({
+                    teacher_id: String(teacherId),
+                    teacher_name: teacherName,
+                    from_date: leaveFrom,
+                    to_date: leaveTo,
+                    reason: leaveReason,
+                    status: "pending"
+                  });
+                  setLeaveSubmitting(false);
+                  if (error) {
+                    if (onShowAction) onShowAction("error", "Failed to submit: " + error.message);
+                  } else {
+                    if (onShowAction) onShowAction("success", "Leave application submitted!");
+                    setLeaveFrom("");
+                    setLeaveTo("");
+                    setLeaveReason("");
+                    loadMyLeaves();
+                  }
+                };
+
+                const daysCount = leaveFrom && leaveTo ? Math.max(0, Math.floor((new Date(leaveTo) - new Date(leaveFrom)) / 86400000) + 1) : 0;
+
+                return (
+                  <section className="form-card card-appear" style={{ width: '100%', padding: '0', overflow: 'hidden', borderRadius: '16px' }}>
+                    <div style={{
+                      background: 'linear-gradient(135deg, #fcf8f0, #f5edd9)',
+                      padding: '24px 28px 20px',
+                      borderBottom: '2px solid #d4c9b0',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{
+                          width: '44px', height: '44px', borderRadius: '12px',
+                          background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                          <CalendarX size={22} color="#fff" />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.15rem', fontWeight: 700 }}>Apply for Leave</h3>
+                          <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--soft-brown)' }}>Submit a leave request for admin approval</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '24px 28px' }}>
+                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                        <label style={{ flex: '1', minWidth: '180px' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.8rem', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>From Date</span>
+                          <input type="date" className="premium-input" value={leaveFrom} max={leaveTo || undefined} onChange={e => setLeaveFrom(e.target.value)}
+                            style={{ padding: '12px 14px', borderRadius: '10px', border: '2px solid #e0d8cc', fontSize: '0.9rem', width: '100%', background: '#fff', color: 'var(--deep-brown)', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' }}
+                            onFocus={e => e.target.style.borderColor = 'var(--primary-gold)'}
+                            onBlur={e => e.target.style.borderColor = '#e0d8cc'}
+                          />
+                        </label>
+                        <label style={{ flex: '1', minWidth: '180px' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.8rem', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>To Date</span>
+                          <input type="date" className="premium-input" value={leaveTo} min={leaveFrom || undefined} onChange={e => setLeaveTo(e.target.value)}
+                            style={{ padding: '12px 14px', borderRadius: '10px', border: '2px solid #e0d8cc', fontSize: '0.9rem', width: '100%', background: '#fff', color: 'var(--deep-brown)', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' }}
+                            onFocus={e => e.target.style.borderColor = 'var(--primary-gold)'}
+                            onBlur={e => e.target.style.borderColor = '#e0d8cc'}
+                          />
+                        </label>
+                      </div>
+                      {daysCount > 0 && (
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '8px',
+                          padding: '6px 16px', borderRadius: '20px', marginBottom: '18px',
+                          background: 'linear-gradient(135deg, #fcf8f0, #f5edd9)',
+                          border: '1px solid #d4c9b0',
+                        }}>
+                          <Calendar size={14} style={{ color: 'var(--primary-gold)' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--deep-brown)' }}>
+                            {daysCount} day{daysCount > 1 ? 's' : ''} of leave
+                          </span>
+                        </div>
+                      )}
+
+                      <label style={{ display: 'block', marginBottom: '20px' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.8rem', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Reason <span style={{ fontWeight: 400, color: 'var(--soft-brown)', textTransform: 'none' }}>(optional)</span></span>
+                        <textarea value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="Tell admin why you need leave..."
+                          style={{
+                            width: '100%', padding: '12px 14px', borderRadius: '10px', border: '2px solid #e0d8cc',
+                            fontSize: '0.9rem', background: '#fff', color: 'var(--deep-brown)',
+                            resize: 'vertical', minHeight: '70px', outline: 'none', transition: 'border-color 0.2s',
+                            fontFamily: 'inherit',
+                          }}
+                          onFocus={e => e.target.style.borderColor = 'var(--primary-gold)'}
+                          onBlur={e => e.target.style.borderColor = '#e0d8cc'}
+                        />
+                      </label>
+
+                      <button onClick={handleLeaveSubmit} disabled={leaveSubmitting || !leaveFrom || !leaveTo}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                          width: '100%', padding: '14px 24px', borderRadius: '12px', border: 'none',
+                          background: leaveFrom && leaveTo && !leaveSubmitting
+                            ? 'linear-gradient(135deg, #d4af37, #b8860b)'
+                            : 'linear-gradient(135deg, #e8e0d4, #d4c9b0)',
+                          color: leaveFrom && leaveTo && !leaveSubmitting ? '#fff' : '#aaa',
+                          fontWeight: 700, fontSize: '1rem', cursor: leaveFrom && leaveTo && !leaveSubmitting ? 'pointer' : 'default',
+                          transition: 'all 0.25s', marginBottom: '32px',
+                          boxShadow: leaveFrom && leaveTo && !leaveSubmitting ? '0 4px 16px rgba(212,175,55,0.25)' : 'none',
+                        }}
+                        onMouseEnter={e => { if (!leaveSubmitting && leaveFrom && leaveTo) e.target.style.transform = 'translateY(-1px)'; }}
+                        onMouseLeave={e => e.target.style.transform = 'none'}
+                      >
+                        {leaveSubmitting ? (
+                          <><Loader2 size={18} className="animate-spin" /> Submitting...</>
+                        ) : (
+                          <><CalendarCheck size={20} /> {daysCount > 0 ? `Submit Leave (${daysCount} day${daysCount > 1 ? 's' : ''})` : 'Submit Leave'}</>
+                        )}
+                      </button>
+
+                      <div style={{
+                        borderTop: '2px solid #f0e8d8', paddingTop: '20px',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                          <div style={{ width: '3px', height: '18px', borderRadius: '2px', background: 'linear-gradient(180deg, #d4af37, #b8860b)' }} />
+                          <h4 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '0.95rem', fontWeight: 700 }}>Leave History</h4>
+                        </div>
+                        {leavesLoading ? (
+                          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} />
+                          </div>
+                        ) : myLeaves.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                            <CalendarX size={28} style={{ opacity: 0.3, marginBottom: '8px' }} />
+                            <div>No leave applications yet.</div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {myLeaves.map(lv => {
+                              const statusColors = {
+                                pending: { bg: '#fff3cd', text: '#856404', border: '#ffeeba', icon: '⏳', label: 'Pending' },
+                                approved: { bg: '#d4edda', text: '#155724', border: '#c3e6cb', icon: '✓', label: 'Approved' },
+                                rejected: { bg: '#f8d7da', text: '#721c24', border: '#f5c6cb', icon: '✕', label: 'Rejected' },
+                              };
+                              const sc = statusColors[lv.status] || statusColors.pending;
+                              const fromD = new Date(lv.from_date);
+                              const toD = new Date(lv.to_date);
+                              const lvDays = Math.max(0, Math.floor((toD - fromD) / 86400000) + 1);
+                              return (
+                                <div key={lv.id} style={{
+                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                  padding: '14px 16px', borderRadius: '12px',
+                                  background: '#faf8f5', border: '1px solid #eee',
+                                  transition: 'all 0.2s',
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                    <div style={{
+                                      width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      background: sc.bg, border: `1px solid ${sc.border}`,
+                                      fontSize: '1rem',
+                                    }}>
+                                      {sc.icon}
+                                    </div>
+                                    <div>
+                                      <div style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.88rem' }}>
+                                        {new Date(lv.from_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {new Date(lv.to_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '3px' }}>
+                                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--primary-gold)', background: '#fcf8f0', padding: '2px 8px', borderRadius: '4px' }}>{lvDays} day{lvDays > 1 ? 's' : ''}</span>
+                                        {lv.reason && <span style={{ fontSize: '0.78rem', color: 'var(--soft-brown)' }}>{lv.reason.length > 30 ? lv.reason.substring(0, 30) + '…' : lv.reason}</span>}
+                                      </div>
+                                      {lv.admin_comment && (
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic', padding: '4px 8px', background: '#f5f5f5', borderRadius: '6px', display: 'inline-block' }}>
+                                          Admin: {lv.admin_comment}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span style={{
+                                    padding: '5px 14px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
+                                    background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`,
+                                  }}>{sc.label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
+            </div>
           ) : null}
 
         </section>
@@ -12190,6 +13566,7 @@ export default function App() {
     schedule: [],
     portalAccessList: [],
     teacherProfiles: [],
+    weeklyResultsArchive: [],
   });
   const [customGroups, setCustomGroups] = useState([]);
   const [teacherAttendance, setTeacherAttendance] = useState([]);
@@ -12902,6 +14279,15 @@ export default function App() {
           supabase.from("parent_report_views").select("*"),
         ]);
 
+        let archiveData = [];
+        try {
+          const { data: archiveResponseData, error: archiveError } = await supabase
+            .from("weekly_results_archive")
+            .select("*")
+            .order("week_date", { ascending: false });
+          if (!archiveError && archiveResponseData) archiveData = archiveResponseData;
+        } catch (_e) {}
+
         if (supportTicketsResponse.data) setSupportTickets(supportTicketsResponse.data);
 
         if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
@@ -12994,6 +14380,7 @@ export default function App() {
           schedule: scheduleResponse.data || [],
           portalAccessList: portalAccessResponse.data || [],
           teacherProfiles: enrichedProfiles,
+          weeklyResultsArchive: archiveData,
         });
 
         if (students.length > 0) {
@@ -13070,12 +14457,15 @@ export default function App() {
       ? [...schoolData.students]
       : schoolData.students.filter((student) => {
           const idMatch = allTeacherIds.some(uid =>
-            String(student.muhaffiz_id) === String(uid) ||
-            String(student.original_teacher_id) === String(uid) ||
-            String(student.badal_teacher_id) === String(uid)
+            String(student.muhaffiz_id).trim() === String(uid).trim() ||
+            String(student.original_teacher_id).trim() === String(uid).trim() ||
+            String(student.badal_teacher_id).trim() === String(uid).trim()
           );
           const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
-          return idMatch || nameMatch;
+          /* Also try matching badal_teacher_id against user email as a fallback */
+          const emailMatch = !idMatch && student.badal_teacher_id && user?.email &&
+            normalizeText(student.badal_teacher_id) === normalizeText(user.email);
+          return idMatch || nameMatch || emailMatch;
         });
 
     const filteredStudents = [...matchedStudents].sort((a, b) => {
@@ -13094,7 +14484,7 @@ export default function App() {
       filteredStudents,
       attendances: teacherAttendance,
     };
-  }, [schoolData, teacherGroupFilter, teacherIdentity, teacherAttendance, portalRole, teacherProfiles]);
+  }, [schoolData, teacherGroupFilter, teacherIdentity, teacherAttendance, portalRole, teacherProfiles, user]);
 
   const monthlySalary = useMemo(() => {
     if (portalRole !== "teacher") return null;
@@ -13299,6 +14689,7 @@ export default function App() {
       announcements: [],
       schedule: [],
       portalAccessList: [],
+      weeklyResultsArchive: [],
     });
     showAction(null, null);
 
