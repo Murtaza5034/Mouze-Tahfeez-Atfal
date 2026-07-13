@@ -8579,17 +8579,23 @@ const handleDownloadAllReports = async () => {
                                   const rawVal = e.target.value;
                                   if (!rawVal) { handleBadalTeacherChange(student, ""); return; }
                                   /* CRITICAL: Resolve the selected option to the teacher's user_id (UUID).
-                                     The option value can be user_id, email, or full_name depending on
-                                     what's available. We must always store a UUID so the matchedStudents
-                                     filter can match student.badal_teacher_id === user.id. */
-                                  const byUserId = portalAccessList.find(p => String(p.user_id) === String(rawVal));
-                                  if (byUserId?.user_id) { handleBadalTeacherChange(student, byUserId.user_id); return; }
-                                  const byEmail = portalAccessList.find(p => p.email === rawVal);
-                                  if (byEmail?.user_id) { handleBadalTeacherChange(student, byEmail.user_id); return; }
-                                  const byName = portalAccessList.find(p => normalizeText(p.full_name) === normalizeText(rawVal));
-                                  if (byName?.user_id) { handleBadalTeacherChange(student, byName.user_id); return; }
-                                  const tpMatch = teacherProfiles.find(tp => String(tp.user_id) === String(rawVal) || normalizeText(tp.full_name) === normalizeText(rawVal));
-                                  handleBadalTeacherChange(student, tpMatch?.user_id || rawVal);
+                                     We must always store a UUID so the matchedStudents
+                                     filter can match student.badal_teacher_id === user.id.
+                                     Search through portalAccessList, teacherProfiles, and if rawVal
+                                     looks like a UUID, use it directly as fallback. */
+                                  const resolved =
+                                    portalAccessList.find(p => String(p.user_id) === String(rawVal))?.user_id ||
+                                    portalAccessList.find(p => String(p.email) === String(rawVal))?.user_id ||
+                                    portalAccessList.find(p => normalizeText(p.full_name) === normalizeText(rawVal))?.user_id ||
+                                    teacherProfiles.find(tp => String(tp.user_id) === String(rawVal))?.user_id ||
+                                    teacherProfiles.find(tp => normalizeText(tp.full_name) === normalizeText(rawVal))?.user_id ||
+                                    (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(rawVal).trim()) ? String(rawVal).trim() : null);
+                                  if (resolved) {
+                                    handleBadalTeacherChange(student, resolved);
+                                  } else {
+                                    console.error('Badal: Could not resolve teacher UUID from value:', rawVal);
+                                    if (showAction) showAction('error', 'Could not identify the selected teacher.');
+                                  }
                                 }}
                               >
                                 <option value="">-- No Badal --</option>
