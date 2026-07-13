@@ -69,6 +69,7 @@ android/.gradle/
 android/capacitor-*
 android/app/capacitor-*
 *.apk
+*.aab
 
 # Keystore (signing keys - DO NOT COMMIT)
 android/app/mauze-tahfeez-release.keystore
@@ -80,8 +81,8 @@ keystore-pass.txt
 android/local.properties
 
 # APK / AAB
-Mauze-Tahfeez.apk
-Mauze-Tahfeez.aab
+Mauze-Tahfeez*.apk
+Mauze-Tahfeez*.aab
 
 # Service account keys (DO NOT COMMIT)
 keys/
