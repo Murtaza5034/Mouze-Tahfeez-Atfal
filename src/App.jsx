@@ -69,6 +69,7 @@ import {
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
+import TeacherLeaveApprovalPanel from "./TeacherLeaveApprovalPanel";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -700,11 +701,11 @@ const fixArabicScript = (text) => {
   // Normalize Gaf (Persian/Urdu script)
   // Some systems render Gaf as double kaaf or k-k-a
   return text
-    .replace(/ظƒظƒ/g, "ع¯")      // Double Kaaf -> Gaf
-    .replace(/ظ…ط±ظƒظƒط§/g, "ظ…ط±ع¯ط§") // Murga (K-K-A) -> Murga (G-A)
-    .replace(/ط¨ظ‡ط§ط¦ظٹ/g, "ط¨ع¾ط§ط¦غŒ") // Bhai phonetic
-    .replace(/ط³ظٹ/g, "ط³غŒ")      // Common character fixing
-    .replace(/ظپظٹ/g, "ظپغŒ");     // Common character fixing
+    .replace(/كك/g, "گ")      // Double Kaaf -> Gaf
+    .replace(/مرككا/g, "مرگا") // Murga (K-K-A) -> Murga (G-A)
+    .replace(/بہائي/g, "بھائي") // Bhai phonetic fix
+    .replace(/سي/g, "سی")      // Common character fixing
+    .replace(/في/g, "فی");     // Common character fixing
 };
 
 const getNotificationPermission = () => {
@@ -4246,18 +4247,23 @@ function ParentPortal({
       title: "Track your child with clarity",
       description:
         "See attendance, class level, guardian details, and the latest updates in one education dashboard.",
-      highlights: [
-        `Student ID: ${studentProfile?.student_id || "..."}`,
-        `Attendance: ${attendance ? attendance.status : "..."}`,
-        `Class: ${studentProfile?.class_level || "..."}`,
-      ],
       childInfo: {
         name: studentProfile?.name || allProfiles[0]?.name || "Loading Student...",
         its: studentProfile?.its || allProfiles[0]?.its || "...",
+        arabicName: studentProfile?.arabic_name || "",
+        parentEmail: studentProfile?.parent_email || user?.email || "...",
         hifzJuz: hifzDetails?.juz || "...",
-        hifzSurat: hifzDetails?.surat || "...",
+        hifzSurat: studentProfile?.latestResult?.wusool_surah || hifzDetails?.surat || "...",
         muhaffizName: hifzDetails?.muhaffiz_name || "Unassigned",
+        teacherNote: hifzDetails?.teacher_note || null,
+        monthlyAttendance: hifzDetails?.monthly_attendance ?? 0,
+        monthlyJadeed: hifzDetails?.monthly_jadeed ?? "",
       },
+      highlights: [
+        `${hifzDetails?.teacher_note || "No teacher feedback yet."}`,
+        `Monthly Attendance: ${hifzDetails?.monthly_attendance ?? 0}`,
+        `Monthly Jadeed: ${hifzDetails?.monthly_jadeed || "0"}`,
+      ],
     },
     Home: {
       eyebrow: "Parents Home",
@@ -4265,9 +4271,9 @@ function ParentPortal({
       description:
         "Access your child's daily learning schedule, important announcements, and school actions here.",
       highlights: [
-        `Attendance: ${attendance?.status || "Present"}`,
+        `Attendance: ${attendance?.status || "-"}`,
         `Lesson: ${studentProfile?.latestResult?.surat || studentProfile?.surat || hifzDetails?.surat || "Update pending"}`,
-        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"} آ· Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
+        `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"}  ·  Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
       ],
       announcements:
         announcements.length > 0
@@ -4485,23 +4491,41 @@ function ParentPortal({
         {activePage === "Home" ? (
           <div className="home-dashboard">
             <div className="hifz-stats-premium-strip">
-              {[
-                { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
-                { label: "Daily Status", val: attendance?.status || "Present", sub: getToday(), icon: Clock, color: "#5d4037" },
-                { label: "Current Juz", val: hifzDetails?.juz || "--", sub: hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
-                { label: "My Muhaffiz", val: hifzDetails?.muhaffiz_name || "Pending", sub: "Direct Teacher", icon: GraduationCap, color: "#d4af37" },
-              ].map((stat, i) => (
-                <div key={i} className="premium-stat-pill card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
-                  <div className="pill-icon" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                    <stat.icon size={18} />
+              {(() => {
+                const mTeacher = teacherProfiles.find(t => {
+                  const mName = normalizeText(studentProfile?.teacherName || "");
+                  return (mName && normalizeText(t.full_name) === mName) ||
+                    String(t.id) === String(studentProfile?.muhaffiz_id) ||
+                    String(t.user_id) === String(studentProfile?.muhaffiz_id) ||
+                    String(t.id) === String(studentProfile?.original_teacher_id) ||
+                    String(t.user_id) === String(studentProfile?.original_teacher_id);
+                });
+                const muhaffizLabel = mTeacher?.gender === 'female' ? 'My Muhaffezah' : 'My Muhaffiz';
+                const muhaffizSub = mTeacher?.gender === 'female' ? 'Direct Muhaffezah' : 'Direct Teacher';
+                const bTeacherId = studentProfile?.badal_teacher_id;
+                const bTeacher = bTeacherId ? teacherProfiles.find(t => String(t.id) === String(bTeacherId) || String(t.user_id) === String(bTeacherId)) : null;
+                const muhaffizVal = bTeacher?.full_name || hifzDetails?.muhaffiz_name || "Pending";
+                const todayStr = getToday();
+                const attDate = new Date(todayStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+                const stats = [
+                  { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
+                  { label: "Daily Attendance", val: attendance?.status || "-", sub: attDate, icon: Clock, color: "#5d4037" },
+                  { label: "Current HIFZ STATUS", val: studentProfile?.latestResult?.wusool_juz || hifzDetails?.juz || "--", sub: studentProfile?.latestResult?.wusool_surah || hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
+                  { label: muhaffizLabel, val: muhaffizVal, sub: muhaffizSub, icon: GraduationCap, color: "#d4af37" },
+                ];
+                return stats.map((stat, i) => (
+                  <div key={i} className="premium-stat-pill card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
+                    <div className="pill-icon" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                      <stat.icon size={18} />
+                    </div>
+                    <div className="pill-info">
+                      <span className="pill-label">{stat.label}</span>
+                      <strong className="pill-value">{stat.val}</strong>
+                      <span className="pill-sub">{stat.sub}</span>
+                    </div>
                   </div>
-                  <div className="pill-info">
-                    <span className="pill-label">{stat.label}</span>
-                    <strong className="pill-value">{stat.val}</strong>
-                    <span className="pill-sub">{stat.sub}</span>
-                  </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
             
             {recentMarhalaPostPreview}
@@ -4578,7 +4602,7 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Profile" && currentPage.childInfo ? (
-          <div className="child-info-card">
+          <div className="child-info-card premium-profile-card">
             <div className="card-header">
               <div className="avatar-placeholder">
                 <User size={32} />
@@ -4587,13 +4611,16 @@ function ParentPortal({
                 <h3 style={{ margin: 0 }}>
                   {currentPage.childInfo.name}
                 </h3>
-                {studentProfile?.arabic_name && (
-                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', marginTop: '4px' }}>
-                    {fixArabicScript(studentProfile.arabic_name)}
+                {currentPage.childInfo.arabicName && (
+                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', marginTop: '4px', fontWeight: 600 }}>
+                    {fixArabicScript(currentPage.childInfo.arabicName)}
                   </div>
                 )}
                 <p style={{ marginTop: '8px' }}>
                   <Hash size={12} /> ITS: {currentPage.childInfo.its}
+                </p>
+                <p style={{ marginTop: '4px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>
+                  <Mail size={12} /> {currentPage.childInfo.parentEmail}
                 </p>
               </div>
             </div>
@@ -4851,74 +4878,78 @@ function ParentPortal({
               <h2 className="page-title">Teacher Contacts</h2>
             </div>
             <div className="teacher-info-stack">
-              {teacherProfiles
-                .filter(t => {
+              {(() => {
+                const muhaffizTag = (t) => t?.gender === 'female' ? 'Muhaffezah' : 'Muhaffiz';
+                const roleFiltered = teacherProfiles.filter(t => t.is_active !== false && t.user_id);
+                const assignedTeacher = roleFiltered.find(t => {
                   const assignedName = normalizeText(studentProfile?.teacherName || "");
-                  return assignedName && normalizeText(t.full_name) === assignedName;
-                })
-                .map(teacher => {
-                  const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
-                  const photo = teacher.photo_url || ASSETS.LOGO;
-                  return (
-                    <article key={teacher.id} className="premium-card teacher-profile-card pinned">
-                      <div className="pin-badge">
-                        <Sparkles size={12} /> My Child's Muhaffiz
-                      </div>
-                      <div className="teacher-card-inner">
-                        <img src={photo} alt={teacher.full_name} className="teacher-photo-square" />
-                        <div className="teacher-details">
-                          <h3>{teacher.full_name}</h3>
-                          <p className="teacher-specialty">Assigned Muhaffiz</p>
-                          <div className="contact-actions">
-                            {teacher.phone_number && (
-                              <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                                <Phone size={16} /> Call
-                              </a>
-                            )}
-                            {waNumber && (
-                              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
-                                <MessageCircle size={16} /> WhatsApp
-                              </a>
-                            )}
+                  return assignedName && (normalizeText(t.full_name) === assignedName ||
+                    String(t.id) === String(studentProfile?.muhaffiz_id) ||
+                    String(t.user_id) === String(studentProfile?.muhaffiz_id) ||
+                    String(t.id) === String(studentProfile?.original_teacher_id) ||
+                    String(t.user_id) === String(studentProfile?.original_teacher_id));
+                });
+                return <>
+                  {assignedTeacher && (() => {
+                    const t = assignedTeacher;
+                    const wa = (t.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                    const photo = t.photo_url || ASSETS.LOGO;
+                    return (
+                      <article key={t.id} className="premium-card teacher-profile-card pinned">
+                        <div className="pin-badge">
+                          <Sparkles size={12} /> My Child's {muhaffizTag(t)}
+                        </div>
+                        <div className="teacher-card-inner">
+                          <img src={photo} alt={t.full_name} className="teacher-photo-square" />
+                          <div className="teacher-details">
+                            <h3>{t.full_name}</h3>
+                            <p className="teacher-specialty">Assigned {muhaffizTag(t)}</p>
+                            <div className="contact-actions">
+                              {t.phone_number && (
+                                <a href={`tel:${t.phone_number}`} className="contact-btn call">
+                                  <Phone size={16} /> Call
+                                </a>
+                              )}
+                              {wa && (
+                                <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                                  <MessageCircle size={16} /> WhatsApp
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </article>
-                  );
-                })}
-
-              {teacherProfiles
-                .filter(t => {
-                  const assignedName = normalizeText(studentProfile?.teacherName || "");
-                  return !assignedName || normalizeText(t.full_name) !== assignedName;
-                })
-                .map((teacher) => {
-                  const waNumber = (teacher.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
-                  const photo = teacher.photo_url || ASSETS.LOGO;
-                  return (
-                    <article key={teacher.id} className="premium-card teacher-profile-card">
-                      <div className="teacher-card-inner">
-                        <img src={photo} alt={teacher.full_name} className="teacher-photo-square" />
-                        <div className="teacher-details">
-                          <h3>{teacher.full_name}</h3>
-                          <p className="teacher-specialty">Muhaffiz</p>
-                          <div className="contact-actions">
-                            {teacher.phone_number && (
-                              <a href={`tel:${teacher.phone_number}`} className="contact-btn call">
-                                <Phone size={16} /> Call
-                              </a>
-                            )}
-                            {waNumber && (
-                              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
-                                <MessageCircle size={16} /> WhatsApp
-                              </a>
-                            )}
+                      </article>
+                    );
+                  })()}
+                  {roleFiltered.filter(t => assignedTeacher ? t.id !== assignedTeacher.id : true).map(t => {
+                    const wa = (t.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                    const photo = t.photo_url || ASSETS.LOGO;
+                    return (
+                      <article key={t.id} className="premium-card teacher-profile-card">
+                        <div className="teacher-card-inner">
+                          <img src={photo} alt={t.full_name} className="teacher-photo-square" />
+                          <div className="teacher-details">
+                            <h3>{t.full_name}</h3>
+                            <p className="teacher-specialty">{muhaffizTag(t)}</p>
+                            <div className="contact-actions">
+                              {t.phone_number && (
+                                <a href={`tel:${t.phone_number}`} className="contact-btn call">
+                                  <Phone size={16} /> Call
+                                </a>
+                              )}
+                              {wa && (
+                                <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                                  <MessageCircle size={16} /> WhatsApp
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                      </article>
+                    );
+                  })}
+                </>;
+              })()}
             </div>
             {teacherProfiles.length === 0 && (
               <div className="empty-state premium-card">
@@ -5172,7 +5203,47 @@ function ParentPortal({
           </div>
         )}
 
-        {currentPage?.highlights && activePage === "Profile" && <InfoHighlights items={currentPage.highlights} />}
+        {activePage === "Profile" && (
+          <div className="info-grid" style={{ marginTop: '24px' }}>
+            <section style={{ padding: '20px', background: 'linear-gradient(135deg, #fdfbf7, #f8f1e6)', border: '1px solid #e8dcc8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(139,109,49,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #d4af37, #b8942e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <MessageCircle size={20} color="#fff" />
+                </div>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--deep-brown)', letterSpacing: '0.5px' }}>TEACHER NOTE</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-color)', lineHeight: '1.6', fontStyle: currentPage.childInfo.teacherNote ? 'normal' : 'italic' }}>
+                {currentPage.childInfo.teacherNote || "No teacher feedback yet."}
+              </p>
+            </section>
+
+            <section style={{ padding: '20px', background: 'linear-gradient(135deg, #fdfbf7, #f8f1e6)', border: '1px solid #e8dcc8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(139,109,49,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #d4af37, #b8942e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CalendarCheck size={20} color="#fff" />
+                </div>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--deep-brown)', letterSpacing: '0.5px' }}>MONTHLY ATTENDANCE</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-color)', lineHeight: '1.6' }}>
+                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--primary-gold)' }}>{currentPage.childInfo.monthlyAttendance}</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginLeft: '6px' }}>days this month</span>
+              </p>
+            </section>
+
+            <section style={{ padding: '20px', background: 'linear-gradient(135deg, #fdfbf7, #f8f1e6)', border: '1px solid #e8dcc8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(139,109,49,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #d4af37, #b8942e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BookOpen size={20} color="#fff" />
+                </div>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--deep-brown)', letterSpacing: '0.5px' }}>MONTHLY JADEED</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-color)', lineHeight: '1.6' }}>
+                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--primary-gold)' }}>{currentPage.childInfo.monthlyJadeed || "0"}</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginLeft: '6px' }}>new {currentPage.childInfo.monthlyJadeed ? 'صفحات' : 'pages'} this month</span>
+              </p>
+            </section>
+          </div>
+        )}
       </main>
 
       <nav className="parent-bottom-nav">
@@ -6930,11 +7001,11 @@ const handleDownloadAllReports = async () => {
                       <StudentAvatar student={selectedStudent} />
                       <div>
                         <h3>{selectedStudent.name}</h3>
-                        <p>{selectedStudent.groupName} آ· {selectedStudent.teacherName}</p>
+                        <p>{selectedStudent.groupName}  ·  {selectedStudent.teacherName}</p>
                         <div className="pill-row">
                           <span className="mini-pill">ITS: {selectedStudent.its || "N-A"}</span>
                           <span className="mini-pill">Juz: {selectedStudent.hifz?.juz || "N-A"}</span>
-                          <span className="mini-pill">Surah: {selectedStudent.hifz?.surat || "Pending"}</span>
+                          <span className="mini-pill">Surah: {selectedStudent.latestResult?.wusool_surah || selectedStudent.hifz?.surat || "Pending"}</span>
                           {selectedStudent.arabic_name && (
                             <span className="mini-pill arabic-kanz" style={{ fontSize: '1rem', color: 'var(--primary-gold)' }}>{fixArabicScript(selectedStudent.arabic_name)}</span>
                           )}
@@ -8153,7 +8224,7 @@ const handleDownloadAllReports = async () => {
                         <option value="">Select child</option>
                         {students.map((student) => (
                           <option key={student.student_id} value={student.student_id}>
-                            {student.name} آ· {student.groupName}
+                            {student.name}  ·  {student.groupName}
                           </option>
                         ))}
                       </select>
@@ -9232,226 +9303,15 @@ const handleDownloadAllReports = async () => {
                 </h2>
                 <p className="subtitle">Review and manage teacher leave applications with badal teacher assignment</p>
               </div>
-              {(function() {
-                const [tlLeaves, setTlLeaves] = useState([]);
-                const [tlLoading, setTlLoading] = useState(true);
-                const [tlFilter, setTlFilter] = useState("pending");
-                const [tlBadalModal, setTlBadalModal] = useState(null);
-                const [tlAssignments, setTlAssignments] = useState({});
-                const [tlSubmitting, setTlSubmitting] = useState(false);
-                const [tlComment, setTlComment] = useState("");
-
-                const fetchTlLeaves = () => {
-                  setTlLoading(true);
-                  supabase.from("teacher_leaves").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-                    if (!error) setTlLeaves(data || []);
-                    setTlLoading(false);
-                  });
-                };
-
-                useEffect(() => { fetchTlLeaves(); }, []);
-
-                /* Auto-restore expired leaves on load */
-                useEffect(() => {
-                  const today = new Date().toISOString().slice(0, 10);
-                  supabase.from("teacher_leave_badals").select("*").eq("active", true).lte("to_date", today).then(({ data: expired }) => {
-                    if (expired && expired.length > 0) {
-                      expired.forEach(b => {
-                        const sid = String(b.student_id);
-                        const sidNum = Number(b.student_id);
-                        const sidVal = isNaN(sidNum) ? sid : sidNum;
-                        supabase.from("child_profiles").update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
-                          supabase.from("teacher_leave_badals").update({ active: false }).eq("id", b.id);
-                        });
-                      });
-                    }
-                  });
-                }, []);
-
-                const handleTlApprove = async (lv) => {
-                  if (!tlComment.trim()) {
-                    if (onShowAction) onShowAction("error", "Please enter an admin comment before approving.");
-                    return;
-                  }
-                  setTlSubmitting(true);
-                  const myStudents = students.filter(s => String(s.muhaffiz_id) === String(lv.teacher_id) || String(s.user_id) === String(lv.teacher_id));
-                  if (myStudents.length === 0) {
-                    if (onShowAction) onShowAction("error", "No children found for this teacher.");
-                    setTlSubmitting(false);
-                    return;
-                  }
-                  const initialAssign = {};
-                  myStudents.forEach(s => { initialAssign[String(s.student_id)] = ""; });
-                  setTlAssignments(initialAssign);
-                  setTlBadalModal({ leave: lv, students: myStudents });
-                  setTlSubmitting(false);
-                };
-
-                const handleTlConfirmBadal = async () => {
-                  const modal = tlBadalModal;
-                  if (!modal) return;
-                  setTlSubmitting(true);
-                  const lv = modal.leave;
-                  const myStudents = modal.students;
-                  const assigned = myStudents.filter(s => tlAssignments[String(s.student_id)]);
-                  if (assigned.length === 0) {
-                    if (onShowAction) onShowAction("error", "Assign at least one child to a badal teacher.");
-                    setTlSubmitting(false);
-                    return;
-                  }
-                  await supabase.from("teacher_leaves").update({ status: "approved", admin_comment: tlComment }).eq("id", lv.id);
-                  for (const s of assigned) {
-                    const badalId = tlAssignments[String(s.student_id)];
-                    const sid = String(s.student_id);
-                    const sidNum = Number(s.student_id);
-                    const sidVal = isNaN(sidNum) ? sid : sidNum;
-                    const badalTeacher = teacherProfiles.find(p => p.user_id === badalId);
-                    const studentName = s.name || s.full_name || "";
-                    await supabase.from("child_profiles").update({ badal_teacher_id: badalId }).eq("student_id", sidVal);
-                    await supabase.from("teacher_leave_badals").insert({
-                      leave_id: lv.id, student_id: sidVal, student_name: studentName,
-                      original_teacher_id: String(lv.teacher_id), badal_teacher_id: badalId,
-                      badal_teacher_name: badalTeacher?.full_name || badalId,
-                      from_date: lv.from_date, to_date: lv.to_date, active: true
-                    });
-                    await supabase.from("badal_assignments").upsert(
-                      { student_id: sidVal, teacher_id: badalId, original_teacher_id: String(lv.teacher_id), status: "active" },
-                      { onConflict: "student_id" }
-                    );
-                    const childName = s.name || s.full_name || "a child";
-                    try {
-                      await supabase.functions.invoke('fcm-notification', {
-                        body: { title: "New Badal Assignment", body: `You have been assigned as badal for ${childName} during leave`, targetUser: badalId, data: { type: "badal_assignment_leave", childName } }
-                      });
-                    } catch (_) {}
-                  }
-                  setTlBadalModal(null);
-                  setTlAssignments({});
-                  setTlComment("");
-                  setTlSubmitting(false);
-                  fetchTlLeaves();
-                  if (loadPortalData) await loadPortalData(portalRole, user);
-                  if (onShowAction) onShowAction("success", `Leave approved! ${assigned.length} child(ren) assigned to badal teachers.`);
-                };
-
-                const handleTlReject = async (lv) => {
-                  if (!tlComment.trim()) {
-                    if (onShowAction) onShowAction("error", "Please enter an admin comment before rejecting.");
-                    return;
-                  }
-                  await supabase.from("teacher_leaves").update({ status: "rejected", admin_comment: tlComment }).eq("id", lv.id);
-                  setTlComment("");
-                  fetchTlLeaves();
-                  if (onShowAction) onShowAction("success", "Leave rejected.");
-                };
-
-                const filteredTl = tlLeaves.filter(l => l.status === tlFilter);
-                const teacherProfilesList = teacherProfiles || [];
-
-                return (
-                  <>
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '12px' }}>
-                      {["pending", "approved", "rejected"].map(f => (
-                        <button key={f} onClick={() => setTlFilter(f)}
-                          style={{
-                            padding: '8px 20px', borderRadius: '20px', border: tlFilter === f ? '2px solid var(--primary-gold)' : '1px solid #ddd',
-                            background: tlFilter === f ? 'var(--primary-gold)' : 'white',
-                            color: tlFilter === f ? 'white' : '#666', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
-                            textTransform: 'capitalize'
-                          }}
-                        >{f}</button>
-                      ))}
-                    </div>
-
-                    {tlLoading ? (
-                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading...</div>
-                    ) : filteredTl.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No {tlFilter} leave applications.</div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        {filteredTl.map(lv => {
-                          const teacherName = lv.teacher_name || lv.teacher_id;
-                          const fromD = new Date(lv.from_date);
-                          const toD = new Date(lv.to_date);
-                          const days = Math.max(0, Math.floor((toD - fromD) / 86400000) + 1);
-                          return (
-                            <div key={lv.id} className="result-card-premium" style={{ padding: '18px', borderRadius: '12px', border: '1px solid #e8e0d4', background: '#fffaf0' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                                <div>
-                                  <div style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '1rem' }}>{teacherName}</div>
-                                  <div style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginTop: '4px' }}>
-                                    {lv.from_date} → {lv.to_date} <span style={{ fontWeight: 600, color: 'var(--primary-gold)' }}>({days} day{days > 1 ? 's' : ''})</span>
-                                  </div>
-                                  {lv.reason && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>"{lv.reason}"</div>}
-                                  {lv.admin_comment && <div style={{ fontSize: '0.75rem', color: 'var(--soft-brown)', marginTop: '2px' }}>Admin: {lv.admin_comment}</div>}
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  {lv.status === 'pending' && (
-                                    <>
-                                      <input type="text" placeholder="Admin comment..." value={tlComment}
-                                        onChange={e => setTlComment(e.target.value)}
-                                        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '0.8rem', width: '180px' }}
-                                      />
-                                      <button onClick={() => handleTlApprove(lv)} disabled={tlSubmitting}
-                                        style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#fff', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                                      >Approve</button>
-                                      <button onClick={() => handleTlReject(lv)} disabled={tlSubmitting}
-                                        style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', color: '#721c24', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                                      >Reject</button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Badal Assignment Modal */}
-                    {tlBadalModal && (
-                      <div className="celebration-overlay" onClick={() => setTlBadalModal(null)}>
-                        <div className="celebration-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-                          <div className="celebration-content" style={{ textAlign: 'left' }}>
-                            <h2 style={{ color: 'var(--deep-brown)', marginBottom: '12px', fontSize: '1.2rem' }}>Assign Badal Teachers</h2>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginBottom: '16px' }}>
-                              {tlBadalModal.leave.teacher_name}'s leave: {tlBadalModal.leave.from_date} → {tlBadalModal.leave.to_date}
-                            </p>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                              Select a substitute teacher for each child. The child will appear in the badal teacher's portal during the leave period and auto-restore when leave ends.
-                            </p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-                              {tlBadalModal.students.map(s => (
-                                <div key={s.student_id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '8px', background: '#f9f6f0' }}>
-                                  <span style={{ flex: 1, fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem' }}>{s.name || s.full_name}</span>
-                                  <select className="premium-select" value={tlAssignments[String(s.student_id)] || ""}
-                                    onChange={e => setTlAssignments(prev => ({ ...prev, [String(s.student_id)]: e.target.value }))}
-                                    style={{ flex: '1', minWidth: '150px', fontSize: '0.8rem' }}
-                                  >
-                                    <option value="">Select badal teacher...</option>
-                                    {teacherProfilesList.filter(p => String(p.user_id) !== String(tlBadalModal.leave.teacher_id)).map(p => (
-                                      <option key={p.user_id} value={p.user_id}>{p.full_name}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                              <button onClick={() => setTlBadalModal(null)}
-                                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', color: '#666', fontWeight: 600, cursor: 'pointer' }}
-                              >Cancel</button>
-                              <button onClick={handleTlConfirmBadal} disabled={tlSubmitting}
-                                style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-                              >{tlSubmitting ? 'Assigning...' : 'Confirm & Approve'}</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
+              <TeacherLeaveApprovalPanel
+                students={students}
+                teacherProfiles={teacherProfiles}
+                onShowAction={onShowAction}
+                loadPortalData={loadPortalData}
+                portalRole={portalRole}
+                user={user}
+              />
+          </div>
           ) : null}
           {portalAccessSuccess && (
             <PortalAccessSuccessModal
@@ -11064,6 +10924,16 @@ function TeacherPortal({
       next[sid] = { ...next[sid], [date]: status };
       return next;
     });
+    const attStudent = overviewStudents.find(s => String(s.student_id) === studentId);
+    if (attStudent) {
+      broadcastNotification(
+        "Attendance Updated",
+        `${attStudent.name || "Your child"} was marked ${status} on ${date}.`,
+        "user",
+        attStudent.parent_user_id || attStudent.user_id || attStudent.parent_email,
+        "Attendance"
+      );
+    }
   };
 
   const handleMarkAllAttendance = async (date, status) => {
@@ -11908,7 +11778,7 @@ function TeacherPortal({
               <div className="bulk-attendance-row">
                 <span className="bulk-label">Quick Mark All:</span>
                 {(() => {
-                  const today = weekDays[weekDays.length - 1];
+                  const today = new Date().toISOString().slice(0, 10);
                   return (
                     <>
                       <button className={`bulk-att-btn present`} onClick={() => handleMarkAllAttendance(today, 'present')} disabled={attendanceLoading}>✓ All Present</button>
@@ -11958,7 +11828,6 @@ function TeacherPortal({
                       <span className="mini-pill">Juz: {student.latestResult?.wusool_juz || student.hifz?.juz || "N-A"}</span>
                       <span className="mini-pill">Surah: {student.latestResult?.wusool_surah || student.hifz?.surat || "Pending"}</span>
                     </div>
-                    <p className="student-status-copy">{student.hifzStatus}</p>
                     {hasBadal && (
                       <div className="badal-info-section">
                         <div className="badal-info-badge">
@@ -11979,7 +11848,7 @@ function TeacherPortal({
                       {(() => {
                         const att = studentAttendance[sid] || {};
                         let present = 0, absent = 0, holiday = 0;
-                        const today = weekDays[weekDays.length - 1];
+                        const today = new Date().toISOString().slice(0, 10);
                         weekDays.forEach((d, idx) => {
                           const isSunday = new Date(d).getDay() === 0;
                           const effectiveStatus = isSunday ? 'holiday' : (att[d] || null);
@@ -12952,7 +12821,6 @@ function TeacherPortal({
                     <article key={student.student_id} className="record-card">
                       <div className="card-primary-info">
                         <strong>{student.name}</strong>
-                        <span>{student.hifzStatus}</span>
                       </div>
                       <div className="performance-pill">
                         Latest Result: {student.latestResult?.computedRank || student.latestResult?.weeklyRank || "pending"}
@@ -13261,6 +13129,13 @@ function TeacherPortal({
                     if (onShowAction) onShowAction("error", "Failed to submit: " + error.message);
                   } else {
                     if (onShowAction) onShowAction("success", "Leave application submitted!");
+                    broadcastNotification(
+                      "Leave Application",
+                      `${teacherName} applied for leave (${leaveFrom} → ${leaveTo})${leaveReason ? `: ${leaveReason}` : ""}`,
+                      "admin",
+                      null,
+                      "Teacher Leaves"
+                    );
                     setLeaveFrom("");
                     setLeaveTo("");
                     setLeaveReason("");
@@ -14228,12 +14103,32 @@ export default function App() {
             // Fall back to buildStudents rank
           }
 
+          const todayStr = getToday();
           const activeAttendance = (attendanceResponse.data || []).find(a => 
+            a.attendance_date === todayStr &&
             activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(a.student_id || "").trim().toLowerCase())
           );
           const activeSchedule = (scheduleResponse.data || []).filter(s => 
             activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(s.student_id || "").trim().toLowerCase())
           );
+
+          // Compute monthly attendance and jadeed totals for the active student
+          const monthStart = new Date();
+          monthStart.setDate(1);
+          const monthStartStr = monthStart.toISOString().split('T')[0];
+          const activeStudentResults = (resultsResponse.data || []).filter(r =>
+            activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(r.student_id || "").trim().toLowerCase()) &&
+            r.week_date >= monthStartStr
+          );
+          const monthlyAttendanceCount = activeStudentResults.reduce((sum, r) => sum + (Number(r.attendance_count) || 0), 0);
+          const monthlyJadeedTotal = activeStudentResults.reduce((sum, r) => {
+            const raw = String(r.total_jadeed_pages ?? "").replace(/[^0-9a-zA-Z\u0600-\u06FF]/g, "").trim();
+            const num = parseFloat(raw);
+            return sum + (isNaN(num) ? 0 : num);
+          }, 0);
+          const monthlyJadeedRaw = activeStudentResults.map(r =>
+            String(r.total_jadeed_pages ?? "").trim()
+          ).filter(Boolean).join(", ");
 
           nextParentState = {
             studentProfile: activeStudent,
@@ -14242,6 +14137,9 @@ export default function App() {
               juz: activeStudent.juz || "--",
               surat: activeStudent.surat || "Pending",
               muhaffiz_name: activeStudent.teacherName || "Pending",
+              teacher_note: activeStudent.latestResult?.attendance_note || null,
+              monthly_attendance: monthlyAttendanceCount,
+              monthly_jadeed: monthlyJadeedTotal || monthlyJadeedRaw,
             },
             announcements: announcementResponse.data || [],
             schedule: activeSchedule,

@@ -318,13 +318,13 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .arabic-kanz {
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   direction: rtl;
   color: var(--dark-gold);
 }
 
 .arabic-text {
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 /* --- Premium Card System --- */
@@ -1597,7 +1597,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .jumla-label {
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   font-size: 2.2rem;
   color: #8b0000;
   margin: 4px 0;
@@ -1617,14 +1617,14 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   margin-bottom: 8px;
   background: white;
   box-shadow: 0 8px 20px rgba(138, 101, 21, 0.1);
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .max-score {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-muted);
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .score-details-box {
@@ -1650,7 +1650,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .arabic-label {
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   font-size: 1.5rem;
   color: var(--dark-gold);
 }
@@ -1659,7 +1659,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   font-weight: 800;
   color: var(--text-main);
   font-size: 1.2rem;
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .result-footer-grid {
@@ -2179,6 +2179,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   background: rgba(46, 125, 50, 0.12);
   border-color: #2e7d32;
   color: #2e7d32;
+  box-shadow: 0 0 12px rgba(46, 125, 50, 0.35);
 }
 
 .att-btn.absent:hover:not(:disabled) {
@@ -2748,7 +2749,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   fill: none;
   stroke: #eee;
   stroke-width: 2;
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', serif;
+  font-family: 'Al-Kanz', 'Amiri', serif;
 }
 
 .attendance-fill-text {
@@ -2819,7 +2820,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 .note-val {
   font-weight: 800;
   color: #c53030;
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .note-label {
@@ -3278,7 +3279,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   font-size: 1.1rem;
   font-weight: 900;
   color: var(--deep-brown);
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 /* --- Report Footer Cards Layout --- */
@@ -4031,7 +4032,7 @@ body {
   color: var(--primary-gold);
   display: block;
   margin-top: 2px;
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 .child-card-group {
@@ -4372,9 +4373,9 @@ body {
 /* Global fix for Arabic letter separation in PDF/Canvas */
 .arabic-kanz {
   direction: rtl !important;
-  unicode-bidi: bidi-override !important;
   letter-spacing: normal !important;
   font-variant-ligatures: common-ligatures !important;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif !important;
 }
 
 /* --- Premium Chat System --- */
@@ -5101,7 +5102,7 @@ body {
 }
 
 .premium-hifz-card .header-text h2 {
-  font-family: 'Kanz al Marjaan', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   color: var(--primary-gold);
   font-size: 2.2rem;
   margin: 0 0 12px 0;
@@ -5890,19 +5891,19 @@ body {
 
 .juz-surat-selector .premium-select {
   width: 100%;
-  font-family: 'Kanz al Marjaan', 'Amiri', 'Traditional Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Traditional Arabic', serif;
   font-size: 1rem;
   letter-spacing: normal;
 }
 
 .juz-surat-selector .premium-select option {
-  font-family: 'Kanz al Marjaan', 'Amiri', 'Traditional Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Traditional Arabic', serif;
   font-size: 0.95rem;
   padding: 8px 12px;
 }
 
 .juz-surat-selector .premium-select optgroup {
-  font-family: 'Kanz al Marjaan', 'Amiri', 'Traditional Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Traditional Arabic', serif;
 }
 
 n/* --- Full Width Label Helper --- */
@@ -5912,18 +5913,18 @@ n/* --- Full Width Label Helper --- */
 
 /* --- Kanz al Marjaan Font Helper (no RTL direction) --- */
 .kanz-font {
-  font-family: 'Kanz al Marjaan', 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
   letter-spacing: normal;
 }
 
 .arabic-text {
-  font-family: 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
 
 
 .premium-select option.arabic-text,
 .juz-surat-selector .premium-select .arabic-kanz-option {
-  font-family: 'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif !important;
+  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif !important;
   font-size: 1.1rem;
 }
 

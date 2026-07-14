@@ -556,7 +556,7 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
           <span style={{ fontFamily: "'Al-Kanz', serif", direction: 'rtl', color: dayData.juz1 || dayData.juz2 || dayData.juz3 || dayData.juz4 ? '#2e7d32' : '#ccc' }}>
             {juzVals || '—'}
           </span>
-          <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', color: isFieldFilled(dayData.jadeed) ? '#5d4037' : '#ddd' }}>
+          <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', color: isFieldFilled(dayData.jadeed) ? '#5d4037' : '#ddd' }}>
             {isFieldFilled(dayData.jadeed) ? formatJadeed(dayData.jadeed) : '—'}
           </span>
           <span style={{ fontFamily: "'Al-Kanz', serif", direction: 'rtl', color: isFieldFilled(dayData.juzhali) ? '#5d4037' : '#ddd' }}>
@@ -567,10 +567,10 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', lineHeight: 1.3 }}>
-        <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', color: isFieldFilled(dayData.murajah) ? '#2e7d32' : '#ccc' }}>
+        <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', color: isFieldFilled(dayData.murajah) ? '#2e7d32' : '#ccc' }}>
           {isFieldFilled(dayData.murajah) ? formatMurajah(dayData.murajah) : '—'}
         </span>
-        <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', color: isFieldFilled(dayData.jadeed) ? '#5d4037' : '#ddd' }}>
+        <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', color: isFieldFilled(dayData.jadeed) ? '#5d4037' : '#ddd' }}>
           {isFieldFilled(dayData.jadeed) ? formatJadeed(dayData.jadeed) : '—'}
         </span>
         <span style={{ fontFamily: "'Al-Kanz', serif", direction: 'rtl', color: isFieldFilled(dayData.juzhali) ? '#5d4037' : '#ddd' }}>
@@ -1017,7 +1017,7 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                               <span>{child.groupName}</span>
                               <span style={{ color: '#d4af37' }}>·</span>
-                              <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '0.75rem' }}>
+                              <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '0.75rem' }}>
                                 {child.mode === 'juz-wise' ? 'جزء wise' : 'سورة wise'}
                               </span>
                               {child.parentName && (
@@ -1095,7 +1095,7 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
                                 }}>
                                   <div>Day {dIdx + 1}</div>
                                   <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px' }}>{engDate}</div>
-                                  <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl' }}>
+                                  <div style={{ fontSize: '8px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl' }}>
                                     {fatemiDate}
                                   </div>
                                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: dd.completed ? '#43a047' : dd.filled > 0 ? '#ffb300' : '#ef5350', margin: '2px auto 0', display: 'inline-block' }} />
@@ -1117,7 +1117,7 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
                                 );
                               }
                               return (
-                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.murajah) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.murajah) ? '#2e7d32' : '#ccc' }}>
+                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.murajah) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.murajah) ? '#2e7d32' : '#ccc' }}>
                                   {isFieldFilled(d.murajah) ? formatMurajah(d.murajah) : '—'}
                                 </div>
                               );
@@ -1128,7 +1128,7 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
                             {dayKeys.map(dd => {
                               const d = dd.dayData || {};
                               return (
-                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.jadeed) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.jadeed) ? '#5d4037' : '#ccc', lineHeight: 1.3 }}>
+                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.jadeed) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.jadeed) ? '#5d4037' : '#ccc', lineHeight: 1.3 }}>
                                   {isFieldFilled(d.jadeed) ? formatJadeed(d.jadeed) : '—'}
                                 </div>
                               );
@@ -1139,7 +1139,7 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
                             {dayKeys.map(dd => {
                               const d = dd.dayData || {};
                               return (
-                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.juzhali) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.juzhali) ? '#5d4037' : '#ccc' }}>
+                                <div key={dd.dayKey} style={{ fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', padding: '6px 8px', textAlign: 'center', background: isFieldFilled(d.juzhali) ? 'rgba(46,125,50,0.06)' : 'rgba(0,0,0,0.02)', borderRadius: '4px', color: isFieldFilled(d.juzhali) ? '#5d4037' : '#ccc' }}>
                                   {isFieldFilled(d.juzhali) ? formatJuzhali(d.juzhali) : '—'}
                                 </div>
                               );

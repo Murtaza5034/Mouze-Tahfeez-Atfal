@@ -354,7 +354,7 @@ Deno.serve(async (req) => {
     // Check jadwal_settings for notification enabled, time, and type
     const { data: jadwalSettings, error: settingsError } = await supabase
       .from('jadwal_settings')
-      .select('jadwal_notification_enabled, jadwal_notification_time, jadwal_type, jadwal_week_start, jadwal_week_end')
+      .select('jadwal_notification_enabled, jadwal_notification_time, jadwal_type, jadwal_week_start, jadwal_week_end, last_jadwal_reminder_at')
       .eq('id', 1)
       .maybeSingle();
 
@@ -370,10 +370,9 @@ Deno.serve(async (req) => {
     const isMiqaat = jadwalSettings?.jadwal_type === 'miqaat' && jadwalSettings?.jadwal_week_start && jadwalSettings?.jadwal_week_end;
     const miqaatWeekStart = isMiqaat ? jadwalSettings.jadwal_week_start : null;
 
-    // Allow a 15-minute window around the target time
     const currentMinutes = todayHour * 60 + todayMinute;
     const targetMinutes = notifHour * 60 + notifMin;
-    const minutesDiff = Math.abs(currentMinutes - targetMinutes);
+    const diff = currentMinutes - targetMinutes;
 
     if (!notifEnabled) {
       console.log('jadwal-reminder: Notifications disabled via settings');
@@ -383,12 +382,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (minutesDiff > 15) {
-      console.log(`jadwal-reminder: Skipping — current ${todayHour}:${todayMinute} not within 15 min of target ${notifTimeStr} (diff ${minutesDiff} min)`);
+    // Only fire within 14 minutes AFTER the target time (once per day)
+    if (diff < 0 || diff >= 14) {
+      console.log(`jadwal-reminder: Skipping — current ${todayHour}:${todayMinute} is ${diff < 0 ? 'before' : 'more than 14 min after'} target ${notifTimeStr} (diff ${diff} min)`);
       return new Response(
-        JSON.stringify({ success: true, message: 'NOT_YET_TIME', sentCount: 0, info: `Target time: ${notifTimeStr}, current: ${todayHour}:${todayMinute}` }),
+        JSON.stringify({ success: true, message: 'NOT_YET_TIME', sentCount: 0, info: `Target time: ${notifTimeStr}, current: ${todayHour}:${todayMinute}, diff: ${diff}` }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
+    }
+
+    // Dedup: check if we already sent today
+    const lastSent = jadwalSettings?.last_jadwal_reminder_at;
+    if (lastSent) {
+      const lastSentDate = new Date(lastSent);
+      const todayStart = new Date(todayDateStr + 'T00:00:00+05:30');
+      if (lastSentDate >= todayStart) {
+        console.log(`jadwal-reminder: Already sent today (last sent: ${lastSent})`);
+        return new Response(
+          JSON.stringify({ success: true, message: 'ALREADY_SENT_TODAY', sentCount: 0 }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
     }
 
     // Get all jadawal records with their schedule_data
@@ -534,6 +548,17 @@ Deno.serve(async (req) => {
       // Small delay to avoid rate limiting (process in waves)
       if (jadawalRecords.length > 10) {
         await new Promise(r => setTimeout(r, 50));
+      }
+    }
+
+    // Update last_jadwal_reminder_at so we don't send again today
+    if (sentCount > 0) {
+      const { error: updateErr } = await supabase
+        .from('jadwal_settings')
+        .update({ last_jadwal_reminder_at: new Date().toISOString() })
+        .eq('id', 1);
+      if (updateErr) {
+        console.warn('Failed to update last_jadwal_reminder_at:', updateErr.message);
       }
     }
 

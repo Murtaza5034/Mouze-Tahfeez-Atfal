@@ -457,12 +457,12 @@ const JuzSelect = ({ value, onChange }) => (
     onChange={(e) => onChange(e.target.value)}
     style={{
       padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-      background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+      background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
     }}
   >
     <option value="">-</option>
     {Array.from({ length: 30 }, (_, i) => (
-      <option key={i + 1} value={String(i + 1)} style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl' }}>{toArabicNum(i + 1)}</option>
+      <option key={i + 1} value={String(i + 1)} style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl' }}>{toArabicNum(i + 1)}</option>
     ))}
   </select>
 );
@@ -501,7 +501,7 @@ const JadeedPicker = ({ value, onChange, defaultSurah }) => {
         onChange={handleSurah}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
           direction: (surahNum && SURAH_AYAH_DATA.find(s => String(s.number) === surahNum)?.nameAr) ? 'rtl' : 'ltr',
         }}
       >
@@ -560,7 +560,7 @@ const JuzhaliPicker = ({ value, onChange, jadeedValue, mode }) => {
 
     const selectStyle = {
       padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-      background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+      background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
     };
 
     return (
@@ -664,7 +664,7 @@ const SurahRangePicker = ({ value, onChange }) => {
         onChange={handleFrom}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
         }}
       >
         <option value="">From Surah</option>
@@ -677,7 +677,7 @@ const SurahRangePicker = ({ value, onChange }) => {
         onChange={handleTill}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', fontFamily: "'Kanz al Marjaan', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
         }}
       >
         <option value="">Till Surah</option>
@@ -795,7 +795,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, edit
                     return (
                       <td key={juz} data-label={label} className={getCellEdited(editHistory, day, juz) ? 'jadwal-cell-edited' : ''}>
                         {readOnly ? (
-                          <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(juzVal) || '-'}</span>
+                          <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(juzVal) || '-'}</span>
                         ) : (
                           <JuzSelect
                             value={juzVal}
@@ -807,7 +807,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, edit
                   })}
                     <td data-label="Jadeed" className={getCellEdited(editHistory, day, 'jadeed') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.jadeed === NO_VALUE ? (
@@ -825,7 +825,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, edit
                   </td>
                   <td data-label="Juzhali" className={getCellEdited(editHistory, day, 'juzhali') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.juzhali === NO_VALUE ? (
@@ -847,7 +847,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, edit
                 <>
                   <td data-label="Murajah" className={getCellEdited(editHistory, day, 'murajah') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.murajah === NO_VALUE ? (
@@ -864,7 +864,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, edit
                   </td>
                   <td data-label="Jadeed" className={getCellEdited(editHistory, day, 'jadeed') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.jadeed === NO_VALUE ? (
@@ -882,7 +882,7 @@ const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, edit
                   </td>
                   <td data-label="Juzhali" className={getCellEdited(editHistory, day, 'juzhali') ? 'jadwal-cell-edited' : ''}>
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.juzhali === NO_VALUE ? (

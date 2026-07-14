@@ -653,7 +653,7 @@ function SidebarHeader({ photoUrl, name, arabicName, tag }) {
           {name}
         </h2>
         {arabicName && (
-          <h3 className="profile-arabic-premium arabic-kanz" style={{ fontFamily: "'Kanz al Marjaan', serif" }}>
+          <h3 className="profile-arabic-premium arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}>
             {fixArabicScript(arabicName)}
           </h3>
         )}
@@ -2308,7 +2308,7 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
         <BookOpen size={80} className="jadeed-icon-bg" />
         <span className="jadeed-count-overlay">{count || 0}</span>
       </div>
-      <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontSize: '1.6rem', fontFamily: "'Kanz al Marjaan', serif", marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
+      <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontSize: '1.6rem', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
         {heading}
       </h4>
       <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
@@ -2319,7 +2319,7 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
 }
 
 function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false }) {
-  const arabicStyle = { fontFamily: "'Kanz al Marjaan', serif" };
+  const arabicStyle = { fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" };
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
   const report = normalizeReportSettings(settings);
 
@@ -3770,7 +3770,7 @@ function ParentPortal({
                   {currentPage.childInfo.name}
                 </h3>
                 {studentProfile?.arabic_name && (
-                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', fontFamily: "'Kanz al Marjaan', serif", marginTop: '4px' }}>
+                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", marginTop: '4px' }}>
                     {fixArabicScript(studentProfile.arabic_name)}
                   </div>
                 )}
