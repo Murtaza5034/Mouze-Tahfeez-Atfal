@@ -5590,9 +5590,14 @@ function AdminPortal({
     const sidNum = Number(student.student_id);
     const sidVal = isNaN(sidNum) ? sidStr : sidNum;
     try {
+      const updateData = { badal_teacher_id: newBadalTeacherId || null };
+      if (newBadalTeacherId && !student.original_teacher_id) {
+        const originalId = student.original_teacher_id || student.muhaffiz_id || null;
+        if (originalId) updateData.original_teacher_id = String(originalId);
+      }
       const { error: updateErr } = await supabase
         .from("child_profiles")
-        .update({ badal_teacher_id: newBadalTeacherId || null })
+        .update(updateData)
         .eq("student_id", sidVal);
       if (updateErr) {
         console.error("badal_teacher_id update error:", updateErr);
@@ -5610,7 +5615,7 @@ function AdminPortal({
         try {
           const childName = student.name || student.full_name || "a child";
           await supabase.functions.invoke('fcm-notification', {
-            body: { title: "New Badal Assignment", body: `You have been assigned as badal for ${childName}`, targetUser: newBadalTeacherId, data: { type: "badal_assignment", childName } }
+            body: { title: "New Badal Assignment", body: `You have been assigned as badal for ${childName}`, targetUser: newBadalTeacherId, data: { type: "badal_assignment", childName, studentId: sidStr } }
           });
         } catch (fcmErr) { console.error("Badal FCM error:", fcmErr); }
       }
