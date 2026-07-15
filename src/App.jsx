@@ -5574,6 +5574,9 @@ function AdminPortal({
   const showAction = onShowAction;
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [], weeklyResultsArchive = [] } = adminData;
 
+  /* Optimistic draft so the dropdown visually changes immediately when user selects */
+  const [badalDraftTeacher, setBadalDraftTeacher] = useState(null);
+
   /*
    * BADAL FLOW - handleBadalTeacherChange (Admin inline badal assignment)
    *
@@ -8651,12 +8654,13 @@ const handleDownloadAllReports = async () => {
                                   ))}
                               </select>
                             </div>
-                            {/* BADAL FLOW: Badal Teacher - optional substitute teacher with premium dropdown */}
-                            <div className="detail-item" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {/* BADAL FLOW: Badal Teacher - premium inline assignment */}
+                            <div className="detail-item" style={{ alignItems: 'flex-start' }}>
                               <span className="detail-label">Badal Teacher:</span>
                               <div className="badal-select-wrap">
-                                {student.badal_teacher_id && (() => {
-                                  const currentBadal = portalAccessList.find(p => p.user_id === student.badal_teacher_id) || teacherProfiles.find(tp => tp.user_id === student.badal_teacher_id);
+                                {(badalDraftTeacher || student.badal_teacher_id) && (() => {
+                                  const bid = badalDraftTeacher || student.badal_teacher_id;
+                                  const currentBadal = portalAccessList.find(p => p.user_id === bid) || teacherProfiles.find(tp => tp.user_id === bid);
                                   return currentBadal ? (
                                     <div className="badal-actual-badge">
                                       <span className="badal-actual-name">{currentBadal.full_name}</span>
@@ -8665,19 +8669,23 @@ const handleDownloadAllReports = async () => {
                                   ) : <span className="badal-actual-badge badal-unknown-badge">Badal Assigned</span>;
                                 })()}
                                 <select
-                                  className="premium-select"
-                                  value={student.badal_teacher_id || ""}
+                                  className="premium-select badal-inline-select"
+                                  value={badalDraftTeacher || student.badal_teacher_id || ""}
                                   onChange={e => {
                                     const rawVal = e.target.value;
-                                    if (!rawVal) { handleBadalTeacherChange(student, ""); return; }
-                                    /* Resolve to teacher UUID — all dropdown options now have valid user_id values */
+                                    setBadalDraftTeacher(rawVal || null);
+                                    if (!rawVal) {
+                                      handleBadalTeacherChange(student, "").finally(() => setBadalDraftTeacher(null));
+                                      return;
+                                    }
                                     const resolved =
                                       portalAccessList.find(p => String(p.user_id) === String(rawVal))?.user_id ||
                                       teacherProfiles.find(tp => String(tp.user_id) === String(rawVal))?.user_id ||
                                       String(rawVal).trim() || null;
                                     if (resolved) {
-                                      handleBadalTeacherChange(student, resolved);
+                                      handleBadalTeacherChange(student, resolved).finally(() => setBadalDraftTeacher(null));
                                     } else {
+                                      setBadalDraftTeacher(null);
                                       if (showAction) showAction('error', 'Could not identify the selected teacher.');
                                     }
                                   }}
