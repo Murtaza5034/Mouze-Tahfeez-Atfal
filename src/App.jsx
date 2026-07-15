@@ -5608,8 +5608,8 @@ function AdminPortal({
       if (showAction) showAction(
         "success",
         newBadalTeacherId
-          ? "Badal teacher assigned! Child will appear in both teachers' portals."
-          : "Badal teacher removed. Child will only appear in the original teacher's portal."
+          ? "Badal teacher assigned! Child shifted to badal teacher. Original teacher can view progress on Badal page."
+          : "Badal teacher removed. Child returned to original teacher."
       );
       if (newBadalTeacherId) {
         try {
@@ -12342,7 +12342,13 @@ function TeacherPortal({
                   const myBadalStudents = filteredStudents
                     .filter(s => s.badal_teacher_id && allUserIds.some(uid => String(s.badal_teacher_id) === String(uid)))
                     .map(s => ({ student: s, student_id: s.student_id, teacher_id: s.badal_teacher_id, original_teacher_id: s.original_teacher_id || s.muhaffiz_id }));
-                  const originalStudents = filteredStudents
+                  /*
+                   * BADAL SHIFT: originalStudents must use schoolData.students directly (not
+                   * filteredStudents) because filteredStudents now excludes badal-assigned
+                   * children from the original teacher's regular view. We still want the
+                   * original teacher to see and click these children on the Badal page.
+                   */
+                  const originalStudents = (schoolData?.students || [])
                     .filter(s => s.badal_teacher_id && allUserIds.some(uid => String(s.original_teacher_id || s.muhaffiz_id) === String(uid)))
                     .map(s => {
                       const badalTeacherInfo = teacherProfiles.find(p => p.user_id === s.badal_teacher_id);
@@ -14388,9 +14394,13 @@ export default function App() {
      *   3. The teacher is the child's badal/substitute teacher (badal_teacher_id)
      *   4. Fallback: teacher name matches child's teacherName
      *
+     * When a child has a badal_teacher_id, the ORIGINAL teacher is EXCLUDED from
+     * filteredStudents so the child only appears in the BADAL teacher's portal.
+     * The original teacher can still view badal progress on the "Badal Update" page.
+     *
      * Permissions (applied elsewhere):
      *   - Badal teacher (badal_teacher_id === user.id): can EDIT badal progress
-     *   - Original teacher (otherwise): can only VIEW badal progress (read-only)
+     *   - Original teacher: can only VIEW badal progress on Badal page (read-only)
      */
     /*
      * BADAL FLOW - Build all possible IDs for the current teacher
@@ -14415,6 +14425,24 @@ export default function App() {
             String(student.original_teacher_id).trim() === String(uid).trim() ||
             String(student.badal_teacher_id).trim() === String(uid).trim()
           );
+
+          /*
+           * BADAL SHIFT: If this student has a badal_teacher_id and the current
+           * teacher is the ORIGINAL teacher (not the badal teacher), exclude from
+           * filteredStudents so the child only appears in the badal teacher's portal.
+           * The original teacher can still view badal progress on the "Badal Update" page.
+           */
+          if (student.badal_teacher_id && idMatch) {
+            const normalizedBadal = String(student.badal_teacher_id).trim();
+            const isOriginal = allTeacherIds.some(uid =>
+              String(student.original_teacher_id || student.muhaffiz_id).trim() === String(uid).trim()
+            );
+            const isBadal = allTeacherIds.some(uid =>
+              normalizedBadal === String(uid).trim()
+            );
+            if (isOriginal && !isBadal) return false;
+          }
+
           const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
           /* Also try matching badal_teacher_id against user email as a fallback */
           const emailMatch = !idMatch && student.badal_teacher_id && user?.email &&
