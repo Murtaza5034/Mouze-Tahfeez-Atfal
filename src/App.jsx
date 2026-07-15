@@ -12056,7 +12056,7 @@ function TeacherPortal({
                         value={teacherForms.result.wusool_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
-                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
                         {SURAH_NAMES_AR.map((name, i) => (
@@ -12123,7 +12123,7 @@ function TeacherPortal({
                         value={teacherForms.result.next_week_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
-                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
                         {SURAH_NAMES_AR.map((name, i) => (
@@ -12167,7 +12167,7 @@ function TeacherPortal({
                         value={teacherForms.result.istifadah_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
-                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif" }}
+                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
                         {SURAH_NAMES_AR.map((name, i) => (
@@ -12388,7 +12388,7 @@ function TeacherPortal({
                                       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                                         <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.3px" }}>Juz</span>
                                         <div style={{ display: "flex", gap: "8px" }}>
-                                          <select className="premium-select" style={{ flex: 1, fontFamily: "'Kanz al Marjaan', 'Traditional Arabic', serif", fontSize: "0.95rem" }} value={draft.juz?.value || ""} onChange={e => setDraft("juz", { ...draft.juz, value: e.target.value })}>
+                                          <select className="premium-select" style={{ flex: 1, fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.95rem" }} value={draft.juz?.value || ""} onChange={e => setDraft("juz", { ...draft.juz, value: e.target.value })}>
                                             <option value="">—</option>
                                             {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
                                           </select>
@@ -12398,28 +12398,28 @@ function TeacherPortal({
                                       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                                         <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.3px" }}>Juz Hali</span>
                                         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                                          <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Traditional Arabic', serif", fontSize: "0.85rem" }} value={draft.juzHali?.type || "juz"} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: e.target.value, from: "", till: "" })}>
+                                          <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.type || "juz"} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: e.target.value, from: "", till: "" })}>
                                             <option value="juz">Juz</option>
                                             <option value="surah">Surah</option>
                                           </select>
                                           {draft.juzHali?.type === "surah" ? (
                                             <>
-                                              <select className="premium-select" style={{ flex: 1, minWidth: "80px", fontFamily: "'Kanz al Marjaan', 'Traditional Arabic', serif", fontSize: "0.85rem" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
+                                              <select className="premium-select" style={{ flex: 1, minWidth: "80px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
                                                 <option value="">From</option>
                                                 {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
                                               </select>
-                                              <select className="premium-select" style={{ flex: 1, minWidth: "80px", fontFamily: "'Kanz al Marjaan', 'Traditional Arabic', serif", fontSize: "0.85rem" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
+                                              <select className="premium-select" style={{ flex: 1, minWidth: "80px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
                                                 <option value="">Till</option>
                                                 {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
                                               </select>
                                             </>
                                           ) : (
                                             <>
-                                              <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Traditional Arabic', serif", fontSize: "0.85rem" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
+                                              <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
                                                 <option value="">From</option>
                                                 {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
                                               </select>
-                                              <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Traditional Arabic', serif", fontSize: "0.85rem" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
+                                              <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
                                                 <option value="">Till</option>
                                                 {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
                                               </select>
@@ -12432,13 +12432,13 @@ function TeacherPortal({
                                     <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
                                       <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.3px" }}>Jadeed</span>
                                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                                        <select className="premium-select" style={{ width: "130px", fontFamily: "'Kanz al Marjaan', 'Traditional Arabic', serif", fontSize: "0.85rem" }} value={draft.jadeed?.type || "pages"} onChange={e => setDraft("jadeed", { ...draft.jadeed, type: e.target.value, from: "", till: "", surah: "", ayat: "" })}>
+                                        <select className="premium-select" style={{ width: "130px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.jadeed?.type || "pages"} onChange={e => setDraft("jadeed", { ...draft.jadeed, type: e.target.value, from: "", till: "", surah: "", ayat: "" })}>
                                           <option value="pages">Pages</option>
                                           <option value="surah_ayat">Surah &amp; Ayat</option>
                                         </select>
                                         {draft.jadeed?.type === "surah_ayat" ? (
                                           <>
-                                            <select className="premium-select" style={{ flex: 1, minWidth: "100px", fontFamily: "'Kanz al Marjaan', 'Traditional Arabic', serif", fontSize: "0.85rem" }} value={draft.jadeed?.surah || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, surah: e.target.value })}>
+                                            <select className="premium-select" style={{ flex: 1, minWidth: "100px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.jadeed?.surah || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, surah: e.target.value })}>
                                               <option value="">Surah</option>
                                               {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
                                             </select>
@@ -13467,6 +13467,50 @@ export default function App() {
   const [portalAccessSuccess, setPortalAccessSuccess] = useState(null);
   const [selfJadwalPopup, setSelfJadwalPopup] = useState(null);
   const lastUnseenRef = useRef(false);
+
+  // Midnight day-reset ticker for daily attendance card
+
+  useEffect(() => {
+
+    if (portalRole !== "parents") return;
+
+    
+
+    let lastDate = getToday();
+
+    const interval = setInterval(() => {
+
+      const currentDate = getToday();
+
+      if (currentDate !== lastDate) {
+
+        lastDate = currentDate;
+
+        // Date changed (midnight rollover), clear the attendance card
+
+        setParentData((prev) => {
+
+          if (prev && prev.attendance) {
+
+            return { ...prev, attendance: null };
+
+          }
+
+          return prev;
+
+        });
+
+      }
+
+    }, 60000); // check every minute
+
+    
+
+    return () => clearInterval(interval);
+
+  }, [portalRole]);
+
+  
 
   useEffect(() => {
     if (!user || !portalRole) return;
@@ -14879,6 +14923,53 @@ export default function App() {
             (payload) => {
               console.log("Real-time parent view update:", payload.eventType, payload.new?.student_id);
               loadPortalData(portalRole, user);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', table: 'attendance', schema: 'public' },
+            (payload) => {
+              if (portalRole === "parents") {
+                const rec = payload.new;
+                const todayStr = getToday();
+                if (rec?.attendance_date === todayStr) {
+                  console.log("Real-time attendance INSERT:", rec);
+                  setParentData(prev => {
+                    if (!prev) return prev;
+                    const allIds = prev.studentProfile?.allIds ||
+                      (prev.studentProfile?.student_id ? [String(prev.studentProfile.student_id)] : []);
+                    const isForThisStudent = allIds.some(id =>
+                      String(id).trim().toLowerCase() === String(rec.student_id || "").trim().toLowerCase()
+                    );
+                    if (!isForThisStudent) return prev;
+                    showAction("info", "Attendance marked ?");
+                    return { ...prev, attendance: rec };
+                  });
+                }
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', table: 'attendance', schema: 'public' },
+            (payload) => {
+              if (portalRole === "parents") {
+                const rec = payload.new;
+                const todayStr = getToday();
+                if (rec?.attendance_date === todayStr) {
+                  console.log("Real-time attendance UPDATE:", rec);
+                  setParentData(prev => {
+                    if (!prev) return prev;
+                    const allIds = prev.studentProfile?.allIds ||
+                      (prev.studentProfile?.student_id ? [String(prev.studentProfile.student_id)] : []);
+                    const isForThisStudent = allIds.some(id =>
+                      String(id).trim().toLowerCase() === String(rec.student_id || "").trim().toLowerCase()
+                    );
+                    if (!isForThisStudent) return prev;
+                    return { ...prev, attendance: rec };
+                  });
+                }
+              }
             }
           );
         
@@ -16749,6 +16840,8 @@ function QuickAccessPagesUI({ supabase: sb }) {
     </div>
   );
 }
+
+
 
 
 

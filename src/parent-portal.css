@@ -1,5 +1,5 @@
-﻿/* ========================================
-   SHARED STATS STRIP â€” All Portals
+/* ========================================
+   SHARED STATS STRIP — All Portals
    ======================================== */
 .portal-stats-strip {
   display: grid;
@@ -177,7 +177,7 @@
 }
 
 /* ========================================
-   PARENT PORTAL â€” Premium Brown & Gold Theme
+   PARENT PORTAL — Premium Brown & Gold Theme
    ======================================== */
 
 .parent-shell {
@@ -507,7 +507,7 @@
 }
 
 /* ========================================
-   QURAN IKHTEBAR PAGE â€” Premium Styles
+   QURAN IKHTEBAR PAGE — Premium Styles
    ======================================== */
 
 .ikhtebar-container {
@@ -991,7 +991,7 @@
 
 /* Misri / Egyptian Style Quran Typography */
 .misri-font {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   direction: rtl;
   text-align: center;
   line-height: 2.8;
@@ -1112,7 +1112,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
 
 /* Professional Naskh Typography */
 .misri-font {
-  font-family: 'Scheherazade New', 'Amiri', 'Me Quran', serif;
+  font-family: 'Kanz al Marjaan', 'Al-Kanz', serif;
   direction: rtl;
   text-align: center;
   line-height: 2.8;
@@ -1189,7 +1189,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
    ======================================== */
 
 /* ============================================
-   DARK MODE â€” Premium Dark Theme
+   DARK MODE — Premium Dark Theme
    Full system dark mode like mobile OS
    ============================================ */
 
@@ -1832,7 +1832,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
 }
 
 /* ============================================
-   ASHARA MODE â€” Aashra Mubarakah Theme
+   ASHARA MODE — Aashra Mubarakah Theme
    Colors: Green | White | Red
    Mourning theme for Imam Hussain (AS)
    Premium animated theme
@@ -1876,7 +1876,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   animation: asharaDropsFall 15s linear infinite !important;
 }
 
-/* ---- Ashara â€” All buttons: green bg, white text, red droplet ---- */
+/* ---- Ashara — All buttons: green bg, white text, red droplet ---- */
 [data-theme="ashara"] button:not(.no-theme):not(.notif-view-btn):not([class*="premium-toggle"]):not([class*="toggle-"]):not([class*="theme-"]):not(.swiper-button-next):not(.swiper-button-prev) {
   background: #0a5c36 !important;
   color: #ffffff !important;
@@ -1902,7 +1902,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   box-shadow: 0 4px 16px rgba(10, 92, 54, 0.3) !important;
 }
 
-/* ---- Ashara â€” Settings tab icons white outline ---- */
+/* ---- Ashara — Settings tab icons white outline ---- */
 [data-theme="ashara"] .settings-tab-btn {
   color: rgba(255, 255, 255, 0.7) !important;
 }
@@ -1930,7 +1930,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   color: #ffffff !important;
 }
 
-/* ---- Ashara â€” Card styling with green borders ---- */
+/* ---- Ashara — Card styling with green borders ---- */
 [data-theme="ashara"] .premium-card,
 [data-theme="ashara"] .dashboard-card,
 [data-theme="ashara"] .settings-tab-pane,
@@ -1940,7 +1940,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   box-shadow: 0 4px 20px rgba(10, 92, 54, 0.06) !important;
 }
 
-/* ---- Ashara â€” Section headings in green ---- */
+/* ---- Ashara — Section headings in green ---- */
 [data-theme="ashara"] h1,
 [data-theme="ashara"] h2,
 [data-theme="ashara"] h3,
@@ -1949,7 +1949,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   color: #0a5c36 !important;
 }
 
-/* ---- Ashara â€” Accent elements in red (sorrow/Imam Hussain) ---- */
+/* ---- Ashara — Accent elements in red (sorrow/Imam Hussain) ---- */
 [data-theme="ashara"] .accent-text,
 [data-theme="ashara"] .highlight-text,
 [data-theme="ashara"] [class*="badge"],
@@ -1957,7 +1957,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   color: #b41e1e !important;
 }
 
-/* ---- Ashara â€” Sidebar / Navigation ---- */
+/* ---- Ashara — Sidebar / Navigation ---- */
 [data-theme="ashara"] .sidebar,
 [data-theme="ashara"] .side-nav {
   background: linear-gradient(180deg, #0a5c36 0%, #07452a 100%) !important;
@@ -2005,7 +2005,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   stroke: #fca5a5 !important;
 }
 
-/* ---- Ashara â€” Inbox notification cards: white embossed text, red droplet ---- */
+/* ---- Ashara — Inbox notification cards: white embossed text, red droplet ---- */
 [data-theme="ashara"] .premium-notif-card {
   background: rgba(255, 255, 255, 0.95) !important;
   border: 1px solid rgba(180, 30, 30, 0.15) !important;
@@ -2038,13 +2038,13 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   transform: scale(1.1) !important;
 }
 
-/* ---- Ashara â€” Selection highlights ---- */
+/* ---- Ashara — Selection highlights ---- */
 [data-theme="ashara"] ::selection {
   background: rgba(10, 92, 54, 0.2) !important;
   color: #0a5c36 !important;
 }
 
-/* ---- Ashara â€” Inbox card action buttons ---- */
+/* ---- Ashara — Inbox card action buttons ---- */
 [data-theme="ashara"] .notif-view-btn {
   background: transparent !important;
   border: none !important;
@@ -2082,7 +2082,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   transform: none !important;
 }
 
-/* ---- Ashara â€” Input fields ---- */
+/* ---- Ashara — Input fields ---- */
 [data-theme="ashara"] input,
 [data-theme="ashara"] select,
 [data-theme="ashara"] textarea {
@@ -2095,7 +2095,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   box-shadow: 0 0 0 3px rgba(10, 92, 54, 0.1) !important;
 }
 
-/* ---- Ashara â€” Links in red (remembrance) ---- */
+/* ---- Ashara — Links in red (remembrance) ---- */
 [data-theme="ashara"] a {
   color: #b41e1e !important;
 }
@@ -2103,7 +2103,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   color: #8a1515 !important;
 }
 
-/* ---- Ashara â€” Settings tabs container (override dark background) ---- */
+/* ---- Ashara — Settings tabs container (override dark background) ---- */
 [data-theme="ashara"] .settings-tabs {
   background: linear-gradient(180deg, #0a5c36 0%, #07452a 100%) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
@@ -2112,7 +2112,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
 
 
 /* ============================================
-   PLUTONIUM MODE â€” Dark Neon Theme
+   PLUTONIUM MODE — Dark Neon Theme
    "where darkness meets the web"
    Electric pink / fuchsia / purple / indigo
    ============================================ */
@@ -2464,7 +2464,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
 }
 
 /* ============================================
-   CLASSIC PRO â€” Premium Frosted Glass Theme
+   CLASSIC PRO — Premium Frosted Glass Theme
    Frosted glass effects with classic gold/brown
    ============================================ */
 

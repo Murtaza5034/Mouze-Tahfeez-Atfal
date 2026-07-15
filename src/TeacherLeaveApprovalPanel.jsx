@@ -14,6 +14,8 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
   let inboxError = null;
   let fcmError = null;
   let fcmData = null;
+  let waError = null;
+  let waSent = 0;
 
   // Store in database first (Inbox)
   if (!skipInbox) {
@@ -52,7 +54,79 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     console.error('FCM notification error:', err);
   }
 
-  return { inboxError, fcmError, fcmData };
+  // Send WhatsApp notification(s) based on role
+  try {
+    const { data: waConfig, error: waConfigErr } = await supabase
+      .from("whatsapp_config")
+      .select("*")
+      .eq("id", 1)
+      .single();
+
+    if (!waConfigErr && waConfig && waConfig.enabled && waConfig.provider !== 'none') {
+      const phoneSet = new Set();
+
+      // Look up phone numbers based on target role
+      if (targetRole === "user" && targetUser) {
+        // Target is a specific user (UUID or email)
+        // Try teacher_profiles first
+        const { data: teachers } = await supabase
+          .from("teacher_profiles")
+          .select("whatsapp_number")
+          .or("user_id.eq." + targetUser + ",email.ilike.%" + targetUser + "%");
+        if (teachers) teachers.forEach(t => { if (t.whatsapp_number) phoneSet.add(t.whatsapp_number); });
+
+        // Try child_profiles by parent_user_id or parent_email
+        const { data: parents } = await supabase
+          .from("child_profiles")
+          .select("whatsapp_number")
+          .or("parent_user_id.eq." + targetUser + ",parent_email.ilike.%" + targetUser + "%");
+        if (parents) parents.forEach(p => { if (p.whatsapp_number) phoneSet.add(p.whatsapp_number); });
+      }
+
+      if (targetRole === "parents" || targetRole === "all") {
+        const { data: allParents } = await supabase
+          .from("child_profiles")
+          .select("whatsapp_number")
+          .not("whatsapp_number", "is", null)
+          .not("whatsapp_number", "eq", "");
+        if (allParents) allParents.forEach(p => { if (p.whatsapp_number) phoneSet.add(p.whatsapp_number); });
+      }
+
+      if (targetRole === "teacher" || targetRole === "admin" || targetRole === "all") {
+        const { data: allTeachers } = await supabase
+          .from("teacher_profiles")
+          .select("whatsapp_number")
+          .not("whatsapp_number", "is", null)
+          .not("whatsapp_number", "eq", "");
+        if (allTeachers) allTeachers.forEach(t => { if (t.whatsapp_number) phoneSet.add(t.whatsapp_number); });
+      }
+
+      // Send WhatsApp message to each unique phone number
+      const waMessage = title + (body ? "\n\n" + body : "");
+      for (const rawPhone of phoneSet) {
+        let formattedPhone = String(rawPhone).split("").filter(c => "0123456789".includes(c)).join("");
+        // Convert Pakistani local numbers (03xx...) to international (923xx...)
+        if (formattedPhone.length === 11 && formattedPhone.startsWith("0")) {
+          formattedPhone = "92" + formattedPhone.substring(1);
+        }
+        if (!formattedPhone || formattedPhone.length < 10) continue;
+
+        try {
+          const { data: waResult, error: waError2 } = await supabase.functions.invoke("whatsapp-notification", {
+            body: { phone: formattedPhone, message: waMessage }
+          });
+          if (!waError2 && waResult?.success) waSent++;
+        } catch (e) {
+          console.warn('WhatsApp send failed for', formattedPhone, e);
+        }
+      }
+    }
+  } catch (err) {
+    waError = err;
+    console.error('WhatsApp notification error:', err);
+  }
+
+  return { inboxError, fcmError, fcmData, waError, waSent };
 };
 
 export default function TeacherLeaveApprovalPanel({

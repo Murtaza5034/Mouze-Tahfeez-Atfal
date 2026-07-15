@@ -7,7 +7,7 @@
 }
 
 .takhteet-progress-container .kanz-font {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   letter-spacing: normal;
 }
 
@@ -154,7 +154,7 @@
 }
 
 .progress-ring-value {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 1.9rem;
   font-weight: 800;
   color: #3e2723;
@@ -190,7 +190,7 @@
 }
 
 .progress-stat .stat-value {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.95rem;
   font-weight: 700;
   color: #3e2723;
@@ -279,7 +279,7 @@
 }
 
 .metric-label-arabic {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.8rem;
   color: #b8962e;
   margin-left: auto;
@@ -318,7 +318,7 @@
 }
 
 .jss-label {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.5rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -327,7 +327,7 @@
 }
 
 .jss-value {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.85rem;
   font-weight: 700;
   color: #3e2723;
@@ -340,7 +340,7 @@
 }
 
 .arabic-text {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.95rem !important;
   letter-spacing: normal;
 }
@@ -614,7 +614,7 @@
 }
 
 .record-card .arabic-text {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.8rem !important;
 }
 

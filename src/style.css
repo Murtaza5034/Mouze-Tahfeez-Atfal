@@ -1,5 +1,4 @@
 @import url('https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
 :root {
   --tajweed-ghunnah: #ff5722;
@@ -20,7 +19,7 @@
 
 /* Quranic Typography */
 .quran-uthmani {
-  font-family: 'Amiri', serif;
+  font-family: 'Kanz al Marjaan', 'Al-Kanz', serif;
   font-size: 2.2rem;
   line-height: 2.8;
   direction: rtl;
@@ -88,15 +87,13 @@
 
 @font-face {
   font-family: 'Kanz al Marjaan';
-  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.eot');
-  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.eot?#iefix') format('embedded-opentype'),
-       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
+  src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
        url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff') format('woff'),
-       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype'),
-       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.svg#KanzalMarjaanRegular') format('svg');
+       url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 @font-face {
@@ -105,6 +102,7 @@
   font-weight: normal;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 @font-face {
@@ -154,9 +152,60 @@
   --header-height: 64px;
 }
 
+/* Performance optimization: GPU acceleration for smooth scrolling */
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Premium icon base style */
+svg.premium-icon, .premium-icon svg {
+  filter: drop-shadow(0 1px 2px rgba(197, 160, 89, 0.15));
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+}
+svg.premium-icon:hover, .premium-icon svg:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 2px 8px rgba(197, 160, 89, 0.3));
+}
+.premium-icon-gold {
+  color: var(--primary-gold);
+  filter: drop-shadow(0 2px 4px rgba(197, 160, 89, 0.25));
+}
+
+/* Profile photo rendering fix */
+img[src*="logo.png"], img[src*="LOGO"] {
+  image-rendering: auto;
+}
+img:not([src*=".svg"]) {
+  image-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Performance: GPU layer promotion for smooth animations */
+.premium-card, .data-card, .form-card, .dashboard-section,
+.child-info-card, .result-card-premium, .student-card,
+.teacher-profile-card, .teacher-attend-card, .premium-stat-pill {
+  contain: layout style paint;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Content-visibility for lazy rendering of off-screen sections */
+.home-dashboard, .portal-stats, .management-grid,
+.assigned-children-grid, .student-card-grid,
+.hifz-stats-premium-strip, .info-grid,
+.announcements-grid, .portal-stats-strip {
+  content-visibility: auto;
+  contain-intrinsic-size: 200px;
+}
+
+/* Smooth image loading for profile photos */
+.student-avatar, .nav-logo, .drawer-avatar,
+.sidebar-avatar-img, .teacher-photo-square,
+.p-faculty-img, .topbar-logo {
+  content-visibility: auto;
+  contain: layout style paint;
+  background: var(--light-gold);
 }
 
 html {
@@ -169,7 +218,7 @@ html {
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', 'Kanz al Marjaan', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Al-Kanz', 'Kanz al Marjaan', sans-serif;
   background-color: var(--cream-bg);
   color: var(--text-main);
   line-height: 1.7;
@@ -318,13 +367,16 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .arabic-kanz {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   direction: rtl;
   color: var(--dark-gold);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .arabic-text {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-weight: 400;
 }
 
 /* --- Premium Card System --- */
@@ -1597,7 +1649,8 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .jumla-label {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-weight: 400;
   font-size: 2.2rem;
   color: #8b0000;
   margin: 4px 0;
@@ -1617,14 +1670,14 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   margin-bottom: 8px;
   background: white;
   box-shadow: 0 8px 20px rgba(138, 101, 21, 0.1);
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .max-score {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-muted);
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .score-details-box {
@@ -1650,7 +1703,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 }
 
 .arabic-label {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 1.5rem;
   color: var(--dark-gold);
 }
@@ -1659,7 +1712,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   font-weight: 800;
   color: var(--text-main);
   font-size: 1.2rem;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .result-footer-grid {
@@ -2749,7 +2802,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   fill: none;
   stroke: #eee;
   stroke-width: 2;
-  font-family: 'Al-Kanz', 'Amiri', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .attendance-fill-text {
@@ -2820,7 +2873,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 .note-val {
   font-weight: 800;
   color: #c53030;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .note-label {
@@ -3279,7 +3332,7 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   font-size: 1.1rem;
   font-weight: 900;
   color: var(--deep-brown);
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 /* --- Report Footer Cards Layout --- */
@@ -4032,7 +4085,7 @@ body {
   color: var(--primary-gold);
   display: block;
   margin-top: 2px;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .child-card-group {
@@ -4375,7 +4428,7 @@ body {
   direction: rtl !important;
   letter-spacing: normal !important;
   font-variant-ligatures: common-ligatures !important;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif !important;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif !important;
 }
 
 /* --- Premium Chat System --- */
@@ -5102,7 +5155,7 @@ body {
 }
 
 .premium-hifz-card .header-text h2 {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   color: var(--primary-gold);
   font-size: 2.2rem;
   margin: 0 0 12px 0;
@@ -5891,19 +5944,19 @@ body {
 
 .juz-surat-selector .premium-select {
   width: 100%;
-  font-family: 'Al-Kanz', 'Amiri', 'Traditional Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 1rem;
   letter-spacing: normal;
 }
 
 .juz-surat-selector .premium-select option {
-  font-family: 'Al-Kanz', 'Amiri', 'Traditional Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.95rem;
   padding: 8px 12px;
 }
 
 .juz-surat-selector .premium-select optgroup {
-  font-family: 'Al-Kanz', 'Amiri', 'Traditional Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 n/* --- Full Width Label Helper --- */
@@ -5913,18 +5966,18 @@ n/* --- Full Width Label Helper --- */
 
 /* --- Kanz al Marjaan Font Helper (no RTL direction) --- */
 .kanz-font {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   letter-spacing: normal;
 }
 
 .arabic-text {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 
 .premium-select option.arabic-text,
 .juz-surat-selector .premium-select .arabic-kanz-option {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif !important;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif !important;
   font-size: 1.1rem;
 }
 
@@ -6572,3 +6625,333 @@ img:not([loading]) {
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 6px rgba(212, 175, 55, 0.15);
 }
 
+
+/* ====== App Update Popup ====== */
+.app-update-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background:
+    radial-gradient(circle at top, rgba(212,175,55,0.18), transparent 34%),
+    rgba(16, 12, 9, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: mauzeUpdateFadeIn 0.28s ease-out both;
+}
+
+@keyframes mauzeUpdateFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.app-update-popup-card {
+  width: min(440px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 28px;
+  background: #ffffff;
+  border: 1px solid rgba(212,175,55,0.35);
+  box-shadow: 0 40px 100px rgba(0,0,0,0.35);
+  position: relative;
+  animation: mauzeUpdateSlideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes mauzeUpdateSlideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.app-update-popup-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(61,43,31,0.10);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.90);
+  color: var(--deep-brown);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+.app-update-popup-close:hover {
+  transform: rotate(90deg);
+  background: rgba(239,68,68,0.08);
+  color: #ef4444;
+}
+
+.app-update-popup-header {
+  padding: 32px 30px 20px;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(212,175,55,0.15), transparent 45%),
+    linear-gradient(180deg, #fefcf8, #fff);
+  border-bottom: 1px solid rgba(212,175,55,0.10);
+}
+
+.app-update-popup-badge {
+  display: inline-flex;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d4af37, #b88a1d);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 16px rgba(212,175,55,0.30);
+}
+
+.app-update-popup-icon-row {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.app-update-popup-icon-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgba(212,175,55,0.12), rgba(255,255,255,0.80));
+  border: 2px solid rgba(212,175,55,0.20);
+  display: grid;
+  place-items: center;
+  color: var(--primary-gold);
+  box-shadow: 0 12px 30px rgba(212,175,55,0.15);
+}
+
+.app-update-popup-sparkle-left {
+  position: absolute;
+  left: 22%;
+  top: -4px;
+  color: #d4af37;
+  opacity: 0.5;
+  animation: mauzeUpdateSparkle 2s ease-in-out infinite;
+}
+
+.app-update-popup-sparkle-right {
+  position: absolute;
+  right: 22%;
+  bottom: -4px;
+  color: #d4af37;
+  opacity: 0.4;
+  animation: mauzeUpdateSparkle 2s ease-in-out 0.5s infinite;
+}
+
+@keyframes mauzeUpdateSparkle {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.3); opacity: 0.8; }
+}
+
+.app-update-popup-title {
+  margin: 0 0 6px;
+  color: var(--deep-brown);
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.app-update-popup-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.app-update-popup-body {
+  padding: 22px 30px;
+}
+
+.app-update-popup-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.app-update-popup-version-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-update-popup-version-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.app-update-popup-version-value {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--deep-brown);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-update-popup-version-code {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--off-white);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.app-update-popup-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--off-white);
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+.app-update-popup-date svg {
+  color: #22c55e;
+}
+
+.app-update-popup-notes {
+  background: linear-gradient(135deg, rgba(212,175,55,0.06), rgba(255,255,255,0.80));
+  border: 1px solid rgba(212,175,55,0.14);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+
+.app-update-popup-notes strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+  color: var(--deep-brown);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.app-update-popup-notes-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--soft-brown);
+  white-space: pre-wrap;
+}
+
+.app-update-popup-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.app-update-popup-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--soft-brown);
+}
+
+.app-update-popup-feature-item svg {
+  color: #22c55e;
+  flex-shrink: 0;
+}
+
+.app-update-popup-footer {
+  padding: 18px 30px 26px;
+  border-top: 1px solid rgba(61,43,31,0.06);
+  background: rgba(252,250,245,0.86);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.app-update-popup-btn-primary {
+  width: 100%;
+  padding: 16px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(135deg, #d4af37, #b88a1d);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 10px 24px rgba(184,138,29,0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.app-update-popup-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(184,138,29,0.30);
+}
+
+.app-update-popup-btn-primary:active {
+  transform: translateY(0);
+}
+
+.app-update-popup-btn-secondary {
+  width: 100%;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(61,43,31,0.10);
+  background: #fff;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.app-update-popup-btn-secondary:hover {
+  background: var(--off-white);
+  color: var(--deep-brown);
+}
+
+@media (max-width: 640px) {
+  .app-update-popup-overlay { padding: 16px; }
+  .app-update-popup-card { border-radius: 24px; }
+  .app-update-popup-header { padding: 26px 22px 18px; }
+  .app-update-popup-body { padding: 18px 22px; }
+  .app-update-popup-footer { padding: 16px 22px 22px; }
+  .app-update-popup-title { font-size: 1.35rem; }
+  .app-update-popup-icon-circle { width: 60px; height: 60px; }
+  .app-update-popup-icon-circle svg { width: 28px; height: 28px; }
+}
+
+
+
+/* Override for elements that specifically need Kanz al Marjaan font (like attendance headings) */
+h4.attendance-rating-text,
+.attendance-rating-text.arabic-kanz {
+  font-family: 'Kanz al Marjaan', 'Al-Kanz', serif !important;
+}
+
+/* Arabic font enforcement */
+.arabic-text, .arabic-label,
+.arabic-kanz,
+.kanz-font,
+[class*=" arabic-"],
+[class*="kanz-"] {
+  font-family: "Al-Kanz", "Amiri", "Scheherazade New", "Traditional Arabic", "Noto Naskh Arabic", serif;
+}

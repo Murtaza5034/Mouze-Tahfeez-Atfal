@@ -8,7 +8,16 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: null,
-      includeAssets: ['logo.png', 'favicon.ico'],
+      includeAssets: [
+        'logo.png',
+        'favicon.ico',
+        'fonts/al-kanz.ttf',
+        'Kanz al Marjaan/kanz-al-marjaan-webfont.woff2',
+        'Kanz al Marjaan/kanz-al-marjaan-webfont.woff',
+        'Kanz al Marjaan/kanz-al-marjaan-webfont.ttf',
+        'Child-Hood.otf',
+        'Qilka-Bold.otf',
+      ],
       manifest: {
         name: 'Mauze Tahfeez Management',
         short_name: 'MauzeTahfeez',
@@ -65,5 +74,10 @@ export default defineConfig(({ mode }) => ({
       '@supabase/supabase-js',
       'lucide-react',
     ],
+  },
+  server: {
+    headers: {
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
   },
 }))

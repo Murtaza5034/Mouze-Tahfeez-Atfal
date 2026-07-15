@@ -6,3 +6,12 @@ node_modules
 .env.local
 README.md
 *.log
+android
+*.aab
+*.apk
+*.tar.gz
+*.mjs
+fix.js
+supabase/migrations
+supabase/functions
+public/*.json

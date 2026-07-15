@@ -25,7 +25,7 @@
   max-width: 820px;
   margin: 0 auto;
   padding: 24px 16px 40px;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .marhala-posts-container button,
@@ -33,7 +33,7 @@
 .marhala-posts-container select,
 .marhala-posts-container textarea,
 .marhala-posts-container option {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .mp-age-digits,
@@ -43,11 +43,11 @@
 }
 
 .mp-age-input::placeholder {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
 }
 
 .mp-arabic-text {
-  font-family: 'Al-Kanz', 'Amiri', 'Traditional Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   letter-spacing: normal;
   text-rendering: optimizeLegibility;
   unicode-bidi: isolate;
@@ -272,7 +272,7 @@
 }
 
 .mp-subtitle {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   margin: 2px 0 0;
   color: var(--text-muted);
   font-size: 0.85rem;
@@ -389,7 +389,7 @@
 }
 
 .mp-form-header h3 {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   margin: 0;
   font-size: 1.15rem;
   color: var(--deep-brown);
@@ -544,7 +544,7 @@
 }
 
 .mp-student-preview-name {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-weight: 700;
   font-size: 1rem;
   color: var(--deep-brown);
@@ -806,7 +806,7 @@
 }
 
 .mp-empty h3 {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   color: var(--deep-brown);
   margin: 0 0 8px;
   font-size: 1.5rem;
@@ -997,7 +997,7 @@
 }
 
 .mp-cert-school-name {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 1.1rem;
   color: var(--dark-gold);
   font-weight: 700;
@@ -1010,7 +1010,7 @@
   font-size: 0.85rem;
   color: var(--primary-gold);
   margin: 0;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-weight: 600;
   letter-spacing: 0.06em;
   opacity: 0.7;
@@ -1063,7 +1063,7 @@
 
 /* The post heading / achievement title */
 .mp-cert-heading {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 1rem;
   color: var(--dark-gold);
   font-weight: 700;
@@ -1075,7 +1075,7 @@
 
 /* Student name - large gold text */
 .mp-cert-student-name {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 2.6rem;
   font-weight: 900;
   color: var(--deep-brown);
@@ -1095,7 +1095,7 @@
 
 .mp-cert-success-line {
   display: none;
-  font-family: 'Al-Kanz', 'Amiri', 'Traditional Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 1rem;
   font-weight: 700;
   color: var(--deep-brown);
@@ -1118,7 +1118,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.95rem;
   color: var(--dark-gold);
   font-weight: 600;
@@ -1144,7 +1144,7 @@
   padding: 8px 20px;
   background: linear-gradient(135deg, var(--primary-gold), #b88a1d);
   border-radius: 999px;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 1.15rem;
   font-weight: 700;
   color: #fff;
@@ -1194,7 +1194,7 @@
   gap: 8px;
   color: var(--primary-gold);
   opacity: 0.5;
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.8rem;
 }
 
@@ -1208,7 +1208,7 @@
   border-radius: 999px;
   background: rgba(197, 160, 89, 0.1);
   border: 1px solid rgba(197, 160, 89, 0.25);
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.9rem;
 }
 
@@ -1272,7 +1272,7 @@
 }
 
 .mp-cert-congrats-text {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 1.3rem;
   color: var(--dark-gold);
   font-weight: 700;
@@ -1297,7 +1297,7 @@
 }
 
 .mp-cert-footer-location {
-  font-family: 'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   font-size: 0.8rem;
   color: var(--text-muted);
   margin: 0;

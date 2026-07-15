@@ -286,7 +286,7 @@ const JuzhaliPicker = ({ value, onChange, jadeedValue, mode }) => {
 
     const selectStyle = {
       padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-      background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
+      background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif",
     };
 
     return (
@@ -560,7 +560,7 @@ const JadeedPicker = ({ value, onChange, defaultSurah }) => {
         onChange={handleSurah}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif",
           direction: (surahNum && SURAH_AYAH_DATA.find(s => String(s.number) === surahNum)?.nameAr) ? 'rtl' : 'ltr',
         }}
       >
@@ -597,7 +597,7 @@ const JuzPicker = ({ value, onChange }) => {
         onChange={(e) => onChange(e.target.value)}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif",
         }}
       >
         <option value="">-- Juz --</option>
@@ -615,12 +615,12 @@ const JuzSelect = ({ value, onChange }) => (
     onChange={(e) => onChange(e.target.value)}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif",
         }}
   >
     <option value="">-</option>
     {Array.from({ length: 30 }, (_, i) => (
-      <option key={i + 1} value={String(i + 1)} style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl' }}>{toArabicNum(i + 1)}</option>
+      <option key={i + 1} value={String(i + 1)} style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl' }}>{toArabicNum(i + 1)}</option>
     ))}
   </select>
 );
@@ -649,7 +649,7 @@ const SurahRangePicker = ({ value, onChange }) => {
         onChange={handleFrom}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif",
         }}
       >
         <option value="">From Surah</option>
@@ -662,7 +662,7 @@ const SurahRangePicker = ({ value, onChange }) => {
         onChange={handleTill}
         style={{
           padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color, #d4af37)',
-          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif",
+          background: '#fff', fontSize: '12px', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif",
         }}
       >
         <option value="">Till Surah</option>
@@ -1048,7 +1048,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                     return (
                       <td key={juz} data-label={label}>
                         {readOnly ? (
-                          <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(juzVal) || '-'}</span>
+                          <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(juzVal) || '-'}</span>
                         ) : (
                           <JuzSelect
                             value={juzVal}
@@ -1060,7 +1060,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   })}
                     <td data-label="Jadeed">
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.jadeed === NO_VALUE ? (
@@ -1078,7 +1078,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.juzhali === NO_VALUE ? (
@@ -1100,7 +1100,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                 <>
                   <td data-label="Murajah">
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.murajah === NO_VALUE ? (
@@ -1117,7 +1117,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   </td>
                   <td data-label="Jadeed">
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.jadeed === NO_VALUE ? (
@@ -1135,7 +1135,7 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
                   </td>
                   <td data-label="Juzhali">
                     {readOnly ? (
-                      <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
                         {row.juzhali === NO_VALUE ? (
@@ -1239,7 +1239,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
           {dateStr ? <span className="jadwal-calendar-date">{dateStr}</span> : null}
         </div>
         {fatemi ? (
-          <div style={{ textAlign: 'center', fontSize: '0.7rem', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", color: 'var(--primary-gold)', padding: '2px 0 4px', lineHeight: 1.2, direction: 'rtl' }}>
+          <div style={{ textAlign: 'center', fontSize: '0.7rem', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", color: 'var(--primary-gold)', padding: '2px 0 4px', lineHeight: 1.2, direction: 'rtl' }}>
             {fatemi}
           </div>
         ) : null}
@@ -1253,7 +1253,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
                     <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>{label}</span>
                   </label>
                   {readOnly ? (
-                    <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(row[juz]) || '-'}</span>
+                    <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(row[juz]) || '-'}</span>
                   ) : (
                     <JuzSelect
                       value={row[juz] || ''}
@@ -1272,7 +1272,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
                 {!readOnly && <NoToggleButton value={row.murajah || ''} onChange={(val) => onCellChange(day, 'murajah', val, idx)} label="Murajah" />}
               </label>
               {readOnly ? (
-                <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
+                <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
               ) : (
                 <div>
                   {row.murajah === NO_VALUE ? (
@@ -1295,7 +1295,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
               {!readOnly && <NoToggleButton value={row.jadeed || ''} onChange={(val) => onCellChange(day, 'jadeed', val, idx)} label="Jadeed" />}
             </label>
             {readOnly ? (
-              <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
+              <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
             ) : (
               <div>
                 {row.jadeed === NO_VALUE ? (
@@ -1318,7 +1318,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
               {!readOnly && <NoToggleButton value={row.juzhali || ''} onChange={(val) => onCellChange(day, 'juzhali', val, idx)} label="Juzhali" />}
             </label>
             {readOnly ? (
-              <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
+              <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
             ) : (
               <div>
                 {row.juzhali === NO_VALUE ? (
@@ -1440,7 +1440,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
               </span>
             )}
           </h3>
-          {fatemiDate && <span style={{ fontSize: '0.75rem', fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", color: 'var(--primary-gold)', direction: 'rtl', display: 'block', marginTop: '2px' }}>{fatemiDate}</span>}
+          {fatemiDate && <span style={{ fontSize: '0.75rem', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", color: 'var(--primary-gold)', direction: 'rtl', display: 'block', marginTop: '2px' }}>{fatemiDate}</span>}
           {customDays ? null : <span className="jadwal-single-day-subtitle">Current Day View</span>}
         </div>
         <button className="jadwal-calendar-nav-btn" onClick={() => goToDay(1)}>
@@ -1458,7 +1458,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
                     <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>{label}</span>
                   </label>
                   {readOnly ? (
-                    <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(row[juz]) || '-'}</span>
+                    <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{toArabicNum(row[juz]) || '-'}</span>
                   ) : (
                     <JuzSelect
                       value={row[juz] || ''}
@@ -1477,7 +1477,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
                 {!readOnly && <NoToggleButton value={row.murajah || ''} onChange={(val) => onCellChange(day, 'murajah', val, currentDayIndex)} label="Murajah" />}
               </label>
               {readOnly ? (
-                <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
+                <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatMurajah(row.murajah)}</span>
               ) : (
                 <div>
                   {row.murajah === NO_VALUE ? (
@@ -1500,7 +1500,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
               {!readOnly && <NoToggleButton value={row.jadeed || ''} onChange={(val) => onCellChange(day, 'jadeed', val, currentDayIndex)} label="Jadeed" />}
             </label>
             {readOnly ? (
-              <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
+              <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJadeed(row.jadeed)}</span>
             ) : (
               <div>
                 {row.jadeed === NO_VALUE ? (
@@ -1522,7 +1522,7 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
               {!readOnly && <NoToggleButton value={row.juzhali || ''} onChange={(val) => onCellChange(day, 'juzhali', val, currentDayIndex)} label="Juzhali" />}
             </label>
             {readOnly ? (
-              <span style={{ fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
+              <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: '14px' }}>{formatJuzhali(row.juzhali)}</span>
             ) : (
               <div>
                 {row.juzhali === NO_VALUE ? (
@@ -1943,7 +1943,7 @@ onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacher
               background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(212,175,55,0.02))',
               border: '1px solid rgba(212,175,55,0.25)', borderRadius: '12px',
               padding: '12px 20px', marginBottom: '16px', textAlign: 'center',
-              fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl'
+              fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl'
             }}>
               <span style={{ fontSize: '15px', color: '#8b6d31', fontWeight: 600 }}>
                 من {getFatemiDateStr(weekRange.weekStart)} إلى {getFatemiDateStr(weekRange.weekEnd)}
@@ -2168,7 +2168,7 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
           background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(212,175,55,0.02))',
           border: '1px solid rgba(212,175,55,0.25)', borderRadius: '12px',
           padding: '12px 20px', marginBottom: '16px', textAlign: 'center',
-          fontFamily: "'Al-Kanz', 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif", direction: 'rtl'
+          fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl'
         }}>
           <span style={{ fontSize: '15px', color: '#8b6d31', fontWeight: 600 }}>
             من {getFatemiDateStr(weekRange.weekStart)} إلى {getFatemiDateStr(weekRange.weekEnd)}

@@ -90,3 +90,7 @@ keys/
 .vercel
 *.py
 public/*.jpg
+
+# Temp fix scripts
+*.mjs
+*.tar.gz

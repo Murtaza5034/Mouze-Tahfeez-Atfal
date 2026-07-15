@@ -6,27 +6,90 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Google Play Android Publisher API base URL
+// Google Play Android Publisher API base URL (for metadata/JSON requests)
 const PLAY_API_BASE = 'https://androidpublisher.googleapis.com/androidpublisher/v3'
+// Google Play media upload base URL (required for binary file uploads like AAB)
+const PLAY_UPLOAD_BASE = 'https://androidpublisher.googleapis.com/upload/androidpublisher/v3'
 
 const PLAY_TRACKS = ['internal', 'alpha', 'beta', 'production'] as const
 type PlayTrack = typeof PLAY_TRACKS[number]
 
 /**
+ * Safely sanitizes and parses a potentially malformed or multi-line JSON string.
+ */
+function parseServiceAccountKey(rawKey: string): Record<string, unknown> {
+  let cleaned = rawKey.trim();
+
+  // Strip enclosing quotes (single, double, or backticks) if present
+  if (
+    (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith('`') && cleaned.endsWith('`'))
+  ) {
+    cleaned = cleaned.substring(1, cleaned.length - 1).trim();
+  }
+
+  // Scan the string character-by-character to find raw newlines inside double-quoted string values,
+  // and convert them to escaped \n to keep JSON.parse happy.
+  let sanitized = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+
+    if (escaped) {
+      sanitized += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      sanitized += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      sanitized += char;
+      continue;
+    }
+
+    if (inString && (char === '\n' || char === '\r')) {
+      if (char === '\n') {
+        sanitized += '\\n';
+      }
+      continue;
+    }
+
+    sanitized += char;
+  }
+
+  try {
+    return JSON.parse(sanitized);
+  } catch (err) {
+    // If that failed, check if the quotes might be escaped double quotes (e.g. CLI escaping)
+    try {
+      const unescaped = sanitized.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      return JSON.parse(unescaped);
+    } catch {
+      throw new Error(`GOOGLE_PLAY_SERVICE_ACCOUNT_KEY is not valid JSON. Parse error: ${err.message}. Please verify the key formatting.`);
+    }
+  }
+}
+
+/**
  * Generate a Google OAuth2 access token using the service account JSON key.
  */
-async function getPlayAccessToken(): Promise<string> {
+async function getPlayAccessToken(): Promise<{ token: string; clientEmail: string }> {
   const serviceAccountJson = Deno.env.get('GOOGLE_PLAY_SERVICE_ACCOUNT_KEY')
   if (!serviceAccountJson) {
     throw new Error('GOOGLE_PLAY_SERVICE_ACCOUNT_KEY environment variable is not set. Please add it via Supabase Secrets.')
   }
 
-  let credentials: Record<string, unknown>
-  try {
-    credentials = JSON.parse(serviceAccountJson)
-  } catch {
-    throw new Error('GOOGLE_PLAY_SERVICE_ACCOUNT_KEY is not valid JSON. Make sure the entire JSON is a single-line string.')
-  }
+  const credentials = parseServiceAccountKey(serviceAccountJson)
+  const clientEmail = String(credentials.client_email || 'unknown')
 
   const auth = new GoogleAuth({
     credentials,
@@ -37,7 +100,7 @@ async function getPlayAccessToken(): Promise<string> {
   if (!token?.token) {
     throw new Error('Failed to generate Google Play access token. Check your service account key.')
   }
-  return token.token
+  return { token: token.token, clientEmail }
 }
 
 /**
@@ -59,6 +122,7 @@ async function deleteEdit(accessToken: string, packageName: string, editId: stri
  */
 async function deployToPlayStore(
   accessToken: string,
+  clientEmail: string,
   packageName: string,
   track: PlayTrack,
   aabBytes: Uint8Array,
@@ -81,7 +145,7 @@ async function deployToPlayStore(
 
   if (!editRes.ok) {
     const err = await editRes.text()
-    throw new Error(`Failed to create edit: ${editRes.status} — ${err}`)
+    throw new Error(`Failed to create edit: ${editRes.status} — ${err}. (Package Name: "${packageName}", Service Account Email: "${clientEmail}". Please verify this service account email has Release permissions for this package in the Google Play Console.)`)
   }
 
   const edit = await editRes.json()
@@ -89,10 +153,10 @@ async function deployToPlayStore(
   console.log(`Edit created: ${editId}`)
 
   try {
-    // Step 2: Upload the AAB bundle
+    // Step 2: Upload the AAB bundle (must use the /upload/ media endpoint, not the regular API base)
     onStage('Uploading bundle to Google Play…')
     console.log(`Uploading AAB bundle (${(aabBytes.length / (1024 * 1024)).toFixed(1)} MB)...`)
-    const uploadUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}/bundles`
+    const uploadUrl = `${PLAY_UPLOAD_BASE}/applications/${packageName}/edits/${editId}/bundles?uploadType=media`
     const uploadRes = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
@@ -270,7 +334,7 @@ Deno.serve(async (req) => {
     try {
       // Get Google Play access token
       console.log('Getting Google Play access token...')
-      const accessToken = await getPlayAccessToken()
+      const { token: accessToken, clientEmail } = await getPlayAccessToken()
 
       // Read AAB bytes
       const aabBytes = new Uint8Array(await aabFile.arrayBuffer())
@@ -278,6 +342,7 @@ Deno.serve(async (req) => {
       // Deploy to Google Play
       const { editId, bundleVersionCode } = await deployToPlayStore(
         accessToken,
+        clientEmail,
         packageName,
         track as PlayTrack,
         aabBytes,
