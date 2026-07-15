@@ -11905,12 +11905,12 @@ function TeacherPortal({
                           const formatJuz = (d) => d?.value ? `Juz ${d.value}${d.marks ? ` — ${d.marks}/10` : ''}` : null;
                           const formatHali = (d) => {
                             if (!d) return null;
-                            if (d.type === 'surah') return `${d.from || '?'} → ${d.till || '?'}${d.marks ? ` — ${d.marks}/10` : ''}`;
+                            if (d.type === 'surah') return <><span className="arabic-kanz">{d.from || '?'}</span> → <span className="arabic-kanz">{d.till || '?'}</span>{d.marks ? ` — ${d.marks}/10` : ''}</>;
                             return `Juz ${d.from || '?'} → ${d.till || '?'}${d.marks ? ` — ${d.marks}/10` : ''}`;
                           };
                           const formatJadeed = (d) => {
                             if (!d) return null;
-                            if (d.type === 'surah_ayat') return `${d.surah || ''} ${d.ayat ? `(${d.ayat})` : ''}`;
+                            if (d.type === 'surah_ayat') return <><span className="arabic-kanz">{d.surah || ''}</span> {d.ayat ? `(${d.ayat})` : ''}</>;
                             return d.from || d.till ? `Pages ${d.from || ''}–${d.till || ''}` : null;
                           };
                           return (
