@@ -11897,15 +11897,32 @@ function TeacherPortal({
                         <div className="badal-info-badge">
                           <RotateCw size={12} /> {isBadalTeacher ? "You are Badal for this child" : isOriginalTeacher ? `Badal Active — ${badalTeacherInfo?.full_name || student.badal_teacher_id}` : `Badal: ${badalTeacherInfo?.full_name || "Assigned"}`}
                         </div>
-                        {badalProgressData.length > 0 && (
-                          <div className="badal-progress-mini">
-                            <span className="badal-progress-mini-label">{isBadalTeacher ? "Your Updates:" : "Badal Progress:"}</span>
-                            {badalProgressData[0].juz && <span>Juz: {badalProgressData[0].juz}</span>}
-                            {badalProgressData[0].juz_hali && <span>Hali: {badalProgressData[0].juz_hali}</span>}
-                            {badalProgressData[0].jadeed_surah_ayat && <span>Jadeed: {badalProgressData[0].jadeed_surah_ayat}</span>}
-                            <span className="badal-progress-mini-date">{new Date(badalProgressData[0].created_at).toLocaleDateString()}</span>
-                          </div>
-                        )}
+                        {badalProgressData.length > 0 && (() => {
+                          const safeParse = (v) => { if (!v) return null; try { return JSON.parse(v); } catch { return null; } };
+                          const juz = safeParse(badalProgressData[0].juz);
+                          const hali = safeParse(badalProgressData[0].juz_hali);
+                          const jadeed = safeParse(badalProgressData[0].jadeed_surah_ayat);
+                          const formatJuz = (d) => d?.value ? `Juz ${d.value}${d.marks ? ` — ${d.marks}/10` : ''}` : null;
+                          const formatHali = (d) => {
+                            if (!d) return null;
+                            if (d.type === 'surah') return `${d.from || '?'} → ${d.till || '?'}${d.marks ? ` — ${d.marks}/10` : ''}`;
+                            return `Juz ${d.from || '?'} → ${d.till || '?'}${d.marks ? ` — ${d.marks}/10` : ''}`;
+                          };
+                          const formatJadeed = (d) => {
+                            if (!d) return null;
+                            if (d.type === 'surah_ayat') return `${d.surah || ''} ${d.ayat ? `(${d.ayat})` : ''}`;
+                            return d.from || d.till ? `Pages ${d.from || ''}–${d.till || ''}` : null;
+                          };
+                          return (
+                            <div className="badal-progress-mini">
+                              <span className="badal-progress-mini-label">{isBadalTeacher ? "Your Updates:" : "Badal Progress:"}</span>
+                              {formatJuz(juz) && <span className="badal-mini-item badal-mini-juz">{formatJuz(juz)}</span>}
+                              {formatHali(hali) && <span className="badal-mini-item badal-mini-hali">{formatHali(hali)}</span>}
+                              {formatJadeed(jadeed) && <span className="badal-mini-item badal-mini-jadeed">{formatJadeed(jadeed)}</span>}
+                              <span className="badal-progress-mini-date">{new Date(badalProgressData[0].created_at).toLocaleDateString()}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                     <div className="attendance-section">
