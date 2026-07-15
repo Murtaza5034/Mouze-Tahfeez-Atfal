@@ -6953,5 +6953,89 @@ h4.attendance-rating-text,
 .kanz-font,
 [class*=" arabic-"],
 [class*="kanz-"] {
-  font-family: "Al-Kanz", "Amiri", "Scheherazade New", "Traditional Arabic", "Noto Naskh Arabic", serif;
+  font-family: "Al-Kanz", "Kanz al Marjaan", serif;
+}
+
+/* ── App Update Popup – Countdown & Force Overrides ── */
+.app-update-popup-overlay.force {
+  background: radial-gradient(circle at top, rgba(239,68,68,0.18), transparent 34%), rgba(8, 4, 2, 0.80);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.app-update-popup-icon-circle.force {
+  background: linear-gradient(145deg, rgba(239,68,68,0.12), rgba(255,255,255,0.80));
+  border-color: rgba(239,68,68,0.30);
+  color: #ef4444;
+  box-shadow: 0 12px 30px rgba(239,68,68,0.15);
+}
+
+.app-update-popup-countdown {
+  padding: 10px 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: rgba(212,175,55,0.04);
+  border-bottom: 1px solid rgba(212,175,55,0.08);
+  flex-wrap: wrap;
+}
+
+.app-update-popup-countdown svg {
+  color: var(--primary-gold);
+  flex-shrink: 0;
+}
+
+.app-update-popup-countdown strong {
+  color: var(--deep-brown);
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.app-update-popup-countdown-bar {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(212,175,55,0.12);
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.app-update-popup-countdown-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #d4af37, #b88a1d);
+  transition: width 1s linear;
+}
+
+.app-update-popup-block-note {
+  margin: -8px 30px 18px;
+  font-size: 0.75rem;
+  color: #ef4444;
+  text-align: center;
+  font-weight: 600;
+  animation: mauzeBlockNotePulse 2s ease-in-out infinite;
+}
+
+@keyframes mauzeBlockNotePulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .app-update-popup-countdown { padding: 10px 22px; }
+  .app-update-popup-block-note { margin: -6px 22px 14px; }
+}
+
+/* ── Biometric Button ── */
+.biometric-btn {
+  margin-top: 8px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
+  box-shadow: 0 8px 20px rgba(99,102,241,0.25) !important;
+}
+
+.biometric-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(99,102,241,0.30) !important;
 }

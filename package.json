@@ -20,6 +20,7 @@
     "@capacitor/push-notifications": "^8.1.1",
     "@capacitor/share": "^8.0.1",
     "@capawesome/capacitor-app-update": "^8.0.3",
+    "@capgo/capacitor-native-biometric": "^8.6.2",
     "@composio/core": "^0.13.1",
     "@supabase/supabase-js": "^2.104.0",
     "ai": "^7.0.16",

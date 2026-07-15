@@ -16,6 +16,8 @@ import {
   FileArchive,
   RefreshCw,
   Play,
+  Send,
+  Globe,
 } from "lucide-react";
 
 const PLAY_TRACKS = [
@@ -47,6 +49,7 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
   const [deploying, setDeploying] = useState(false);
   const [deployStage, setDeployStage] = useState(-1);
   const [deletingId, setDeletingId] = useState(null);
+  const [consoleUpdating, setConsoleUpdating] = useState(null);
 
   // Form state
   const [selectedTrack, setSelectedTrack] = useState("internal");
@@ -278,6 +281,40 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
     } finally {
       setDeploying(false);
       setDeployStage(-1);
+    }
+  };
+
+  const handleSubmitForReview = async (release) => {
+    if (!window.confirm(`Submit v${release.version_name} (${release.track}) for review? This simulates sending to Google Play Console for review.`)) return;
+    try {
+      setConsoleUpdating(release.id);
+      const { error } = await supabase
+        .from("app_releases")
+        .update({ console_status: "in_review" })
+        .eq("id", release.id);
+      if (error) throw error;
+      await loadReleases();
+    } catch (err) {
+      alert("Failed to update console status: " + err.message);
+    } finally {
+      setConsoleUpdating(null);
+    }
+  };
+
+  const handlePublish = async (release) => {
+    if (!window.confirm(`Publish v${release.version_name} to Production (set as live)? Users will see a force update after 10 minutes.`)) return;
+    try {
+      setConsoleUpdating(release.id);
+      const { error } = await supabase
+        .from("app_releases")
+        .update({ console_status: "published", status: "live" })
+        .eq("id", release.id);
+      if (error) throw error;
+      await loadReleases();
+    } catch (err) {
+      alert("Failed to publish: " + err.message);
+    } finally {
+      setConsoleUpdating(null);
     }
   };
 
@@ -598,6 +635,122 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
           </form>
         </section>
 
+        {/* Console Status Management – only for un-published releases */}
+        {releases.some((r) => r.console_status !== "published" && r.status === "live") && (
+          <section className="form-card card-appear" style={{ marginTop: "16px" }}>
+            <div className="card-headline">
+              <Globe size={20} />
+              <h3>Google Play Console Flow</h3>
+            </div>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "4px 0 16px" }}>
+              Manage the review &amp; publishing lifecycle from here. Press <strong>Submit</strong> after
+              uploading to send for review, then <strong>Publish</strong> when approved to push live.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {releases
+                .filter((r) => r.console_status !== "published")
+                .slice(0, 3)
+                .map((release) => {
+                  const isLive = release.status === "live";
+                  const cs = release.console_status || "draft";
+                  return (
+                    <div
+                      key={release.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "12px 16px",
+                        borderRadius: "14px",
+                        background: "var(--off-white)",
+                        border: "1px solid var(--glass-border)",
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <strong style={{ fontSize: "0.9rem" }}>
+                          v{release.version_name}
+                        </strong>
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginLeft: "8px" }}>
+                          ({release.track})
+                        </span>
+                        <div style={{ fontSize: "0.78rem", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{
+                            display: "inline-block",
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            fontSize: "0.65rem",
+                            fontWeight: 700,
+                            background: cs === "in_review" ? "rgba(59,130,246,0.12)" : cs === "draft" ? "rgba(168,85,247,0.10)" : "rgba(34,197,94,0.12)",
+                            color: cs === "in_review" ? "#1e40af" : cs === "draft" ? "#6b21a8" : "#166534",
+                          }}>
+                            {cs === "in_review" ? "In Review" : cs === "published" ? "Published" : "Draft"}
+                          </span>
+                          {isLive && cs !== "published" && (
+                            <span style={{ color: "var(--primary-gold)", fontWeight: 700 }}>
+                              ● Live (not published)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                        {cs === "draft" && (
+                          <button
+                            type="button"
+                            className="action-button"
+                            disabled={consoleUpdating === release.id}
+                            onClick={() => handleSubmitForReview(release)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "10px 16px",
+                              borderRadius: "12px",
+                              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+                              color: "#fff",
+                              border: "none",
+                              fontWeight: 700,
+                              fontSize: "0.78rem",
+                              cursor: "pointer",
+                              opacity: consoleUpdating === release.id ? 0.6 : 1,
+                            }}
+                          >
+                            {consoleUpdating === release.id ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+                            Submit for Review
+                          </button>
+                        )}
+                        {cs === "in_review" && (
+                          <button
+                            type="button"
+                            className="action-button"
+                            disabled={consoleUpdating === release.id}
+                            onClick={() => handlePublish(release)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "10px 16px",
+                              borderRadius: "12px",
+                              background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                              color: "#fff",
+                              border: "none",
+                              fontWeight: 700,
+                              fontSize: "0.78rem",
+                              cursor: "pointer",
+                              opacity: consoleUpdating === release.id ? 0.6 : 1,
+                            }}
+                          >
+                            {consoleUpdating === release.id ? <Loader2 size={14} className="spin" /> : <CheckCircle2 size={14} />}
+                            Publish
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </section>
+        )}
+
         {/* Release History */}
         <section className="data-card card-appear">
           <div className="card-headline">
@@ -688,6 +841,30 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
                             <StatusIcon size={14} className={release.status === "deploying" ? "spin" : ""} />
                             {STATUS_CONFIG[release.status]?.label || release.status}
                           </span>
+                          {release.console_status && release.console_status !== "draft" && (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                padding: "2px 8px",
+                                borderRadius: "999px",
+                                background:
+                                  release.console_status === "in_review" ? "rgba(59,130,246,0.10)" :
+                                  release.console_status === "published" ? "rgba(34,197,94,0.10)" :
+                                  "rgba(168,85,247,0.08)",
+                                color:
+                                  release.console_status === "in_review" ? "#3b82f6" :
+                                  release.console_status === "published" ? "#22c55e" :
+                                  "#8b5cf6",
+                              }}
+                            >
+                              {release.console_status === "in_review" ? "In Review" :
+                               release.console_status === "published" ? "Published" : release.console_status}
+                            </span>
+                          )}
                         </div>
                         <div
                           style={{

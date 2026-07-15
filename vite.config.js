@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => ({
+  define: {
+    __APP_VERSION__: JSON.stringify("1.2.2"),
+    __APP_VERSION_CODE__: JSON.stringify(25),
+  },
   plugins: [
     react(),
     VitePWA({

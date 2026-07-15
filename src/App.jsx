@@ -695,6 +695,7 @@ const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
 const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
 const LazyMarhalaPosts = React.lazy(() => import("./MarhalaPosts"));
 const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
+import AppUpdatePopup from "./AppUpdatePopup";
 
 const fixArabicScript = (text) => {
   if (!text) return "";
@@ -16181,6 +16182,7 @@ const handleSendCustomNotification = async (event) => {
 
   return (
     <React.Fragment>
+      <AppUpdatePopup />
       <AnnouncementDetailsModal
         announcement={selectedAnnouncement}
         onClose={() => setSelectedAnnouncement(null)}
