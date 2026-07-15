@@ -10655,9 +10655,43 @@ function TeacherPortal({
       .filter(Boolean);
   }, [badalAssignments, badalStudentProfiles, filteredStudents, schoolData, user?.id, teacherIdentity, teacherProfiles]);
 
+  /*
+   * BADAL SHIFT: visibleStudents = filteredStudents minus badal-shifted children for ORIGINAL teachers.
+   * The original teacher should NOT see the child in their overview, Fill Result, or Jadwal.
+   * The badal teacher still sees the child via badal_teacher_id match in filteredStudents.
+   */
+  const currentTeacherIds = useMemo(() => {
+    const rawId = user?.id || teacherIdentity;
+    const ids = [];
+    if (rawId) ids.push(String(rawId));
+    if (user?.id && teacherIdentity && String(user.id) !== String(teacherIdentity)) ids.push(String(teacherIdentity));
+    (Array.isArray(schoolData?.portalAccessList) ? schoolData.portalAccessList : [])
+      .filter(a => { const m = String(a.user_id) === String(rawId) || (a.full_name && teacherIdentity && normalizeText(a.full_name) === normalizeText(teacherIdentity)); return m && a.user_id; })
+      .forEach(a => { if (!ids.includes(String(a.user_id))) ids.push(String(a.user_id)); });
+    (Array.isArray(teacherProfiles) ? teacherProfiles : [])
+      .filter(p => { const m = String(p.user_id) === String(rawId) || (p.full_name && teacherIdentity && normalizeText(p.full_name) === normalizeText(teacherIdentity)); return m && p.user_id; })
+      .forEach(p => { if (!ids.includes(String(p.user_id))) ids.push(String(p.user_id)); });
+    return ids;
+  }, [user?.id, teacherIdentity, schoolData?.portalAccessList, teacherProfiles]);
+
+  const visibleStudents = useMemo(() => {
+    return filteredStudents.filter(student => {
+      if (student.badal_teacher_id) {
+        const isOriginal = currentTeacherIds.some(uid =>
+          String(student.original_teacher_id || student.muhaffiz_id).trim() === uid.trim()
+        );
+        const isBadal = currentTeacherIds.some(uid =>
+          String(student.badal_teacher_id).trim() === uid.trim()
+        );
+        if (isOriginal && !isBadal) return false;
+      }
+      return true;
+    });
+  }, [filteredStudents, currentTeacherIds]);
+
   const overviewStudents = useMemo(() => {
-    return [...filteredStudents, ...badalOverviewStudents];
-  }, [filteredStudents, badalOverviewStudents]);
+    return [...visibleStudents, ...badalOverviewStudents];
+  }, [visibleStudents, badalOverviewStudents]);
 
   useEffect(() => {
     const teacherId = user?.id || teacherIdentity;
@@ -11465,17 +11499,17 @@ function TeacherPortal({
   }, [filteredStudents, parentViews]);
 
   const recentMarhalaPostPreview = (
-    <Suspense fallback={null}>
-      <LazyMarhalaPosts
-        role="teacher"
-        students={filteredStudents}
-        onShowAction={onShowAction}
-        maxAgeHours={24}
-        limit={3}
-        hideEmpty
-        homePreview
-        className="mp-home-preview"
-      />
+     <Suspense fallback={null}>
+       <LazyMarhalaPosts
+         role="teacher"
+         students={visibleStudents}
+         onShowAction={onShowAction}
+         maxAgeHours={24}
+         limit={3}
+         hideEmpty
+         homePreview
+         className="mp-home-preview"
+       />
     </Suspense>
   );
 
@@ -11601,7 +11635,7 @@ function TeacherPortal({
            {activePage === "Jadwal" && (
               <Suspense fallback={null}>
                 <LazyJadwalTeacherView 
-                  students={filteredStudents} 
+                  students={visibleStudents} 
                   onShowAction={onShowAction} 
                   onBroadcastNotification={broadcastNotification} 
                   initialStudentId={activeStudentId}
@@ -11616,7 +11650,7 @@ function TeacherPortal({
                 <LazySelfJadwalTeacherView
                   showAction={onShowAction}
                   onBroadcastNotification={broadcastNotification}
-                  students={filteredStudents}
+                  students={visibleStudents}
                 />
               </Suspense>
            )}
@@ -14394,10 +14428,6 @@ export default function App() {
      *   3. The teacher is the child's badal/substitute teacher (badal_teacher_id)
      *   4. Fallback: teacher name matches child's teacherName
      *
-     * When a child has a badal_teacher_id, the ORIGINAL teacher is EXCLUDED from
-     * filteredStudents so the child only appears in the BADAL teacher's portal.
-     * The original teacher can still view badal progress on the "Badal Update" page.
-     *
      * Permissions (applied elsewhere):
      *   - Badal teacher (badal_teacher_id === user.id): can EDIT badal progress
      *   - Original teacher: can only VIEW badal progress on Badal page (read-only)
@@ -14425,24 +14455,6 @@ export default function App() {
             String(student.original_teacher_id).trim() === String(uid).trim() ||
             String(student.badal_teacher_id).trim() === String(uid).trim()
           );
-
-          /*
-           * BADAL SHIFT: If this student has a badal_teacher_id and the current
-           * teacher is the ORIGINAL teacher (not the badal teacher), exclude from
-           * filteredStudents so the child only appears in the badal teacher's portal.
-           * The original teacher can still view badal progress on the "Badal Update" page.
-           */
-          if (student.badal_teacher_id && idMatch) {
-            const normalizedBadal = String(student.badal_teacher_id).trim();
-            const isOriginal = allTeacherIds.some(uid =>
-              String(student.original_teacher_id || student.muhaffiz_id).trim() === String(uid).trim()
-            );
-            const isBadal = allTeacherIds.some(uid =>
-              normalizedBadal === String(uid).trim()
-            );
-            if (isOriginal && !isBadal) return false;
-          }
-
           const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
           /* Also try matching badal_teacher_id against user email as a fallback */
           const emailMatch = !idMatch && student.badal_teacher_id && user?.email &&
