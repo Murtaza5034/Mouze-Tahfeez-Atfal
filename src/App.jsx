@@ -5605,11 +5605,16 @@ function AdminPortal({
         return;
       }
       if (loadPortalData) await loadPortalData(portalRole, user);
+      let badalTeacherName = "";
+      if (newBadalTeacherId) {
+        const bt = portalAccessList.find(p => p.user_id === newBadalTeacherId) || teacherProfiles.find(tp => tp.user_id === newBadalTeacherId);
+        badalTeacherName = bt?.full_name || "";
+      }
       if (showAction) showAction(
         "success",
         newBadalTeacherId
-          ? "Badal teacher assigned! Child shifted to badal teacher. Original teacher can view progress on Badal page."
-          : "Badal teacher removed. Child returned to original teacher."
+          ? `✓ ${badalTeacherName} assigned as Badal for ${student.name || "this child"}`
+          : "Badal removed. Child returned to original teacher."
       );
       if (newBadalTeacherId) {
         try {
@@ -8646,54 +8651,65 @@ const handleDownloadAllReports = async () => {
                                   ))}
                               </select>
                             </div>
-                            {/* BADAL FLOW: Badal Teacher dropdown - optional substitute teacher */}
-                            <div className="detail-item">
+                            {/* BADAL FLOW: Badal Teacher - optional substitute teacher with premium dropdown */}
+                            <div className="detail-item" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               <span className="detail-label">Badal Teacher:</span>
-                              <select
-                                className="premium-select badal-inline-select"
-                                value={student.badal_teacher_id || ""}
-                                onChange={e => {
-                                  const rawVal = e.target.value;
-                                  if (!rawVal) { handleBadalTeacherChange(student, ""); return; }
-                                  /* CRITICAL: Resolve the selected option to the teacher's user_id (UUID).
-                                     We must always store a UUID so the matchedStudents
-                                     filter can match student.badal_teacher_id === user.id.
-                                     Search through portalAccessList, teacherProfiles, and if rawVal
-                                     looks like a UUID, use it directly as fallback. */
-                                  const resolved =
-                                    portalAccessList.find(p => String(p.user_id) === String(rawVal))?.user_id ||
-                                    portalAccessList.find(p => String(p.email) === String(rawVal))?.user_id ||
-                                    portalAccessList.find(p => normalizeText(p.full_name) === normalizeText(rawVal))?.user_id ||
-                                    teacherProfiles.find(tp => String(tp.user_id) === String(rawVal))?.user_id ||
-                                    teacherProfiles.find(tp => normalizeText(tp.full_name) === normalizeText(rawVal))?.user_id ||
-                                    (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(rawVal).trim()) ? String(rawVal).trim() : null);
-                                  if (resolved) {
-                                    handleBadalTeacherChange(student, resolved);
-                                  } else {
-                                    console.error('Badal: Could not resolve teacher UUID from value:', rawVal);
-                                    if (showAction) showAction('error', 'Could not identify the selected teacher.');
-                                  }
-                                }}
-                              >
-                                <option value="">-- No Badal --</option>
-                                {portalAccessList
-                                  .filter(a =>
-                                    normalizeText(a.portal_role).includes('teacher') ||
-                                    normalizeText(a.portal_role).includes('muhaffiz')
-                                  )
-                                  .map(p => (
-                                    <option key={`badal-portal-${p.id}`} value={p.user_id || p.email}>
-                                      {p.full_name || p.email}
-                                    </option>
-                                  ))}
-                                {teacherProfiles
-                                  .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
-                                  .map(tp => (
-                                    <option key={`badal-tp-${tp.id}`} value={tp.user_id || tp.full_name}>
-                                      {tp.full_name}
-                                    </option>
-                                  ))}
-                              </select>
+                              <div className="badal-select-wrap">
+                                {student.badal_teacher_id && (() => {
+                                  const currentBadal = portalAccessList.find(p => p.user_id === student.badal_teacher_id) || teacherProfiles.find(tp => tp.user_id === student.badal_teacher_id);
+                                  return currentBadal ? (
+                                    <div className="badal-actual-badge">
+                                      <span className="badal-actual-name">{currentBadal.full_name}</span>
+                                      <span className="badal-actual-role">ضمان</span>
+                                    </div>
+                                  ) : <span className="badal-actual-badge badal-unknown-badge">Badal Assigned</span>;
+                                })()}
+                                <select
+                                  className="premium-select"
+                                  value={student.badal_teacher_id || ""}
+                                  onChange={e => {
+                                    const rawVal = e.target.value;
+                                    if (!rawVal) { handleBadalTeacherChange(student, ""); return; }
+                                    /* Resolve to teacher UUID — all dropdown options now have valid user_id values */
+                                    const resolved =
+                                      portalAccessList.find(p => String(p.user_id) === String(rawVal))?.user_id ||
+                                      teacherProfiles.find(tp => String(tp.user_id) === String(rawVal))?.user_id ||
+                                      String(rawVal).trim() || null;
+                                    if (resolved) {
+                                      handleBadalTeacherChange(student, resolved);
+                                    } else {
+                                      if (showAction) showAction('error', 'Could not identify the selected teacher.');
+                                    }
+                                  }}
+                                >
+                                  <option value="">— No Badal —</option>
+                                  {(() => {
+                                    const teachers = [
+                                      ...portalAccessList
+                                        .filter(a =>
+                                          a.user_id && (
+                                            normalizeText(a.portal_role).includes('teacher') ||
+                                            normalizeText(a.portal_role).includes('muhaffiz')
+                                          )
+                                        )
+                                        .map(p => ({ _key: p.user_id, user_id: p.user_id, full_name: p.full_name })),
+                                      ...teacherProfiles
+                                        .filter(tp =>
+                                          tp.user_id &&
+                                          !portalAccessList.some(pa => pa.user_id === tp.user_id)
+                                        )
+                                        .map(tp => ({ _key: tp.user_id, user_id: tp.user_id, full_name: tp.full_name }))
+                                    ];
+                                    const seen = new Set();
+                                    const unique = [];
+                                    teachers.forEach(t => { if (!seen.has(t._key)) { seen.add(t._key); unique.push(t); } });
+                                    unique.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+                                    return unique.map(t => (
+                                      <option key={t._key} value={t.user_id}>{t.full_name}</option>
+                                    ));
+                                  })()}
+                                </select>
+                              </div>
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">Parent:</span>
@@ -11848,7 +11864,7 @@ function TeacherPortal({
                   const currentUserId = user?.id || teacherIdentity;
                   const isBadalTeacher = hasBadal && String(student.badal_teacher_id) === String(currentUserId);
                   const isOriginalTeacher = hasBadal && String(student.original_teacher_id || student.muhaffiz_id) === String(currentUserId);
-                  const badalTeacherInfo = hasBadal ? teacherProfiles.find(p => p.user_id === student.badal_teacher_id) : null;
+                  const badalTeacherInfo = hasBadal ? (teacherProfiles.find(p => p.user_id === student.badal_teacher_id) || portalAccessList.find(p => p.user_id === student.badal_teacher_id)) : null;
                   const badalProgressData = badalProgress
                     .filter(p => String(p.student_id) === sid)
                     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -12385,7 +12401,7 @@ function TeacherPortal({
                   const originalStudents = (schoolData?.students || [])
                     .filter(s => s.badal_teacher_id && allUserIds.some(uid => String(s.original_teacher_id || s.muhaffiz_id) === String(uid)))
                     .map(s => {
-                      const badalTeacherInfo = teacherProfiles.find(p => p.user_id === s.badal_teacher_id);
+                      const badalTeacherInfo = teacherProfiles.find(p => p.user_id === s.badal_teacher_id) || portalAccessList.find(p => p.user_id === s.badal_teacher_id);
                       return { student: s, student_id: s.student_id, teacher_id: s.badal_teacher_id, original_teacher_id: s.original_teacher_id || s.muhaffiz_id, badalTeacherInfo };
                     });
                   return (
@@ -12425,7 +12441,7 @@ function TeacherPortal({
                                     </div>
                                     {original_teacher_id && (
                                       <span className="badal-original-badge" style={{ marginLeft: "auto", background: "rgba(183,137,31,0.12)", color: "#8d6e1f", fontWeight: 700 }}>
-                                        Original: {teacherProfiles.find(p => p.user_id === original_teacher_id)?.full_name || "Unknown"}
+                                        Original: {(teacherProfiles.find(p => p.user_id === original_teacher_id) || portalAccessList.find(p => p.user_id === original_teacher_id))?.full_name || original_teacher_id}
                                       </span>
                                     )}
                                   </div>

@@ -4134,6 +4134,49 @@ body {
   font-size: 0.85rem;
 }
 
+.badal-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.badal-actual-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fdf8ee 0%, #f5ebd0 100%);
+  border: 1.5px solid rgba(183, 137, 31, 0.3);
+  box-shadow: 0 2px 8px rgba(183, 137, 31, 0.06);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--deep-brown, #3e2723);
+  width: fit-content;
+}
+
+.badal-actual-name {
+  color: var(--deep-brown, #3e2723);
+  font-weight: 700;
+}
+
+.badal-actual-role {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--primary-gold, #b8891f);
+  background: rgba(183, 137, 31, 0.12);
+  padding: 2px 8px;
+  border-radius: 8px;
+  letter-spacing: 0.3px;
+}
+
+.badal-unknown-badge {
+  background: rgba(229, 57, 53, 0.06);
+  border-color: rgba(229, 57, 53, 0.2);
+  color: #c62828;
+  font-size: 0.78rem;
+}
+
 .badal-inline-select {
   font-size: 0.8rem !important;
   padding: 6px 10px !important;
