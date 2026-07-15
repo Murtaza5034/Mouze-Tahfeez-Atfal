@@ -1249,7 +1249,7 @@ function PremiumHifzCard({ user }) {
           <div className="header-text">
             <h2>
               <Sparkles size={24} className="sparkle-icon" />
-              Daily Hifz Entry of the Day
+              Daily  Hifz  Entry  of  the  Day
             </h2>
             <p>
               Maintaining a consistent daily record is the cornerstone of your students' Hifz journey. 
@@ -1270,9 +1270,9 @@ function PremiumHifzCard({ user }) {
             rel="noopener noreferrer" 
             onClick={handleTrackClick}
           >
-            <BookOpen size={20} />
+            <BookOpen size={24} />
             Elearning quran
-            <ArrowRight size={18} />
+            <ArrowRight size={20} />
           </a>
           {isMarkedToday && (
             <span className="status-note success">
