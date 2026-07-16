@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase, supabaseUrl } from "./supabaseClient";
 import {
   Upload,
@@ -244,27 +244,6 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
       setDeployStage(-1);
       setDeployMessage(data.message || "App deployed successfully!");
 
-      // Send push notification about the update
-      const trackLabel = PLAY_TRACKS.find((t) => t.id === selectedTrack)?.label || selectedTrack;
-      const notesPreview = releaseNotes.trim()
-        ? `\n\nWhat's new:\n${releaseNotes.trim()}`
-        : "";
-
-      if (typeof onBroadcastNotification === "function") {
-        try {
-          await onBroadcastNotification(
-            `📱 New App Update — v${versionName.trim()}`,
-            `A new version (${versionName.trim()}) has been deployed to the ${trackLabel} track. Please update your app from the Google Play Store to get the latest features and improvements.${notesPreview}`,
-            "all",
-            null,
-            "Home",
-            false
-          );
-        } catch (notifErr) {
-          console.warn("Failed to send update notification:", notifErr);
-        }
-      }
-
       // Reset form
       setSelectedFile(null);
       setVersionName("");
@@ -311,6 +290,27 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
         .eq("id", release.id);
       if (error) throw error;
       await loadReleases();
+
+      // Send notification only after publishing (NOT on upload)
+      const trackLabel = PLAY_TRACKS.find((t) => t.id === release.track)?.label || release.track;
+      const notesPreview = release.release_notes
+        ? `\n\nWhat's new:\n${release.release_notes}`
+        : "";
+
+      if (typeof onBroadcastNotification === "function") {
+        try {
+          await onBroadcastNotification(
+            `📱 New App Update — v${release.version_name}`,
+            `A new version (${release.version_name}) is now available on the Google Play Store. Please update your app to continue.${notesPreview}`,
+            "all",
+            null,
+            "Home",
+            false
+          );
+        } catch (notifErr) {
+          console.warn("Failed to send update notification:", notifErr);
+        }
+      }
     } catch (err) {
       alert("Failed to publish: " + err.message);
     } finally {

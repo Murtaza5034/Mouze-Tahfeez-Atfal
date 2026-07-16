@@ -40,6 +40,16 @@
 -keep class io.capawesome.capacitor.plugins.appupdate.** { *; }
 
 # ============================================
+# Capacitor App Plugin (app state listeners)
+# ============================================
+-keep class com.capacitorjs.plugins.app.** { *; }
+
+# ============================================
+# Capacitor App Launcher Plugin
+# ============================================
+-keep class com.capacitorjs.plugins.applauncher.** { *; }
+
+# ============================================
 # Firebase / Google Play Services
 # ============================================
 -keep class com.google.firebase.** { *; }

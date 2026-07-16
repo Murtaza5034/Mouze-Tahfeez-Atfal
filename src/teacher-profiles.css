@@ -19,9 +19,10 @@
 }
 
 .teacher-profile-card {
-  padding: 0 !important; /* Premium card has internal padding */
+  padding: 0 !important;
   position: relative;
   overflow: visible;
+  contain: layout style;
 }
 
 .teacher-card-inner {

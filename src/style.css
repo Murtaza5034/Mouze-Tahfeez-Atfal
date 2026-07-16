@@ -2215,50 +2215,53 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   flex: 1;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1.5px solid transparent;
+  border: 1.5px solid #c5a059;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: rgba(0,0,0,0.04);
-  color: #666;
+  background: #ffffff;
+  color: #5d4037;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
 }
 
 .att-btn.present:hover:not(:disabled) {
-  background: rgba(46, 125, 50, 0.08);
-  border-color: rgba(46, 125, 50, 0.25);
+  background: #f0fdf0;
+  border-color: #2e7d32;
   color: #2e7d32;
 }
 
 .att-btn.present.active {
-  background: rgba(46, 125, 50, 0.12);
+  background: #e8f5e9;
   border-color: #2e7d32;
   color: #2e7d32;
-  box-shadow: 0 0 12px rgba(46, 125, 50, 0.35);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(46, 125, 50, 0.25);
 }
 
 .att-btn.absent:hover:not(:disabled) {
-  background: rgba(198, 40, 40, 0.08);
-  border-color: rgba(198, 40, 40, 0.25);
-  color: #c62828;
-}
-
-.att-btn.absent.active {
-  background: rgba(198, 40, 40, 0.12);
+  background: #fdf0f0;
   border-color: #c62828;
   color: #c62828;
 }
 
+.att-btn.absent.active {
+  background: #fde8e8;
+  border-color: #c62828;
+  color: #c62828;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(198, 40, 40, 0.25);
+}
+
 .att-btn.holiday:hover:not(:disabled) {
-  background: rgba(156, 39, 176, 0.08);
-  border-color: rgba(156, 39, 176, 0.25);
-  color: #7b1fa2;
+  background: #fffdf0;
+  border-color: #c5a059;
+  color: #8b6d31;
 }
 
 .att-btn.holiday.active {
-  background: rgba(156, 39, 176, 0.12);
-  border-color: #7b1fa2;
-  color: #7b1fa2;
+  background: #fff8e1;
+  border-color: #c5a059;
+  color: #8b6d31;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(197, 160, 89, 0.25);
 }
 
 .att-stat.holiday {
@@ -2293,31 +2296,32 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
 .bulk-att-btn {
   padding: 8px 16px;
   border-radius: 10px;
-  border: 1.5px solid transparent;
+  border: 1.5px solid #c5a059;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: rgba(0,0,0,0.04);
-  color: #666;
+  background: #ffffff;
+  color: #5d4037;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
 }
 
 .bulk-att-btn.present:hover:not(:disabled) {
-  background: rgba(46, 125, 50, 0.08);
-  border-color: rgba(46, 125, 50, 0.25);
+  background: #f0fdf0;
+  border-color: #2e7d32;
   color: #2e7d32;
 }
 
 .bulk-att-btn.absent:hover:not(:disabled) {
-  background: rgba(198, 40, 40, 0.08);
-  border-color: rgba(198, 40, 40, 0.25);
+  background: #fdf0f0;
+  border-color: #c62828;
   color: #c62828;
 }
 
 .bulk-att-btn.holiday:hover:not(:disabled) {
-  background: rgba(156, 39, 176, 0.08);
-  border-color: rgba(156, 39, 176, 0.25);
-  color: #7b1fa2;
+  background: #fffdf0;
+  border-color: #c5a059;
+  color: #8b6d31;
 }
 
 .bulk-att-btn:disabled {
@@ -5242,11 +5246,12 @@ body {
 .premium-hifz-card .header-text h2 {
   font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
   color: var(--primary-gold);
-  font-size: 2.2rem;
+  font-size: 1.8rem;
   margin: 0 0 12px 0;
   display: flex;
   align-items: center;
   gap: 12px;
+  letter-spacing: 2px;
 }
 
 .premium-hifz-card .header-text p {
@@ -6223,6 +6228,38 @@ n/* --- Full Width Label Helper --- */
   100% { background-position: 400px 0; }
 }
 
+@keyframes skeleton-shimmer-rtl {
+  0% { background-position: 400px 0; }
+  100% { background-position: -400px 0; }
+}
+
+.reduce-animations *,
+.reduce-animations *::before,
+.reduce-animations *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+.reduce-animations .skeleton-el,
+.reduce-animations .skeleton-shimmer,
+.reduce-animations .card-appear,
+.reduce-animations .fade-in,
+.reduce-animations .slide-in-up,
+.reduce-animations .slide-in-down,
+.reduce-animations .slide-in-left,
+.reduce-animations .slide-in-right {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.skeleton-el-rtl {
+  background: linear-gradient(90deg, #f0ebe0 25%, #e8dfce 37%, #f0ebe0 63%) !important;
+  background-size: 400px 100% !important;
+  animation: skeleton-shimmer-rtl 1.6s ease-in-out infinite !important;
+}
+
 .skeleton-screen {
   position: fixed;
   inset: 0;
@@ -7113,14 +7150,693 @@ h4.attendance-rating-text,
   .app-update-popup-block-note { margin: -6px 22px 14px; }
 }
 
-/* ── Biometric Button ── */
-.biometric-btn {
-  margin-top: 8px;
-  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
-  box-shadow: 0 8px 20px rgba(99,102,241,0.25) !important;
+/* ===================================================================
+   ★ MAUZE MOBILE PREMIUM — ULTIMATE RESPONSIVE FIXES
+   Comprehensive optimization for all mobile screen sizes.
+   Targets: 320px – 480px small phones, 481px – 640px large phones,
+            641px – 768px phablets, 769px – 1024px tablets.
+   =================================================================== */
+
+/* ---- 1. GLOBAL MOBILE RESET ---- */
+@media (max-width: 480px) {
+  html { font-size: 15px; }
+  
+  .app-shell,
+  .parent-shell,
+  .admin-main,
+  .admin-content-pad,
+  .parent-main,
+  .page-card,
+  .premium-card,
+  .data-card,
+  .form-card,
+  .dashboard-section,
+  .result-card-premium {
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
-.biometric-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(99,102,241,0.30) !important;
+/* ---- 2. APP SHELL & LAYOUT CONTAINMENT ---- */
+@media (max-width: 480px) {
+  .app-shell {
+    padding: 12px 10px 160px;
+    min-height: 100vh;
+  }
+
+  .parent-main {
+    padding: 16px 12px 130px;
+  }
+
+  .admin-content-pad {
+    padding: 16px 12px 100px;
+  }
+
+  .announcements-page,
+  .hub-raqam-container,
+  .settings-page,
+  .ikhtebar-container,
+  .overview-container {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
 }
+
+/* ---- 3. PREMIUM CARD SYSTEM — MOBILE TIGHTENING ---- */
+@media (max-width: 480px) {
+  .premium-card {
+    padding: 20px 16px !important;
+    border-radius: 20px !important;
+  }
+
+  .data-card,
+  .form-card,
+  .dashboard-section,
+  .child-info-card,
+  .student-card,
+  .result-card-premium {
+    padding: 16px 14px !important;
+    border-radius: 18px !important;
+  }
+
+  .page-card {
+    padding: 16px 12px;
+    border-radius: 20px;
+  }
+
+  .result-card-premium {
+    padding: 14px 10px !important;
+    border-radius: 20px !important;
+  }
+
+  .attendance-card-modern,
+  .jadeed-pages-card {
+    padding: 16px 12px !important;
+  }
+
+  .badal-modal-content {
+    padding: 20px 16px;
+    margin: 10px;
+    width: calc(100% - 20px);
+    max-width: 100%;
+  }
+}
+
+/* ---- 4. OVERLAYS — CENTERED MODALS WITH VISIBLE TEXT ---- */
+@media (max-width: 480px) {
+  .notifications-panel-overlay {
+    padding: 16px !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+
+  .notifications-panel {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 80vh !important;
+    border-radius: 20px !important;
+  }
+
+  .announce-details-modal {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .details-hero-img {
+    height: 160px;
+  }
+
+  .details-body {
+    padding: 20px 18px;
+  }
+
+  .details-body h2 {
+    font-size: 20px;
+  }
+
+  .portal-access-success-card {
+    padding: 20px 16px !important;
+    border-radius: 22px !important;
+  }
+
+  .portal-access-success-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .portal-access-success-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .otp-modal-card {
+    border-radius: 22px;
+    margin: 0;
+  }
+
+  .otp-modal-card .login-logo {
+    padding: 14px 16px 2px;
+  }
+
+  .otp-modal-card .login-body {
+    padding: 8px 16px 18px;
+  }
+
+  .secret-key-code {
+    font-size: 22px;
+    letter-spacing: 6px;
+  }
+
+  .secret-key-display {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+
+  .celebration-modal {
+    width: 92% !important;
+    margin: 16px;
+  }
+
+  .celebration-content {
+    padding: 28px 20px 24px;
+  }
+
+  .celebration-title {
+    font-size: 1.4rem;
+  }
+
+  .premium-status-alert {
+    width: 92%;
+    top: 12px;
+  }
+
+  .status-alert-content {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .status-alert-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .status-alert-text strong {
+    font-size: 13px;
+  }
+
+  .status-alert-text p {
+    font-size: 12px;
+  }
+
+  .miqaat-popup-card {
+    max-width: 94vw;
+    max-height: 90vh;
+    border-radius: 18px;
+  }
+
+  .miqaat-popup-header {
+    padding: 14px 18px 12px;
+  }
+
+  .miqaat-popup-body {
+    padding: 12px 18px 18px;
+  }
+
+  .miqaat-popup-event {
+    padding: 12px;
+  }
+
+  .miqaat-popup-event-name {
+    font-size: 14px;
+  }
+
+  .app-update-popup-overlay {
+    padding: 12px !important;
+  }
+
+  .app-update-popup-overlay > div {
+    border-radius: 22px !important;
+    padding: 24px 18px !important;
+  }
+
+  .biometric-lock-card {
+    padding: 36px 24px 28px !important;
+  }
+
+  .biometric-lock-title {
+    font-size: 1.25rem;
+  }
+
+  .biometric-lock-circle {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+/* ---- 5. TYPOGRAPHY — OPTIMAL READABILITY ---- */
+@media (max-width: 480px) {
+  h1 { font-size: 1.7rem; }
+  h2 { font-size: 1.4rem; }
+  h3 { font-size: 1.15rem; }
+  h4 { font-size: 1rem; }
+
+  .page-card h2 {
+    font-size: clamp(1.3rem, 6vw, 1.7rem);
+  }
+
+  .section-title {
+    font-size: 1.05rem;
+  }
+
+  .page-description {
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+
+  .brand-title {
+    font-size: clamp(0.9rem, 4vw, 1.15rem);
+  }
+
+  .brand-tag {
+    font-size: 0.62rem;
+  }
+
+  .content-title {
+    font-size: 22px;
+  }
+
+  .content-desc {
+    font-size: 12px;
+  }
+
+  p:not([class*="card"]):not([class*="record"]):not([class*="cell"]):not([class*="row"]):not([class*="item"]):not([class*="stat"]):not([class*="pill"]):not([class*="step"]):not([class*="badge"]):not([class*="tag"]):not([class*="chip"]):not(.mp-):not(.bot-bubble):not(.notification-item p),
+  .page-description,
+  .notif-excerpt {
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+}
+
+@media (max-width: 380px) {
+  html { font-size: 14px; }
+  
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.05rem; }
+
+  .content-title {
+    font-size: 18px;
+  }
+}
+
+/* ---- 6. SIDEBAR / DRAWER — FULL MOBILE COVERAGE ---- */
+@media (max-width: 480px) {
+  .sidebar {
+    width: min(300px, 88vw) !important;
+    padding: 20px 12px !important;
+  }
+
+  .parent-drawer {
+    width: min(300px, 88vw) !important;
+  }
+
+  .sidebar-profile-centered {
+    padding: 28px 16px 24px;
+  }
+
+  .profile-name-premium {
+    font-size: 1.1rem;
+  }
+
+  .profile-arabic-premium {
+    font-size: 1.1rem;
+  }
+
+  .avatar-vessel-centered {
+    width: 68px;
+    height: 68px;
+  }
+
+  .sidebar-link {
+    padding: 12px 14px;
+    font-size: 0.88rem;
+    margin: 3px 12px;
+    width: calc(100% - 24px);
+  }
+
+  .sidebar-category {
+    padding: 20px 16px 8px;
+    font-size: 0.65rem;
+  }
+
+  .drawer-link {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    margin: 2px 12px;
+    width: calc(100% - 24px);
+  }
+
+  .drawer-section-label {
+    padding: 16px 16px 8px;
+  }
+
+  .drawer-nav {
+    padding: 16px 0;
+  }
+
+  .drawer-footer {
+    padding: 12px 0 20px;
+  }
+}
+
+/* ---- 7. FORMS & INPUTS — TOUCH-FRIENDLY ---- */
+@media (max-width: 480px) {
+  input,
+  select,
+  textarea,
+  .premium-select,
+  .premium-input-mini,
+  .stack-form input,
+  .stack-form select,
+  .stack-form textarea {
+    font-size: 16px !important;
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .input-with-icon input {
+    padding: 12px 48px 12px 42px !important;
+    font-size: 16px !important;
+  }
+
+  .login-button,
+  .action-button,
+  .action-button-mini,
+  .premium-btn,
+  button.large {
+    min-height: 48px;
+    padding: 14px 20px;
+    font-size: 15px;
+  }
+
+  button,
+  .btn,
+  [role="button"],
+  .nav-link,
+  .bottom-nav-btn {
+    min-height: 44px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .form-grid.four-up {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .setup-grid {
+    gap: 20px;
+  }
+
+  .filter-box {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .difficulty-toggle {
+    gap: 6px;
+  }
+
+  .diff-btn {
+    padding: 8px;
+    font-size: 0.78rem;
+  }
+
+  .setup-form {
+    gap: 14px;
+  }
+}
+
+/* ---- 8. NAVIGATION — BOTTOM BAR & TOPBAR ---- */
+@media (max-width: 480px) {
+  .navbar {
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .nav-link {
+    font-size: 0.55rem;
+    padding: 4px 2px;
+    gap: 3px;
+    min-height: 48px;
+  }
+
+  .nav-text {
+    font-size: 0.5rem;
+    line-height: 1.1;
+  }
+
+  .parent-bottom-nav {
+    padding: 8px;
+    gap: 0;
+  }
+
+  .bottom-nav-btn {
+    font-size: 0.6rem;
+    padding: 8px 4px;
+    gap: 3px;
+  }
+
+/* ===================================================================
+   ★ MOBILE CRITICAL OVERRIDES — Progress Overview Context
+   Overrides the overly-specific existing selectors that use !important
+   inside the .progress-overview context (report cards).
+   =================================================================== */
+}
+@media (max-width: 480px) {
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-card-premium {
+    padding: 14px 10px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-footer-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box {
+    padding: 10px 8px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .target-box p {
+    font-size: 0.75rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-val {
+    font-size: 0.9rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .score-circle {
+    width: 54px !important;
+    height: 54px !important;
+    font-size: 1.5rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-card-modern,
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-pages-card {
+    padding: 12px 8px !important;
+    min-height: 80px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-star {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .attendance-stars-container {
+    gap: 4px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jumla-label {
+    font-size: 1.5rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .arabic-label {
+    font-size: 1.1rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .week-meta-grid {
+    gap: 8px !important;
+    padding: 6px 8px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .meta-val {
+    font-size: 0.85rem !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .report-footer-cards {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-count-overlay {
+    font-size: 1.2rem !important;
+  }
+}
+
+/* ---- Ultra-small: result-footer-grid stacked ---- */
+@media (max-width: 359px) {
+  .result-footer-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .result-footer-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .portal-stats-strip {
+    grid-template-columns: 1fr !important;
+  }
+
+  .hifz-stats-premium-strip {
+    grid-template-columns: 1fr !important;
+  }
+
+  .themes-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ===================================================================
+   ★ IOS INPUT FIX — Prevent zoom & ensure consistent styling
+   =================================================================== */
+@media (max-width: 480px) {
+  input,
+  select,
+  textarea {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238d7362' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px !important;
+  }
+
+  /* Ensure Arabic text wraps properly */
+  .arabic-kanz,
+  .arabic-text,
+  [class*="arabic"] {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+  }
+
+  /* Card text overflow protection */
+  .card-primary-info,
+  .child-card-info,
+  .notif-card-content,
+  .pill-info,
+  .student-card-head > div {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* Touch feedback for cards */
+  .premium-card:active,
+  .data-card:active,
+  .dashboard-section:active {
+    transform: scale(0.98);
+  }
+
+  /* Disable hover effects on touch devices */
+  .premium-card:hover::before,
+  .premium-card:hover {
+    transform: none !important;
+    box-shadow: 0 4px 20px rgba(61, 43, 31, 0.06) !important;
+    border-color: var(--glass-border) !important;
+  }
+
+  .premium-card:hover::before {
+    opacity: 0 !important;
+  }
+
+  .data-card:hover,
+  .dashboard-section:hover {
+    box-shadow: 0 4px 20px rgba(61, 43, 31, 0.06) !important;
+    border-color: var(--glass-border) !important;
+  }
+}
+
+/* ===================================================================
+   ★ SAFE AREA MARGIN ENHANCEMENTS
+   Ensure content doesn't hide behind notches / home indicators.
+   =================================================================== */
+@supports (padding: env(safe-area-inset-bottom)) {
+  @media (max-width: 480px) {
+    .app-shell {
+      padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .parent-main {
+      padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .page-loading-overlay {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+  }
+}
+
+
+/* ── Biometric Settings (Premium) ── */
+/* Info Card */
+.biometric-info-card {
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(197, 160, 89, 0.06);
+  border: 1px solid rgba(197, 160, 89, 0.15);
+}
+
+.biometric-info-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--soft-brown);
+  margin-bottom: 12px;
+}
+
+.biometric-info-list {
+  margin: 0;
+  padding: 0 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.biometric-info-list li {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+@keyframes biometricFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+

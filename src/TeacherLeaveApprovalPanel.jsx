@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 
 const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Inbox", skipInbox = false, fileUrl = null) => {

@@ -20,6 +20,7 @@ import {
   Trash,
   X,
   User,
+  UserPlus,
   Users,
   Phone,
   MessageCircle,
@@ -3169,6 +3170,8 @@ function SettingsPage({
   setIsDarkMode, 
   appTheme, 
   setAppTheme, 
+  reduceAnimations,
+  setReduceAnimations,
   user, 
   studentProfile,
   onShowAction,
@@ -3178,7 +3181,7 @@ function SettingsPage({
 }) {
   const [activeTab, setActiveTab] = useState("Dark mode");
   const [selectedSetting, setSelectedSetting] = useState(null);
-  const tabs = ["Dark mode", "App themes", "Notifications", "Security", "Support", "About"];
+  const tabs = ["Dark mode", "App themes", "Notifications", "Animations", "Security", "Support", "About"];
   const [passForm, setPassForm] = useState({ newPassword: "", confirmPassword: "" });
 
   const handleUpdatePassword = async (e) => {
@@ -3263,6 +3266,7 @@ function SettingsPage({
     "Dark mode": { icon: Moon, title: "Appearance", desc: "Switch between light and dark visual modes." },
     "App themes": { icon: Palette, title: "Premium Themes", desc: "Choose a visual style that matches your preference." },
     "Notifications": { icon: Bell, title: "Notifications", desc: role === "parents" ? "Control how you receive alerts about your child's progress." : "Control how you receive alerts about students and schedules." },
+    "Animations": { icon: Sparkles, title: "Animations & Effects", desc: "Control page transitions, loading effects and motion in the app." },
     "Security": { icon: Lock, title: "Security & Password", desc: "Update your portal access credentials." },
     "Support": { icon: LifeBuoy, title: "Technical Support", desc: "Encountering an issue? Let our team know." },
     "About": { icon: Info, title: "Mauze Tahfeez Atfal", desc: "App info, version & registration." },
@@ -3396,6 +3400,48 @@ function SettingsPage({
               </div>
             )}
 
+            {activeTab === "Animations" && (
+              <div className="settings-tab-pane">
+                <div className="setting-control-row" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '16px', marginBottom: '16px' }}>
+                  <div className="control-label">
+                    <Sparkles className="gold-icon" size={20} />
+                    <div>
+                      <span>Reduce Animations</span>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>Disable page transitions, loading effects and motion</p>
+                    </div>
+                  </div>
+                  <button 
+                    className={`toggle-switch ${reduceAnimations ? 'on' : 'off'}`}
+                    onClick={() => setReduceAnimations(!reduceAnimations)}
+                  >
+                    <div className="toggle-thumb" />
+                  </button>
+                </div>
+                {reduceAnimations ? (
+                  <div className="hint-text" style={{ padding: '12px 16px', background: 'var(--light-gold)', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--deep-brown)' }}>
+                    <CheckCircle2 size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                    Animations are reduced. Page content loads instantly without motion effects.
+                  </div>
+                ) : (
+                  <div className="hint-text" style={{ padding: '12px 16px', background: 'rgba(197,160,89,0.08)', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    <Sparkles size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                    Full animations enabled — enjoy smooth page transitions and shimmer loading effects.
+                  </div>
+                )}
+                <div className="biometric-info-card" style={{ marginTop: '16px' }}>
+                  <div className="biometric-info-header">
+                    <Sparkles size={16} />
+                    <span>What changes</span>
+                  </div>
+                  <ul className="biometric-info-list">
+                    <li>Page transitions between portal sections</li>
+                    <li>Card entrance animations (card-appear)</li>
+                    <li>Loading skeleton shimmer effects</li>
+                    <li>Slide-in and fade-in animations</li>
+                  </ul>
+                </div>
+              </div>
+            )}
             {activeTab === "Support" && (
               <div className="settings-tab-pane">
                 <form className="stack-form" onSubmit={handleSupportSubmit}>
@@ -3914,6 +3960,8 @@ function ParentPortal({
   onDismissAnnounce,
   onClearAllAnnounces,
   actionMessage,
+  reduceAnimations,
+  setReduceAnimations,
 }) {
   const reportSettingsObject = normalizeReportSettings(propReportSettings);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -4461,8 +4509,8 @@ function ParentPortal({
             />
          )}
         {activePage === "Schedule" ? (
-          <div className="home-dashboard">
-            <div className="dashboard-section">
+          <div className="home-dashboard fade-in">
+            <div className="dashboard-section card-appear">
               <div className="section-header">
                 <Calendar size={18} />
                 <h3>Study Schedule</h3>
@@ -4490,7 +4538,7 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Home" ? (
-          <div className="home-dashboard">
+          <div className="home-dashboard fade-in">
             <div className="hifz-stats-premium-strip">
               {(() => {
                 const mTeacher = teacherProfiles.find(t => {
@@ -4522,7 +4570,7 @@ function ParentPortal({
                     <div className="pill-info">
                       <span className="pill-label">{stat.label}</span>
                       <strong className="pill-value">{stat.val}</strong>
-                      <span className="pill-sub">{stat.sub}</span>
+                      <span className={'pill-sub' + (stat.label === 'Current HIFZ STATUS' ? ' arabic-kanz' : '')}>{stat.sub}</span>
                     </div>
                   </div>
                 ));
@@ -4603,7 +4651,7 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Profile" && currentPage.childInfo ? (
-          <div className="child-info-card premium-profile-card">
+          <div className="child-info-card premium-profile-card fade-in card-appear">
             <div className="card-header">
               <div className="avatar-placeholder">
                 <User size={32} />
@@ -5038,12 +5086,13 @@ function ParentPortal({
             setIsDarkMode={setIsDarkMode}
             appTheme={appTheme}
             setAppTheme={setAppTheme}
+            reduceAnimations={reduceAnimations}
+            setReduceAnimations={setReduceAnimations}
             user={user}
             studentProfile={studentProfile}
             onShowAction={showAction}
           />
         ) : null}
-
 
 
 
@@ -5205,7 +5254,7 @@ function ParentPortal({
         )}
 
         {activePage === "Profile" && (
-          <div className="info-grid" style={{ marginTop: '24px' }}>
+          <div className="info-grid fade-in" style={{ marginTop: '24px' }}>
             <section style={{ padding: '20px', background: 'linear-gradient(135deg, #fdfbf7, #f8f1e6)', border: '1px solid #e8dcc8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(139,109,49,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #d4af37, #b8942e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -6607,7 +6656,11 @@ const handleDownloadAllReports = async () => {
                 <p className="subtitle">Add and manage students in the system</p>
               </div>
 
-              <div className="assignment-form-complex card-appear">
+              <div className="assignment-form-complex premium-card card-appear" style={{ padding: '24px', border: '1px solid var(--glass-border)', borderRadius: '28px', background: 'var(--premium-white)' }}>
+                <div className="form-section-heading" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--glass-border)' }}>
+                  <GraduationCap size={20} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--deep-brown)' }}>Add New Student</h3>
+                </div>
                 <form className="stack-form" onSubmit={async (e) => {
                   e.preventDefault();
                   const formData = new FormData(e.target);
@@ -6636,77 +6689,69 @@ const handleDownloadAllReports = async () => {
                   } else {
                     alert("Student added successfully!");
                     e.target.reset();
-                    // Better than reload: refresh the data in memory
                     loadPortalData(portalRole, user);
                   }
                 }}>
-                  <div className="form-row">
-                    <label>
-                      <span>Full Name (English)</span>
-                      <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
-                    </label>
-                    <label>
-                      <span>Arabic Name (اسم الطالب)</span>
-                      <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
-                    </label>
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      <span>Parent Auth Email</span>
-                      <input name="parent_email" type="email" placeholder="parent@example.com" className="premium-input" />
-                    </label>
-                    <label>
-                      <span>WhatsApp Number (Parents)</span>
-                      <input name="whatsapp_number" type="text" placeholder="e.g. 923001234567" className="premium-input" />
-                    </label>
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      <span>Photo URL</span>
-                      <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
-                    </label>
-                    <label style={{ opacity: 0, pointerEvents: 'none' }}>
-                      <span>Spacer</span>
-                      <input type="text" className="premium-input" />
-                    </label>
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      <span>Juz</span>
-                      <input name="juz" type="text" placeholder="e.g. 30" className="premium-input" />
-                    </label>
-                    <label>
-                      <span>Surat / Ayat</span>
-                      <input name="surat" type="text" placeholder="e.g. Al-Naba" className="premium-input" />
-                    </label>
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      <span>ITS Number</span>
-                      <input name="its" type="text" placeholder="ITS" className="premium-input" />
-                    </label>
-                    <label>
-                      <span>Group / Class</span>
-                      <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
-                    </label>
-                  </div>
-                  <button type="submit" className="action-button">Add Student to Database</button>
+                  <label>
+                    <span>Full Name (English)</span>
+                    <input name="full_name" type="text" placeholder="Enter name..." required className="premium-input" />
+                  </label>
+                  <label>
+                    <span>Arabic Name (اسم الطالب)</span>
+                    <input name="arabic_name" type="text" placeholder="Arabic Name" className="premium-input arabic-kanz" style={{ fontSize: '1.2rem' }} />
+                  </label>
+                  <label>
+                    <span>Parent Auth Email</span>
+                    <input name="parent_email" type="email" placeholder="parent@example.com" className="premium-input" />
+                  </label>
+                  <label>
+                    <span>WhatsApp Number (Parents)</span>
+                    <input name="whatsapp_number" type="text" placeholder="e.g. 923001234567" className="premium-input" />
+                  </label>
+                  <label>
+                    <span>Photo URL</span>
+                    <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                  </label>
+                  <label>
+                    <span>ITS Number</span>
+                    <input name="its" type="text" placeholder="ITS" className="premium-input" />
+                  </label>
+                  <label>
+                    <span>Juz</span>
+                    <input name="juz" type="text" placeholder="e.g. 30" className="premium-input" />
+                  </label>
+                  <label>
+                    <span>Surat / Ayat</span>
+                    <input name="surat" type="text" placeholder="e.g. Al-Naba" className="premium-input" />
+                  </label>
+                  <label>
+                    <span>Group / Class</span>
+                    <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
+                  </label>
+                  <button type="submit" className="action-button" style={{ background: 'linear-gradient(135deg, var(--primary-gold), #a07d3a)', width: '100%', padding: '14px', fontSize: '1rem' }}>
+                    <UserPlus size={18} /> Add Student to Database
+                  </button>
                 </form>
               </div>
 
               <div className="assigned-list card-appear" style={{ marginTop: '30px' }}>
-                <h3 className="premium-subtitle">Current Students ({students.length})</h3>
+                <div className="form-section-heading" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <Users size={20} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 className="premium-subtitle" style={{ margin: 0 }}>Current Students</h3>
+                  <span style={{ background: 'var(--light-gold)', color: 'var(--primary-gold)', padding: '2px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700, marginLeft: '4px' }}>{students.length}</span>
+                </div>
                 <div className="assigned-grid">
-                  {students.map(s => (
-                    <div key={s.student_id} className="assigned-child-card">
-                      <div className="child-info-header">
+                  {students.map((s, idx) => (
+                    <div key={s.student_id} className="assigned-child-card" style={{ animationDelay: `${idx * 0.06}s` }}>
+                      <div className="child-card-main">
                         <StudentAvatar student={s} size="small" />
-                        <div>
-                          <h4>{s.name}</h4>
-                          <p>{s.groupName || 'No Group'}</p>
+                        <div className="child-card-info">
+                          <strong>{s.name}</strong>
+                          {s.arabic_name && <span className="child-card-arabic">{s.arabic_name}</span>}
+                          <p className="child-card-group">{s.groupName || 'No Group'}</p>
                           {s.whatsapp_number && (
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                              <MessageCircle size={12} style={{ color: '#25D366' }} /> {s.whatsapp_number}
+                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                              <MessageCircle size={11} style={{ color: '#25D366' }} /> {s.whatsapp_number}
                             </p>
                           )}
                         </div>
@@ -6714,13 +6759,19 @@ const handleDownloadAllReports = async () => {
                       <button
                         className="btn-text-only red"
                         onClick={() => onDeleteRecord("child_profiles", "student_id")(s.student_id)}
-                        style={{ marginTop: '10px' }}
+                        style={{ marginTop: '4px', alignSelf: 'flex-start' }}
                       >
-                        Remove Student
+                        <Trash2 size={14} /> Remove
                       </button>
                     </div>
                   ))}
                 </div>
+                {students.length === 0 && (
+                  <div className="empty-state" style={{ padding: '40px 20px' }}>
+                    <Users size={48} style={{ opacity: 0.15 }} />
+                    <p>No students registered yet. Use the form above to add students.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -10575,8 +10626,10 @@ function TeacherPortal({
   onDismissAnnounce,
   onClearAllAnnounces,
     autoSaveTimerRef,
-  performAutoSaveRef,
-  currentStudentIdRef,
+    performAutoSaveRef,
+    reduceAnimations,
+    setReduceAnimations,
+    currentStudentIdRef,
   saveStatus,
   setSaveStatus,
   saveErrorDetails,
@@ -11029,6 +11082,19 @@ function TeacherPortal({
     });
     setAttendanceLoading(false);
     if (onShowAction) onShowAction("success", `Marked all as ${status}`);
+
+    overviewStudents.forEach(s => {
+      const parentTarget = s.parent_user_id || s.user_id || s.parent_email;
+      if (parentTarget) {
+        broadcastNotification(
+          "Attendance Updated",
+          `${s.name || "Your child"} was marked ${status} on ${date}.`,
+          "user",
+          parentTarget,
+          "Attendance"
+        );
+      }
+    });
   };
 
   const openNotificationDetail = (event, notification) => {
@@ -11680,7 +11746,7 @@ function TeacherPortal({
            )}
 
           {activePage === "My Group" ? (
-            <div className="portal-content">
+            <div className="portal-content fade-in">
               <div className="portal-stats-strip teacher-stats">
                 {[
                   { label: "Students", value: overviewStudents.length, sub: "In my group", icon: 'Users', pct: 100 },
@@ -11995,8 +12061,8 @@ function TeacherPortal({
           ) : null}
 
           {activePage === "Fill Result" ? (
-            <div className="management-grid two-columns">
-              <section className="form-card">
+            <div className="management-grid two-columns fade-in">
+              <section className="form-card card-appear">
                 <div className="card-headline">
                   <BookOpen size={18} />
                   <h3>Fill Tahfeez Report</h3>
@@ -12384,7 +12450,7 @@ function TeacherPortal({
           ) : null}
 
           {activePage === "Badal" ? (
-            <div className="management-grid" style={{ maxWidth: "900px", margin: "0 auto" }}>
+            <div className="management-grid fade-in" style={{ maxWidth: "900px", margin: "0 auto" }}>
               <div className="data-card" style={{ padding: "24px" }}>
                 <div className="card-headline" style={{ marginBottom: "20px" }}>
                   <RotateCw size={20} style={{ color: "var(--primary-gold)" }} />
@@ -12913,7 +12979,7 @@ function TeacherPortal({
                         Latest Result: {student.latestResult?.computedRank || student.latestResult?.weeklyRank || "pending"}
                       </div>
                       <Suspense fallback={null}>
-                        <LazyTakhteetProgress weeklyResult={student.latestResult} />
+                        <LazyTakhteetProgress weeklyResult={student.latestResult} currentJuz={student.hifz?.juz} />
                       </Suspense>
                     </article>
                   ))}
@@ -13148,6 +13214,8 @@ function TeacherPortal({
                 setIsDarkMode={setIsDarkMode}
                 appTheme={appTheme}
                 setAppTheme={setAppTheme}
+                reduceAnimations={reduceAnimations}
+                setReduceAnimations={setReduceAnimations}
                 user={user}
                 studentProfile={null}
                 onShowAction={onShowAction}
@@ -13687,6 +13755,9 @@ export default function App() {
   const [appTheme, setAppTheme] = useState(() => {
     return localStorage.getItem("mauze-app-theme") || "default";
   });
+  const [reduceAnimations, setReduceAnimations] = useState(() => {
+    return localStorage.getItem("mauze-reduce-animations") === "true";
+  });
 
   useEffect(() => {
     document.body.classList.toggle("dark-mode", isDarkMode);
@@ -13697,6 +13768,11 @@ export default function App() {
     document.body.setAttribute("data-theme", appTheme);
     localStorage.setItem("mauze-app-theme", appTheme);
   }, [appTheme]);
+
+  useEffect(() => {
+    document.body.classList.toggle("reduce-animations", reduceAnimations);
+    localStorage.setItem("mauze-reduce-animations", reduceAnimations);
+  }, [reduceAnimations]);
 
   const [supportTickets, setSupportTickets] = useState([]);
   const [adminForms, setAdminForms] = useState({
@@ -16129,15 +16205,29 @@ const handleSendCustomNotification = async (event) => {
     const sId = teacherForms.result.student_id;
     const numericId = sId && !isNaN(sId) ? Number(sId) : sId;
 
+    const f = teacherForms.result;
     const payload = {
-      ...teacherForms.result,
+      week_date: f.week_date || getToday(),
       student_id: numericId,
-      attendance_count: toNumber(teacherForms.result.attendance_count),
-      total_jadeed_pages: teacherForms.result.total_jadeed_pages || null,
-      murajazah: toNumber(teacherForms.result.murajazah),
-      juz_hali: toNumber(teacherForms.result.juz_hali),
-      takhteet: toNumber(teacherForms.result.takhteet),
-      jadeed: toNumber(teacherForms.result.jadeed),
+      attendance_count: toNumber(f.attendance_count),
+      total_jadeed_pages: f.total_jadeed_pages || null,
+      murajazah: toNumber(f.murajazah),
+      juz_hali: toNumber(f.juz_hali),
+      takhteet: toNumber(f.takhteet),
+      jadeed: toNumber(f.jadeed),
+      wusool_juz: f.wusool_juz || null,
+      wusool_page: f.wusool_page || null,
+      wusool_surah: f.wusool_surah ?? "",
+      next_week_juz: f.next_week_juz || null,
+      next_week_page: f.next_week_page || null,
+      next_week_surah: f.next_week_surah ?? "",
+      istifadah_juz: f.istifadah_juz || null,
+      istifadah_page: f.istifadah_page || null,
+      istifadah_surah: f.istifadah_surah ?? "",
+      matrookah: f.matrookah || null,
+      daeefah: f.daeefah || null,
+      attendance_note: f.attendance_note || null,
+      total_score: totalScore,
     };
 
     if (isTeacherResultLocked(reportSettingsObject)) {
@@ -16311,6 +16401,8 @@ const handleSendCustomNotification = async (event) => {
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
             actionMessage={actionMessage}
+            reduceAnimations={reduceAnimations}
+            setReduceAnimations={setReduceAnimations}
           />
         ) : portalRole === "admin" ? (
           <AdminPortal
@@ -16457,14 +16549,16 @@ const handleSendCustomNotification = async (event) => {
             isDarkMode={isDarkMode}
             setIsDarkMode={setIsDarkMode}
             appTheme={appTheme}
-                        autoSaveTimerRef={autoSaveTimerRef}
+            setAppTheme={setAppTheme}
+            reduceAnimations={reduceAnimations}
+            setReduceAnimations={setReduceAnimations}
+            autoSaveTimerRef={autoSaveTimerRef}
             performAutoSaveRef={performAutoSaveRef}
             currentStudentIdRef={currentStudentIdRef}
             saveStatus={saveStatus}
             setSaveStatus={setSaveStatus}
             saveErrorDetails={saveErrorDetails}
             setSaveErrorDetails={setSaveErrorDetails}
-setAppTheme={setAppTheme}
           />
         )}
 

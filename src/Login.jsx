@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Fingerprint, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, Users, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, Users, X } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import lottie from "lottie-web";
-import { isBiometricAvailable, setBiometricCredentials, getBiometricCredentials, isBiometricEnabled, removeBiometricCredentials } from "./hooks/useBiometric";
+
 import "./Login.css";
 
 const ROLE_OPTIONS = [
@@ -63,9 +63,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
     if (saved === null) return true;
     return saved !== "false";
   });
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [biometricReady, setBiometricReady] = useState(isBiometricEnabled());
-  const [biometricLoading, setBiometricLoading] = useState(false);
 
   // Secret key flow states
   const [step, setStep] = useState(initialUser ? "otp" : "login");
@@ -117,10 +114,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
   useEffect(() => {
     const savedTheme = localStorage.getItem("mauze-app-theme") || "default";
     document.body.setAttribute("data-theme", savedTheme);
-  }, []);
-
-  useEffect(() => {
-    isBiometricAvailable().then(setBiometricAvailable);
   }, []);
 
   useEffect(() => {
@@ -206,12 +199,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
       return;
     }
 
-    if (biometricAvailable && !isBiometricEnabled()) {
-      try {
-        await setBiometricCredentials(email, password);
-        setBiometricReady(true);
-      } catch {}
-    }
   };
 
   const handleVerifySecretKey = async (event) => {
@@ -415,71 +402,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
               )}
             </button>
 
-            {biometricAvailable && biometricReady && (
-              <button
-                type="button"
-                className="login-button biometric-btn"
-                disabled={biometricLoading}
-                onClick={async () => {
-                  setBiometricLoading(true);
-                  setError(null);
-                  try {
-                    const creds = await getBiometricCredentials();
-                    if (!creds) {
-                      setBiometricLoading(false);
-                      return;
-                    }
-                    setEmail(creds.email);
-                    setPassword(creds.password);
-
-                    if (selectedRole === "admin") {
-                      sessionStorage.setItem("mauze-admin-otp-flow", "true");
-                    }
-
-                    const { data, error: authError } = await supabase.auth.signInWithPassword({
-                      email: creds.email,
-                      password: creds.password,
-                    });
-
-                    if (authError) {
-                      setError(authError.message);
-                      setBiometricLoading(false);
-                      if (selectedRole === "admin") sessionStorage.removeItem("mauze-admin-otp-flow");
-                      return;
-                    }
-
-                    if (selectedRole === "admin") {
-                      setTempUser(data.user);
-                      setStep("otp");
-                      setPassword("");
-                      setBiometricLoading(false);
-                      return;
-                    }
-
-                    const result = await onLoginSuccess(data.user, selectedRole, true);
-                    if (!result?.ok) {
-                      setError(result.message || "This account cannot access the selected portal.");
-                    }
-                  } catch (err) {
-                    setError("Biometric login failed. Please log in manually.");
-                  } finally {
-                    setBiometricLoading(false);
-                  }
-                }}
-              >
-                {biometricLoading ? (
-                  <>
-                    <Loader2 size={18} className="spinner" />
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    <Fingerprint size={18} />
-                    Log in with Biometric
-                  </>
-                )}
-              </button>
-            )}
           </form>
 
           {/* ── Forgot Password Section ── */}

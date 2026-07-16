@@ -6,14 +6,17 @@
     <meta http-equiv="Cache-Control" content="public, max-age=31536000, immutable" />
     <meta http-equiv="Pragma" content="public" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Mauze Tahfeez" />
     <meta name="theme-color" content="#c5a059" />
     <meta name="description" content="Educational portal for Quran memorization and Islamic learning" />
     <meta name="keywords" content="Quran, memorization, Islamic education, tahfeez" />
-    <link rel="apple-touch-icon" href="/LOGO%20ATFAAL.png" />
-    <link rel="icon" type="image/png" href="/LOGO%20ATFAAL.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <meta name="application-name" content="Mauze Tahfeez" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/LOGO%20ATFAAL-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/LOGO%20ATFAAL-512.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/LOGO%20ATFAAL-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/LOGO%20ATFAAL-512.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://supabase.co">
@@ -26,34 +29,25 @@
         try {
           if (!('serviceWorker' in navigator)) return;
 
-          const cleanupFlag = '__mauze_tahfeez_sw_cleanup__';
-          if (sessionStorage.getItem(cleanupFlag) === '1') {
-            sessionStorage.removeItem(cleanupFlag);
-            return;
-          }
-
           const registrations = await navigator.serviceWorker.getRegistrations();
           if (!registrations.length) return;
 
-          // Keep Firebase messaging service worker alive (needed for push notifications)
-          const nonFcmRegs = registrations.filter(r =>
-            !r.active?.scriptURL?.includes('firebase-messaging-sw')
-          );
-          if (!nonFcmRegs.length) return;
+          const swUrls = registrations.map(r => r.active?.scriptURL || '').join(',');
 
-          sessionStorage.setItem(cleanupFlag, '1');
-          await Promise.allSettled(nonFcmRegs.map((registration) => registration.unregister()));
+          const isOldSw = swUrl =>
+            swUrl.includes('sw.js') &&
+            !swUrl.includes('firebase-messaging-sw') &&
+            !swUrl.includes('workbox');
 
-          if ('caches' in window) {
-            const cacheKeys = await caches.keys();
-            await Promise.allSettled(cacheKeys.map((key) => caches.delete(key)));
+          const oldRegs = registrations.filter(r => isOldSw(r.active?.scriptURL || ''));
+          if (oldRegs.length) {
+            await Promise.allSettled(oldRegs.map(r => r.unregister()));
+            const url = new URL(window.location.href);
+            url.searchParams.set('fresh', '1');
+            window.location.replace(url.toString());
           }
-
-          const url = new URL(window.location.href);
-          url.searchParams.set('fresh', '1');
-          window.location.replace(url.toString());
         } catch (error) {
-          console.warn('Service worker cleanup skipped:', error);
+          console.warn('Service worker check skipped:', error);
         }
       })();
     </script>

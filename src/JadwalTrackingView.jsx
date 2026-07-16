@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import {
   Calendar, Users, X, ChevronRight, CheckCircle, AlertCircle, Loader2,

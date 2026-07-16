@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { calculateTakhteetProgress } from './utils/progressCalculation';
 import './TakhteetProgress.css';
 
 // Surah names in Arabic
@@ -58,21 +59,33 @@ const parseField = (rawJuz, rawPage, rawSurah) => {
 };
 
 // Calculate pages covered from target (istifadah) to current (wusool).
-// Both istifadah_page and wusool_page are absolute Quran page numbers (1-604).
-// pagesCovered = wusool_page - istifadah_page + 1 (inclusive).
-// For Juz 26-30, page range is from ~502 to ~604.
-const calcPagesCovered = (targetPage, currentPage) => {
+// For Juz 1-25 (ascending): pagesCovered = wusool - istifadah + 1 (when wusool >= istifadah)
+// For Juz 26-30 (descending): pagesCovered = istifadah - wusool + 1 (when wusool <= istifadah)
+const calcPagesCovered = (targetPage, currentPage, isJuz26to30 = false) => {
   const t = parseInt(targetPage, 10);
   const c = parseInt(currentPage, 10);
   if (isNaN(t) || isNaN(c)) return 0;
+  if (isJuz26to30) {
+    // Juz 26-30: lower page number = more progress (closer to end of Quran)
+    // Target achieved when current <= target
+    if (c > t) return 0; // Haven't reached target yet
+    return t - c + 1;
+  }
+  // Juz 1-25: higher page number = more progress
   if (c < t) return 0; // Haven't reached target yet
   return c - t + 1;
 };
 
-const calcPagesRemaining = (targetPage, currentPage) => {
+const calcPagesRemaining = (targetPage, currentPage, isJuz26to30 = false) => {
   const t = parseInt(targetPage, 10);
   const c = parseInt(currentPage, 10);
   if (isNaN(t) || isNaN(c)) return 0;
+  if (isJuz26to30) {
+    // Juz 26-30: remaining = current - target (going backward in page numbers)
+    if (c <= t) return 0; // Target achieved or exceeded
+    return c - t;
+  }
+  // Juz 1-25: remaining = target - current (going forward in page numbers)
   if (c >= t) return 0; // Target achieved
   return t - c;
 };
@@ -202,29 +215,24 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
   const wusoolPage = weeklyResult?.wusool_page;
   const nextWeekPage = weeklyResult?.next_week_page;
 
-  const pagesCovered = calcPagesCovered(istifadahPage, wusoolPage);
-  const pagesRemaining = calcPagesRemaining(istifadahPage, wusoolPage);
-  const nextWeekPages = parseInt(nextWeekPage, 10) || 0;
-
-  // Determine if child is in Juz 1-25 range (page range 1-503).
-  // For these children, percentage is proportional: (wusool - istifadah) / (next_week - istifadah) * 100.
-  // For Juz 26-30, keep binary 0/100% behavior.
   const currentJuzNum = currentJuz ? parseInt(String(currentJuz).trim(), 10) : NaN;
   const isJuz1to25 = !isNaN(currentJuzNum) && currentJuzNum >= 1 && currentJuzNum <= 25;
+  const isJuz26to30 = !isNaN(currentJuzNum) && currentJuzNum >= 26 && currentJuzNum <= 30;
 
-  // Compute progress percentage — proportional for Juz 1-25, binary for Juz 26-30
+  const pagesCovered = calcPagesCovered(istifadahPage, wusoolPage, isJuz26to30);
+  const pagesRemaining = calcPagesRemaining(istifadahPage, wusoolPage, isJuz26to30);
+  const nextWeekPages = parseInt(nextWeekPage, 10) || 0;
+
+  // Use the centralized calculation from progressCalculation utility
   const calcProgressPercent = () => {
-    if (isJuz1to25) {
-      const start = parseInt(istifadahPage, 10);
-      const curr = parseInt(wusoolPage, 10);
-      const targetEnd = parseInt(nextWeekPage, 10);
-      if (!isNaN(start) && !isNaN(curr) && !isNaN(targetEnd) && targetEnd > start) {
-        const done = Math.max(0, curr - start);
-        const planned = targetEnd - start;
-        return Math.min(100, Math.max(0, Math.round((done / planned) * 100)));
-      }
+    const start = parseInt(istifadahPage, 10);
+    const curr = parseInt(wusoolPage, 10);
+    const currentJuzNum = currentJuz ? parseInt(String(currentJuz).trim(), 10) : NaN;
+
+    if (!isNaN(start) && !isNaN(curr) && !isNaN(currentJuzNum)) {
+      const result = calculateTakhteetProgress(curr, start, currentJuzNum);
+      return Math.min(100, Math.max(0, Math.round(result.progressPercent)));
     }
-    // Binary for Juz 26-30 or when target data is incomplete
     return pagesCovered > 0 ? 100 : 0;
   };
 
@@ -233,15 +241,15 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
   // Target is achieved when computed progress reaches 100%
   const isComplete = computedPercent >= 100;
 
-  // Next Week Target percentage — reuse the main computed percent for Juz 1-25
+  // Next Week Target percentage — reuse computed percent
   let nextWeekPercent = 0;
-  if (isJuz1to25) {
+  if (pagesCovered > 0 || isJuz1to25) {
     nextWeekPercent = computedPercent;
   } else {
     const tPage = parseInt(istifadahPage, 10);
     const nPage = parseInt(nextWeekPage, 10);
     if (!isNaN(tPage) && !isNaN(nPage) && tPage > 0 && nPage > 0) {
-      const nwPages = calcPagesCovered(String(tPage), String(nPage));
+      const nwPages = calcPagesCovered(String(tPage), String(nPage), isJuz26to30);
       if (nwPages > 0) {
         nextWeekPercent = computedPercent;
       }

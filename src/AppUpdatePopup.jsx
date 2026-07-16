@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import { Smartphone, X, CheckCircle2, ExternalLink, Sparkles, Shield, Clock } from "lucide-react";
 
@@ -45,6 +45,7 @@ export default function AppUpdatePopup() {
         .from("app_releases")
         .select("version_name, version_code, release_notes, created_at, force_update")
         .eq("status", "live")
+        .eq("console_status", "published")
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
