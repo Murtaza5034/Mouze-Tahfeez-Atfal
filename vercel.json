@@ -1,20 +1,18 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "installCommand": "npm install --legacy-peer-deps",
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/portal/Login.aspx",
-      "destination": "/api/portal-proxy?path=Login.aspx"
-    },
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
     {
-      "source": "/portal/:path*",
-      "destination": "/api/portal-proxy?path=:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
