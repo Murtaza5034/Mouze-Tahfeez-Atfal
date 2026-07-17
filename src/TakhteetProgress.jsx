@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { calculateTakhteetProgress } from './utils/progressCalculation';
-import './TakhteetProgress.css';
+// CSS imported dynamically below to avoid Vite HMR conflict with React.lazy
 
 // Surah names in Arabic
 const SURAH_NAMES_AR = [
@@ -201,6 +201,11 @@ const JssDisplay = ({ juz, surah, safa, compact = false }) => (
 );
 
 const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
+  // Dynamic CSS import to avoid Vite HMR conflict with React.lazy
+  useEffect(() => {
+    import('./TakhteetProgress.css');
+  }, []);
+
   const [percent, setPercent] = useState(0);
 
   // Parse all three field sets

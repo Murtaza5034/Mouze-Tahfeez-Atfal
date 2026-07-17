@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import { Heart, Sparkles, User, Edit3, Save, X, Trash2, Plus, Upload, Camera, MessageCircle, Instagram, Clock, Globe } from "lucide-react";
-import lottie from "lottie-web";
+
 import "./marhala-posts.css";
 
 const FONT_FACE_CSS = `
@@ -228,7 +228,10 @@ function MarhalaPosts({
   // Load Lottie animation when overlay div is in DOM
   useEffect(() => {
     if (showAnimation && animCanvasRef.current) {
-      try {
+      (async () => {
+        try {
+          const lottieModule = await import("lottie-web");
+        const lottie = lottieModule.default || lottieModule;
         if (animInstanceRef.current) {
           animInstanceRef.current.destroy();
         }
@@ -244,10 +247,11 @@ function MarhalaPosts({
         animInstanceRef.current.addEventListener("complete", () => {
           setShowAnimation(false);
         });
-      } catch (e) {
-        console.warn("Lottie animation failed to load:", e);
-        setShowAnimation(false);
-      }
+        } catch (e) {
+          console.warn("Lottie animation failed to load:", e);
+          setShowAnimation(false);
+        }
+      })();
     }
   }, [showAnimation]);
 

@@ -1,3 +1,13 @@
+/** Determine the subfolder name from a file extension */
+function getFileSubfolder(name) {
+  const ext = (name || "").split(".").pop()?.toLowerCase() || "";
+  if (ext === "pdf") return "PDF";
+  if (ext === "csv") return "CSV";
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "Images";
+  if (["zip", "rar", "7z"].includes(ext)) return "Archives";
+  return "Other";
+}
+
 export async function downloadFile(urlOrBlob, name) {
   try {
     let blob;
@@ -9,7 +19,7 @@ export async function downloadFile(urlOrBlob, name) {
     }
 
     if (window.Capacitor?.isNativePlatform()) {
-      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+      // Read blob as base64
       const reader = new FileReader();
       const base64 = await new Promise((resolve, reject) => {
         reader.onload = () => resolve(reader.result);
@@ -17,15 +27,42 @@ export async function downloadFile(urlOrBlob, name) {
         reader.readAsDataURL(blob);
       });
       const base64Data = base64.split(",")[1];
-      await Filesystem.writeFile({
-        path: name,
-        data: base64Data,
-        directory: Directory.Documents,
-      });
-      const result = await Filesystem.getUri({
-        path: name,
-        directory: Directory.Documents,
-      });
+
+      // Use the native MauzeDownloader JavaScript interface if available
+      // This saves files directly to Mauze Tahfeez/<Subfolder>/ via DownloadManager
+      // (works on all Android versions without runtime storage permissions)
+      if (window.MauzeDownloader) {
+        window.MauzeDownloader.download(base64Data, name);
+        return { type: "native" };
+      }
+
+      // Fallback: use Capacitor Filesystem
+      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+      const subfolder = getFileSubfolder(name);
+      const relativePath = `Mauze Tahfeez/${subfolder}/${name}`;
+
+      let result;
+      try {
+        await Filesystem.writeFile({
+          path: `Download/${relativePath}`,
+          data: base64Data,
+          directory: Directory.ExternalStorage,
+        });
+        result = await Filesystem.getUri({
+          path: `Download/${relativePath}`,
+          directory: Directory.ExternalStorage,
+        });
+      } catch (_) {
+        await Filesystem.writeFile({
+          path: relativePath,
+          data: base64Data,
+          directory: Directory.Documents,
+        });
+        result = await Filesystem.getUri({
+          path: relativePath,
+          directory: Directory.Documents,
+        });
+      }
       return { type: "native", filePath: result.uri };
     }
 

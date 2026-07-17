@@ -295,12 +295,24 @@ Deno.serve(async (req) => {
         .eq('user_role', targetRole)
       if (error) throw error
       tokens = roleTokens?.map(rt => rt.fcm_token) || []
-    } else {
+    } else if (targetRole === 'all') {
+      // Explicitly requested broadcast to all users
       const { data: allTokens, error } = await supabase
         .from('user_fcm_tokens')
         .select('fcm_token')
       if (error) throw error
       tokens = allTokens?.map(at => at.fcm_token) || []
+    } else {
+      // Safety guard: neither targetUser nor valid targetRole provided — don't fall through to all users
+      console.warn('FCM: No valid targetUser or targetRole specified, skipping notification');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'NO_TOKENS_FOUND',
+          details: 'No targetUser or targetRole specified. Notification skipped to avoid broadcasting to all users.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     if (tokens.length === 0) {

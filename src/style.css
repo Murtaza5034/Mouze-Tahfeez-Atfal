@@ -7840,3 +7840,216 @@ h4.attendance-rating-text,
 }
 
 
+/* ── Settings Section Divider ── */
+.settings-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary-gold, #d4af37);
+}
+
+.settings-section-divider::before,
+.settings-section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.3), transparent);
+}
+
+
+/* ── App Lock Overlay (Full Screen) ── */
+.app-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background:
+    radial-gradient(ellipse at top, rgba(212,175,55,0.12), transparent 50%),
+    rgba(10, 8, 6, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: appLockFadeIn 0.25s ease-out both;
+}
+
+.app-lock-modal {
+  width: min(400px, 100%);
+  padding: 40px 32px 36px;
+  border-radius: 28px;
+  background: linear-gradient(145deg, #fcfaf5, #f7f2e9);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  box-shadow:
+    0 40px 80px rgba(0,0,0,0.35),
+    0 0 0 1px rgba(212,175,55,0.08) inset;
+  text-align: center;
+  animation: appLockSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.app-lock-modal.dark {
+  background: linear-gradient(145deg, #1e1b17, #2a2520);
+  border-color: rgba(212, 175, 55, 0.15);
+}
+
+.app-lock-modal.dark .app-lock-title,
+.app-lock-modal.dark .app-lock-subtitle {
+  color: #e8ddd0;
+}
+
+.app-lock-modal.dark .app-lock-pin-input {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(212,175,55,0.2);
+  color: #e8ddd0;
+}
+
+.app-lock-modal.dark .app-lock-pin-input:focus {
+  border-color: #d4af37;
+  background: rgba(212,175,55,0.08);
+}
+
+.app-lock-modal.dark .app-lock-pin-input.filled {
+  background: rgba(212,175,55,0.15);
+  border-color: #d4af37;
+}
+
+.app-lock-modal.dark .app-lock-hint {
+  color: #a0907a;
+}
+
+.app-lock-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 16px;
+  background: linear-gradient(135deg, rgba(212,175,55,0.2), rgba(197,160,89,0.1));
+  border: 2px solid rgba(212, 175, 55, 0.3);
+  color: var(--primary-gold, #d4af37);
+}
+
+.app-lock-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--deep-brown, #2f2118);
+  margin: 0 0 6px;
+  letter-spacing: -0.025em;
+}
+
+.app-lock-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted, #8a786a);
+  margin: 0 0 28px;
+}
+
+.app-lock-pin-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.app-lock-pin-input {
+  width: 48px;
+  height: 58px;
+  border-radius: 14px;
+  border: 2px solid rgba(61, 43, 31, 0.12);
+  background: rgba(255,255,255,0.8);
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: 'Inter', monospace;
+  color: var(--deep-brown, #2f2118);
+  outline: none;
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+
+.app-lock-pin-input:focus {
+  border-color: var(--primary-gold, #d4af37);
+  background: rgba(212,175,55,0.06);
+  box-shadow: 0 0 0 3px rgba(212,175,55,0.12);
+}
+
+.app-lock-pin-input.filled {
+  background: rgba(212,175,55,0.12);
+  border-color: var(--primary-gold, #d4af37);
+}
+
+.app-lock-pin-input.error {
+  border-color: #ef4444;
+  background: rgba(239,68,68,0.06);
+  animation: appLockShake 0.3s ease;
+}
+
+.app-lock-error {
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin: -8px 0 16px;
+  font-weight: 600;
+}
+
+.app-lock-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 32px;
+  border-radius: 999px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(197, 160, 89, 0.12);
+  color: var(--deep-brown, #2f2118);
+  opacity: 0.5;
+}
+
+.app-lock-submit-btn.ready {
+  opacity: 1;
+  background: linear-gradient(135deg, #d4af37, #b8941f);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(212,175,55,0.25);
+}
+
+.app-lock-submit-btn.ready:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(212,175,55,0.35);
+}
+
+.app-lock-submit-btn:disabled {
+  cursor: not-allowed;
+}
+
+.app-lock-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 20px;
+  font-size: 0.78rem;
+  color: var(--text-muted, #8a786a);
+}
+
+@keyframes appLockFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes appLockSlideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes appLockShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+
+

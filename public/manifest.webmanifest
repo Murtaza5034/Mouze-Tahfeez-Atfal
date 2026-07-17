@@ -1,0 +1,28 @@
+{
+  "name": "Mauze Tahfeez Management Portal",
+  "short_name": "MauzeTahfeez",
+  "description": "Premium Management Portal for Mauze Tahfeez - Quran memorization tracking & Islamic education",
+  "theme_color": "#c5a059",
+  "background_color": "#fcfaf5",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "lang": "en-US",
+  "categories": ["education", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "/LOGO%20ATFAAL-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/LOGO%20ATFAAL-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Home",
+      "url": "/",
+      "icons": [{ "src": "/LOGO%20ATFAAL-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

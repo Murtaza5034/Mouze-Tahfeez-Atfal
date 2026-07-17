@@ -51,9 +51,19 @@ export default function AppUpdatePopup() {
         .single();
 
       if (error) {
-        if (error.code === "PGRST116" || error.message?.includes("does not exist")) {
+        // Handle missing table/missing column errors gracefully (e.g., migration not run)
+        if (
+          error.code === "PGRST116" ||
+          error.message?.includes("does not exist") ||
+          error.code === "42P01" ||
+          error.code === "42703" ||
+          error.status === 400 ||
+          error.status === 404
+        ) {
+          console.warn("AppUpdatePopup: app_releases table not ready yet (migrations may need to run)");
           setDismissed(true); return;
         }
+        console.warn("AppUpdatePopup: Unexpected error checking for update:", error);
         setDismissed(true); return;
       }
 

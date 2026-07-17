@@ -66,7 +66,9 @@ import {
   DollarSign,
   Crown,
   KeyRound,
-  LogIn
+  LogIn,
+  Fingerprint,
+  Smartphone
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -694,7 +696,7 @@ const LazySelfJadwalTeacherView = React.lazy(() =>
 
 const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
 const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
-const LazyMarhalaPosts = React.lazy(() => import("./MarhalaPosts"));
+import MarhalaPosts from "./MarhalaPosts";
 const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
 import AppUpdatePopup from "./AppUpdatePopup";
 
@@ -2073,6 +2075,46 @@ const toArabicDigits = (str) => {
   return String(str).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d, 10)]);
 };
 
+const APP_LOCK_KEYS = {
+  enabled: 'mauze-app-lock-enabled',
+  pin: 'mauze-app-lock-pin',
+  locked: 'mauze-app-locked',
+};
+
+function hashPin(pin) {
+  let hash = 0;
+  for (let i = 0; i < pin.length; i++) {
+    const char = pin.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return 'pin_' + Math.abs(hash).toString(36);
+}
+
+function isAppLockEnabled() {
+  return localStorage.getItem(APP_LOCK_KEYS.enabled) === 'true';
+}
+
+function getStoredPinHash() {
+  return localStorage.getItem(APP_LOCK_KEYS.pin) || '';
+}
+
+function isAppCurrentlyLocked() {
+  return sessionStorage.getItem(APP_LOCK_KEYS.locked) === 'true';
+}
+
+function setAppLockedState(locked) {
+  if (locked) {
+    sessionStorage.setItem(APP_LOCK_KEYS.locked, 'true');
+  } else {
+    sessionStorage.removeItem(APP_LOCK_KEYS.locked);
+  }
+}
+
+function verifyPin(inputPin) {
+  return hashPin(inputPin) === getStoredPinHash();
+}
+
 const ARABIC_MONTHS = [
   "محرم الحرام", "صفر المظفر", "ربيع الأول", "ربيع الآخر",
   "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
@@ -3177,8 +3219,11 @@ function SettingsPage({
   onShowAction,
   teacherUnlockStatus,
   setTeacherUnlockStatus,
-  role = "parents"
+  role = "parents",
+  appLockEnabled,
+  onAppLockToggle
 }) {
+  const [showAppLockSetup, setShowAppLockSetup] = useState(false);
   const [activeTab, setActiveTab] = useState("Dark mode");
   const [selectedSetting, setSelectedSetting] = useState(null);
   const tabs = ["Dark mode", "App themes", "Notifications", "Animations", "Security", "Support", "About"];
@@ -3267,7 +3312,7 @@ function SettingsPage({
     "App themes": { icon: Palette, title: "Premium Themes", desc: "Choose a visual style that matches your preference." },
     "Notifications": { icon: Bell, title: "Notifications", desc: role === "parents" ? "Control how you receive alerts about your child's progress." : "Control how you receive alerts about students and schedules." },
     "Animations": { icon: Sparkles, title: "Animations & Effects", desc: "Control page transitions, loading effects and motion in the app." },
-    "Security": { icon: Lock, title: "Security & Password", desc: "Update your portal access credentials." },
+    "Security": { icon: Lock, title: "Security & App Lock", desc: "Update password & enable app lock with PIN or biometrics." },
     "Support": { icon: LifeBuoy, title: "Technical Support", desc: "Encountering an issue? Let our team know." },
     "About": { icon: Info, title: "Mauze Tahfeez Atfal", desc: "App info, version & registration." },
   };
@@ -3312,7 +3357,7 @@ function SettingsPage({
             <div className="settings-detail-heading">
               {activeTab === "Dark mode" && <><h3>Appearance</h3><p>Switch between light and dark visual modes.</p></>}
               {activeTab === "Notifications" && <><h3>Notifications</h3>{role === "parents" ? <p>Control how you receive alerts about your child's progress.</p> : <p>Control how you receive alerts about students and schedules.</p>}</>}
-              {activeTab === "Security" && <><h3>Security & Password</h3><p>Update your portal access credentials.</p></>}
+              {activeTab === "Security" && <><h3>Security & App Lock</h3><p>Update your password, enable app lock with PIN, or use biometrics.</p></>}
               {activeTab === "App themes" && <><h3>Premium Themes</h3><p>Choose a visual style that matches your preference.</p></>}
               {activeTab === "Support" && <><h3>Technical Support</h3><p>Encountering an issue? Let our team know.</p></>}
               {activeTab === "About" && <><h3>Mauze Tahfeez Atfal</h3><p>App info, version & registration.</p></>}
@@ -3374,6 +3419,70 @@ function SettingsPage({
                     Update Password
                   </button>
                 </form>
+
+                <div className="settings-section-divider">
+                  <span>App Lock</span>
+                </div>
+
+                {showAppLockSetup ? (
+                  <AppLockSetup 
+                    onShowAction={onShowAction}
+                    onClose={() => {
+                      setShowAppLockSetup(false);
+                      // If user cancelled without actually saving PIN, reset toggle
+                      if (typeof isAppLockEnabled === 'function' && !isAppLockEnabled()) {
+                        onAppLockToggle(false);
+                      }
+                    }}
+                  />
+                ) : (
+                  <>
+                    <div className="setting-control-row">
+                      <div className="control-label">
+                        <Lock className="gold-icon" size={20} />
+                        <div>
+                          <span>App Lock Protection</span>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                            {appLockEnabled 
+                              ? 'App is secured with a PIN lock. You will be asked to unlock every time you open the app.' 
+                              : 'Secure the app with a 5-digit PIN. On next open, you must unlock to access the portal.'}
+                          </p>
+                        </div>
+                      </div>
+                      <button 
+                        className={`toggle-switch ${appLockEnabled ? 'on' : 'off'}`}
+                        onClick={() => {
+                          if (appLockEnabled) {
+                            onAppLockToggle(false);
+                          } else {
+                            setShowAppLockSetup(true);
+                          }
+                        }}
+                      >
+                        <div className="toggle-thumb" />
+                      </button>
+                    </div>
+
+                    {appLockEnabled && (
+                      <div className="biometric-info-card" style={{ marginTop: '16px' }}>
+                        <div className="biometric-info-header">
+                          <Fingerprint size={16} />
+                          <span>Biometric Authentication</span>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Your device may support fingerprint or face unlock as an alternative to entering your PIN each time. 
+                          Enable biometrics in your device settings for this app.
+                        </p>
+                        {navigator.credentials && navigator.credentials.preventSilentAccess && (
+                          <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--primary-gold)' }}>
+                            <Smartphone size={16} />
+                            <span>Biometric hardware detected on this device</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -3962,6 +4071,10 @@ function ParentPortal({
   actionMessage,
   reduceAnimations,
   setReduceAnimations,
+  appLocked,
+  appLockEnabled,
+  onAppUnlock,
+  onAppLockToggle,
 }) {
   const reportSettingsObject = normalizeReportSettings(propReportSettings);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -4273,7 +4386,7 @@ function ParentPortal({
 
   const recentMarhalaPostPreview = (
     <Suspense fallback={null}>
-      <LazyMarhalaPosts
+      <MarhalaPosts
         role="parents"
         studentProfile={studentProfile}
         onShowAction={showAction}
@@ -4320,7 +4433,7 @@ function ParentPortal({
       description:
         "Access your child's daily learning schedule, important announcements, and school actions here.",
       highlights: [
-        `Attendance: ${attendance?.status || "-"}`,
+        `Attendance: ${(() => { const s = (attendance?.status || '').toLowerCase(); return s === 'present' ? 'Present' : s === 'absent' ? 'Absent' : s === 'holiday' ? 'Holiday' : '-' })()}`,
         `Lesson: ${studentProfile?.latestResult?.surat || studentProfile?.surat || hifzDetails?.surat || "Update pending"}`,
         `Wusool: Juz ${studentProfile?.latestResult?.wusool_juz || "--"}  ·  Page ${studentProfile?.latestResult?.wusool_page || "--"}`,
       ],
@@ -4470,19 +4583,7 @@ function ParentPortal({
             <span className="topbar-sub">Parents Portal</span>
           </div>
         </div>
-        {allProfiles.length > 1 && (
-          <div className="topbar-student-switcher">
-            <select
-              className="student-select-minimal"
-              value={studentProfile?.student_id}
-              onChange={(e) => setSelectedStudentId(e.target.value)}
-            >
-              {allProfiles.map(p => (
-                <option key={p.student_id} value={p.student_id}>{p.full_name.split(' ')[0]}</option>
-              ))}
-            </select>
-          </div>
-        )}
+
         <button className="topbar-logout-btn" onClick={onLogout} title="Logout">
           <LogOut size={22} />
         </button>
@@ -4556,9 +4657,12 @@ function ParentPortal({
                 const muhaffizVal = bTeacher?.full_name || hifzDetails?.muhaffiz_name || "Pending";
                 const todayStr = getToday();
                 const attDate = new Date(todayStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+                const attStatus = (attendance?.status || '').toLowerCase();
+                const attColor = attStatus === 'present' ? '#22c55e' : attStatus === 'absent' ? '#ef4444' : attStatus === 'holiday' ? '#f59e0b' : '#5d4037';
+                const attLabel = attStatus === 'present' ? 'Present' : attStatus === 'absent' ? 'Absent' : attStatus === 'holiday' ? 'Holiday' : '-';
                 const stats = [
                   { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
-                  { label: "Daily Attendance", val: attendance?.status || "-", sub: attDate, icon: Clock, color: "#5d4037" },
+                  { label: "Daily Attendance", val: attLabel, sub: attDate, icon: Clock, color: attColor },
                   { label: "Current HIFZ STATUS", val: studentProfile?.latestResult?.wusool_juz || hifzDetails?.juz || "--", sub: studentProfile?.latestResult?.wusool_surah || hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
                   { label: muhaffizLabel, val: muhaffizVal, sub: muhaffizSub, icon: GraduationCap, color: "#d4af37" },
                 ];
@@ -4569,8 +4673,8 @@ function ParentPortal({
                     </div>
                     <div className="pill-info">
                       <span className="pill-label">{stat.label}</span>
-                      <strong className="pill-value">{stat.val}</strong>
-                      <span className={'pill-sub' + (stat.label === 'Current HIFZ STATUS' ? ' arabic-kanz' : '')}>{stat.sub}</span>
+                      <strong className="pill-value" style={stat.label === 'Daily Attendance' ? { color: stat.color } : {}}>{stat.val}</strong>
+                      <span className={'pill-sub' + (stat.label === 'Current HIFZ STATUS' ? ' arabic-kanz' : '')} style={stat.label === 'Current HIFZ STATUS' ? { fontSize: '1.15rem', lineHeight: '1.5', textAlign: 'right' } : {}}>{stat.sub}</span>
                     </div>
                   </div>
                 ));
@@ -5074,7 +5178,7 @@ function ParentPortal({
 
         {activePage === "Marhala Posts" ? (
           <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
-            <LazyMarhalaPosts
+            <MarhalaPosts
               onShowAction={showAction}
             />
           </Suspense>
@@ -5091,6 +5195,8 @@ function ParentPortal({
             user={user}
             studentProfile={studentProfile}
             onShowAction={showAction}
+            appLockEnabled={appLockEnabled}
+            onAppLockToggle={onAppLockToggle}
           />
         ) : null}
 
@@ -6017,8 +6123,23 @@ const handleDownloadAllReports = async () => {
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
   const isOtpTeacher = !userAssignedRoles.includes('admin');
+  // Compute teacher match IDs once (not per student) to avoid O(n*m) filtering
+  const teacherMatchIds = isOtpTeacher ? (() => {
+    const uid = String(user?.id || '');
+    const profileIds = (teacherProfiles || [])
+      .filter(t => String(t.user_id) === uid)
+      .flatMap(t => [String(t.id), String(t.user_id)]);
+    const portalIds = (portalAccessList || [])
+      .filter(p => p.portal_role === 'teacher' && String(p.user_id) === uid)
+      .map(p => String(p.user_id));
+    return [...new Set([...profileIds, ...portalIds])];
+  })() : [];
   const rankPreviewStudents = isOtpTeacher
-    ? students.filter(s => String(s.muhaffiz_id) === String(user?.id))
+    ? students.filter(s => teacherMatchIds.some(id =>
+        String(s.muhaffiz_id) === id ||
+        String(s.original_teacher_id) === id ||
+        String(s.badal_teacher_id) === id
+      ))
     : students;
 
   const selectedStudent = selectedStudentId
@@ -6635,7 +6756,7 @@ const handleDownloadAllReports = async () => {
           ) : null}
           {activePage === "Marhala Posts" ? (
             <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
-              <LazyMarhalaPosts
+              <MarhalaPosts
                 role="admin"
                 students={students}
                 onShowAction={onShowAction}
@@ -7399,12 +7520,7 @@ const handleDownloadAllReports = async () => {
                       }).join('\n');
                       const csvContent = header + '\n' + rows;
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `attendance_${selMonth}.csv`;
-                      a.click();
-                      URL.revokeObjectURL(url);
+                      import("./downloadUtils").then(m => m.downloadFile(blob, `attendance_${selMonth}.csv`));
                     }}
                     id="att-download-btn"
                     data-month={attMonth || ''}
@@ -10640,6 +10756,10 @@ function TeacherPortal({
   setIsDarkMode,
   appTheme,
   setAppTheme,
+  appLocked,
+  appLockEnabled,
+  onAppUnlock,
+  onAppLockToggle,
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const backdropMouseDownRef = useRef(false);
@@ -10648,6 +10768,13 @@ function TeacherPortal({
 
   const [studentAttendance, setStudentAttendance] = useState({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [currentDate, setCurrentDate] = useState(() => getLocalDateKey());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentDate(getLocalDateKey());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
   const [histStudentId, setHistStudentId] = useState("");
   const [histDate, setHistDate] = useState(new Date().toISOString().slice(0, 10));
   const [histStatus, setHistStatus] = useState(null);
@@ -10668,7 +10795,7 @@ function TeacherPortal({
   const [selectedBadalOriginal, setSelectedBadalOriginal] = useState(null);
   const weekDays = useMemo(() => {
     const days = [];
-    const today = new Date();
+    const today = new Date(currentDate);
     const dayOfWeek = today.getDay();
     const satOffset = dayOfWeek === 6 ? 0 : -(dayOfWeek + 1);
     const saturday = new Date(today);
@@ -10676,10 +10803,10 @@ function TeacherPortal({
     for (let i = 0; i < 7; i++) {
       const d = new Date(saturday);
       d.setDate(saturday.getDate() + i);
-      days.push(d.toISOString().slice(0, 10));
+      days.push(getLocalDateKey(d));
     }
     return days;
-  }, []);
+  }, [currentDate]);
 
   const badalOverviewStudents = useMemo(() => {
     /* Also directly check child_profiles.badal_teacher_id for the new approach */
@@ -11043,13 +11170,35 @@ function TeacherPortal({
     });
     const attStudent = overviewStudents.find(s => String(s.student_id) === studentId);
     if (attStudent) {
-      broadcastNotification(
-        "Attendance Updated",
-        `${attStudent.name || "Your child"} was marked ${status} on ${date}.`,
-        "user",
-        attStudent.parent_user_id || attStudent.user_id || attStudent.parent_email,
-        "Attendance"
-      );
+      // Notify parent — only if a valid target exists (prevents FCM falling through to ALL users)
+      const parentTarget = attStudent.parent_user_id || attStudent.parent_email;
+      if (parentTarget) {
+        broadcastNotification(
+          "Attendance Updated",
+          `${attStudent.name || "Your child"} was marked ${status} on ${date}.`,
+          "user",
+          parentTarget,
+          "Attendance"
+        );
+      }
+      // Also notify the child's own teacher (if different from current user)
+      const teacherIdField = attStudent.muhaffiz_id || attStudent.original_teacher_id;
+      const currentUserId = user?.id || teacherIdentity;
+      if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
+        const teacherMatch = teacherProfiles.find(t =>
+          String(t.id) === String(teacherIdField) ||
+          String(t.user_id) === String(teacherIdField)
+        );
+        if (teacherMatch?.user_id && String(teacherMatch.user_id) !== String(currentUserId)) {
+          broadcastNotification(
+            "Attendance Updated",
+            `${attStudent.name || "Your child"} was marked ${status} on ${date}.`,
+            "user",
+            teacherMatch.user_id,
+            "Attendance"
+          );
+        }
+      }
     }
   };
 
@@ -11084,7 +11233,7 @@ function TeacherPortal({
     if (onShowAction) onShowAction("success", `Marked all as ${status}`);
 
     overviewStudents.forEach(s => {
-      const parentTarget = s.parent_user_id || s.user_id || s.parent_email;
+      const parentTarget = s.parent_user_id || s.parent_email;
       if (parentTarget) {
         broadcastNotification(
           "Attendance Updated",
@@ -11590,7 +11739,7 @@ function TeacherPortal({
 
   const recentMarhalaPostPreview = (
      <Suspense fallback={null}>
-       <LazyMarhalaPosts
+       <MarhalaPosts
          role="teacher"
          students={visibleStudents}
          onShowAction={onShowAction}
@@ -11674,33 +11823,7 @@ function TeacherPortal({
             </button>
             <h2 className="page-title">{activePage}</h2>
           </div>
-          {(() => {
-            const jadwalArr = Array.isArray(jadwalSettings) ? jadwalSettings : [];
-            let allowed = [];
-            try {
-              const row = jadwalArr.find(s => s.id === 1) || jadwalArr[0] || {};
-              allowed = JSON.parse(row.teacher_admin_access || '[]');
-            } catch {}
-            return Array.isArray(allowed) && allowed.includes(user?.email) ? (
-              <button
-                onClick={() => { if (onRequestAdminAccess) onRequestAdminAccess(); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 14px', border: 'none', borderRadius: '10px', cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #d4af37, #b8941f)',
-                  color: 'white', fontWeight: 600, fontSize: '0.78rem',
-                  boxShadow: '0 2px 10px rgba(212,175,55,0.3)',
-                  transition: 'all 0.2s ease',
-                  whiteSpace: 'nowrap',
-                  position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(-50%) translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(212,175,55,0.4)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateX(-50%)'; e.currentTarget.style.boxShadow = ''; }}
-              >
-                <ShieldCheck size={16} /> Admin
-              </button>
-            ) : null;
-          })()}
+
           <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
         </header>
 
@@ -11908,12 +12031,11 @@ function TeacherPortal({
               <div className="bulk-attendance-row">
                 <span className="bulk-label">Quick Mark All:</span>
                 {(() => {
-                  const today = new Date().toISOString().slice(0, 10);
                   return (
                     <>
-                      <button className={`bulk-att-btn present`} onClick={() => handleMarkAllAttendance(today, 'present')} disabled={attendanceLoading}>✓ All Present</button>
-                      <button className={`bulk-att-btn absent`} onClick={() => handleMarkAllAttendance(today, 'absent')} disabled={attendanceLoading}>✕ All Absent</button>
-                      <button className={`bulk-att-btn holiday`} onClick={() => handleMarkAllAttendance(today, 'holiday')} disabled={attendanceLoading}>☾ Holiday</button>
+                      <button className={`bulk-att-btn present`} onClick={() => handleMarkAllAttendance(currentDate, 'present')} disabled={attendanceLoading}>✓ All Present</button>
+                      <button className={`bulk-att-btn absent`} onClick={() => handleMarkAllAttendance(currentDate, 'absent')} disabled={attendanceLoading}>✕ All Absent</button>
+                      <button className={`bulk-att-btn holiday`} onClick={() => handleMarkAllAttendance(currentDate, 'holiday')} disabled={attendanceLoading}>☾ Holiday</button>
                     </>
                   );
                 })()}
@@ -11995,7 +12117,6 @@ function TeacherPortal({
                       {(() => {
                         const att = studentAttendance[sid] || {};
                         let present = 0, absent = 0, holiday = 0;
-                        const today = new Date().toISOString().slice(0, 10);
                         weekDays.forEach((d, idx) => {
                           const isSunday = new Date(d).getDay() === 0;
                           const effectiveStatus = isSunday ? 'holiday' : (att[d] || null);
@@ -12003,9 +12124,9 @@ function TeacherPortal({
                           else if (effectiveStatus === 'absent') absent++;
                           else if (effectiveStatus === 'holiday') holiday++;
                         });
-                        const todayIsSunday = new Date(today).getDay() === 0;
-                        const todayStatus = todayIsSunday ? 'holiday' : (att[today] || null);
-                        const todayDate = new Date(today);
+                        const todayIsSunday = new Date(currentDate).getDay() === 0;
+                        const todayStatus = todayIsSunday ? 'holiday' : (att[currentDate] || null);
+                        const todayDate = new Date(currentDate);
                         const todayLabel = todayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
                         const workingDays = 6;
                         return (
@@ -12024,21 +12145,21 @@ function TeacherPortal({
                                 <>
                                   <button
                                     className={`att-btn present ${todayStatus === 'present' ? 'active' : ''}`}
-                                    onClick={() => handleMarkAttendance(student.student_id, today, 'present')}
+                                    onClick={() => handleMarkAttendance(student.student_id, currentDate, 'present')}
                                     disabled={attendanceLoading}
                                   >
                                     {todayStatus === 'present' ? '✓' : ''} Present
                                   </button>
                                   <button
                                     className={`att-btn absent ${todayStatus === 'absent' ? 'active' : ''}`}
-                                    onClick={() => handleMarkAttendance(student.student_id, today, 'absent')}
+                                    onClick={() => handleMarkAttendance(student.student_id, currentDate, 'absent')}
                                     disabled={attendanceLoading}
                                   >
                                     {todayStatus === 'absent' ? '✕' : ''} Absent
                                   </button>
                                   <button
                                     className={`att-btn holiday ${todayStatus === 'holiday' ? 'active' : ''}`}
-                                    onClick={() => handleMarkAttendance(student.student_id, today, 'holiday')}
+                                    onClick={() => handleMarkAttendance(student.student_id, currentDate, 'holiday')}
                                     disabled={attendanceLoading}
                                   >
                                     {todayStatus === 'holiday' ? '☾' : ''} Holiday
@@ -13220,6 +13341,8 @@ function TeacherPortal({
                 studentProfile={null}
                 onShowAction={onShowAction}
                 role="teacher"
+                appLockEnabled={appLockEnabled}
+                onAppLockToggle={onAppLockToggle}
               />
               {(function() {
                 const toggleAttHist = () => {
@@ -13538,6 +13661,244 @@ const SURAH_NAMES_AR = [
   "المسد","الإخلاص","الفلق","الناس"
 ];
 
+// --- App Lock Components ---
+function AppLockScreen({ onUnlock, isDarkMode }) {
+  const [pin, setPin] = useState(['', '', '', '', '']);
+  const [error, setError] = useState('');
+  const [attempts, setAttempts] = useState(0);
+  const inputRefs = useRef([]);
+
+  useEffect(() => {
+    inputRefs.current[0]?.focus();
+  }, []);
+
+  const handleDigitChange = (idx, value) => {
+    if (value && !/^\d$/.test(value)) return;
+    setError('');
+    const newPin = [...pin];
+    newPin[idx] = value;
+    setPin(newPin);
+    if (value && idx < 4) {
+      inputRefs.current[idx + 1]?.focus();
+    }
+  };
+
+  const handleKeyDown = (idx, e) => {
+    if (e.key === 'Backspace' && !pin[idx] && idx > 0) {
+      inputRefs.current[idx - 1]?.focus();
+    }
+    if (e.key === 'Enter' && pin.every(d => d)) {
+      handleSubmit();
+    }
+  };
+
+  const handleSubmit = () => {
+    const entered = pin.join('');
+    if (entered.length !== 5) {
+      setError('Please enter all 5 digits');
+      return;
+    }
+    if (verifyPin(entered)) {
+      setAppLockedState(false);
+      setAttempts(0);
+      onUnlock();
+    } else {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      setError(newAttempts >= 3 ? 'Too many attempts. Try again later.' : 'Incorrect PIN');
+      setPin(['', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+      if (newAttempts >= 3) {
+        setTimeout(() => setAttempts(0), 30000);
+      }
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pasted = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 5);
+    if (pasted.length === 5) {
+      const newPin = pasted.split('');
+      setPin(newPin);
+      inputRefs.current[4]?.focus();
+    }
+  };
+
+  return (
+    <div className="app-lock-overlay">
+      <div className={`app-lock-modal ${isDarkMode ? 'dark' : ''}`}>
+        <div className="app-lock-icon">
+          <Lock size={32} />
+        </div>
+        <h2 className="app-lock-title">App Locked</h2>
+        <p className="app-lock-subtitle">Enter your PIN to access the portal</p>
+
+        <div className="app-lock-pin-row" onPaste={handlePaste}>
+          {pin.map((digit, idx) => (
+            <input
+              key={idx}
+              ref={el => inputRefs.current[idx] = el}
+              type="password"
+              inputMode="numeric"
+              maxLength={1}
+              className={`app-lock-pin-input ${error ? 'error' : ''} ${digit ? 'filled' : ''}`}
+              value={digit}
+              onChange={(e) => handleDigitChange(idx, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(idx, e)}
+              autoComplete="off"
+            />
+          ))}
+        </div>
+
+        {error && <p className="app-lock-error">{error}</p>}
+
+        <button
+          className={`app-lock-submit-btn ${pin.every(d => d) ? 'ready' : ''}`}
+          onClick={handleSubmit}
+          disabled={!pin.every(d => d)}
+        >
+          <Unlock size={18} />
+          Unlock
+        </button>
+
+        {navigator.credentials && navigator.credentials.preventSilentAccess && (
+          <p className="app-lock-hint">
+            <Fingerprint size={14} />
+            Use device biometrics if available
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AppLockSetup({ onShowAction, onClose }) {
+  const [step, setStep] = useState('create');
+  const [pin, setPin] = useState(['', '', '', '', '']);
+  const [confirmPin, setConfirmPin] = useState(['', '', '', '', '']);
+  const [error, setError] = useState('');
+  const inputRefs = useRef([]);
+
+  useEffect(() => {
+    inputRefs.current[0]?.focus();
+  }, []);
+
+  const handleDigitChange = (idx, value, target, setter) => {
+    if (value && !/^\d$/.test(value)) return;
+    setError('');
+    const newPin = [...target];
+    newPin[idx] = value;
+    setter(newPin);
+    if (value && idx < 4) {
+      inputRefs.current[idx + 1]?.focus();
+    }
+  };
+
+  const handleKeyDown = (idx, e, target, setter) => {
+    if (e.key === 'Backspace' && !target[idx] && idx > 0) {
+      inputRefs.current[idx - 1]?.focus();
+    }
+    if (e.key === 'Enter' && target.every(d => d)) {
+      if (step === 'create') {
+        handleCreate();
+      } else {
+        handleConfirm();
+      }
+    }
+  };
+
+  const handleCreate = () => {
+    const entered = pin.join('');
+    if (entered.length !== 5) {
+      setError('Please enter a 5-digit PIN');
+      return;
+    }
+    setConfirmPin(['', '', '', '', '']);
+    setStep('confirm');
+    setTimeout(() => inputRefs.current[0]?.focus(), 100);
+  };
+
+  const handleConfirm = () => {
+    const entered = confirmPin.join('');
+    if (entered.length !== 5) {
+      setError('Please enter all 5 digits');
+      return;
+    }
+    if (entered !== pin.join('')) {
+      setError('PINs do not match. Try again.');
+      setConfirmPin(['', '', '', '', '']);
+      setStep('create');
+      setPin(['', '', '', '', '']);
+      setTimeout(() => inputRefs.current[0]?.focus(), 100);
+      return;
+    }
+    localStorage.setItem(APP_LOCK_KEYS.enabled, 'true');
+    localStorage.setItem(APP_LOCK_KEYS.pin, hashPin(entered));
+    setAppLockedState(false);
+    onShowAction('success', 'App lock enabled successfully!');
+    onClose();
+  };
+
+  const handleCancel = () => {
+    setStep('create');
+    setPin(['', '', '', '', '']);
+    setConfirmPin(['', '', '', '', '']);
+    setError('');
+    onClose();
+  };
+
+  const currentPin = step === 'create' ? pin : confirmPin;
+  const setCurrentPin = step === 'create' ? setPin : setConfirmPin;
+
+  return (
+    <div className="settings-tab-pane">
+      <div className="biometric-info-card">
+        <div className="biometric-info-header">
+          <Lock size={16} />
+          <span>{step === 'create' ? 'Create Your 5-Digit PIN' : 'Confirm Your PIN'}</span>
+        </div>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+          {step === 'create'
+            ? 'Choose a 5-digit PIN you will remember. You will need this every time you open the app.'
+            : 'Re-enter the same 5-digit PIN to confirm.'}
+        </p>
+      </div>
+
+      <div className="app-lock-pin-row" style={{ marginTop: '24px', justifyContent: 'center' }}>
+        {currentPin.map((digit, idx) => (
+          <input
+            key={idx}
+            ref={el => inputRefs.current[idx] = el}
+            type="password"
+            inputMode="numeric"
+            maxLength={1}
+            className={`app-lock-pin-input ${error ? 'error' : ''} ${digit ? 'filled' : ''}`}
+            value={digit}
+            onChange={(e) => handleDigitChange(idx, e.target.value, currentPin, setCurrentPin)}
+            onKeyDown={(e) => handleKeyDown(idx, e, currentPin, setCurrentPin)}
+            autoComplete="off"
+          />
+        ))}
+      </div>
+
+      {error && <p className="app-lock-error" style={{ textAlign: 'center', marginTop: '12px' }}>{error}</p>}
+
+      <div style={{ display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'center' }}>
+        <button
+          className="action-button"
+          onClick={step === 'create' ? handleCreate : handleConfirm}
+          disabled={!currentPin.every(d => d)}
+        >
+          {step === 'create' ? 'Next' : 'Confirm & Enable'}
+        </button>
+        <button className="action-button" style={{ background: 'transparent', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }} onClick={handleCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Juz/Surat Selector Component ---
 export default function App() {
   const [notificationPermission, setNotificationPermission] = useState(
@@ -13588,6 +13949,16 @@ export default function App() {
   }, []);
 
   const [loading, setLoading] = useState(true);
+  const [appLockEnabled, setAppLockEnabled] = useState(() => isAppLockEnabled());
+  const [appLocked, setAppLocked] = useState(() => {
+    const enabled = isAppLockEnabled();
+    const wasLocked = isAppCurrentlyLocked();
+    if (enabled && !wasLocked) {
+      setAppLockedState(true);
+      return true;
+    }
+    return enabled && wasLocked;
+  });
   const [actionMessage, setActionMessage] = useState(null);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [activeStudentId, setActiveStudentId] = useState(null);
@@ -14007,7 +14378,10 @@ export default function App() {
           return;
         }
       } catch (e) {
-        console.warn("Token refresh failed", e);
+        console.warn("Token refresh failed, clearing stale session:", e);
+        // Clear stale session data so subsequent API calls don't fail with 401/400
+        try { await supabase.auth.signOut(); } catch (_) {}
+        localStorage.removeItem(STORAGE_KEYS.cachedAuth);
       }
 
       if (!mounted) return;
@@ -14246,7 +14620,7 @@ export default function App() {
             jadwalSettingsResponse,
           ] = await Promise.all([
             supabase
-              .from("attendance")
+              .from("student_daily_attendance")
               .select("*")
               .in("student_id", studentQueryIds)
               .order("attendance_date", { ascending: false }),
@@ -14826,6 +15200,24 @@ export default function App() {
     window.location.reload();
   };
 
+  const handleAppUnlock = () => {
+    setAppLocked(false);
+    setAppLockedState(false);
+  };
+
+  const handleAppLockToggle = (enable) => {
+    if (!enable) {
+      localStorage.removeItem(APP_LOCK_KEYS.enabled);
+      localStorage.removeItem(APP_LOCK_KEYS.pin);
+      setAppLockedState(false);
+      setAppLockEnabled(false);
+      setAppLocked(false);
+      showAction('success', 'App lock disabled.');
+    } else {
+      setAppLockEnabled(true);
+    }
+  };
+
   const handleCreatePortalAccess = async (event) => {
     event.preventDefault();
 
@@ -15090,7 +15482,7 @@ export default function App() {
           )
           .on(
             'postgres_changes',
-            { event: 'INSERT', table: 'attendance', schema: 'public' },
+            { event: 'INSERT', table: 'student_daily_attendance', schema: 'public' },
             (payload) => {
               if (portalRole === "parents") {
                 const rec = payload.new;
@@ -15105,7 +15497,7 @@ export default function App() {
                       String(id).trim().toLowerCase() === String(rec.student_id || "").trim().toLowerCase()
                     );
                     if (!isForThisStudent) return prev;
-                    showAction("info", "Attendance marked ?");
+                    showAction("info", "Attendance marked ✓");
                     return { ...prev, attendance: rec };
                   });
                 }
@@ -15114,7 +15506,7 @@ export default function App() {
           )
           .on(
             'postgres_changes',
-            { event: 'UPDATE', table: 'attendance', schema: 'public' },
+            { event: 'UPDATE', table: 'student_daily_attendance', schema: 'public' },
             (payload) => {
               if (portalRole === "parents") {
                 const rec = payload.new;
@@ -16310,7 +16702,7 @@ const handleSendCustomNotification = async (event) => {
         "Tahfeez Report Submitted",
         `A new progress report has been saved for ${targetStudent?.name || "the student"}.`,
         "parents",
-        targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email,
+        targetStudent?.parent_user_id || targetStudent?.parent_email,
         "Progress"
       );
     }
@@ -16403,6 +16795,10 @@ const handleSendCustomNotification = async (event) => {
             actionMessage={actionMessage}
             reduceAnimations={reduceAnimations}
             setReduceAnimations={setReduceAnimations}
+            appLocked={appLocked}
+            appLockEnabled={appLockEnabled}
+            onAppUnlock={handleAppUnlock}
+            onAppLockToggle={handleAppLockToggle}
           />
         ) : portalRole === "admin" ? (
           <AdminPortal
@@ -16559,6 +16955,10 @@ const handleSendCustomNotification = async (event) => {
             setSaveStatus={setSaveStatus}
             saveErrorDetails={saveErrorDetails}
             setSaveErrorDetails={setSaveErrorDetails}
+            appLocked={appLocked}
+            appLockEnabled={appLockEnabled}
+            onAppUnlock={handleAppUnlock}
+            onAppLockToggle={handleAppLockToggle}
           />
         )}
 
@@ -16837,6 +17237,9 @@ const handleSendCustomNotification = async (event) => {
           ></lottie-player>
         </div>
       )}
+      {user && appLocked && (
+        <AppLockScreen isDarkMode={isDarkMode} onUnlock={handleAppUnlock} />
+      )}
     </React.Fragment>
   );
 }
@@ -16918,8 +17321,8 @@ function QuickAccessPagesUI({ supabase: sb }) {
                   ? '0 4px 20px rgba(212,175,55,0.2)'
                   : '0 2px 8px rgba(0,0,0,0.04)',
               }}
-              onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.borderColor = '#d4af37'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(212,175,55,0.12)'; } }}
-              onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.borderColor = '#e8e0d0'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'; } }}
+              onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.border = '1px solid #d4af37'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(212,175,55,0.12)'; } }}
+              onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.border = '1px solid #e8e0d0'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'; } }}
             >
               <div style={{
                 width: 44, height: 44, borderRadius: 12,
@@ -16964,8 +17367,9 @@ function QuickAccessPagesUI({ supabase: sb }) {
               <div style={{
                 padding: isOpen ? '6px 22px 22px' : '0 22px',
                 background: '#fff',
-                border: isOpen ? '1px solid #e8e0d0' : 'none',
-                borderTop: 'none',
+                borderWidth: isOpen ? '0 1px 1px' : 0,
+                borderStyle: isOpen ? 'solid' : 'none',
+                borderColor: isOpen ? '#e8e0d0' : 'transparent',
                 borderRadius: '0 0 14px 14px',
               }}>
                 {tab.pages.map((page, i) => {

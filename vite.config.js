@@ -4,14 +4,33 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => ({
   define: {
-    __APP_VERSION__: JSON.stringify("1.2.7"),
-    __APP_VERSION_CODE__: JSON.stringify(30),
-  },
-  resolve: {
-    dedupe: ['react', 'react-dom'],
+    __APP_VERSION__: JSON.stringify("1.2.8"),
+    __APP_VERSION_CODE__: JSON.stringify(31),
   },
   plugins: [
     react(),
+    // Patch: Add missing getRefreshReg to @vitejs/plugin-react v6's
+    // bundled refresh-runtime.js (needed by React 18 Fast Refresh).
+    // The plugin v6 ships a simplified runtime that omits this function.
+    {
+      name: 'patch-react-refresh-runtime',
+      transform(code, id) {
+        // Handle both raw ID and \0-prefixed variants (Vite/Rolldown internal handling)
+        if (id === '/@react-refresh' || id.endsWith('/@react-refresh')) {
+          return code + `
+// --- patched by mauze-tahfeez ---
+// getRefreshReg is called by React 18's babel transform to register
+// component types for Fast Refresh. Returns (type, id) => register(type, id).
+export function getRefreshReg() {
+  return function (type, id) {
+    register(type, id);
+  };
+}
+`;
+        }
+        return code;
+      }
+    },
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
@@ -106,28 +125,11 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
             return 'vendor';
           }
-          if (id.includes('node_modules/@supabase/')) {
-            return 'supabase';
-          }
-          if (id.includes('node_modules/jspdf') || id.includes('node_modules/html2canvas')) {
-            return 'pdf';
-          }
-          if (id.includes('node_modules/lucide-react')) {
-            return 'icons';
-          }
         },
       },
     },
     chunkSizeWarningLimit: 1000,
     assetsInlineLimit: 4096,
-  },
-  optimizeDeps: {
-    include: [
-      'react',
-      'react-dom',
-      '@supabase/supabase-js',
-      'lucide-react',
-    ],
   },
   server: {
     headers: {

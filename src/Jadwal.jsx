@@ -1781,7 +1781,7 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
           String(s.student_id) === String(selectedStudentId) ||
           (s.allIds && s.allIds.includes(String(selectedStudentId)))
         );
-        const parentId = targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.parent_email;
+        const parentId = targetStudent?.parent_user_id || targetStudent?.parent_email;
         if (parentId) {
           await onBroadcastNotification(
             "Jadwal Timetable Updated 📅",
