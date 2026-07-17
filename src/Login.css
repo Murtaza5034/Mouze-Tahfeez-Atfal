@@ -397,11 +397,33 @@
 }
 
 .remember-me-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary-gold);
+  display: none;
+}
+
+.premium-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--primary-gold);
+  background: var(--premium-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  border-radius: 4px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(212, 175, 55, 0.15);
+}
+
+.premium-checkbox.checked {
+  background: linear-gradient(135deg, var(--primary-gold), #c9a84c);
+  border-color: var(--primary-gold);
+  box-shadow: 0 3px 10px rgba(212, 175, 55, 0.35);
+}
+
+.premium-checkbox svg {
+  display: block;
+  color: white;
 }
 
 .login-button {

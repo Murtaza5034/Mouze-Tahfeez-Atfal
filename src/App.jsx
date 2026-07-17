@@ -10135,18 +10135,19 @@ const handleDownloadAllReports = async () => {
                   <div className="form-grid">
                     <label>
                       <span>Enable Daily Reminder</span>
-                      <label className="premium-switch" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                        <input
-                          name="jadwal_notification_enabled"
-                          type="checkbox"
-                          checked={jadwalSettingsDraft.jadwal_notification_enabled !== false}
-                          onChange={(e) => setJadwalSettingsDraft((c) => ({ ...c, jadwal_notification_enabled: e.target.checked }))}
-                          style={{ width: '20px', height: '20px', accentColor: 'var(--primary-gold)' }}
-                        />
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+                        <button
+                          type="button"
+                          className={`toggle-switch${jadwalSettingsDraft.jadwal_notification_enabled !== false ? ' on' : ''}`}
+                          onClick={() => setJadwalSettingsDraft((c) => ({ ...c, jadwal_notification_enabled: c.jadwal_notification_enabled === false }))}
+                          aria-label="Toggle daily reminder"
+                        >
+                          <div className="toggle-thumb" />
+                        </button>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: jadwalSettingsDraft.jadwal_notification_enabled !== false ? 'var(--primary-gold)' : 'var(--text-secondary)' }}>
                           {jadwalSettingsDraft.jadwal_notification_enabled !== false ? 'Enabled' : 'Disabled'}
                         </span>
-                      </label>
+                      </div>
                       <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
                         Sends a push notification to parents each day with their child's assigned jadwal for the day.
                       </small>

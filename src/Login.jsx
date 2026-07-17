@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, Users, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, Users, X } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import lottie from "lottie-web";
 
@@ -371,6 +371,12 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
+                <span
+                  className={`premium-checkbox${rememberMe ? ' checked' : ''}`}
+                  onClick={(e) => { e.preventDefault(); setRememberMe(!rememberMe); }}
+                >
+                  {rememberMe && <Check size={14} strokeWidth={3} />}
+                </span>
                 <span>Remember me</span>
               </label>
               <button
