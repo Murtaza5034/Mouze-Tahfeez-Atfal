@@ -1,4 +1,3 @@
-/** Determine the subfolder name from a file extension */
 function getFileSubfolder(name) {
   const ext = (name || "").split(".").pop()?.toLowerCase() || "";
   if (ext === "pdf") return "PDF";
@@ -6,6 +5,28 @@ function getFileSubfolder(name) {
   if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "Images";
   if (["zip", "rar", "7z"].includes(ext)) return "Archives";
   return "Other";
+}
+
+export async function requestStorageAccess() {
+  if (!window.MauzeDownloader) return false;
+  return new Promise((resolve) => {
+    window.__mauzeStorageCb = (success) => resolve(success);
+    window.MauzeDownloader.requestStorageAccess();
+    setTimeout(() => {
+      if (window.__mauzeStorageCb) {
+        window.__mauzeStorageCb = null;
+        resolve(false);
+      }
+    }, 120000);
+  });
+}
+
+export function isStorageAccessGranted() {
+  return window.MauzeDownloader?.isStorageAccessGranted() === true;
+}
+
+export function getSaveLocation() {
+  return window.MauzeDownloader?.getSaveLocationPath() || "Not set";
 }
 
 export async function downloadFile(urlOrBlob, name) {
@@ -19,7 +40,6 @@ export async function downloadFile(urlOrBlob, name) {
     }
 
     if (window.Capacitor?.isNativePlatform()) {
-      // Read blob as base64
       const reader = new FileReader();
       const base64 = await new Promise((resolve, reject) => {
         reader.onload = () => resolve(reader.result);
@@ -28,16 +48,18 @@ export async function downloadFile(urlOrBlob, name) {
       });
       const base64Data = base64.split(",")[1];
 
-      // Use the native MauzeDownloader JavaScript interface if available
-      // This saves files directly to Mauze Tahfeez/<Subfolder>/ via DownloadManager
-      // (works on all Android versions without runtime storage permissions)
       if (window.MauzeDownloader) {
+        if (!window.MauzeDownloader.isStorageAccessGranted()) {
+          const granted = await requestStorageAccess();
+          if (!granted) {
+            return { type: "cancelled" };
+          }
+        }
         window.MauzeDownloader.download(base64Data, name);
         const subfolder = getFileSubfolder(name);
         return { type: "native", filePath: `Mauze Tahfeez/${subfolder}/${name}` };
       }
 
-      // Fallback: use Capacitor Filesystem
       const { Filesystem, Directory } = await import("@capacitor/filesystem");
       const subfolder = getFileSubfolder(name);
       const relativePath = `Mauze Tahfeez/${subfolder}/${name}`;

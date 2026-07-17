@@ -4,8 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => ({
   define: {
-    __APP_VERSION__: JSON.stringify("1.2.9"),
-    __APP_VERSION_CODE__: JSON.stringify(32),
+    __APP_VERSION__: JSON.stringify("1.3.0"),
+    __APP_VERSION_CODE__: JSON.stringify(33),
   },
   plugins: [
     react(),
