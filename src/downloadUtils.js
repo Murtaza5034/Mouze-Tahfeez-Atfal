@@ -33,7 +33,8 @@ export async function downloadFile(urlOrBlob, name) {
       // (works on all Android versions without runtime storage permissions)
       if (window.MauzeDownloader) {
         window.MauzeDownloader.download(base64Data, name);
-        return { type: "native" };
+        const subfolder = getFileSubfolder(name);
+        return { type: "native", filePath: `Mauze Tahfeez/${subfolder}/${name}` };
       }
 
       // Fallback: use Capacitor Filesystem

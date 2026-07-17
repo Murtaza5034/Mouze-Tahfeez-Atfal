@@ -89,7 +89,7 @@ public class MainActivity extends BridgeActivity {
                     values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
                     values.put(MediaStore.Downloads.MIME_TYPE, getMimeType(fileName));
                     values.put(MediaStore.Downloads.RELATIVE_PATH,
-                            Environment.DIRECTORY_DOWNLOADS + "/Mauze Tahfeez/" + subfolder);
+                            "Mauze Tahfeez/" + subfolder);
 
                     Uri uri = getContentResolver().insert(
                             MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);

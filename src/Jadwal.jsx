@@ -871,7 +871,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   const printableHeight = 297 - margin * 2;
   const pageLimit = (containerWidth + 80) * (printableHeight / printableWidth);
   const measureEl = document.createElement("div");
-  measureEl.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+  measureEl.style.cssText = `position:fixed;left:0;top:0;z-index:-10000;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
   document.body.appendChild(measureEl);
 
   let pageGroups = [];
@@ -902,7 +902,7 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   for (let pi = 0; pi < pageGroups.length; pi++) {
     const group = pageGroups[pi];
     const container = document.createElement("div");
-    container.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${containerWidth}px;padding:40px;min-height:${pageLimit}px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+    container.style.cssText = `position:fixed;left:0;top:0;z-index:-10000;width:${containerWidth}px;padding:40px;min-height:${pageLimit}px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
     const frameFn = pi === 0 ? pageFrameHtml : pageFrameNoHeaderHtml;
     if (style === 'calendar') {
       container.innerHTML = frameFn(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${group.join('')}</div>`);
@@ -917,10 +917,16 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
-      onclone: (clonedDoc) => {
+      onclone: async (clonedDoc) => {
         const style = clonedDoc.createElement('style');
         style.textContent = FONT_FACE_CSS;
         clonedDoc.head.appendChild(style);
+        if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+          await Promise.race([
+            clonedDoc.fonts.ready,
+            new Promise(resolve => setTimeout(resolve, 3000)),
+          ]);
+        }
       },
     });
 
