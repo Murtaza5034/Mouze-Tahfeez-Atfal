@@ -326,6 +326,28 @@ Deno.serve(async (req) => {
       )
     }
 
+    const recentDuplicate = targetUser ? await supabase
+      .from('system_notifications')
+      .select('id')
+      .eq('target_user', targetUser)
+      .eq('title', title)
+      .eq('body', body)
+      .gte('created_at', new Date(Date.now() - 30000).toISOString())
+      .limit(1)
+      .maybeSingle() : null;
+
+    if (recentDuplicate?.data?.id) {
+      console.log(`Skipping duplicate notification for user ${targetUser}: "${title}" already sent within 30s`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'DUPLICATE_SKIPPED',
+          details: 'Identical notification already sent to this user within the last 30 seconds.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      )
+    }
+
     // Send via FCM HTTP v1
     const { results: fcmResults, staleTokens } = await sendFCMv1Notifications(tokens, title, body, data)
 

@@ -15211,6 +15211,11 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    try {
+      const fcm = await import("./fcmService").then(m => m.default);
+      await fcm.removeToken();
+    } catch (e) { /* ignore */ }
+
     setUser(null);
     setPortalAccess(emptyPortalAccess);
     setParentData(emptyParentData);
@@ -15489,9 +15494,10 @@ export default function App() {
                       vibrate: [200, 100, 200],
                       data: {
                         redirectPage: redirectPath,
+                        notification_id: newNotif.id,
                         url: redirectPath ? '/?redirectPage=' + encodeURIComponent(redirectPath) : '/'
                       },
-                      tag: 'mauze-tahfeez-notification',
+                      tag: `mauze-${newNotif.id}`,
                       renotify: true,
                       requireInteraction: true,
                       actions: [

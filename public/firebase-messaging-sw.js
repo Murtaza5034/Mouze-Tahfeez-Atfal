@@ -33,6 +33,10 @@ function parsePushPayload(payload) {
   };
 }
 
+function makeNotifTag(info) {
+  return info.data?.notification_id || info.data?.id || `mauze-${info.title}-${info.body}-${Date.now()}`;
+}
+
 function buildNotificationOptions(info) {
   const options = {
     body: info.body,
@@ -44,7 +48,7 @@ function buildNotificationOptions(info) {
       url: info.url,
       timestamp: new Date().toISOString()
     },
-    tag: 'mauze-tahfeez-notification',
+    tag: makeNotifTag(info),
     renotify: true,
     requireInteraction: true,
     silent: false,

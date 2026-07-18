@@ -17,6 +17,22 @@ class FCMService {
     this.initializingPromise = null;
     this.refreshInterval = null;
     this.isNative = false;
+    this._shownIds = new Set();
+    this._dedupWindow = 30000;
+  }
+
+  _isDuplicate(id) {
+    if (!id) return false;
+    if (this._shownIds.has(id)) return true;
+    this._shownIds.add(id);
+    setTimeout(() => this._shownIds.delete(id), this._dedupWindow);
+    return false;
+  }
+
+  _makeNotificationId(payload) {
+    const n = payload?.notification || {};
+    const d = payload?.data || {};
+    return d?.notification_id || d?.id || `${n?.title || ''}_${n?.body || ''}_${d?.timestamp || Date.now()}`;
   }
 
   // Refresh token periodically (every 2 hours) to keep it valid
@@ -369,8 +385,12 @@ class FCMService {
     if (this.isNative) return;
 
     try {
+      const notifId = this._makeNotificationId(payload);
+      if (this._isDuplicate(notifId)) {
+        console.log('Skipping duplicate notification:', notifId);
+        return;
+      }
       console.log('Showing notification:', payload);
-      // Play premium notification chime at full volume
       this.playPremiumChime();
       const { notification, data } = payload;
       const image = notification?.image || data?.image || "";
@@ -386,7 +406,7 @@ class FCMService {
           url: data?.url || payload.fcmOptions?.link || '/',
           timestamp: new Date().toISOString()
         },
-        tag: 'mauze-tahfeez-notification',
+        tag: notifId,
         renotify: true,
         requireInteraction: true,
         silent: false,
