@@ -12617,12 +12617,16 @@ function TeacherPortal({
           ) : null}
 
           {activePage === "Badal" ? (
-            <div className="management-grid fade-in" style={{ maxWidth: "900px", margin: "0 auto" }}>
-              <div className="data-card" style={{ padding: "24px" }}>
-                <div className="card-headline" style={{ marginBottom: "20px" }}>
-                  <RotateCw size={20} style={{ color: "var(--primary-gold)" }} />
-                  <h3 style={{ margin: 0 }}>Badal Update</h3>
+            <div className="badal-page-container">
+              <div className="badal-page-header">
+                <div className="badal-page-header-icon">
+                  <RotateCw size={20} />
                 </div>
+                <div>
+                  <h3>Badal Update</h3>
+                  <p>Track and update progress for children assigned to you as a substitute teacher</p>
+                </div>
+              </div>
                 {(() => {
                   const rawId = user?.id || teacherIdentity;
                   const allUserIds = [];
@@ -12666,7 +12670,7 @@ function TeacherPortal({
                     <>
                       {myBadalStudents.length > 0 && (
                         <div style={{ marginBottom: "32px" }}>
-                          <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "16px" }}>
+                          <p className="badal-helper-text">
                             Children assigned to you as Badal — update their Tahfeez progress. All entries update today's record (no duplicates).
                           </p>
                           <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
@@ -12688,97 +12692,95 @@ function TeacherPortal({
                               const juzNums = Array.from({ length: 30 }, (_, i) => String(i + 1));
                               const setDraft = (path, val) => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], [path]: val } }));
                               return (
-                                <article key={`my-${sid}`} className="badal-student-card" style={{ padding: "24px", background: "linear-gradient(135deg, #fffdf7 0%, #f5ebd0 100%)", borderRadius: "20px", border: "1px solid rgba(183,137,31,0.2)", boxShadow: "0 4px 20px rgba(183,137,31,0.08)" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px", paddingBottom: "16px", borderBottom: "1px solid rgba(183,137,31,0.12)" }}>
+                                <article key={`my-${sid}`} className="badal-student-card">
+                                  <div className="badal-card-header">
                                     <StudentAvatar student={student} size="small" />
                                     <div>
-                                      <h4 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#3e2723" }}>{student.name}</h4>
+                                      <h4>{student.name}</h4>
                                       {student.arabic_name && (
                                         <span className="arabic-kanz" style={{ fontSize: "1.05rem", color: "var(--primary-gold)" }}>{student.arabic_name}</span>
                                       )}
                                     </div>
                                     {original_teacher_id && (
-                                      <span className="badal-original-badge" style={{ marginLeft: "auto", background: "rgba(183,137,31,0.12)", color: "#8d6e1f", fontWeight: 700 }}>
+                                      <span className="badal-original-badge">
                                         Original: {(teacherProfiles.find(p => p.user_id === original_teacher_id) || portalAccessList.find(p => p.user_id === original_teacher_id))?.full_name || original_teacher_id}
                                       </span>
                                     )}
                                   </div>
-                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                                    <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.3px" }}>Juz</span>
-                                        <div style={{ display: "flex", gap: "8px" }}>
-                                          <select className="premium-select" style={{ flex: 1, fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.95rem" }} value={draft.juz?.value || ""} onChange={e => setDraft("juz", { ...draft.juz, value: e.target.value })}>
-                                            <option value="">—</option>
-                                            {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
-                                          </select>
-                                          <input className="premium-input" style={{ width: "80px", textAlign: "center", fontWeight: 600 }} placeholder="Marks" type="number" step="0.1" min="0" max="30" value={draft.juz?.marks ?? ""} onChange={e => setDraft("juz", { ...draft.juz, marks: e.target.value })} />
-                                        </div>
-                                      </div>
-                                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.3px" }}>Juz Hali</span>
-                                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                                          <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.type || "juz"} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: e.target.value, from: "", till: "" })}>
-                                            <option value="juz">Juz</option>
-                                            <option value="surah">Surah</option>
-                                          </select>
-                                          {draft.juzHali?.type === "surah" ? (
-                                            <>
-                                              <select className="premium-select" style={{ flex: 1, minWidth: "80px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
-                                                <option value="">From</option>
-                                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
-                                              </select>
-                                              <select className="premium-select" style={{ flex: 1, minWidth: "80px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
-                                                <option value="">Till</option>
-                                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
-                                              </select>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
-                                                <option value="">From</option>
-                                                {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
-                                              </select>
-                                              <select className="premium-select" style={{ width: "70px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
-                                                <option value="">Till</option>
-                                                {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
-                                              </select>
-                                            </>
-                                          )}
-                                          <input className="premium-input" style={{ width: "70px", textAlign: "center", fontWeight: 600 }} placeholder="Marks" type="number" step="0.1" min="0" max="30" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: e.target.value })} />
-                                        </div>
+                                  <div className="badal-form-grid">
+                                    <div className="badal-field-group">
+                                      <span className="badal-field-label">Juz</span>
+                                      <div className="badal-field-row">
+                                        <select className="badal-select" style={{ flex: 1 }} value={draft.juz?.value || ""} onChange={e => setDraft("juz", { ...draft.juz, value: e.target.value })}>
+                                          <option value="">—</option>
+                                          {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
+                                        </select>
+                                        <input className="badal-marks-input" placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juz?.marks ?? ""} onChange={e => setDraft("juz", { ...draft.juz, marks: e.target.value })} />
                                       </div>
                                     </div>
-                                    <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
-                                      <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.3px" }}>Jadeed</span>
-                                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                                        <select className="premium-select" style={{ width: "130px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.jadeed?.type || "pages"} onChange={e => setDraft("jadeed", { ...draft.jadeed, type: e.target.value, from: "", till: "", surah: "", ayat: "" })}>
+                                    <div className="badal-field-group">
+                                      <span className="badal-field-label">Juz Hali</span>
+                                      <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
+                                        <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.type || "juz"} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: e.target.value, from: "", till: "" })}>
+                                          <option value="juz">Juz</option>
+                                          <option value="surah">Surah</option>
+                                        </select>
+                                        {draft.juzHali?.type === "surah" ? (
+                                          <>
+                                            <select className="badal-select" style={{ flex: 1, minWidth: "80px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
+                                              <option value="">From</option>
+                                              {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
+                                            </select>
+                                            <select className="badal-select" style={{ flex: 1, minWidth: "80px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
+                                              <option value="">Till</option>
+                                              {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
+                                            </select>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
+                                              <option value="">From</option>
+                                              {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
+                                            </select>
+                                            <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
+                                              <option value="">Till</option>
+                                              {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
+                                            </select>
+                                          </>
+                                        )}
+                                        <input className="badal-marks-input" style={{ width: "70px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: e.target.value })} />
+                                      </div>
+                                    </div>
+                                    <div className="badal-field-group full-width">
+                                      <span className="badal-field-label">Jadeed</span>
+                                      <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
+                                        <select className="badal-select" style={{ width: "130px" }} value={draft.jadeed?.type || "pages"} onChange={e => setDraft("jadeed", { ...draft.jadeed, type: e.target.value, from: "", till: "", surah: "", ayat: "" })}>
                                           <option value="pages">Pages</option>
                                           <option value="surah_ayat">Surah &amp; Ayat</option>
                                         </select>
                                         {draft.jadeed?.type === "surah_ayat" ? (
                                           <>
-                                            <select className="premium-select" style={{ flex: 1, minWidth: "100px", fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: "0.85rem" }} value={draft.jadeed?.surah || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, surah: e.target.value })}>
+                                            <select className="badal-select" style={{ flex: 1, minWidth: "100px" }} value={draft.jadeed?.surah || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, surah: e.target.value })}>
                                               <option value="">Surah</option>
                                               {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
                                             </select>
-                                            <input className="premium-input" style={{ width: "100px", textAlign: "center" }} placeholder="Ayat e.g. 1-10" value={draft.jadeed?.ayat || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, ayat: e.target.value })} />
+                                            <input className="badal-premium-input" style={{ width: "100px", textAlign: "center" }} placeholder="Ayat e.g. 1-10" value={draft.jadeed?.ayat || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, ayat: e.target.value })} />
                                           </>
                                         ) : (
                                           <>
-                                            <input className="premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="From" type="number" min="1" value={draft.jadeed?.from || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, from: e.target.value })} />
-                                            <input className="premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="Till" type="number" min="1" value={draft.jadeed?.till || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, till: e.target.value })} />
+                                            <input className="badal-premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="From" type="number" min="1" value={draft.jadeed?.from || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, from: e.target.value })} />
+                                            <input className="badal-premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="Till" type="number" min="1" value={draft.jadeed?.till || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, till: e.target.value })} />
                                           </>
                                         )}
                                       </div>
                                     </div>
-                                    <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" }}>
-                                      <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.3px" }}>Notes</span>
-                                      <input className="premium-input" placeholder="Optional notes about today's progress" value={draft.notes ?? ""} onChange={e => setDraft("notes", e.target.value)} />
+                                    <div className="badal-field-group full-width">
+                                      <span className="badal-field-label">Notes</span>
+                                      <input className="badal-notes-input" placeholder="Optional notes about today's progress" value={draft.notes ?? ""} onChange={e => setDraft("notes", e.target.value)} />
                                     </div>
                                   </div>
-                                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px", paddingTop: "16px", borderTop: "1px solid rgba(183,137,31,0.12)" }}>
-                                    <button className="premium-btn" onClick={() => handleSaveBadalProgress(student_id)} disabled={savingBadal[sid]}>
+                                  <div className="badal-card-footer">
+                                    <button className="badal-save-btn" onClick={() => handleSaveBadalProgress(student_id)} disabled={savingBadal[sid]}>
                                       {savingBadal[sid] ? "Saving..." : latest ? "Update Today's Record" : "Save Progress"}
                                     </button>
                                   </div>
@@ -12789,18 +12791,18 @@ function TeacherPortal({
                         </div>
                       )}
                       {myBadalStudents.length === 0 && originalStudents.length === 0 && (
-                        <div className="empty-state" style={{ padding: "40px 0", textAlign: "center" }}>
-                          <RotateCw size={40} style={{ opacity: 0.2, marginBottom: "12px" }} />
+                        <div className="badal-empty-state">
+                          <RotateCw size={40} />
                           <p>No badal activity yet. Admin will assign children to you here.</p>
                         </div>
                       )}
                       {originalStudents.length > 0 && (
                         <div>
-                          <h4 style={{ margin: "0 0 6px 0", fontSize: "0.95rem", color: "var(--text-muted)" }}>My Students (Badal)</h4>
-                          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px" }}>
+                          <h4 className="badal-section-title">My Students (Badal)</h4>
+                          <p className="badal-section-desc">
                             Students shifted to a badal teacher. Tap a name to see today's progress.
                           </p>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px" }}>
+                          <div className="badal-original-tabs">
                             {originalStudents.map(({ student, student_id, badalTeacherInfo }) => {
                               if (!student) return null;
                               const sid = String(student_id);
@@ -12809,21 +12811,12 @@ function TeacherPortal({
                                 <button
                                   key={`tab-${sid}`}
                                   onClick={() => setSelectedBadalOriginal(isSelected ? null : sid)}
-                                  style={{
-                                    display: "flex", alignItems: "center", gap: "8px",
-                                    padding: "10px 16px", borderRadius: "10px",
-                                    border: isSelected ? "2px solid #e53935" : "1px solid rgba(229,57,53,0.2)",
-                                    background: isSelected ? "rgba(229,57,53,0.06)" : "transparent",
-                                    color: "var(--text-color)", cursor: "pointer",
-                                    fontSize: "0.9rem", fontWeight: isSelected ? 700 : 400,
-                                    transition: "all 0.25s",
-                                    boxShadow: isSelected ? "0 0 12px rgba(229,57,53,0.2)" : "none",
-                                  }}
+                                  className={`badal-original-tab${isSelected ? " active" : ""}`}
                                 >
                                   <StudentAvatar student={student} size="small" />
                                   <span>{student.name}</span>
                                   {badalTeacherInfo && (
-                                    <span style={{ fontSize: "0.7rem", color: "#e53935", fontWeight: 600 }}>⚡ {badalTeacherInfo.full_name}</span>
+                                    <span className="badal-original-tab-badge">⚡ {badalTeacherInfo.full_name}</span>
                                   )}
                                 </button>
                               );
@@ -12842,8 +12835,8 @@ function TeacherPortal({
                               const juzHali = latestEntry ? safeParse(latestEntry.juz_hali) : null;
                               const jadeed = latestEntry ? safeParse(latestEntry.jadeed_surah_ayat) : null;
                               return (
-                                <article style={{ padding: "24px", borderRadius: "20px", background: "linear-gradient(135deg, #fffdf7 0%, #f5ebd0 100%)", border: "1px solid rgba(183,137,31,0.2)", boxShadow: "0 4px 20px rgba(183,137,31,0.08)" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px", paddingBottom: "14px", borderBottom: "1px solid rgba(183,137,31,0.12)" }}>
+                                <article className="badal-readonly-card">
+                                  <div className="badal-readonly-header">
                                     <StudentAvatar student={item.student} size="small" />
                                     <div>
                                       <h4 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#3e2723" }}>{item.student.name}</h4>
@@ -12851,14 +12844,7 @@ function TeacherPortal({
                                         <span className="arabic-kanz" style={{ fontSize: "1rem", color: "var(--primary-gold)" }}>{item.student.arabic_name}</span>
                                       )}
                                     </div>
-                                    <span style={{
-                                      marginLeft: "auto", padding: "6px 14px", borderRadius: "20px",
-                                      fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap",
-                                      background: "rgba(229,57,53,0.12)", color: "#e53935",
-                                      border: "1px solid rgba(229,57,53,0.25)",
-                                      boxShadow: "0 0 10px rgba(229,57,53,0.15), 0 0 20px rgba(229,57,53,0.05)",
-                                      textShadow: "0 0 4px rgba(229,57,53,0.1)",
-                                    }}>
+                                    <span className="badal-readonly-badge">
                                       ⚡ Badal: {item.badalTeacherInfo?.full_name || "Assigned"}
                                     </span>
                                   </div>
@@ -12868,41 +12854,39 @@ function TeacherPortal({
                                     </p>
                                   ) : (
                                     <div>
-                                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", padding: "8px 12px", background: "rgba(183,137,31,0.06)", borderRadius: "10px" }}>
-                                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#5d4037" }}>
-                                          📅 {new Date(latestEntry.created_at || latestEntry.week_date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}
-                                        </span>
+                                      <div className="badal-progress-date">
+                                        <span>📅 {new Date(latestEntry.created_at || latestEntry.week_date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</span>
                                         {latestEntry.notes && (
-                                          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginLeft: "auto", fontStyle: "italic" }}>📝 {latestEntry.notes}</span>
+                                          <span className="badal-progress-date-note">📝 {latestEntry.notes}</span>
                                         )}
                                       </div>
-                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                                      <div className="badal-progress-grid">
                                         {juz && (juz.value || juz.marks) && (
-                                          <div style={{ padding: "12px 14px", background: "rgba(183,137,31,0.04)", borderRadius: "12px", border: "1px solid rgba(183,137,31,0.08)" }}>
-                                            <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#8d6e1f", textTransform: "uppercase", letterSpacing: "0.5px" }}>Juz</span>
-                                            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "4px" }}>
-                                              {juz.value && <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#3e2723" }}>{juz.value}</span>}
-                                              {juz.marks && <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#2e7d32" }}>{juz.marks}/30</span>}
+                                          <div className="badal-progress-item">
+                                            <span className="badal-progress-label">Juz</span>
+                                            <div className="badal-progress-value">
+                                              {juz.value && <span className="badal-progress-main">{juz.value}</span>}
+                                              {juz.marks && <span className="badal-progress-marks">{juz.marks}/10</span>}
                                             </div>
                                           </div>
                                         )}
                                         {juzHali && (juzHali.from || juzHali.marks) && (
-                                          <div style={{ padding: "12px 14px", background: "rgba(183,137,31,0.04)", borderRadius: "12px", border: "1px solid rgba(183,137,31,0.08)" }}>
-                                            <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#8d6e1f", textTransform: "uppercase", letterSpacing: "0.5px" }}>Juz Hali</span>
-                                            <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
+                                          <div className="badal-progress-item">
+                                            <span className="badal-progress-label">Juz Hali</span>
+                                            <div className="badal-progress-value" style={{ flexWrap: "wrap" }}>
                                               {juzHali.type === "surah" ? (
                                                 <span className="arabic-kanz" style={{ fontSize: "0.9rem", color: "#3e2723" }}>{juzHali.from || "?"} — {juzHali.till || "?"}</span>
                                               ) : (
-                                                <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#3e2723" }}>{juzHali.from || "?"} — {juzHali.till || "?"}</span>
+                                                <span className="badal-progress-main">{juzHali.from || "?"} — {juzHali.till || "?"}</span>
                                               )}
-                                              {juzHali.marks && <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#2e7d32", marginLeft: "auto" }}>{juzHali.marks}/30</span>}
+                                              {juzHali.marks && <span className="badal-progress-marks" style={{ marginLeft: "auto" }}>{juzHali.marks}/10</span>}
                                             </div>
                                           </div>
                                         )}
                                       </div>
                                       {jadeed && (jadeed.from || jadeed.surah) && (
-                                        <div style={{ marginTop: "12px", padding: "12px 14px", background: "rgba(183,137,31,0.04)", borderRadius: "12px", border: "1px solid rgba(183,137,31,0.08)" }}>
-                                          <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#8d6e1f", textTransform: "uppercase", letterSpacing: "0.5px" }}>Jadeed</span>
+                                        <div className="badal-progress-jadeed-item">
+                                          <span className="badal-progress-label">Jadeed</span>
                                           <div style={{ marginTop: "4px" }}>
                                             {jadeed.type === "surah_ayat" ? (
                                               <span className="arabic-kanz" style={{ fontSize: "0.95rem", color: "#3e2723" }}>{jadeed.surah || "?"} {jadeed.ayat ? `(${jadeed.ayat})` : ""}</span>
@@ -12918,7 +12902,7 @@ function TeacherPortal({
                               );
                             })()
                           ) : (
-                            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
+                            <p className="badal-helper-text" style={{ textAlign: "center", padding: "20px 0" }}>
                               Select a child above to view their badal progress.
                             </p>
                           )}
@@ -12927,7 +12911,6 @@ function TeacherPortal({
                     </>
                   );
                 })()}
-              </div>
             </div>
           ) : null}
 
