@@ -4379,19 +4379,13 @@ function ParentPortal({
         const imgData = canvas.toDataURL("image/jpeg", 0.85);
         if (imgData.length < 5000) throw new Error("Capture failed");
 
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const imgProps = pdf.getImageProperties(imgData);
-        const margin = 5;
-        const maxWidth = pageWidth - margin * 2;
-        const maxHeight = pageHeight - margin * 2;
-        const fitScale = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
-        const finalWidth = imgProps.width * fitScale;
-        const finalHeight = imgProps.height * fitScale;
-        const x = (pageWidth - finalWidth) / 2;
-        const y = (pageHeight - finalHeight) / 2;
-        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const imgProps = pdf.getImageProperties(imgData);
+          const fitScale = pageWidth / imgProps.width;
+          const finalWidth = imgProps.width * fitScale;
+          const finalHeight = imgProps.height * fitScale;
+          pdf.addImage(imgData, "JPEG", 0, 0, finalWidth, finalHeight, undefined, 'FAST');
         const pdfBlob = pdf.output('blob');
         const dlResult = await downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (dlResult?.type === "native") {
@@ -4941,14 +4935,14 @@ function ParentPortal({
               id="parent-capture-zone"
               style={{ 
                 position: 'fixed', 
-                left: '-10000px', 
+                left: '0', 
                 top: '0', 
                 width: '794px', 
                 zIndex: -1000, 
                 background: 'white',
-                overflow: 'hidden',
                 height: isGeneratingPDF ? 'auto' : '1px',
-                visibility: isGeneratingPDF ? 'visible' : 'hidden'
+                opacity: 0,
+                pointerEvents: 'none'
               }}
             >
               {isGeneratingPDF && (
@@ -5017,31 +5011,16 @@ function ParentPortal({
                 </p>
                 <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
                   <button className="celebration-close-btn" onClick={async () => {
+                    const fp = downloadPopup.filePath;
                     try {
-                      const { Share } = await import("@capacitor/share");
-                      await Share.share({
-                        title: downloadPopup.fileName,
-                        text: downloadPopup.fileName,
-                        url: downloadPopup.filePath,
-                      });
-                    } catch (e) {
+                      const { AppLauncher } = await import("@capacitor/app-launcher");
+                      await AppLauncher.openUrl({ url: fp });
+                    } catch {
                       try {
-                        const { Filesystem, Directory } = await import("@capacitor/filesystem");
-                        const result = await Filesystem.readFile({
-                          path: downloadPopup.fileName,
-                          directory: Directory.Documents,
-                        });
-                        const byteString = atob(result.data);
-                        const ab = new ArrayBuffer(byteString.length);
-                        const ia = new Uint8Array(ab);
-                        for (let i = 0; i < byteString.length; i++) {
-                          ia[i] = byteString.charCodeAt(i);
-                        }
-                        const blob = new Blob([ab], { type: 'application/pdf' });
-                        const url = URL.createObjectURL(blob);
-                        window.open(url, '_blank');
-                      } catch (e2) {
-                        if (showAction) showAction("error", "Could not open file.");
+                        const { Share } = await import("@capacitor/share");
+                        await Share.share({ url: fp, title: downloadPopup.fileName });
+                      } catch {
+                        try { window.open(fp, '_blank'); } catch {}
                       }
                     }
                     setDownloadPopup(null);
@@ -6135,19 +6114,13 @@ const handleDownloadAllReports = async () => {
             throw new Error("Captured image is blank or too small.");
           }
 
-          const pdf = new jsPDF('p', 'mm', 'a4');
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          const imgProps = pdf.getImageProperties(imgData);
-          const margin = 5;
-          const maxWidth = pageWidth - margin * 2;
-          const maxHeight = pageHeight - margin * 2;
-          const fitScale = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
-          const finalWidth = imgProps.width * fitScale;
-          const finalHeight = imgProps.height * fitScale;
-          const x = (pageWidth - finalWidth) / 2;
-          const y = (pageHeight - finalHeight) / 2;
-          pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const imgProps = pdf.getImageProperties(imgData);
+        const fitScale = pageWidth / imgProps.width;
+        const finalWidth = imgProps.width * fitScale;
+        const finalHeight = imgProps.height * fitScale;
+        pdf.addImage(imgData, "JPEG", 0, 0, finalWidth, finalHeight, undefined, 'FAST');
           const pdfBlob = pdf.output("blob");
           const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
           zip.file(`${i+1}_${safeName}_Report.pdf`, pdfBlob);
@@ -9499,14 +9472,14 @@ const handleDownloadAllReports = async () => {
             id="bulk-capture-hidden-zone"
               style={{ 
                 position: 'fixed', 
-                left: '-10000px', 
+                left: '0', 
                 top: '0', 
                 width: '794px', 
                 zIndex: -1000, 
                 background: 'white',
-                overflow: 'hidden',
                 height: isGeneratingReports ? 'auto' : '1px',
-                visibility: isGeneratingReports ? 'visible' : 'hidden'
+                opacity: 0,
+                pointerEvents: 'none'
               }}
             >
               {isGeneratingReports && studentToRender && (
@@ -11561,17 +11534,11 @@ function TeacherPortal({
 
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
         const imgProps = pdf.getImageProperties(imgData);
-        const margin = 5;
-        const maxWidth = pageWidth - margin * 2;
-        const maxHeight = pageHeight - margin * 2;
-        const fitScale = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
+        const fitScale = pageWidth / imgProps.width;
         const finalWidth = imgProps.width * fitScale;
         const finalHeight = imgProps.height * fitScale;
-        const x = (pageWidth - finalWidth) / 2;
-        const y = (pageHeight - finalHeight) / 2;
-        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
+        pdf.addImage(imgData, "JPEG", 0, 0, finalWidth, finalHeight, undefined, 'FAST');
         const pdfBlob = pdf.output("blob");
         const dlResult = await downloadFile(pdfBlob, `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (dlResult?.type === "native") {
@@ -12592,14 +12559,14 @@ function TeacherPortal({
                 id="teacher-capture-zone"
               style={{ 
                 position: 'fixed', 
-                left: '-10000px', 
+                left: '0', 
                 top: '0', 
                 width: '794px', 
                 zIndex: -1000, 
                 background: 'white',
-                overflow: 'hidden',
                 height: isGeneratingTeacherPDF ? 'auto' : '1px',
-                visibility: isGeneratingTeacherPDF ? 'visible' : 'hidden'
+                opacity: 0,
+                pointerEvents: 'none'
               }}
             >
               {isGeneratingTeacherPDF && (
@@ -13638,14 +13605,17 @@ function TeacherPortal({
               </p>
               <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
                 <button className="celebration-close-btn" onClick={async () => {
+                  const fp = teacherDownloadPopup.filePath;
                   try {
-                    const { Share } = await import("@capacitor/share");
-                    await Share.share({
-                      url: teacherDownloadPopup.filePath,
-                      title: "Open Report",
-                    });
-                  } catch (e) {
-                    if (onShowAction) onShowAction("error", "Could not open file.");
+                    const { AppLauncher } = await import("@capacitor/app-launcher");
+                    await AppLauncher.openUrl({ url: fp });
+                  } catch {
+                    try {
+                      const { Share } = await import("@capacitor/share");
+                      await Share.share({ url: fp, title: "Open Report" });
+                    } catch {
+                      try { window.open(fp, '_blank'); } catch {}
+                    }
                   }
                   setTeacherDownloadPopup(null);
                 }}>
