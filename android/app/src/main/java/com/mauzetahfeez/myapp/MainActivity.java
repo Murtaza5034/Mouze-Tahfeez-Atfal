@@ -10,7 +10,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.view.KeyEvent;
@@ -22,8 +21,6 @@ import android.webkit.WebView;
 import android.webkit.URLUtil;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -38,32 +35,11 @@ public class MainActivity extends BridgeActivity {
     private static final int STORAGE_PERMISSION_REQUEST_CODE = 1001;
 
     private WebView webView;
-    private ActivityResultLauncher<Intent> storageAccessLauncher;
     private SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         prefs = getSharedPreferences("mauze_prefs", MODE_PRIVATE);
-
-        storageAccessLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                    Uri treeUri = result.getData().getData();
-                    if (treeUri != null) {
-                        getContentResolver().takePersistableUriPermission(treeUri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                        prefs.edit().putString("save_location_uri", treeUri.toString()).apply();
-                        runOnUiThread(() ->
-                            Toast.makeText(MainActivity.this, "Save folder set!", Toast.LENGTH_SHORT).show()
-                        );
-                        notifyJsStorageReady(true);
-                        return;
-                    }
-                }
-                notifyJsStorageReady(false);
-            }
-        );
 
         super.onCreate(savedInstanceState);
 
@@ -75,15 +51,6 @@ public class MainActivity extends BridgeActivity {
         });
 
         setupDownloadListener();
-    }
-
-    private void notifyJsStorageReady(boolean success) {
-        if (webView != null) {
-            webView.evaluateJavascript(
-                "javascript:(function(){if(window.__mauzeStorageCb){window.__mauzeStorageCb(" + success + ");window.__mauzeStorageCb=null;}})()",
-                null
-            );
-        }
     }
 
     public void requestStoragePermission() {
@@ -105,164 +72,166 @@ public class MainActivity extends BridgeActivity {
 
     private class MauzeDownloadInterface {
         @JavascriptInterface
-        public void download(String base64Data, String fileName) {
+        public boolean download(String base64Data, String fileName) {
             try {
                 byte[] fileBytes = Base64.decode(base64Data, Base64.DEFAULT);
                 String subfolder = getMauzeSubfolder(fileName);
-                String savedUri = prefs.getString("save_location_uri", null);
 
-                if (savedUri != null) {
-                    saveViaSAF(Uri.parse(savedUri), fileBytes, fileName, subfolder);
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    saveViaMediaStore(fileBytes, fileName, subfolder);
+                boolean saved = saveViaMediaStore(fileBytes, fileName, subfolder);
+
+                if (!saved) {
+                    saved = saveViaDirectFile(fileBytes, fileName, subfolder);
+                }
+
+                if (!saved) {
+                    saved = saveViaLegacyFile(fileBytes, fileName, subfolder);
+                }
+
+                if (saved) {
+                    return true;
                 } else {
-                    saveViaDirectFile(fileBytes, fileName, subfolder);
+                    runOnUiThread(() ->
+                        Toast.makeText(MainActivity.this,
+                                "Download failed. Please check storage permissions.",
+                                Toast.LENGTH_LONG).show()
+                    );
+                    return false;
                 }
             } catch (Exception e) {
                 e.printStackTrace();
                 runOnUiThread(() ->
                     Toast.makeText(MainActivity.this,
-                            "Download failed: " + e.getMessage(),
+                            "Download error: " + e.getMessage(),
                             Toast.LENGTH_LONG).show()
                 );
+                return false;
             }
+        }
+
+        @JavascriptInterface
+        public String downloadAndGetPath(String base64Data, String fileName) {
+            boolean ok = download(base64Data, fileName);
+            if (ok) {
+                String subfolder = getMauzeSubfolder(fileName);
+                return "Mauze Tahfeez/" + subfolder + "/" + fileName;
+            }
+            return "";
         }
 
         @JavascriptInterface
         public void requestStorageAccess() {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                          | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            storageAccessLauncher.launch(intent);
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                requestStoragePermission();
+            }
         }
 
         @JavascriptInterface
         public boolean isStorageAccessGranted() {
-            return prefs.getString("save_location_uri", null) != null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                return true;
+            }
+            return ContextCompat.checkSelfPermission(MainActivity.this,
+                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_GRANTED;
         }
 
         @JavascriptInterface
         public String getSaveLocationPath() {
-            String uri = prefs.getString("save_location_uri", "");
-            return uri.isEmpty() ? "Not set" : uri;
+            return "Mauze Tahfeez/";
         }
 
-        private void saveViaSAF(Uri treeUri, byte[] fileBytes,
-                                String fileName, String subfolder) throws Exception {
-            Uri mauzeDir = ensureSubfolder(treeUri, "Mauze Tahfeez");
-            if (mauzeDir == null) {
-                runOnUiThread(() -> Toast.makeText(MainActivity.this,
-                        "Could not create save folder. Please re-select.",
-                        Toast.LENGTH_LONG).show());
-                prefs.edit().remove("save_location_uri").apply();
-                notifyJsStorageReady(false);
-                return;
-            }
-            Uri subDir = ensureSubfolder(mauzeDir, subfolder);
-            if (subDir == null) subDir = mauzeDir;
-
-            String mimeType = getMimeType(fileName);
-            Uri fileUri = DocumentsContract.createDocument(
-                    getContentResolver(), subDir, mimeType, fileName);
-            if (fileUri == null) {
-                String base = fileName.contains(".")
-                    ? fileName.substring(0, fileName.lastIndexOf('.'))
-                    : fileName;
-                String ext = fileName.contains(".")
-                    ? fileName.substring(fileName.lastIndexOf('.'))
-                    : "";
-                fileUri = DocumentsContract.createDocument(
-                    getContentResolver(), subDir, mimeType,
-                    base + "_" + System.currentTimeMillis() + ext);
-            }
-            if (fileUri != null) {
-                try (OutputStream os = getContentResolver().openOutputStream(fileUri)) {
-                    os.write(fileBytes);
-                }
-                runOnUiThread(() ->
-                    Toast.makeText(MainActivity.this,
-                            "Saved to your folder/" + subfolder + "/",
-                            Toast.LENGTH_SHORT).show()
-                );
-            }
-        }
-
-        private Uri ensureSubfolder(Uri parentUri, String name) throws Exception {
-            Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                    parentUri, DocumentsContract.getTreeDocumentId(parentUri));
-            try (android.database.Cursor c = getContentResolver().query(childrenUri,
-                    new String[]{
-                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                        DocumentsContract.Document.COLUMN_MIME_TYPE
-                    }, null, null, null)) {
-                while (c != null && c.moveToNext()) {
-                    String mime = c.getString(2);
-                    String displayName = c.getString(1);
-                    if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)
-                            && name.equals(displayName)) {
-                        String docId = c.getString(0);
-                        return DocumentsContract.buildDocumentUriUsingTree(
-                                parentUri, docId);
+        private boolean saveViaMediaStore(byte[] fileBytes, String fileName,
+                                          String subfolder) {
+            try {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+                values.put(MediaStore.Downloads.MIME_TYPE, getMimeType(fileName));
+                String relativePath = "Mauze Tahfeez/" + subfolder;
+                values.put(MediaStore.Downloads.RELATIVE_PATH, relativePath);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    Uri uri = getContentResolver().insert(
+                            MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (uri != null) {
+                        try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+                            if (os != null) {
+                                os.write(fileBytes);
+                                os.flush();
+                            }
+                        }
+                        runOnUiThread(() ->
+                            Toast.makeText(MainActivity.this,
+                                    "Saved to " + relativePath + "/",
+                                    Toast.LENGTH_SHORT).show()
+                        );
+                        return true;
                     }
                 }
             } catch (Exception ignored) {}
-            return DocumentsContract.createDocument(
-                    getContentResolver(), parentUri,
-                    DocumentsContract.Document.MIME_TYPE_DIR, name);
+            return false;
         }
 
-        private void saveViaMediaStore(byte[] fileBytes, String fileName,
-                                       String subfolder) throws Exception {
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
-            values.put(MediaStore.Downloads.MIME_TYPE, getMimeType(fileName));
-            values.put(MediaStore.Downloads.RELATIVE_PATH,
-                    "Mauze Tahfeez/" + subfolder);
-            Uri uri = getContentResolver().insert(
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-            if (uri != null) {
-                try (OutputStream os = getContentResolver().openOutputStream(uri)) {
-                    os.write(fileBytes);
+        private boolean saveViaDirectFile(byte[] fileBytes, String fileName,
+                                          String subfolder) {
+            try {
+                File downloadsDir = Environment.getExternalStoragePublicDirectory(
+                        Environment.DIRECTORY_DOWNLOADS);
+                File mauzeDir = new File(downloadsDir, "Mauze Tahfeez/" + subfolder);
+                if (!mauzeDir.exists()) {
+                    mauzeDir.mkdirs();
                 }
+                File destFile = new File(mauzeDir, fileName);
+                try (FileOutputStream fos = new FileOutputStream(destFile)) {
+                    fos.write(fileBytes);
+                    fos.flush();
+                }
+                Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                intent.setData(Uri.fromFile(destFile));
+                sendBroadcast(intent);
                 runOnUiThread(() ->
                     Toast.makeText(MainActivity.this,
                             "Saved to Mauze Tahfeez/" + subfolder + "/",
                             Toast.LENGTH_SHORT).show()
                 );
+                return true;
+            } catch (Exception ignored) {
+                return false;
             }
         }
 
-        private void saveViaDirectFile(byte[] fileBytes, String fileName,
-                                       String subfolder) throws Exception {
-            if (ContextCompat.checkSelfPermission(MainActivity.this,
-                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
-                requestStoragePermission();
+        private boolean saveViaLegacyFile(byte[] fileBytes, String fileName,
+                                          String subfolder) {
+            try {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this,
+                            android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            != PackageManager.PERMISSION_GRANTED) {
+                        requestStoragePermission();
+                        return false;
+                    }
+                }
+                File downloadsDir = Environment.getExternalStoragePublicDirectory(
+                        Environment.DIRECTORY_DOWNLOADS);
+                File mauzeDir = new File(downloadsDir, "Mauze Tahfeez/" + subfolder);
+                if (!mauzeDir.exists()) {
+                    mauzeDir.mkdirs();
+                }
+                File destFile = new File(mauzeDir, fileName);
+                try (FileOutputStream fos = new FileOutputStream(destFile)) {
+                    fos.write(fileBytes);
+                    fos.flush();
+                }
+                Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                intent.setData(Uri.fromFile(destFile));
+                sendBroadcast(intent);
                 runOnUiThread(() ->
                     Toast.makeText(MainActivity.this,
-                            "Storage permission needed. Please try again.",
-                            Toast.LENGTH_LONG).show()
+                            "Saved to Mauze Tahfeez/" + subfolder + "/",
+                            Toast.LENGTH_SHORT).show()
                 );
-                return;
+                return true;
+            } catch (Exception ignored) {
+                return false;
             }
-            File downloadsDir = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS);
-            File mauzeDir = new File(downloadsDir,
-                    "Mauze Tahfeez/" + subfolder);
-            mauzeDir.mkdirs();
-            File destFile = new File(mauzeDir, fileName);
-            try (FileOutputStream fos = new FileOutputStream(destFile)) {
-                fos.write(fileBytes);
-            }
-            Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-            intent.setData(Uri.fromFile(destFile));
-            sendBroadcast(intent);
-            runOnUiThread(() ->
-                Toast.makeText(MainActivity.this,
-                        "Saved to Mauze Tahfeez/" + subfolder + "/",
-                        Toast.LENGTH_SHORT).show()
-            );
         }
     }
 
@@ -382,10 +351,27 @@ public class MainActivity extends BridgeActivity {
                             DownloadManager.Request
                                     .VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
-                    request.setDestinationInExternalPublicDir(
-                            Environment.DIRECTORY_DOWNLOADS,
-                            relativePath
-                    );
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        ContentValues values = new ContentValues();
+                        values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+                        values.put(MediaStore.Downloads.MIME_TYPE,
+                                mimeType != null ? mimeType : getMimeType(fileName));
+                        values.put(MediaStore.Downloads.RELATIVE_PATH,
+                                "Mauze Tahfeez/" + subfolder);
+                        Uri destUri = getContentResolver().insert(
+                                MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                        if (destUri != null) {
+                            request.setDestinationUri(destUri);
+                        } else {
+                            request.setDestinationInExternalPublicDir(
+                                    Environment.DIRECTORY_DOWNLOADS,
+                                    relativePath);
+                        }
+                    } else {
+                        request.setDestinationInExternalPublicDir(
+                                Environment.DIRECTORY_DOWNLOADS,
+                                relativePath);
+                    }
 
                     String cookies =
                             CookieManager.getInstance().getCookie(url);

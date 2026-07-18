@@ -9,24 +9,31 @@ function getFileSubfolder(name) {
 
 export async function requestStorageAccess() {
   if (!window.MauzeDownloader) return false;
-  return new Promise((resolve) => {
-    window.__mauzeStorageCb = (success) => resolve(success);
+  if (window.MauzeDownloader.isStorageAccessGranted()) return true;
+  try {
     window.MauzeDownloader.requestStorageAccess();
-    setTimeout(() => {
-      if (window.__mauzeStorageCb) {
-        window.__mauzeStorageCb = null;
-        resolve(false);
-      }
-    }, 120000);
-  });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return window.MauzeDownloader.isStorageAccessGranted();
+  } catch {
+    return false;
+  }
 }
 
 export function isStorageAccessGranted() {
-  return window.MauzeDownloader?.isStorageAccessGranted() === true;
+  if (!window.MauzeDownloader) return false;
+  try {
+    return window.MauzeDownloader.isStorageAccessGranted() === true;
+  } catch {
+    return false;
+  }
 }
 
 export function getSaveLocation() {
-  return window.MauzeDownloader?.getSaveLocationPath() || "Not set";
+  try {
+    return window.MauzeDownloader?.getSaveLocationPath() || "Not set";
+  } catch {
+    return "Not set";
+  }
 }
 
 export async function downloadFile(urlOrBlob, name) {
@@ -34,65 +41,21 @@ export async function downloadFile(urlOrBlob, name) {
     let blob;
     if (typeof urlOrBlob === "string") {
       const response = await fetch(urlOrBlob);
+      if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
       blob = await response.blob();
     } else {
       blob = urlOrBlob;
     }
 
     if (window.Capacitor?.isNativePlatform()) {
-      const reader = new FileReader();
-      const base64 = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      const base64Data = base64.split(",")[1];
-
-      if (window.MauzeDownloader) {
-        if (!window.MauzeDownloader.isStorageAccessGranted()) {
-          const granted = await requestStorageAccess();
-          if (!granted) {
-            return { type: "cancelled" };
-          }
-        }
-        window.MauzeDownloader.download(base64Data, name);
-        const subfolder = getFileSubfolder(name);
-        return { type: "native", filePath: `Mauze Tahfeez/${subfolder}/${name}` };
-      }
-
-      const { Filesystem, Directory } = await import("@capacitor/filesystem");
-      const subfolder = getFileSubfolder(name);
-      const relativePath = `Mauze Tahfeez/${subfolder}/${name}`;
-
-      let result;
-      try {
-        await Filesystem.writeFile({
-          path: `Download/${relativePath}`,
-          data: base64Data,
-          directory: Directory.ExternalStorage,
-        });
-        result = await Filesystem.getUri({
-          path: `Download/${relativePath}`,
-          directory: Directory.ExternalStorage,
-        });
-      } catch (_) {
-        await Filesystem.writeFile({
-          path: relativePath,
-          data: base64Data,
-          directory: Directory.Documents,
-        });
-        result = await Filesystem.getUri({
-          path: relativePath,
-          directory: Directory.Documents,
-        });
-      }
-      return { type: "native", filePath: result.uri };
+      return await nativeDownload(blob, name);
     }
 
     const { saveAs } = await import("file-saver");
     saveAs(blob, name);
     return { type: "web" };
-  } catch {
+  } catch (err) {
+    console.error("downloadFile error:", err);
     if (typeof urlOrBlob === "string") {
       const link = document.createElement("a");
       link.href = urlOrBlob;
@@ -102,7 +65,58 @@ export async function downloadFile(urlOrBlob, name) {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      return { type: "web" };
     }
-    return { type: "web" };
+    throw err;
   }
+}
+
+async function nativeDownload(blob, name) {
+  const reader = new FileReader();
+  const base64 = await new Promise((resolve, reject) => {
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+  const base64Data = base64.split(",")[1];
+
+  if (window.MauzeDownloader) {
+    await requestStorageAccess();
+    const savedPath = window.MauzeDownloader.downloadAndGetPath(base64Data, name);
+    if (savedPath) {
+      return { type: "native", filePath: savedPath };
+    }
+  }
+
+  const { Filesystem, Directory } = await import("@capacitor/filesystem");
+  const subfolder = getFileSubfolder(name);
+  const relativePath = `Mauze Tahfeez/${subfolder}/${name}`;
+
+  let result;
+  try {
+    await Filesystem.writeFile({
+      path: relativePath,
+      data: base64Data,
+      directory: Directory.Documents,
+    });
+    result = await Filesystem.getUri({
+      path: relativePath,
+      directory: Directory.Documents,
+    });
+  } catch {
+    try {
+      await Filesystem.writeFile({
+        path: `Download/${relativePath}`,
+        data: base64Data,
+        directory: Directory.ExternalStorage,
+      });
+      result = await Filesystem.getUri({
+        path: `Download/${relativePath}`,
+        directory: Directory.ExternalStorage,
+      });
+    } catch {
+      throw new Error("Failed to save file via any storage method.");
+    }
+  }
+  return { type: "native", filePath: result.uri };
 }

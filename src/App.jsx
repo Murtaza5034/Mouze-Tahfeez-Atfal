@@ -559,6 +559,20 @@ const PREMIUM_NOTIFICATION_CSS = `
 `;
 
 
+async function captureWithRetry(captureFn, maxRetries = 2) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const canvas = await captureFn();
+    if (canvas && canvas.width > 10 && canvas.height > 10) {
+      const testData = canvas.toDataURL("image/jpeg", 0.5);
+      if (testData.length > 5000) return canvas;
+    }
+    if (attempt < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  return captureFn();
+}
+
 const loadFcmService = async () => {
   const mod = await import("./fcmService");
   return mod.default;
@@ -584,8 +598,21 @@ const loadSaveAs = async () => {
   return mod.saveAs;
 };
 
+function getFontBaseUrl() {
+  if (typeof window !== "undefined" && window.location) {
+    return window.location.origin;
+  }
+  return "";
+}
+
+function makeFontUrlsAbsolute(css) {
+  const base = getFontBaseUrl();
+  if (!base || base === "null" || base === "undefined") return css;
+  return css.replace(/url\(\s*['"]?\//g, `url('${base}/`);
+}
+
 // @font-face CSS for injection into html2canvas cloned document (ensures Kanz al Marjaan renders in PDFs)
-const FONT_FACE_CSS = `
+const FONT_FACE_CSS = makeFontUrlsAbsolute(`
 @font-face {
   font-family: 'Kanz al Marjaan';
   src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
@@ -616,18 +643,21 @@ const FONT_FACE_CSS = `
   font-style: normal;
   font-display: swap;
 }
-`;
+`);
+
+function makeFontSrcAbsolute(src) {
+  const base = getFontBaseUrl();
+  if (!base || base === "null" || base === "undefined") return src;
+  return src.replace(/url\(\s*['"]?\//g, `url('${base}/`);
+}
 
 const loadCustomFontsForCanvas = async () => {
-  const timeout = setTimeout(() => { throw new Error("Font loading timed out"); }, 8000);
   try {
-    // Wait for any browser-triggered font loading to settle
     await Promise.race([
       document.fonts.ready,
       new Promise(resolve => setTimeout(resolve, 2000)),
     ]);
 
-    // Explicitly load Kanz al Marjaan via FontFace API
     const fontUrls = [
       {
         family: "Kanz al Marjaan",
@@ -660,20 +690,18 @@ const loadCustomFontsForCanvas = async () => {
     for (const { family, sources } of fontUrls) {
       const testStr = "abcdefghijklmnopqrstuvwxyz0123456789";
       if (!document.fonts.check(`1em "${family}"`, testStr)) {
-        const ff = new FontFace(family, sources.join(", "));
+        const absoluteSources = sources.map(s => makeFontSrcAbsolute(s));
+        const ff = new FontFace(family, absoluteSources.join(", "));
         await ff.load();
         document.fonts.add(ff);
       }
     }
 
-    // One final wait to ensure everything is settled
     await Promise.race([
       document.fonts.ready,
       new Promise(resolve => setTimeout(resolve, 3000)),
     ]);
-    clearTimeout(timeout);
   } catch (err) {
-    clearTimeout(timeout);
     console.warn("Custom font loading for canvas capture failed:", err);
   }
 };
@@ -2951,15 +2979,13 @@ function RankPreview({ students }) {
   };
 
   const rankedStudents = useMemo(() => {
-    const withScores = studentList
-      .filter(s => s.latestResult)
-      .map(s => ({
-        ...s,
-        score: calculateEffectiveScore(s.latestResult),
-        jadeed: Number(s.latestResult.jadeed) || 0,
-        jadeedPages: Number(String(s.latestResult.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0,
-        attendance: Number(s.latestResult.attendance_count) || 0,
-      }));
+    const withScores = studentList.map(s => ({
+      ...s,
+      score: s.latestResult ? calculateEffectiveScore(s.latestResult) : 0,
+      jadeed: Number(s.latestResult?.jadeed) || 0,
+      jadeedPages: Number(String(s.latestResult?.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0,
+      attendance: Number(s.latestResult?.attendance_count) || 0,
+    }));
     
     withScores.sort((a, b) => {
       const scoreDiff = b.score - a.score;
@@ -3008,23 +3034,42 @@ function RankPreview({ students }) {
       const { default: html2canvas } = await import("html2canvas");
       const { jsPDF } = await import("jspdf");
 
-      const canvas = await html2canvas(tableRef.current, {
-        scale: 2,
+      await loadCustomFontsForCanvas();
+      const elementRect = tableRef.current.getBoundingClientRect();
+      const isMobile = window.innerWidth < 768;
+      const captureScale = isMobile ? 1.5 : 2;
+      const canvas = await captureWithRetry(() => html2canvas(tableRef.current, {
+        scale: captureScale,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-      });
+        width: elementRect.width,
+        height: elementRect.height,
+        onclone: async (clonedDoc) => {
+          const style = clonedDoc.createElement('style');
+          style.textContent = FONT_FACE_CSS;
+          clonedDoc.head.appendChild(style);
+          try {
+            await Promise.race([
+              clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
+              new Promise(resolve => setTimeout(resolve, 4000)),
+            ]);
+          } catch (e) { /* ignore */ }
+        },
+      }), 2);
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      if (imgData.length < 5000) throw new Error("Capture produced blank image");
       const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 8;
       const maxWidth = pageWidth - margin * 2;
       const maxHeight = pageHeight - margin * 2;
-      const fitScale = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
-      const imgWidth = canvas.width * fitScale;
-      const imgHeight = canvas.height * fitScale;
+      const imgProps = pdf.getImageProperties(imgData);
+      const fitScale = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
+      const imgWidth = imgProps.width * fitScale;
+      const imgHeight = imgProps.height * fitScale;
       const x = (pageWidth - imgWidth) / 2;
       const y = (pageHeight - imgHeight) / 2;
       pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight, undefined, 'FAST');
@@ -4304,33 +4349,36 @@ function ParentPortal({
     if (element) {
       try {
         await new Promise(resolve => setTimeout(resolve, 500));
-        // Ensure custom fonts are loaded
         await loadCustomFontsForCanvas();
         const [html2canvas, jsPDF] = await Promise.all([
           loadHtml2Canvas(),
           loadJsPDF(),
         ]);
-        const canvas = await html2canvas(element, {
-          scale: 2,
+        const isMobile = window.innerWidth < 768;
+        const captureScale = isMobile ? 1.5 : 2;
+        const elementRect = element.getBoundingClientRect();
+        const canvas = await captureWithRetry(() => html2canvas(element, {
+          scale: captureScale,
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
+          width: elementRect.width,
+          height: elementRect.height,
           onclone: async (clonedDoc) => {
             const style = clonedDoc.createElement('style');
             style.textContent = FONT_FACE_CSS;
             clonedDoc.head.appendChild(style);
-            if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+            try {
               await Promise.race([
-                clonedDoc.fonts.ready,
-                new Promise(resolve => setTimeout(resolve, 3000)),
+                clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
+                new Promise(resolve => setTimeout(resolve, 4000)),
               ]);
-            }
+            } catch (e) { /* ignore */ }
           },
-        });
-        const imgData = canvas.toDataURL("image/jpeg", 0.75); // reduced quality for smaller size
+        }), 2);
+        const imgData = canvas.toDataURL("image/jpeg", 0.85);
         if (imgData.length < 5000) throw new Error("Capture failed");
 
-        // Fit image to A4 page with proper scaling and centering
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
@@ -4970,22 +5018,31 @@ function ParentPortal({
                 <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
                   <button className="celebration-close-btn" onClick={async () => {
                     try {
-                      const { Filesystem, Directory } = await import("@capacitor/filesystem");
-                      const result = await Filesystem.readFile({
-                        path: downloadPopup.fileName,
-                        directory: Directory.Documents,
+                      const { Share } = await import("@capacitor/share");
+                      await Share.share({
+                        title: downloadPopup.fileName,
+                        text: downloadPopup.fileName,
+                        url: downloadPopup.filePath,
                       });
-                      const byteString = atob(result.data);
-                      const ab = new ArrayBuffer(byteString.length);
-                      const ia = new Uint8Array(ab);
-                      for (let i = 0; i < byteString.length; i++) {
-                        ia[i] = byteString.charCodeAt(i);
-                      }
-                      const blob = new Blob([ab], { type: 'application/pdf' });
-                      const url = URL.createObjectURL(blob);
-                      window.open(url, '_blank');
                     } catch (e) {
-                      if (showAction) showAction("error", "Could not open file.");
+                      try {
+                        const { Filesystem, Directory } = await import("@capacitor/filesystem");
+                        const result = await Filesystem.readFile({
+                          path: downloadPopup.fileName,
+                          directory: Directory.Documents,
+                        });
+                        const byteString = atob(result.data);
+                        const ab = new ArrayBuffer(byteString.length);
+                        const ia = new Uint8Array(ab);
+                        for (let i = 0; i < byteString.length; i++) {
+                          ia[i] = byteString.charCodeAt(i);
+                        }
+                        const blob = new Blob([ab], { type: 'application/pdf' });
+                        const url = URL.createObjectURL(blob);
+                        window.open(url, '_blank');
+                      } catch (e2) {
+                        if (showAction) showAction("error", "Could not open file.");
+                      }
                     }
                     setDownloadPopup(null);
                   }}>
@@ -6048,33 +6105,36 @@ const handleDownloadAllReports = async () => {
 
       if (element) {
         try {
-          // Extra small delay to ensure images inside the element are settled
-          await new Promise(resolve => setTimeout(resolve, 500)); 
+          await new Promise(resolve => setTimeout(resolve, 500));
 
-          const canvas = await html2canvas(element, {
-            scale: 2,
+          const isMobile = window.innerWidth < 768;
+          const captureScale = isMobile ? 1.5 : 2;
+          const elementRect = element.getBoundingClientRect();
+          const canvas = await captureWithRetry(() => html2canvas(element, {
+            scale: captureScale,
             useCORS: true,
             allowTaint: true,
             backgroundColor: "#ffffff",
+            width: elementRect.width,
+            height: elementRect.height,
             onclone: async (clonedDoc) => {
               const style = clonedDoc.createElement('style');
               style.textContent = FONT_FACE_CSS;
               clonedDoc.head.appendChild(style);
-              if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+              try {
                 await Promise.race([
-                  clonedDoc.fonts.ready,
-                  new Promise(resolve => setTimeout(resolve, 3000)),
+                  clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
+                  new Promise(resolve => setTimeout(resolve, 4000)),
                 ]);
-              }
+              } catch (e) { /* ignore */ }
             },
-          });
+          }), 2);
           
           const imgData = canvas.toDataURL("image/jpeg", 0.85);
           if (imgData.length < 5000) {
             throw new Error("Captured image is blank or too small.");
           }
 
-          // Fit image to A4 page with proper scaling and centering
           const pdf = new jsPDF('p', 'mm', 'a4');
           const pageWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
@@ -6122,25 +6182,6 @@ const handleDownloadAllReports = async () => {
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
-  const isOtpTeacher = !userAssignedRoles.includes('admin');
-  // Compute teacher match IDs once (not per student) to avoid O(n*m) filtering
-  const teacherMatchIds = isOtpTeacher ? (() => {
-    const uid = String(user?.id || '');
-    const profileIds = (teacherProfiles || [])
-      .filter(t => String(t.user_id) === uid)
-      .flatMap(t => [String(t.id), String(t.user_id)]);
-    const portalIds = (portalAccessList || [])
-      .filter(p => p.portal_role === 'teacher' && String(p.user_id) === uid)
-      .map(p => String(p.user_id));
-    return [...new Set([...profileIds, ...portalIds])];
-  })() : [];
-  const rankPreviewStudents = isOtpTeacher
-    ? students.filter(s => teacherMatchIds.some(id =>
-        String(s.muhaffiz_id) === id ||
-        String(s.original_teacher_id) === id ||
-        String(s.badal_teacher_id) === id
-      ))
-    : students;
 
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
@@ -6769,7 +6810,7 @@ const handleDownloadAllReports = async () => {
               <LazyAppUpdateManager onBroadcastNotification={broadcastNotification} />
             </Suspense>
           ) : null}
-          {activePage === "Rank Preview" ? (            <RankPreview students={rankPreviewStudents} />          ) : null}
+          {activePage === "Rank Preview" ? (            <RankPreview students={students} />          ) : null}
           {activePage === "Student Registry" && (
             <div className="admin-section fade-in">
               <div className="section-header">
@@ -11492,28 +11533,32 @@ function TeacherPortal({
           loadHtml2Canvas(),
           loadJsPDF(),
         ]);
-        const canvas = await html2canvas(element, {
-          scale: 2,
+        const isMobile = window.innerWidth < 768;
+        const captureScale = isMobile ? 1.5 : 2;
+        const elementRect = element.getBoundingClientRect();
+        const canvas = await captureWithRetry(() => html2canvas(element, {
+          scale: captureScale,
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
+          width: elementRect.width,
+          height: elementRect.height,
           onclone: async (clonedDoc) => {
             const style = clonedDoc.createElement('style');
             style.textContent = FONT_FACE_CSS;
             clonedDoc.head.appendChild(style);
-            if (clonedDoc.fonts && clonedDoc.fonts.ready) {
+            try {
               await Promise.race([
-                clonedDoc.fonts.ready,
-                new Promise(resolve => setTimeout(resolve, 3000)),
+                clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
+                new Promise(resolve => setTimeout(resolve, 4000)),
               ]);
-            }
+            } catch (e) { /* ignore */ }
           },
-        });
+        }), 2);
 
         const imgData = canvas.toDataURL("image/jpeg", 0.85);
         if (imgData.length < 5000) throw new Error("Capture failed");
 
-        // Fit image to A4 page with proper scaling and centering
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();

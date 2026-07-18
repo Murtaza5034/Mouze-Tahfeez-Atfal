@@ -56,7 +56,20 @@ const NoToggleButton = ({ value, onChange, label }) => {
   );
 };
 
-const FONT_FACE_CSS = `
+function getFontBaseUrl() {
+  if (typeof window !== "undefined" && window.location) {
+    return window.location.origin;
+  }
+  return "";
+}
+
+function makeFontUrlsAbsolute(css) {
+  const base = getFontBaseUrl();
+  if (!base || base === "null" || base === "undefined") return css;
+  return css.replace(/url\(\s*['"]?\//g, `url('${base}/`);
+}
+
+const FONT_FACE_CSS = makeFontUrlsAbsolute(`
 @font-face {
   font-family: 'Kanz al Marjaan';
   src: url('/Kanz%20al%20Marjaan/kanz-al-marjaan-webfont.woff2') format('woff2'),
@@ -73,7 +86,7 @@ const FONT_FACE_CSS = `
   font-style: normal;
   font-display: swap;
 }
-`;
+`);
 
 const hexToRgb = (hex) => {
   const c = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '#ffffff');
@@ -912,23 +925,38 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
     }
     document.body.appendChild(container);
 
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      onclone: async (clonedDoc) => {
-        const style = clonedDoc.createElement('style');
-        style.textContent = FONT_FACE_CSS;
-        clonedDoc.head.appendChild(style);
-        if (clonedDoc.fonts && clonedDoc.fonts.ready) {
-          await Promise.race([
-            clonedDoc.fonts.ready,
-            new Promise(resolve => setTimeout(resolve, 3000)),
-          ]);
-        }
-      },
-    });
+    const isMobile = window.innerWidth < 768;
+    const captureScale = isMobile ? 1.5 : 2;
+    const retries = 2;
+    let canvas = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      canvas = await html2canvas(container, {
+        scale: captureScale,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: container.offsetWidth,
+        height: container.offsetHeight,
+        onclone: async (clonedDoc) => {
+          const style = clonedDoc.createElement('style');
+          style.textContent = FONT_FACE_CSS;
+          clonedDoc.head.appendChild(style);
+          try {
+            await Promise.race([
+              clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
+              new Promise(resolve => setTimeout(resolve, 4000)),
+            ]);
+          } catch (e) { /* ignore */ }
+        },
+      });
+      if (canvas && canvas.width > 10 && canvas.height > 10) {
+        const testData = canvas.toDataURL("image/jpeg", 0.5);
+        if (testData.length > 5000) break;
+      }
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
 
     const imgData = canvas.toDataURL("image/jpeg", 0.85);
     if (pi > 0) pdf.addPage();
