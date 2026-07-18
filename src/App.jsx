@@ -4941,7 +4941,7 @@ function ParentPortal({
                 zIndex: -1000, 
                 background: 'white',
                 height: isGeneratingPDF ? 'auto' : '1px',
-                opacity: 0,
+                opacity: isGeneratingPDF ? 1 : 0,
                 pointerEvents: 'none'
               }}
             >
@@ -9478,7 +9478,7 @@ const handleDownloadAllReports = async () => {
                 zIndex: -1000, 
                 background: 'white',
                 height: isGeneratingReports ? 'auto' : '1px',
-                opacity: 0,
+                opacity: isGeneratingReports ? 1 : 0,
                 pointerEvents: 'none'
               }}
             >
@@ -12555,22 +12555,22 @@ function TeacherPortal({
               </section>
 
               {/* Hidden capture zone for Teacher PDF download */}
-              <div 
-                id="teacher-capture-zone"
-              style={{ 
-                position: 'fixed', 
-                left: '0', 
-                top: '0', 
-                width: '794px', 
-                zIndex: -1000, 
-                background: 'white',
-                height: isGeneratingTeacherPDF ? 'auto' : '1px',
-                opacity: 0,
-                pointerEvents: 'none'
-              }}
-            >
-              {isGeneratingTeacherPDF && (
-                <div id="teacher-capture-content" style={{ background: 'white' }}>
+          <div 
+            id="teacher-capture-zone"
+          style={{ 
+            position: 'fixed', 
+            left: '0', 
+            top: '0', 
+            width: '794px', 
+            zIndex: -1000, 
+            background: 'white',
+            height: isGeneratingTeacherPDF ? 'auto' : '1px',
+            opacity: isGeneratingTeacherPDF ? 1 : 0,
+            pointerEvents: 'none'
+          }}
+        >
+          {isGeneratingTeacherPDF && (
+            <div id="teacher-capture-content" style={{ background: 'white' }}>
                     <TahfeezReportCard
                       student={selectedStudent}
                       weeklyResult={liveResult}
