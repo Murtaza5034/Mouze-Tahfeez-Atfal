@@ -4381,11 +4381,17 @@ function ParentPortal({
 
           const pdf = new jsPDF('p', 'mm', 'a4');
           const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const margin = 8;
+          const maxW = pageWidth - margin * 2;
+          const maxH = pageHeight - margin * 2;
           const imgProps = pdf.getImageProperties(imgData);
-          const fitScale = pageWidth / imgProps.width;
+          const fitScale = Math.min(maxW / imgProps.width, maxH / imgProps.height);
           const finalWidth = imgProps.width * fitScale;
           const finalHeight = imgProps.height * fitScale;
-          pdf.addImage(imgData, "JPEG", 0, 0, finalWidth, finalHeight, undefined, 'FAST');
+          const x = (pageWidth - finalWidth) / 2;
+          const y = (pageHeight - finalHeight) / 2;
+          pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
         const pdfBlob = pdf.output('blob');
         const dlResult = await downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (dlResult?.type === "native") {
@@ -6116,11 +6122,17 @@ const handleDownloadAllReports = async () => {
 
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 8;
+        const maxW = pageWidth - margin * 2;
+        const maxH = pageHeight - margin * 2;
         const imgProps = pdf.getImageProperties(imgData);
-        const fitScale = pageWidth / imgProps.width;
+        const fitScale = Math.min(maxW / imgProps.width, maxH / imgProps.height);
         const finalWidth = imgProps.width * fitScale;
         const finalHeight = imgProps.height * fitScale;
-        pdf.addImage(imgData, "JPEG", 0, 0, finalWidth, finalHeight, undefined, 'FAST');
+        const x = (pageWidth - finalWidth) / 2;
+        const y = (pageHeight - finalHeight) / 2;
+        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
           const pdfBlob = pdf.output("blob");
           const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
           zip.file(`${i+1}_${safeName}_Report.pdf`, pdfBlob);
@@ -11534,11 +11546,17 @@ function TeacherPortal({
 
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 8;
+        const maxW = pageWidth - margin * 2;
+        const maxH = pageHeight - margin * 2;
         const imgProps = pdf.getImageProperties(imgData);
-        const fitScale = pageWidth / imgProps.width;
+        const fitScale = Math.min(maxW / imgProps.width, maxH / imgProps.height);
         const finalWidth = imgProps.width * fitScale;
         const finalHeight = imgProps.height * fitScale;
-        pdf.addImage(imgData, "JPEG", 0, 0, finalWidth, finalHeight, undefined, 'FAST');
+        const x = (pageWidth - finalWidth) / 2;
+        const y = (pageHeight - finalHeight) / 2;
+        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
         const pdfBlob = pdf.output("blob");
         const dlResult = await downloadFile(pdfBlob, `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
         if (dlResult?.type === "native") {

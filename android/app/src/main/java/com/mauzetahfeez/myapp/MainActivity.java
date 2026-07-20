@@ -156,6 +156,8 @@ public class MainActivity extends BridgeActivity {
                             if (os != null) {
                                 os.write(fileBytes);
                                 os.flush();
+                            } else {
+                                return false;
                             }
                         }
                         runOnUiThread(() ->

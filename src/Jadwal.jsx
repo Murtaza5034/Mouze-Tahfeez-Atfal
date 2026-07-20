@@ -882,9 +882,10 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
   const margin = 10;
   const printableWidth = 210 - margin * 2;
   const printableHeight = 297 - margin * 2;
-  const pageLimit = (containerWidth + 80) * (printableHeight / printableWidth);
+  const containerOuterWidth = containerWidth + 80;
+  const pageLimit = containerOuterWidth * (printableHeight / printableWidth);
   const measureEl = document.createElement("div");
-  measureEl.style.cssText = `position:fixed;left:0;top:0;z-index:-10000;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+  measureEl.style.cssText = `position:fixed;left:0;top:0;z-index:-10000;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;box-sizing:content-box;`;
   document.body.appendChild(measureEl);
 
   let pageGroups = [];
@@ -911,11 +912,13 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
   // Render each page group as a separate html2canvas → PDF page
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
 
   for (let pi = 0; pi < pageGroups.length; pi++) {
     const group = pageGroups[pi];
     const container = document.createElement("div");
-    container.style.cssText = `position:fixed;left:0;top:0;z-index:-10000;width:${containerWidth}px;padding:40px;min-height:${pageLimit}px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;`;
+    container.style.cssText = `position:fixed;left:0;top:0;z-index:-10000;width:${containerWidth}px;padding:40px;background:${t.backgroundColor};${bgCss}font-family:'Inter','Segoe UI',sans-serif;color:#2c1e11;box-sizing:content-box;`;
     const frameFn = pi === 0 ? pageFrameHtml : pageFrameNoHeaderHtml;
     if (style === 'calendar') {
       container.innerHTML = frameFn(`<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:20px;">${group.join('')}</div>`);
@@ -936,7 +939,6 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
         allowTaint: true,
         backgroundColor: '#ffffff',
         width: container.offsetWidth,
-        height: container.offsetHeight,
         onclone: async (clonedDoc) => {
           const style = clonedDoc.createElement('style');
           style.textContent = FONT_FACE_CSS;
@@ -960,10 +962,16 @@ const handleDownloadPDF = async (studentName, scheduleData, mode = 'juz-wise', t
 
     const imgData = canvas.toDataURL("image/jpeg", 0.85);
     if (pi > 0) pdf.addPage();
-    const imgWidth2 = printableWidth;
-    const imgHeight2 = (canvas.height * imgWidth2) / canvas.width;
-    const finalHeight = imgHeight2 > printableHeight ? printableHeight : imgHeight2;
-    pdf.addImage(imgData, "JPEG", margin, margin, imgWidth2, finalHeight, undefined, 'FAST');
+    const imgProps = pdf.getImageProperties(imgData);
+    const fitScale = Math.min(
+      printableWidth / imgProps.width,
+      printableHeight / imgProps.height
+    );
+    const imgW = imgProps.width * fitScale;
+    const imgH = imgProps.height * fitScale;
+    const imgX = (pageWidth - imgW) / 2;
+    const imgY = margin;
+    pdf.addImage(imgData, "JPEG", imgX, imgY, imgW, imgH, undefined, 'FAST');
     document.body.removeChild(container);
   }
 
