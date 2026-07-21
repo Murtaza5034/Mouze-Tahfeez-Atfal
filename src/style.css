@@ -4689,6 +4689,98 @@ body {
   box-shadow: 0 0 0 3px rgba(197,160,89,0.1);
 }
 
+/* Badal Universal Student Selector */
+.badal-universal-selector {
+  margin-bottom: 20px;
+  animation: badalFadeIn 0.35s ease;
+}
+
+.badal-universal-selector-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #fffefb 0%, #f8efd8 100%);
+  border: 2px solid rgba(183,137,31,0.2);
+  border-radius: 16px;
+  padding: 4px 12px 4px 44px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 12px rgba(183,137,31,0.06);
+}
+
+.badal-universal-selector-inner:focus-within {
+  border-color: #d4af37;
+  box-shadow: 0 0 0 4px rgba(197,160,89,0.12), 0 4px 20px rgba(183,137,31,0.1);
+}
+
+.badal-universal-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #b88a1d;
+  opacity: 0.6;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.badal-universal-select {
+  width: 100%;
+  padding: 12px 8px;
+  border: none;
+  background: transparent;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #3e2723;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+}
+
+.badal-universal-select option {
+  padding: 8px;
+  font-weight: 500;
+}
+
+.badal-universal-clear {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(183,137,31,0.1);
+  color: #8d6e1f;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.badal-universal-clear:hover {
+  background: rgba(183,137,31,0.2);
+  transform: scale(1.1);
+}
+
+.badal-universal-badge {
+  margin-left: auto;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #d4af37, #b88a1d);
+  color: #fff;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(184,138,29,0.2);
+}
+
+.badal-universal-card {
+  animation: badalFadeIn 0.35s ease;
+  margin-bottom: 28px;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .badal-form-grid {
@@ -4699,6 +4791,15 @@ body {
   .badal-progress-grid {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
+  }
+
+  .badal-universal-selector-inner {
+    padding-left: 38px;
+  }
+
+  .badal-universal-select {
+    font-size: 0.85rem;
+    padding: 10px 4px;
   }
 
   .badal-student-card {
@@ -4762,6 +4863,222 @@ body {
   .badal-original-tab {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* ── Badal Premium Tabs ── */
+.badal-premium-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.badal-premium-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--border, #e0d5c7);
+  border-radius: 12px;
+  background: var(--card-bg, #fffaf3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.85rem;
+  color: var(--text, #3e2723);
+  position: relative;
+  min-width: 0;
+}
+.badal-premium-tab:hover {
+  border-color: var(--primary-gold, #c9a96e);
+  box-shadow: 0 2px 8px rgba(201,169,110,0.15);
+  transform: translateY(-1px);
+}
+.badal-premium-tab.active {
+  border-color: var(--primary-gold, #c9a96e);
+  background: linear-gradient(135deg, #fffaf3 0%, #fdf6e8 100%);
+  box-shadow: 0 2px 12px rgba(201,169,110,0.2);
+}
+.badal-premium-tab.filled-today {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #4ade80;
+}
+.badal-premium-tab.filled-today.active {
+  border-color: #22c55e;
+  box-shadow: 0 2px 12px rgba(34,197,94,0.25);
+}
+.badal-tab-name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badal-tab-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fff3e0;
+  color: #e65100;
+  white-space: nowrap;
+}
+.badal-tab-badge-badal {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.badal-tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  box-shadow: 0 0 4px rgba(34,197,94,0.5);
+  animation: badalPulse 2s infinite;
+}
+@keyframes badalPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+/* ── Badal Premium Popup ── */
+.badal-premium-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: badalFadeIn 0.2s ease;
+}
+.badal-premium-popup {
+  background: var(--card-bg, #fffaf3);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  animation: badalSlideUp 0.3s ease;
+}
+@keyframes badalSlideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.badal-premium-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border, #e0d5c7);
+  background: linear-gradient(135deg, #fffaf3 0%, #fdf6e8 100%);
+  border-radius: 20px 20px 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.badal-premium-popup-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #3e2723;
+}
+.badal-popup-badge {
+  margin-left: auto;
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: #fff3e0;
+  color: #e65100;
+  white-space: nowrap;
+}
+.badal-popup-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.badal-popup-close:hover {
+  background: #f0e6d6;
+  color: #3e2723;
+}
+
+/* ── Badal Premium Table ── */
+.badal-table-wrap {
+  padding: 16px 24px 24px;
+  overflow-x: auto;
+}
+.badal-premium-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.badal-premium-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 700;
+  color: #8d6e53;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e0d5c7;
+  background: #fdf8f0;
+}
+.badal-premium-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid #f0e6d6;
+  vertical-align: top;
+  color: #3e2723;
+}
+.badal-premium-table tbody tr:hover {
+  background: #fdf8f0;
+}
+.badal-premium-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.badal-table-date {
+  font-weight: 600;
+  white-space: nowrap;
+  color: #5d4037;
+  font-size: 0.8rem;
+}
+.badal-table-cell {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.badal-table-marks {
+  font-size: 0.75rem;
+  color: #8d6e53;
+}
+
+@media (max-width: 768px) {
+  .badal-premium-popup {
+    max-width: 100%;
+    border-radius: 16px;
+    max-height: 90vh;
+  }
+  .badal-premium-popup-header {
+    padding: 16px;
+    flex-wrap: wrap;
+  }
+  .badal-table-wrap {
+    padding: 12px 16px 16px;
+  }
+  .badal-premium-table {
+    font-size: 0.8rem;
+  }
+  .badal-premium-table thead th,
+  .badal-premium-table tbody td {
+    padding: 8px 6px;
+  }
+  .badal-premium-tabs {
+    gap: 8px;
+  }
+  .badal-premium-tab {
+    padding: 8px 12px;
+    font-size: 0.8rem;
   }
 }
 
@@ -8585,5 +8902,46 @@ h4.attendance-rating-text,
   75% { transform: translateX(6px); }
 }
 
-
-
+/* ---- Download Premium Popup ---- */
+.download-premium-modal {
+  border-radius: 24px !important;
+  background: linear-gradient(145deg, #ffffff, #faf8f5) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(46,125,50,0.1) !important;
+  max-width: 380px !important;
+  animation: downloadSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.download-premium-icon {
+  width: 72px; height: 72px; margin: 0 auto 12px;
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  animation: downloadPulse 0.6s ease-in-out;
+}
+.download-premium-file-info {
+  display: flex; align-items: center; gap: 10px;
+  background: #f5f3ef; border-radius: 12px;
+  padding: 10px 14px; margin: 16px auto; max-width: 100%;
+  border: 1px solid #e8e3dc;
+}
+.download-premium-file-icon { font-size: 20px; flex-shrink: 0; }
+.download-premium-file-name {
+  font-size: 0.78rem; color: var(--deep-brown);
+  word-break: break-all; line-height: 1.3; font-weight: 500;
+}
+.download-open-btn {
+  background: linear-gradient(135deg, #2e7d32, #1b5e20) !important;
+  border: none !important; color: #fff !important;
+  padding: 10px 24px !important; font-size: 14px !important;
+}
+.download-open-btn:hover {
+  filter: brightness(1.1);
+}
+@keyframes downloadSlideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes downloadPulse {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}

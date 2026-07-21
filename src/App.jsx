@@ -706,6 +706,46 @@ const loadCustomFontsForCanvas = async () => {
   }
 };
 
+async function captureElementToPdf(elementId, fileName, { scale, onBeforeCapture } = {}) {
+  let el = null;
+  for (let i = 0; i < 25; i++) {
+    await new Promise(r => setTimeout(r, 200));
+    el = document.getElementById(elementId);
+    if (el && el.offsetParent !== null && el.offsetWidth > 0) break;
+    if (el && el.getBoundingClientRect().width > 0) break;
+  }
+  if (!el) throw new Error(`Element #${elementId} not found`);
+  await new Promise(r => setTimeout(r, 600));
+  await loadCustomFontsForCanvas();
+  if (onBeforeCapture) await onBeforeCapture();
+  const [h2c, { jsPDF }] = await Promise.all([
+    import("html2canvas").then(m => m.default),
+    import("jspdf"),
+  ]);
+  const captureScale = scale || (window.innerWidth < 768 ? 2.5 : 3);
+  const rect = el.getBoundingClientRect();
+  const canvas = await captureWithRetry(() => h2c(el, {
+    scale: captureScale, useCORS: true, allowTaint: true, backgroundColor: "#ffffff",
+    width: rect.width, height: rect.height, logging: false,
+    onclone: async (doc) => {
+      const s = doc.createElement('style');
+      s.textContent = FONT_FACE_CSS;
+      doc.head.appendChild(s);
+      try { await Promise.race([doc.fonts ? doc.fonts.ready : Promise.resolve(), new Promise(r => setTimeout(r, 4000))]); } catch (e) {}
+    },
+  }), 3);
+  const imgData = canvas.toDataURL("image/jpeg", 0.92);
+  if (imgData.length < 5000) throw new Error("Blank capture");
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+  const m = 6, mw = pw - m * 2, mh = ph - m * 2;
+  const ip = pdf.getImageProperties(imgData);
+  const fs = Math.min(mw / ip.width, mh / ip.height);
+  const fw = ip.width * fs, fh = ip.height * fs;
+  pdf.addImage(imgData, "JPEG", (pw - fw) / 2, (ph - fh) / 2, fw, fh, undefined, 'FAST');
+  return pdf.output('blob');
+}
+
 const LazyJadwalTeacherView = React.lazy(() =>
   import("./Jadwal").then((mod) => ({ default: mod.JadwalTeacherView }))
 );
@@ -902,7 +942,7 @@ const UI_TEXT = {
 const DEFAULT_PAGE_BY_ROLE = {
   parents: "Home",
   admin: "Overview",
-  teacher: "My Group",
+  teacher: "Home",
 };
 
 const RESULT_NUMERIC_FIELDS = ["murajazah", "juz_hali", "takhteet", "jadeed"];
@@ -3031,54 +3071,43 @@ function RankPreview({ students }) {
     if (!tableRef.current || rankedStudents.length === 0) return;
     setDownloadingPdf(true);
     try {
-      const { default: html2canvas } = await import("html2canvas");
-      const { jsPDF } = await import("jspdf");
-
       await loadCustomFontsForCanvas();
-      const elementRect = tableRef.current.getBoundingClientRect();
-      const isMobile = window.innerWidth < 768;
-      const captureScale = isMobile ? 1.5 : 2;
-      const canvas = await captureWithRetry(() => html2canvas(tableRef.current, {
-        scale: captureScale,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        width: elementRect.width,
-        height: elementRect.height,
-        onclone: async (clonedDoc) => {
-          const style = clonedDoc.createElement('style');
-          style.textContent = FONT_FACE_CSS;
-          clonedDoc.head.appendChild(style);
-          try {
-            await Promise.race([
-              clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
-              new Promise(resolve => setTimeout(resolve, 4000)),
-            ]);
-          } catch (e) { /* ignore */ }
+      const [h2c, { jsPDF }] = await Promise.all([
+        import("html2canvas").then(m => m.default),
+        import("jspdf"),
+      ]);
+      const rect = tableRef.current.getBoundingClientRect();
+      const canvas = await captureWithRetry(() => h2c(tableRef.current, {
+        scale: window.innerWidth < 768 ? 2.5 : 3,
+        useCORS: true, allowTaint: true, backgroundColor: '#ffffff',
+        width: rect.width, height: rect.height, logging: false,
+        onclone: async (doc) => {
+          const s = doc.createElement('style');
+          s.textContent = FONT_FACE_CSS;
+          doc.head.appendChild(s);
+          try { await Promise.race([doc.fonts ? doc.fonts.ready : Promise.resolve(), new Promise(r => setTimeout(r, 4000))]); } catch (e) {}
         },
-      }), 2);
-
+      }), 3);
       const imgData = canvas.toDataURL("image/jpeg", 0.92);
-      if (imgData.length < 5000) throw new Error("Capture produced blank image");
-      const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 8;
-      const maxWidth = pageWidth - margin * 2;
-      const maxHeight = pageHeight - margin * 2;
-      const imgProps = pdf.getImageProperties(imgData);
-      const fitScale = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
-      const imgWidth = imgProps.width * fitScale;
-      const imgHeight = imgProps.height * fitScale;
-      const x = (pageWidth - imgWidth) / 2;
-      const y = (pageHeight - imgHeight) / 2;
-      pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight, undefined, 'FAST');
-
+      if (imgData.length < 5000) throw new Error("Blank capture");
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+      const m = 6, mw = pw - m * 2, mh = ph - m * 2;
+      const ip = pdf.getImageProperties(imgData);
+      const fs = Math.min(mw / ip.width, mh / ip.height);
+      const fw = ip.width * fs, fh = ip.height * fs;
+      pdf.addImage(imgData, "JPEG", (pw - fw) / 2, (ph - fh) / 2, fw, fh, undefined, 'FAST');
       const pdfBlob = pdf.output('blob');
       const fileName = `Rank_Preview_${new Date().toISOString().split('T')[0]}.pdf`;
-      await import("./downloadUtils").then(m => m.downloadFile(pdfBlob, fileName));
+      const dlResult = await import("./downloadUtils").then(m => m.downloadFile(pdfBlob, fileName));
+      if (dlResult?.type === "native") {
+        setDownloadPopup({ filePath: dlResult.filePath, fileName });
+      } else {
+        if (showAction) showAction("success", "Rankings downloaded successfully!");
+      }
     } catch (err) {
       console.error("PDF download error:", err);
+      if (showAction) showAction("error", err.message || "Failed to generate PDF.");
     }
     setDownloadingPdf(false);
   };
@@ -3114,24 +3143,7 @@ function RankPreview({ students }) {
             >
               <RotateCw size={16} /> Refresh Ranks
             </button>
-            {rankedStudents.length > 0 && (
-              <button
-                onClick={handleDownloadPDF}
-                disabled={downloadingPdf}
-                style={{
-                  padding: '8px 18px', borderRadius: '10px', border: '1px solid #5d4037',
-                  background: 'linear-gradient(135deg, #5d4037, #3d2b1f)', color: '#fff',
-                  fontSize: '13px', fontWeight: 700, cursor: downloadingPdf ? 'not-allowed' : 'pointer',
-                  fontFamily: 'Inter, sans-serif', display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  transition: 'all 0.2s', opacity: downloadingPdf ? 0.7 : 1,
-                }}
-                onMouseEnter={e => { if (!downloadingPdf) e.currentTarget.style.filter = 'brightness(1.15)'; }}
-                onMouseLeave={e => e.currentTarget.style.filter = 'none'}
-              >
-                {downloadingPdf ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                {downloadingPdf ? 'Generating...' : 'Download PDF'}
-              </button>
-            )}
+
           </div>
         </div>
         <p className="subtitle">
@@ -4334,79 +4346,21 @@ function ParentPortal({
 
   const handleDownloadReport = async () => {
     if (!studentProfile) return;
-    
     setIsGeneratingPDF(true);
     if (showAction) showAction("success", "Preparing your child's progress report...");
-
-    // Wait for render
-    let element = null;
-    for (let attempt = 0; attempt < 15; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 400));
-      element = document.getElementById("parent-capture-content");
-      if (element) break;
-    }
-
-    if (element) {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await loadCustomFontsForCanvas();
-        const [html2canvas, jsPDF] = await Promise.all([
-          loadHtml2Canvas(),
-          loadJsPDF(),
-        ]);
-        const isMobile = window.innerWidth < 768;
-        const captureScale = isMobile ? 1.5 : 2;
-        const elementRect = element.getBoundingClientRect();
-        const canvas = await captureWithRetry(() => html2canvas(element, {
-          scale: captureScale,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          width: elementRect.width,
-          height: elementRect.height,
-          onclone: async (clonedDoc) => {
-            const style = clonedDoc.createElement('style');
-            style.textContent = FONT_FACE_CSS;
-            clonedDoc.head.appendChild(style);
-            try {
-              await Promise.race([
-                clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
-                new Promise(resolve => setTimeout(resolve, 4000)),
-              ]);
-            } catch (e) { /* ignore */ }
-          },
-        }), 2);
-        const imgData = canvas.toDataURL("image/jpeg", 0.85);
-        if (imgData.length < 5000) throw new Error("Capture failed");
-
-          const pdf = new jsPDF('p', 'mm', 'a4');
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          const margin = 8;
-          const maxW = pageWidth - margin * 2;
-          const maxH = pageHeight - margin * 2;
-          const imgProps = pdf.getImageProperties(imgData);
-          const fitScale = Math.min(maxW / imgProps.width, maxH / imgProps.height);
-          const finalWidth = imgProps.width * fitScale;
-          const finalHeight = imgProps.height * fitScale;
-          const x = (pageWidth - finalWidth) / 2;
-          const y = (pageHeight - finalHeight) / 2;
-          pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
-        const pdfBlob = pdf.output('blob');
-        const dlResult = await downloadFile(pdfBlob, `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
-        if (dlResult?.type === "native") {
-          setDownloadPopup({ filePath: dlResult.filePath, fileName: `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf` });
-        } else {
-          if (showAction) showAction("success", "Report downloaded successfully!");
-        }
-      } catch (err) {
-        console.error("PDF Error:", err);
-        if (showAction) showAction("error", "Failed to generate PDF.");
+    try {
+      const pdfBlob = await captureElementToPdf("parent-capture-content", "", { scale: 3 });
+      const fileName = `${(studentProfile.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`;
+      const dlResult = await downloadFile(pdfBlob, fileName);
+      if (dlResult?.type === "native") {
+        setDownloadPopup({ filePath: dlResult.filePath, fileName });
+      } else {
+        if (showAction) showAction("success", "Report downloaded successfully!");
       }
-    } else {
-      if (showAction) showAction("error", "Capture element not found.");
+    } catch (err) {
+      console.error("PDF Error:", err);
+      if (showAction) showAction("error", err.message || "Failed to generate PDF.");
     }
-    
     setIsGeneratingPDF(false);
   };
   parentData;
@@ -4901,21 +4855,7 @@ function ParentPortal({
 
               return (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-                    <button 
-                      className="action-button premium" 
-                      onClick={handleDownloadReport}
-                      disabled={isGeneratingPDF}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
-                    >
-                      {isGeneratingPDF ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : (
-                        <Download size={18} />
-                      )}
-                      {isGeneratingPDF ? "Generating PDF..." : "Download Report"}
-                    </button>
-                  </div>
+
                   <TahfeezReportCard
                     student={{
                       name: studentProfile?.name,
@@ -4941,18 +4881,19 @@ function ParentPortal({
               id="parent-capture-zone"
               style={{ 
                 position: 'fixed', 
-                left: '0', 
+                left: '-9999px', 
                 top: '0', 
                 width: '794px', 
-                zIndex: -1000, 
+                zIndex: 9999, 
                 background: 'white',
                 height: isGeneratingPDF ? 'auto' : '1px',
                 opacity: isGeneratingPDF ? 1 : 0,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                overflow: 'visible'
               }}
             >
               {isGeneratingPDF && (
-                <div id="parent-capture-content" style={{ background: 'white' }}>
+                <div id="parent-capture-content" style={{ background: 'white', padding: '4px' }}>
                   <TahfeezReportCard
                     student={{
                       name: studentProfile?.name,
@@ -5003,20 +4944,26 @@ function ParentPortal({
 
         {downloadPopup && (
           <div className="celebration-overlay" onClick={() => setDownloadPopup(null)}>
-            <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+            <div className="celebration-modal download-premium-modal" onClick={e => e.stopPropagation()}>
               <div className="celebration-content">
-                <div className="celebration-emoji-row">
-                  <span className="celebration-emoji" style={{fontSize:'36px'}}>&#x2705;</span>
+                <div className="download-premium-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M8 12l3 3 5-5"/>
+                  </svg>
                 </div>
-                <h2 className="celebration-title">Download Completed!</h2>
+                <h2 className="celebration-title" style={{color:'#2e7d32'}}>Download Completed!</h2>
                 <p className="celebration-message">
-                  Your report has been downloaded successfully.
+                  Your file has been saved successfully.
                 </p>
-                <p style={{fontSize:'0.8rem',color:'var(--soft-brown)',marginBottom:'20px',wordBreak:'break-all'}}>
-                  {downloadPopup.fileName}
-                </p>
-                <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
-                  <button className="celebration-close-btn" onClick={async () => {
+                <div className="download-premium-file-info">
+                  <span className="download-premium-file-icon">
+                    {downloadPopup.fileName?.endsWith('.pdf') ? '📄' : '📦'}
+                  </span>
+                  <span className="download-premium-file-name">{downloadPopup.fileName}</span>
+                </div>
+                <div style={{display:'flex',gap:'12px',justifyContent:'center',marginTop:'8px'}}>
+                  <button className="action-button premium download-open-btn" onClick={async () => {
                     const fp = downloadPopup.filePath;
                     try {
                       const { AppLauncher } = await import("@capacitor/app-launcher");
@@ -5031,7 +4978,7 @@ function ParentPortal({
                     }
                     setDownloadPopup(null);
                   }}>
-                    Open
+                    Open File
                   </button>
                   <button className="celebration-close-btn" style={{background:'var(--glass-bg)',color:'var(--deep-brown)'}} onClick={() => setDownloadPopup(null)}>
                     Close
@@ -5772,63 +5719,6 @@ function AdminPortal({
   const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [], weeklyResultsArchive = [] } = adminData;
 
   /* Optimistic draft so the dropdown visually changes immediately when user selects */
-  const [badalDraftTeacher, setBadalDraftTeacher] = useState(null);
-
-  /*
-   * BADAL FLOW - handleBadalTeacherChange (Admin inline badal assignment)
-   *
-   * This is called when admin changes the "Badal Teacher" dropdown on a child card.
-   * It directly updates child_profiles.badal_teacher_id.
-   *
-   * Teacher Portal visibility (handled in matchedStudents / overviewStudents):
-   *   - A teacher sees children where: teacher_id === teacher.id (original) OR badal_teacher_id === teacher.id (substitute)
-   *   - Badal teacher = can EDIT progress (badal_progress table)
-   *   - Original teacher = can VIEW (read-only) badal progress
-   */
-  const handleBadalTeacherChange = async (student, newBadalTeacherId) => {
-    const sidStr = String(student.student_id);
-    const sidNum = Number(student.student_id);
-    const sidVal = isNaN(sidNum) ? sidStr : sidNum;
-    try {
-      const updateData = { badal_teacher_id: newBadalTeacherId || null };
-      if (newBadalTeacherId && !student.original_teacher_id) {
-        const originalId = student.original_teacher_id || student.muhaffiz_id || null;
-        if (originalId) updateData.original_teacher_id = String(originalId);
-      }
-      const { error: updateErr } = await supabase
-        .from("child_profiles")
-        .update(updateData)
-        .eq("student_id", sidVal);
-      if (updateErr) {
-        console.error("badal_teacher_id update error:", updateErr);
-        if (showAction) showAction("error", `Badal update failed: ${updateErr.message}`);
-        return;
-      }
-      if (loadPortalData) await loadPortalData(portalRole, user);
-      let badalTeacherName = "";
-      if (newBadalTeacherId) {
-        const bt = portalAccessList.find(p => p.user_id === newBadalTeacherId) || teacherProfiles.find(tp => tp.user_id === newBadalTeacherId);
-        badalTeacherName = bt?.full_name || "";
-      }
-      if (showAction) showAction(
-        "success",
-        newBadalTeacherId
-          ? `✓ ${badalTeacherName} assigned as Badal for ${student.name || "this child"}`
-          : "Badal removed. Child returned to original teacher."
-      );
-      if (newBadalTeacherId) {
-        try {
-          const childName = student.name || student.full_name || "a child";
-          await supabase.functions.invoke('fcm-notification', {
-            body: { title: "New Badal Assignment", body: `You have been assigned as badal for ${childName}`, targetUser: newBadalTeacherId, data: { type: "badal_assignment", childName, studentId: sidStr } }
-          });
-        } catch (fcmErr) { console.error("Badal FCM error:", fcmErr); }
-      }
-    } catch (err) {
-      console.error("Badal assignment error:", err);
-      if (showAction) showAction("error", `Badal assignment failed: ${err.message || err}`);
-    }
-  };
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
   const [reportSettingsDraft, setReportSettingsDraft] = useState(() => normalizeReportSettings(reportSettings));
   const [jadwalSettingsDraft, setJadwalSettingsDraft] = useState(() => normalizeJadwalSettings(jadwalSettings));
@@ -6061,15 +5951,12 @@ const handleDownloadAllReports = async () => {
 
     setIsGeneratingReports(true);
     setGenerationProgress(0);
-    const [html2canvas, jsPDF, JSZip, saveAs] = await Promise.all([
-      loadHtml2Canvas(),
-      loadJsPDF(),
+    const [JSZip, saveAs] = await Promise.all([
       loadJSZip(),
       loadSaveAs(),
     ]);
     const zip = new JSZip();
 
-    // Pre-load custom fonts once before the batch loop
     await loadCustomFontsForCanvas();
 
     if (onShowAction) onShowAction("success", `Preparing ${students.length} reports... Please wait.`);
@@ -6079,70 +5966,13 @@ const handleDownloadAllReports = async () => {
       setStudentToRender(student);
       setGenerationProgress(i + 1);
       
-      // Wait for React to render the component and assets (fonts/images) are loaded
-      let element = null;
-      const maxAttempts = 20;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 300)); 
-        element = document.getElementById("actual-report-content");
-        if (element) break;
-      }
-
-      if (element) {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 500));
-
-          const isMobile = window.innerWidth < 768;
-          const captureScale = isMobile ? 1.5 : 2;
-          const elementRect = element.getBoundingClientRect();
-          const canvas = await captureWithRetry(() => html2canvas(element, {
-            scale: captureScale,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: "#ffffff",
-            width: elementRect.width,
-            height: elementRect.height,
-            onclone: async (clonedDoc) => {
-              const style = clonedDoc.createElement('style');
-              style.textContent = FONT_FACE_CSS;
-              clonedDoc.head.appendChild(style);
-              try {
-                await Promise.race([
-                  clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
-                  new Promise(resolve => setTimeout(resolve, 4000)),
-                ]);
-              } catch (e) { /* ignore */ }
-            },
-          }), 2);
-          
-          const imgData = canvas.toDataURL("image/jpeg", 0.85);
-          if (imgData.length < 5000) {
-            throw new Error("Captured image is blank or too small.");
-          }
-
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 8;
-        const maxW = pageWidth - margin * 2;
-        const maxH = pageHeight - margin * 2;
-        const imgProps = pdf.getImageProperties(imgData);
-        const fitScale = Math.min(maxW / imgProps.width, maxH / imgProps.height);
-        const finalWidth = imgProps.width * fitScale;
-        const finalHeight = imgProps.height * fitScale;
-        const x = (pageWidth - finalWidth) / 2;
-        const y = (pageHeight - finalHeight) / 2;
-        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
-          const pdfBlob = pdf.output("blob");
-          const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
-          zip.file(`${i+1}_${safeName}_Report.pdf`, pdfBlob);
-        } catch (err) {
-          console.error(`Error generating PDF for ${student.name}:`, err);
-          if (onShowAction) onShowAction("error", `Skipped ${student.name}: ${err.message}`);
-        }
-      } else {
-        console.error(`Could not find capture element for ${student.name}`);
-        if (onShowAction) onShowAction("error", `Technical Error: Could not render ${student.name}`);
+      try {
+        const pdfBlob = await captureElementToPdf("actual-report-content", "", { scale: 2.5 });
+        const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
+        zip.file(`${i+1}_${safeName}_Report.pdf`, pdfBlob);
+      } catch (err) {
+        console.error(`Error generating PDF for ${student.name}:`, err);
+        if (onShowAction) onShowAction("error", `Skipped ${student.name}: ${err.message}`);
       }
     }
 
@@ -6151,8 +5981,12 @@ const handleDownloadAllReports = async () => {
       if (content.size < 500) {
         throw new Error("Generated ZIP is empty. Please try again.");
       }
-      downloadFile(content, `Student_Reports_Bulk_${new Date().toISOString().split('T')[0]}.zip`);
-      if (onShowAction) onShowAction("success", "All reports downloaded successfully!");
+      const dlResult = await downloadFile(content, `Student_Reports_Bulk_${new Date().toISOString().split('T')[0]}.zip`);
+      if (dlResult?.type === "native") {
+        setDownloadPopup({ filePath: dlResult.filePath, fileName: `Student_Reports_Bulk_${new Date().toISOString().split('T')[0]}.zip` });
+      } else {
+        if (onShowAction) onShowAction("success", "All reports downloaded successfully!");
+      }
     } catch (err) {
       console.error("Error generating ZIP:", err);
       if (onShowAction) onShowAction("error", err.message || "Failed to generate ZIP file.");
@@ -8847,71 +8681,7 @@ const handleDownloadAllReports = async () => {
                                   ))}
                               </select>
                             </div>
-                            {/* BADAL FLOW: Badal Teacher - premium inline assignment */}
-                            <div className="detail-item" style={{ alignItems: 'flex-start' }}>
-                              <span className="detail-label">Badal Teacher:</span>
-                              <div className="badal-select-wrap">
-                                {(badalDraftTeacher || student.badal_teacher_id) && (() => {
-                                  const bid = badalDraftTeacher || student.badal_teacher_id;
-                                  const currentBadal = portalAccessList.find(p => p.user_id === bid) || teacherProfiles.find(tp => tp.user_id === bid);
-                                  return currentBadal ? (
-                                    <div className="badal-actual-badge">
-                                      <span className="badal-actual-name">{currentBadal.full_name}</span>
-                                      <span className="badal-actual-role">ضمان</span>
-                                    </div>
-                                  ) : <span className="badal-actual-badge badal-unknown-badge">Badal Assigned</span>;
-                                })()}
-                                <select
-                                  className="premium-select badal-inline-select"
-                                  value={badalDraftTeacher || student.badal_teacher_id || ""}
-                                  onChange={e => {
-                                    const rawVal = e.target.value;
-                                    setBadalDraftTeacher(rawVal || null);
-                                    if (!rawVal) {
-                                      handleBadalTeacherChange(student, "").finally(() => setBadalDraftTeacher(null));
-                                      return;
-                                    }
-                                    const resolved =
-                                      portalAccessList.find(p => String(p.user_id) === String(rawVal))?.user_id ||
-                                      teacherProfiles.find(tp => String(tp.user_id) === String(rawVal))?.user_id ||
-                                      String(rawVal).trim() || null;
-                                    if (resolved) {
-                                      handleBadalTeacherChange(student, resolved).finally(() => setBadalDraftTeacher(null));
-                                    } else {
-                                      setBadalDraftTeacher(null);
-                                      if (showAction) showAction('error', 'Could not identify the selected teacher.');
-                                    }
-                                  }}
-                                >
-                                  <option value="">— No Badal —</option>
-                                  {(() => {
-                                    const teachers = [
-                                      ...portalAccessList
-                                        .filter(a =>
-                                          a.user_id && (
-                                            normalizeText(a.portal_role).includes('teacher') ||
-                                            normalizeText(a.portal_role).includes('muhaffiz')
-                                          )
-                                        )
-                                        .map(p => ({ _key: p.user_id, user_id: p.user_id, full_name: p.full_name })),
-                                      ...teacherProfiles
-                                        .filter(tp =>
-                                          tp.user_id &&
-                                          !portalAccessList.some(pa => pa.user_id === tp.user_id)
-                                        )
-                                        .map(tp => ({ _key: tp.user_id, user_id: tp.user_id, full_name: tp.full_name }))
-                                    ];
-                                    const seen = new Set();
-                                    const unique = [];
-                                    teachers.forEach(t => { if (!seen.has(t._key)) { seen.add(t._key); unique.push(t); } });
-                                    unique.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
-                                    return unique.map(t => (
-                                      <option key={t._key} value={t.user_id}>{t.full_name}</option>
-                                    ));
-                                  })()}
-                                </select>
-                              </div>
-                            </div>
+
                             <div className="detail-item">
                               <span className="detail-label">Parent:</span>
                               <span className="detail-value">{parent?.full_name || "Unlinked"}</span>
@@ -9484,18 +9254,19 @@ const handleDownloadAllReports = async () => {
             id="bulk-capture-hidden-zone"
               style={{ 
                 position: 'fixed', 
-                left: '0', 
+                left: '-9999px', 
                 top: '0', 
                 width: '794px', 
-                zIndex: -1000, 
+                zIndex: 9999, 
                 background: 'white',
                 height: isGeneratingReports ? 'auto' : '1px',
                 opacity: isGeneratingReports ? 1 : 0,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                overflow: 'visible'
               }}
             >
               {isGeneratingReports && studentToRender && (
-                <div id="actual-report-content" style={{ background: 'white' }}>
+                <div id="actual-report-content" style={{ background: 'white', padding: '4px' }}>
                 <TahfeezReportCard
                   student={{
                     name: studentToRender.name,
@@ -10820,6 +10591,13 @@ function TeacherPortal({
   const [savingBadal, setSavingBadal] = useState({});
   const [badalStudentProfiles, setBadalStudentProfiles] = useState([]);
   const [selectedBadalOriginal, setSelectedBadalOriginal] = useState(null);
+  const [selectedUniversalStudent, setSelectedUniversalStudent] = useState(null);
+  const [selectedBadalHistory, setSelectedBadalHistory] = useState(null);
+  const [badalStudentHistory, setBadalStudentHistory] = useState([]);
+  const [badalTabProgress, setBadalTabProgress] = useState([]);
+  const [badalTabLoading, setBadalTabLoading] = useState(false);
+  const [allSchoolStudents, setAllSchoolStudents] = useState([]);
+  const universalStudents = allSchoolStudents.length > 0 ? allSchoolStudents : (schoolData?.students || []);
   const weekDays = useMemo(() => {
     const days = [];
     const today = new Date(currentDate);
@@ -11031,9 +10809,28 @@ function TeacherPortal({
       : Promise.resolve({ data: null });
     /* Also fetch original-teacher students (current teacher is original, someone else is badal) */
     const originalProfileQuery = teacherIdFilter[0]
-      ? supabase.from("child_profiles").select("student_id, full_name, original_teacher_id, badal_teacher_id")
-          .or(teacherIdFilter.map(id => `original_teacher_id.eq.${id}`).join(","))
-          .not("badal_teacher_id", "is", null)
+      ? supabase.rpc("get_all_child_profiles")
+          .then(({ data, error }) => {
+            if (error || !data) {
+              /* Fallback to direct query if RPC not deployed */
+              return supabase.from("child_profiles")
+                .select("student_id, full_name, original_teacher_id, badal_teacher_id")
+                .or(teacherIdFilter.map(id => `original_teacher_id.eq.${id}`).join(","));
+            }
+            return {
+              data: data.filter(cp =>
+                cp.original_teacher_id && teacherIdFilter.some(tid => String(cp.original_teacher_id || "") === String(tid))
+              ),
+              error: null,
+            };
+          })
+          .catch(() => {
+            /* RPC call failed completely, fallback to direct query */
+            const id = teacherIdFilter[0];
+            return supabase.from("child_profiles")
+              .select("student_id, full_name, original_teacher_id, badal_teacher_id")
+              .or(teacherIdFilter.map(tid => `original_teacher_id.eq.${tid}`).join(","));
+          })
       : Promise.resolve({ data: null });
     Promise.all([
       supabase.from("badal_assignments").select("*").eq("status", "active"),
@@ -11105,8 +10902,31 @@ function TeacherPortal({
   useEffect(() => { fetchBadalData(); }, [fetchBadalData]);
 
   useEffect(() => {
-    if (activePage === "Badal") fetchBadalData();
+    if (activePage === "Badal" || activePage === "BadalEntry") fetchBadalData();
   }, [activePage, fetchBadalData]);
+
+  useEffect(() => {
+    if ((activePage === "Badal" || activePage === "BadalEntry") && portalRole === "teacher") {
+      supabase.rpc("get_all_child_profiles").then(({ data, error }) => {
+        if (!error && data) {
+          setAllSchoolStudents(data.map(p => ({
+            student_id: p.student_id || p.id,
+            name: p.full_name || "",
+            arabic_name: fixArabicScript(p.arabic_name),
+            groupName: p.group_name || "Ungrouped",
+            photoUrl: p.photo_url || "",
+            full_name: p.full_name,
+            group_name: p.group_name,
+            class: p.class,
+            original_teacher_id: p.original_teacher_id || null,
+            badal_teacher_id: p.badal_teacher_id || null,
+            muhaffiz_id: p.teacher_id || null,
+            teacherName: p.teacher_name || "",
+          })));
+        }
+      });
+    }
+  }, [activePage, portalRole]);
 
   const handleSaveBadalProgress = async (studentId) => {
     const raw = badalProgressDraft[studentId];
@@ -11133,6 +10953,19 @@ function TeacherPortal({
     }
     if (error) { if (onShowAction) onShowAction("error", error.message); }
     else {
+      /* Auto-set badal_teacher_id on child_profiles so both teachers see the correct tabs */
+      try {
+        const currentTeacherId = String(teacherId);
+        const sid = String(studentId);
+        const studentCheck = (badalStudentProfiles || []).find(s => String(s.student_id) === sid)
+          || (typeof filteredStudents !== 'undefined' ? filteredStudents.find(s => String(s.student_id) === sid) : null)
+          || (schoolData?.students || []).find(s => String(s.student_id) === sid);
+        const isAlreadyBadal = studentCheck?.badal_teacher_id && String(studentCheck.badal_teacher_id) === currentTeacherId;
+        const isOriginal = studentCheck && (String(studentCheck.original_teacher_id || studentCheck.muhaffiz_id || "") === currentTeacherId);
+        if (!isAlreadyBadal && !isOriginal) {
+          await supabase.from("child_profiles").update({ badal_teacher_id: currentTeacherId }).eq("student_id", sid);
+        }
+      } catch (_) {}
       if (onShowAction) onShowAction("success", "Badal progress saved!");
       setBadalProgress(prev => {
         const newEntry = { ...payload, id: existing?.id || Date.now().toString(), created_at: new Date().toISOString() };
@@ -11163,6 +10996,7 @@ function TeacherPortal({
       } catch (fcmErr) { console.error("Badal progress FCM error:", fcmErr); }
     }
     setSavingBadal(prev => ({ ...prev, [studentId]: false }));
+    fetchBadalData();
   };
 
   const handleMarkAttendance = async (studentId, date, status) => {
@@ -11195,6 +11029,21 @@ function TeacherPortal({
       next[sid] = { ...next[sid], [date]: status };
       return next;
     });
+    const cursor = new Date(date);
+    const monOffset = cursor.getDay() === 0 ? -6 : 1 - cursor.getDay();
+    const mon = new Date(cursor);
+    mon.setDate(cursor.getDate() + monOffset);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    let weeklyCount = 0;
+    for (let d = new Date(mon); d <= sun; d.setDate(d.getDate() + 1)) {
+      const ds = d.toISOString().slice(0, 10);
+      const s = ds === date ? status : (studentAttendance[sid]?.[ds] || null);
+      if (s === 'present') weeklyCount++;
+    }
+    if (String(teacherForms?.result?.student_id) === String(studentId)) {
+      setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: weeklyCount } }));
+    }
     const attStudent = overviewStudents.find(s => String(s.student_id) === studentId);
     if (attStudent) {
       // Notify parent — only if a valid target exists (prevents FCM falling through to ALL users)
@@ -11256,6 +11105,23 @@ function TeacherPortal({
       });
       return next;
     });
+    const selectedSid = String(teacherForms?.result?.student_id || '').trim().toLowerCase();
+    if (selectedSid) {
+      const cursor2 = new Date(date);
+      const monOffset2 = cursor2.getDay() === 0 ? -6 : 1 - cursor2.getDay();
+      const mon2 = new Date(cursor2);
+      mon2.setDate(cursor2.getDate() + monOffset2);
+      const sun2 = new Date(mon2);
+      sun2.setDate(mon2.getDate() + 6);
+      let wc = 0;
+      for (let d = new Date(mon2); d <= sun2; d.setDate(d.getDate() + 1)) {
+        const ds = d.toISOString().slice(0, 10);
+        const existing = studentAttendance[selectedSid]?.[ds] || null;
+        const finalStatus = overviewStudents.some(s => String(s.student_id).trim().toLowerCase() === selectedSid) && ds === date ? status : existing;
+        if (finalStatus === 'present') wc++;
+      }
+      setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: wc } }));
+    }
     setAttendanceLoading(false);
     if (onShowAction) onShowAction("success", `Marked all as ${status}`);
 
@@ -11501,77 +11367,19 @@ function TeacherPortal({
     if (!selectedStudent) return;
     setIsGeneratingTeacherPDF(true);
     if (onShowAction) onShowAction("success", "Preparing report PDF...");
-
-    let element = null;
-    for (let attempt = 0; attempt < 15; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 400));
-      element = document.getElementById("teacher-capture-content");
-      if (element) break;
-    }
-
-    if (element) {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await loadCustomFontsForCanvas();
-
-        const [html2canvas, jsPDF] = await Promise.all([
-          loadHtml2Canvas(),
-          loadJsPDF(),
-        ]);
-        const isMobile = window.innerWidth < 768;
-        const captureScale = isMobile ? 1.5 : 2;
-        const elementRect = element.getBoundingClientRect();
-        const canvas = await captureWithRetry(() => html2canvas(element, {
-          scale: captureScale,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          width: elementRect.width,
-          height: elementRect.height,
-          onclone: async (clonedDoc) => {
-            const style = clonedDoc.createElement('style');
-            style.textContent = FONT_FACE_CSS;
-            clonedDoc.head.appendChild(style);
-            try {
-              await Promise.race([
-                clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
-                new Promise(resolve => setTimeout(resolve, 4000)),
-              ]);
-            } catch (e) { /* ignore */ }
-          },
-        }), 2);
-
-        const imgData = canvas.toDataURL("image/jpeg", 0.85);
-        if (imgData.length < 5000) throw new Error("Capture failed");
-
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 8;
-        const maxW = pageWidth - margin * 2;
-        const maxH = pageHeight - margin * 2;
-        const imgProps = pdf.getImageProperties(imgData);
-        const fitScale = Math.min(maxW / imgProps.width, maxH / imgProps.height);
-        const finalWidth = imgProps.width * fitScale;
-        const finalHeight = imgProps.height * fitScale;
-        const x = (pageWidth - finalWidth) / 2;
-        const y = (pageHeight - finalHeight) / 2;
-        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight, undefined, 'FAST');
-        const pdfBlob = pdf.output("blob");
-        const dlResult = await downloadFile(pdfBlob, `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`);
-        if (dlResult?.type === "native") {
-          setTeacherDownloadPopup({ filePath: dlResult.filePath, fileName: `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf` });
-        } else {
-          if (onShowAction) onShowAction("success", "Report downloaded successfully!");
-        }
-      } catch (err) {
-        console.error("PDF Error:", err);
-        if (onShowAction) onShowAction("error", "Failed to generate PDF.");
+    try {
+      const pdfBlob = await captureElementToPdf("teacher-capture-content", "", { scale: 3 });
+      const fileName = `${(selectedStudent.name || "Student").replace(/[^a-z0-9]/gi, "_")}_Report.pdf`;
+      const dlResult = await downloadFile(pdfBlob, fileName);
+      if (dlResult?.type === "native") {
+        setTeacherDownloadPopup({ filePath: dlResult.filePath, fileName });
+      } else {
+        if (onShowAction) onShowAction("success", "Report downloaded successfully!");
       }
-    } else {
-      if (onShowAction) onShowAction("error", "Capture element not found.");
+    } catch (err) {
+      console.error("PDF Error:", err);
+      if (onShowAction) onShowAction("error", err.message || "Failed to generate PDF.");
     }
-
     setIsGeneratingTeacherPDF(false);
   };
 
@@ -11802,12 +11610,14 @@ function TeacherPortal({
         <nav className="sidebar-nav">
           <p className="sidebar-category management-cat">Workplace</p>
           {[
+            { id: "Home", label: "Home", icon: Sparkles },
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
             { id: "Jadwal", label: "Jadwal", icon: Calendar },
             { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
             { id: "Inbox", label: "Inbox", icon: Bell },
+            { id: "BadalEntry", label: "Badal Entry", icon: FileText },
             { id: "Badal", label: "Badal Update", icon: RotateCw },
             { id: "Attendance History", label: "Attendance History", icon: CalendarCheck },
             { id: "Apply Leave", label: "Apply Leave", icon: CalendarX },
@@ -11899,7 +11709,7 @@ function TeacherPortal({
               </Suspense>
            )}
 
-          {activePage === "My Group" ? (
+           {activePage === "Home" ? (
             <div className="portal-content fade-in">
               <div className="portal-stats-strip teacher-stats">
                 {[
@@ -12014,8 +11824,6 @@ function TeacherPortal({
                 </section>
               )}
 
-
-
               {recentMarhalaPostPreview}
               <PremiumHifzCard user={user} />
 
@@ -12058,7 +11866,11 @@ function TeacherPortal({
                   )}
                 </div>
               </div>
+            </div>
+          ) : null}
 
+           {activePage === "My Group" ? (
+            <div className="portal-content fade-in">
               <div className="bulk-attendance-row">
                 <span className="bulk-label">Quick Mark All:</span>
                 {(() => {
@@ -12541,6 +12353,7 @@ function TeacherPortal({
                         </p>
                       </div>
                     </div>
+
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                       <button
                         className="action-button premium"
@@ -12577,18 +12390,19 @@ function TeacherPortal({
             id="teacher-capture-zone"
           style={{ 
             position: 'fixed', 
-            left: '0', 
+            left: '-9999px', 
             top: '0', 
             width: '794px', 
-            zIndex: -1000, 
+            zIndex: 9999, 
             background: 'white',
             height: isGeneratingTeacherPDF ? 'auto' : '1px',
             opacity: isGeneratingTeacherPDF ? 1 : 0,
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            overflow: 'visible'
           }}
         >
           {isGeneratingTeacherPDF && (
-            <div id="teacher-capture-content" style={{ background: 'white' }}>
+            <div id="teacher-capture-content" style={{ background: 'white', padding: '4px' }}>
                     <TahfeezReportCard
                       student={selectedStudent}
                       weeklyResult={liveResult}
@@ -12598,6 +12412,228 @@ function TeacherPortal({
                   </div>
                 )}
               </div>
+            </div>
+          ) : null}
+
+          {activePage === "BadalEntry" ? (
+            <div className="badal-page-container">
+              <div className="badal-page-header">
+                <div className="badal-page-header-icon">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3>Badal Entry</h3>
+                  <p>Select any student from the school and fill their Badal progress</p>
+                </div>
+              </div>
+              <div className="badal-universal-selector">
+                <div className="badal-universal-selector-inner">
+                  <Search size={16} className="badal-universal-search-icon" />
+                  <select
+                    className="badal-universal-select"
+                    value={selectedUniversalStudent || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setSelectedUniversalStudent(val || null);
+                      if (val) setSelectedBadalOriginal(null);
+                      setSelectedBadalHistory(null);
+                    }}
+                  >
+                    <option value="">— Select any student to fill Badal progress —</option>
+                    {universalStudents.map(s => (
+                      <option key={s.student_id} value={String(s.student_id)}>
+                        {s.name} {s.arabic_name ? `(${s.arabic_name})` : ""} — {s.groupName || s.class || ""}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedUniversalStudent && (
+                    <button className="badal-universal-clear" onClick={() => setSelectedUniversalStudent(null)} title="Clear selection">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {selectedUniversalStudent ? (() => {
+                const sid = selectedUniversalStudent;
+                const student = universalStudents.find(s => String(s.student_id) === sid);
+                if (!student) return null;
+                const latestProgress = badalProgress
+                  .filter(p => String(p.student_id) === sid)
+                  .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                const existing = badalProgressDraft[sid] || {};
+                const latest = latestProgress[0];
+                const safeParse = (v) => { if (!v) return {}; try { return JSON.parse(v); } catch { return {}; } };
+                const draft = {
+                  juz: existing.juz || safeParse(latest?.juz),
+                  juzHali: existing.juzHali || safeParse(latest?.juz_hali),
+                  jadeed: existing.jadeed || safeParse(latest?.jadeed_surah_ayat),
+                  notes: existing.notes ?? latest?.notes ?? "",
+                };
+                const juzNums = Array.from({ length: 30 }, (_, i) => String(i + 1));
+                const setDraft = (path, val) => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], [path]: val } }));
+                const rawId = user?.id || teacherIdentity;
+                const myHistoryEntries = badalProgress
+                  .filter(p => String(p.student_id) === sid && String(p.teacher_id) === String(rawId))
+                  .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                const historyOpen = selectedBadalHistory === sid;
+                return (
+                  <><article key={`uni-${sid}`} className="badal-student-card badal-universal-card">
+                    <div className="badal-card-header">
+                      <StudentAvatar student={student} size="small" />
+                      <div>
+                        <h4>{student.name}</h4>
+                        {student.arabic_name && (
+                          <span className="arabic-kanz" style={{ fontSize: "1.05rem", color: "var(--primary-gold)" }}>{student.arabic_name}</span>
+                        )}
+                      </div>
+                      <span className="badal-universal-badge">Quick Fill</span>
+                    </div>
+                    <div className="badal-form-grid">
+                      <div className="badal-field-group">
+                        <span className="badal-field-label">Juz</span>
+                        <div className="badal-field-row">
+                          <select className="badal-select" style={{ flex: 1 }} value={draft.juz?.value || ""} onChange={e => setDraft("juz", { ...draft.juz, value: e.target.value })}>
+                            <option value="">—</option>
+                            {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                          <input className="badal-marks-input" placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juz?.marks ?? ""} onChange={e => setDraft("juz", { ...draft.juz, marks: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="badal-field-group">
+                        <span className="badal-field-label">Juz Hali</span>
+                        <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
+                          <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.type || "juz"} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: e.target.value, from: "", till: "" })}>
+                            <option value="juz">Juz</option>
+                            <option value="surah">Surah</option>
+                          </select>
+                          {draft.juzHali?.type === "surah" ? (
+                            <>
+                              <select className="badal-select" style={{ flex: 1, minWidth: "80px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
+                                <option value="">From</option>
+                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
+                              </select>
+                              <select className="badal-select" style={{ flex: 1, minWidth: "80px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
+                                <option value="">Till</option>
+                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
+                              </select>
+                            </>
+                          ) : (
+                            <>
+                              <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
+                                <option value="">From</option>
+                                {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                              <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
+                                <option value="">Till</option>
+                                {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                            </>
+                          )}
+                          <input className="badal-marks-input" style={{ width: "70px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="badal-field-group full-width">
+                        <span className="badal-field-label">Jadeed</span>
+                        <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
+                          <select className="badal-select" style={{ width: "130px" }} value={draft.jadeed?.type || "pages"} onChange={e => setDraft("jadeed", { ...draft.jadeed, type: e.target.value, from: "", till: "", surah: "", ayat: "" })}>
+                            <option value="pages">Pages</option>
+                            <option value="surah_ayat">Surah &amp; Ayat</option>
+                          </select>
+                          {draft.jadeed?.type === "surah_ayat" ? (
+                            <>
+                              <select className="badal-select" style={{ flex: 1, minWidth: "100px" }} value={draft.jadeed?.surah || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, surah: e.target.value })}>
+                                <option value="">Surah</option>
+                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
+                              </select>
+                              <input className="badal-premium-input" style={{ width: "100px", textAlign: "center" }} placeholder="Ayat e.g. 1-10" value={draft.jadeed?.ayat || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, ayat: e.target.value })} />
+                            </>
+                          ) : (
+                            <>
+                              <input className="badal-premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="From" type="number" min="1" value={draft.jadeed?.from || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, from: e.target.value })} />
+                              <input className="badal-premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="Till" type="number" min="1" value={draft.jadeed?.till || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, till: e.target.value })} />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="badal-field-group full-width">
+                        <span className="badal-field-label">Notes</span>
+                        <input className="badal-notes-input" placeholder="Optional notes about today's progress" value={draft.notes ?? ""} onChange={e => setDraft("notes", e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="badal-card-footer">
+                      <button className="badal-save-btn" onClick={() => handleSaveBadalProgress(sid)} disabled={savingBadal[sid]}>
+                        {savingBadal[sid] ? "Saving..." : latest ? "Update Today's Record" : "Save Progress"}
+                      </button>
+                    </div>
+                  </article>
+                  <div className="badal-entry-history-section">
+                    <div className="badal-premium-tabs" style={{ marginTop: '16px' }}>
+                      <button
+                        className={`badal-premium-tab${historyOpen ? " active" : ""}`}
+                        onClick={() => {
+                          if (historyOpen) {
+                            setSelectedBadalHistory(null);
+                          } else {
+                            setSelectedBadalHistory(sid);
+                            supabase.from("badal_progress").select("*").eq("student_id", String(sid)).eq("teacher_id", String(rawId)).order("week_date", { ascending: false }).then(({ data }) => { if (data) setBadalStudentHistory(data); });
+                          }
+                        }}
+                      >
+                        <StudentAvatar student={student} size="small" />
+                        <span className="badal-tab-name">{student.name} — My History</span>
+                        {myHistoryEntries.length > 0 && <span className="badal-entry-count">{myHistoryEntries.length} entry{myHistoryEntries.length !== 1 ? "s" : ""}</span>}
+                      </button>
+                    </div>
+                    {historyOpen && (
+                      <div className="badal-premium-popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedBadalHistory(null); }}>
+                        <div className="badal-premium-popup">
+                          <div className="badal-premium-popup-header">
+                            <StudentAvatar student={student} size="small" />
+                            <div>
+                              <h4>{student.name} — My Entries</h4>
+                            </div>
+                            <button className="badal-popup-close" onClick={() => setSelectedBadalHistory(null)}><X size={18} /></button>
+                          </div>
+                          {badalStudentHistory.length === 0 ? (
+                            <p style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)", fontStyle: "italic" }}>No entries yet for this student.</p>
+                          ) : (
+                            <div className="badal-table-wrap">
+                              <table className="badal-premium-table">
+                                <thead>
+                                  <tr>
+                                    <th>Date</th>
+                                    <th>Juz</th>
+                                    <th>Juz Hali</th>
+                                    <th>Jadeed</th>
+                                    <th>Notes</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {badalStudentHistory.map((entry, i) => {
+                                    const juz = safeParse(entry.juz);
+                                    const juzHali = safeParse(entry.juz_hali);
+                                    const jadeed = safeParse(entry.jadeed_surah_ayat);
+                                    const dateStr = new Date(entry.created_at || entry.week_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                                    return (
+                                      <tr key={entry.id || i}>
+                                        <td className="badal-table-date">{dateStr}</td>
+                                        <td className="badal-table-cell">{juz?.value || "—"}{juz?.marks ? <><br /><span className="badal-table-marks">Marks: {juz.marks}/10</span></> : ""}</td>
+                                        <td className="badal-table-cell">{juzHali ? <span>{juzHali.type === "surah" ? <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{juzHali.from || "?"} — {juzHali.till || "?"}</span> : <span>From {juzHali.from || "?"} — Till {juzHali.till || "?"}</span>}{juzHali.marks ? <><br /><span className="badal-table-marks">Marks: {juzHali.marks}/10</span></> : ""}</span> : "—"}</td>
+                                        <td className="badal-table-cell">{jadeed ? (jadeed.type === "surah_ayat" ? <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{jadeed.surah || "?"}{jadeed.ayat ? <><br /><span className="badal-table-marks">Ayat: {jadeed.ayat}</span></> : ""}</span> : <span>Pg {jadeed.from || "?"} — {jadeed.till || "?"}</span>) : "—"}</td>
+                                        <td className="badal-table-cell">{entry.notes || "—"}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div></>
+                );
+              })() : null}
             </div>
           ) : null}
 
@@ -12624,274 +12660,166 @@ function TeacherPortal({
                     .filter(p => { const match = String(p.user_id) === String(rawId) || (p.full_name && normalizeText(p.full_name) === normalizeText(teacherIdentity)); return match && p.user_id; })
                     .forEach(p => { if (!allUserIds.includes(String(p.user_id))) allUserIds.push(String(p.user_id)); });
 
-                  /*
-                   * BADAL FLOW - Badal page student lists
-                   *
-                   * myBadalStudents: Students where THIS teacher is the BADAL teacher.
-                   *   - These show the EDIT form (can update Juz, Juz Hali, Jadeed progress).
-                   *   - Uses student.badal_teacher_id (from child_profiles).
-                   *
-                   * originalStudents: Students where THIS teacher is the ORIGINAL teacher
-                   * AND they have a badal teacher assigned.
-                   *   - These show READ-ONLY progress (view what the badal teacher entered).
-                   *   - Uses student.original_teacher_id from child_profiles.
-                   */
-                  const myBadalStudents = filteredStudents
-                    .filter(s => s.badal_teacher_id && allUserIds.some(uid => String(s.badal_teacher_id) === String(uid)))
-                    .map(s => ({ student: s, student_id: s.student_id, teacher_id: s.badal_teacher_id, original_teacher_id: s.original_teacher_id || s.muhaffiz_id }));
-                  /*
-                   * BADAL SHIFT: originalStudents must use schoolData.students directly (not
-                   * filteredStudents) because filteredStudents now excludes badal-assigned
-                   * children from the original teacher's regular view. We still want the
-                   * original teacher to see and click these children on the Badal page.
-                   */
-                  const originalStudents = (schoolData?.students || [])
-                    .filter(s => s.badal_teacher_id && allUserIds.some(uid => String(s.original_teacher_id || s.muhaffiz_id) === String(uid)))
+                  const myBadalStudents = [];
+                  const seenBadal = new Set();
+                  (filteredStudents || []).forEach(s => {
+                    if (s.badal_teacher_id && allUserIds.some(uid => String(s.badal_teacher_id) === String(uid))) {
+                      const sid = String(s.student_id);
+                      if (!seenBadal.has(sid)) { seenBadal.add(sid); myBadalStudents.push({ student: s, student_id: sid, type: "badal", original_teacher_id: s.original_teacher_id || s.muhaffiz_id, badalTeacherInfo: null }); }
+                    }
+                  });
+                  (badalStudentProfiles || []).forEach(s => {
+                    if (s.badal_teacher_id && allUserIds.some(uid => String(s.badal_teacher_id) === String(uid))) {
+                      const sid = String(s.student_id);
+                      if (!seenBadal.has(sid)) { seenBadal.add(sid); myBadalStudents.push({ student: s, student_id: sid, type: "badal", original_teacher_id: s.original_teacher_id || s.muhaffiz_id, badalTeacherInfo: null }); }
+                    }
+                  });
+                  const originalStudentsList = (universalStudents || [])
+                    .filter(s => allUserIds.some(uid => String(s.original_teacher_id || s.muhaffiz_id) === String(uid)))
+                    .filter(s => !allUserIds.some(uid => String(s.badal_teacher_id || "") === String(uid)))
                     .map(s => {
                       const badalTeacherInfo = teacherProfiles.find(p => p.user_id === s.badal_teacher_id) || portalAccessList.find(p => p.user_id === s.badal_teacher_id);
-                      return { student: s, student_id: s.student_id, teacher_id: s.badal_teacher_id, original_teacher_id: s.original_teacher_id || s.muhaffiz_id, badalTeacherInfo };
+                      return { student: s, student_id: s.student_id, type: "original", original_teacher_id: s.original_teacher_id || s.muhaffiz_id, badalTeacherInfo };
                     });
+                  const allTabs = [...myBadalStudents, ...originalStudentsList];
+                  const today = new Date().toISOString().slice(0, 10);
+                  const filledTodayByMe = (sid) => badalProgress.some(p =>
+                    String(p.student_id) === String(sid) &&
+                    String(p.teacher_id) === String(rawId) &&
+                    (p.week_date === today || (p.created_at && p.created_at.slice(0, 10) === today))
+                  );
+                  const selectedItem = selectedBadalOriginal ? allTabs.find(a => String(a.student_id) === selectedBadalOriginal) : null;
                   return (
                     <>
-                      {myBadalStudents.length > 0 && (
-                        <div style={{ marginBottom: "32px" }}>
-                          <p className="badal-helper-text">
-                            Children assigned to you as Badal — update their Tahfeez progress. All entries update today's record (no duplicates).
-                          </p>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-                            {myBadalStudents.map(({ student, student_id, original_teacher_id }) => {
-                              if (!student) return null;
-                              const latestProgress = badalProgress
-                                .filter(p => String(p.student_id) === String(student_id))
-                                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                              const sid = String(student_id);
-                              const existing = badalProgressDraft[sid] || {};
-                              const latest = latestProgress[0];
-                              const safeParse = (v) => { if (!v) return {}; try { return JSON.parse(v); } catch { return {}; } };
-                              const draft = {
-                                juz: existing.juz || safeParse(latest?.juz),
-                                juzHali: existing.juzHali || safeParse(latest?.juz_hali),
-                                jadeed: existing.jadeed || safeParse(latest?.jadeed_surah_ayat),
-                                notes: existing.notes ?? latest?.notes ?? "",
-                              };
-                              const juzNums = Array.from({ length: 30 }, (_, i) => String(i + 1));
-                              const setDraft = (path, val) => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], [path]: val } }));
-                              return (
-                                <article key={`my-${sid}`} className="badal-student-card">
-                                  <div className="badal-card-header">
-                                    <StudentAvatar student={student} size="small" />
-                                    <div>
-                                      <h4>{student.name}</h4>
-                                      {student.arabic_name && (
-                                        <span className="arabic-kanz" style={{ fontSize: "1.05rem", color: "var(--primary-gold)" }}>{student.arabic_name}</span>
-                                      )}
-                                    </div>
-                                    {original_teacher_id && (
-                                      <span className="badal-original-badge">
-                                        Original: {(teacherProfiles.find(p => p.user_id === original_teacher_id) || portalAccessList.find(p => p.user_id === original_teacher_id))?.full_name || original_teacher_id}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="badal-form-grid">
-                                    <div className="badal-field-group">
-                                      <span className="badal-field-label">Juz</span>
-                                      <div className="badal-field-row">
-                                        <select className="badal-select" style={{ flex: 1 }} value={draft.juz?.value || ""} onChange={e => setDraft("juz", { ...draft.juz, value: e.target.value })}>
-                                          <option value="">—</option>
-                                          {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
-                                        </select>
-                                        <input className="badal-marks-input" placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juz?.marks ?? ""} onChange={e => setDraft("juz", { ...draft.juz, marks: e.target.value })} />
-                                      </div>
-                                    </div>
-                                    <div className="badal-field-group">
-                                      <span className="badal-field-label">Juz Hali</span>
-                                      <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
-                                        <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.type || "juz"} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: e.target.value, from: "", till: "" })}>
-                                          <option value="juz">Juz</option>
-                                          <option value="surah">Surah</option>
-                                        </select>
-                                        {draft.juzHali?.type === "surah" ? (
-                                          <>
-                                            <select className="badal-select" style={{ flex: 1, minWidth: "80px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
-                                              <option value="">From</option>
-                                              {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
-                                            </select>
-                                            <select className="badal-select" style={{ flex: 1, minWidth: "80px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
-                                              <option value="">Till</option>
-                                              {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
-                                            </select>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
-                                              <option value="">From</option>
-                                              {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
-                                            </select>
-                                            <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
-                                              <option value="">Till</option>
-                                              {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
-                                            </select>
-                                          </>
-                                        )}
-                                        <input className="badal-marks-input" style={{ width: "70px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: e.target.value })} />
-                                      </div>
-                                    </div>
-                                    <div className="badal-field-group full-width">
-                                      <span className="badal-field-label">Jadeed</span>
-                                      <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
-                                        <select className="badal-select" style={{ width: "130px" }} value={draft.jadeed?.type || "pages"} onChange={e => setDraft("jadeed", { ...draft.jadeed, type: e.target.value, from: "", till: "", surah: "", ayat: "" })}>
-                                          <option value="pages">Pages</option>
-                                          <option value="surah_ayat">Surah &amp; Ayat</option>
-                                        </select>
-                                        {draft.jadeed?.type === "surah_ayat" ? (
-                                          <>
-                                            <select className="badal-select" style={{ flex: 1, minWidth: "100px" }} value={draft.jadeed?.surah || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, surah: e.target.value })}>
-                                              <option value="">Surah</option>
-                                              {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
-                                            </select>
-                                            <input className="badal-premium-input" style={{ width: "100px", textAlign: "center" }} placeholder="Ayat e.g. 1-10" value={draft.jadeed?.ayat || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, ayat: e.target.value })} />
-                                          </>
-                                        ) : (
-                                          <>
-                                            <input className="badal-premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="From" type="number" min="1" value={draft.jadeed?.from || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, from: e.target.value })} />
-                                            <input className="badal-premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="Till" type="number" min="1" value={draft.jadeed?.till || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, till: e.target.value })} />
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="badal-field-group full-width">
-                                      <span className="badal-field-label">Notes</span>
-                                      <input className="badal-notes-input" placeholder="Optional notes about today's progress" value={draft.notes ?? ""} onChange={e => setDraft("notes", e.target.value)} />
-                                    </div>
-                                  </div>
-                                  <div className="badal-card-footer">
-                                    <button className="badal-save-btn" onClick={() => handleSaveBadalProgress(student_id)} disabled={savingBadal[sid]}>
-                                      {savingBadal[sid] ? "Saving..." : latest ? "Update Today's Record" : "Save Progress"}
-                                    </button>
-                                  </div>
-                                </article>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                      {myBadalStudents.length === 0 && originalStudents.length === 0 && (
+                      {allTabs.length === 0 ? (
                         <div className="badal-empty-state">
                           <RotateCw size={40} />
-                          <p>No badal activity yet. Admin will assign children to you here.</p>
+                          <p>No badal activity yet. Use Badal Entry to fill progress for any student.</p>
                         </div>
-                      )}
-                      {originalStudents.length > 0 && (
-                        <div>
-                          <h4 className="badal-section-title">My Students (Badal)</h4>
-                          <p className="badal-section-desc">
-                            Students shifted to a badal teacher. Tap a name to see today's progress.
-                          </p>
-                          <div className="badal-original-tabs">
-                            {originalStudents.map(({ student, student_id, badalTeacherInfo }) => {
-                              if (!student) return null;
+                      ) : (
+                        <>
+                          <div className="badal-premium-tabs">
+                            {allTabs.map(({ student, student_id, type, badalTeacherInfo }) => {
                               const sid = String(student_id);
                               const isSelected = selectedBadalOriginal === sid;
+                              const isGreen = type === "badal" && filledTodayByMe(sid);
                               return (
                                 <button
                                   key={`tab-${sid}`}
-                                  onClick={() => setSelectedBadalOriginal(isSelected ? null : sid)}
-                                  className={`badal-original-tab${isSelected ? " active" : ""}`}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedBadalOriginal(null);
+                                    } else {
+                                      setSelectedBadalOriginal(sid);
+                                      setBadalTabLoading(true);
+                                      supabase.from("badal_progress").select("*").eq("student_id", String(sid)).order("week_date", { ascending: false }).then(({ data }) => {
+                                        setBadalTabLoading(false);
+                                        if (data) setBadalTabProgress(data);
+                                      });
+                                    }
+                                  }}
+                                  className={`badal-premium-tab${isSelected ? " active" : ""}${isGreen ? " filled-today" : ""}`}
                                 >
                                   <StudentAvatar student={student} size="small" />
-                                  <span>{student.name}</span>
-                                  {badalTeacherInfo && (
-                                    <span className="badal-original-tab-badge">⚡ {badalTeacherInfo.full_name}</span>
+                                  <span className="badal-tab-name">{student.name}</span>
+                                  {type === "original" && badalTeacherInfo && (
+                                    <span className="badal-tab-badge">⚡ {badalTeacherInfo.full_name}</span>
                                   )}
+                                  {type === "badal" && (
+                                    <span className="badal-tab-badge badal-tab-badge-badal">ضمان</span>
+                                  )}
+                                  {isGreen && <span className="badal-tab-dot" />}
                                 </button>
                               );
                             })}
                           </div>
-                          {selectedBadalOriginal ? (
-                            (() => {
-                              const item = originalStudents.find(a => String(a.student_id) === selectedBadalOriginal);
-                              if (!item || !item.student) return null;
-                              const progressData = badalProgress
-                                .filter(p => String(p.student_id) === selectedBadalOriginal)
-                                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                              const latestEntry = progressData[0] || null;
-                              const safeParse = (v) => { if (!v) return null; try { return JSON.parse(v); } catch { return null; } };
-                              const juz = latestEntry ? safeParse(latestEntry.juz) : null;
-                              const juzHali = latestEntry ? safeParse(latestEntry.juz_hali) : null;
-                              const jadeed = latestEntry ? safeParse(latestEntry.jadeed_surah_ayat) : null;
-                              return (
-                                <article className="badal-readonly-card">
-                                  <div className="badal-readonly-header">
-                                    <StudentAvatar student={item.student} size="small" />
+                          {selectedItem ? (() => {
+                            const sid = String(selectedItem.student_id);
+                            const student = selectedItem.student;
+                            const displayData = badalTabProgress.length > 0 && String(badalTabProgress[0]?.student_id) === String(sid) ? badalTabProgress : [];
+                            const safeParse = (v) => { if (!v) return null; try { return JSON.parse(v); } catch { return null; } };
+                            return (
+                              <div className="badal-premium-popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedBadalOriginal(null); }}>
+                                <div className="badal-premium-popup">
+                                  <div className="badal-premium-popup-header">
+                                    <StudentAvatar student={student} size="small" />
                                     <div>
-                                      <h4 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#3e2723" }}>{item.student.name}</h4>
-                                      {item.student.arabic_name && (
-                                        <span className="arabic-kanz" style={{ fontSize: "1rem", color: "var(--primary-gold)" }}>{item.student.arabic_name}</span>
+                                      <h4>{student.name}</h4>
+                                      {student.arabic_name && (
+                                        <span className="arabic-kanz" style={{ fontSize: "1rem", color: "var(--primary-gold)" }}>{student.arabic_name}</span>
                                       )}
                                     </div>
-                                    <span className="badal-readonly-badge">
-                                      ⚡ Badal: {item.badalTeacherInfo?.full_name || "Assigned"}
-                                    </span>
+                                    {selectedItem.type === "original" && selectedItem.badalTeacherInfo && (
+                                      <span className="badal-popup-badge">⚡ Badal: {selectedItem.badalTeacherInfo.full_name}</span>
+                                    )}
+                                    <button className="badal-popup-close" onClick={() => setSelectedBadalOriginal(null)}><X size={18} /></button>
                                   </div>
-                                  {!latestEntry ? (
-                                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", padding: "12px 0", textAlign: "center", fontStyle: "italic" }}>
-                                      No progress updates yet from the badal teacher.
+                                  {badalTabLoading ? (
+                                    <p style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)", fontStyle: "italic" }}>Loading...</p>
+                                  ) : displayData.length === 0 ? (
+                                    <p style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)", fontStyle: "italic" }}>
+                                      {selectedItem.type === "original" ? "No progress updates yet from the badal teacher." : "No entries yet. Fill a Badal Entry for this student."}
                                     </p>
                                   ) : (
-                                    <div>
-                                      <div className="badal-progress-date">
-                                        <span>📅 {new Date(latestEntry.created_at || latestEntry.week_date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</span>
-                                        {latestEntry.notes && (
-                                          <span className="badal-progress-date-note">📝 {latestEntry.notes}</span>
-                                        )}
-                                      </div>
-                                      <div className="badal-progress-grid">
-                                        {juz && (juz.value || juz.marks) && (
-                                          <div className="badal-progress-item">
-                                            <span className="badal-progress-label">Juz</span>
-                                            <div className="badal-progress-value">
-                                              {juz.value && <span className="badal-progress-main">{juz.value}</span>}
-                                              {juz.marks && <span className="badal-progress-marks">{juz.marks}/10</span>}
-                                            </div>
-                                          </div>
-                                        )}
-                                        {juzHali && (juzHali.from || juzHali.marks) && (
-                                          <div className="badal-progress-item">
-                                            <span className="badal-progress-label">Juz Hali</span>
-                                            <div className="badal-progress-value" style={{ flexWrap: "wrap" }}>
-                                              {juzHali.type === "surah" ? (
-                                                <span className="arabic-kanz" style={{ fontSize: "0.9rem", color: "#3e2723" }}>{juzHali.from || "?"} — {juzHali.till || "?"}</span>
-                                              ) : (
-                                                <span className="badal-progress-main">{juzHali.from || "?"} — {juzHali.till || "?"}</span>
-                                              )}
-                                              {juzHali.marks && <span className="badal-progress-marks" style={{ marginLeft: "auto" }}>{juzHali.marks}/10</span>}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                      {jadeed && (jadeed.from || jadeed.surah) && (
-                                        <div className="badal-progress-jadeed-item">
-                                          <span className="badal-progress-label">Jadeed</span>
-                                          <div style={{ marginTop: "4px" }}>
-                                            {jadeed.type === "surah_ayat" ? (
-                                              <span className="arabic-kanz" style={{ fontSize: "0.95rem", color: "#3e2723" }}>{jadeed.surah || "?"} {jadeed.ayat ? `(${jadeed.ayat})` : ""}</span>
-                                            ) : (
-                                              <span style={{ fontSize: "1rem", fontWeight: 600, color: "#3e2723" }}>Pg {jadeed.from || "?"} — {jadeed.till || "?"}</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      )}
+                                    <div className="badal-table-wrap">
+                                      <table className="badal-premium-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Date</th>
+                                            <th>Juz</th>
+                                            <th>Juz Hali</th>
+                                            <th>Jadeed</th>
+                                            <th>Notes</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {displayData.map((entry, i) => {
+                                            const juz = safeParse(entry.juz);
+                                            const juzHali = safeParse(entry.juz_hali);
+                                            const jadeed = safeParse(entry.jadeed_surah_ayat);
+                                            const dateStr = new Date(entry.created_at || entry.week_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                                            return (
+                                              <tr key={entry.id || i}>
+                                                <td className="badal-table-date">{dateStr}</td>
+                                                <td className="badal-table-cell">
+                                                  {juz ? (
+                                                    <span>{juz.value || "—"}{juz.marks ? <><br /><span className="badal-table-marks">Marks: {juz.marks}/10</span></> : ""}</span>
+                                                  ) : "—"}
+                                                </td>
+                                                <td className="badal-table-cell">
+                                                  {juzHali ? (
+                                                    <span>
+                                                      {juzHali.type === "surah" ? (
+                                                        <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{juzHali.from || "?"} — {juzHali.till || "?"}</span>
+                                                      ) : (
+                                                        <span>From {juzHali.from || "?"} — Till {juzHali.till || "?"}</span>
+                                                      )}
+                                                      {juzHali.marks ? <><br /><span className="badal-table-marks">Marks: {juzHali.marks}/10</span></> : ""}
+                                                    </span>
+                                                  ) : "—"}
+                                                </td>
+                                                <td className="badal-table-cell">
+                                                  {jadeed ? (
+                                                    jadeed.type === "surah_ayat" ? (
+                                                      <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{jadeed.surah || "?"}{jadeed.ayat ? <><br /><span className="badal-table-marks">Ayat: {jadeed.ayat}</span></> : ""}</span>
+                                                    ) : (
+                                                      <span>Pg {jadeed.from || "?"} — {jadeed.till || "?"}</span>
+                                                    )
+                                                  ) : "—"}
+                                                </td>
+                                                <td className="badal-table-cell">{entry.notes || "—"}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
                                     </div>
                                   )}
-                                </article>
-                              );
-                            })()
-                          ) : (
-                            <p className="badal-helper-text" style={{ textAlign: "center", padding: "20px 0" }}>
-                              Select a child above to view their badal progress.
-                            </p>
-                          )}
-                        </div>
+                                </div>
+                              </div>
+                            );
+                          })() : null}
+                        </>
                       )}
                     </>
                   );
@@ -13609,20 +13537,26 @@ function TeacherPortal({
 
       {teacherDownloadPopup && (
         <div className="celebration-overlay" onClick={() => setTeacherDownloadPopup(null)}>
-          <div className="celebration-modal" onClick={e => e.stopPropagation()}>
+          <div className="celebration-modal download-premium-modal" onClick={e => e.stopPropagation()}>
             <div className="celebration-content">
-              <div className="celebration-emoji-row">
-                <span className="celebration-emoji" style={{fontSize:'36px'}}>&#x2705;</span>
+              <div className="download-premium-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M8 12l3 3 5-5"/>
+                </svg>
               </div>
-              <h2 className="celebration-title">Download Completed!</h2>
+              <h2 className="celebration-title" style={{color:'#2e7d32'}}>Download Completed!</h2>
               <p className="celebration-message">
                 The report has been downloaded successfully.
               </p>
-              <p style={{fontSize:'0.8rem',color:'var(--soft-brown)',marginBottom:'20px',wordBreak:'break-all'}}>
-                {teacherDownloadPopup.fileName}
-              </p>
-              <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
-                <button className="celebration-close-btn" onClick={async () => {
+              <div className="download-premium-file-info">
+                <span className="download-premium-file-icon">
+                  {teacherDownloadPopup.fileName?.endsWith('.pdf') ? '📄' : '📦'}
+                </span>
+                <span className="download-premium-file-name">{teacherDownloadPopup.fileName}</span>
+              </div>
+              <div style={{display:'flex',gap:'12px',justifyContent:'center',marginTop:'8px'}}>
+                <button className="action-button premium download-open-btn" onClick={async () => {
                   const fp = teacherDownloadPopup.filePath;
                   try {
                     const { AppLauncher } = await import("@capacitor/app-launcher");
@@ -13637,7 +13571,7 @@ function TeacherPortal({
                   }
                   setTeacherDownloadPopup(null);
                 }}>
-                  Open
+                  Open File
                 </button>
                 <button className="celebration-close-btn" style={{background:'var(--glass-bg)',color:'var(--deep-brown)'}} onClick={() => setTeacherDownloadPopup(null)}>
                   Close
