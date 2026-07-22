@@ -4,8 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => ({
   define: {
-    __APP_VERSION__: JSON.stringify("1.3.8"),
-    __APP_VERSION_CODE__: JSON.stringify(41),
+    __APP_VERSION__: JSON.stringify("1.4.4"),
+    __APP_VERSION_CODE__: JSON.stringify(47),
   },
   plugins: [
     react(),
@@ -55,16 +55,16 @@ export function getRefreshReg() {
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 86400 },
-              networkTimeoutSeconds: 10,
+              expiration: { maxEntries: 300, maxAgeSeconds: 86400 },
+              networkTimeoutSeconds: 4,
             }
           },
           {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico)(?:\?.*)?$/,
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico|webp)(?:\?.*)?$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'image-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 86400 * 30 },
+              expiration: { maxEntries: 200, maxAgeSeconds: 86400 * 60 },
             }
           },
           {

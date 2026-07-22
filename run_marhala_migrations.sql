@@ -28,6 +28,11 @@ ALTER TABLE marhala_posts ADD COLUMN IF NOT EXISTS live_at TIMESTAMPTZ DEFAULT n
 -- Add background_opacity for certificate background visibility control
 ALTER TABLE marhala_posts ADD COLUMN IF NOT EXISTS background_opacity REAL DEFAULT 0.3;
 
+-- Add heading_url for custom heading image upload
+ALTER TABLE marhala_posts ADD COLUMN IF NOT EXISTS heading_url TEXT DEFAULT '';
+-- Add heading_scale for heading image size control (percentage)
+ALTER TABLE marhala_posts ADD COLUMN IF NOT EXISTS heading_scale NUMERIC DEFAULT 100;
+
 -- Create marhala_post_photos storage bucket for photo uploads
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (

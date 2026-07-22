@@ -33,6 +33,10 @@
       "dest": "/$1.$2"
     },
     {
+      "src": "/privacy",
+      "dest": "/index.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

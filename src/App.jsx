@@ -767,6 +767,7 @@ const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
 import MarhalaPosts from "./MarhalaPosts";
 const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
 import AppUpdatePopup from "./AppUpdatePopup";
+import PrivacyPolicy from "./PrivacyPolicy";
 
 const fixArabicScript = (text) => {
   if (!text) return "";
@@ -4143,6 +4144,9 @@ function ParentPortal({
   const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
   const [secondsSpent, setSecondsSpent] = useState(0);
   const [pageVisibility, setPageVisibility] = useState({});
+  const [parentArchiveResults, setParentArchiveResults] = useState([]);
+  const [parentArchiveMonth, setParentArchiveMonth] = useState("");
+  const [parentArchiveLoading, setParentArchiveLoading] = useState(false);
 
   useEffect(() => {
     supabase.from('page_visibility')
@@ -4192,6 +4196,23 @@ function ParentPortal({
   };
 
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData || {};
+
+  // Fetch archive results when viewing Results Archive
+  useEffect(() => {
+    if (activePage !== "Results Archive" || !studentProfile?.student_id) return;
+    setParentArchiveLoading(true);
+    const sid = String(studentProfile.student_id);
+    Promise.all([
+      supabase.from("weekly_results").select("*").eq("student_id", sid).order("week_date", { ascending: false }),
+      supabase.from("weekly_results_archive").select("*").eq("student_id", sid).order("week_date", { ascending: false }),
+    ]).then(([liveRes, archiveRes]) => {
+      const merged = {};
+      (liveRes.data || []).forEach(r => { merged[r.week_date] = r; });
+      (archiveRes.data || []).forEach(r => { if (!merged[r.week_date]) merged[r.week_date] = r; });
+      setParentArchiveResults(Object.values(merged).sort((a, b) => new Date(b.week_date) - new Date(a.week_date)));
+      setParentArchiveLoading(false);
+    }).catch(() => { setParentArchiveLoading(false); });
+  }, [activePage, studentProfile?.student_id]);
 
   const currentRank = weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank;
   const studentId = studentProfile?.student_id;
@@ -4554,6 +4575,11 @@ function ParentPortal({
           {pageVisibility["Marhala Posts"] !== false && (
             <button className={`drawer-link ${activePage === "Marhala Posts" ? "active" : ""}`} onClick={() => { setActivePage("Marhala Posts"); setMenuOpen(false); }}>
               <Heart size={18} /> Marhala Posts
+            </button>
+          )}
+          {pageVisibility["Results Archive"] !== false && (
+            <button className={`drawer-link ${activePage === "Results Archive" ? "active" : ""}`} onClick={() => { setActivePage("Results Archive"); setMenuOpen(false); }}>
+              <FileArchive size={18} /> Results Archive
             </button>
           )}
           {pageVisibility["Settings"] !== false && (
@@ -5347,6 +5373,196 @@ function ParentPortal({
             </div>
           </div>
         )}
+
+        {activePage === "Results Archive" ? (
+          <div className="overview-container fade-in" style={{ paddingBottom: '80px' }}>
+            <div className="section-header">
+              <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <FileArchive size={24} style={{ color: 'var(--primary-gold)' }} />
+                Results Archive
+              </h2>
+              <p className="subtitle">Complete history of your child's weekly Tahfeez results — Saturday to Friday cycle</p>
+            </div>
+
+            {(() => {
+              const ScoreField = ({ label, value, max }) => (
+                <div style={{ background: '#f9f6f0', borderRadius: '8px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--soft-brown)' }}>{label}</span>
+                  <span className="kanz-font" style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '1.05rem', letterSpacing: 'normal' }}>
+                    {toArabicDigits(value != null ? value : 0)} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/ {max}</span>
+                  </span>
+                </div>
+              );
+              const InfoField = ({ label, value }) => (
+                <div style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--soft-brown)' }}>{label}:</span>
+                  <span className="kanz-font" style={{ fontWeight: 600, color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{value != null ? value : '-'}</span>
+                </div>
+              );
+
+              const archive = parentArchiveResults;
+              const selMonth = parentArchiveMonth;
+              const setSelMonth = setParentArchiveMonth;
+
+              const monthGroups = {};
+              archive.forEach(a => {
+                if (!a.week_date) return;
+                const d = new Date(a.week_date);
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                if (!monthGroups[key]) monthGroups[key] = { label, weeks: [] };
+                if (!monthGroups[key].weeks.some(w => w.week_date === a.week_date)) {
+                  monthGroups[key].weeks.push(a);
+                }
+              });
+              const sortedMonths = Object.keys(monthGroups).sort((a, b) => b.localeCompare(a));
+
+              return (
+                <div className="archive-container card-appear" style={{ padding: '24px', borderRadius: '16px', background: 'var(--white)' }}>
+                  {parentArchiveLoading ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                      <div className="loading-spinner" style={{ margin: '0 auto 12px' }} />
+                      Loading results...
+                    </div>
+                  ) : archive.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                      <FileArchive size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                      <p>No archived results found. Weekly results will appear here once teachers save progress.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', padding: '16px', borderRadius: '12px', background: 'linear-gradient(135deg, #fcf8f0, #f5edd9)' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--primary-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.2rem' }}>
+                          {studentProfile?.name?.charAt(0)?.toUpperCase() || 'S'}
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.2rem' }}>{studentProfile?.name || 'Student'}</h3>
+                          <p style={{ margin: '4px 0 0', color: 'var(--soft-brown)', fontSize: '0.85rem' }}>
+                            {archive.length} week{archive.length !== 1 ? 's' : ''} recorded
+                            {studentProfile?.groupName ? ` \u2022 ${studentProfile.groupName}` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      {sortedMonths.length > 0 && (
+                        <div style={{ marginBottom: '20px' }}>
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', borderBottom: '2px solid #eee', paddingBottom: '12px' }}>
+                            {sortedMonths.map(key => (
+                              <button
+                                key={key}
+                                className={`premium-tab ${selMonth === key ? 'active' : ''}`}
+                                onClick={() => setSelMonth(selMonth === key ? '' : key)}
+                                style={{
+                                  padding: '8px 18px',
+                                  borderRadius: '8px',
+                                  border: selMonth === key ? '2px solid var(--primary-gold)' : '2px solid transparent',
+                                  background: selMonth === key ? 'var(--primary-gold)' : '#f5f0e8',
+                                  color: selMonth === key ? '#fff' : 'var(--deep-brown)',
+                                  fontWeight: 600,
+                                  fontSize: '0.85rem',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                }}
+                              >
+                                {monthGroups[key].label}
+                                <span style={{ marginLeft: '6px', opacity: 0.7, fontSize: '0.75rem' }}>({monthGroups[key].weeks.length})</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {selMonth && monthGroups[selMonth] ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                          {monthGroups[selMonth].weeks
+                            .sort((a, b) => new Date(b.week_date) - new Date(a.week_date))
+                            .map(wr => {
+                              const fi = getFatemiInfo(wr.week_date);
+                              const scoreTotal = wr.total_score ?? (Number(wr.murajazah || 0) + Number(wr.juz_hali || 0) + Number(wr.takhteet || 0) + Number(wr.jadeed || 0));
+                              return (
+                                <div key={wr.week_date + '_' + (wr.archived_at || '')} className="result-card-premium" style={{ padding: '20px', borderRadius: '12px', border: '1px solid #e8e0d4', background: '#fffaf0' }}>
+                                  {/* Week Header */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px dashed #d4c9b0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                      <div style={{ background: 'var(--primary-gold)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontWeight: 700, fontSize: '0.8rem' }}>
+                                        Week {fi.week}
+                                      </div>
+                                      <div>
+                                        <div className="kanz-font" style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.95rem', letterSpacing: 'normal' }}>{fi.date} {fi.monthName} {fi.year}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(wr.week_date).toLocaleDateString('en-GB')}</div>
+                                      </div>
+                                    </div>
+                                    <div className="kanz-font" style={{ background: '#4a3410', color: '#d4af37', borderRadius: '50%', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.1rem', letterSpacing: 'normal' }}>
+                                      {toArabicDigits(scoreTotal)}
+                                    </div>
+                                  </div>
+
+                                  {/* Score Grid */}
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                    <ScoreField label="Murajah" value={wr.murajazah} max={30} />
+                                    <ScoreField label="Juz Hali" value={wr.juz_hali} max={30} />
+                                    <ScoreField label="Takhteet" value={wr.takhteet} max={20} />
+                                    <ScoreField label="Jadeed" value={wr.jadeed} max={20} />
+                                  </div>
+
+                                  {/* Extra Info */}
+                                  {(wr.matrookah || wr.daeefah || wr.attendance_count != null || wr.total_jadeed_pages) && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '12px', padding: '12px', background: '#f5f0e8', borderRadius: '8px' }}>
+                                      {wr.matrookah != null && <InfoField label="Matrookah" value={wr.matrookah} />}
+                                      {wr.daeefah != null && <InfoField label="Daeefah" value={wr.daeefah} />}
+                                      {wr.attendance_count != null && <InfoField label="Attendance" value={`${wr.attendance_count}/6`} />}
+                                      {wr.total_jadeed_pages && <InfoField label="Jadeed Pages" value={wr.total_jadeed_pages} />}
+                                    </div>
+                                  )}
+
+                                  {/* Wusool Info */}
+                                  {(wr.wusool_juz || wr.wusool_surah || wr.wusool_page) && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                                      <InfoField label="Wusool Juz" value={wr.wusool_juz || '-'} />
+                                      <InfoField label="Wusool Surah" value={wr.wusool_surah || '-'} />
+                                      <InfoField label="Wusool Page" value={wr.wusool_page || '-'} />
+                                    </div>
+                                  )}
+
+                                  {/* Next Week */}
+                                  {(wr.next_week_juz || wr.next_week_surah || wr.next_week_page) && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                                      <InfoField label="Next Juz" value={wr.next_week_juz || '-'} />
+                                      <InfoField label="Next Surah" value={wr.next_week_surah || '-'} />
+                                      <InfoField label="Next Page" value={wr.next_week_page || '-'} />
+                                    </div>
+                                  )}
+
+                                  {/* Target */}
+                                  {(wr.istifadah_juz || wr.istifadah_surah || wr.istifadah_page) && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', padding: '10px', background: '#f0f4e8', borderRadius: '8px' }}>
+                                      <InfoField label="Target Juz" value={wr.istifadah_juz || '-'} />
+                                      <InfoField label="Target Surah" value={wr.istifadah_surah || '-'} />
+                                      <InfoField label="Target Page" value={wr.istifadah_page || '-'} />
+                                    </div>
+                                  )}
+
+                                    {wr.attendance_note && (
+                                    <div className="kanz-font" style={{ marginTop: '8px', padding: '8px 12px', background: '#fff3cd', borderRadius: '6px', fontSize: '0.85rem', color: '#856404', letterSpacing: 'normal' }}>
+                                      Note: {wr.attendance_note}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : sortedMonths.length > 0 && !selMonth ? (
+                        <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                          Select a month above to view weekly results
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        ) : null}
 
         {activePage === "Profile" && (
           <div className="info-grid fade-in" style={{ marginTop: '24px' }}>
@@ -12354,21 +12570,7 @@ function TeacherPortal({
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-                      <button
-                        className="action-button premium"
-                        onClick={handleTeacherDownloadReport}
-                        disabled={isGeneratingTeacherPDF}
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontSize: '13px' }}
-                      >
-                        {isGeneratingTeacherPDF ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <Download size={16} />
-                        )}
-                        {isGeneratingTeacherPDF ? "Generating PDF..." : "Download Report PDF"}
-                      </button>
-                    </div>
+
                     <div>
                       <TahfeezReportCard
                         student={selectedStudent}
@@ -14249,7 +14451,7 @@ export default function App() {
 
     const failsafe = setTimeout(() => {
       if (mounted) setLoading(false);
-    }, 5000);
+    }, 3500);
 
     async function tryRestoreCachedAuth(retries = 2) {
       const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
@@ -14283,6 +14485,23 @@ export default function App() {
 
         setUser({ id: cached.userId, email: cached.email });
         storeRole(cached.role);
+
+        // Restore cached data instantly while fresh data loads
+        try {
+          const cachedRaw = localStorage.getItem('mauze_portal_cache');
+          if (cachedRaw) {
+            const cacheData = JSON.parse(cachedRaw);
+            if (cacheData.role === cached.role && Date.now() - cacheData._t < 86400000) {
+              if (cached.role === 'parents' && cacheData.parentData) {
+                setParentData(cacheData.parentData);
+              } else if (cacheData.schoolData) {
+                setSchoolData(cacheData.schoolData);
+              }
+              setLoading(false);
+            }
+          }
+        } catch (_) {}
+
         for (let attempt = 0; attempt <= retries; attempt++) {
           try {
             await loadPortalData(cached.role, { id: cached.userId, email: cached.email });
@@ -14411,6 +14630,22 @@ export default function App() {
                 console.error('FCM initialization failed:', error);
               }
             }
+
+            // Restore cached data instantly while fresh data loads
+            try {
+              const cachedRaw = localStorage.getItem('mauze_portal_cache');
+              if (cachedRaw) {
+                const cached = JSON.parse(cachedRaw);
+                if (cached.role === access.role && Date.now() - cached._t < 86400000) {
+                  if (access.role === 'parents' && cached.parentData) {
+                    setParentData(cached.parentData);
+                  } else if (cached.schoolData) {
+                    setSchoolData(cached.schoolData);
+                  }
+                  setLoading(false);
+                }
+              }
+            } catch (_) {}
 
             await loadPortalData(access.role, session.user, access.parentProfile);
           }
@@ -14686,6 +14921,7 @@ export default function App() {
 
         setParentData(nextParentState);
         setTeacherProfiles(nextParentState.teacherProfiles || []);
+        try { localStorage.setItem('mauze_portal_cache', JSON.stringify({ role: 'parents', parentData: nextParentState, schoolData: null, _t: Date.now() })); } catch (_) {}
       } else {
         const [
           profilesResponse,
@@ -14818,6 +15054,7 @@ export default function App() {
           teacherProfiles: enrichedProfiles,
           weeklyResultsArchive: archiveData,
         });
+        try { localStorage.setItem('mauze_portal_cache', JSON.stringify({ role, schoolData: { students, weeklyResults: resultsResponse.data || [], announcements: eventsResponse.data || [], schedule: scheduleResponse.data || [], portalAccessList: portalAccessResponse.data || [], teacherProfiles: enrichedProfiles, weeklyResultsArchive: archiveData }, parentData: null, _t: Date.now() })); } catch (_) {}
 
         if (students.length > 0) {
           if (role !== "admin") {
@@ -16698,6 +16935,15 @@ const handleSendCustomNotification = async (event) => {
     return <LoadingScreen message="Connecting to Mauze Tahfeez..." />;
   }
 
+
+  // Public route: Show Privacy Policy without authentication
+  // Supports both /privacy path and ?page=privacy query param
+  if (typeof window !== "undefined" && (
+    window.location.pathname === "/privacy" ||
+    new URLSearchParams(window.location.search).get("page") === "privacy"
+  )) {
+    return <PrivacyPolicy />;
+  }
 
   if (!user) {
     return <Login onLoginSuccess={handleLoginSuccess} />;

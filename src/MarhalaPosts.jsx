@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
 import { Heart, Sparkles, User, Edit3, Save, X, Trash2, Plus, Upload, Camera, MessageCircle, Instagram, Clock, Globe } from "lucide-react";
 
@@ -64,7 +65,7 @@ const calculateAge = (dob) => {
 
 const isMissingColumnError = (error) => {
   const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
-  return error?.code === "PGRST204" || message.includes("schema cache") || message.includes("does not exist") || message.includes("column") || message.includes("background_url") || message.includes("school_heading") || message.includes("date_of_birth");
+  return error?.code === "PGRST204" || message.includes("schema cache") || message.includes("does not exist") || message.includes("column") || message.includes("background_url") || message.includes("school_heading") || message.includes("date_of_birth") || message.includes("heading_url") || message.includes("heading_scale");
 };
 
 const runMigration = async () => {
@@ -96,6 +97,7 @@ function MarhalaPosts({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingBackground, setUploadingBackground] = useState(false);
+  const [uploadingHeading, setUploadingHeading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPost, setSelectedPost] = useState(null);
   const [postsHidden, setPostsHidden] = useState(false);
@@ -111,11 +113,13 @@ function MarhalaPosts({
   const [formHeading, setFormHeading] = useState("");
   const [formMarhala, setFormMarhala] = useState("");
   const [formPhotoUrl, setFormPhotoUrl] = useState("");
+  const [formHeadingUrl, setFormHeadingUrl] = useState("");
   const [formBackgroundUrl, setFormBackgroundUrl] = useState("");
   const [formAge, setFormAge] = useState("");
   const [formSchoolHeadingAr, setFormSchoolHeadingAr] = useState("");
   const [formSchoolHeadingEn, setFormSchoolHeadingEn] = useState("");
   const [formBackgroundOpacity, setFormBackgroundOpacity] = useState(0.3);
+  const [formHeadingScale, setFormHeadingScale] = useState(100);
 
   // Like animation state
   const [recentlyLiked, setRecentlyLiked] = useState({});
@@ -286,6 +290,19 @@ function MarhalaPosts({
       .update(updates)
       .eq("id", post.id);
     if (error) {
+      if (isMissingColumnError(error)) {
+        const migrated = await runMigration();
+        if (migrated) {
+          const { error: retryErr } = await supabase
+            .from("marhala_posts")
+            .update(updates)
+            .eq("id", post.id);
+          if (!retryErr) {
+            if (onShowAction) onShowAction("success", newIsLive ? "Post is now LIVE!" : "Post is now hidden from portals.");
+            return;
+          }
+        }
+      }
       setPosts((prev) =>
         prev.map((p) => (p.id === post.id ? post : p))
       );
@@ -293,7 +310,7 @@ function MarhalaPosts({
       if (onShowAction) onShowAction("error", "Failed to toggle live status: " + error.message);
       return;
     }
-    if (onShowAction) onShowAction("success", newIsLive ? "Post is now LIVE for 24 hours!" : "Post is now hidden from portals.");
+    if (onShowAction) onShowAction("success", newIsLive ? "Post is now LIVE!" : "Post is now hidden from portals.");
   };
 
   useEffect(() => {
@@ -453,6 +470,44 @@ function MarhalaPosts({
     }
   };
 
+  // Upload heading image to Supabase storage
+  const handleHeadingUpload = async (file) => {
+    if (!file) return;
+    setUploadingHeading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fileName = `heading_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      let { error: uploadError } = await supabase.storage
+        .from("marhala_post_photos")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+      if (uploadError?.message?.includes("Bucket not found")) {
+        await ensureBucketExists();
+        uploadError = (await supabase.storage
+          .from("marhala_post_photos")
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+          })).error;
+      }
+      if (uploadError) throw uploadError;
+      const { data: publicUrlData } = supabase.storage
+        .from("marhala_post_photos")
+        .getPublicUrl(fileName);
+      const publicUrl = publicUrlData?.publicUrl || "";
+      if (publicUrl) {
+        setFormHeadingUrl(publicUrl);
+      }
+    } catch (err) {
+      console.error("Heading upload error:", err);
+      if (onShowAction) onShowAction("error", "Failed to upload heading image: " + err.message);
+    } finally {
+      setUploadingHeading(false);
+    }
+  };
+
   // Admin: select student from autocomplete
   const handleStudentSelect = (student) => {
     setFormStudent(student);
@@ -489,10 +544,6 @@ function MarhalaPosts({
       if (onShowAction) onShowAction("error", "Please select a student.");
       return;
     }
-    if (!formHeading.trim()) {
-      if (onShowAction) onShowAction("error", "Please enter a heading.");
-      return;
-    }
     setSaving(true);
     try {
       const studentId = String(formStudent.student_id || formStudent.id || "");
@@ -507,6 +558,8 @@ function MarhalaPosts({
         marhala_name: formMarhala,
         title: formHeading,
         heading: formHeading,
+        heading_url: formHeadingUrl || null,
+        ...(formHeadingUrl ? { heading_scale: formHeadingScale } : {}),
         image_url: formPhotoUrl,
         background_url: formBackgroundUrl || null,
         description: computedAge,
@@ -573,6 +626,7 @@ function MarhalaPosts({
     setFormPhotoUrl(post.image_url || "");
     setFormBackgroundUrl(post.background_url || "");
     setFormBackgroundOpacity(post.background_opacity != null ? post.background_opacity : 0.3);
+    setFormHeadingScale(post.heading_scale != null ? post.heading_scale : 100);
     setFormAge(post.description || post.age || "");
     setFormSchoolHeadingAr(post.school_heading_ar || "");
     setFormSchoolHeadingEn(post.school_heading_en || "");
@@ -624,11 +678,13 @@ function MarhalaPosts({
     setFormHeading("");
     setFormMarhala("");
     setFormPhotoUrl("");
+    setFormHeadingUrl("");
     setFormBackgroundUrl("");
     setFormAge("");
     setFormSchoolHeadingAr("");
     setFormSchoolHeadingEn("");
     setFormBackgroundOpacity(0.3);
+    setFormHeadingScale(100);
   };
 
   // Get student details from cache or students prop
@@ -638,7 +694,11 @@ function MarhalaPosts({
     const fromProps = (students || []).find(
       (s) => String(s.student_id) === String(post.student_id) || String(s.id) === String(post.student_id)
     );
-    return fromProps || null;
+    if (fromProps) return fromProps;
+    if (studentProfile && (String(studentProfile.student_id) === String(post.student_id) || String(studentProfile.id) === String(post.student_id))) {
+      return studentProfile;
+    }
+    return null;
   };
 
   // Filter students for autocomplete
@@ -660,6 +720,8 @@ function MarhalaPosts({
       student_name: name,
       marhala_name: formMarhala,
       title: formHeading || "Post heading will appear here",
+      heading_url: formHeadingUrl || null,
+      ...(formHeadingUrl ? { heading_scale: formHeadingScale } : {}),
       image_url: photo,
       background_url: formBackgroundUrl,
       description: formAge,
@@ -670,7 +732,7 @@ function MarhalaPosts({
       likes: [],
       created_at: new Date().toISOString(),
     };
-  }, [formStudent, formHeading, formMarhala, formPhotoUrl, formAge, formSchoolHeadingAr, formSchoolHeadingEn, studentDetailsCache]);
+  }, [formStudent, formHeading, formMarhala, formPhotoUrl, formAge, formSchoolHeadingAr, formSchoolHeadingEn, formHeadingUrl, formHeadingScale, studentDetailsCache]);
 
   const previewStudentInfo = useMemo(() => {
     if (!formStudent) return null;
@@ -686,29 +748,11 @@ function MarhalaPosts({
 
   const visiblePosts = useMemo(() => {
     let nextPosts = posts;
-    if (!isAdmin) {
-      const nowTime = now;
-      nextPosts = nextPosts.filter((post) => {
-        if (!post.is_live) return false;
-        if (post.live_at) {
-          const liveTime = new Date(post.live_at).getTime();
-          if (Number.isFinite(liveTime)) {
-            const hoursSinceLive = (nowTime - liveTime) / (1000 * 60 * 60);
-            if (hoursSinceLive > 24) return false;
-          }
-        }
-        return true;
-      });
-    }
-    if (maxAgeHours) {
-      const cutoff = now - maxAgeHours * 60 * 60 * 1000;
-      nextPosts = nextPosts.filter((post) => {
-        const createdAt = new Date(post.created_at).getTime();
-        return Number.isFinite(createdAt) && createdAt >= cutoff;
-      });
+    if (!isAdmin && !homePreview) {
+      nextPosts = nextPosts.filter((post) => post.is_live);
     }
     return limit ? nextPosts.slice(0, limit) : nextPosts;
-  }, [posts, maxAgeHours, limit, now, isAdmin]);
+  }, [posts, limit, isAdmin, homePreview]);
 
   // Auto-open first live post on homePreview (teacher/parent portal) — once per post (persisted)
   useEffect(() => {
@@ -841,15 +885,46 @@ function MarhalaPosts({
     handleShareImage(post, studentInfo, "instagram");
   };
 
-  if (!loading && !loadingSettings && hideEmpty && visiblePosts.length === 0 && !postsHidden) {
-    return null;
-  }
-
   const showPosts = !postsHidden;
 
-  if (homePreview && !showPosts) return null;
+  if (homePreview && !showPosts && !loading) return null;
+
+  const portalModal = homePreview && selectedPost && createPortal(
+    (() => {
+      const currentPost = posts.find((post) => post.id === selectedPost.id) || selectedPost;
+      const studentInfo = getStudentInfo(currentPost);
+      return (
+        <div className="mp-modal-backdrop" onClick={() => setSelectedPost(null)}>
+          <div className={`mp-animation-overlay ${showAnimation ? "visible" : ""}`} ref={animCanvasRef} />
+          <div className="mp-modal-card" ref={postCardRef} onClick={(event) => event.stopPropagation()}>
+            <button className="mp-modal-close" onClick={() => setSelectedPost(null)} aria-label="Close Marhala post">
+              <X size={20} />
+            </button>
+            <PostCard
+              post={currentPost}
+              studentInfo={studentInfo}
+              currentUserId={currentUserId}
+              hasLiked={hasLiked(currentPost)}
+              recentlyLiked={recentlyLiked[currentPost.id]}
+              onLike={handleLike}
+            />
+            <div className="mp-share-actions">
+              <button className="mp-share-btn whatsapp" onClick={() => handleWhatsAppShare(currentPost, studentInfo)}>
+                <MessageCircle size={18} /> WhatsApp Status
+              </button>
+              <button className="mp-share-btn instagram" onClick={() => handleInstagramShare(currentPost, studentInfo)}>
+                <Instagram size={18} /> Instagram Story
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    })(),
+    document.body
+  );
 
   return (
+    <>
     <div className={`marhala-posts-container fade-in ${className}`.trim()}>
       {/* Visibility Banner */}
       {!showPosts && (
@@ -1021,16 +1096,51 @@ function MarhalaPosts({
                 />
               </div>
               <div className="mp-form-group">
-                <label>📝 Heading</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Mabrook! Passed Marhala Ula with excellence!"
-                  value={formHeading}
-                  onChange={(e) => setFormHeading(e.target.value)}
-                  className="mp-input"
-                  required
-                />
+                <label>📝 Heading Image (upload custom text design PNG)</label>
+                <div className="mp-photo-upload-wrapper">
+                  <div className="mp-photo-upload-area">
+                    {formHeadingUrl ? (
+                      <div className="mp-photo-preview" style={{ width: '200px', height: 'auto', minHeight: '60px' }}>
+                        <img src={formHeadingUrl} alt="Heading design" style={{ objectFit: 'contain', width: '100%', height: 'auto' }} />
+                        <button type="button" className="mp-photo-remove" onClick={() => setFormHeadingUrl("")} title="Remove heading image"><X size={16} /></button>
+                      </div>
+                    ) : (
+                      <div className="mp-photo-placeholder" style={{ width: '200px', height: '80px' }}>
+                        <Camera size={24} />
+                        <span>Upload Image</span>
+                      </div>
+                    )}
+                    <label className="mp-photo-upload-btn">
+                      <Upload size={16} />
+                      {uploadingHeading ? "Uploading..." : "Choose File"}
+                      <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploadingHeading} onChange={(e) => { if (e.target.files?.[0]) handleHeadingUpload(e.target.files[0]); e.target.value = ""; }} />
+                    </label>
+                    <div className="mp-photo-or-url">
+                      <span>or URL:</span>
+                      <input type="url" placeholder="https://..." value={formHeadingUrl} onChange={(e) => setFormHeadingUrl(e.target.value)} className="mp-input mp-url-input" />
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              {formHeadingUrl && (
+                <div className="mp-form-group">
+                  <label>📐 Heading Image Scale: {formHeadingScale}%</label>
+                  <input
+                    type="range"
+                    min="30"
+                    max="200"
+                    step="5"
+                    value={formHeadingScale}
+                    onChange={(e) => setFormHeadingScale(parseFloat(e.target.value))}
+                    className="mp-range-slider"
+                  />
+                  <div className="mp-range-labels">
+                    <span>Small</span>
+                    <span>Large</span>
+                  </div>
+                </div>
+              )}
 
               {/* Photo Upload */}
               <div className="mp-form-group">
@@ -1260,37 +1370,9 @@ function MarhalaPosts({
         )}
       </div>
 
-      {homePreview && selectedPost && (() => {
-        const currentPost = posts.find((post) => post.id === selectedPost.id) || selectedPost;
-        const studentInfo = getStudentInfo(currentPost);
-        return (
-          <div className="mp-modal-backdrop" onClick={() => setSelectedPost(null)}>
-            <div className={`mp-animation-overlay ${showAnimation ? "visible" : ""}`} ref={animCanvasRef} />
-            <div className="mp-modal-card" ref={postCardRef} onClick={(event) => event.stopPropagation()}>
-              <button className="mp-modal-close" onClick={() => setSelectedPost(null)} aria-label="Close Marhala post">
-                <X size={20} />
-              </button>
-              <PostCard
-                post={currentPost}
-                studentInfo={studentInfo}
-                currentUserId={currentUserId}
-                hasLiked={hasLiked(currentPost)}
-                recentlyLiked={recentlyLiked[currentPost.id]}
-                onLike={handleLike}
-              />
-              <div className="mp-share-actions">
-                <button className="mp-share-btn whatsapp" onClick={() => handleWhatsAppShare(currentPost, studentInfo)}>
-                  <MessageCircle size={18} /> WhatsApp Status
-                </button>
-                <button className="mp-share-btn instagram" onClick={() => handleInstagramShare(currentPost, studentInfo)}>
-                  <Instagram size={18} /> Instagram Story
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
+  {portalModal}
+  </>
   );
 }
 
@@ -1316,17 +1398,19 @@ function CompactMarhalaPostCard({ post, studentInfo, hasLiked, recentlyLiked, on
   const marhalaDisplay = MARHALA_ARABIC_LABELS[post.marhala_name] || post.marhala_name || "Marhala";
 
   return (
-    <article className="mp-compact-card card-appear">
-      <button className="mp-compact-photo" onClick={onOpen} aria-label="Open Marhala post">
-        {postPhoto ? <img src={postPhoto} alt={post.student_name || "Marhala post"} /> : <User size={28} />}
-      </button>
-      <div className="mp-compact-info">
-        <span className="mp-compact-eyebrow mp-arabic-text" dir="rtl">{marhalaDisplay}</span>
+    <article className={`mp-compact-card card-appear ${post.is_live ? 'mp-compact-live' : ''}`}>
+      <div className="mp-compact-photo-wrap">
+        <button className="mp-compact-photo" onClick={onOpen} aria-label="Open Marhala post">
+          {postPhoto ? <img src={postPhoto} alt={post.student_name || "Marhala post"} /> : <User size={28} />}
+        </button>
         {post.is_live && (
-          <span className="mp-compact-live-badge">
+          <span className="mp-compact-live-badge-top">
             <span className="mp-live-dot" /> LIVE
           </span>
         )}
+      </div>
+      <div className="mp-compact-info">
+        <span className="mp-compact-eyebrow mp-arabic-text" dir="rtl">{marhalaDisplay}</span>
         <h3 className="mp-compact-name mp-arabic-text" dir={studentInfo?.arabic_name || studentInfo?.arabicName || post.arabic_name ? "rtl" : "auto"}>{childName}</h3>
       </div>
       <div className="mp-compact-actions">
@@ -1335,10 +1419,10 @@ function CompactMarhalaPostCard({ post, studentInfo, hasLiked, recentlyLiked, on
           onClick={(event) => { event.stopPropagation(); onLike && onLike(post); }}
           aria-label={hasLiked ? "Unlike" : "Like"}
         >
-          <Heart size={18} fill={hasLiked ? "var(--like-red)" : "none"} color={hasLiked ? "var(--like-red)" : "var(--deep-brown)"} />
+          <Heart size={16} fill={hasLiked ? "var(--like-red)" : "none"} color={hasLiked ? "var(--like-red)" : "var(--deep-brown)"} />
           <span className="mp-like-count">{toArabicDigits(likeCount)}</span>
         </button>
-        <button className="mp-compact-open" onClick={onOpen}>Open</button>
+        <button className="mp-compact-open" onClick={onOpen}>{post.is_live ? 'View Post' : 'Open'}</button>
       </div>
     </article>
   );
@@ -1362,7 +1446,6 @@ function PostCard({
   const postBackground = post.background_url || "";
   const backgroundOpacity = post.background_opacity != null ? post.background_opacity : 0.3;
   const studentAge = post.description || post.age || (studentInfo?.date_of_birth ? calculateAge(studentInfo.date_of_birth) : null);
-  const postHeading = post.title || post.heading || "";
   const marhalaDisplay = post.marhala_name || "";
   const marhalaArabicDisplay = MARHALA_ARABIC_LABELS[marhalaDisplay] || marhalaDisplay;
   const studentArabicName = studentInfo?.arabic_name || studentInfo?.arabicName || post.arabic_name || "";
@@ -1491,7 +1574,7 @@ function PostCard({
             {studentAge !== null && (
               <div className="mp-cert-photo-age">
                 <span className="mp-cert-detail-label">Age</span>
-                <span className="mp-cert-detail-value"><span className="mp-age-digits">{studentAge}</span> years</span>
+                <span className="mp-cert-detail-value">{toArabicDigits(studentAge)}</span>
               </div>
             )}
             <div className="mp-cert-blessing mp-arabic-text" dir="rtl">مبارك مهنّا</div>
@@ -1506,9 +1589,9 @@ function PostCard({
               {marhalaArabicDisplay}
             </div>
           )}
-          {postHeading && (
-            <p className="mp-cert-heading" dir="auto">{postHeading}</p>
-          )}
+          {post.heading_url ? (
+            <img src={post.heading_url} alt="Heading" className="mp-cert-heading-img" style={{ transform: `scale(${(post.heading_scale || 100) / 100})` }} />
+          ) : null}
         </div>
 
       </div>
