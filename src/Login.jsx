@@ -5,6 +5,23 @@ import lottie from "lottie-web";
 
 import "./Login.css";
 
+const PremiumEye = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-eye-svg">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.15" />
+    <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+    <circle cx="13.5" cy="10.5" r="0.8" fill="white" opacity="0.5" />
+  </svg>
+);
+
+const PremiumEyeOff = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-eye-svg">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+);
+
 const ROLE_OPTIONS = [
   {
     id: "parents",
@@ -47,6 +64,7 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [buttonFeedback, setButtonFeedback] = useState(null);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [forgotCurrentPassword, setForgotCurrentPassword] = useState("");
   const [forgotNewPassword, setForgotNewPassword] = useState("");
@@ -159,9 +177,8 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setButtonFeedback(null);
 
-    // For admin login, set a flag BEFORE authenticating so the App.jsx auth
-    // listener knows to pause auto-resolve and let the OTP modal appear.
     if (selectedRole === "admin") {
       sessionStorage.setItem("mauze-admin-otp-flow", "true");
     }
@@ -172,33 +189,35 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
     });
 
     if (authError) {
-      setError(authError.message);
-      setLoading(false);
+      setButtonFeedback("error");
+      setTimeout(() => {
+        setError(authError.message);
+        setLoading(false);
+        setButtonFeedback(null);
+      }, 1200);
       if (selectedRole === "admin") {
         sessionStorage.removeItem("mauze-admin-otp-flow");
       }
       return;
     }
 
-    if (selectedRole === "admin") {
-      // Show OTP screen immediately after successful authentication.
-      // Full portal authorization (portal_access table + metadata roles)
-      // happens in onLoginSuccess after OTP verification.
-      setTempUser(data.user);
-      setStep("otp");
-      setPassword("");
-      setLoading(false);
-      return;
-    }
+    setButtonFeedback("success");
+    setLoading(false);
 
-    const result = await onLoginSuccess(data.user, selectedRole, rememberMe);
-
-    if (!result?.ok) {
-      setError(result?.message || "This account cannot access the selected portal.");
-      setLoading(false);
-      return;
-    }
-
+    setTimeout(() => {
+      setButtonFeedback(null);
+      if (selectedRole === "admin") {
+        setTempUser(data.user);
+        setStep("otp");
+        setPassword("");
+        return;
+      }
+      onLoginSuccess(data.user, selectedRole, rememberMe).then((result) => {
+        if (!result?.ok) {
+          setError(result?.message || "This account cannot access the selected portal.");
+        }
+      });
+    }, 1000);
   };
 
   const handleVerifySecretKey = async (event) => {
@@ -347,12 +366,16 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                 />
                 <button
                   type="button"
-                  className="password-toggle-btn"
+                  className={`password-toggle-btn${selectedRole === "admin" ? " admin-eye-btn" : ""}`}
                   onClick={() => setShowPassword((prev) => !prev)}
                   tabIndex={-1}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {selectedRole === "admin" ? (
+                    showPassword ? <PremiumEyeOff size={18} /> : <PremiumEye size={18} />
+                  ) : (
+                    showPassword ? <EyeOff size={18} /> : <Eye size={18} />
+                  )}
                 </button>
               </div>
             </div>
@@ -394,18 +417,35 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
               </button>
             </div>
 
-            <button type="submit" className="login-button" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 size={18} className="spinner" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  <LogIn size={18} />
-                  Open {activeRole.label} Portal
-                </>
-              )}
+            <button
+              type="submit"
+              className={`login-button${buttonFeedback === "success" ? " feedback-success" : ""}${buttonFeedback === "error" ? " feedback-error" : ""}`}
+              disabled={loading || buttonFeedback !== null}
+            >
+              <span className="btn-fill-overlay" />
+              <span className="btn-content">
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="spinner" />
+                    Signing in...
+                  </>
+                ) : buttonFeedback === "success" ? (
+                  <>
+                    <Check size={18} />
+                    Access Granted
+                  </>
+                ) : buttonFeedback === "error" ? (
+                  <>
+                    <X size={18} />
+                    Access Denied
+                  </>
+                ) : (
+                  <>
+                    <LogIn size={18} />
+                    Open {activeRole.label} Portal
+                  </>
+                )}
+              </span>
             </button>
 
           </form>

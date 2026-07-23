@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Privacy Policy - Mauze Tahfeez</title>
+  <style>
+    :root {
+      --primary-gold: #c5a059;
+      --dark-gold: #b8923e;
+      --deep-brown: #3d2b1f;
+      --soft-brown: #8a786a;
+      --off-white: #faf8f5;
+      --card-bg: #ffffff;
+      --border-light: #f0e6d3;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      background: #1a120a;
+      color: #3d2b1f;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .bg-layer {
+      position: fixed;
+      inset: 0;
+      background: url('/login background.jpg') center/cover no-repeat;
+      opacity: 0.4;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(26,18,10,0.85), rgba(0,0,0,0.7));
+      z-index: 1;
+      pointer-events: none;
+    }
+    .page-wrapper {
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px;
+    }
+    .policy-card {
+      max-width: 860px;
+      width: 100%;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border-radius: 28px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    .policy-accent {
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary-gold), #f0d080, var(--primary-gold));
+      box-shadow: 0 0 20px rgba(197,160,89,0.4);
+    }
+    .policy-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 36px 36px 20px;
+      text-align: center;
+    }
+    .policy-logo {
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      border-radius: 20px;
+      background: rgba(197,160,89,0.08);
+      border: 1.5px solid rgba(197,160,89,0.2);
+      padding: 8px;
+      margin-bottom: 16px;
+    }
+    .policy-title {
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--deep-brown);
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+    .policy-subtitle {
+      font-size: 13px;
+      color: var(--soft-brown);
+      font-weight: 500;
+    }
+    .policy-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--primary-gold), transparent);
+      margin: 0 36px;
+      opacity: 0.3;
+    }
+    .policy-body {
+      padding: 28px 36px 40px;
+    }
+    .policy-body h2 {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--deep-brown);
+      margin: 28px 0 12px;
+      letter-spacing: -0.02em;
+    }
+    .policy-body h2:first-child { margin-top: 0; }
+    .policy-body h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary-gold);
+      margin: 20px 0 8px;
+    }
+    .policy-body p {
+      font-size: 14px;
+      color: #5a4a3a;
+      margin-bottom: 12px;
+    }
+    .policy-body ul {
+      margin: 8px 0 16px;
+      padding-left: 24px;
+    }
+    .policy-body ul li {
+      font-size: 14px;
+      color: #5a4a3a;
+      margin-bottom: 6px;
+      list-style-type: disc;
+    }
+    .policy-body strong {
+      color: var(--deep-brown);
+    }
+    .policy-body .highlight-box {
+      background: rgba(197,160,89,0.06);
+      border: 1px solid rgba(197,160,89,0.15);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 16px 0;
+    }
+    .policy-footer {
+      text-align: center;
+      padding: 20px 36px 32px;
+      border-top: 1px solid var(--border-light);
+    }
+    .policy-footer p {
+      font-size: 12px;
+      color: var(--soft-brown);
+    }
+    .policy-footer a {
+      color: var(--primary-gold);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .policy-footer a:hover {
+      text-decoration: underline;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 16px;
+      color: var(--soft-brown);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--primary-gold); }
+    @media (max-width: 600px) {
+      .page-wrapper { padding: 16px 12px; }
+      .policy-card { border-radius: 22px; }
+      .policy-header { padding: 24px 20px 16px; }
+      .policy-logo { width: 60px; height: 60px; padding: 6px; }
+      .policy-title { font-size: 22px; }
+      .policy-divider { margin: 0 20px; }
+      .policy-body { padding: 20px 20px 28px; }
+      .policy-body h2 { font-size: 18px; }
+      .policy-footer { padding: 16px 20px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-wrapper">
+    <a href="/" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to Mauze Tahfeez
+    </a>
+    <div class="policy-card">
+      <div class="policy-accent"></div>
+      <div class="policy-header">
+        <img src="/LOGO%20ATFAAL.png" alt="Mauze Tahfeez Logo" class="policy-logo" />
+        <h1 class="policy-title">Privacy Policy</h1>
+        <p class="policy-subtitle">Last updated: July 23, 2026</p>
+      </div>
+      <div class="policy-divider"></div>
+      <div class="policy-body">
+
+        <p>Mauze Tahfeez ("we," "our," or "us") operates the Mauze Tahfeez educational portal. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our portal, including all parent, teacher, and admin interfaces.</p>
+
+        <div class="highlight-box">
+          <strong>Summary:</strong> We collect only the information necessary to operate the educational portal — student progress data, attendance records, assessment results, and account credentials. We do not sell your data. We do not use your data for advertising. Your data is stored securely on Supabase cloud infrastructure.
+        </div>
+
+        <h2>1. Information We Collect</h2>
+
+        <h3>Account Information</h3>
+        <p>When you create or are assigned an account, we collect:</p>
+        <ul>
+          <li><strong>Email address</strong> — used for login, notifications, and password recovery</li>
+          <li><strong>Full name</strong> — used to identify users within the portal</li>
+          <li><strong>Role</strong> (Parent, Teacher, or Admin) — to determine what features and data you can access</li>
+          <li><strong>Phone number</strong> (optional) — used for WhatsApp notifications and account recovery</li>
+        </ul>
+
+        <h3>Student & Academic Data</h3>
+        <p>For students registered in the system, we collect:</p>
+        <ul>
+          <li><strong>Student name and personal details</strong> — as provided by parents or administrators</li>
+          <li><strong>Class and group assignments</strong> — to organize students into appropriate learning groups</li>
+          <li><strong>Attendance records</strong> — daily attendance tracking for each class session</li>
+          <li><strong>Academic results and progress</strong> — assessment scores, memorization progress (Sabaq, Sabqi, Manzil), and quarterly results</li>
+          <li><strong>Behavioral records</strong> — conduct notes and disciplinary records as entered by teachers</li>
+          <li><strong>Schedule and timetable information</strong> — class schedules, exam timetables, and Jadwal tracking</li>
+        </ul>
+
+        <h3>Teacher & Staff Data</h3>
+        <ul>
+          <li><strong>Professional information</strong> — subjects taught, assigned groups, staff profile details</li>
+          <li><strong>Salary and leave records</strong> — attendance, leave applications, and salary disbursement history</li>
+          <li><strong>Performance data</strong> — class statistics and student outcome metrics</li>
+        </ul>
+
+        <h3>Automatically Collected Information</h3>
+        <ul>
+          <li><strong>Device information</strong> — browser type, operating system, and device type for compatibility</li>
+          <li><strong>Usage data</strong> — pages visited and features used, to improve the portal experience</li>
+          <li><strong>IP address</strong> — for security monitoring and fraud prevention</li>
+        </ul>
+
+        <h2>2. How We Use Your Information</h2>
+        <p>We use the collected information for the following purposes:</p>
+        <ul>
+          <li><strong>Portal Operation:</strong> To provide and maintain the educational portal, including all parent, teacher, and admin features</li>
+          <li><strong>Progress Tracking:</strong> To record and display student academic progress, attendance, and assessment results</li>
+          <li><strong>Communication:</strong> To send notifications about student progress, schedule changes, and important announcements</li>
+          <li><strong>Reporting:</strong> To generate report cards, progress reports, and certificates for students</li>
+          <li><strong>Account Management:</strong> To manage user accounts, roles, and access permissions</li>
+          <li><strong>Improvement:</strong> To analyze usage patterns and improve the portal's features and performance</li>
+          <li><strong>Security:</strong> To protect against unauthorized access, fraud, and abuse</li>
+        </ul>
+
+        <h2>3. How We Share Your Information</h2>
+        <p>We do not sell, trade, or rent your personal information to third parties. We may share information only in the following circumstances:</p>
+        <ul>
+          <li><strong>Within the Portal:</strong> Data is shared between parents, teachers, and administrators according to their respective roles and permissions</li>
+          <li><strong>Service Providers:</strong> We use Supabase (database and authentication), OneSignal (push notifications), and Firebase Cloud Messaging (notifications). These providers process data solely on our behalf and are contractually bound to protect your data</li>
+          <li><strong>Legal Requirements:</strong> If required by law or to protect our legal rights</li>
+        </ul>
+
+        <h2>4. Data Storage and Security</h2>
+        <p>We implement appropriate technical and organizational measures to protect your data:</p>
+        <ul>
+          <li><strong>Encryption:</strong> All data transmitted between your device and our servers is encrypted using TLS/SSL</li>
+          <li><strong>Authentication:</strong> Access is protected by secure login credentials with optional multi-factor authentication for admin accounts</li>
+          <li><strong>Access Control:</strong> Role-based access control ensures users can only view data relevant to their role</li>
+          <li><strong>Infrastructure:</strong> Data is stored on Supabase cloud infrastructure with industry-standard security measures</li>
+          <li><strong>Backups:</strong> Regular automated backups are performed to prevent data loss</li>
+        </ul>
+
+        <h2>5. Data Retention</h2>
+        <p>We retain your personal information for as long as your account is active or as needed to provide the portal services. Academic records (attendance, results, progress) are retained for the duration of a student's enrollment and may be archived after graduation or withdrawal for record-keeping purposes. Account data may be deleted upon request, subject to legal obligations.</p>
+
+        <h2>6. Your Rights and Choices</h2>
+        <p>Depending on your jurisdiction, you may have the following rights:</p>
+        <ul>
+          <li><strong>Access:</strong> Request a copy of the personal data we hold about you</li>
+          <li><strong>Correction:</strong> Request correction of inaccurate or incomplete data</li>
+          <li><strong>Deletion:</strong> Request deletion of your personal data, subject to legal retention requirements</li>
+          <li><strong>Portability:</strong> Request transfer of your data to another service provider</li>
+          <li><strong>Objection:</strong> Object to processing of your personal data in certain circumstances</li>
+        </ul>
+        <p>To exercise any of these rights, please contact us using the information in Section 9.</p>
+
+        <h2>7. Children's Privacy</h2>
+        <p>Our portal is used by educational institutions to manage student information. Student data is provided by parents, guardians, or school administrators with appropriate consent. We do not knowingly collect personal information directly from children under 13 without parental consent. If you believe a child has provided us with personal information without parental consent, please contact us immediately.</p>
+
+        <h2>8. Changes to This Privacy Policy</h2>
+        <p>We may update this Privacy Policy from time to time. The updated version will be indicated by an updated "Last updated" date at the top of this page. We encourage you to review this Privacy Policy periodically to stay informed about how we are protecting your information.</p>
+
+        <h2>9. Contact Information</h2>
+        <p>If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:</p>
+        <ul>
+          <li><strong>Email:</strong> privacy@mauzetahfeez.com (replace with your actual email)</li>
+          <li><strong>Portal:</strong> Access the "Settings" page within the portal and submit a support request</li>
+        </ul>
+
+      </div>
+      <div class="policy-footer">
+        <p>&copy; 2026 Mauze Tahfeez. All rights reserved.</p>
+        <p style="margin-top:4px;">
+          <a href="/">Return to Portal</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

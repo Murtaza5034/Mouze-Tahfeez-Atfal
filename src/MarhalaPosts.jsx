@@ -566,6 +566,7 @@ function MarhalaPosts({
         school_heading_ar: formSchoolHeadingAr,
         school_heading_en: formSchoolHeadingEn,
         background_opacity: formBackgroundOpacity,
+        is_live: true,
         updated_at: new Date().toISOString(),
       };
 
@@ -748,11 +749,8 @@ function MarhalaPosts({
 
   const visiblePosts = useMemo(() => {
     let nextPosts = posts;
-    if (!isAdmin && !homePreview) {
-      nextPosts = nextPosts.filter((post) => post.is_live);
-    }
     return limit ? nextPosts.slice(0, limit) : nextPosts;
-  }, [posts, limit, isAdmin, homePreview]);
+  }, [posts, limit]);
 
   // Auto-open first live post on homePreview (teacher/parent portal) — once per post (persisted)
   useEffect(() => {
@@ -908,13 +906,31 @@ function MarhalaPosts({
               recentlyLiked={recentlyLiked[currentPost.id]}
               onLike={handleLike}
             />
-            <div className="mp-share-actions">
-              <button className="mp-share-btn whatsapp" onClick={() => handleWhatsAppShare(currentPost, studentInfo)}>
-                <MessageCircle size={18} /> WhatsApp Status
-              </button>
-              <button className="mp-share-btn instagram" onClick={() => handleInstagramShare(currentPost, studentInfo)}>
-                <Instagram size={18} /> Instagram Story
-              </button>
+            <div className="mp-modal-share-bar">
+              <div className="mp-modal-like-area">
+                <button
+                  className={`mp-modal-like-btn${recentlyLiked[currentPost.id] ? " just-liked" : ""}`}
+                  onClick={() => handleLike(currentPost)}
+                  aria-label={hasLiked(currentPost) ? "Unlike" : "Like"}
+                >
+                  <Heart
+                    size={18}
+                    fill={hasLiked(currentPost) ? "var(--like-red)" : "none"}
+                    color={hasLiked(currentPost) ? "var(--like-red)" : "var(--deep-brown)"}
+                  />
+                </button>
+                <span className={`mp-like-count ${(currentPost.likes || []).length > 0 ? "has-likes" : ""}`}>
+                  {toArabicDigits((currentPost.likes || []).length)}
+                </span>
+              </div>
+              <div className="mp-modal-share-icons">
+                <button className="mp-modal-share-icon whatsapp" onClick={() => handleWhatsAppShare(currentPost, studentInfo)} title="Share on WhatsApp">
+                  <MessageCircle size={20} />
+                </button>
+                <button className="mp-modal-share-icon instagram" onClick={() => handleInstagramShare(currentPost, studentInfo)} title="Share on Instagram">
+                  <Instagram size={20} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1470,18 +1486,6 @@ function PostCard({
         />
       )}
 
-      {/* Ornate corner decorations */}
-      <CornerOrnament className="mp-cert-corner mp-cert-corner-tl" />
-      <CornerOrnament className="mp-cert-corner mp-cert-corner-tr" />
-
-      {/* Ornament frame overlay */}
-      <div className="mp-cert-ornament-frame" aria-hidden="true">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="98" height="98" rx="2" stroke="#c5a059" strokeWidth="0.5" strokeDasharray="4 6" fill="none" opacity="0.3"/>
-          <rect x="3" y="3" width="94" height="94" rx="1" stroke="#8a6515" strokeWidth="0.3" fill="none" opacity="0.15"/>
-        </svg>
-      </div>
-
       {/* Inner certificate container */}
       <div className="mp-certificate-inner">
         {/* Action buttons - overlaid top-right */}
@@ -1533,12 +1537,6 @@ function PostCard({
         <div className="mp-cert-header">
           <h3 className="mp-cert-school-name mp-arabic-text" dir="rtl">{post.school_heading_ar || "تحفيظ - روضة تحفيظ الأطفال"}</h3>
           <p className="mp-cert-school-name-sub">{post.school_heading_en || "Tahfeez \u2022 Rawdat Tahfeez al Atfal"}</p>
-          
-          <div className="mp-cert-star-divider">
-            <div className="mp-cert-deco-line" />
-            <Sparkles size={14} className="mp-cert-star-icon" />
-            <div className="mp-cert-deco-line" />
-          </div>
         </div>
 
         {/* Certificate Body */}
@@ -1577,7 +1575,7 @@ function PostCard({
                 <span className="mp-cert-detail-value">{toArabicDigits(studentAge)}</span>
               </div>
             )}
-            <div className="mp-cert-blessing mp-arabic-text" dir="rtl">مبارك مهنّا</div>
+            <div className="mp-cert-blessing mp-arabic-text" dir="rtl">مبارك مهنىْ</div>
           </div>
         </div>
 

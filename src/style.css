@@ -1894,6 +1894,53 @@ p:not([class*="card"]):not([class*="record"]):not([class*="table"]):not([class*=
   resize: vertical;
 }
 
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper input {
+  padding-right: 44px;
+}
+
+.portal-password-toggle-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--primary-gold);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  z-index: 2;
+  transition: all 0.2s;
+}
+
+.portal-password-toggle-btn:hover {
+  color: var(--dark-gold);
+}
+
+.portal-password-toggle-btn .premium-lock-svg {
+  animation: premiumLockPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes premiumLockPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(197, 160, 89, 0.3));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
+    transform: scale(1.08);
+  }
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5079,6 +5126,17 @@ body {
   .badal-premium-tab {
     padding: 8px 12px;
     font-size: 0.8rem;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+  .badal-premium-tab .badal-tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badal-tab-badge {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
   }
 }
 

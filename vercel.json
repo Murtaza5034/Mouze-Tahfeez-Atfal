@@ -37,6 +37,14 @@
       "dest": "/index.html"
     },
     {
+      "src": "/privacy-policy",
+      "dest": "/privacy-policy.html"
+    },
+    {
+      "src": "/(.*)\\.html$",
+      "dest": "/$1.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

@@ -213,31 +213,72 @@
   cursor: pointer;
 }
 
-.mp-share-actions {
+.mp-modal-card .mp-like-group {
+  display: none;
+}
+
+.mp-modal-share-bar {
   display: flex;
-  gap: 10px;
-  justify-content: center;
-  flex-wrap: wrap;
-  padding: 16px 4px 4px;
-}
-
-.mp-share-btn {
-  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  border: none;
-  border-radius: 999px;
-  padding: 11px 18px;
-  color: #fff;
-  font-weight: 800;
-  cursor: pointer;
+  justify-content: space-between;
+  padding: 14px 6px 4px;
 }
 
-.mp-share-btn.whatsapp {
+.mp-modal-like-area {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(197, 160, 89, 0.15);
+}
+
+.mp-modal-like-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.mp-modal-like-btn:hover {
+  transform: scale(1.15);
+}
+
+.mp-modal-share-icons {
+  display: flex;
+  gap: 8px;
+}
+
+.mp-modal-share-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+}
+
+.mp-modal-share-icon:hover {
+  transform: scale(1.1);
+}
+
+.mp-modal-share-icon.whatsapp {
   background: #25d366;
 }
 
-.mp-share-btn.instagram {
+.mp-modal-share-icon.instagram {
   background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
 }
 
@@ -1743,6 +1784,74 @@
   }
 
   .mp-title { font-size: 1.3rem; }
+}
+
+/* ── Mobile: Keep post card at desktop size ── */
+@media (max-width: 700px) {
+  .mp-post-card {
+    padding: 8px;
+  }
+  .mp-cert-body {
+    flex-direction: row;
+    padding: 8px 28px 20px;
+    align-items: flex-start;
+    text-align: right;
+  }
+  .mp-cert-info {
+    align-items: flex-end;
+    text-align: right;
+  }
+  .mp-cert-details {
+    justify-content: flex-end;
+  }
+  .mp-cert-photo-area {
+    width: 160px;
+  }
+  .mp-cert-photo,
+  .mp-cert-photo-placeholder {
+    width: 160px;
+    height: 180px;
+  }
+  .mp-cert-student-name {
+    font-size: 2.6rem;
+  }
+  .mp-cert-student-arabic-name {
+    font-size: 1.55rem;
+  }
+  .mp-cert-heading {
+    font-size: 1rem;
+    text-align: right;
+  }
+  .mp-cert-marhala-badge {
+    font-size: 1.15rem;
+    padding: 8px 20px;
+  }
+  .mp-cert-corner {
+    width: 36px;
+    height: 36px;
+  }
+  .mp-cert-photo-age {
+    min-width: 150px;
+    font-size: 0.85rem;
+  }
+  .mp-cert-blessing {
+    font-size: 1.6rem;
+  }
+  .mp-cert-center-info {
+    padding: 0px 28px 20px;
+    gap: 6px;
+    margin-top: -36px;
+  }
+  .mp-cert-center-info .mp-cert-marhala-badge {
+    font-size: 1.15rem;
+    padding: 8px 20px;
+  }
+  .mp-cert-center-info .mp-cert-heading {
+    font-size: 1rem;
+  }
+  .mp-cert-header {
+    padding: 24px 24px 12px;
+  }
 }
 
 /* === Live Badge Styles === */

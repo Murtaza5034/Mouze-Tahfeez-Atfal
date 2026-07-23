@@ -88,6 +88,52 @@
   z-index: 10;
 }
 
+.muhaffiz-divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  padding: 0 8px;
+}
+
+.muhaffiz-divider-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--primary-gold);
+}
+
+.muhaffiz-divider-line::before,
+.muhaffiz-divider-line::after {
+  content: '';
+  flex: 1;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.35), rgba(212, 175, 55, 0.35), transparent);
+}
+
+.muhaffiz-divider-diamond {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-gold);
+  opacity: 0.7;
+}
+
+.muhaffiz-divider-message {
+  font-size: 0.82rem;
+  color: var(--soft-brown);
+  text-align: center;
+  line-height: 1.5;
+  font-weight: 500;
+  max-width: 420px;
+}
+
 .empty-state.premium-card {
   display: flex;
   flex-direction: column;

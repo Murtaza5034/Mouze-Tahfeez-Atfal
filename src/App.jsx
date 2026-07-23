@@ -93,6 +93,36 @@ const LottieTrophy = ({ size = 120 }) => {
   );
 };
 
+const PremiumStudentsIcon = ({ size = 48 }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-students-svg">
+    <path d="M6 20l18-9 18 9-18 9z" />
+    <path d="M6 20v5s6 3.5 18 3.5 18-3.5 18-3.5v-5" />
+    <path d="M24 11v5" />
+    <path d="M24 16l-5 2.5" />
+    <circle cx="24" cy="11" r="1.5" fill="currentColor" opacity="0.5" />
+    <path d="M14 30l1-0.7 1 0.7-0.3 1h-1.4z" fill="currentColor" opacity="0.3" />
+    <path d="M32 30l1-0.7 1 0.7-0.3 1h-1.4z" fill="currentColor" opacity="0.3" />
+  </svg>
+);
+
+const PremiumLockOpen = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-lock-svg">
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0" />
+    <circle cx="12" cy="16" r="1.5" fill="currentColor" opacity="0.3" />
+    <path d="M12 16v-1" strokeWidth="2" />
+  </svg>
+);
+
+const PremiumLockClosed = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-lock-svg">
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    <circle cx="12" cy="16" r="1.5" fill="currentColor" opacity="0.3" />
+    <path d="M12 16v-1" strokeWidth="2" />
+  </svg>
+);
+
 const ELEARNING_URL = "https://www.elearningquran.com/Login.aspx";
 const ELEARNING_ORIGIN = new URL(ELEARNING_URL).origin;
 
@@ -4642,7 +4672,7 @@ function ParentPortal({
             <div className="dashboard-section card-appear">
               <div className="section-header">
                 <Calendar size={18} />
-                <h3>Study Schedule</h3>
+                <h3>Marahil Ikhtebar Schedule</h3>
               </div>
               <div className="schedule-list">
                 {currentPage.schedule.map((item, index) => (
@@ -5088,6 +5118,36 @@ function ParentPortal({
                         </div>
                       </article>
                     );
+                    })()}
+                  {assignedTeacher && (() => {
+                    const label = assignedTeacher?.gender === 'female' ? 'Muhaffezah' : 'Muhaffiz';
+                    return (
+                      <div className="muhaffiz-divider">
+                        <div className="muhaffiz-divider-line">
+                          <span className="muhaffiz-divider-diamond">&#9670;</span>
+                          Your Child&rsquo;s {label}
+                          <span className="muhaffiz-divider-diamond">&#9670;</span>
+                        </div>
+                        <p className="muhaffiz-divider-message">
+                          This is your child&rsquo;s designated {label}. You may contact them directly for any academic or progress-related queries.
+                        </p>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const otherTeachers = roleFiltered.filter(t => assignedTeacher ? t.id !== assignedTeacher.id : true);
+                    return otherTeachers.length > 0 ? (
+                      <div className="muhaffiz-divider">
+                        <div className="muhaffiz-divider-line">
+                          <span className="muhaffiz-divider-diamond">&#9670;</span>
+                          Our Other Muhaffiz &amp; Muhaffezah
+                          <span className="muhaffiz-divider-diamond">&#9670;</span>
+                        </div>
+                        <p className="muhaffiz-divider-message">
+                          You may also reach out to any of our other qualified staff members for additional support.
+                        </p>
+                      </div>
+                    ) : null;
                   })()}
                   {roleFiltered.filter(t => assignedTeacher ? t.id !== assignedTeacher.id : true).map(t => {
                     const wa = (t.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
@@ -5865,6 +5925,8 @@ function AdminPortal({
   adminForms,
   menuOpen,
   portalAccess,
+  showPortalPassword,
+  setShowPortalPassword,
   onAdminFormChange,
   onCreateAnnouncement,
   onCreateGroup,
@@ -7005,14 +7067,7 @@ const handleDownloadAllReports = async () => {
                     <div className="ig-top-row">
                       <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
                         {stat.label === "Students" ? (
-                          <lottie-player
-                            src="/75d381a6-1151-11ee-b2bc-779f96f074bf.json"
-                            background="transparent"
-                            speed="1"
-                            style={{ width: "48px", height: "48px" }}
-                            loop
-                            autoplay
-                          ></lottie-player>
+                          <PremiumStudentsIcon size={48} />
                         ) : (
                           <Icon size={18} />
                         )}
@@ -9379,14 +9434,25 @@ const handleDownloadAllReports = async () => {
                     </label>
                     <label>
                       <span>Account Password</span>
-                      <input
-                        type="password"
-                        name="password"
-                        value={adminForms.portalAccess.password || ""}
-                        onChange={onAdminFormChange("portalAccess")}
-                        placeholder="Min 6 characters"
-                        required
-                      />
+                      <div className="password-input-wrapper">
+                        <input
+                          type={showPortalPassword ? "text" : "password"}
+                          name="password"
+                          value={adminForms.portalAccess.password || ""}
+                          onChange={onAdminFormChange("portalAccess")}
+                          placeholder="Min 6 characters"
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="portal-password-toggle-btn"
+                          onClick={() => setShowPortalPassword((prev) => !prev)}
+                          tabIndex={-1}
+                          aria-label={showPortalPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPortalPassword ? <PremiumLockOpen size={18} /> : <PremiumLockClosed size={18} />}
+                        </button>
+                      </div>
                     </label>
                   </div>
                   <div className="form-grid">
@@ -11956,14 +12022,7 @@ function TeacherPortal({
                       <div className="ig-top-row">
                         <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
                           {stat.label === "Students" ? (
-                            <lottie-player
-                              src="/75d381a6-1151-11ee-b2bc-779f96f074bf.json"
-                              background="transparent"
-                              speed="1"
-                              style={{ width: "48px", height: "48px" }}
-                              loop
-                              autoplay
-                            ></lottie-player>
+                            <PremiumStudentsIcon size={48} />
                           ) : stat.icon === 'Users' && <Users size={18} />}
                           {stat.icon === 'FileText' && <FileText size={18} />}
                           {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
@@ -14357,6 +14416,7 @@ export default function App() {
       show_salary_card: true,
     },
   });
+  const [showPortalPassword, setShowPortalPassword] = useState(false);
   const [teacherForms, setTeacherForms] = useState({
     result: createTeacherResultDraft(),
   });
@@ -17094,6 +17154,8 @@ const handleSendCustomNotification = async (event) => {
             portalAccessSuccess={portalAccessSuccess}
             onClosePortalAccessSuccess={() => setPortalAccessSuccess(null)}
             onTeacherUnlock={handleTeacherUnlock}
+            showPortalPassword={showPortalPassword}
+            setShowPortalPassword={setShowPortalPassword}
           />
         ) : (
           <TeacherPortal
