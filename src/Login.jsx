@@ -5,23 +5,6 @@ import lottie from "lottie-web";
 
 import "./Login.css";
 
-const PremiumEye = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-eye-svg">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.15" />
-    <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-    <circle cx="13.5" cy="10.5" r="0.8" fill="white" opacity="0.5" />
-  </svg>
-);
-
-const PremiumEyeOff = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-eye-svg">
-    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-    <line x1="1" y1="1" x2="23" y2="23" />
-  </svg>
-);
-
 const ROLE_OPTIONS = [
   {
     id: "parents",
@@ -49,13 +32,11 @@ const ROLE_OPTIONS = [
   },
 ];
 
-export default function Login({ onLoginSuccess, initialUser = null, initialRole = "parents", onCancel = null }) {
+export default function Login({ onLoginSuccess }) {
   const [selectedRole, setSelectedRole] = useState(() => {
-    if (initialUser && initialRole) return initialRole;
     return localStorage.getItem("mauze-saved-role") || "parents";
   });
   const [email, setEmail] = useState(() => {
-    if (initialUser?.email) return initialUser.email;
     return localStorage.getItem("mauze-saved-email") || "";
   });
   const [password, setPassword] = useState(() => {
@@ -64,7 +45,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [buttonFeedback, setButtonFeedback] = useState(null);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [forgotCurrentPassword, setForgotCurrentPassword] = useState("");
   const [forgotNewPassword, setForgotNewPassword] = useState("");
@@ -75,6 +55,7 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
   const [showForgotCurrent, setShowForgotCurrent] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirm, setShowForgotConfirm] = useState(false);
+  const [buttonFeedback, setButtonFeedback] = useState(null);
   const welcomeRef = useRef(null);
   const [rememberMe, setRememberMe] = useState(() => {
     const saved = localStorage.getItem("mauze-remember-me");
@@ -82,60 +63,12 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
     return saved !== "false";
   });
 
-  // Secret key flow states
-  const [step, setStep] = useState(initialUser ? "otp" : "login");
-  const [tempUser, setTempUser] = useState(initialUser || null);
-  const [secretKey, setSecretKey] = useState("");
-  const [keyInput, setKeyInput] = useState("");
-  const [keyLoading, setKeyLoading] = useState(false);
-  const [keyTimer, setKeyTimer] = useState(60);
-  const [keyError, setKeyError] = useState("");
-
-  const generateAlphanumericOtp = (length = 6) => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Easily readable uppercase alphanumeric
-    let code = "";
-    for (let i = 0; i < length; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
-
-  // Auto-generate secret key when OTP step mounts
-  useEffect(() => {
-    if (step !== "otp") return;
-    setSecretKey(generateAlphanumericOtp(6));
-    setKeyInput("");
-    setKeyError("");
-    setKeyTimer(60);
-  }, [step]);
-
-  // 1-minute countdown timer — auto-expires and cancels
-  useEffect(() => {
-    if (step !== "otp") return;
-    if (keyTimer <= 0) {
-      setSecretKey("");
-      setKeyInput("");
-      setKeyError("");
-      setStep("login");
-      setTempUser(null);
-      setError(null);
-      supabase.auth.signOut().catch(() => {});
-      if (onCancel) onCancel();
-      return;
-    }
-    const interval = setInterval(() => {
-      setKeyTimer((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [keyTimer, step]);
-
   useEffect(() => {
     const savedTheme = localStorage.getItem("mauze-app-theme") || "default";
     document.body.setAttribute("data-theme", savedTheme);
   }, []);
 
   useEffect(() => {
-    if (step !== "login") return; // Only load animation in login step
     if (!welcomeRef.current) return;
     let anim = null;
     const timer = setTimeout(() => {
@@ -155,7 +88,7 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
       clearTimeout(timer);
       if (anim) anim.destroy();
     };
-  }, [step]);
+  }, []);
 
   useEffect(() => {
     if (rememberMe && email && password) {
@@ -173,104 +106,62 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
 
   const activeRole = ROLE_OPTIONS.find((option) => option.id === selectedRole);
 
+  function isNetworkError(err) {
+    if (!err) return false;
+    const msg = (err.message || err.name || '').toLowerCase();
+    return msg.includes('fetch') || msg.includes('network') || msg.includes('networkerror') ||
+      msg.includes('typeerror') || msg.includes('failed to fetch') || msg.includes('internet') ||
+      err.name === 'TypeError' || err.code === 'NETWORK_ERROR';
+  }
+
+  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
   const handleLogin = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
     setButtonFeedback(null);
 
-    if (selectedRole === "admin") {
-      sessionStorage.setItem("mauze-admin-otp-flow", "true");
-    }
+    let lastError = null;
+    const maxRetries = 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError) {
-      setButtonFeedback("error");
-      setTimeout(() => {
-        setError(authError.message);
-        setLoading(false);
-        setButtonFeedback(null);
-      }, 1200);
-      if (selectedRole === "admin") {
-        sessionStorage.removeItem("mauze-admin-otp-flow");
-      }
-      return;
-    }
-
-    setButtonFeedback("success");
-    setLoading(false);
-
-    setTimeout(() => {
-      setButtonFeedback(null);
-      if (selectedRole === "admin") {
-        setTempUser(data.user);
-        setStep("otp");
-        setPassword("");
+      if (!authError) {
+        setButtonFeedback("success");
+        setTimeout(() => {
+          setButtonFeedback(null);
+          onLoginSuccess(data.user, selectedRole, rememberMe).then((result) => {
+            setLoading(false);
+            if (!result?.ok) {
+              setError(result?.message || "This account cannot access the selected portal.");
+            }
+          });
+        }, 1000);
         return;
       }
-      onLoginSuccess(data.user, selectedRole, rememberMe).then((result) => {
-        if (!result?.ok) {
-          setError(result?.message || "This account cannot access the selected portal.");
-        }
-      });
-    }, 1000);
-  };
 
-  const handleVerifySecretKey = async (event) => {
-    if (event) event.preventDefault();
-    setKeyLoading(true);
-    setKeyError("");
+      lastError = authError;
 
-    if (!keyInput.trim()) {
-      setKeyError("Please enter the secret key.");
-      setKeyLoading(false);
-      return;
-    }
-
-    if (keyInput.trim().toUpperCase() !== secretKey) {
-      setKeyError("Invalid secret key. Please check and try again.");
-      setKeyLoading(false);
-      return;
-    }
-
-    try {
-      sessionStorage.setItem("mauze-admin-otp-verified", "true");
-      const result = await onLoginSuccess(tempUser, "admin", rememberMe);
-
-      if (result?.ok) {
-        sessionStorage.removeItem("mauze-admin-otp-flow");
-        setKeyLoading(false);
-      } else {
-        setKeyError(result?.message || "This account cannot access the admin portal.");
-        setKeyLoading(false);
-        sessionStorage.removeItem("mauze-admin-otp-verified");
+      if (isNetworkError(authError) && attempt < maxRetries) {
+        setError(`Connection unstable. Retrying... (${attempt + 1}/${maxRetries})`);
+        await delay(1500 * (attempt + 1));
+        continue;
       }
-    } catch (err) {
-      console.error("Success login trigger failure:", err);
-      setKeyError("Portal authorization failed. Please try again.");
-      setKeyLoading(false);
+      break;
     }
-  };
 
-  const handleOtpCancel = async () => {
-    sessionStorage.removeItem("mauze-admin-otp-flow");
-    setSecretKey("");
-    setKeyInput("");
-    setKeyError("");
-    setKeyTimer(60);
-    setStep("login");
-    setTempUser(null);
-    setError(null);
-    
-    await supabase.auth.signOut();
-    
-    if (onCancel) {
-      onCancel();
-    }
+    setButtonFeedback("error");
+    setTimeout(() => {
+      setError(isNetworkError(lastError)
+        ? "Unable to connect. Please check your internet and try again."
+        : lastError.message);
+      setLoading(false);
+      setButtonFeedback(null);
+    }, 1200);
   };
 
   const handleRoleSwitch = (roleId) => {
@@ -281,20 +172,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
       setPassword("");
     }
   };
-
-  // Escape key closes the OTP modal (defined after handleOtpCancel for hoisting)
-  useEffect(() => {
-    if (step !== "otp") return;
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        handleOtpCancel();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [step, handleOtpCancel]);
-
-  // OTP rendered as modal overlay inside the login page below
 
   return (
     <div className="login-container">
@@ -366,16 +243,12 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                 />
                 <button
                   type="button"
-                  className={`password-toggle-btn${selectedRole === "admin" ? " admin-eye-btn" : ""}`}
+                  className="password-toggle-btn"
                   onClick={() => setShowPassword((prev) => !prev)}
                   tabIndex={-1}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {selectedRole === "admin" ? (
-                    showPassword ? <PremiumEyeOff size={18} /> : <PremiumEye size={18} />
-                  ) : (
-                    showPassword ? <EyeOff size={18} /> : <Eye size={18} />
-                  )}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
@@ -431,12 +304,12 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                   </>
                 ) : buttonFeedback === "success" ? (
                   <>
-                    <Check size={18} />
+                    <Check size={18} className="feedback-check" />
                     Access Granted
                   </>
                 ) : buttonFeedback === "error" ? (
                   <>
-                    <X size={18} />
+                    <X size={18} className="feedback-x" />
                     Access Denied
                   </>
                 ) : (
@@ -612,7 +485,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
 
                       setForgotLoading(true);
                       try {
-                        // 1. Verify identity by signing in with current credentials
                         const { error: signInError } = await supabase.auth.signInWithPassword({
                           email: email.trim(),
                           password: forgotCurrentPassword,
@@ -624,7 +496,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                           return;
                         }
 
-                        // 2. Update to new password via Supabase Auth
                         const { error: updateError } = await supabase.auth.updateUser({
                           password: forgotNewPassword,
                         });
@@ -635,7 +506,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
                           return;
                         }
 
-                        // 3. Sign out so user returns to login page
                         await supabase.auth.signOut();
 
                         setForgotSuccess(
@@ -682,103 +552,6 @@ export default function Login({ onLoginSuccess, initialUser = null, initialRole 
           )}
         </div>
       </div>
-
-      {/* ── OTP Secret Key Modal Overlay ── */}
-      {step === "otp" && (
-        <div className="otp-modal-overlay">
-          <div className="otp-modal-card">
-            <div className="login-card-accent" />
-
-            <div className="login-logo">
-              <img src="/logo.png" alt="Mauze Tahfeez" className="login-logo-img" />
-            </div>
-
-            <div className="login-body">
-              <div className="content-header">
-                <div className="otp-shield-badge">
-                  <ShieldCheck size={32} className="otp-shield-icon" />
-                </div>
-                <h1 className="content-title">Admin Verification</h1>
-                <p className="content-desc">
-                  A secure secret key has been generated. Enter it below to access the Admin portal.
-                </p>
-              </div>
-
-              {/* Timer bar */}
-              <div className="secret-key-timer-bar">
-                <div
-                  className="secret-key-timer-fill"
-                  style={{ width: `${(keyTimer / 60) * 100}%` }}
-                />
-              </div>
-              <div className="secret-key-timer-text">
-                {keyTimer > 0 ? (
-                  <span>Key expires in <strong>{keyTimer}s</strong></span>
-                ) : (
-                  <span className="secret-key-expired">Key expired — please cancel and log in again</span>
-                )}
-              </div>
-
-              {/* Secret key display */}
-              <div className="secret-key-display">
-                <KeyRound size={22} />
-                <span className="secret-key-code">{secretKey}</span>
-              </div>
-
-              <form onSubmit={handleVerifySecretKey} className="login-form">
-                <div className="input-group">
-                  <label htmlFor="key-input">Enter Secret Key</label>
-                  <div className="input-with-icon">
-                    <KeyRound size={18} />
-                    <input
-                      id="key-input"
-                      type="text"
-                      className="otp-input-field"
-                      placeholder="ENTER 6-DIGIT KEY"
-                      value={keyInput}
-                      onChange={(e) => setKeyInput(e.target.value.toUpperCase().slice(0, 6))}
-                      required
-                      autoComplete="off"
-                      maxLength={6}
-                      disabled={keyTimer <= 0}
-                    />
-                  </div>
-                </div>
-
-                {keyError && (
-                  <div className="error-message">
-                    <AlertCircle size={16} />
-                    <span>{keyError}</span>
-                  </div>
-                )}
-
-                <button type="submit" className="login-button" disabled={keyLoading || keyTimer <= 0}>
-                  {keyLoading ? (
-                    <>
-                      <Loader2 size={18} className="spinner" />
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck size={18} />
-                      Verify & Access Admin
-                    </>
-                  )}
-                </button>
-              </form>
-
-              <button
-                type="button"
-                className="forgot-cancel-btn"
-                onClick={handleOtpCancel}
-                style={{ marginTop: "16px" }}
-              >
-                <X size={14} /> Cancel & Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

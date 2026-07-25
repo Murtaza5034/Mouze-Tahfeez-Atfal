@@ -1134,6 +1134,8 @@
     margin-bottom: 10px;
     padding: 10px 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .jadwal-table td {
@@ -1141,21 +1143,25 @@
     justify-content: space-between;
     align-items: center;
     border: none;
-    padding: 6px 0;
+    padding: 5px 0;
     text-align: right;
-    gap: 8px;
+    gap: 4px;
+    flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .jadwal-table td::before {
     content: attr(data-label);
     font-weight: 700;
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
     color: var(--soft-brown, #8b6d31);
     white-space: nowrap;
     text-align: left;
-    min-width: 70px;
+    min-width: 55px;
+    flex-shrink: 0;
   }
 
   .jadwal-table td.day-cell {
@@ -1193,10 +1199,10 @@
   .jadwal-table input,
   .jadwal-table select {
     width: auto;
-    min-width: 80px;
-    max-width: 140px;
-    font-size: 12px;
-    padding: 6px 8px;
+    min-width: 60px;
+    max-width: 110px;
+    font-size: 11px;
+    padding: 4px 6px;
   }
 
   .jadwal-table select.star-select {
@@ -1204,7 +1210,41 @@
   }
 
   .jadwal-table td span {
-    font-size: 13px;
+    font-size: 12px;
+  }
+
+  .jadwal-table td[data-label="Jadeed"] > div,
+  .jadwal-table td[data-label="Juzhali"] > div {
+    flex-wrap: wrap !important;
+    width: 100%;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  .jadwal-table td[data-label="Jadeed"] select,
+  .jadwal-table td[data-label="Juzhali"] select {
+    max-width: 95px;
+    min-width: 0;
+    font-size: 11px;
+    padding: 4px 5px;
+  }
+
+  .jadwal-table td[data-label="Jadeed"] > div > div,
+  .jadwal-table td[data-label="Juzhali"] > div > div {
+    flex-wrap: wrap !important;
+    width: auto;
+    min-width: 0;
+  }
+
+  .jadwal-table td[data-label="Jadeed"] .jadwal-jadeed-picker,
+  .jadwal-table td[data-label="Juzhali"] .jadwal-jadeed-picker {
+    padding: 2px 4px;
+  }
+
+  .jadwal-table td.star-cell span {
+    font-size: 13px !important;
+    white-space: normal;
+    word-break: break-word;
   }
 
   /* ---------- Calendar Style ---------- */
@@ -1335,20 +1375,40 @@
     padding: 16px 18px !important;
     margin-bottom: 14px !important;
   }
-  /* Premium card inner body - reduce padding */
+  .jadwal-container > div:first-child:not(.jadwal-header) > div:last-child {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .jadwal-container > div:first-child:not(.jadwal-header) > div:last-child > div {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    padding: 6px 12px !important;
+  }
+  /* Premium card inner body - reduce padding, prevent overflow */
   .jadwal-container > div:first-child:not(.jadwal-header) + div > div:last-child {
-    padding: 12px !important;
+    padding: 10px !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   /* Premium card header row - compact */
   .jadwal-container > div:first-child:not(.jadwal-header) + div > div:first-child {
-    padding: 14px 16px !important;
+    padding: 12px 14px !important;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  /* Ensure premium card itself doesn't overflow */
+  .jadwal-container > div:first-child:not(.jadwal-header) + div {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 }
 
 @media (max-width: 480px) {
   .jadwal-container {
-    padding: 12px 10px;
-    margin-top: 8px;
+    padding: 10px 8px;
+    margin-top: 6px;
   }
 
   .jadwal-header h2 {
@@ -1356,25 +1416,36 @@
   }
 
   .jadwal-table tbody tr {
-    padding: 8px 10px;
+    padding: 8px 8px;
   }
 
   .jadwal-table td {
-    padding: 5px 0;
-    font-size: 12px;
+    padding: 4px 0;
+    font-size: 11px;
   }
 
   .jadwal-table td::before {
-    font-size: 10px;
-    min-width: 60px;
+    font-size: 9px;
+    min-width: 50px;
   }
 
   .jadwal-table input,
   .jadwal-table select {
-    font-size: 11px;
-    min-width: 60px;
-    max-width: 100px;
-    padding: 4px 6px;
+    font-size: 10px;
+    min-width: 50px;
+    max-width: 85px;
+    padding: 3px 5px;
+  }
+
+  .jadwal-table td[data-label="Jadeed"] select,
+  .jadwal-table td[data-label="Juzhali"] select {
+    max-width: 80px;
+    font-size: 10px;
+    padding: 3px 4px;
+  }
+
+  .jadwal-table td.star-cell span {
+    font-size: 11px !important;
   }
 
   .jadwal-calendar-container {
@@ -1427,7 +1498,7 @@
 
 /* Remove the extra top margin & default card styling
    so it blends into the admin layout cleanly */
-.admin-content-pad .jadwal-container {
+.admin-content-pad .jadwal-container:not(.self-jadwal-editor) {
   margin-top: 0;
   padding: 0;
   background: transparent;

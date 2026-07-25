@@ -233,6 +233,7 @@ const createTeacherResultDraft = (overrides = {}) => ({
   next_week_page: "",
   next_week_surah: "",
   total_jadeed_pages: "",
+  total_jadeed_unit: "صفه",
   istifadah_juz: "",
   istifadah_page: "",
   istifadah_surah: "",
@@ -794,6 +795,7 @@ const LazySelfJadwalTeacherView = React.lazy(() =>
 
 const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
 const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
+const LazySupportBot = React.lazy(() => import("./SupportBot"));
 import MarhalaPosts from "./MarhalaPosts";
 const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
 import AppUpdatePopup from "./AppUpdatePopup";
@@ -801,14 +803,20 @@ import PrivacyPolicy from "./PrivacyPolicy";
 
 const fixArabicScript = (text) => {
   if (!text) return "";
-  // Normalize Gaf (Persian/Urdu script)
-  // Some systems render Gaf as double kaaf or k-k-a
   return text
-    .replace(/كك/g, "گ")      // Double Kaaf -> Gaf
-    .replace(/مرككا/g, "مرگا") // Murga (K-K-A) -> Murga (G-A)
-    .replace(/بہائي/g, "بھائي") // Bhai phonetic fix
-    .replace(/سي/g, "سی")      // Common character fixing
-    .replace(/في/g, "فی");     // Common character fixing
+    .normalize("NFKC")
+    .replace(/[آأإٱ]/g, "ا")     // All Alef variants -> standard Alef
+    .replace(/[ؤ]/g, "و")         // Waw with hamza -> standard Waw
+    .replace(/[ئ]/g, "ي")         // Yeh with hamza -> standard Arabic Yeh
+    .replace(/[ىيےی]/g, "ي")     // Alef maksura, Farsi Yeh, Yeh Barree -> Arabic Yeh
+    .replace(/[کك]/g, "ك")        // Kaf variants -> standard Arabic Kaf
+    .replace(/[ة]/g, "ه")         // Taa marbuta -> standard Arabic Heh
+    .replace(/[ھﮭﮟہ]/g, "ه")   // Heh variants -> standard Arabic Heh
+    .replace(/[ّٰٓ‍‌]/g, "")     // Remove zero-width joiners, non-joiners, shadda
+    .replace(/ـ/g, "")            // Remove tatweel/kashida
+    .replace(/[\u064B-\u065F]/g, "") // Remove all Arabic diacritics
+    .replace(/\s+/g, " ")
+    .trim();
 };
 
 const getNotificationPermission = () => {
@@ -2350,6 +2358,29 @@ async function authorizePortalAccess(user, requestedRole) {
     };
   }
 
+  // Allow admin access if teacher's email is in teacher_admin_access list
+  if (requestedRole === "admin" && user?.email) {
+    try {
+      const { data: settingsData } = await supabase
+        .from('jadwal_settings')
+        .select('teacher_admin_access')
+        .eq('id', 1)
+        .single();
+      if (settingsData?.teacher_admin_access) {
+        const accessList = JSON.parse(settingsData.teacher_admin_access);
+        if (Array.isArray(accessList) && accessList.some(e => normalizeText(e) === normalizeText(user.email))) {
+          return {
+            ok: true,
+            role: "admin",
+            assignedRoles: [...assignedRoles, "admin"],
+            parentProfile: null,
+            accessRow: null,
+          };
+        }
+      }
+    } catch (_) {}
+  }
+
   if (requestedRole === "parents") {
     const parentProfiles = await findParentProfiles(user.id, user.email);
 
@@ -2643,49 +2674,62 @@ const recalculateComputedRanks = (students) => {
   });
 };
 
-function LoadingScreen({ message }) {
+function LoadingScreen({ message, onComplete }) {
+  const [phase, setPhase] = useState(0);
+  const completedRef = useRef(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 1600);
+    const t2 = setTimeout(() => {
+      setPhase(2);
+      if (!completedRef.current) {
+        completedRef.current = true;
+        if (onComplete) onComplete();
+      }
+    }, 3000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [onComplete]);
   return (
-    <div className="skeleton-screen">
-      <div className="skeleton-sidebar">
-        <div className="skeleton-el skeleton-sidebar-logo" />
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="skeleton-el skeleton-sidebar-nav-item" />
-        ))}
-      </div>
-      <div className="skeleton-main">
-        <div className="skeleton-el skeleton-header-bar" />
-        <div className="skeleton-stats-row">
-          <div className="skeleton-el skeleton-stat-card" />
-          <div className="skeleton-el skeleton-stat-card" />
-          <div className="skeleton-el skeleton-stat-card" />
-        </div>
-        <div className="skeleton-content-grid">
-          <div className="skeleton-el skeleton-content-card">
-            <div className="skeleton-card-title" />
-            <div className="skeleton-el skeleton-line w90" />
-            <div className="skeleton-el skeleton-line w75" />
-            <div className="skeleton-el skeleton-line w60" />
-          </div>
-          <div className="skeleton-el skeleton-content-card">
-            <div className="skeleton-card-title" />
-            <div className="skeleton-el skeleton-line w75" />
-            <div className="skeleton-el skeleton-line w90" />
-            <div className="skeleton-el skeleton-line w60" />
-          </div>
-        </div>
-        <div className="skeleton-row">
-          <div className="skeleton-el skeleton-content-card">
-            <div className="skeleton-card-title" />
-            <div className="skeleton-el skeleton-line w90" />
-            <div className="skeleton-el skeleton-line w75" />
-          </div>
-          <div className="skeleton-el skeleton-content-card">
-            <div className="skeleton-card-title" />
-            <div className="skeleton-el skeleton-line w60" />
-            <div className="skeleton-el skeleton-line w90" />
-          </div>
+    <div className="splash-screen">
+      <div className="splash-logo-container">
+        <svg viewBox="0 0 400 400" className="splash-svg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="splashGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#d4af37" />
+              <stop offset="50%" stopColor="#f5e6a3" />
+              <stop offset="100%" stopColor="#b8941f" />
+            </linearGradient>
+            <linearGradient id="splashGold2" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#b8941f" />
+              <stop offset="50%" stopColor="#f5e6a3" />
+              <stop offset="100%" stopColor="#d4af37" />
+            </linearGradient>
+          </defs>
+          <circle cx="200" cy="200" r="160" fill="none" stroke="url(#splashGold)" strokeWidth="2"
+            className="splash-path" strokeDasharray="1005" strokeDashoffset="1005"
+            style={{ animation: 'splashTrace 1.6s ease-out forwards' }} />
+          <circle cx="200" cy="200" r="140" fill="none" stroke="url(#splashGold2)" strokeWidth="1"
+            className="splash-path" strokeDasharray="880" strokeDashoffset="880"
+            style={{ animation: 'splashTrace 1.6s ease-out 0.25s forwards' }} />
+          <path d="M 200 80 L 200 320" fill="none" stroke="url(#splashGold)" strokeWidth="1.5"
+            className="splash-path" strokeDasharray="240" strokeDashoffset="240"
+            style={{ animation: 'splashTrace 1s ease-out 0.7s forwards' }} />
+          <path d="M 140 200 L 260 200" fill="none" stroke="url(#splashGold)" strokeWidth="1.5"
+            className="splash-path" strokeDasharray="120" strokeDashoffset="120"
+            style={{ animation: 'splashTrace 1s ease-out 0.9s forwards' }} />
+          <circle cx="200" cy="200" r="60" fill="none" stroke="url(#splashGold)" strokeWidth="1.5"
+            className="splash-path" strokeDasharray="377" strokeDashoffset="377"
+            style={{ animation: 'splashTrace 1.4s ease-out 1.2s forwards' }} />
+        </svg>
+        <div className="splash-logo-inner">
+          <img src="/atfal logo splash.png" alt="" className={`splash-logo-img ${phase >= 1 ? 'visible' : ''}`} />
         </div>
       </div>
+      <h1 className={`splash-title ${phase >= 1 ? 'visible' : ''}`}>روضة الأطفال</h1>
+      <p className={`splash-subtitle ${phase >= 1 ? 'visible' : ''}`}>Mauze Tahfeez</p>
+      <div className={`splash-loader ${phase >= 2 ? 'done' : ''}`}>
+        <div className="splash-loader-bar" />
+      </div>
+      <p className={`splash-message ${phase >= 1 ? 'visible' : ''}`}>{message || 'Loading...'}</p>
     </div>
   );
 }
@@ -2771,7 +2815,8 @@ function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
   );
 }
 
-function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
+function JadeedPagesCard({ count, heading = "Jadeed Safahat", unit = "صفه" }) {
+  const unitLabel = unit === "سطر" ? "جملة سطر" : "جملة صــ";
   return (
     <div className="jadeed-pages-card card-appear">
       <div className="attendance-lighting" />
@@ -2780,11 +2825,8 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat" }) {
         <span className="jadeed-count-overlay"><span className="kanz-font">{toArabicDigits(count || 0)}</span></span>
       </div>
       <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontFamily: "'Kanz al Marjaan', serif", fontSize: '1.6rem', marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
-        {heading}
+        {unitLabel}
       </h4>
-      <p className="attendance-sub-label" style={{ textAlign: 'center', fontSize: '11px' }}>
-        New pages memorized this week
-      </p>
     </div>
   );
 }
@@ -2875,7 +2917,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold' }}>{student?.arabic_name ? fixArabicScript(student.arabic_name) : student?.name}</span>
+                <span className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{student?.arabic_name ? fixArabicScript(student.arabic_name) : student?.name}</span>
                 {rankImproved && (
                   <lottie-player
                     src="/11eb8d74-1187-11ee-95e9-a721cfe73700.json"
@@ -2903,7 +2945,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             </div>
             <div className="meta-col">
               <span className="meta-label child-hood-font">Month:</span>
-              <span className="meta-val arabic-kanz">{fatemi.monthName}</span>
+              <span className="meta-val arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{fatemi.monthName}</span>
             </div>
           </div>
         </div>
@@ -2911,7 +2953,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         <div className="result-main">
           <div className="total-score-block">
             <span className="score-title child-hood-font">{report.weekly_score_heading}</span>
-            <span className="jumla-label arabic-kanz">{report.jumla_heading}</span>
+            <span className="jumla-label arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.jumla_heading}</span>
             <div className="score-circle">
               <span className="kanz-font">{toArabicDigits((weeklyResult?.total_score ?? 
                 (toNumber(weeklyResult?.murajazah) + 
@@ -2930,7 +2972,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               { label: report.jadeed_heading, val: weeklyResult?.jadeed, max: 20 }
             ].map((item) => (
               <div key={item.label} className="score-row" dir="rtl">
-                <span className="arabic-label kanz-font">{item.label} :</span>
+                <span className="arabic-label kanz-font" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{item.label} :</span>
                 <span className="score-val" style={{ direction: 'ltr', unicodeBidi: 'isolate' }}><span className="kanz-font">{toArabicDigits(item.val || "0")}</span><span style={{fontFamily:'Arial,sans-serif'}}> / </span><span className="kanz-font">{toArabicDigits(item.max)}</span></span>
               </div>
             ))}
@@ -2959,8 +3001,8 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
                 )}
               </div>
               {rankChange === 'same' && (
-                <span style={{ fontSize: '0.8rem', color: '#999', fontStyle: 'italic', marginTop: '4px' }} className="kanz-font">
-                  The rank remains the same as last week.
+                <span style={{ fontSize: '0.85rem', color: '#777', fontWeight: 600, marginTop: '4px' }} className="kanz-font">
+                  same rank
                 </span>
               )}
             </div>
@@ -2969,32 +3011,32 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
         <div className="result-footer-grid">
           <div className="target-box highlight-wusool">
-            <h5 className="arabic-kanz" dir="rtl" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>{hWusool}</h5>
-            <p dir="rtl"><span className="arabic-kanz">{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.wusool_surah || "-"}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
+            <h5 className="arabic-kanz" dir="rtl" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', letterSpacing: 'normal', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{hWusool}</h5>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.wusool_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>سورة :</span> <span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{weeklyResult?.wusool_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.wusool_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.wusool_page || "-")}</span></p>
           </div>
           <div className="target-box highlight-matrookah">
             <div className="note-item-row">
               <span className="note-val kanz-font">{toArabicDigits(weeklyResult?.matrookah || "-")}</span>
-              <span className="note-label arabic-kanz">{report.matrookah_heading} :</span>
+              <span className="note-label arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.matrookah_heading} :</span>
             </div>
             <div className="note-item-row">
               <span className="note-val kanz-font">{toArabicDigits(weeklyResult?.daeefah || "-")}</span>
-              <span className="note-label arabic-kanz">{report.daeefah_heading} :</span>
+              <span className="note-label arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.daeefah_heading} :</span>
             </div>
           </div>
           <div className="target-box">
             <h5 className="child-hood-font">{hNext}</h5>
-            <p dir="rtl"><span className="arabic-kanz">{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.next_week_surah || "-"}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.next_week_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>سورة :</span> <span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{weeklyResult?.next_week_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.next_week_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.next_week_page || "-")}</span></p>
           </div>
           <div className="target-box highlight">
             <h5 className="child-hood-font">{hIstifadah}</h5>
-            <p dir="rtl"><span className="arabic-kanz">{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">سورة :</span> <span className="arabic-kanz">{weeklyResult?.istifadah_surah || "-"}</span></p>
-            <p dir="rtl"><span className="arabic-kanz">{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.istifadah_juz_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_juz || "-")}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>سورة :</span> <span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{weeklyResult?.istifadah_surah || "-"}</span></p>
+            <p dir="rtl"><span className="arabic-kanz" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{report.istifadah_page_heading} :</span> <span className="kanz-font">{toArabicDigits(weeklyResult?.istifadah_page || "-")}</span></p>
           </div>
         </div>
 
@@ -3007,6 +3049,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
           <JadeedPagesCard
             count={weeklyResult?.total_jadeed_pages}
             heading={report.jadeed_safahat_heading}
+            unit={weeklyResult?.total_jadeed_unit}
           />
         </div>
 
@@ -3309,7 +3352,9 @@ function SettingsPage({
   setTeacherUnlockStatus,
   role = "parents",
   appLockEnabled,
-  onAppLockToggle
+  onAppLockToggle,
+  attHistEnabled,
+  onToggleAttHist
 }) {
   const [showAppLockSetup, setShowAppLockSetup] = useState(false);
   const [activeTab, setActiveTab] = useState("Dark mode");
@@ -3435,6 +3480,38 @@ function SettingsPage({
               );
             })}
           </div>
+          {role === "teacher" && attHistEnabled !== undefined && onToggleAttHist && (
+            <div className="management-grid" style={{ marginTop: '20px' }}>
+              <section className="form-card card-appear">
+                <div className="card-headline headline-with-action">
+                  <div className="headline-left">
+                    <CalendarCheck size={20} style={{ color: 'var(--primary-gold)' }} />
+                    <h3>Attendance History <span style={{ fontSize: '0.7rem', background: 'var(--primary-gold)', color: '#fff', padding: '2px 8px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, verticalAlign: 'middle' }}>PREMIUM</span></h3>
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                  Enable marking attendance for any past date. Useful if you forgot to mark a day — you can go back and update it anytime from the Attendance History page.
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    onClick={onToggleAttHist}
+                    style={{
+                      width: '52px', height: '28px', borderRadius: '14px', border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.3s',
+                      background: attHistEnabled ? 'var(--primary-gold)' : '#ccc',
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'all 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                      left: attHistEnabled ? '27px' : '3px',
+                    }} />
+                  </button>
+                  <span style={{ fontWeight: 600, color: attHistEnabled ? 'var(--deep-brown)' : 'var(--text-muted)', fontSize: '0.95rem' }}>
+                    {attHistEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </section>
+            </div>
+          )}
         </>
       ) : (
         <div className="settings-detail">
@@ -4177,6 +4254,7 @@ function ParentPortal({
   const [parentArchiveResults, setParentArchiveResults] = useState([]);
   const [parentArchiveMonth, setParentArchiveMonth] = useState("");
   const [parentArchiveLoading, setParentArchiveLoading] = useState(false);
+  const [showHomeSupportBot, setShowHomeSupportBot] = useState(false);
 
   useEffect(() => {
     supabase.from('page_visibility')
@@ -4612,6 +4690,9 @@ function ParentPortal({
               <FileArchive size={18} /> Results Archive
             </button>
           )}
+          <button className={`drawer-link ${activePage === "AI Assistance" ? "active" : ""}`} onClick={() => { setActivePage("AI Assistance"); setMenuOpen(false); }}>
+            <MessageCircle size={18} /> AI Assistance
+          </button>
           {pageVisibility["Settings"] !== false && (
             <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
               <Settings size={18} /> Settings
@@ -4718,8 +4799,15 @@ function ParentPortal({
                 const attStatus = (attendance?.status || '').toLowerCase();
                 const attColor = attStatus === 'present' ? '#22c55e' : attStatus === 'absent' ? '#ef4444' : attStatus === 'holiday' ? '#f59e0b' : '#5d4037';
                 const attLabel = attStatus === 'present' ? 'Present' : attStatus === 'absent' ? 'Absent' : attStatus === 'holiday' ? 'Holiday' : '-';
+                const weekDate = weeklyResult?.week_date;
+                let weekLabel = "out of 100";
+                if (weekDate) {
+                  const wd = new Date(weekDate + 'T00:00:00');
+                  const weekEnd = new Date(wd.getTime() + 6 * 86400000);
+                  weekLabel = `${wd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — ${weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+                }
                 const stats = [
-                  { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: "out of 100", icon: Trophy, color: "#c5a059" },
+                  { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: weekLabel, icon: Trophy, color: "#c5a059" },
                   { label: "Daily Attendance", val: attLabel, sub: attDate, icon: Clock, color: attColor },
                   { label: "Current HIFZ STATUS", val: studentProfile?.latestResult?.wusool_juz || hifzDetails?.juz || "--", sub: studentProfile?.latestResult?.wusool_surah || hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
                   { label: muhaffizLabel, val: muhaffizVal, sub: muhaffizSub, icon: GraduationCap, color: "#d4af37" },
@@ -4738,11 +4826,20 @@ function ParentPortal({
                 ));
               })()}
             </div>
+
+            <div className="support-bot-home-btn-wrapper">
+              <button className="support-bot-home-btn" onClick={() => setActivePage('AI Assistance')}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                AI Technical Support
+              </button>
+            </div>
             
             {recentMarhalaPostPreview}
             
             <Suspense fallback={null}>
-              <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} />
+              <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} reportSettings={reportSettingsObject} />
             </Suspense>
             
             <div className="dashboard-section">
@@ -5119,63 +5216,62 @@ function ParentPortal({
                       </article>
                     );
                     })()}
-                  {assignedTeacher && (() => {
-                    const label = assignedTeacher?.gender === 'female' ? 'Muhaffezah' : 'Muhaffiz';
-                    return (
-                      <div className="muhaffiz-divider">
-                        <div className="muhaffiz-divider-line">
-                          <span className="muhaffiz-divider-diamond">&#9670;</span>
-                          Your Child&rsquo;s {label}
-                          <span className="muhaffiz-divider-diamond">&#9670;</span>
-                        </div>
-                        <p className="muhaffiz-divider-message">
-                          This is your child&rsquo;s designated {label}. You may contact them directly for any academic or progress-related queries.
-                        </p>
-                      </div>
-                    );
-                  })()}
                   {(() => {
-                    const otherTeachers = roleFiltered.filter(t => assignedTeacher ? t.id !== assignedTeacher.id : true);
-                    return otherTeachers.length > 0 ? (
-                      <div className="muhaffiz-divider">
-                        <div className="muhaffiz-divider-line">
-                          <span className="muhaffiz-divider-diamond">&#9670;</span>
-                          Our Other Muhaffiz &amp; Muhaffezah
-                          <span className="muhaffiz-divider-diamond">&#9670;</span>
+                    const roleTeachers = roleFiltered.filter(t => {
+                      if (assignedTeacher && t.id === assignedTeacher.id) return false;
+                      return t.teacher_role === 'masool' || t.teacher_role === 'musaid';
+                    }).sort((a, b) => {
+                      if (a.teacher_role === 'masool' && b.teacher_role === 'musaid') return -1;
+                      if (a.teacher_role === 'musaid' && b.teacher_role === 'masool') return 1;
+                      return 0;
+                    });
+                    const roleLabel = (role) => {
+                      if (role === 'masool') return 'Masool';
+                      if (role === 'musaid') return 'Musaid';
+                      return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Staff';
+                    };
+                    return roleTeachers.length > 0 ? (
+                      <>
+                        <div className="muhaffiz-divider">
+                          <div className="muhaffiz-divider-line">
+                            <span className="muhaffiz-divider-diamond">&#9670;</span>
+                            Masool &amp; Musaid
+                            <span className="muhaffiz-divider-diamond">&#9670;</span>
+                          </div>
+                          <p className="muhaffiz-divider-message">
+                            You may also contact our Masool and Musaid for additional support.
+                          </p>
                         </div>
-                        <p className="muhaffiz-divider-message">
-                          You may also reach out to any of our other qualified staff members for additional support.
-                        </p>
-                      </div>
+                        {roleTeachers.map(t => {
+                          const wa = (t.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
+                          const photo = t.photo_url || ASSETS.LOGO;
+                          return (
+                            <article key={t.id} className="premium-card teacher-profile-card">
+                              <div className="teacher-card-inner">
+                                <img src={photo} alt={t.full_name} className="teacher-photo-square" />
+                                <div className="teacher-details">
+                                  <h3>{t.full_name}</h3>
+                                  <p className="teacher-specialty">{roleLabel(t.teacher_role)}</p>
+                                  <div className="contact-actions">
+                                    {t.phone_number && (
+                                      <a href={`tel:${t.phone_number}`} className="contact-btn call">
+                                        <Phone size={16} /> Call
+                                      </a>
+                                    )}
+                                    {wa && (
+                                      <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                                        <MessageCircle size={16} /> WhatsApp
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </>
                     ) : null;
                   })()}
-                  {roleFiltered.filter(t => assignedTeacher ? t.id !== assignedTeacher.id : true).map(t => {
-                    const wa = (t.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
-                    const photo = t.photo_url || ASSETS.LOGO;
-                    return (
-                      <article key={t.id} className="premium-card teacher-profile-card">
-                        <div className="teacher-card-inner">
-                          <img src={photo} alt={t.full_name} className="teacher-photo-square" />
-                          <div className="teacher-details">
-                            <h3>{t.full_name}</h3>
-                            <p className="teacher-specialty">{muhaffizTag(t)}</p>
-                            <div className="contact-actions">
-                              {t.phone_number && (
-                                <a href={`tel:${t.phone_number}`} className="contact-btn call">
-                                  <Phone size={16} /> Call
-                                </a>
-                              )}
-                              {wa && (
-                                <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
-                                  <MessageCircle size={16} /> WhatsApp
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
                 </>;
               })()}
             </div>
@@ -5623,6 +5719,21 @@ function ParentPortal({
             })()}
           </div>
         ) : null}
+
+        {activePage === "AI Assistance" && (
+          <div className="ai-assistance-page fade-in" style={{ paddingBottom: '80px' }}>
+            <div className="section-header" style={{ marginBottom: '16px' }}>
+              <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <MessageCircle size={24} style={{ color: 'var(--primary-gold)' }} />
+                AI Technical Support
+              </h2>
+              <p className="subtitle">Ask anything about the app — I'll guide you instantly</p>
+            </div>
+            <Suspense fallback={null}>
+              <LazySupportBot onNavigate={setActivePage} onClose={() => setActivePage('Home')} pageMode />
+            </Suspense>
+          </div>
+        )}
 
         {activePage === "Profile" && (
           <div className="info-grid fade-in" style={{ marginTop: '24px' }}>
@@ -9020,7 +9131,7 @@ const handleDownloadAllReports = async () => {
                           if (!selectedName) {
                             setAdminForms(curr => ({
                               ...curr,
-                              teacherProfile: { user_id: "", full_name: "", photo_url: "", phone_number: "", whatsapp_number: "", salary_per_minute: "2.3", show_salary_card: true }
+                              teacherProfile: { user_id: "", full_name: "", photo_url: "", phone_number: "", whatsapp_number: "", salary_per_minute: "2.3", show_salary_card: true, teacher_role: "muhaffiz" }
                             }));
                             return;
                           }
@@ -9039,7 +9150,8 @@ const handleDownloadAllReports = async () => {
                               whatsapp_number: existingProfile?.whatsapp_number || "",
                               photo_url: existingProfile?.photo_url || existingAccess?.photo_url || "",
                               salary_per_minute: salaryStr,
-                              show_salary_card: existingProfile?.show_salary_card ?? existingAccess?.show_salary_card ?? true
+                              show_salary_card: existingProfile?.show_salary_card ?? existingAccess?.show_salary_card ?? true,
+                              teacher_role: existingProfile?.teacher_role || "muhaffiz"
                             }
                           }));
                         }}
@@ -9168,6 +9280,23 @@ const handleDownloadAllReports = async () => {
                     </div>
                   </div>
 
+                  <div className="form-section">
+                    <div className="form-section-title">Teacher Role</div>
+                    <label>
+                      <span>Designation</span>
+                      <select
+                        name="teacher_role"
+                        value={adminForms.teacherProfile.teacher_role || "muhaffiz"}
+                        onChange={onAdminFormChange("teacherProfile")}
+                        className="premium-select"
+                      >
+                        <option value="muhaffiz">Muhaffiz (Default)</option>
+                        <option value="masool">Masool (Supervisor)</option>
+                        <option value="musaid">Musaid (Assistant)</option>
+                      </select>
+                    </label>
+                  </div>
+
                   <button type="submit" className="action-button">
                     <CheckCircle size={16} />
                     Save Profile
@@ -9224,6 +9353,12 @@ const handleDownloadAllReports = async () => {
                             {sel.show_salary_card ? "Visible" : "Hidden"}
                           </span>
                         </div>
+                        <div className="preview-detail-row">
+                          <span className="preview-salary-label">Teacher Role</span>
+                          <span className="preview-status-badge active">
+                            {(sel.teacher_role || "muhaffiz").charAt(0).toUpperCase() + (sel.teacher_role || "muhaffiz").slice(1)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -9236,7 +9371,12 @@ const handleDownloadAllReports = async () => {
                         <img src={profile.photo_url || "/default-avatar.png"} alt="" className="user-dp-badge" />
                         <div>
                           <strong>{profile.full_name}</strong>
-                          <p className="record-sub">{profile.whatsapp_number || "No contact"}</p>
+                          <p className="record-sub" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span className="preview-status-badge" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                              {(profile.teacher_role || "muhaffiz").charAt(0).toUpperCase() + (profile.teacher_role || "muhaffiz").slice(1)}
+                            </span>
+                            {profile.whatsapp_number || "No contact"}
+                          </p>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -10831,7 +10971,6 @@ function TeacherPortal({
   saveErrorDetails,
   setSaveErrorDetails,
  onShowAction,
-  onRequestAdminAccess,
   isDarkMode,
   setIsDarkMode,
   appTheme,
@@ -10840,6 +10979,7 @@ function TeacherPortal({
   appLockEnabled,
   onAppUnlock,
   onAppLockToggle,
+  teacherAdminAccessList = [],
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const backdropMouseDownRef = useRef(false);
@@ -11684,6 +11824,7 @@ function TeacherPortal({
       student_id: numericId,
       attendance_count: toNumber(f.attendance_count),
       total_jadeed_pages: f.total_jadeed_pages ?? null,
+      total_jadeed_unit: f.total_jadeed_unit || "صفه",
       murajazah: sMurajazah,
       juz_hali: sJuzHali,
       takhteet: sTakhteet,
@@ -11912,25 +12053,16 @@ function TeacherPortal({
         </nav>
         <div className="sidebar-footer">
           {(() => {
-            const assignedRoles = getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents');
-            const jadwalArr = Array.isArray(jadwalSettings) ? jadwalSettings : [];
-            let teacherAdminAllowed = false;
-            try {
-              const row = jadwalArr.find(s => s.id === 1) || jadwalArr[0] || {};
-              teacherAdminAllowed = JSON.parse(row.teacher_admin_access || '[]').includes(user?.email);
-            } catch {}
-            const showAdminViaSettings = teacherAdminAllowed && !assignedRoles.includes('admin');
-            return assignedRoles.map((role) => (
+            const fromMetadata = getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents');
+            const hasAdminAccess = user?.email && teacherAdminAccessList.some(e => normalizeText(e) === normalizeText(user.email));
+            const roles = hasAdminAccess && !fromMetadata.includes('admin')
+              ? [...fromMetadata, 'admin']
+              : fromMetadata;
+            return roles.map((role) => (
               <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
                 <LogOut size={18} /> Switch to {role}
               </button>
-            )).concat(
-              showAdminViaSettings ? (
-                <button key="admin-otp" className="sidebar-link" onClick={() => { if (onRequestAdminAccess) onRequestAdminAccess(); }}>
-                  <LogOut size={18} /> Switch to admin
-                </button>
-              ) : []
-            );
+            ));
           })()}
           <button className="sidebar-link logout-btn" onClick={onLogout}>
             <LogOut size={18} /> Logout
@@ -12178,7 +12310,7 @@ function TeacherPortal({
                   const currentUserId = user?.id || teacherIdentity;
                   const isBadalTeacher = hasBadal && String(student.badal_teacher_id) === String(currentUserId);
                   const isOriginalTeacher = hasBadal && String(student.original_teacher_id || student.muhaffiz_id) === String(currentUserId);
-                  const badalTeacherInfo = hasBadal ? (teacherProfiles.find(p => p.user_id === student.badal_teacher_id) || portalAccessList.find(p => p.user_id === student.badal_teacher_id)) : null;
+                  const badalTeacherInfo = hasBadal ? (teacherProfiles.find(p => p.user_id === student.badal_teacher_id) || (schoolData?.portalAccessList || []).find(p => p.user_id === student.badal_teacher_id)) : null;
                   const badalProgressData = badalProgress
                     .filter(p => String(p.student_id) === sid)
                     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -12404,7 +12536,7 @@ function TeacherPortal({
                     </label>
                   </div>
 
-                  <div className="form-grid">
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
 
 
                     <label>
@@ -12415,6 +12547,18 @@ function TeacherPortal({
                         value={teacherForms.result.total_jadeed_pages ?? ""}
                         onChange={onTeacherFormChange}
                       />
+                    </label>
+                    <label>
+                      <span>Unit</span>
+                      <select
+                        className="premium-select"
+                        name="total_jadeed_unit"
+                        value={teacherForms.result.total_jadeed_unit}
+                        onChange={onTeacherFormChange}
+                      >
+                        <option value="صفه">صفه (Safha)</option>
+                        <option value="سطر">سطر (Satar)</option>
+                      </select>
                     </label>
                   </div>
 
@@ -12939,7 +13083,7 @@ function TeacherPortal({
                     .filter(s => allUserIds.some(uid => String(s.original_teacher_id || s.muhaffiz_id) === String(uid)))
                     .filter(s => !allUserIds.some(uid => String(s.badal_teacher_id || "") === String(uid)))
                     .map(s => {
-                      const badalTeacherInfo = teacherProfiles.find(p => p.user_id === s.badal_teacher_id) || portalAccessList.find(p => p.user_id === s.badal_teacher_id);
+                      const badalTeacherInfo = teacherProfiles.find(p => p.user_id === s.badal_teacher_id) || (schoolData?.portalAccessList || []).find(p => p.user_id === s.badal_teacher_id);
                       return { student: s, student_id: s.student_id, type: "original", original_teacher_id: s.original_teacher_id || s.muhaffiz_id, badalTeacherInfo };
                     });
                   const allTabs = [...myBadalStudents, ...originalStudentsList];
@@ -13303,7 +13447,7 @@ function TeacherPortal({
                         Latest Result: {student.latestResult?.computedRank || student.latestResult?.weeklyRank || "pending"}
                       </div>
                       <Suspense fallback={null}>
-                        <LazyTakhteetProgress weeklyResult={student.latestResult} currentJuz={student.hifz?.juz} />
+                        <LazyTakhteetProgress weeklyResult={student.latestResult} currentJuz={student.hifz?.juz} reportSettings={reportSettingsObject} />
                       </Suspense>
                     </article>
                   ))}
@@ -13546,46 +13690,13 @@ function TeacherPortal({
                 role="teacher"
                 appLockEnabled={appLockEnabled}
                 onAppLockToggle={onAppLockToggle}
-              />
-              {(function() {
-                const toggleAttHist = () => {
+                attHistEnabled={attHistEnabled}
+                onToggleAttHist={() => {
                   const next = !attHistEnabled;
                   setAttHistEnabled(next);
                   localStorage.setItem('teacher_attendance_history_enabled', String(next));
-                };
-                return (
-                  <div className="management-grid" style={{ marginTop: '20px' }}>
-                    <section className="form-card card-appear">
-                      <div className="card-headline headline-with-action">
-                        <div className="headline-left">
-                          <CalendarCheck size={20} style={{ color: 'var(--primary-gold)' }} />
-                          <h3>Attendance History <span style={{ fontSize: '0.7rem', background: 'var(--primary-gold)', color: '#fff', padding: '2px 8px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, verticalAlign: 'middle' }}>PREMIUM</span></h3>
-                        </div>
-                      </div>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                        Enable marking attendance for any past date. Useful if you forgot to mark a day — you can go back and update it anytime from the Attendance History page.
-                      </p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button
-                          onClick={toggleAttHist}
-                          style={{
-                            width: '52px', height: '28px', borderRadius: '14px', border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.3s',
-                            background: attHistEnabled ? 'var(--primary-gold)' : '#ccc',
-                          }}
-                        >
-                          <span style={{
-                            position: 'absolute', top: '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'all 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                            left: attHistEnabled ? '27px' : '3px',
-                          }} />
-                        </button>
-                        <span style={{ fontWeight: 600, color: attHistEnabled ? 'var(--deep-brown)' : 'var(--text-muted)', fontSize: '0.95rem' }}>
-                          {attHistEnabled ? 'Enabled' : 'Disabled'}
-                        </span>
-                      </div>
-                    </section>
-                  </div>
-                );
-              })()}
+                }}
+              />
             </>
           ) : null}
 
@@ -14123,8 +14234,8 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState("");
   const [saveErrorDetails, setSaveErrorDetails] = useState("");
   const [user, setUser] = useState(null);
-  const [pendingAdminSession, setPendingAdminSession] = useState(null);
-  const [teacherAdminAuth, setTeacherAdminAuth] = useState(null);
+
+
   const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
   const [portalRole, setPortalRole] = useState(() => {
     if (typeof window === "undefined") {
@@ -14161,6 +14272,7 @@ export default function App() {
   }, []);
 
   const [loading, setLoading] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
   const [appLockEnabled, setAppLockEnabled] = useState(() => isAppLockEnabled());
   const [appLocked, setAppLocked] = useState(() => {
     const enabled = isAppLockEnabled();
@@ -14194,6 +14306,12 @@ export default function App() {
   const [teacherProfiles, setTeacherProfiles] = useState([]);
   const [reportSettings, setReportSettings] = useState([]);
   const [jadwalSettings, setJadwalSettings] = useState([]);
+  const teacherAdminAccessList = useMemo(() => {
+    try {
+      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+      return JSON.parse(row.teacher_admin_access || '[]');
+    } catch { return []; }
+  }, [jadwalSettings]);
   const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
   const [whatsappConfig, setWhatsappConfig] = useState(null);
   const [emailSettings, setEmailSettings] = useState(null);
@@ -14414,6 +14532,7 @@ export default function App() {
       whatsapp_number: "",
       salary_per_minute: "2.3",
       show_salary_card: true,
+      teacher_role: "muhaffiz",
     },
   });
   const [showPortalPassword, setShowPortalPassword] = useState(false);
@@ -14473,6 +14592,13 @@ export default function App() {
     setMenuOpen(false);
     setActionMessage(null);
 
+    // When switching to admin role, reload data via get_all_child_profiles RPC
+    // to bypass RLS (teachers toggled for admin access would otherwise see only their students).
+    // On initial login, user is null here so this won't double-load.
+    if (user && portalRole === "admin") {
+      loadPortalData(portalRole, user);
+    }
+
     // Check URL for redirectPage from notification click outside the app
     const params = new URLSearchParams(window.location.search);
     const redirectFromNotif = params.get('redirectPage');
@@ -14520,11 +14646,6 @@ export default function App() {
       try {
         const cached = JSON.parse(cachedRaw);
         if (!cached.userId || !cached.role) return false;
-
-        // Require OTP for admin, even from cached auth
-        if (cached.role === "admin" && !sessionStorage.getItem("mauze-admin-otp-verified") && !localStorage.getItem("mauze-admin-otp-verified")) {
-          return false;
-        }
 
         // Re-authenticate with Supabase if no valid session exists, so subsequent
         // loadPortalData queries (which require RLS auth) don't fail.
@@ -14650,29 +14771,6 @@ export default function App() {
               return;
             }
 
-            // Auto-restore admin role for OTP-verified teachers on refresh
-            if (localStorage.getItem("mauze-admin-otp-verified") &&
-                localStorage.getItem('teacher-admin-authenticated') === session.user.email &&
-                window.localStorage.getItem(STORAGE_KEYS.role) === "admin" &&
-                access.role !== "admin") {
-              access.role = "admin";
-              access.ok = true;
-              access.assignedRoles = ["admin", ...(access.assignedRoles || [])];
-            }
-
-            // Admin OTP gating: require secret key for admin on fresh app load
-            // (INITIAL_SESSION or SIGNED_IN from initialize), but not on
-            // TOKEN_REFRESHED during an already-active session.
-            // sessionStorage survives refreshes (no OTP), cleared on close (OTP shown).
-            if (access.role === "admin" &&
-                (event === "INITIAL_SESSION" || event === "SIGNED_IN") &&
-                !sessionStorage.getItem("mauze-admin-otp-verified")) {
-              setUser(null);
-              setPendingAdminSession({ user: session.user, access });
-              setLoading(false);
-              return;
-            }
-
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
 
@@ -14709,9 +14807,25 @@ export default function App() {
 
             await loadPortalData(access.role, session.user, access.parentProfile);
           }
-        } catch (err) {
+          } catch (err) {
           console.error("Auth initialization error:", err);
-          if (mounted) setLoading(false);
+          if (mounted) {
+            if (isNetworkError(err)) {
+              const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+              if (cachedRaw) {
+                try {
+                  const cached = JSON.parse(cachedRaw);
+                  if (cached.userId === session.user.id) {
+                    storeRole(cached.role);
+                    setUser(session.user);
+                    loadPortalData(cached.role, session.user).catch(() => {});
+                    return;
+                  }
+                } catch (_) {}
+              }
+            }
+            setLoading(false);
+          }
         }
       } else {
         if (mounted) {
@@ -14736,16 +14850,6 @@ export default function App() {
         for (const key of Object.keys(localStorage)) {
           if (key.startsWith('sb-')) localStorage.removeItem(key);
         }
-      }
-      // When admin OTP flow is active, skip auto-resolve so Login.jsx
-      // can show the secret key modal before portal authorization.
-      // Clear stale OTP flag from possible page refresh during admin OTP flow
-      // Don't clear on SIGNED_OUT — it's part of the signInWithPassword sequence during OTP flow
-      if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') {
-        sessionStorage.removeItem('mauze-admin-otp-flow');
-      }
-      if (event === 'SIGNED_IN' && sessionStorage.getItem('mauze-admin-otp-flow') === 'true') {
-        return;
       }
       handleAuthChange(event, session);
     });
@@ -14983,6 +15087,21 @@ export default function App() {
         setTeacherProfiles(nextParentState.teacherProfiles || []);
         try { localStorage.setItem('mauze_portal_cache', JSON.stringify({ role: 'parents', parentData: nextParentState, schoolData: null, _t: Date.now() })); } catch (_) {}
       } else {
+        // For admin role, use get_all_child_profiles RPC (SECURITY DEFINER, bypasses RLS)
+        // so teachers toggled for admin access can see all students.
+        const profilesPromise = role === "admin"
+          ? supabase.rpc("get_all_child_profiles")
+              .then(({ data, error }) => {
+                if (error || !data) {
+                  return supabase.from("child_profiles").select("*").order("full_name", { ascending: true });
+                }
+                return { data, error: null };
+              })
+              .catch(() =>
+                supabase.from("child_profiles").select("*").order("full_name", { ascending: true })
+              )
+          : supabase.from("child_profiles").select("*").order("full_name", { ascending: true });
+
         const [
           profilesResponse,
           resultsResponse,
@@ -14997,7 +15116,7 @@ export default function App() {
           supportTicketsResponse,
           parentViewsResponse,
         ] = await Promise.all([
-          supabase.from("child_profiles").select("*").order("full_name", { ascending: true }),
+          profilesPromise,
           supabase.from("weekly_results").select("*").order("week_date", { ascending: false }),
           supabase.from("events").select("*").order("event_date", { ascending: false }),
           supabase.from("schedule").select("*").order("task_time", { ascending: true }),
@@ -15132,13 +15251,25 @@ export default function App() {
                 current.teacherAttendance.teacher_name || students[0].teacherName || "",
             },
           }));
-          setTeacherForms((current) => ({
-            ...current,
-            result: {
-              ...current.result,
-              student_id: current.result.student_id || students[0].student_id,
-            },
-          }));
+          setTeacherForms((current) => {
+            const currentSid = current.result.student_id || students[0].student_id;
+            const freshResults = resultsResponse.data || [];
+            const matchingResults = freshResults
+              .filter(r => String(r.student_id) === String(currentSid))
+              .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
+            const latestResult = matchingResults.length > 0 ? matchingResults[0] : {};
+            return {
+              ...current,
+              result: {
+                ...current.result,
+                ...latestResult,
+                wusool_surah: latestResult?.wusool_surah || "",
+                next_week_surah: latestResult?.next_week_surah || "",
+                istifadah_surah: latestResult?.istifadah_surah || "",
+                student_id: currentSid,
+              },
+            };
+          });
         }
       }
     } catch (error) {
@@ -15254,98 +15385,6 @@ export default function App() {
     }
   }
 
-  const generateOtp = (length = 6) => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let code = "";
-    for (let i = 0; i < length; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
-
-  useEffect(() => {
-    if (!teacherAdminAuth || teacherAdminAuth.step !== 'otp') return;
-    if (teacherAdminAuth.timer <= 0) {
-      setTeacherAdminAuth(null);
-      return;
-    }
-    const interval = setInterval(() => {
-      setTeacherAdminAuth(prev => {
-        if (!prev || prev.step !== 'otp' || prev.timer <= 1) return null;
-        return { ...prev, timer: prev.timer - 1 };
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [teacherAdminAuth]);
-
-  const handleTeacherAdminLogin = async () => {
-    if (!teacherAdminAuth || teacherAdminAuth.step !== 'login') return;
-    if (!teacherAdminAuth.email.trim() || !teacherAdminAuth.password.trim()) {
-      setTeacherAdminAuth(prev => ({ ...prev, error: 'Enter the admin email and password.' }));
-      return;
-    }
-    try {
-      sessionStorage.setItem('mauze-admin-otp-flow', 'true');
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: teacherAdminAuth.email,
-        password: teacherAdminAuth.password,
-      });
-      if (error) {
-        sessionStorage.removeItem('mauze-admin-otp-flow');
-        throw error;
-      }
-      if (!data?.user) {
-        sessionStorage.removeItem('mauze-admin-otp-flow');
-        throw new Error('Unable to verify user.');
-      }
-      const adminAccess = await authorizePortalAccess(data.user, 'admin');
-      if (!adminAccess.ok) {
-        sessionStorage.removeItem('mauze-admin-otp-flow');
-        setTeacherAdminAuth(prev => ({ ...prev, error: adminAccess.message || 'This account does not have admin access.' }));
-        return;
-      }
-      localStorage.setItem('teacher-admin-authenticated', teacherAdminAuth.email);
-      const key = generateOtp(6);
-      setTeacherAdminAuth({ step: 'otp', secretKey: key, input: '', timer: 60, error: null });
-    } catch (err) {
-      sessionStorage.removeItem('mauze-admin-otp-flow');
-      setTeacherAdminAuth(prev => ({ ...prev, error: err.message || 'Login failed.' }));
-    }
-  };
-
-  const handleTeacherAdminOtpVerify = async () => {
-    if (!teacherAdminAuth || teacherAdminAuth.step !== 'otp') return false;
-    if (teacherAdminAuth.input.toUpperCase() === teacherAdminAuth.secretKey) {
-      sessionStorage.setItem("mauze-admin-otp-verified", "true");
-      localStorage.setItem("mauze-admin-otp-verified", "true");
-      sessionStorage.removeItem('mauze-admin-otp-flow');
-      localStorage.setItem('teacher-admin-otp-login-done', 'true');
-      storeRole("admin");
-      // Resolve current user (may be null from SIGNED_OUT during OTP sign-in)
-      let currentUser = user;
-      if (!currentUser) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          setUser(session.user);
-          currentUser = session.user;
-        }
-      }
-      // Persist admin identity so refresh/reopen keeps admin role
-      const adminEmail = currentUser?.email || user?.email || '';
-      localStorage.setItem('teacher-admin-authenticated', adminEmail);
-      localStorage.setItem(STORAGE_KEYS.cachedAuth, JSON.stringify({
-        role: "admin",
-        userId: currentUser?.id || user?.id || '',
-        email: adminEmail,
-      }));
-      setTeacherAdminAuth(null);
-      if (currentUser) loadPortalData("admin", currentUser);
-      return true;
-    }
-    setTeacherAdminAuth(prev => prev ? { ...prev, error: "Invalid key. Try again." } : null);
-    return false;
-  };
-
   function showAction(type, text) {
     setActionMessage({ type, text });
     if (type && text) {
@@ -15358,6 +15397,14 @@ export default function App() {
         });
       }, 4000);
     }
+  }
+
+  function isNetworkError(err) {
+    if (!err) return false;
+    const msg = (err.message || err.name || '').toLowerCase();
+    return msg.includes('fetch') || msg.includes('network') || msg.includes('networkerror') ||
+      msg.includes('typeerror') || msg.includes('failed to fetch') || msg.includes('internet') ||
+      err.name === 'TypeError' || err.code === 'NETWORK_ERROR';
   }
 
   const handleLoginSuccess = async (loggedInUser, selectedRole, rememberMe = true) => {
@@ -15392,24 +15439,32 @@ export default function App() {
       return { ok: true };
     } catch (error) {
       console.error("Portal authorization failed:", error);
+
+      if (isNetworkError(error)) {
+        const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw);
+            if (cached.userId === loggedInUser.id || cached.email === loggedInUser.email) {
+              storeRole(cached.role || selectedRole);
+              setUser(loggedInUser);
+              loadPortalData(cached.role || selectedRole, loggedInUser).catch(() => {});
+              return { ok: true };
+            }
+          } catch (_) {}
+        }
+        return {
+          ok: false,
+          message: "Unable to connect. Signed in but could not verify portal access. Please try again when connected.",
+        };
+      }
+
       await supabase.auth.signOut();
       return {
         ok: false,
         message: "We could not verify this account for the selected portal.",
       };
     }
-  };
-
-  const handlePendingAdminLoginSuccess = async (loggedInUser, selectedRole, rememberMe = true) => {
-    const result = await handleLoginSuccess(loggedInUser, selectedRole, rememberMe);
-    if (result?.ok) {
-      setPendingAdminSession(null);
-    }
-    return result;
-  };
-
-  const handlePendingAdminCancel = () => {
-    setPendingAdminSession(null);
   };
 
   const handleLogout = async () => {
@@ -15436,14 +15491,12 @@ export default function App() {
     } catch (err) {
       console.warn("Logout error:", err);
     }
-    const adminLoginDone = localStorage.getItem('teacher-admin-otp-login-done');
     // Preserve saved credentials so "Remember Me" still works on next visit
     const savedEmail = localStorage.getItem("mauze-saved-email");
     const savedPassword = localStorage.getItem("mauze-saved-password");
     const savedRole = localStorage.getItem("mauze-saved-role");
     const rememberMe = localStorage.getItem("mauze-remember-me");
     localStorage.clear();
-    if (adminLoginDone) localStorage.setItem('teacher-admin-otp-login-done', adminLoginDone);
     if (rememberMe === "true") {
       if (savedEmail) localStorage.setItem("mauze-saved-email", savedEmail);
       if (savedPassword) localStorage.setItem("mauze-saved-password", savedPassword);
@@ -16794,6 +16847,7 @@ const handleSendCustomNotification = async (event) => {
           whatsapp_number: payload.whatsapp_number,
           salary_per_minute: Number(payload.salary_per_minute || 2.3),
           show_salary_card: !!payload.show_salary_card,
+          teacher_role: payload.teacher_role || "muhaffiz",
           is_active: true,
         },
         { onConflict: "user_id" }
@@ -16830,6 +16884,7 @@ const handleSendCustomNotification = async (event) => {
         whatsapp_number: payload.whatsapp_number || "",
         salary_per_minute: String(payload.salary_per_minute || "2.3"),
         show_salary_card: !!payload.show_salary_card,
+        teacher_role: payload.teacher_role || "muhaffiz",
       }
     }));
     showAction("success", "Teacher profile updated.");
@@ -16857,6 +16912,7 @@ const handleSendCustomNotification = async (event) => {
       student_id: numericId,
       attendance_count: toNumber(f.attendance_count),
       total_jadeed_pages: f.total_jadeed_pages || null,
+      total_jadeed_unit: f.total_jadeed_unit || "صفه",
       murajazah: toNumber(f.murajazah),
       juz_hali: toNumber(f.juz_hali),
       takhteet: toNumber(f.takhteet),
@@ -16980,19 +17036,8 @@ const handleSendCustomNotification = async (event) => {
 
 
 
-  if (pendingAdminSession) {
-    return (
-      <Login
-        onLoginSuccess={handlePendingAdminLoginSuccess}
-        initialUser={pendingAdminSession.user}
-        initialRole="admin"
-        onCancel={handlePendingAdminCancel}
-      />
-    );
-  }
-
-  if (loading) {
-    return <LoadingScreen message="Connecting to Mauze Tahfeez..." />;
+  if (loading || !splashDone) {
+    return <LoadingScreen message="Connecting to Mauze Tahfeez..." onComplete={() => setSplashDone(true)} />;
   }
 
 
@@ -17197,14 +17242,6 @@ const handleSendCustomNotification = async (event) => {
             onDismissAnnounce={dismissAnnouncement}
             onClearAllAnnounces={clearAllAnnouncements}
             onShowAction={showAction}
-            onRequestAdminAccess={() => {
-              if (localStorage.getItem('teacher-admin-otp-login-done')) {
-                const key = generateOtp(6);
-                setTeacherAdminAuth({ step: 'otp', secretKey: key, input: '', timer: 60, error: null });
-              } else {
-                setTeacherAdminAuth({ step: 'login', email: '', password: '', error: null });
-              }
-            }}
             teacherUnlockStatus={teacherUnlockStatus}
             setTeacherUnlockStatus={setTeacherUnlockStatus}
             isDarkMode={isDarkMode}
@@ -17224,6 +17261,7 @@ const handleSendCustomNotification = async (event) => {
             appLockEnabled={appLockEnabled}
             onAppUnlock={handleAppUnlock}
             onAppLockToggle={handleAppLockToggle}
+            teacherAdminAccessList={teacherAdminAccessList}
           />
         )}
 
@@ -17296,200 +17334,6 @@ const handleSendCustomNotification = async (event) => {
           </div>
         </div>
       )}
-      {teacherAdminAuth && (() => {
-        const isLogin = teacherAdminAuth.step === 'login';
-        const isOtp = teacherAdminAuth.step === 'otp';
-        return (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 999999, backdropFilter: 'blur(6px)', padding: '20px',
-        }}>
-          <div style={{
-            background: 'white', borderRadius: '24px', padding: '40px 36px 32px',
-            maxWidth: '440px', width: '100%', textAlign: 'center',
-            boxShadow: '0 30px 80px rgba(0,0,0,0.35)', animation: 'modalScaleIn 0.25s ease',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #d4af37, #b8941f)' }} />
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                width: '56px', height: '56px', borderRadius: '16px',
-                background: isLogin
-                  ? 'linear-gradient(135deg, rgba(93,64,55,0.15), rgba(93,64,55,0.05))'
-                  : 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.06))',
-                display: 'grid', placeItems: 'center', margin: '0 auto 14px',
-              }}>
-                {isLogin ? <LogIn size={24} style={{ color: 'var(--deep-brown)' }} /> : <ShieldCheck size={28} style={{ color: 'var(--primary-gold)' }} />}
-              </div>
-              <h2 style={{ margin: '0 0 4px', color: 'var(--deep-brown)', fontSize: '1.3rem', fontWeight: 700 }}>
-                {isLogin ? 'Confirm Your Identity' : 'Admin Access'}
-              </h2>
-              <p style={{ margin: '0', color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                {isLogin
-                  ? `Enter the admin email and password to proceed.`
-                  : `Enter the secure key to access the Admin Portal. This key expires in `}
-                {isOtp && <strong style={{ color: teacherAdminAuth.timer <= 10 ? '#c62828' : 'var(--deep-brown)' }}>{teacherAdminAuth.timer}s</strong>}.
-              </p>
-            </div>
-
-            {isLogin && (
-              <>
-              <div style={{ textAlign: 'left', marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>Email</label>
-                <input
-                  type="email"
-                  placeholder="Enter admin email"
-                  value={teacherAdminAuth.email || ''}
-                  onChange={(e) => setTeacherAdminAuth(prev => prev ? { ...prev, email: e.target.value, error: null } : null)}
-                  style={{
-                    width: '100%', padding: '12px 14px', fontSize: '0.9rem',
-                    borderRadius: '10px', border: `2px solid ${teacherAdminAuth.error ? '#ef5350' : 'rgba(0,0,0,0.1)'}`,
-                    outline: 'none', boxSizing: 'border-box',
-                    background: teacherAdminAuth.error ? 'rgba(239,83,80,0.04)' : 'white',
-                    transition: 'border-color 0.2s ease',
-                  }}
-                />
-              </div>
-              <div style={{ textAlign: 'left', marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>Password</label>
-                <input
-                  type="password"
-                  placeholder="Enter your password"
-                  value={teacherAdminAuth.password || ''}
-                  onChange={(e) => setTeacherAdminAuth(prev => prev ? { ...prev, password: e.target.value, error: null } : null)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleTeacherAdminLogin(); }}
-                  autoFocus
-                  style={{
-                    width: '100%', padding: '12px 14px', fontSize: '0.9rem',
-                    border: `2px solid ${teacherAdminAuth.error ? '#ef5350' : 'rgba(0,0,0,0.1)'}`,
-                    borderRadius: '10px', outline: 'none',
-                    background: teacherAdminAuth.error ? 'rgba(239,83,80,0.04)' : 'white',
-                    boxSizing: 'border-box', transition: 'border-color 0.2s ease',
-                  }}
-                />
-              </div>
-              {teacherAdminAuth.error && (
-                <p style={{ margin: '-8px 0 14px', color: '#c62828', fontSize: '0.8rem', fontWeight: 500, textAlign: 'left' }}>
-                  {teacherAdminAuth.error}
-                </p>
-              )}
-              <button
-                onClick={handleTeacherAdminLogin}
-                disabled={!teacherAdminAuth.email?.trim() || !teacherAdminAuth.password?.trim()}
-                style={{
-                  width: '100%', padding: '14px', fontSize: '0.95rem', fontWeight: 700,
-                  border: 'none', borderRadius: '12px', cursor: teacherAdminAuth.email?.trim() && teacherAdminAuth.password?.trim() ? 'pointer' : 'not-allowed',
-                  background: teacherAdminAuth.email?.trim() && teacherAdminAuth.password?.trim()
-                    ? 'linear-gradient(135deg, #5d4037, #4e342e)'
-                    : 'rgba(0,0,0,0.08)',
-                  color: teacherAdminAuth.email?.trim() && teacherAdminAuth.password?.trim() ? 'white' : '#999',
-                  transition: 'all 0.2s ease', marginBottom: '10px',
-                  boxShadow: teacherAdminAuth.email?.trim() && teacherAdminAuth.password?.trim() ? '0 4px 16px rgba(93,64,55,0.25)' : 'none',
-                }}
-              >
-                <LogIn size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                Continue
-              </button>
-              </>
-            )}
-
-            {isOtp && (
-              <>
-              <div style={{
-                background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
-                borderRadius: '14px', padding: '20px', marginBottom: '20px',
-                position: 'relative',
-              }}>
-                <div style={{
-                  position: 'absolute', top: '-60%', left: '-10%', width: '120%', height: '200%',
-                  background: 'radial-gradient(ellipse at center, rgba(212,175,55,0.08), transparent 70%)',
-                  pointerEvents: 'none',
-                }} />
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  <div style={{
-                    fontFamily: "'SF Mono', 'Fira Code', monospace", fontSize: '1.8rem',
-                    letterSpacing: '10px', color: '#d4af37', fontWeight: 700,
-                    textAlign: 'center', userSelect: 'all',
-                  }}>
-                    {teacherAdminAuth.secretKey}
-                  </div>
-                  <div style={{
-                    marginTop: '10px', height: '4px', borderRadius: '2px',
-                    background: 'rgba(255,255,255,0.1)', overflow: 'hidden',
-                  }}>
-                    <div style={{
-                      height: '100%', borderRadius: '2px', width: `${(teacherAdminAuth.timer / 60) * 100}%`,
-                      background: teacherAdminAuth.timer <= 10
-                        ? 'linear-gradient(90deg, #ef5350, #d32f2f)'
-                        : 'linear-gradient(90deg, #d4af37, #b8941f)',
-                      transition: 'width 1s linear',
-                    }} />
-                  </div>
-                </div>
-              </div>
-              <input
-                type="text"
-                maxLength={6}
-                placeholder="ENTER 6-DIGIT KEY"
-                value={teacherAdminAuth.input || ''}
-                onChange={(e) => {
-                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-                  setTeacherAdminAuth(prev => prev ? { ...prev, input: val, error: null } : null);
-                }}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleTeacherAdminOtpVerify(); }}
-                autoFocus
-                style={{
-                  width: '100%', padding: '14px 16px', fontSize: '1.2rem',
-                  textAlign: 'center', letterSpacing: '6px', textTransform: 'uppercase',
-                  border: `2px solid ${teacherAdminAuth.error ? '#ef5350' : 'rgba(0,0,0,0.1)'}`,
-                  borderRadius: '12px', outline: 'none', marginBottom: '12px',
-                  fontFamily: "'SF Mono', 'Fira Code', monospace", fontWeight: 700,
-                  background: teacherAdminAuth.error ? 'rgba(239,83,80,0.04)' : 'white',
-                  boxSizing: 'border-box',
-                }}
-              />
-              {teacherAdminAuth.error && (
-                <p style={{ margin: '-8px 0 12px', color: '#c62828', fontSize: '0.8rem', fontWeight: 500 }}>
-                  {teacherAdminAuth.error}
-                </p>
-              )}
-              <button
-                onClick={handleTeacherAdminOtpVerify}
-                disabled={(teacherAdminAuth.input || '').length < 6}
-                style={{
-                  width: '100%', padding: '14px', fontSize: '0.95rem', fontWeight: 700,
-                  border: 'none', borderRadius: '12px', cursor: (teacherAdminAuth.input || '').length >= 6 ? 'pointer' : 'not-allowed',
-                  background: (teacherAdminAuth.input || '').length >= 6
-                    ? 'linear-gradient(135deg, #d4af37, #b8941f)'
-                    : 'rgba(0,0,0,0.08)',
-                  color: (teacherAdminAuth.input || '').length >= 6 ? 'white' : '#999',
-                  transition: 'all 0.2s ease', marginBottom: '10px',
-                  boxShadow: (teacherAdminAuth.input || '').length >= 6 ? '0 4px 16px rgba(212,175,55,0.3)' : 'none',
-                }}
-              >
-                Verify & Access Admin
-              </button>
-              </>
-            )}
-
-            <button
-              onClick={() => setTeacherAdminAuth(null)}
-              style={{
-                width: '100%', padding: '12px', fontSize: '0.85rem',
-                border: 'none', borderRadius: '10px', cursor: 'pointer',
-                background: 'transparent', color: 'var(--text-muted)',
-                transition: 'color 0.2s ease',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--deep-brown)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-        );
-      })()}
       {searchPageLoading && (
         <div className="page-loading-overlay">
           <lottie-player

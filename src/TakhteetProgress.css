@@ -223,13 +223,48 @@
   color: #3e2723;
 }
 
+/* Done Pages Badge */
+.done-pages-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(46, 196, 182, 0.12), rgba(46, 196, 182, 0.06));
+  border: 1px solid rgba(46, 196, 182, 0.25);
+  border-radius: 999px;
+  padding: 4px 14px;
+  margin-top: 4px;
+}
+
+.done-pages-icon {
+  font-size: 0.75rem;
+  color: #2ec4b6;
+  font-weight: 900;
+}
+
+.done-pages-text {
+  font-size: 0.72rem;
+  color: #1a8a7f;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.done-pages-text .kanz-font {
+  color: #1a7a6f;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.stat-value.done-value {
+  color: #2ec4b6;
+}
+
 /* ===== Metrics Grid ===== */
 .takhteet-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   flex: 1;
-  min-width: 360px;
+  min-width: 460px;
 }
 
 /* ===== Premium Metric Card ===== */
@@ -248,6 +283,7 @@
 .takhteet-metric-card:nth-child(1) { animation-delay: 0.1s; }
 .takhteet-metric-card:nth-child(2) { animation-delay: 0.2s; }
 .takhteet-metric-card:nth-child(3) { animation-delay: 0.3s; }
+.takhteet-metric-card:nth-child(4) { animation-delay: 0.4s; }
 
 .takhteet-metric-card:hover {
   transform: translateY(-4px);
@@ -329,6 +365,79 @@
   box-shadow:
     0 8px 28px rgba(74, 144, 217, 0.16),
     0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Ruby card — warm coral red for Done This Week */
+.metric-ruby {
+  background: linear-gradient(145deg, #fef6f5, #fce8e4);
+  border: 1px solid rgba(217, 83, 79, 0.22);
+  box-shadow:
+    0 4px 16px rgba(217, 83, 79, 0.08),
+    0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.metric-ruby::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #d9534f, #f08a85, #d9534f);
+  z-index: 1;
+}
+
+.metric-ruby:hover {
+  box-shadow:
+    0 8px 28px rgba(217, 83, 79, 0.16),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Done Weekly Display — premium large number */
+.done-weekly-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0 8px;
+  gap: 2px;
+}
+
+.done-weekly-value {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: #d9534f;
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(217, 83, 79, 0.12);
+}
+
+.done-weekly-unit {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #c0392b;
+  margin-top: 4px;
+}
+
+.done-highlight .kanz-font {
+  color: #d9534f;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.metric-ruby .metric-footer {
+  border-top-color: rgba(217, 83, 79, 0.15);
+}
+
+.metric-ruby .jss-display {
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(254,246,245,0.92));
+  border-color: rgba(217, 83, 79, 0.2);
+}
+
+.metric-ruby .jss-label {
+  color: #c0392b;
 }
 
 /* Subtle radial glow behind content */
@@ -750,7 +859,7 @@
 }
 
 .record-card .takhteet-metrics-grid {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   min-width: 180px;
   gap: 8px;
 }
@@ -818,6 +927,35 @@
   font-size: 0.75rem;
 }
 
+.record-card .done-pages-badge {
+  padding: 2px 10px;
+  gap: 4px;
+}
+
+.record-card .done-pages-text {
+  font-size: 0.6rem;
+}
+
+.record-card .done-pages-text .kanz-font {
+  font-size: 0.68rem;
+}
+
+.record-card .progress-stat .stat-value.done-value {
+  font-size: 0.8rem;
+}
+
+.record-card .done-weekly-value {
+  font-size: 1.6rem;
+}
+
+.record-card .done-weekly-unit {
+  font-size: 0.5rem;
+}
+
+.record-card .done-highlight .kanz-font {
+  font-size: 0.72rem;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 900px) {
   .takhteet-main-section {
@@ -832,6 +970,13 @@
 
   .record-card .takhteet-metrics-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .takhteet-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    min-width: unset;
   }
 }
 
@@ -865,6 +1010,10 @@
 
   .record-card .takhteet-metrics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .done-weekly-value {
+    font-size: 1.8rem;
   }
 
   .record-card .takhteet-glass-card {

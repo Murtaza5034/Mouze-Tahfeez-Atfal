@@ -200,13 +200,18 @@ const JssDisplay = ({ juz, surah, safa, compact = false }) => (
   </div>
 );
 
-const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
+const TakhteetProgress = ({ weeklyResult, currentJuz, reportSettings }) => {
   // Dynamic CSS import to avoid Vite HMR conflict with React.lazy
   useEffect(() => {
     import('./TakhteetProgress.css');
   }, []);
 
   const [percent, setPercent] = useState(0);
+
+  // Use admin-configured headings if available
+  const takhteetTillHeading = reportSettings?.istifadah_heading || "Target Till";
+  const takhteetHeading = reportSettings?.takhteet_heading || "Takhteet";
+  const wusoolHeading = reportSettings?.wusool_heading || "Wusool";
 
   // Parse all three field sets
   const target = parseField(weeklyResult?.istifadah_juz, weeklyResult?.istifadah_page, weeklyResult?.istifadah_surah);
@@ -219,6 +224,7 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
   const istifadahPage = weeklyResult?.istifadah_page;
   const wusoolPage = weeklyResult?.wusool_page;
   const nextWeekPage = weeklyResult?.next_week_page;
+  const totalJadeedPages = weeklyResult?.total_jadeed_pages;
 
   const currentJuzNum = currentJuz ? parseInt(String(currentJuz).trim(), 10) : NaN;
   const isJuz1to25 = !isNaN(currentJuzNum) && currentJuzNum >= 1 && currentJuzNum <= 25;
@@ -292,7 +298,7 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
             </span>
           </div>
           <p className="takhteet-card-subtitle">
-            Track your child's memorization journey — how much target was set, where they are now, and what's coming next.
+            Track {takhteetHeading.toLowerCase()} progress — from {takhteetTillHeading.toLowerCase()} to current position, with pages completed shown in real time.
           </p>
         </div>
 
@@ -304,18 +310,23 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
             <div className="progress-stats-row">
               <div className="progress-stat">
                 <span className="stat-label">Target</span>
-                <span className="stat-value kanz-font">{toArabicDigits(istifadahPage || pagesCovered)}</span>
+                <span className="stat-value kanz-font">{toArabicDigits(istifadahPage || '--')}</span>
               </div>
               <div className="progress-stat-divider">/</div>
               <div className="progress-stat">
-                <span className="stat-label">Done</span>
-                <span className="stat-value kanz-font">{toArabicDigits(pagesCovered)}</span>
+                <span className="stat-label">On</span>
+                <span className="stat-value kanz-font">{toArabicDigits(wusoolPage || '--')}</span>
+              </div>
+              <div className="progress-stat-divider">/</div>
+              <div className="progress-stat">
+                <span className="stat-label">Left</span>
+                <span className="stat-value kanz-font">{toArabicDigits(pagesRemaining)}</span>
               </div>
             </div>
             <p className="progress-remaining">
               {pagesRemaining > 0 ? (
                 <><strong className="kanz-font">{toArabicDigits(pagesRemaining)}</strong> pages remaining</>
-              ) : pagesCovered > 0 ? (
+              ) : computedPercent >= 100 ? (
                 <span className="success-text celebration-text">🎉 Mubarak Mohanna! Target achieved 🎉</span>
               ) : null}
             </p>
@@ -323,10 +334,10 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
 
           {/* 3 Metric Cards */}
           <div className="takhteet-metrics-grid">
-            {/* Metric 1: Target Given */}
+            {/* Metric 1: Target Given — uses admin-configured takhteet heading */}
             <MetricCard
-              label="Target Given"
-              labelAr="الهدف المعطى"
+              label={takhteetTillHeading}
+              labelAr={takhteetHeading}
               icon="🎯"
               accent="gold"
             >
@@ -336,13 +347,13 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
                 safa={target.safa}
               />
               <div className="metric-footer">
-                <span className="metric-pages">Target till page <span className="kanz-font">{toArabicDigits(istifadahPage || '--')}</span></span>
+                <span className="metric-pages">{takhteetTillHeading} page <span className="kanz-font">{toArabicDigits(istifadahPage || '--')}</span></span>
               </div>
             </MetricCard>
 
-            {/* Metric 2: Currently On (Wusool) */}
+            {/* Metric 2: Currently On (Wusool) — uses admin-configured wusool heading */}
             <MetricCard
-              label="Currently On"
+              label={wusoolHeading}
               labelAr="الوصول الحالي"
               icon="📍"
               accent="emerald"
@@ -353,11 +364,33 @@ const TakhteetProgress = ({ weeklyResult, currentJuz }) => {
                 safa={wusool.safa}
               />
               <div className="metric-footer">
-                <span className="metric-pages"><span className="kanz-font">{toArabicDigits(pagesCovered)}</span> pages done</span>
+                <span className="metric-pages">{wusoolHeading} page <span className="kanz-font">{wusool.safa}</span></span>
               </div>
             </MetricCard>
 
-            {/* Metric 3: Next Week Target % */}
+            {/* Metric 3: Done This Week — premium pages completed */}
+            <MetricCard
+              label="Done This Week"
+              labelAr="تم هذا الأسبوع"
+              icon="✅"
+              accent="ruby"
+            >
+              <div className="done-weekly-display">
+                <span className="done-weekly-value kanz-font">{toArabicDigits(totalJadeedPages || '0')}</span>
+                <span className="done-weekly-unit">Pages</span>
+              </div>
+              <div className="metric-footer">
+                <span className="metric-pages done-highlight">
+                  {totalJadeedPages ? (
+                    <>🎯 <span className="kanz-font">{toArabicDigits(totalJadeedPages)}</span> pages completed this week</>
+                  ) : (
+                    <span className="muted">No pages recorded yet</span>
+                  )}
+                </span>
+              </div>
+            </MetricCard>
+
+            {/* Metric 4: Next Week Target % */}
             <MetricCard
               label="Next Week Target"
               labelAr="هدف الأسبوع القادم"

@@ -1537,110 +1537,120 @@ export const SelfJadwalTeacherView
   };
 
   return (
-    <div className="jadwal-container">
-      <div style={premiumHeaderStyle}>
-        <div style={premiumHeaderGlow} />
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <div style={premiumTitleStyle}>
-              <Crown size={24} style={{ color: '#d4af37' }} />
-              <span>Self Jadwal Editor</span>
-            </div>
-            <span style={premiumBadgeStyle}>
-              <Gem size={12} /> Premium
-            </span>
-          </div>
-          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontFamily: 'Inter, sans-serif', marginTop: '4px' }}>
-            View and edit personal schedules for parents
-          </p>
-        </div>
-      </div>
-
-      <div style={premiumCardStyle}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)' }}>
-          <div className="student-selector" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <select
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="premium-select"
-              style={{ flex: 1, minWidth: '250px', padding: '10px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
-            >
-              <option value="">-- Select Child --</option>
-              {students.length > 0 && (
-                <optgroup label="👦 Group Children">
-                  {students.map(s => (
-                    <option key={`child-${s.student_id || s.id}`} value={s.student_id || s.id}>
-                      {s.name || s.full_name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-            {selectedUserId && (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="jadwal-save-btn" onClick={handleNotifyUser} disabled={saving}>
-                  {saving ? (
-                    <><Loader2 className="animate-spin" size={16} /> <span>Notifying...</span></>
-                  ) : (
-                    <><Save size={16} /> <span>Notify User</span></>
-                  )}
-                </button>
+    <>
+      <div className="jadwal-container parent-view self-jadwal-editor">
+        <div style={premiumHeaderStyle}>
+          <div style={premiumHeaderGlow} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={premiumTitleStyle}>
+                <Crown size={24} style={{ color: '#d4af37' }} />
+                <span>Self Jadwal Schedule</span>
               </div>
-            )}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="loading-spinner" style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
-        ) : selectedUserId ? (
-          <>
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={premiumBadgeStyle}>
+                <Gem size={12} /> Premium
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
                 <Star size={14} style={{ color: '#d4af37' }} />
-                <span style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>{selectedUserName}</span>
+                <span style={{ color: '#e8d5a3', fontSize: '14px', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
+                  {selectedUserName || 'Select a child'}
+                </span>
               </div>
-              <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Mode:</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
+                <Award size={14} style={{ color: '#d4af37' }} />
+                <span style={{ color: '#e8d5a3', fontSize: '13px', fontFamily: 'Inter, sans-serif', opacity: 0.8 }}>
+                  Teacher Editor
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={premiumCardStyle}>
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)' }}>
+            <div className="student-selector" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <select
-                value={mode}
-                onChange={(e) => setMode(e.target.value)}
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
                 className="premium-select"
-                style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
+                style={{ flex: 1, minWidth: '250px', padding: '10px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
               >
-                <option value="juz-wise">Juz Wise</option>
-                <option value="surah-wise">Surah Wise</option>
+                <option value="">-- Select Child --</option>
+                {students.length > 0 && (
+                  <optgroup label="👦 Group Children">
+                    {students.map(s => (
+                      <option key={`child-${s.student_id || s.id}`} value={s.student_id || s.id}>
+                        {s.name || s.full_name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
-              {mode === 'surah-wise' && (
-                <span style={{ fontSize: '12px', color: '#8b6d31', fontStyle: 'italic' }}>Free text: English or Arabic</span>
+              {selectedUserId && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="jadwal-save-btn" onClick={handleNotifyUser} disabled={saving}>
+                    {saving ? (
+                      <><Loader2 className="animate-spin" size={16} /> <span>Notifying...</span></>
+                    ) : (
+                      <><Save size={16} /> <span>Notify User</span></>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
-            <div style={{ padding: '20px' }}>
-              <SelfJadwalTableStyle
-                mode={mode}
-                scheduleData={scheduleData}
-                onCellChange={handleCellChange}
-                editHistory={editHistory}
-                dayDates={dayDates}
-                customDays={enrichedDays || customDays}
-                onMiqaatClick={handleMiqaatClick}
-              />
-            </div>
-          </>
-        ) : (
-          <div className="jadwal-empty" style={{ padding: '60px 20px', textAlign: 'center', color: '#999' }}>
-            <Lock size={32} style={{ color: '#d4af37', opacity: 0.4, marginBottom: '12px' }} />
-            <p style={{ fontFamily: 'Inter, sans-serif' }}>Select a parent/user from the dropdown to view and edit their Self Jadwal schedule.</p>
           </div>
+
+          {loading ? (
+            <div className="loading-spinner" style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+          ) : selectedUserId ? (
+            <>
+              <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Mode:</label>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                  className="premium-select"
+                  style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  <option value="juz-wise">Juz Wise</option>
+                  <option value="surah-wise">Surah Wise</option>
+                </select>
+                {mode === 'surah-wise' && (
+                  <span style={{ fontSize: '12px', color: '#8b6d31', fontStyle: 'italic' }}>Free text: English or Arabic</span>
+                )}
+                <span style={{ fontSize: '12px', color: '#5d4037', fontStyle: 'italic', fontFamily: 'Inter, sans-serif', fontWeight: 600, marginLeft: 'auto' }}>✏️ Auto-saved</span>
+              </div>
+              <div style={{ padding: '20px' }}>
+                <SelfJadwalTableStyle
+                  mode={mode}
+                  scheduleData={scheduleData}
+                  onCellChange={handleCellChange}
+                  editHistory={editHistory}
+                  dayDates={dayDates}
+                  customDays={enrichedDays || customDays}
+                  onMiqaatClick={handleMiqaatClick}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="jadwal-empty" style={{ padding: '60px 20px', textAlign: 'center', color: '#999' }}>
+              <Lock size={32} style={{ color: '#d4af37', opacity: 0.4, marginBottom: '12px' }} />
+              <p style={{ fontFamily: 'Inter, sans-serif' }}>Select a parent/user from the dropdown to view and edit their Self Jadwal schedule.</p>
+            </div>
+          )}
+        </div>
+
+        {miqaatPopup && (
+          <MiqaatPopup
+            events={miqaatPopup.events}
+            dayName={miqaatPopup.dayName}
+            fatemiDate={miqaatPopup.fatemiDate}
+            onClose={() => setMiqaatPopup(null)}
+          />
         )}
       </div>
-
-      {miqaatPopup && (
-        <MiqaatPopup
-          events={miqaatPopup.events}
-          dayName={miqaatPopup.dayName}
-          fatemiDate={miqaatPopup.fatemiDate}
-          onClose={() => setMiqaatPopup(null)}
-        />
-      )}
-    </div>
+    </>
   );
 };

@@ -3501,6 +3501,40 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   }
 }
 
+/* Support Bot Home Button */
+.support-bot-home-btn-wrapper {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.support-bot-home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #0c5b4d, #00352d);
+  color: #fffdf8;
+  font-weight: 800;
+  font-size: 0.95rem;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(12, 91, 77, 0.25);
+  width: 100%;
+  justify-content: center;
+}
+
+.support-bot-home-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(12, 91, 77, 0.35);
+}
+
+.support-bot-home-btn svg {
+  flex-shrink: 0;
+}
+
 /* Mobile heading overrides */
 @media (max-width: 480px) {
   .section-title { font-size: 1.15rem; }
