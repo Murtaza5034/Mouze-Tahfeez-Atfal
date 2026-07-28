@@ -1,6 +1,8 @@
 import "./style.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
+import { getCellEdited, toArabicNum, calcTotalPages, formatJadeed, formatJuzhali, formatMurajah } from "./SelfJadwal";
 import {
   Bell,
   BookOpen,
@@ -2475,6 +2477,106 @@ function getStudentStatus(student) {
   return "Status update pending";
 }
 
+const READ_DAY_ORDER = ['SATURDAY','SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY'];
+const READ_DAY_LABELS = { SATURDAY:'Saturday', SUNDAY:'Sunday', MONDAY:'Monday', TUESDAY:'Tuesday', WEDNESDAY:'Wednesday', THURSDAY:'Thursday', FRIDAY:'Friday' };
+
+const getWeekDateStr = (dayIndex) => {
+  const now = new Date();
+  const saturday = new Date(now);
+  const daysBack = (6 - now.getDay() + 7) % 7;
+  saturday.setDate(now.getDate() - daysBack);
+  const d = new Date(saturday);
+  d.setDate(saturday.getDate() + dayIndex);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+function ReadJadwalView({ scheduleData, mode, editHistory }) {
+  const todayIndex = [1,2,3,4,5,6,0][new Date().getDay()];
+  return (
+    <div className="jadwal-table-wrapper">
+      <table className="jadwal-table">
+        <thead>
+          {mode === 'juz-wise' ? (
+            <>
+              <tr>
+                <th rowSpan="2">Day</th>
+                <th colSpan="4" style={{ textAlign: 'center' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                    <BookOpen size={14} /> <span>Murajah</span>
+                  </div>
+                </th>
+                <th rowSpan="2"><span>Jadeed</span></th>
+                <th rowSpan="2"><span>Juzhali</span></th>
+                <th rowSpan="2"><span>Total</span></th>
+              </tr>
+              <tr>
+                <th>1</th><th>2</th><th>3</th><th>4</th>
+              </tr>
+            </>
+          ) : (
+            <tr>
+              <th>Day</th>
+              <th><span>Murajah</span></th>
+              <th><span>Jadeed</span></th>
+              <th><span>Juzhali</span></th>
+              <th><span>Total</span></th>
+            </tr>
+          )}
+        </thead>
+        <tbody>
+          {READ_DAY_ORDER.map((day, idx) => {
+            const row = scheduleData[day] || {};
+            const isToday = idx === todayIndex;
+            return (
+              <tr key={day} className={isToday ? 'read-jadwal-today-row' : ''}>
+                <td className={`day-cell ${isToday ? 'read-jadwal-today-day' : ''}`}>
+                  <div className="day-cell-content">
+                    <span className="day-cell-name">{READ_DAY_LABELS[day]}</span>
+                    <span className="day-cell-date">{getWeekDateStr(idx)}</span>
+                  </div>
+                </td>
+                {mode === 'juz-wise' ? (
+                  <>
+                    {['juz1','juz2','juz3','juz4'].map((juz, ji) => (
+                      <td key={juz} data-label={`Juz ${ji + 1}`} className={getCellEdited(editHistory, day, juz) ? 'jadwal-cell-edited' : ''}>
+                        <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: 14 }}>{toArabicNum(row[juz] || '') || '-'}</span>
+                      </td>
+                    ))}
+                    <td data-label="Jadeed" className={getCellEdited(editHistory, day, 'jadeed') ? 'jadwal-cell-edited' : ''}>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: 14 }}>{formatJadeed(row.jadeed)}</span>
+                    </td>
+                    <td data-label="Juzhali" className={getCellEdited(editHistory, day, 'juzhali') ? 'jadwal-cell-edited' : ''}>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: 14 }}>{formatJuzhali(row.juzhali)}</span>
+                    </td>
+                    <td data-label="Total" className="star-cell">
+                      <span style={{ fontWeight: 700, color: '#d4af37', fontSize: 16 }}>{calcTotalPages(row, mode)} Pages</span>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td data-label="Murajah" className={getCellEdited(editHistory, day, 'murajah') ? 'jadwal-cell-edited' : ''}>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: 14 }}>{formatMurajah(row.murajah)}</span>
+                    </td>
+                    <td data-label="Jadeed" className={getCellEdited(editHistory, day, 'jadeed') ? 'jadwal-cell-edited' : ''}>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: 14 }}>{formatJadeed(row.jadeed)}</span>
+                    </td>
+                    <td data-label="Juzhali" className={getCellEdited(editHistory, day, 'juzhali') ? 'jadwal-cell-edited' : ''}>
+                      <span style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl', fontSize: 14 }}>{formatJuzhali(row.juzhali)}</span>
+                    </td>
+                    <td data-label="Total" className="star-cell">
+                      <span style={{ fontWeight: 700, color: '#d4af37', fontSize: 16 }}>{calcTotalPages(row, mode)} Pages</span>
+                    </td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles = []) {
   const resultsByWeek = {};
   weeklyResults.forEach(r => {
@@ -4255,6 +4357,56 @@ function ParentPortal({
   const [parentArchiveMonth, setParentArchiveMonth] = useState("");
   const [parentArchiveLoading, setParentArchiveLoading] = useState(false);
   const [showHomeSupportBot, setShowHomeSupportBot] = useState(false);
+  const [parentActionStatuses, setParentActionStatuses] = useState(() => {
+    try {
+      const saved = localStorage.getItem('parent-quick-action-statuses');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.date === getLocalDateKey()) return parsed.statuses;
+      }
+    } catch {}
+    return {};
+  });
+  useEffect(() => {
+    localStorage.setItem('parent-quick-action-statuses', JSON.stringify({ date: getLocalDateKey(), statuses: parentActionStatuses }));
+  }, [parentActionStatuses]);
+  const setActionStatusParent = (key, type, message) => {
+    setParentActionStatuses(prev => ({ ...prev, [key]: { type, message, time: new Date().toLocaleTimeString() } }));
+  };
+  const [daysTracked, setDaysTracked] = useState(0);
+  const [trackedDaysForParent, setTrackedDaysForParent] = useState([]);
+  const [selfJadwalRefreshKey, setSelfJadwalRefreshKey] = useState(0);
+  const [readJadwalData, setReadJadwalData] = useState(null);
+  const [readJadwalMode, setReadJadwalMode] = useState('juz-wise');
+  const [readJadwalEditHistory, setReadJadwalEditHistory] = useState({});
+  const [readJadwalLoading, setReadJadwalLoading] = useState(true);
+  const [readJadwalUnseen, setReadJadwalUnseen] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('parent-jadwal-tracked-days');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.date === getLocalDateKey()) {
+          setTrackedDaysForParent(parsed.days);
+          setDaysTracked(parsed.days.length);
+        }
+      }
+    } catch {}
+    if (activePage === "Jadwal") {
+      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const today = getLocalDateKey();
+      const dayName = dayNames[new Date(today + 'T00:00:00').getDay()];
+      setTrackedDaysForParent(prev => {
+        if (!prev.includes(dayName)) {
+          const next = [...prev, dayName];
+          setDaysTracked(next.length);
+          localStorage.setItem('parent-jadwal-tracked-days', JSON.stringify({ date: today, days: next }));
+          return next;
+        }
+        return prev;
+      });
+    }
+  }, [activePage]);
 
   useEffect(() => {
     supabase.from('page_visibility')
@@ -4269,13 +4421,57 @@ function ParentPortal({
       });
   }, []);
 
-  // Redirect away from hidden pages
-  useEffect(() => {
-    if (!pageVisibility || Object.keys(pageVisibility).length === 0) return;
-    if (pageVisibility[activePage] === false) {
-      setActivePage('Home');
+  // Fetch self_jadwal data for read-only view
+  const fetchReadJadwal = useCallback(async () => {
+    if (!user?.id) return;
+    setReadJadwalLoading(true);
+    const { data, error } = await supabase
+      .from('self_jadwal')
+      .select('schedule_data, has_unseen_changes')
+      .eq('user_id', user.id)
+      .single();
+    if (error && error.code !== 'PGRST116') {
+      console.error('Failed to fetch Self Jadwal:', error);
+    } else if (data && data.schedule_data) {
+      const defaultSchedule = {};
+      ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'].forEach(day => {
+        defaultSchedule[day] = { juz1: '', juz2: '', juz3: '', juz4: '', murajah: '', juzhali: '', jadeed: '', star: '' };
+      });
+      setReadJadwalData({ ...defaultSchedule, ...data.schedule_data, _mode: undefined, _editHistory: undefined });
+      setReadJadwalMode(data.schedule_data._mode || 'juz-wise');
+      setReadJadwalEditHistory(data.schedule_data._editHistory || {});
+      setReadJadwalUnseen(data.has_unseen_changes || false);
+    } else {
+      setReadJadwalData(null);
+      setReadJadwalMode('juz-wise');
+      setReadJadwalEditHistory({});
+      setReadJadwalUnseen(false);
     }
-  }, [activePage, pageVisibility]);
+    setReadJadwalLoading(false);
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchReadJadwal();
+  }, [fetchReadJadwal, selfJadwalRefreshKey]);
+
+  // Mark as viewed when opening
+  useEffect(() => {
+    if (activePage === "Jadwal" && user?.id && readJadwalUnseen) {
+      supabase.from('self_jadwal').update({ has_unseen_changes: false }).eq('user_id', user.id).then(() => setReadJadwalUnseen(false));
+    }
+  }, [activePage, user?.id]);
+
+  // Real-time subscription for instant updates
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase.channel('self-jadwal-realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'self_jadwal', filter: `user_id=eq.${user.id}` },
+        () => { setSelfJadwalRefreshKey(k => k + 1); setReadJadwalUnseen(true); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
 
   const openNotificationDetail = (event, notification) => {
     event?.preventDefault?.();
@@ -4690,6 +4886,9 @@ function ParentPortal({
               <FileArchive size={18} /> Results Archive
             </button>
           )}
+          <button className={`drawer-link ${activePage === "Takhteet Progress" ? "active" : ""}`} onClick={() => { setActivePage("Takhteet Progress"); setMenuOpen(false); }}>
+            <Layers3 size={18} /> Takhteet Progress
+          </button>
           <button className={`drawer-link ${activePage === "AI Assistance" ? "active" : ""}`} onClick={() => { setActivePage("AI Assistance"); setMenuOpen(false); }}>
             <MessageCircle size={18} /> AI Assistance
           </button>
@@ -4801,10 +5000,16 @@ function ParentPortal({
                 const attLabel = attStatus === 'present' ? 'Present' : attStatus === 'absent' ? 'Absent' : attStatus === 'holiday' ? 'Holiday' : '-';
                 const weekDate = weeklyResult?.week_date;
                 let weekLabel = "out of 100";
-                if (weekDate) {
-                  const wd = new Date(weekDate + 'T00:00:00');
-                  const weekEnd = new Date(wd.getTime() + 6 * 86400000);
-                  weekLabel = `${wd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — ${weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+                {
+                  const wd = new Date();
+                  const wdDay = wd.getDay();
+                  const daysSinceFri = (wdDay + 2) % 7;
+                  const prevFri = new Date(wd);
+                  prevFri.setDate(wd.getDate() - daysSinceFri);
+                  const weekStart = new Date(prevFri);
+                  weekStart.setDate(prevFri.getDate() - 6);
+                  const weekEnd = prevFri;
+                  weekLabel = `${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — ${weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
                 }
                 const stats = [
                   { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: weekLabel, icon: Trophy, color: "#c5a059" },
@@ -4827,47 +5032,9 @@ function ParentPortal({
               })()}
             </div>
 
-            <div className="support-bot-home-btn-wrapper">
-              <button className="support-bot-home-btn" onClick={() => setActivePage('AI Assistance')}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-                AI Technical Support
-              </button>
-            </div>
-            
             {recentMarhalaPostPreview}
-            
-            <Suspense fallback={null}>
-              <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} reportSettings={reportSettingsObject} />
-            </Suspense>
-            
-            <div className="dashboard-section">
-              <div className="section-header">
-                <Calendar size={18} />
-                <h3>Today's Schedule</h3>
-              </div>
-              <div className="schedule-list">
-                {pages.Schedule.schedule.map((item, index) => (
-                  <div key={`${item.task_name}-${index}`} className={`schedule-item ${item.is_done ? "done" : ""}`}>
-                    <div className="time-strip">
-                      <Clock size={14} />
-                      {item.task_time}
-                    </div>
-                    <div className="task-info">
-                      <p>{item.task_name}</p>
-                      {item.is_done ? (
-                        <CheckCircle2 size={16} className="status-icon" />
-                      ) : (
-                        <div className="pending-circle" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="dashboard-section">
+            <div className="dashboard-section" style={{ marginBottom: '20px' }}>
               <div className="section-header">
                 <Bell size={18} />
                 <h3>Active Notifications</h3>
@@ -4904,6 +5071,140 @@ function ParentPortal({
                 })() : (
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
                 )}
+              </div>
+            </div>
+
+            <div className="dashboard-section">
+              <div className="section-header">
+                <Calendar size={18} />
+                <h3>Today's Schedule</h3>
+              </div>
+              <div className="schedule-list">
+                {pages.Schedule.schedule.map((item, index) => (
+                  <div key={`${item.task_name}-${index}`} className={`schedule-item ${item.is_done ? "done" : ""}`}>
+                    <div className="time-strip">
+                      <Clock size={14} />
+                      {item.task_time}
+                    </div>
+                    <div className="task-info">
+                      <p>{item.task_name}</p>
+                      {item.is_done ? (
+                        <CheckCircle2 size={16} className="status-icon" />
+                      ) : (
+                        <div className="pending-circle" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="support-bot-home-btn-wrapper">
+              <button className="support-bot-home-btn" onClick={() => setActivePage('AI Assistance')}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                AI Technical Support
+              </button>
+            </div>
+
+            <div className="premium-quick-panel card-appear">
+              <div className="quick-panel-header">
+                <div className="quick-panel-header-left">
+                  <Sparkles size={22} className="sparkle-icon" />
+                  <h3>Quick Actions</h3>
+                </div>
+                <div className="quick-panel-header-right">
+                  <span className="quick-panel-badge">Premium</span>
+                  <span className="quick-panel-date">{new Date().toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                </div>
+              </div>
+              <div className="quick-panel-body">
+                <div className="quick-panel-table">
+                  <div className="quick-panel-row">
+                    <div className="quick-panel-btn-col">
+                      <button className="quick-action-btn" onClick={() => { setActionStatusParent('jadwal', 'info', 'Opening Jadwal...'); setTimeout(() => { setActivePage('Jadwal'); setMenuOpen(false); }, 50); }}>
+                        <span style={{ position: 'relative' }}>
+                          <Calendar size={20} />
+                          {readJadwalUnseen && <span style={{ position:'absolute', top:-4, right:-4, width:10, height:10, borderRadius:'50%', background:'#4ade80', boxShadow:'0 0 8px rgba(74,222,128,0.8)', animation:'pulse 2s infinite' }} />}
+                        </span>
+                        <span className="q-btn-label">Read Jadwal</span>
+                        <ArrowRight size={16} className="q-btn-arrow" />
+                      </button>
+                    </div>
+                    <div className="quick-panel-status-col">
+                      {parentActionStatuses['jadwal'] ? (
+                        <div className={`q-status ${parentActionStatuses['jadwal'].type}`}>
+                          {parentActionStatuses['jadwal'].type === 'success' ? <CheckCircle size={16} /> : parentActionStatuses['jadwal'].type === 'error' ? <XCircle size={16} /> : <AlertCircle size={16} />}
+                          <span className="q-status-msg">{parentActionStatuses['jadwal'].message}</span>
+                          <span className="q-status-time">{parentActionStatuses['jadwal'].time}</span>
+                        </div>
+                      ) : (
+                        <div className="q-status idle"><Clock size={14} /><span>Ready</span></div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="quick-panel-row">
+                    <div className="quick-panel-btn-col">
+                      <button className="quick-action-btn" onClick={() => { setActionStatusParent('leave', 'info', 'Opening Apply Leave...'); setTimeout(() => { setActivePage('Apply Leave'); setMenuOpen(false); }, 50); }}>
+                        <CalendarX size={20} />
+                        <span className="q-btn-label">Apply Leave</span>
+                        <ArrowRight size={16} className="q-btn-arrow" />
+                      </button>
+                    </div>
+                    <div className="quick-panel-status-col">
+                      {parentActionStatuses['leave'] ? (
+                        <div className={`q-status ${parentActionStatuses['leave'].type}`}>
+                          {parentActionStatuses['leave'].type === 'success' ? <CheckCircle size={16} /> : parentActionStatuses['leave'].type === 'error' ? <XCircle size={16} /> : <AlertCircle size={16} />}
+                          <span className="q-status-msg">{parentActionStatuses['leave'].message}</span>
+                          <span className="q-status-time">{parentActionStatuses['leave'].time}</span>
+                        </div>
+                      ) : (
+                        <div className="q-status idle"><Clock size={14} /><span>Ready</span></div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="quick-panel-row">
+                    <div className="quick-panel-btn-col">
+                      <button className="quick-action-btn" onClick={() => { setActionStatusParent('archive', 'info', 'Opening Archive...'); setTimeout(() => { setActivePage('Results Archive'); setMenuOpen(false); }, 50); }}>
+                        <FileArchive size={20} />
+                        <span className="q-btn-label">Result Archive</span>
+                        <ArrowRight size={16} className="q-btn-arrow" />
+                      </button>
+                    </div>
+                    <div className="quick-panel-status-col">
+                      {parentActionStatuses['archive'] ? (
+                        <div className={`q-status ${parentActionStatuses['archive'].type}`}>
+                          {parentActionStatuses['archive'].type === 'success' ? <CheckCircle size={16} /> : parentActionStatuses['archive'].type === 'error' ? <XCircle size={16} /> : <AlertCircle size={16} />}
+                          <span className="q-status-msg">{parentActionStatuses['archive'].message}</span>
+                          <span className="q-status-time">{parentActionStatuses['archive'].time}</span>
+                        </div>
+                      ) : (
+                        <div className="q-status idle"><Clock size={14} /><span>Ready</span></div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="quick-panel-row">
+                    <div className="quick-panel-btn-col">
+                      <button className="quick-action-btn" onClick={() => { setActionStatusParent('takhteet', 'info', 'Opening Takhteet Progress...'); setTimeout(() => { setActivePage('Takhteet Progress'); setMenuOpen(false); }, 50); }}>
+                        <Layers3 size={20} />
+                        <span className="q-btn-label">Takhteet Progress</span>
+                        <ArrowRight size={16} className="q-btn-arrow" />
+                      </button>
+                    </div>
+                    <div className="quick-panel-status-col">
+                      {parentActionStatuses['takhteet'] ? (
+                        <div className={`q-status ${parentActionStatuses['takhteet'].type}`}>
+                          {parentActionStatuses['takhteet'].type === 'success' ? <CheckCircle size={16} /> : parentActionStatuses['takhteet'].type === 'error' ? <XCircle size={16} /> : <AlertCircle size={16} />}
+                          <span className="q-status-msg">{parentActionStatuses['takhteet'].message}</span>
+                          <span className="q-status-time">{parentActionStatuses['takhteet'].time}</span>
+                        </div>
+                      ) : (
+                        <div className="q-status idle"><Clock size={14} /><span>Ready</span></div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -5142,18 +5443,45 @@ function ParentPortal({
           </div>
         )}
 
-{activePage === "Jadwal" ? (
-          <Suspense fallback={null}>
-            <LazyJadwalParentView 
-              studentId={studentProfile?.allIds?.[0] || studentProfile?.student_id} 
-              teacherName={studentProfile?.teacherName}
-              teacherId={studentProfile?.muhaffiz_id}
-              teacherProfiles={teacherProfiles}
-              showAction={showAction}
-              jadwalSettings={propJadwalSettings}
-              onDownloadComplete={(popup) => setDownloadPopup(popup)}
-            />
-          </Suspense>
+        {activePage === "Jadwal" ? (
+          <div className="premium-jadwal-page fade-in">
+            <div className="pj-header">
+              <div className="pj-header-left">
+                <Calendar size={24} style={{ color: 'var(--primary-gold)' }} />
+                <div>
+                  <h2>Read Jadwal</h2>
+                  <p className="pj-subtitle">Self Jadwal Schedule — {user?.email || "read-only view"}</p>
+                </div>
+              </div>
+              <div className="pj-days-track">
+                {readJadwalUnseen && (
+                  <div style={{ display:'flex', alignItems:'center', gap:'6px', color:'#4ade80', fontSize:'13px', fontWeight:600, fontFamily:'Inter,sans-serif', background:'rgba(74,222,128,0.1)', padding:'6px 14px', borderRadius:'20px', border:'1px solid rgba(74,222,128,0.3)' }}>
+                    <div style={{ width:8, height:8, borderRadius:'50%', background:'#4ade80', boxShadow:'0 0 8px #4ade80', animation:'pulse 2s infinite' }} />
+                    Updated
+                  </div>
+                )}
+                <span className="pj-days-count">{readJadwalData ? ['SATURDAY','SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY'].filter(d => { const r = readJadwalData[d]; return r && (r.juz1 || r.juz2 || r.juz3 || r.juz4 || r.murajah || r.jadeed || r.juzhali); }).length : 0}</span>
+                <span className="pj-days-label">Active Days</span>
+              </div>
+            </div>
+            <div className="pj-content">
+              {readJadwalLoading ? (
+                <div className="pj-loading" style={{ padding: '40px', textAlign: 'center', fontFamily: 'Inter, sans-serif', color: '#999' }}>Loading Self Jadwal...</div>
+              ) : !readJadwalData ? (
+                <div className="pj-loading" style={{ padding: '60px 40px', textAlign: 'center' }}>
+                  <Calendar size={48} style={{ color: '#d4af37', marginBottom: '16px', opacity: 0.6 }} />
+                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px', color: '#888', marginBottom: '8px' }}>No Self Jadwal data yet</p>
+                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#aaa' }}>Go to Self Jadwal page to create your schedule</p>
+                </div>
+              ) : (
+                <ReadJadwalView
+                  scheduleData={readJadwalData}
+                  mode={readJadwalMode}
+                  editHistory={readJadwalEditHistory}
+                />
+              )}
+            </div>
+          </div>
         ) : null}
 
         {activePage === "Self Jadwal" ? (
@@ -5720,6 +6048,21 @@ function ParentPortal({
           </div>
         ) : null}
 
+        {activePage === "Takhteet Progress" ? (
+          <div className="overview-container fade-in" style={{ paddingBottom: '80px' }}>
+            <div className="section-header" style={{ marginBottom: '24px' }}>
+              <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Layers3 size={24} style={{ color: 'var(--primary-gold)' }} />
+                Takhteet Progress
+              </h2>
+              <p className="subtitle">Visual progress tracking for your child's Hifz journey</p>
+            </div>
+            <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>}>
+              <LazyTakhteetProgress weeklyResult={weeklyResult} currentJuz={hifzDetails?.juz} reportSettings={reportSettingsObject} />
+            </Suspense>
+          </div>
+        ) : null}
+
         {activePage === "AI Assistance" && (
           <div className="ai-assistance-page fade-in" style={{ paddingBottom: '80px' }}>
             <div className="section-header" style={{ marginBottom: '16px' }}>
@@ -6120,6 +6463,52 @@ function AdminPortal({
     } catch { return []; }
   });
   const [teacherAccessDirty, setTeacherAccessDirty] = useState(false);
+  const [uploadingStudentRegistryPhoto, setUploadingStudentRegistryPhoto] = useState(false);
+  const [uploadingAssignmentPhoto, setUploadingAssignmentPhoto] = useState(false);
+  const studentPhotoInputRef = useRef(null);
+  const assignmentPhotoInputRef = useRef(null);
+
+  const handleStudentRegistryPhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingStudentRegistryPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `student-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const { error } = await supabase.storage.from("teacher_photos").upload(fileName, file);
+      if (error) throw error;
+      const { data: publicUrlData } = supabase.storage.from("teacher_photos").getPublicUrl(fileName);
+      const input = document.querySelector('form.stack-form input[name="photo_url"]');
+      if (input) input.value = publicUrlData.publicUrl;
+      onShowAction("success", "Photo uploaded!");
+    } catch (err) {
+      onShowAction("error", "Upload failed: " + err.message);
+    } finally {
+      setUploadingStudentRegistryPhoto(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleAssignmentPhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAssignmentPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `student-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const { error } = await supabase.storage.from("teacher_photos").upload(fileName, file);
+      if (error) throw error;
+      const { data: publicUrlData } = supabase.storage.from("teacher_photos").getPublicUrl(fileName);
+      const form = document.querySelector('.assignment-form-complex form');
+      if (form && form.photo_url) form.photo_url.value = publicUrlData.publicUrl;
+      onShowAction("success", "Photo uploaded!");
+    } catch (err) {
+      onShowAction("error", "Upload failed: " + err.message);
+    } finally {
+      setUploadingAssignmentPhoto(false);
+      if (e.target) e.target.value = '';
+    }
+  };
 
   useEffect(() => {
     try {
@@ -6150,6 +6539,49 @@ function AdminPortal({
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
   const [whatsAppLogs, setWhatsAppLogs] = useState([]);
+  const [showWaConfirmAfterPublish, setShowWaConfirmAfterPublish] = useState(false);
+  const [pendingWaTargetCount, setPendingWaTargetCount] = useState(0);
+  const [manualWaPhone, setManualWaPhone] = useState("");
+  const [manualWaMessage, setManualWaMessage] = useState("");
+  const [manualWaSending, setManualWaSending] = useState(false);
+  const [manualWaStudentName, setManualWaStudentName] = useState("");
+  const [manualWaStatus, setManualWaStatus] = useState(null); // { type: 'success'|'error', text: '' }
+  const [waPersistentLogs, setWaPersistentLogs] = useState([]);
+  const [showWaLogHistory, setShowWaLogHistory] = useState(false);
+
+  const addWaPersistentLog = useCallback((entry) => {
+    const logEntry = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      time: new Date().toISOString(),
+      timeDisplay: new Date().toLocaleString(),
+      ...entry,
+    };
+    setWaPersistentLogs(prev => {
+      const next = [logEntry, ...prev].slice(0, 200);
+      try { localStorage.setItem('mauze-wa-log-history', JSON.stringify(next)); } catch {}
+      return next;
+    });
+    return logEntry;
+  }, []);
+
+  const clearWaPersistentLogs = useCallback(() => {
+    setWaPersistentLogs([]);
+    try { localStorage.removeItem('mauze-wa-log-history'); } catch {}
+  }, []);
+
+  // Load persistent WhatsApp logs from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('mauze-wa-log-history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setWaPersistentLogs(parsed);
+      }
+    } catch (e) {
+      console.warn('Failed to load WhatsApp log history:', e);
+    }
+  }, []);
+
   const [teacherUnlockStatus, setTeacherUnlockStatus] = useState("");
   const [archiveChildId, setArchiveChildId] = useState("");
   const [archiveMonth, setArchiveMonth] = useState("");
@@ -6267,16 +6699,55 @@ function AdminPortal({
     });
 
     if (error) {
-      throw new Error(error.message || "Failed to send WhatsApp message");
+      // Extract the real error from the edge function's JSON response
+      let realError = "Failed to send WhatsApp message";
+      try {
+        const errorBody = await error.context?.json();
+        if (errorBody?.error) realError = errorBody.error;
+        else if (errorBody?.message) realError = errorBody.message;
+        else if (errorBody?.details) realError = errorBody.details;
+      } catch (e) {
+        realError = error.message || "Failed to send WhatsApp message";
+      }
+      throw new Error(realError);
     }
 
     if (!data?.success) {
       throw new Error(data?.error || data?.message || "Failed to send WhatsApp message");
     }
-
     return true;
   };
 
+  const handleSendWhatsApp = async () => {
+    if (!whatsappConfig || !whatsappConfig.enabled) {
+      alert("WhatsApp is not enabled. Please enable and configure it first.");
+      return;
+    }
+    const confirmSend = window.confirm(
+      `Send WhatsApp notifications about latest results to all parents with WhatsApp numbers?\nThis cannot be undone.`
+    );
+    if (!confirmSend) return;
+    triggerWhatsAppNotifications();
+  };
+
+
+  const handleManualWaSend = async () => {
+    if (!manualWaPhone) return;
+    setManualWaSending(true);
+    setManualWaStatus(null);
+    try {
+      const message = manualWaMessage.trim() || (whatsappConfig?.message_template?.replace(/\{\{child_name\}\}/g, manualWaStudentName || 'Student') || 'Salam! Your child\'s Tahfeez result update.');
+      const studentName = manualWaStudentName || manualWaPhone;
+      await sendIndividualWhatsApp(manualWaPhone, message, studentName);
+      setManualWaStatus({ type: 'success', text: 'WhatsApp sent to ' + manualWaPhone + ' successfully!' });
+      addWaPersistentLog({ time: new Date().toLocaleTimeString(), text: 'Manual send to ' + studentName + ' (' + manualWaPhone + ') successful!', type: 'success', phone: manualWaPhone, studentName: studentName });
+    } catch (err) {
+      setManualWaStatus({ type: 'error', text: 'Failed: ' + (err.message || 'Unknown error') });
+      addWaPersistentLog({ time: new Date().toLocaleTimeString(), text: 'Manual send to ' + manualWaPhone + ' failed: ' + (err.message || 'Unknown error'), type: 'error', phone: manualWaPhone, studentName: manualWaStudentName || manualWaPhone });
+    } finally {
+      setManualWaSending(false);
+    }
+  };
   const triggerWhatsAppNotifications = async (silent = false) => {
     if (!whatsappConfig) {
       if (!silent) alert("WhatsApp Configuration is not loaded yet. Please wait a second and try again.");
@@ -6297,7 +6768,10 @@ function AdminPortal({
     
     setSendingWhatsApp(true);
     setWhatsAppProgress({ current: 0, total: targetStudents.length });
-    setWhatsAppLogs([{ time: new Date().toLocaleTimeString(), text: `Starting WhatsApp notifications for ${targetStudents.length} parents...`, type: 'info' }]);
+    
+    const startLog = { time: new Date().toLocaleTimeString(), text: `Starting WhatsApp notifications for ${targetStudents.length} parents...`, type: 'info' };
+    setWhatsAppLogs([startLog]);
+    addWaPersistentLog({ ...startLog, phone: 'system', studentName: 'Batch' });
     
     let sentCount = 0;
     
@@ -6306,21 +6780,27 @@ function AdminPortal({
       const phone = student.whatsapp_number;
       const message = parseTemplate(whatsappConfig.message_template, student);
       
-      setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Sending to ${student.name} (${phone})...`, type: 'sending' }]);
+      const sendingLog = { time: new Date().toLocaleTimeString(), text: `Sending to ${student.name} (${phone})...`, type: 'sending' };
+      setWhatsAppLogs(prev => [...prev, sendingLog]);
+      addWaPersistentLog({ ...sendingLog, phone, studentName: student.name });
       
       try {
         await sendIndividualWhatsApp(phone, message, student.name);
         sentCount++;
+        const successLog = { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' };
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! âœ…`, type: 'success' }
+          successLog
         ]);
+        addWaPersistentLog({ ...successLog, phone, studentName: student.name });
       } catch (err) {
         console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
+        const errorLog = { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} ❌`, type: 'error' };
         setWhatsAppLogs(prev => [
           ...prev.slice(0, -1),
-          { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} â‌Œ`, type: 'error' }
+          errorLog
         ]);
+        addWaPersistentLog({ ...errorLog, phone, studentName: student.name, error: err.message });
       }
       
       setWhatsAppProgress(prev => ({ ...prev, current: i + 1 }));
@@ -6330,7 +6810,9 @@ function AdminPortal({
       }
     }
     
-    setWhatsAppLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `WhatsApp notifications finished! Sent: ${sentCount}/${targetStudents.length} successfully.`, type: 'info' }]);
+    const finishLog = { time: new Date().toLocaleTimeString(), text: `WhatsApp notifications finished! Sent: ${sentCount}/${targetStudents.length} successfully.`, type: 'info' };
+    setWhatsAppLogs(prev => [...prev, finishLog]);
+    addWaPersistentLog({ ...finishLog, phone: 'system', studentName: 'Batch' });
   };
 const handleDownloadAllReports = async () => {
     if (students.length === 0) {
@@ -6535,9 +7017,13 @@ const handleDownloadAllReports = async () => {
         onShowAction("success", "Reports are live. Parents and teachers have been notified.");
       }
 
-      triggerWhatsAppNotifications(true).catch((err) => {
-        console.error("WhatsApp notifications failed after reports went live:", err);
-      });
+      if (whatsappConfig?.auto_send_on_publish) {
+        const waTargetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
+        if (waTargetStudents.length > 0) {
+          setPendingWaTargetCount(waTargetStudents.length);
+          setShowWaConfirmAfterPublish(true);
+        }
+      }
     } else if (notifyLive && updates.reports_live === true && !isReportVisibleNow(nextSettings, now)) {
       const actionTime = getReportActionTime(nextSettings);
       if (actionTime) {
@@ -7080,7 +7566,13 @@ const handleDownloadAllReports = async () => {
                   </label>
                   <label>
                     <span>Photo URL</span>
-                    <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input name="photo_url" type="text" placeholder="https://..." className="premium-input" style={{ flex: 1 }} />
+                      <button type="button" onClick={() => studentPhotoInputRef.current?.click()} style={{ padding:'7px 14px', borderRadius:'10px', border:'1px solid var(--glass-border)', background:'var(--premium-white)', cursor:'pointer', fontSize:'12px', fontWeight:600, color:'var(--deep-brown)', fontFamily:'Inter, sans-serif', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:6 }}>
+                        {uploadingStudentRegistryPhoto ? '⏳' : '📷'} Upload
+                      </button>
+                    </div>
+                    <input ref={studentPhotoInputRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleStudentRegistryPhotoUpload} />
                   </label>
                   <label>
                     <span>ITS Number</span>
@@ -7244,12 +7736,15 @@ const handleDownloadAllReports = async () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {(teacherProfiles || [])
-                    .filter(t => t.email)
-                    .map(teacher => {
-                    const isOn = teacherAdminAccessList.includes(teacher.email);
+                  {(teacherProfiles || []).map(teacher => {
+                    const portalMatch = portalAccessList.find(a =>
+                      a.user_id === teacher.user_id || normalizeText(a.full_name) === normalizeText(teacher.full_name)
+                    );
+                    const teacherEmail = teacher.email || portalMatch?.email || '';
+                    const isOn = teacherAdminAccessList.includes(teacherEmail);
+                    const canToggle = !!teacherEmail;
                     return (
-                      <div key={teacher.user_id || teacher.email} style={{
+                      <div key={teacher.user_id || teacher.full_name} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         padding: '10px 14px', borderRadius: '10px',
                         background: isOn ? 'rgba(212,175,55,0.05)' : 'rgba(0,0,0,0.02)',
@@ -7275,29 +7770,35 @@ const handleDownloadAllReports = async () => {
                               {teacher.full_name || 'Unknown Teacher'}
                             </div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              {teacher.email || 'No email'}
+                              {teacherEmail || portalMatch?.portal_role ? `${portalMatch.portal_role} – no email` : 'No email'}
                             </div>
                           </div>
                         </div>
                         <button
                           onClick={() => {
+                            if (!canToggle) return;
                             const list = isOn
-                              ? teacherAdminAccessList.filter(e => e !== teacher.email)
-                              : [...teacherAdminAccessList, teacher.email];
+                              ? teacherAdminAccessList.filter(e => e !== teacherEmail)
+                              : [...teacherAdminAccessList, teacherEmail];
                             setTeacherAdminAccessList(list);
                             setTeacherAccessDirty(true);
                           }}
+                          disabled={!canToggle}
                           style={{
                             width: '48px', height: '26px', borderRadius: '13px',
-                            border: 'none', cursor: 'pointer', position: 'relative',
-                            background: isOn ? 'linear-gradient(135deg, #d4af37, #b8941f)' : 'rgba(0,0,0,0.12)',
+                            border: 'none', cursor: canToggle ? 'pointer' : 'not-allowed',
+                            position: 'relative',
+                            background: canToggle
+                              ? isOn ? 'linear-gradient(135deg, #d4af37, #b8941f)' : 'rgba(0,0,0,0.12)'
+                              : 'rgba(0,0,0,0.04)',
                             transition: 'all 0.25s ease', flexShrink: 0,
                             boxShadow: isOn ? '0 2px 8px rgba(212,175,55,0.3)' : 'none',
                           }}
                         >
                           <div style={{
                             width: '20px', height: '20px', borderRadius: '50%',
-                            background: 'white', position: 'absolute', top: '3px',
+                            background: canToggle ? 'white' : '#ddd',
+                            position: 'absolute', top: '3px',
                             left: isOn ? '25px' : '3px',
                             transition: 'left 0.25s ease',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
@@ -7306,9 +7807,9 @@ const handleDownloadAllReports = async () => {
                       </div>
                     );
                   })}
-                  {(!teacherProfiles || teacherProfiles.filter(t => t.email).length === 0) && (
+                  {(!teacherProfiles || teacherProfiles.length === 0) && (
                     <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      No teachers found with email addresses.
+                      No teachers found.
                     </div>
                   )}
                 </div>
@@ -8909,7 +9410,13 @@ const handleDownloadAllReports = async () => {
 
                       <label>
                         <span>Photo URL</span>
-                        <input name="photo_url" type="text" placeholder="https://..." className="premium-input" />
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <input name="photo_url" type="text" placeholder="https://..." className="premium-input" style={{ flex: 1 }} />
+                          <button type="button" onClick={() => assignmentPhotoInputRef.current?.click()} style={{ padding:'7px 14px', borderRadius:'10px', border:'1px solid var(--glass-border)', background:'var(--premium-white)', cursor:'pointer', fontSize:'12px', fontWeight:600, color:'var(--deep-brown)', fontFamily:'Inter, sans-serif', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:6 }}>
+                            {uploadingAssignmentPhoto ? '⏳' : '📷'} Upload
+                          </button>
+                        </div>
+                        <input ref={assignmentPhotoInputRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleAssignmentPhotoUpload} />
                       </label>
 
                       <label>
@@ -9160,7 +9667,12 @@ const handleDownloadAllReports = async () => {
                       >
                         <option value="">-- Select Teacher --</option>
                         {(portalAccessList.length > 0 || teacherProfiles.length > 0) &&
-                          portalAccessList.map(a => (
+                          portalAccessList
+                            .filter(a =>
+                              normalizeText(a.portal_role).includes('teacher') ||
+                              normalizeText(a.portal_role).includes('muhaffiz')
+                            )
+                            .map(a => (
                             <option key={a.id || a.full_name} value={a.full_name}>{a.full_name}</option>
                           ))
                         }
@@ -9864,6 +10376,87 @@ const handleDownloadAllReports = async () => {
                     Save Report Settings
                   </button>
                 </form>
+              {/* Persistent WhatsApp Log History */}
+              <div style={{ marginTop: '24px', borderTop: '2px solid var(--glass-border)', paddingTop: '18px' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setShowWaLogHistory(prev => !prev)}
+                >
+                  <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--deep-brown)', fontSize: '0.95rem' }}>
+                    <MessageCircle size={16} style={{ color: 'var(--primary-gold)' }} />
+                    WhatsApp Log History
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                      ({waPersistentLogs.length} entries)
+                    </span>
+                  </h4>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {waPersistentLogs.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); clearWaPersistentLogs(); }}
+                        style={{
+                          fontSize: '0.7rem', padding: '3px 10px', borderRadius: '999px',
+                          border: '1px solid var(--glass-border)', background: 'none',
+                          color: 'var(--text-muted)', cursor: 'pointer'
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <ChevronDown
+                      size={18}
+                      style={{
+                        color: 'var(--text-muted)',
+                        transform: showWaLogHistory ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.2s ease'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {showWaLogHistory && (
+                  <div
+                    className="log-console"
+                    style={{
+                      marginTop: '10px', maxHeight: '300px', overflowY: 'auto',
+                      background: '#f8f6f1', borderRadius: '12px', padding: '12px',
+                      fontFamily: 'monospace', fontSize: '0.75rem', lineHeight: '1.6'
+                    }}
+                  >
+                    {waPersistentLogs.length === 0 ? (
+                      <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+                        <MessageCircle size={24} style={{ opacity: 0.3, marginBottom: '8px' }} />
+                        <p style={{ margin: 0 }}>No WhatsApp logs yet. Logs appear here when you send WhatsApp notifications.</p>
+                      </div>
+                    ) : (
+                      waPersistentLogs.map((log) => (
+                        <div key={log.id} style={{
+                          display: 'flex', gap: '8px', padding: '4px 0',
+                          borderBottom: '1px solid rgba(0,0,0,0.04)',
+                          color: log.type === 'success' ? '#2e7d32' :
+                                 log.type === 'error' ? '#c62828' :
+                                 log.type === 'sending' ? '#1565c0' : 'var(--text-main)'
+                        }}>
+                          <span style={{ color: 'var(--text-muted)', flexShrink: 0, fontSize: '0.7rem' }}>
+                            [{log.timeDisplay || log.time}]
+                          </span>
+                          <span style={{ flex: 1, minWidth: 0 }}>{log.text || log.message}</span>
+                          {log.studentName && (
+                            <span style={{
+                              flexShrink: 0, fontSize: '0.7rem',
+                              background: 'rgba(0,0,0,0.06)', padding: '1px 6px', borderRadius: '4px',
+                              color: 'var(--text-muted)'
+                            }}>
+                              {log.studentName}
+                            </span>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
               </section>
 
               <section className="data-card card-appear">
@@ -10706,7 +11299,8 @@ const handleDownloadAllReports = async () => {
                     api_token: formData.get("wa_api_token"),
                     account_sid: formData.get("wa_account_sid"),
                     from_number: formData.get("wa_from_number"),
-                    message_template: formData.get("wa_message_template")
+                    message_template: formData.get("wa_message_template"),
+                    auto_send_on_publish: formData.get("wa_auto_send_on_publish") === "true"
                   };
                   onUpdateWhatsappConfig(updates);
                 }}>
@@ -10726,6 +11320,8 @@ const handleDownloadAllReports = async () => {
                         <option value="custom">Custom HTTP Gateway</option>
                         <option value="twilio">Twilio API</option>
                         <option value="meta">Meta Cloud API</option>
+                        <option value="openwa">OpenWA (Self-Hosted)</option>
+                            <option value="ultramsg">UltraMsg API (Cloud)</option>
                       </select>
                     </label>
                   </div>
@@ -10764,11 +11360,258 @@ const handleDownloadAllReports = async () => {
                     <span className="hint-text">Placeholders: <code>{"{{child_name}}"}</code>, <code>{"{{group_name}}"}</code>, <code>{"{{juz}}"}</code>, <code>{"{{surat}}"}</code></span>
                   </label>
 
+                  <label>
+                    <span>Auto-send WhatsApp when results go live</span>
+                    <select name="wa_auto_send_on_publish" defaultValue={String(whatsappConfig?.auto_send_on_publish ?? false)} className="premium-select">
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                    <span className="hint-text">When enabled, WhatsApp notifications will be automatically sent to all parents when you publish weekly results.</span>
+                  </label>
+
                   <button type="submit" className="action-button premium" style={{ marginTop: '10px' }}>
                     Save WhatsApp Settings
                   </button>
                 </form>
+
+              {/* Send WhatsApp Notifications Button */}
+              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <button
+                  type="button"
+                  className="action-button premium"
+                  onClick={handleSendWhatsApp}
+                  disabled={sendingWhatsApp || !whatsappConfig?.enabled}
+                  style={{
+                    background: !whatsappConfig?.enabled ? 'var(--text-muted)' : 'linear-gradient(135deg, #25D366, #128C7E)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <MessageCircle size={18} />
+                  {sendingWhatsApp ? `Sending... (${whatsAppProgress?.current || 0}/${whatsAppProgress?.total || 0})` : 'Send WhatsApp Notifications to Parents'}
+                </button>
+
+                {/* WhatsApp Log History */}
+                <div
+                  onClick={() => setShowWaLogHistory(!showWaLogHistory)}
+                  style={{
+                    cursor: 'pointer',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    background: 'var(--card-bg)',
+                    border: '1px solid var(--glass-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MessageCircle size={16} style={{ color: 'var(--primary-gold)' }} />
+                    <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.95rem' }}>
+                      WhatsApp Log History
+                    </span>
+                    <span style={{
+                      background: waPersistentLogs.length > 0 ? 'var(--primary-gold)' : 'var(--text-muted)',
+                      color: 'white',
+                      borderRadius: '999px',
+                      padding: '2px 10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700
+                    }}>
+                      {waPersistentLogs.length} entries
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {waPersistentLogs.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); clearWaPersistentLogs(); }}
+                        style={{
+                          background: 'none',
+                          border: '1px solid rgba(255,0,0,0.2)',
+                          borderRadius: '8px',
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          color: '#e74c3c',
+                          fontWeight: 600
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <ChevronDown
+                      size={18}
+                      style={{
+                        color: 'var(--text-muted)',
+                        transform: showWaLogHistory ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.3s ease'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {showWaLogHistory && (
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: '#fcfaf5',
+                    border: '1px solid var(--glass-border)',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    {waPersistentLogs.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        No WhatsApp logs yet. Logs appear here when you send WhatsApp notifications.
+                      </div>
+                    ) : (
+                      [...waPersistentLogs].reverse().map((log, idx) => (
+                        <div
+                          key={log.id || idx}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            fontSize: '0.82rem',
+                            lineHeight: '1.4',
+                            background: log.type === 'success' ? 'rgba(37, 211, 102, 0.12)' :
+                                       log.type === 'error' ? 'rgba(231, 76, 60, 0.10)' :
+                                       log.type === 'sending' ? 'rgba(33, 150, 243, 0.10)' :
+                                       'rgba(255, 255, 255, 0.8)',
+                            borderLeft: '3px solid ' + (
+                              log.type === 'success' ? '#25d366' :
+                              log.type === 'error' ? '#e74c3c' :
+                              log.type === 'sending' ? '#2196f3' :
+                              'var(--glass-border)'
+                            ),
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                              {log.time}
+                            </span>
+                            {log.student && (
+                              <span style={{
+                                fontSize: '0.7rem',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(212, 175, 55, 0.15)',
+                                color: 'var(--primary-gold)',
+                                fontWeight: 700
+                              }}>
+                                {log.student}
+                              </span>
+                            )}
+                            {log.phone && (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                {log.phone}
+                              </span>
+                            )}
+                          </div>
+                          <span style={{
+                            color: log.type === 'success' ? '#1b8c3d' :
+                                   log.type === 'error' ? '#c0392b' :
+                                   log.type === 'sending' ? '#1565c0' :
+                                   'var(--deep-brown)',
+                            fontWeight: log.type === 'sending' ? 400 : 500
+                          }}>
+                            {log.text}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               </section>
+
+              {/* --- Manual Send WhatsApp Section --- */}
+              <section className="data-card card-appear" style={{ marginTop: '16px' }}>
+              <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Phone size={16} color="#25D366" />
+                  <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--deep-brown)' }}>Send to a specific number</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      placeholder="Phone number (e.g. 923001234567)"
+                      value={manualWaPhone}
+                      onChange={(e) => setManualWaPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="premium-input"
+                      style={{ flex: '1', minWidth: '180px' }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Student name (optional)"
+                      value={manualWaStudentName}
+                      onChange={(e) => setManualWaStudentName(e.target.value)}
+                      className="premium-input"
+                      style={{ flex: '0 1 auto', minWidth: '120px', maxWidth: '160px' }}
+                    />
+                  </div>
+                  <textarea
+                    placeholder="Message (leave empty to use the configured template)"
+                    value={manualWaMessage}
+                    onChange={(e) => setManualWaMessage(e.target.value)}
+                    rows={3}
+                    className="premium-input"
+                    style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: '0.85rem' }}
+                  />
+
+                  {manualWaStatus && (
+                    <div style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: manualWaStatus.type === 'success' ? 'rgba(37,211,102,0.08)' : 'rgba(192,57,43,0.08)',
+                      border: '1px solid ' + (manualWaStatus.type === 'success' ? 'rgba(37,211,102,0.2)' : 'rgba(192,57,43,0.2)'),
+                      color: manualWaStatus.type === 'success' ? '#1a8a4a' : '#c0392b'
+                    }}>
+                      {manualWaStatus.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                      {manualWaStatus.text}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={manualWaSending || !manualWaPhone}
+                    onClick={handleManualWaSend}
+                    className="action-button premium"
+                    style={{
+                      alignSelf: 'flex-start',
+                      background: !manualWaPhone ? 'var(--text-muted)' : 'linear-gradient(135deg, #25D366, #128C7E)',
+                      color: 'white',
+                      border: 'none',
+                      opacity: manualWaSending ? 0.7 : 1,
+                      cursor: manualWaSending ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {manualWaSending ? (
+                      <><Loader2 size={16} style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }} /> Sending...</>
+                    ) : (
+                      <><Send size={16} style={{ marginRight: '6px' }} /> Send WhatsApp</>
+                    )}
+                  </button>
+                </div>
+              </div>
+              </section>
+
+              
 
               <section className="data-card card-appear">
                 <div className="card-headline">
@@ -10919,6 +11762,69 @@ const handleDownloadAllReports = async () => {
 
 
       </main>
+
+      {/* WhatsApp Confirmation Popup — shown when results go live and auto-send is enabled */}
+      {showWaConfirmAfterPublish && (
+        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)' }} onClick={() => setShowWaConfirmAfterPublish(false)}>
+          <div className="card-appear" style={{ maxWidth: '480px', width: '90%', padding: '28px 24px 24px', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: '20px', boxShadow: '0 24px 80px rgba(0,0,0,0.35)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+            {/* Decorative gold accent line */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, var(--primary-gold), #f6dc88, var(--primary-gold))', borderRadius: '20px 20px 0 0' }} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', marginTop: '6px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(37,211,102,0.15), rgba(18,140,126,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(37,211,102,0.25)' }}>
+                <MessageCircle size={22} color="#25D366" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--deep-brown)' }}>Send WhatsApp Notifications?</h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>Weekly results are now live</p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.92rem', lineHeight: 1.6, color: 'var(--text-color)', margin: '4px 0 18px' }}>
+              The latest Tahfeez progress reports are published and parents have been notified via push notification.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'rgba(37,211,102,0.06)', borderRadius: '12px', border: '1px solid rgba(37,211,102,0.15)', marginBottom: '22px' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #25D366, #128C7E)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Users size={18} color="white" />
+              </div>
+              <div>
+                <span style={{ fontWeight: '700', fontSize: '1.05rem', color: 'var(--deep-brown)' }}>{pendingWaTargetCount}</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: '6px' }}>parent{pendingWaTargetCount !== 1 ? 's' : ''} with WhatsApp will be notified</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="action-button"
+                style={{ background: 'transparent', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}
+                onClick={() => {
+                  setShowWaConfirmAfterPublish(false);
+                  setPendingWaTargetCount(0);
+                }}
+              >
+                Skip
+              </button>
+              <button
+                className="action-button premium"
+                style={{ background: 'linear-gradient(135deg, #25D366, #128C7E)', color: 'white', border: 'none' }}
+                disabled={sendingWhatsApp}
+                onClick={() => {
+                  setShowWaConfirmAfterPublish(false);
+                  setPendingWaTargetCount(0);
+                  triggerWhatsAppNotifications(true).catch((err) => {
+                    console.error("WhatsApp notifications failed after reports went live:", err);
+                  });
+                }}
+              >
+                <MessageCircle size={16} style={{ marginRight: '6px' }} />
+                {sendingWhatsApp ? 'Sending...' : 'Send WhatsApp'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -11034,6 +11940,91 @@ function TeacherPortal({
     }
     return days;
   }, [currentDate]);
+
+  const [trackedDays, setTrackedDays] = useState([]);
+  const [trackCount, setTrackCount] = useState(0);
+  const [trackLoading, setTrackLoading] = useState(true);
+  useEffect(() => {
+    const fetchTracking = async () => {
+      if (!user) return;
+      try {
+        setTrackLoading(true);
+        const { data, error } = await supabase
+          .from('elearning_tracking')
+          .select('tracked_date')
+          .eq('user_id', user.id);
+        if (error) throw error;
+        if (data) {
+          const dbDays = data.map(row => row.tracked_date);
+          const localDays = loadTrackedDays(user.id);
+          const mergedDays = Array.from(new Set([...dbDays, ...localDays]));
+          setTrackedDays(mergedDays);
+          setTrackCount(mergedDays.length);
+          localStorage.setItem(`mauze-hifz-tracked-days-${user.id}`, JSON.stringify(mergedDays));
+        }
+      } catch (err) {
+        console.error("Error fetching tracking data:", err);
+        const localDays = loadTrackedDays(user.id);
+        setTrackedDays(localDays);
+        setTrackCount(localDays.length);
+      } finally {
+        setTrackLoading(false);
+      }
+    };
+    fetchTracking();
+  }, [user]);
+
+  const [showChildSelect, setShowChildSelect] = useState(false);
+  const [quickActionStatuses, setQuickActionStatuses] = useState(() => {
+    try {
+      const saved = localStorage.getItem('teacher-quick-action-statuses');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.date === getLocalDateKey()) return parsed.statuses;
+      }
+    } catch {}
+    return {};
+  });
+  useEffect(() => {
+    localStorage.setItem('teacher-quick-action-statuses', JSON.stringify({
+      date: getLocalDateKey(),
+      statuses: quickActionStatuses
+    }));
+  }, [quickActionStatuses]);
+
+  const setActionStatus = (key, type, message) => {
+    setQuickActionStatuses(prev => ({
+      ...prev,
+      [key]: { type, message, time: new Date().toLocaleTimeString() }
+    }));
+  };
+
+  const handleElearningClick = () => {
+    const today = getLocalDateKey();
+    if (!trackedDays.includes(today)) {
+      const nextDays = [...trackedDays, today];
+      setTrackedDays(nextDays);
+      setTrackCount(nextDays.length);
+      localStorage.setItem(`mauze-hifz-tracked-days-${user.id}`, JSON.stringify(nextDays));
+      supabase.from('elearning_tracking').insert([{ user_id: user.id, tracked_date: today }])
+        .then(({ error }) => { if (error && error.code !== '23505') console.error("Supabase sync failed:", error); })
+        .catch(err => console.error("Backend tracking failed:", err));
+    }
+    window.open(ELEARNING_URL, '_blank', 'noopener,noreferrer');
+    setActionStatus('elearning', 'success', 'Elearning opened successfully');
+  };
+
+  const handleQuickMarkAllAttendance = async (status) => {
+    await handleMarkAllAttendance(currentDate, status);
+    const label = status === 'present' ? 'All Present' : status === 'absent' ? 'All Absent' : 'Holiday';
+    setActionStatus('attendance', 'success', `${label} marked for today`);
+  };
+
+  const handleNavigateTo = (page, actionKey, label) => {
+    setActivePage(page);
+    setMenuOpen(false);
+    setActionStatus(actionKey, 'info', `Navigated to ${label}`);
+  };
 
   const badalOverviewStudents = useMemo(() => {
     /* Also directly check child_profiles.badal_teacher_id for the new approach */
@@ -12123,158 +13114,338 @@ function TeacherPortal({
               </Suspense>
            )}
 
-           {activePage === "Home" ? (
-            <div className="portal-content fade-in">
-              <div className="portal-stats-strip teacher-stats">
-                {[
-                  { label: "Students", value: overviewStudents.length, sub: "In my group", icon: 'Users', pct: 100 },
-                  { label: "Results", value: `${Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0}%`, sub: "Submitted", icon: 'FileText', pct: Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0 },
-                  { label: "Avg Score", value: overviewStudents.length > 0 ? Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: overviewStudents.length > 0 ? Math.min(Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length), 100) : 0 },
-                  { label: "Parent Views", value: `${parentViewedCount}/${overviewStudents.length || 0}`, sub: "Viewed reports", icon: 'Eye', pct: overviewStudents.length ? Math.round((parentViewedCount / overviewStudents.length) * 100) : 0 },
-                  ...(monthlySalary?.showCard ? [{
-                    label: "Minutes", value: `${monthlySalary.totalMinutes || "0"}`, sub: "This month", icon: 'Clock', pct: Math.min(monthlySalary.totalMinutes / 100, 100)
-                  }] : []),
-                ].map((stat, i) => {
-                  const accentColors = [
-                    { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
-                    { icon: 'var(--deep-brown)', bar: '#3d2b1f', glow: 'rgba(61, 43, 31, 0.12)' },
-                    { icon: '#b8860b', bar: '#b8860b', glow: 'rgba(184, 134, 11, 0.18)' },
-                    { icon: '#8b6d31', bar: '#8b6d31', glow: 'rgba(139, 109, 49, 0.12)' },
-                    { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
-                  ];
-                  const c = accentColors[i % accentColors.length];
-                  const isPct = stat.label === "Results";
-                  const isFrac = stat.label === "Parent Views";
-                  const [numStr, denStr] = isFrac ? String(stat.value).split('/') : [];
-                  return (
-                    <div key={stat.label} className="infographic-card">
-                      <div className="ig-bg-pattern">
-                        {['✦', '◈', '◆', '⬢', '◇'][i % 5]}
-                      </div>
-                      <div className="ig-top-row">
-                        <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
-                          {stat.label === "Students" ? (
-                            <PremiumStudentsIcon size={48} />
-                          ) : stat.icon === 'Users' && <Users size={18} />}
-                          {stat.icon === 'FileText' && <FileText size={18} />}
-                          {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
-                          {stat.icon === 'Eye' && <Eye size={18} />}
-                          {stat.icon === 'DollarSign' && <DollarSign size={18} />}
-                          {stat.icon === 'Clock' && <Clock size={18} />}
+            {activePage === "Home" ? (
+             <div className="portal-content fade-in">
+               <div className="portal-stats-strip teacher-stats">
+                 {[
+                   { label: "Students", value: overviewStudents.length, sub: "In my group", icon: 'Users', pct: 100 },
+                   { label: "Results", value: `${Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0}%`, sub: "Submitted", icon: 'FileText', pct: Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0 },
+                   { label: "Avg Score", value: overviewStudents.length > 0 ? Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: overviewStudents.length > 0 ? Math.min(Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length), 100) : 0 },
+                   { label: "Parent Views", value: `${parentViewedCount}/${overviewStudents.length || 0}`, sub: "Viewed reports", icon: 'Eye', pct: overviewStudents.length ? Math.round((parentViewedCount / overviewStudents.length) * 100) : 0 },
+                   ...(monthlySalary?.showCard ? [{
+                     label: "Minutes", value: `${monthlySalary.totalMinutes || "0"}`, sub: "This month", icon: 'Clock', pct: Math.min(monthlySalary.totalMinutes / 100, 100)
+                   }] : []),
+                 ].map((stat, i) => {
+                   const accentColors = [
+                     { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
+                     { icon: 'var(--deep-brown)', bar: '#3d2b1f', glow: 'rgba(61, 43, 31, 0.12)' },
+                     { icon: '#b8860b', bar: '#b8860b', glow: 'rgba(184, 134, 11, 0.18)' },
+                     { icon: '#8b6d31', bar: '#8b6d31', glow: 'rgba(197, 160, 89, 0.12)' },
+                     { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
+                   ];
+                   const c = accentColors[i % accentColors.length];
+                   const isPct = stat.label === "Results";
+                   const isFrac = stat.label === "Parent Views";
+                   const [numStr, denStr] = isFrac ? String(stat.value).split('/') : [];
+                   return (
+                     <div key={stat.label} className="infographic-card">
+                       <div className="ig-bg-pattern">
+                         {['✦', '◈', '◆', '⬢', '◇'][i % 5]}
+                       </div>
+                       <div className="ig-top-row">
+                         <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
+                           {stat.label === "Students" ? (
+                             <PremiumStudentsIcon size={48} />
+                           ) : stat.icon === 'Users' && <Users size={18} />}
+                           {stat.icon === 'FileText' && <FileText size={18} />}
+                           {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
+                           {stat.icon === 'Eye' && <Eye size={18} />}
+                           {stat.icon === 'DollarSign' && <DollarSign size={18} />}
+                           {stat.icon === 'Clock' && <Clock size={18} />}
+                         </div>
+                         {(isPct || isFrac) && (
+                           <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
+                             {stat.pct >= 50 ? '↑' : '↓'} {stat.pct}%
+                           </span>
+                         )}
+                       </div>
+                       <div className="ig-value">
+                         {isFrac ? (
+                           <>
+                             <span className="ig-count-anim">{numStr}</span>
+                             <span style={{ fontSize: '1rem', opacity: 0.4, margin: '0 2px', color: 'var(--soft-brown)' }}>/</span>
+                             <span style={{ fontSize: '1.2rem', opacity: 0.5, color: 'var(--soft-brown)' }}>{denStr}</span>
+                           </>
+                         ) : (
+                           <span className="ig-count-anim">{stat.value}</span>
+                         )}
+                       </div>
+                       <span className="ig-label">{stat.label}</span>
+                       <span className="ig-sub">{stat.sub}</span>
+                       <div className="ig-bar-track" style={{ background: `rgba(197, 160, 89, 0.12)` }}>
+                         <div className="ig-bar-fill" style={{ width: `${stat.pct}%`, background: `linear-gradient(90deg, ${c.bar}, ${c.bar}dd)`, boxShadow: `0 0 6px ${c.glow}` }} />
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+
+               <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
+                 <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                   <Bell size={18} style={{ color: 'var(--primary-gold)' }} />
+                   <h3 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--deep-brown)' }}>Active Notifications</h3>
+                 </div>
+                 <div className="announcement-list">
+                   {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
+                     const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
+                     return (
+                       <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', marginBottom: '12px', position: 'relative' }} onClick={(e) => openNotificationDetail(e, news)}>
+                         <button 
+                           className="card-dismiss-btn" 
+                           title="Clear from home" 
+                           onClick={(e) => { 
+                             e.stopPropagation(); 
+                             onDismissHomeNotif(news.id); 
+                           }}
+                         >
+                           <X size={14} />
+                         </button>
+                         <div style={{ paddingRight: '48px' }}>
+                           <div className="news-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
+                             <span className="tag update" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--primary-gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                               Alert
+                             </span>
+                             <span className="date" style={{ color: 'var(--text-muted)' }}>{new Date(news.created_at).toLocaleDateString()}</span>
+                           </div>
+                           <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: 'var(--deep-brown)' }}>{news.title}</h4>
+                           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                             {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
+                           </p>
+                         </div>
+                       </div>
+                     );
+                   })() : (
+                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
+                   )}
+                 </div>
+               </div>
+
+               <div className="premium-quick-panel card-appear">
+                 <div className="quick-panel-header">
+                   <div className="quick-panel-header-left">
+                     <Sparkles size={22} className="sparkle-icon" />
+                     <h3>Quick Actions Panel</h3>
+                   </div>
+                   <div className="quick-panel-header-right">
+                     <span className="quick-panel-badge">Premium</span>
+                     <span className="quick-panel-date">{new Date().toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                   </div>
+                 </div>
+                 <div className="quick-panel-body">
+                   <div className="quick-panel-table">
+                     <div className="quick-panel-row">
+                       <div className="quick-panel-btn-col">
+                         <button className="quick-action-btn elearning-btn" onClick={handleElearningClick}>
+                           <BookOpen size={20} />
+                           <span className="q-btn-label">Elearning</span>
+                           <div className="q-btn-track">
+                             <span className="q-track-count">{trackLoading ? "..." : trackCount}</span>
+                             <span className="q-track-label">days</span>
+                           </div>
+                           <ArrowRight size={16} className="q-btn-arrow" />
+                         </button>
+                       </div>
+                       <div className="quick-panel-status-col">
+                         {quickActionStatuses['elearning'] ? (
+                           <div className={`q-status ${quickActionStatuses['elearning'].type}`}>
+                             {quickActionStatuses['elearning'].type === 'success' ? <CheckCircle size={16} /> : quickActionStatuses['elearning'].type === 'error' ? <XCircle size={16} /> : <AlertCircle size={16} />}
+                             <span className="q-status-msg">{quickActionStatuses['elearning'].message}</span>
+                             <span className="q-status-time">{quickActionStatuses['elearning'].time}</span>
+                           </div>
+                         ) : (
+                           <div className="q-status idle">
+                             <Clock size={14} />
+                             <span>Ready</span>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+
+                     <div className="quick-panel-row">
+                       <div className="quick-panel-btn-col">
+                         <div className="triple-btn-group">
+                           <button className="quick-action-btn sm present-btn" onClick={() => handleQuickMarkAllAttendance('present')} disabled={attendanceLoading}>
+                             <UserCheck size={16} />
+                             <span>Present</span>
+                           </button>
+                           <button className="quick-action-btn sm absent-btn" onClick={() => handleQuickMarkAllAttendance('absent')} disabled={attendanceLoading}>
+                             <UserX size={16} />
+                             <span>Absent</span>
+                           </button>
+                            <button className="quick-action-btn sm child-select-btn" onClick={(e) => { e.stopPropagation(); setShowChildSelect(true); }}>
+                             <Users size={16} />
+                             <span>Select</span>
+                           </button>
+                         </div>
+                       </div>
+                       <div className="quick-panel-status-col">
+                         {quickActionStatuses['attendance'] ? (
+                           <div className={`q-status ${quickActionStatuses['attendance'].type}`}>
+                             {quickActionStatuses['attendance'].type === 'success' ? <CheckCircle size={16} /> : quickActionStatuses['attendance'].type === 'error' ? <XCircle size={16} /> : <AlertCircle size={16} />}
+                             <span className="q-status-msg">{quickActionStatuses['attendance'].message}</span>
+                             <span className="q-status-time">{quickActionStatuses['attendance'].time}</span>
+                           </div>
+                         ) : (
+                           <div className="q-status idle">
+                             <Clock size={14} />
+                             <span>Ready</span>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+
+                     <div className="quick-panel-row">
+                       <div className="quick-panel-btn-col">
+                         <button className="quick-action-btn" onClick={() => handleNavigateTo("Self Jadwal", 'selfJadwal', 'Self Jadwal')}>
+                           <Crown size={20} />
+                           <span className="q-btn-label">Self Jadwal</span>
+                           <ArrowRight size={16} className="q-btn-arrow" />
+                         </button>
+                       </div>
+                       <div className="quick-panel-status-col">
+                         {quickActionStatuses['selfJadwal'] ? (
+                           <div className={`q-status ${quickActionStatuses['selfJadwal'].type}`}>
+                             {quickActionStatuses['selfJadwal'].type === 'success' ? <CheckCircle size={16} /> : quickActionStatuses['selfJadwal'].type === 'error' ? <XCircle size={16} /> : <AlertCircle size={16} />}
+                             <span className="q-status-msg">{quickActionStatuses['selfJadwal'].message}</span>
+                             <span className="q-status-time">{quickActionStatuses['selfJadwal'].time}</span>
+                           </div>
+                         ) : (
+                           <div className="q-status idle">
+                             <Clock size={14} />
+                             <span>Ready</span>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+
+                     <div className="quick-panel-row">
+                       <div className="quick-panel-btn-col">
+                         <button className="quick-action-btn" onClick={() => handleNavigateTo("Fill Result", 'markProgress', 'Mark Progress')}>
+                           <Sparkles size={20} />
+                           <span className="q-btn-label">Mark Progress</span>
+                           <ArrowRight size={16} className="q-btn-arrow" />
+                         </button>
+                       </div>
+                       <div className="quick-panel-status-col">
+                         {quickActionStatuses['markProgress'] ? (
+                           <div className={`q-status ${quickActionStatuses['markProgress'].type}`}>
+                             {quickActionStatuses['markProgress'].type === 'success' ? <CheckCircle size={16} /> : quickActionStatuses['markProgress'].type === 'error' ? <XCircle size={16} /> : <AlertCircle size={16} />}
+                             <span className="q-status-msg">{quickActionStatuses['markProgress'].message}</span>
+                             <span className="q-status-time">{quickActionStatuses['markProgress'].time}</span>
+                           </div>
+                         ) : (
+                           <div className="q-status idle">
+                             <Clock size={14} />
+                             <span>Ready</span>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+                {showChildSelect && typeof document !== 'undefined' && createPortal(
+                  <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={(e) => { if (e.target === e.currentTarget) setShowChildSelect(false); }}>
+                    <div className="child-select-modal" style={{ background: '#fff', borderRadius: '24px', width: '100%', maxWidth: '480px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 64px rgba(0,0,0,0.2)', border: '1px solid var(--glass-border, #e8e0d0)', overflow: 'hidden', animation: 'none' }}>
+                      <div className="child-select-header">
+                        <div className="cs-header-left">
+                          <Users size={20} style={{ color: 'var(--primary-gold)' }} />
+                          <h3>Quick Attendance</h3>
                         </div>
-                        {(isPct || isFrac) && (
-                          <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
-                            {stat.pct >= 50 ? '↑' : '↓'} {stat.pct}%
-                          </span>
-                        )}
+                        <button className="cs-close-btn" onClick={() => setShowChildSelect(false)}>
+                          <X size={18} />
+                        </button>
                       </div>
-                      <div className="ig-value">
-                        {isFrac ? (
-                          <>
-                            <span className="ig-count-anim">{numStr}</span>
-                            <span style={{ fontSize: '1rem', opacity: 0.4, margin: '0 2px', color: 'var(--soft-brown)' }}>/</span>
-                            <span style={{ fontSize: '1.2rem', opacity: 0.5, color: 'var(--soft-brown)' }}>{denStr}</span>
-                          </>
+                      <div className="child-select-date">
+                        <CalendarCheck size={14} />
+                        <span>{new Date(currentDate + 'T00:00:00').toLocaleDateString("en-US", { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                      <div className="child-select-list">
+                        {overviewStudents.length === 0 ? (
+                          <p className="cs-empty">No students in your group</p>
                         ) : (
-                          <span className="ig-count-anim">{stat.value}</span>
+                          overviewStudents.map(student => {
+                            const sid = String(student.student_id).trim().toLowerCase();
+                            const todayStatus = studentAttendance[sid]?.[currentDate];
+                            return (
+                              <div key={student.student_id} className="child-select-item">
+                                <div className="cs-item-left">
+                                  <div className="cs-avatar">{student.name?.charAt(0)?.toUpperCase() || "?"}</div>
+                                  <span className="cs-name">{student.name}</span>
+                                </div>
+                                <div className="cs-dots">
+                                  <button
+                                    className={`cs-dot cs-dot-green ${todayStatus === 'present' ? 'active' : ''}`}
+                                    onClick={() => { handleMarkAttendance(student.student_id, currentDate, 'present'); if (onShowAction) onShowAction("success", `${student.name} marked present`); }}
+                                    title="Mark Present"
+                                  >
+                                    <CheckCircle size={16} />
+                                  </button>
+                                  <button
+                                    className={`cs-dot cs-dot-red ${todayStatus === 'absent' ? 'active' : ''}`}
+                                    onClick={() => { handleMarkAttendance(student.student_id, currentDate, 'absent'); if (onShowAction) onShowAction("success", `${student.name} marked absent`); }}
+                                    title="Mark Absent"
+                                  >
+                                    <XCircle size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
                         )}
-                      </div>
-                      <span className="ig-label">{stat.label}</span>
-                      <span className="ig-sub">{stat.sub}</span>
-                      <div className="ig-bar-track" style={{ background: `rgba(197, 160, 89, 0.12)` }}>
-                        <div className="ig-bar-fill" style={{ width: `${stat.pct}%`, background: `linear-gradient(90deg, ${c.bar}, ${c.bar}dd)`, boxShadow: `0 0 6px ${c.glow}` }} />
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-              {monthlySalary?.showCard && (
-                <section className="data-card salary-callout premium-attendance-card">
-                  <div className="card-headline">
-                    <Sparkles size={18} />
-                    <h3>Monthly Attendance</h3>
-                  </div>
-                  <div className="attendance-cumulative-strip">
-                    {(() => {
-                      const sorted = (teacherData.attendances || [])
-                        .filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity))
-                        .filter(a => {
-                          const d = new Date(a.attendance_date);
-                          const now = new Date();
-                          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                        })
-                        .sort((a, b) => new Date(a.attendance_date) - new Date(b.attendance_date))
-                        .slice(-7);
-                      let running = 0;
-                      return sorted.map((a, i) => {
-                        const mins = toNumber(a.minutes_present);
-                        running += mins;
-                        const date = new Date(a.attendance_date);
-                        const dayLabel = date.toLocaleDateString("en-US", { weekday: "short" });
-                        const dateLabel = date.getDate();
-                        return (
-                          <div key={a.id || i} className={`cumulative-day ${a.status?.toLowerCase() === "present" ? "day-present" : "day-absent"}`}>
-                            <span className="day-name">{dayLabel}</span>
-                            <span className="day-date">{dateLabel}</span>
-                            <span className="day-mins">{mins} min</span>
-                            <span className="day-running">{running} total</span>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                  <div className="attendance-total-row">
-                    <span className="total-label">Total Minutes This Month</span>
-                    <span className="total-value">{monthlySalary.totalMinutes}</span>
-                  </div>
-                  <p className="hint-text">Based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
-                </section>
-              )}
+                  </div>,
+                  document.body
+                )}
 
-              {recentMarhalaPostPreview}
-              <PremiumHifzCard user={user} />
+               {monthlySalary?.showCard && (
+                 <section className="data-card salary-callout premium-attendance-card">
+                   <div className="card-headline">
+                     <Sparkles size={18} />
+                     <h3>Monthly Attendance</h3>
+                   </div>
+                   <div className="attendance-cumulative-strip">
+                     {(() => {
+                       const sorted = (teacherData.attendances || [])
+                         .filter(a => normalizeText(a.teacher_name) === normalizeText(teacherIdentity))
+                         .filter(a => {
+                           const d = new Date(a.attendance_date);
+                           const now = new Date();
+                           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                         })
+                         .sort((a, b) => new Date(a.attendance_date) - new Date(b.attendance_date))
+                         .slice(-7);
+                       let running = 0;
+                       return sorted.map((a, i) => {
+                         const mins = toNumber(a.minutes_present);
+                         running += mins;
+                         const date = new Date(a.attendance_date);
+                         const dayLabel = date.toLocaleDateString("en-US", { weekday: "short" });
+                         const dateLabel = date.getDate();
+                         return (
+                           <div key={a.id || i} className={`cumulative-day ${a.status?.toLowerCase() === "present" ? "day-present" : "day-absent"}`}>
+                             <span className="day-name">{dayLabel}</span>
+                             <span className="day-date">{dateLabel}</span>
+                             <span className="day-mins">{mins} min</span>
+                             <span className="day-running">{running} total</span>
+                           </div>
+                         );
+                       });
+                     })()}
+                   </div>
+                   <div className="attendance-total-row">
+                     <span className="total-label">Total Minutes This Month</span>
+                     <span className="total-value">{monthlySalary.totalMinutes}</span>
+                   </div>
+                   <p className="hint-text">Based on {monthlySalary.daysPresent} days of attendance verified by admin.</p>
+                 </section>
+               )}
 
-              <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
-                <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <Bell size={18} style={{ color: 'var(--primary-gold)' }} />
-                  <h3 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--deep-brown)' }}>Active Notifications</h3>
-                </div>
-                <div className="announcement-list">
-                  {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
-                    const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
-                    return (
-                      <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', marginBottom: '12px', position: 'relative' }} onClick={(e) => openNotificationDetail(e, news)}>
-                        <button 
-                          className="card-dismiss-btn" 
-                          title="Clear from home" 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            onDismissHomeNotif(news.id); 
-                          }}
-                        >
-                          <X size={14} />
-                        </button>
-                        <div style={{ paddingRight: '48px' }}>
-                          <div className="news-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
-                            <span className="tag update" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--primary-gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
-                              Alert
-                            </span>
-                            <span className="date" style={{ color: 'var(--text-muted)' }}>{new Date(news.created_at).toLocaleDateString()}</span>
-                          </div>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: 'var(--deep-brown)' }}>{news.title}</h4>
-                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                            {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })() : (
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : null}
+               {recentMarhalaPostPreview}
+             </div>
+           ) : null}
 
            {activePage === "My Group" ? (
             <div className="portal-content fade-in">

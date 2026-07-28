@@ -94,3 +94,8 @@ public/*.jpg
 # Temp fix scripts
 *.mjs
 *.tar.gz
+# Temporary files
+ngrok.zip
+openwa-qr.html
+openwa-qr.png
+ngrok_temp/

@@ -1448,6 +1448,9 @@
     font-size: 11px !important;
   }
 
+  .day-cell-date {
+    font-size: 9px !important;
+  }
   .jadwal-calendar-container {
     padding: 8px;
   }

@@ -19,6 +19,7 @@ interface WhatsAppConfig {
   account_sid?: string | null
   from_number?: string | null
   message_template?: string | null
+  openwa_session_id?: string | null
 }
 
 const normalizePhone = (phone: string) => (phone || "").replace(/\D/g, "")
@@ -238,6 +239,74 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: true,
           provider: "ultramsg",
+          phone,
+          result,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      )
+    }
+
+    if (whatsappConfig.provider === "openwa") {
+      const openwaSessionId = whatsappConfig.openwa_session_id
+      const openwaBaseUrl = Deno.env.get("OPENWA_BASE_URL")
+      const openwaApiKey = Deno.env.get("OPENWA_API_KEY")
+
+      if (!openwaSessionId) {
+        throw new Error("OpenWA config incomplete: session ID is missing. Set it in the admin WhatsApp settings.")
+      }
+
+      if (!openwaBaseUrl) {
+        throw new Error("OpenWA config incomplete: OPENWA_BASE_URL environment variable is not set")
+      }
+
+      const chatId = `${phone}@c.us`
+      const url = `${openwaBaseUrl.replace(/\/+$/, "")}/api/sessions/${openwaSessionId}/messages/send-text`
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      }
+      if (openwaApiKey) {
+        headers["X-API-Key"] = openwaApiKey
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          chatId,
+          text: message,
+        }),
+      })
+
+      const responseText = await textResponse(response)
+
+      if (!response.ok) {
+        // OpenWA's whatsapp-web.js adapter sometimes throws a 500 with
+        // "engine returned no message" even though the message IS sent.
+        // Only suppress this specific known false-positive.
+        const isDeliveryFalsePositive =
+          responseText.toLowerCase().includes("engine returned no message")
+
+        if (!isDeliveryFalsePositive) {
+          throw new Error(`OpenWA API Error (${response.status}): ${responseText.slice(0, 400)}`)
+        }
+
+        console.warn(
+          "OpenWA returned 500 but message was likely delivered (known false-positive)",
+        )
+      }
+
+      let result: Record<string, unknown> = {}
+      try {
+        result = JSON.parse(responseText)
+      } catch {
+        // response might not be valid JSON on error
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          provider: "openwa",
           phone,
           result,
         }),

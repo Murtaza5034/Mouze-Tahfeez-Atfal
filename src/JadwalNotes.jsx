@@ -112,6 +112,37 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
           } catch (err) {
             console.error("FCM parent note notification trigger failed:", err);
           }
+
+          // Also send WhatsApp to teacher
+          try {
+            const { data: waConfig } = await supabase
+              .from("whatsapp_config")
+              .select("*")
+              .eq("id", 1)
+              .single();
+
+            if (waConfig && waConfig.enabled && waConfig.provider !== 'none') {
+              const { data: teacherData } = await supabase
+                .from("teacher_profiles")
+                .select("whatsapp_number")
+                .eq("user_id", teacherTarget)
+                .maybeSingle();
+
+              if (teacherData?.whatsapp_number) {
+                let phone = String(teacherData.whatsapp_number).replace(/\D/g, '');
+                if (phone.length === 11 && phone.startsWith("0")) {
+                  phone = "92" + phone.substring(1);
+                }
+                if (phone.length >= 10) {
+                  await supabase.functions.invoke("whatsapp-notification", {
+                    body: { phone, message: `${notifTitle}\n\n${notifBody}` }
+                  });
+                }
+              }
+            }
+          } catch (waErr) {
+            console.error("WhatsApp parent note notification failed:", waErr);
+          }
         }
       }
     }

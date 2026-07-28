@@ -7,7 +7,7 @@ import './jadwal.css';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
-const getFatemiDateStr = (dateStr) => {
+export const getFatemiDateStr = (dateStr) => {
   if (!dateStr) return '';
   try {
     const date = new Date(dateStr);
@@ -81,7 +81,7 @@ DAYS.forEach(day => {
 
 const NO_VALUE = 'NO';
 
-const getCellEdited = (editHistory, day, field) => {
+export const getCellEdited = (editHistory, day, field) => {
   if (!editHistory) return false;
   const ts = editHistory[`${day}_${field}`];
   return ts && (Date.now() - new Date(ts).getTime() < 30000);
@@ -254,7 +254,7 @@ const getJuzFromPage = (page) => {
   return 1;
 };
 
-const toArabicNum = (n) => {
+export const toArabicNum = (n) => {
   const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
   return String(n).replace(/\d/g, d => arabicDigits[d]);
 };
@@ -267,7 +267,7 @@ const findSurahByName = (name) => {
   );
 };
 
-const calcTotalPages = (row, mode) => {
+export const calcTotalPages = (row, mode) => {
   if (!row) return 0;
   let murajahPages = 0;
   if (mode === 'juz-wise') {
@@ -366,7 +366,7 @@ const calcTotalPages = (row, mode) => {
   return murajahPages + juzhaliPages;
 };
 
-const formatMurajah = (val) => {
+export const formatMurajah = (val) => {
   if (!val) return '-';
   if (val === NO_VALUE) return 'NO';
   const parts = val.split(' til ');
@@ -381,7 +381,7 @@ const formatMurajah = (val) => {
   return single ? single.nameAr : val;
 };
 
-const formatJadeed = (val) => {
+export const formatJadeed = (val) => {
   if (!val) return '-';
   if (val === NO_VALUE) return 'NO';
   const parts = val.split(':');
@@ -393,7 +393,7 @@ const formatJadeed = (val) => {
   return val;
 };
 
-const formatJuzhali = (val) => {
+export const formatJuzhali = (val) => {
   if (!val) return '-';
   if (val === NO_VALUE) return 'NO';
   if (val.includes(' til ')) {
@@ -689,7 +689,7 @@ const SurahRangePicker = ({ value, onChange }) => {
   );
 };
 
-const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, editHistory, dayDates, customDays, onMiqaatClick }) => {
+export const SelfJadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, editHistory, dayDates, customDays, onMiqaatClick }) => {
   const daysToRender = React.useMemo(() => customDays || DAYS.map((day, idx) => ({ dayName: day, fatemiDate: dayDates?.[idx] || '' })), [dayDates, customDays]);
 
   const defaultJadeedSurah = React.useMemo(() => {
@@ -1062,6 +1062,44 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
             }
           });
         } catch (_) {}
+
+        // Also send WhatsApp to the target user if available
+        try {
+          const { data: waConfig } = await supabase
+            .from("whatsapp_config")
+            .select("*")
+            .eq("id", 1)
+            .single();
+
+          if (waConfig && waConfig.enabled && waConfig.provider !== 'none' && userId) {
+            const { data: userTeacher } = await supabase
+              .from("teacher_profiles")
+              .select("whatsapp_number")
+              .or(`user_id.eq.${userId},id.eq.${userId}`)
+              .maybeSingle();
+
+            const { data: userParent } = await supabase
+              .from("child_profiles")
+              .select("whatsapp_number")
+              .or(`parent_user_id.eq.${userId},id.eq.${userId}`)
+              .maybeSingle();
+
+            const rawPhone = userTeacher?.whatsapp_number || userParent?.whatsapp_number;
+            if (rawPhone) {
+              let phone = String(rawPhone).replace(/\D/g, '');
+              if (phone.length === 11 && phone.startsWith("0")) {
+                phone = "92" + phone.substring(1);
+              }
+              if (phone.length >= 10) {
+                await supabase.functions.invoke("whatsapp-notification", {
+                  body: { phone, message: `Self Jadwal Updated ✏️\n\n${userName} has updated their Self Jadwal schedule.` }
+                });
+              }
+            }
+          }
+        } catch (waErr) {
+          console.error("WhatsApp Self Jadwal notification failed:", waErr);
+        }
       }
     }, 1500);
 
