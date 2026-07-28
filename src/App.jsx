@@ -1142,6 +1142,83 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     console.error('FCM notification error:', err);
   }
 
+  // Auto-send WhatsApp alongside FCM when targeting parents or all users
+  const waTargetRoles = ["all", "parents", null, undefined];
+  const shouldSendWhatsApp = !targetUser && waTargetRoles.includes(targetRole);
+  
+  if (shouldSendWhatsApp) {
+    supabase
+      .from("whatsapp_config")
+      .select("*")
+      .eq("id", 1)
+      .single()
+      .then(({ data: waConfig }) => {
+        if (!waConfig?.enabled || !waConfig?.provider || waConfig.provider === "none" || waConfig.provider === "mock") {
+          return;
+        }
+        
+        supabase
+          .from("child_profiles")
+          .select("student_id, name, full_name, whatsapp_number")
+          .then(({ data: students }) => {
+            const waTargets = (students || []).filter(
+              (s) => s.whatsapp_number && s.whatsapp_number.trim() !== ""
+            );
+            
+            if (waTargets.length === 0) return;
+            
+            console.log(
+              `Auto WhatsApp: Sending \"${title}\" to ${waTargets.length} parents sequentially...`
+            );
+            
+            // Send sequentially with delay to avoid rate limits
+            const sendNext = async (index) => {
+              if (index >= waTargets.length) return;
+              
+              const student = waTargets[index];
+              let phone = (student.whatsapp_number || "")
+                .split("")
+                .filter((c) => "0123456789".includes(c))
+                .join("");
+              
+              // Convert local Pakistani numbers (03xx...) to international (923xx...)
+              if (phone.length === 11 && phone.startsWith("0")) {
+                phone = "92" + phone.substring(1);
+              }
+              
+              if (phone) {
+                const message = `📢 ${title}\n\n${body}`;
+                const studentName = student.name || student.full_name || "Student";
+                
+                try {
+                  const result = await supabase.functions.invoke("whatsapp-notification", {
+                    body: { phone, message, studentName },
+                  });
+                  if (result.error) {
+                    console.error(`WhatsApp auto-send failed for ${studentName}:`, result.error);
+                  } else {
+                    console.log(`WhatsApp auto-send OK for ${studentName} (${phone})`);
+                  }
+                } catch (err) {
+                  console.error(`WhatsApp auto-send error for ${studentName}:`, err);
+                }
+              }
+              
+              // Wait 800ms before next send
+              await new Promise(r => setTimeout(r, 800));
+              return sendNext(index + 1);
+            };
+            
+            // Fire off the chain (don't await - fire and forget)
+            sendNext(0).catch(err => 
+              console.error("WhatsApp auto-send chain error:", err)
+            );
+          })
+          .catch((err) => console.error("WhatsApp auto-send: failed to fetch students", err));
+      })
+      .catch((err) => console.error("WhatsApp auto-send: failed to fetch config", err));
+  }
+
   return { inboxError, fcmError, fcmData };
 };
 
