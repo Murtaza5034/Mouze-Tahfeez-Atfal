@@ -1020,7 +1020,7 @@ const NAV_ICONS = {
   "Messages": MessageCircle,
   "Email Settings": Mail,
   "Marhala Posts": Heart,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Event Leave": CalendarX,
 };
 
 const emptyParentData = {
@@ -1091,7 +1091,21 @@ function writeLocalArray(key, value) {
 
 
 
-const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Inbox", skipInbox = false, fileUrl = null) => {
+const normalizePhoneNumber = (phone) => {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/\D/g, '');
+  if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    cleaned = '92' + cleaned.substring(1);
+  } else if (cleaned.length === 13 && cleaned.startsWith('0092')) {
+    cleaned = '92' + cleaned.substring(4);
+  } else if (cleaned.length === 12 && cleaned.startsWith('92')) {
+  } else if (cleaned.length === 10) {
+    cleaned = '92' + cleaned;
+  }
+  return cleaned;
+};
+
+const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Inbox", skipInbox = false, fileUrl = null, skipWhatsApp = false) => {
   const dbPayload = {
     title,
     body,
@@ -1142,81 +1156,89 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
     console.error('FCM notification error:', err);
   }
 
-  // Auto-send WhatsApp alongside FCM when targeting parents or all users
-  const waTargetRoles = ["all", "parents", null, undefined];
-  const shouldSendWhatsApp = !targetUser && waTargetRoles.includes(targetRole);
+  // Auto-send WhatsApp alongside FCM when targeting parents, teachers, or all users
+  const waTargetRoles = ["all", "parents", "teacher", null, undefined];
+  const shouldSendWhatsApp = !targetUser && waTargetRoles.includes(targetRole) && !skipWhatsApp;
   
   if (shouldSendWhatsApp) {
-    supabase
-      .from("whatsapp_config")
-      .select("*")
-      .eq("id", 1)
-      .single()
-      .then(({ data: waConfig }) => {
-        if (!waConfig?.enabled || !waConfig?.provider || waConfig.provider === "none" || waConfig.provider === "mock") {
-          return;
-        }
-        
-        supabase
+    try {
+      const { data: waConfig, error: waCfgErr } = await supabase
+        .from("whatsapp_config")
+        .select("*")
+        .eq("id", 1)
+        .maybeSingle();
+
+      if (waCfgErr) {
+        console.error("WhatsApp config load error:", waCfgErr);
+      } else if (!waConfig) {
+        console.warn("WhatsApp config not found (no row id=1). Go to Global Settings to configure it.");
+      } else if (waConfig.enabled && waConfig.provider && waConfig.provider !== "none" && waConfig.provider !== "mock") {
+        const phoneSet = new Set();
+        const waMessage = `📢 ${title}\n\n${body}`;
+
+        const { data: parents } = await supabase
           .from("child_profiles")
           .select("student_id, name, full_name, whatsapp_number")
-          .then(({ data: students }) => {
-            const waTargets = (students || []).filter(
-              (s) => s.whatsapp_number && s.whatsapp_number.trim() !== ""
-            );
-            
-            if (waTargets.length === 0) return;
-            
-            console.log(
-              `Auto WhatsApp: Sending \"${title}\" to ${waTargets.length} parents sequentially...`
-            );
-            
-            // Send sequentially with delay to avoid rate limits
-            const sendNext = async (index) => {
-              if (index >= waTargets.length) return;
-              
-              const student = waTargets[index];
-              let phone = (student.whatsapp_number || "")
-                .split("")
-                .filter((c) => "0123456789".includes(c))
-                .join("");
-              
-              // Convert local Pakistani numbers (03xx...) to international (923xx...)
-              if (phone.length === 11 && phone.startsWith("0")) {
-                phone = "92" + phone.substring(1);
-              }
-              
-              if (phone) {
-                const message = `📢 ${title}\n\n${body}`;
-                const studentName = student.name || student.full_name || "Student";
-                
-                try {
-                  const result = await supabase.functions.invoke("whatsapp-notification", {
-                    body: { phone, message, studentName },
-                  });
-                  if (result.error) {
-                    console.error(`WhatsApp auto-send failed for ${studentName}:`, result.error);
-                  } else {
-                    console.log(`WhatsApp auto-send OK for ${studentName} (${phone})`);
-                  }
-                } catch (err) {
-                  console.error(`WhatsApp auto-send error for ${studentName}:`, err);
+          .not("whatsapp_number", "is", null)
+          .not("whatsapp_number", "eq", "");
+        if (parents) {
+          parents.forEach(p => {
+            if (p.whatsapp_number) {
+              phoneSet.add(JSON.stringify({ phone: p.whatsapp_number, name: p.name || p.full_name || "Parent" }));
+            }
+          });
+        }
+
+        const { data: teachers } = await supabase
+          .from("teacher_profiles")
+          .select("full_name, whatsapp_number")
+          .not("whatsapp_number", "is", null)
+          .not("whatsapp_number", "eq", "");
+        if (teachers) {
+          teachers.forEach(t => {
+            if (t.whatsapp_number) {
+              phoneSet.add(JSON.stringify({ phone: t.whatsapp_number, name: t.full_name || "Teacher" }));
+            }
+          });
+        }
+
+        const targets = [...phoneSet].map(s => JSON.parse(s));
+        if (targets.length > 0) {
+          let waSent = 0;
+          let waFailed = 0;
+          const CONCURRENCY = 5;
+          for (let i = 0; i < targets.length; i += CONCURRENCY) {
+            const batch = targets.slice(i, i + CONCURRENCY);
+            const batchResults = await Promise.allSettled(
+              batch.map(async ({ phone: rawPhone, name: personName }) => {
+                const phone = normalizePhoneNumber(rawPhone);
+                if (!phone) return;
+                const { data: waData, error: waErr } = await supabase.functions.invoke("whatsapp-notification", {
+                  body: { phone, message: waMessage, studentName: personName },
+                });
+                if (waErr || !waData?.success) {
+                  throw new Error(waErr?.message || waData?.error || "unknown");
                 }
-              }
-              
-              // Wait 800ms before next send
-              await new Promise(r => setTimeout(r, 800));
-              return sendNext(index + 1);
-            };
-            
-            // Fire off the chain (don't await - fire and forget)
-            sendNext(0).catch(err => 
-              console.error("WhatsApp auto-send chain error:", err)
+              })
             );
-          })
-          .catch((err) => console.error("WhatsApp auto-send: failed to fetch students", err));
-      })
-      .catch((err) => console.error("WhatsApp auto-send: failed to fetch config", err));
+            batchResults.forEach(r => {
+              if (r.status === 'fulfilled') waSent++;
+              else { waFailed++; console.error("WhatsApp auto-send error:", r.reason); }
+            });
+            if (i + CONCURRENCY < targets.length) await new Promise(r => setTimeout(r, 300));
+          }
+          if (waFailed > 0) {
+            console.warn(`WhatsApp auto-send: ${waSent} sent, ${waFailed} failed`);
+          }
+        } else {
+          console.warn("WhatsApp auto-send: No parents or teachers found with WhatsApp numbers.");
+        }
+      } else {
+        console.warn("WhatsApp auto-send skipped: provider is", waConfig.provider, "enabled:", waConfig.enabled);
+      }
+    } catch (err) {
+      console.error("WhatsApp auto-send error:", err);
+    }
   }
 
   return { inboxError, fcmError, fcmData };
@@ -2853,6 +2875,37 @@ const recalculateComputedRanks = (students) => {
   });
 };
 
+class PortalErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("PortalErrorBoundary caught:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
+          <h2 style={{ color: '#e74c3c', marginBottom: '12px' }}>Something went wrong</h2>
+          <p style={{ color: '#666', marginBottom: '8px' }}>The portal could not be loaded. Please try refreshing the page.</p>
+          <p style={{ color: '#999', fontSize: '0.85rem' }}>{this.state.error?.message || 'Unknown error'}</p>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+            style={{ marginTop: '20px', padding: '10px 24px', background: '#3498db', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1rem' }}
+          >
+            Refresh Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function LoadingScreen({ message, onComplete }) {
   const [phase, setPhase] = useState(0);
   const completedRef = useRef(false);
@@ -3565,12 +3618,12 @@ function SettingsPage({
   };
 
   const themes = [
-    { id: "default", name: "Classic Premium", desc: "The original elegant look", color: "#5d4037" },
+    { id: "default", name: "Classic", desc: "The original elegant look", color: "#5d4037" },
     { id: "childish", name: "Playful Learning", desc: "Colorful and fun for kids", color: "#ff8a65" },
     { id: "men", name: "Executive Dark", desc: "Professional and sleek", color: "#263238" },
     { id: "women", name: "Royal Grace", desc: "Sophisticated and soft tones", color: "#8e24aa" },
     { id: "ashara", name: "Ashara Mode", desc: "Aashra Mubarakah — Mourning for Imam Hussain (AS)", color: "#0a5c36", premium: true },
-    { id: "classic-pro", name: "Classic Pro", desc: "Premium frosted glass with classic gold tones", color: "#c5a059", premium: true },
+    { id: "classic-pro", name: "Classic Pro", desc: "Frosted glass with classic gold tones", color: "#c5a059", premium: true },
     { id: "plutonium", name: "Plutonium", desc: "Dark neon — where darkness meets the web", color: "#f81ce5", premium: true },
   ];
 
@@ -3621,7 +3674,7 @@ function SettingsPage({
 
   const settingsMeta = {
     "Dark mode": { icon: Moon, title: "Appearance", desc: "Switch between light and dark visual modes." },
-    "App themes": { icon: Palette, title: "Premium Themes", desc: "Choose a visual style that matches your preference." },
+    "App themes": { icon: Palette, title: "Themes", desc: "Choose a visual style that matches your preference." },
     "Notifications": { icon: Bell, title: "Notifications", desc: role === "parents" ? "Control how you receive alerts about your child's progress." : "Control how you receive alerts about students and schedules." },
     "Animations": { icon: Sparkles, title: "Animations & Effects", desc: "Control page transitions, loading effects and motion in the app." },
     "Security": { icon: Lock, title: "Security & App Lock", desc: "Update password & enable app lock with PIN or biometrics." },
@@ -3665,7 +3718,7 @@ function SettingsPage({
                 <div className="card-headline headline-with-action">
                   <div className="headline-left">
                     <CalendarCheck size={20} style={{ color: 'var(--primary-gold)' }} />
-                    <h3>Attendance History <span style={{ fontSize: '0.7rem', background: 'var(--primary-gold)', color: '#fff', padding: '2px 8px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, verticalAlign: 'middle' }}>PREMIUM</span></h3>
+                    <h3>Attendance History</h3>
                   </div>
                 </div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
@@ -3702,7 +3755,7 @@ function SettingsPage({
               {activeTab === "Dark mode" && <><h3>Appearance</h3><p>Switch between light and dark visual modes.</p></>}
               {activeTab === "Notifications" && <><h3>Notifications</h3>{role === "parents" ? <p>Control how you receive alerts about your child's progress.</p> : <p>Control how you receive alerts about students and schedules.</p>}</>}
               {activeTab === "Security" && <><h3>Security & App Lock</h3><p>Update your password, enable app lock with PIN, or use biometrics.</p></>}
-              {activeTab === "App themes" && <><h3>Premium Themes</h3><p>Choose a visual style that matches your preference.</p></>}
+              {activeTab === "App themes" && <><h3>Themes</h3><p>Choose a visual style that matches your preference.</p></>}
               {activeTab === "Support" && <><h3>Technical Support</h3><p>Encountering an issue? Let our team know.</p></>}
               {activeTab === "About" && <><h3>Mauze Tahfeez Atfal</h3><p>App info, version & registration.</p></>}
             </div>
@@ -3840,7 +3893,6 @@ function SettingsPage({
                       onClick={() => setAppTheme(t.id)}
                     >
                       <div className="theme-preview" style={{ backgroundColor: t.color }}>
-                        {t.premium && <span className="premium-badge"><Lock size={12} /> Premium</span>}
                         {appTheme === t.id && <CheckCircle size={24} color="white" />}
                       </div>
                       <div className="theme-info">
@@ -3943,7 +3995,7 @@ function SettingsPage({
                 <div className="about-header">
                   <img src="/logo.png" alt="Mauze Tahfeez" className="about-logo" />
                   <h3>Mauze Tahfeez Atfal</h3>
-                  <p>v2.4.0 Premium Portal</p>
+                  <p>v2.4.0</p>
                 </div>
                 <div className="about-details">
                   <p>Mauze Tahfeez is a comprehensive Quran memorization tracking platform designed for the students and parents of Al-Madrasa tus Saifiya tul Burhaniyah.</p>
@@ -5192,7 +5244,6 @@ function ParentPortal({
                   <h3>Quick Actions</h3>
                 </div>
                 <div className="quick-panel-header-right">
-                  <span className="quick-panel-badge">Premium</span>
                   <span className="quick-panel-date">{new Date().toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                 </div>
               </div>
@@ -6376,6 +6427,197 @@ function AdminLeaveManagement({ onShowAction, students }) {
   );
 }
 
+function PremiumEventLeavePage({ onShowAction, user }) {
+  const [events, setEvents] = useState([]);
+  const [eventLeaves, setEventLeaves] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState("");
+  const [customEventName, setCustomEventName] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [evRes, lvRes] = await Promise.all([
+        supabase.from("miqaat_calendar").select("*").order("id"),
+        supabase.from("event_leaves").select("*").order("created_at", { ascending: false })
+      ]);
+      if (!evRes.error) setEvents(evRes.data || []);
+      if (!lvRes.error) setEventLeaves(lvRes.data || []);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const sendNotificationToAll = async (title, body) => {
+    const dbPayload = { title, body, target_role: "all", redirect_page: "Inbox" };
+    await supabase.from("system_notifications").insert([dbPayload]);
+
+    await supabase.functions.invoke('fcm-notification', {
+      body: { title, body, targetRole: "all", data: { redirectPage: "Inbox", timestamp: new Date().toISOString() } }
+    }).catch(() => {});
+
+    const { data: waConfig } = await supabase.from("whatsapp_config").select("*").eq("id", 1).single();
+    if (waConfig?.enabled && waConfig?.provider && waConfig.provider !== "none") {
+      const phoneSet = new Set();
+      const { data: parents } = await supabase.from("child_profiles").select("whatsapp_number").not("whatsapp_number", "is", null).not("whatsapp_number", "eq", "");
+      if (parents) parents.forEach(p => { if (p.whatsapp_number) phoneSet.add(p.whatsapp_number); });
+      const { data: teachers } = await supabase.from("teacher_profiles").select("whatsapp_number").not("whatsapp_number", "is", null).not("whatsapp_number", "eq", "");
+      if (teachers) teachers.forEach(t => { if (t.whatsapp_number) phoneSet.add(t.whatsapp_number); });
+      const waMessage = title + "\n\n" + body;
+      let idx = 0;
+      for (const rawPhone of phoneSet) {
+        let phone = String(rawPhone).split("").filter(c => "0123456789".includes(c)).join("");
+        if (phone.length === 11 && phone.startsWith("0")) phone = "92" + phone.substring(1);
+        if (!phone || phone.length < 10) continue;
+        await supabase.functions.invoke("whatsapp-notification", { body: { phone, message: waMessage } }).catch(() => {});
+        idx++;
+        if (idx < phoneSet.size) await new Promise(r => setTimeout(r, 600));
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const isOther = selectedEvent === "other";
+    const eventName = isOther ? (customEventName || "Other").trim() : (events.find(ev => String(ev.id) === String(selectedEvent))?.name || "Unknown Event");
+    if (!selectedEvent || !fromDate || !toDate) {
+      if (onShowAction) onShowAction("error", "Please select an event, from date, and till date.");
+      return;
+    }
+    if (isOther && !customEventName.trim()) {
+      if (onShowAction) onShowAction("error", "Please enter the event name.");
+      return;
+    }
+    if (new Date(toDate) < new Date(fromDate)) {
+      if (onShowAction) onShowAction("error", "Till date must be after from date.");
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from("event_leaves").insert({
+      event_id: isOther ? null : Number(selectedEvent),
+      event_name: eventName,
+      from_date: fromDate,
+      to_date: toDate,
+      reason: reason || null,
+      applied_by: user?.id || user?.email || "admin"
+    });
+    if (error) {
+      if (onShowAction) onShowAction("error", "Failed to apply leave: " + error.message);
+      setSubmitting(false);
+      return;
+    }
+    const title = "Event Leave: " + eventName;
+    const body = `Leave has been applied for ${eventName} from ${fromDate} to ${toDate}.${reason ? "\nReason: " + reason : ""}`;
+    await sendNotificationToAll(title, body);
+    if (onShowAction) onShowAction("success", `Leave applied for ${eventName} from ${fromDate} to ${toDate}. Notifications sent to teachers & parents.`);
+    setSelectedEvent("");
+    setCustomEventName("");
+    setFromDate("");
+    setToDate("");
+    setReason("");
+    setSubmitting(false);
+    const { data } = await supabase.from("event_leaves").select("*").order("created_at", { ascending: false });
+    if (data) setEventLeaves(data);
+  };
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="management-grid two-columns">
+      <section className="form-card card-appear" style={{ borderTop: '3px solid var(--primary-gold)' }}>
+        <div className="card-headline">
+          <CalendarX size={20} style={{ color: 'var(--primary-gold)' }} />
+          <h3 style={{ color: 'var(--deep-brown)' }}>Event Leave</h3>
+        </div>
+        <p className="subtitle" style={{ marginBottom: '20px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>
+          Apply leave for a Miqaat event. Notifications with WhatsApp will be sent to all teachers and parents.
+        </p>
+        <form className="stack-form" onSubmit={handleSubmit}>
+          <label className="form-group">
+            <span>Select Event <span style={{ color: 'red' }}>*</span></span>
+            <select className="premium-select" value={selectedEvent} onChange={e => { setSelectedEvent(e.target.value); if (e.target.value !== "other") setCustomEventName(""); }} required>
+              <option value="">-- Choose an event --</option>
+              {events.map(ev => (
+                <option key={ev.id} value={ev.id}>{ev.name} ({ev.type})</option>
+              ))}
+              <option value="other">Other (custom event)</option>
+            </select>
+          </label>
+          {selectedEvent === "other" && (
+            <label className="form-group">
+              <span>Custom Event Name <span style={{ color: 'red' }}>*</span></span>
+              <input type="text" className="premium-input" value={customEventName} onChange={e => setCustomEventName(e.target.value)} placeholder="Enter the event name..." required />
+            </label>
+          )}
+          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <label className="form-group">
+              <span>From Date <span style={{ color: 'red' }}>*</span></span>
+              <input type="date" className="premium-input" value={fromDate} onChange={e => setFromDate(e.target.value)} min={todayStr} required />
+            </label>
+            <label className="form-group">
+              <span>Till Date <span style={{ color: 'red' }}>*</span></span>
+              <input type="date" className="premium-input" value={toDate} onChange={e => setToDate(e.target.value)} min={fromDate || todayStr} required />
+            </label>
+          </div>
+          <label className="form-group">
+            <span>Reason / Notes (optional)</span>
+            <textarea className="premium-input" rows={3} value={reason} onChange={e => setReason(e.target.value)} placeholder="Optional reason for this leave..." style={{ resize: 'vertical' }} />
+          </label>
+          <button type="submit" disabled={submitting} className="action-button premium" style={{
+            background: submitting ? 'var(--text-muted)' : 'linear-gradient(135deg, #d4af37, #b8860b)',
+            color: '#fff', fontWeight: 700, fontSize: '0.95rem', padding: '14px 28px',
+            display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center',
+            border: 'none', borderRadius: '12px', cursor: submitting ? 'not-allowed' : 'pointer',
+            marginTop: '8px', boxShadow: '0 4px 15px rgba(212,175,55,0.3)'
+          }}>
+            {submitting ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Applying...</> : <><Send size={18} /> Apply Event Leave & Notify All</>}
+          </button>
+        </form>
+      </section>
+
+      <section className="data-card card-appear">
+        <div className="card-headline">
+          <FileText size={18} />
+          <h3>Leave History</h3>
+        </div>
+        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>Loading...</div>
+          ) : eventLeaves.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              <Calendar size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
+              <p>No event leaves applied yet.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {eventLeaves.map(lv => (
+                <div key={lv.id} className="result-card-premium" style={{ padding: '14px', borderRadius: '10px', border: '1px solid #e8e0d4', background: '#fffaf0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.9rem' }}>{lv.event_name}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--soft-brown)', marginTop: '4px' }}>
+                        {lv.from_date} → {lv.to_date}
+                      </div>
+                      {lv.reason && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', fontStyle: 'italic' }}>{lv.reason}</div>}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                      {new Date(lv.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function PortalAccessSuccessModal({ payload, onClose }) {
   if (!payload) return null;
 
@@ -6525,7 +6767,7 @@ function AdminPortal({
 
 }) {
   const showAction = onShowAction;
-  const { announcements, customGroups, schedule, students, teacherAttendance, portalAccessList, teacherProfiles, supportTickets = [], weeklyResultsArchive = [] } = adminData;
+  const { announcements = [], customGroups = [], schedule = [], students = [], teacherAttendance = [], portalAccessList = [], teacherProfiles = [], supportTickets = [], weeklyResultsArchive = [] } = adminData || {};
 
   /* Optimistic draft so the dropdown visually changes immediately when user selects */
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -6756,15 +6998,10 @@ function AdminPortal({
   };
 
   const sendIndividualWhatsApp = async (phone, message, studentName) => {
-    let formattedPhone = (phone || "").split("").filter((c) => "0123456789".includes(c)).join("");
-    
-    // Automatically convert local Pakistani numbers (03xx...) to international format (923xx...)
-    if (formattedPhone.length === 11 && formattedPhone.startsWith("0")) {
-      formattedPhone = "92" + formattedPhone.substring(1);
-    }
+    const formattedPhone = normalizePhoneNumber(phone);
 
-    if (!formattedPhone) {
-      throw new Error("Invalid phone number");
+    if (!formattedPhone || formattedPhone.length < 10) {
+      throw new Error("Invalid phone number: " + (phone || "empty"));
     }
 
     const { data, error } = await supabase.functions.invoke("whatsapp-notification", {
@@ -6776,7 +7013,6 @@ function AdminPortal({
     });
 
     if (error) {
-      // Extract the real error from the edge function's JSON response
       let realError = "Failed to send WhatsApp message";
       try {
         const errorBody = await error.context?.json();
@@ -6797,7 +7033,7 @@ function AdminPortal({
 
   const handleSendWhatsApp = async () => {
     if (!whatsappConfig || !whatsappConfig.enabled) {
-      alert("WhatsApp is not enabled. Please enable and configure it first.");
+      showAction("error", "WhatsApp is not enabled. Please enable and configure it first.");
       return;
     }
     const confirmSend = window.confirm(
@@ -6827,19 +7063,18 @@ function AdminPortal({
   };
   const triggerWhatsAppNotifications = async (silent = false) => {
     if (!whatsappConfig) {
-      if (!silent) alert("WhatsApp Configuration is not loaded yet. Please wait a second and try again.");
+      if (!silent) showAction("error", "WhatsApp Configuration is not loaded yet. Please wait a second and try again.");
       return;
     }
     if (!whatsappConfig.enabled || whatsappConfig.provider === 'none') {
-      if (!silent) alert("WhatsApp notifications are disabled or the provider is set to None. Please configure them below.");
+      if (!silent) showAction("error", "WhatsApp notifications are disabled or the provider is set to None. Please configure them below.");
       return;
     }
     
     const targetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
     
     if (targetStudents.length === 0) {
-      if (!silent) alert("No students found with a WhatsApp number in their profile!");
-      if (onShowAction) onShowAction("info", "No parents with WhatsApp numbers found to notify.");
+      if (!silent) showAction("info", "No students found with a WhatsApp number in their profile.");
       return;
     }
     
@@ -6851,44 +7086,52 @@ function AdminPortal({
     addWaPersistentLog({ ...startLog, phone: 'system', studentName: 'Batch' });
     
     let sentCount = 0;
+    let failCount = 0;
+    const CONCURRENCY = 5;
     
-    for (let i = 0; i < targetStudents.length; i++) {
-      const student = targetStudents[i];
-      const phone = student.whatsapp_number;
-      const message = parseTemplate(whatsappConfig.message_template, student);
+    for (let i = 0; i < targetStudents.length; i += CONCURRENCY) {
+      const batch = targetStudents.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (student) => {
+          const phone = student.whatsapp_number;
+          const message = parseTemplate(whatsappConfig.message_template, student);
+          const sendingLog = { time: new Date().toLocaleTimeString(), text: `Sending to ${student.name} (${phone})...`, type: 'sending' };
+          addWaPersistentLog({ ...sendingLog, phone, studentName: student.name });
+          
+          await sendIndividualWhatsApp(phone, message, student.name);
+          return { student, status: 'success' };
+        })
+      );
       
-      const sendingLog = { time: new Date().toLocaleTimeString(), text: `Sending to ${student.name} (${phone})...`, type: 'sending' };
-      setWhatsAppLogs(prev => [...prev, sendingLog]);
-      addWaPersistentLog({ ...sendingLog, phone, studentName: student.name });
+      batchResults.forEach((result, idx) => {
+        const student = batch[idx];
+        const phone = student.whatsapp_number;
+        if (result.status === 'fulfilled') {
+          sentCount++;
+          const successLog = { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' };
+          addWaPersistentLog({ ...successLog, phone, studentName: student.name });
+        } else {
+          failCount++;
+          const errMsg = result.reason?.message || 'Unknown error';
+          console.error(`WhatsApp notification failed for ${student.name}:`, errMsg);
+          const errorLog = { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${errMsg} ❌`, type: 'error' };
+          addWaPersistentLog({ ...errorLog, phone, studentName: student.name, error: errMsg });
+        }
+      });
       
-      try {
-        await sendIndividualWhatsApp(phone, message, student.name);
-        sentCount++;
-        const successLog = { time: new Date().toLocaleTimeString(), text: `Sent to ${student.name} (${phone}) successfully! ✅`, type: 'success' };
-        setWhatsAppLogs(prev => [
-          ...prev.slice(0, -1),
-          successLog
-        ]);
-        addWaPersistentLog({ ...successLog, phone, studentName: student.name });
-      } catch (err) {
-        console.error(`WhatsApp notification failed for ${student.name}:`, err.message);
-        const errorLog = { time: new Date().toLocaleTimeString(), text: `Failed for ${student.name} (${phone}): ${err.message} ❌`, type: 'error' };
-        setWhatsAppLogs(prev => [
-          ...prev.slice(0, -1),
-          errorLog
-        ]);
-        addWaPersistentLog({ ...errorLog, phone, studentName: student.name, error: err.message });
-      }
+      setWhatsAppProgress(prev => ({ ...prev, current: Math.min(i + CONCURRENCY, targetStudents.length) }));
       
-      setWhatsAppProgress(prev => ({ ...prev, current: i + 1 }));
-      
-      if (i < targetStudents.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      if (i + CONCURRENCY < targetStudents.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
     
-    const finishLog = { time: new Date().toLocaleTimeString(), text: `WhatsApp notifications finished! Sent: ${sentCount}/${targetStudents.length} successfully.`, type: 'info' };
-    setWhatsAppLogs(prev => [...prev, finishLog]);
+    if (failCount > 0) {
+      showAction("error", `WhatsApp: ${sentCount} sent, ${failCount} failed. Check logs for details.`);
+    } else if (sentCount > 0) {
+      showAction("success", `WhatsApp sent to ${sentCount} parent${sentCount !== 1 ? 's' : ''}!`);
+    }
+    const finishLog = { time: new Date().toLocaleTimeString(), text: `WhatsApp finished! Sent: ${sentCount}, Failed: ${failCount}`, type: 'info' };
     addWaPersistentLog({ ...finishLog, phone: 'system', studentName: 'Batch' });
   };
 const handleDownloadAllReports = async () => {
@@ -6945,7 +7188,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
+  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
@@ -7083,6 +7326,8 @@ const handleDownloadAllReports = async () => {
         "all",
         null,
         "Progress",
+        true,
+        null,
         true
       );
 
@@ -7533,16 +7778,16 @@ const handleDownloadAllReports = async () => {
                       const subj = fd.get("manual_subject") || "";
                       const msg = fd.get("manual_message") || "";
                       if (!to || !subj || !msg) {
-                        alert("Please fill in To, Subject, and Message fields.");
+                        showAction("error", "Please fill in To, Subject, and Message fields.");
                         return;
                       }
                       const html = "<p>" + msg.replace(/\n/g, "<br>") + "</p>";
                       try {
                         await onSendIndividualEmail(to, subj, html, "", "", "");
-                        alert("Email sent successfully!");
+                        showAction("success", "Email sent successfully!");
                         e.target.reset();
                       } catch (err) {
-                        alert("Failed to send email: " + err.message);
+                        showAction("error", "Failed to send email: " + err.message);
                       }
                     }}
                   >
@@ -7618,9 +7863,9 @@ const handleDownloadAllReports = async () => {
                   }]).select().single();
 
                   if (error) {
-                    alert("Error adding student: " + error.message);
+                    showAction("error", "Error adding student: " + error.message);
                   } else {
-                    alert("Student added successfully!");
+                    showAction("success", "Student added successfully!");
                     e.target.reset();
                     loadPortalData(portalRole, user);
                   }
@@ -8654,8 +8899,8 @@ const handleDownloadAllReports = async () => {
                       onClick={async () => {
                         const fcmService = await loadFcmService();
                         const result = await fcmService.initialize("admin");
-                        if (result) alert("Notifications active for this device!");
-                        else alert("Failed to activate. Check browser permissions.");
+                        if (result) showAction("success", "Notifications active for this device!");
+                        else showAction("error", "Failed to activate. Check browser permissions.");
                       }}
                     >
                       <Bell size={14} /> Enable Device Alerts
@@ -9573,7 +9818,7 @@ const handleDownloadAllReports = async () => {
                         onClick={() => {
                           const student_id = document.querySelector('select[name="student_id"]').value;
                           if (student_id) onUnassignChild(student_id);
-                          else alert("Please select a student first.");
+                          else showAction("error", "Please select a student first.");
                         }}
                       >
                         Clear All Links
@@ -10318,6 +10563,14 @@ const handleDownloadAllReports = async () => {
               />
           </div>
           ) : null}
+
+          {activePage === "Event Leave" ? (
+            <PremiumEventLeavePage
+              onShowAction={onShowAction}
+              user={user}
+            />
+          ) : null}
+
           {portalAccessSuccess && (
             <PortalAccessSuccessModal
               payload={portalAccessSuccess}
@@ -11886,12 +12139,15 @@ const handleDownloadAllReports = async () => {
                 className="action-button premium"
                 style={{ background: 'linear-gradient(135deg, #25D366, #128C7E)', color: 'white', border: 'none' }}
                 disabled={sendingWhatsApp}
-                onClick={() => {
+                onClick={async () => {
                   setShowWaConfirmAfterPublish(false);
                   setPendingWaTargetCount(0);
-                  triggerWhatsAppNotifications(true).catch((err) => {
+                  try {
+                    await triggerWhatsAppNotifications(true);
+                  } catch (err) {
                     console.error("WhatsApp notifications failed after reports went live:", err);
-                  });
+                    showAction("error", "WhatsApp notifications failed: " + (err.message || "Unknown error"));
+                  }
                 }}
               >
                 <MessageCircle size={16} style={{ marginRight: '6px' }} />
@@ -13187,6 +13443,7 @@ function TeacherPortal({
                   showAction={onShowAction}
                   onBroadcastNotification={broadcastNotification}
                   students={visibleStudents}
+                  currentUserId={user?.id}
                 />
               </Suspense>
            )}
@@ -13304,8 +13561,7 @@ function TeacherPortal({
                      <h3>Quick Actions Panel</h3>
                    </div>
                    <div className="quick-panel-header-right">
-                     <span className="quick-panel-badge">Premium</span>
-                     <span className="quick-panel-date">{new Date().toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                      <span className="quick-panel-date">{new Date().toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                    </div>
                  </div>
                  <div className="quick-panel-body">
@@ -15844,7 +16100,10 @@ export default function App() {
     // to bypass RLS (teachers toggled for admin access would otherwise see only their students).
     // On initial login, user is null here so this won't double-load.
     if (user && portalRole === "admin") {
-      loadPortalData(portalRole, user);
+      setLoading(true);
+      loadPortalData(portalRole, user).catch(() => {
+        if (typeof setLoading === 'function') setLoading(false);
+      });
     }
 
     // Check URL for redirectPage from notification click outside the app
@@ -17488,7 +17747,47 @@ const handleSendCustomNotification = async (event) => {
         attachedFileUrl || null
       );
 
-      showAction("success", "Custom Notification Dispatched!");
+      let waSent = 0;
+      let waFailed = 0;
+      let waSkipped = false;
+      const { data: waCfg, error: waCfgErr } = await supabase.from("whatsapp_config").select("*").eq("id", 1).maybeSingle();
+      if (waCfgErr) { console.error("WhatsApp config error:", waCfgErr); waSkipped = true; }
+      else if (!waCfg) { waSkipped = true; }
+      else if (!waCfg.enabled || !waCfg.provider || waCfg.provider === "none" || waCfg.provider === "mock") { waSkipped = true; }
+      else {
+        const waPhoneSet = new Set();
+        const waMessage = `📢 ${notifTitle}\n\n${notifBody}`;
+
+        if (targetRole === "parents" || targetRole === "all") {
+          const { data: waParents } = await supabase.from("child_profiles").select("whatsapp_number, name, full_name").not("whatsapp_number", "is", null).not("whatsapp_number", "eq", "");
+          if (waParents) waParents.forEach(p => { if (p.whatsapp_number) waPhoneSet.add(p.whatsapp_number); });
+        }
+        if (targetRole === "teacher" || targetRole === "all") {
+          const { data: waTeachers } = await supabase.from("teacher_profiles").select("whatsapp_number, full_name").not("whatsapp_number", "is", null).not("whatsapp_number", "eq", "");
+          if (waTeachers) waTeachers.forEach(t => { if (t.whatsapp_number) waPhoneSet.add(t.whatsapp_number); });
+        }
+
+        if (waPhoneSet.size > 0) {
+          for (const rawPhone of waPhoneSet) {
+            let phone = String(rawPhone).split("").filter(c => "0123456789".includes(c)).join("");
+            if (phone.length === 11 && phone.startsWith("0")) phone = "92" + phone.substring(1);
+            if (!phone) continue;
+            try {
+              const { data: waRes, error: waErr } = await supabase.functions.invoke("whatsapp-notification", {
+                body: { phone, message: waMessage, studentName: "Notification" },
+              });
+              if (waErr || !waRes?.success) { waFailed++; } else { waSent++; }
+            } catch { waFailed++; }
+            await new Promise(r => setTimeout(r, 600));
+          }
+        }
+      }
+
+      let waNote = "";
+      if (waSkipped) waNote = " WhatsApp: config disabled or not found (check Global Settings).";
+      else if (waSent > 0 || waFailed > 0) waNote = ` WhatsApp: ${waSent} sent, ${waFailed} failed.`;
+      else waNote = " WhatsApp: no parent/teacher numbers found in profiles.";
+      showAction("success", `Notification sent via app.${waNote}`);
     }
 
     setAttachedFileUrl("");
@@ -17905,18 +18204,17 @@ const handleSendCustomNotification = async (event) => {
 
   const triggerEmailNotifications = async (silent = false) => {
     if (!emailSettings) {
-      if (!silent) alert("Email Configuration is not loaded yet. Please wait a second and try again.");
+      if (!silent) showAction("error", "Email Configuration is not loaded yet. Please wait a second and try again.");
       return;
     }
     if (!emailSettings.enabled) {
-      if (!silent) alert("Email notifications are disabled. Please enable them in Email Settings below.");
+      if (!silent) showAction("error", "Email notifications are disabled. Please enable them in Email Settings below.");
       return;
     }
 
     const targetStudents = schoolData.students.filter(s => s.parent_email && s.parent_email.trim() !== "");
     if (targetStudents.length === 0) {
-      if (!silent) alert("No students found with a parent email address!");
-      showAction("info", "No parents with email addresses found to notify.");
+      if (!silent) showAction("info", "No students found with a parent email address.");
       return;
     }
 
@@ -18312,6 +18610,7 @@ const handleSendCustomNotification = async (event) => {
         onClose={() => setSelectedAnnouncement(null)}
       />
       <div className="app-portal-wrapper">
+        <PortalErrorBoundary>
         {portalRole === "parents" ? (
           <ParentPortal
             activePage={activePage}
@@ -18512,7 +18811,7 @@ const handleSendCustomNotification = async (event) => {
             teacherAdminAccessList={teacherAdminAccessList}
           />
         )}
-
+        </PortalErrorBoundary>
       </div>
       {selfJadwalPopup && (
         <div style={{

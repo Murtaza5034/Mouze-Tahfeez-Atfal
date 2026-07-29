@@ -86,7 +86,7 @@ const APP_KB = [
   {
     keywords: ['dark mode', 'theme', 'appearance', 'light mode'],
     page: 'Settings',
-    answer: 'You can switch between light and dark mode, and choose from premium themes like Classic Premium, Playful Learning, Executive Dark, Royal Grace, Ashara Mode, Classic Pro, and Plutonium — all from Settings > Dark mode or App themes.'
+    answer: 'You can switch between light and dark mode, and choose from themes like Classic, Playful Learning, Executive Dark, Royal Grace, Ashara Mode, Classic Pro, and Plutonium — all from Settings > Dark mode or App themes.'
   },
   {
     keywords: ['password', 'change password', 'security', 'app lock'],

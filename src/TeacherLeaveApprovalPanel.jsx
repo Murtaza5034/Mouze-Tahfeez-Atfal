@@ -1,6 +1,20 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 
+const normalizePhoneNumber = (phone) => {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/\D/g, '');
+  if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    cleaned = '92' + cleaned.substring(1);
+  } else if (cleaned.length === 13 && cleaned.startsWith('0092')) {
+    cleaned = '92' + cleaned.substring(4);
+  } else if (cleaned.length === 12 && cleaned.startsWith('92')) {
+  } else if (cleaned.length === 10) {
+    cleaned = '92' + cleaned;
+  }
+  return cleaned;
+};
+
 const broadcastNotification = async (title, body, targetRole = "all", targetUser = null, redirectPage = "Inbox", skipInbox = false, fileUrl = null) => {
   const dbPayload = {
     title,
@@ -103,22 +117,22 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
 
       // Send WhatsApp message to each unique phone number
       const waMessage = title + (body ? "\n\n" + body : "");
-      for (const rawPhone of phoneSet) {
-        let formattedPhone = String(rawPhone).split("").filter(c => "0123456789".includes(c)).join("");
-        // Convert Pakistani local numbers (03xx...) to international (923xx...)
-        if (formattedPhone.length === 11 && formattedPhone.startsWith("0")) {
-          formattedPhone = "92" + formattedPhone.substring(1);
-        }
-        if (!formattedPhone || formattedPhone.length < 10) continue;
-
-        try {
-          const { data: waResult, error: waError2 } = await supabase.functions.invoke("whatsapp-notification", {
-            body: { phone: formattedPhone, message: waMessage }
-          });
-          if (!waError2 && waResult?.success) waSent++;
-        } catch (e) {
-          console.warn('WhatsApp send failed for', formattedPhone, e);
-        }
+      const phoneArray = [...phoneSet];
+      const CONCURRENCY = 5;
+      for (let i = 0; i < phoneArray.length; i += CONCURRENCY) {
+        const batch = phoneArray.slice(i, i + CONCURRENCY);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (rawPhone) => {
+            const formattedPhone = normalizePhoneNumber(rawPhone);
+            if (!formattedPhone || formattedPhone.length < 10) return;
+            const { data: waResult, error: waError2 } = await supabase.functions.invoke("whatsapp-notification", {
+              body: { phone: formattedPhone, message: waMessage }
+            });
+            if (waError2 || !waResult?.success) throw new Error(waError2?.message || waResult?.error || "unknown");
+          })
+        );
+        batchResults.forEach(r => { if (r.status === 'fulfilled') waSent++; });
+        if (i + CONCURRENCY < phoneArray.length) await new Promise(r => setTimeout(r, 300));
       }
     }
   } catch (err) {

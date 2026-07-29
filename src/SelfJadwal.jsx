@@ -1033,7 +1033,10 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
     const currentSnapshot = JSON.stringify({ data: scheduleData, mode });
     if (currentSnapshot === lastSavedSnapshotRef.current) return;
 
+    const thisGen = ++saveGenerationRef.current;
+
     autoSaveTimerRef.current = setTimeout(async () => {
+      setIsSaving(true);
       const now = Date.now();
       const mergedHistory = { ...(scheduleData._editHistory || {}), ...editHistory };
       const cleanHistory = {};
@@ -1049,8 +1052,11 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
           parent_viewed_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 
+      if (saveGenerationRef.current !== thisGen) return;
+
       if (!error) {
         lastSavedSnapshotRef.current = currentSnapshot;
+        if (showAction) showAction('success', 'Self Jadwal saved!');
         try {
           await supabase.functions.invoke('fcm-notification', {
             body: {
@@ -1063,7 +1069,6 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
           });
         } catch (_) {}
 
-        // Also send WhatsApp to the target user if available
         try {
           const { data: waConfig } = await supabase
             .from("whatsapp_config")
@@ -1100,7 +1105,10 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
         } catch (waErr) {
           console.error("WhatsApp Self Jadwal notification failed:", waErr);
         }
+      } else {
+        if (showAction) showAction('error', 'Failed to auto-save Self Jadwal: ' + error.message);
       }
+      if (saveGenerationRef.current === thisGen) setIsSaving(false);
     }, 1500);
 
     return () => {
@@ -1311,9 +1319,6 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
                 <Crown size={24} style={{ color: '#d4af37' }} />
                 <span>Self Jadwal Schedule</span>
               </div>
-              <span style={premiumBadgeStyle}>
-                <Gem size={12} /> Premium
-              </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
@@ -1375,7 +1380,13 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
                   ✓ Mark as Viewed
                 </button>
               )}
-              <span style={{ fontSize: '12px', color: '#5d4037', fontStyle: 'italic', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>✏️ Auto-saved</span>
+              {isSaving ? (
+                <span style={{ fontSize: '12px', color: '#d4af37', fontStyle: 'italic', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>
+                  <Loader2 size={12} className="spin" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Saving...
+                </span>
+              ) : (
+                <span style={{ fontSize: '12px', color: '#16a34a', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>✓ Saved</span>
+              )}
             </div>
           </div>
           <div style={{ padding: '20px' }}>            <SelfJadwalTableStyle
@@ -1405,12 +1416,13 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
 
 
 export const SelfJadwalTeacherView
- = ({ showAction, onBroadcastNotification, students = [] }) => {
+ = ({ showAction, onBroadcastNotification, students = [], currentUserId }) => {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedUserName, setSelectedUserName] = useState('');
   const [editHistory, setEditHistory] = useState({});
   const [resolvedUserId, setResolvedUserId] = useState('');
@@ -1418,6 +1430,7 @@ export const SelfJadwalTeacherView
 
   const autoSaveTimerRef = useRef(null);
   const lastSavedSnapshotRef = useRef('');
+  const saveGenerationRef = useRef(0);
 
   const weekRange = useMemo(() => getCurrentWeekRange(), []);
   const dayDates = useMemo(() => weekRange ? DAYS.map((_, idx) => getDayDate(weekRange.weekStart, idx)) : [], [weekRange]);
@@ -1475,8 +1488,11 @@ export const SelfJadwalTeacherView
     const currentSnapshot = JSON.stringify({ data: scheduleData, mode });
     if (currentSnapshot === lastSavedSnapshotRef.current) return;
 
+    const thisGen = ++saveGenerationRef.current;
+
     autoSaveTimerRef.current = setTimeout(async () => {
       if (!resolvedUserId) return;
+      setIsSaving(true);
       const now = Date.now();
       const mergedHistory = { ...(scheduleData._editHistory || {}), ...editHistory };
       const cleanHistory = {};
@@ -1490,21 +1506,26 @@ export const SelfJadwalTeacherView
           schedule_data: { ...scheduleData, _mode: mode, _editHistory: cleanHistory },
           updated_at: new Date().toISOString(),
           has_unseen_changes: true,
-          last_updated_by: resolvedUserId,
+          last_updated_by: currentUserId || resolvedUserId,
           teacher_updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 
+      if (saveGenerationRef.current !== thisGen) return;
+
       if (error) {
         console.error('Auto-save self Jadwal failed:', error);
+        if (showAction) showAction('error', 'Failed to auto-save: ' + error.message);
       } else {
         lastSavedSnapshotRef.current = JSON.stringify({ data: scheduleData, mode });
+        if (showAction) showAction('success', 'Self Jadwal saved!');
       }
+      if (saveGenerationRef.current === thisGen) setIsSaving(false);
     }, 1500);
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [scheduleData, mode, resolvedUserId]);
+  }, [scheduleData, mode, resolvedUserId, currentUserId]);
 
   const fetchSelfJadwalByChildId = async (childId) => {
     setLoading(true);
@@ -1585,9 +1606,6 @@ export const SelfJadwalTeacherView
                 <Crown size={24} style={{ color: '#d4af37' }} />
                 <span>Self Jadwal Schedule</span>
               </div>
-              <span style={premiumBadgeStyle}>
-                <Gem size={12} /> Premium
-              </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
@@ -1658,7 +1676,15 @@ export const SelfJadwalTeacherView
                 {mode === 'surah-wise' && (
                   <span style={{ fontSize: '12px', color: '#8b6d31', fontStyle: 'italic' }}>Free text: English or Arabic</span>
                 )}
-                <span style={{ fontSize: '12px', color: '#5d4037', fontStyle: 'italic', fontFamily: 'Inter, sans-serif', fontWeight: 600, marginLeft: 'auto' }}>✏️ Auto-saved</span>
+                <span style={{ fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: 600, marginLeft: 'auto' }}>
+                  {isSaving ? (
+                    <span style={{ color: '#d4af37', fontStyle: 'italic' }}>
+                      <Loader2 size={12} className="spin" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Saving...
+                    </span>
+                  ) : (
+                    <span style={{ color: '#16a34a' }}>✓ Saved</span>
+                  )}
+                </span>
               </div>
               <div style={{ padding: '20px' }}>
                 <SelfJadwalTableStyle
