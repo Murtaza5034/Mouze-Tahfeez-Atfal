@@ -980,6 +980,8 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
   const [editHistory, setEditHistory] = useState({});
   const [miqaatPopup, setMiqaatPopup] = useState(null);
 
+  const [isSaving, setIsSaving] = useState(false);
+  const saveGenerationRef = useRef(0);
   const autoSaveTimerRef = useRef(null);
   const lastSavedSnapshotRef = useRef('');
 

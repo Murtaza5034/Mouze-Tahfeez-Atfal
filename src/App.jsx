@@ -4540,16 +4540,25 @@ function ParentPortal({
   }, [activePage]);
 
   useEffect(() => {
-    supabase.from('page_visibility')
-      .select('page_key, visible')
-      .eq('role', 'parents')
-      .then(({ data }) => {
-        if (data) {
-          const map = {};
-          data.forEach(p => { map[p.page_key] = p.visible; });
-          setPageVisibility(map);
-        }
-      });
+    Promise.all([
+      supabase.from('page_visibility')
+        .select('page_key, visible')
+        .eq('role', 'parents'),
+      supabase.from('jadwal_settings')
+        .select('parent_leave_enabled')
+        .eq('id', 1)
+        .maybeSingle()
+    ]).then(([pvRes, jsRes]) => {
+      const map = {};
+      if (pvRes.data) {
+        pvRes.data.forEach(p => { map[p.page_key] = p.visible; });
+      }
+      // If admin has disabled the parent leave portal, hide Apply Leave
+      if (jsRes.data && jsRes.data.parent_leave_enabled === false) {
+        map['Apply Leave'] = false;
+      }
+      setPageVisibility(map);
+    });
   }, []);
 
   // Fetch self_jadwal data for read-only view
@@ -9451,6 +9460,67 @@ const handleDownloadAllReports = async () => {
                   showAction("info", `Filtered to: ${marhala || "All Marahil"}`);
                 }}
               />
+
+              {/* ── Parent Leave Portal Toggle ── */}
+              {(() => {
+                const jsRow = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+                const leaveEnabled = jsRow.parent_leave_enabled !== false;
+                return (
+                  <section className="form-card card-appear" style={{ marginTop: '24px', borderTop: '3px solid ' + (leaveEnabled ? '#16a34a' : '#dc2626') }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                      <div>
+                        <div className="card-headline" style={{ marginBottom: '8px' }}>
+                          <CalendarX size={20} style={{ color: leaveEnabled ? '#16a34a' : '#dc2626' }} />
+                          <h3 style={{ color: 'var(--deep-brown)' }}>Parent Leave Portal</h3>
+                        </div>
+                        <p className="subtitle" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--soft-brown)', maxWidth: '460px' }}>
+                          When enabled, parents can access the "Apply Leave" page in the parent portal to submit leave applications for their children.
+                        </p>
+                        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            width: '10px', height: '10px',
+                            borderRadius: '50%',
+                            background: leaveEnabled ? '#16a34a' : '#dc2626',
+                            boxShadow: '0 0 8px ' + (leaveEnabled ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)'),
+                          }} />
+                          <span style={{ fontWeight: 700, fontSize: '0.9rem', color: leaveEnabled ? '#16a34a' : '#dc2626', fontFamily: 'Inter, sans-serif', letterSpacing: '0.5px' }}>
+                            {leaveEnabled ? '● LIVE — Parents can apply leave' : '● OFFLINE — Leave portal is hidden'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          await onSaveJadwalSettings({ parent_leave_enabled: !leaveEnabled });
+                        }}
+                        style={{
+                          padding: '12px 28px',
+                          borderRadius: '12px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          fontSize: '0.95rem',
+                          fontFamily: 'Inter, sans-serif',
+                          letterSpacing: '0.3px',
+                          transition: 'all 0.2s ease',
+                          background: leaveEnabled
+                            ? 'linear-gradient(135deg, #fee2e2, #fecaca)'
+                            : 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+                          color: leaveEnabled ? '#991b1b' : '#166534',
+                          boxShadow: '0 4px 14px ' + (leaveEnabled ? 'rgba(220,38,38,0.15)' : 'rgba(22,163,74,0.15)'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px ' + (leaveEnabled ? 'rgba(220,38,38,0.2)' : 'rgba(22,163,74,0.2)'); }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 14px ' + (leaveEnabled ? 'rgba(220,38,38,0.15)' : 'rgba(22,163,74,0.15)'); }}
+                      >
+                        {leaveEnabled ? <><Lock size={18} /> Turn Off Leave Portal</> : <><Unlock size={18} /> Turn On Leave Portal</>}
+                      </button>
+                    </div>
+                  </section>
+                );
+              })()}
 
               <div className="management-grid two-columns" style={{ marginTop: '24px' }}>
 
