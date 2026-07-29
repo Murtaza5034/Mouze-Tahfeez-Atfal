@@ -802,6 +802,8 @@ import MarhalaPosts from "./MarhalaPosts";
 const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
 import AppUpdatePopup from "./AppUpdatePopup";
 import PrivacyPolicy from "./PrivacyPolicy";
+import PremiumTodaySchedule from "./PremiumTodaySchedule";
+import "./premium-today-schedule.css";
 
 const fixArabicScript = (text) => {
   if (!text) return "";
@@ -5078,30 +5080,16 @@ function ParentPortal({
          )}
         {activePage === "Schedule" ? (
           <div className="home-dashboard fade-in">
-            <div className="dashboard-section card-appear">
-              <div className="section-header">
-                <Calendar size={18} />
-                <h3>Marahil Ikhtebar Schedule</h3>
-              </div>
-              <div className="schedule-list">
-                {currentPage.schedule.map((item, index) => (
-                  <div key={`${item.task_name}-${index}`} className={`schedule-item ${item.is_done ? "done" : ""}`}>
-                    <div className="time-strip">
-                      <Clock size={14} />
-                      {item.task_time}
-                    </div>
-                    <div className="task-info">
-                      <p>{item.task_name}</p>
-                      {item.is_done ? (
-                        <CheckCircle2 size={16} className="status-icon" />
-                      ) : (
-                        <div className="pending-circle" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <PremiumTodaySchedule
+              schedule={currentPage.schedule}
+              role="parent"
+              studentName={studentProfile?.name || studentProfile?.full_name || ""}
+              studentId={studentProfile?.student_id || ""}
+              marhala={studentProfile?.marhala || ""}
+              onToggleDone={(index, isDone) => {
+                showAction("success", isDone ? "Task marked as done! 🎉" : "Task marked as pending");
+              }}
+            />
           </div>
         ) : null}
 
@@ -5203,30 +5191,16 @@ function ParentPortal({
               </div>
             </div>
 
-            <div className="dashboard-section">
-              <div className="section-header">
-                <Calendar size={18} />
-                <h3>Today's Schedule</h3>
-              </div>
-              <div className="schedule-list">
-                {pages.Schedule.schedule.map((item, index) => (
-                  <div key={`${item.task_name}-${index}`} className={`schedule-item ${item.is_done ? "done" : ""}`}>
-                    <div className="time-strip">
-                      <Clock size={14} />
-                      {item.task_time}
-                    </div>
-                    <div className="task-info">
-                      <p>{item.task_name}</p>
-                      {item.is_done ? (
-                        <CheckCircle2 size={16} className="status-icon" />
-                      ) : (
-                        <div className="pending-circle" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <PremiumTodaySchedule
+              schedule={pages.Schedule.schedule}
+              role="parent"
+              studentName={studentProfile?.name || studentProfile?.full_name || ""}
+              studentId={studentProfile?.student_id || ""}
+              marhala={studentProfile?.marhala || ""}
+              onToggleDone={(index, isDone) => {
+                showAction("success", isDone ? "Task marked as done! 🎉" : "Task marked as pending");
+              }}
+            />
 
             <div className="support-bot-home-btn-wrapper">
               <button className="support-bot-home-btn" onClick={() => setActivePage('AI Assistance')}>
@@ -6100,7 +6074,13 @@ function ParentPortal({
                                         Week {fi.week}
                                       </div>
                                       <div>
-                                        <div className="kanz-font" style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.95rem', letterSpacing: 'normal' }}>{fi.date} {fi.monthName} {fi.year}</div>
+                                        <div className="kanz-font" style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '1rem', direction: 'rtl', textAlign: 'right', display: 'flex', alignItems: 'center', gap: '4px', letterSpacing: 'normal', lineHeight: 1.4 }}>
+  <span style={{ fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: '1.05rem', color: 'var(--primary-gold)', fontWeight: 700 }}>{fi.year}</span>
+  <span style={{ opacity: 0.5, margin: '0 2px' }}>•</span>
+  <span style={{ fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: '1rem', color: 'var(--deep-brown)' }}>{fi.monthName}</span>
+  <span style={{ opacity: 0.5, margin: '0 2px' }}>•</span>
+  <span style={{ fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: '1.1rem', color: 'var(--primary-gold)', fontWeight: 700 }}>{fi.date}</span>
+</div>
                                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(wr.week_date).toLocaleDateString('en-GB')}</div>
                                       </div>
                                     </div>
@@ -8444,7 +8424,13 @@ const handleDownloadAllReports = async () => {
                                           Week {fi.week}
                                         </div>
                                         <div>
-                                          <div style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.95rem' }}>{fi.date} {fi.monthName} {fi.year}</div>
+                                          <div style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '1rem', direction: 'rtl', textAlign: 'right', display: 'flex', alignItems: 'center', gap: '4px', lineHeight: 1.4 }}>
+  <span style={{ fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: '1.05rem', color: 'var(--primary-gold)', fontWeight: 700 }}>{fi.year}</span>
+  <span style={{ opacity: 0.5, margin: '0 2px' }}>•</span>
+  <span style={{ fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: '1rem', color: 'var(--deep-brown)' }}>{fi.monthName}</span>
+  <span style={{ opacity: 0.5, margin: '0 2px' }}>•</span>
+  <span style={{ fontFamily: "'Kanz al Marjaan', 'Al-Kanz', serif", fontSize: '1.1rem', color: 'var(--primary-gold)', fontWeight: 700 }}>{fi.date}</span>
+</div>
                                           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(wr.week_date).toLocaleDateString('en-GB')}</div>
                                         </div>
                                       </div>
@@ -9451,60 +9437,22 @@ const handleDownloadAllReports = async () => {
           ) : null}
 
           {activePage === "Schedule" ? (
-            <div className="management-grid two-columns">
-              <section className="form-card">
-                <div className="card-headline">
-                  <Calendar size={18} />
-                  <h3>Create Schedule</h3>
-                </div>
-                <form className="stack-form" onSubmit={onCreateSchedule}>
-                  <div className="form-grid">
-                    <label>
-                      <span>Student</span>
-                      <select
-                        name="student_id"
-                        value={adminForms.schedule.student_id}
-                        onChange={onAdminFormChange("schedule")}
-                        required
-                      >
-                        <option value="">Select child</option>
-                        {students.map((student) => (
-                          <option key={student.student_id} value={student.student_id}>
-                            {student.name}  ·  {student.groupName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+            <>
+              <PremiumTodaySchedule
+                schedule={schedule}
+                role="admin"
+                onToggleDone={(index, isDone) => {
+                  showAction("success", isDone ? "Task marked as done! 🎉" : "Task marked as pending");
+                }}
+                onUpdateBody={(index, body) => {
+                  showAction("success", "Body message updated!");
+                }}
+                onUpdateMarhala={(marhala) => {
+                  showAction("info", `Filtered to: ${marhala || "All Marahil"}`);
+                }}
+              />
 
-                    <label>
-                      <span>Time</span>
-                      <input
-                        type="time"
-                        name="task_time"
-                        value={adminForms.schedule.task_time}
-                        onChange={onAdminFormChange("schedule")}
-                        required
-                      />
-                    </label>
-                  </div>
-
-                  <label>
-                    <span>Task Name</span>
-                    <input
-                      type="text"
-                      name="task_name"
-                      value={adminForms.schedule.task_name}
-                      onChange={onAdminFormChange("schedule")}
-                      placeholder="Sabak, Murajaat, revision..."
-                      required
-                    />
-                  </label>
-
-                  <button type="submit" className="action-button">
-                    Create Schedule
-                  </button>
-                </form>
-              </section>
+              <div className="management-grid two-columns" style={{ marginTop: '24px' }}>
 
               <section className="form-card card-appear">
                 <div className="card-headline">
@@ -9638,6 +9586,7 @@ const handleDownloadAllReports = async () => {
                 </form>
               </section>
             </div>
+            </>
           ) : null}
 
 
