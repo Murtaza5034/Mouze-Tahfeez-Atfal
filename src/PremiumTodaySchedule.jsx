@@ -22,7 +22,8 @@ import {
   Moon,
   Star,
   MoreHorizontal,
-  ArrowRight
+  ArrowRight,
+  Users
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import "./premium-today-schedule.css";
@@ -88,6 +89,11 @@ const getTodayISO = () => {
   return d.toISOString().slice(0, 10);
 };
 
+/* ─── Student Label Helper ─── */
+const getStudentLabel = (s) => {
+  return s?.name || s?.full_name || s?.student_id || "Unknown Student";
+};
+
 /* ─── Main Component ─── */
 export default function PremiumTodaySchedule({
   /* Data */
@@ -96,6 +102,11 @@ export default function PremiumTodaySchedule({
   marhala = "",
   studentName = "",
   studentId = "",
+  
+  /* Students list & selection (admin only) */
+  students = [],
+  selectedStudentId = "",
+  onSelectStudent,
   
   /* Callbacks */
   onToggleDone,
@@ -115,6 +126,7 @@ export default function PremiumTodaySchedule({
   const [selectedIkhtebar, setSelectedIkhtebar] = useState("");
   const [showIkhtebarOptions, setShowIkhtebarOptions] = useState(false);
   const [showMarhalaDropdown, setShowMarhalaDropdown] = useState(false);
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [expandedTask, setExpandedTask] = useState(null);
   const [bodyEditId, setBodyEditId] = useState(null);
   const [bodyEditValue, setBodyEditValue] = useState("");
@@ -123,6 +135,7 @@ export default function PremiumTodaySchedule({
   const [animIn, setAnimIn] = useState(false);
   const marhalaRef = useRef(null);
   const ikhtebarRef = useRef(null);
+  const studentRef = useRef(null);
 
   useEffect(() => {
     setLocalSchedule(schedule);
@@ -139,14 +152,18 @@ export default function PremiumTodaySchedule({
         setShowMarhalaDropdown(false);
       if (ikhtebarRef.current && !ikhtebarRef.current.contains(e.target))
         setShowIkhtebarOptions(false);
+      if (studentRef.current && !studentRef.current.contains(e.target))
+        setShowStudentDropdown(false);
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   const isAdmin = role === "admin";
+  const isParent = role === "parent";
 
   const handleToggleDone = (index) => {
+    if (isParent) return; // Parents cannot toggle
     const updated = [...localSchedule];
     updated[index] = { ...updated[index], is_done: !updated[index].is_done };
     setLocalSchedule(updated);
@@ -154,6 +171,7 @@ export default function PremiumTodaySchedule({
   };
 
   const handleReschedule = (index) => {
+    if (isParent) return; // Parents cannot reschedule
     if (onReschedule) onReschedule(index, rescheduleDate);
     setShowReschedule(null);
     setRescheduleDate("");
@@ -177,9 +195,20 @@ export default function PremiumTodaySchedule({
     if (onCreateIkhtebar) onCreateIkhtebar(option.value);
   };
 
+  const handleStudentSelect = (sid) => {
+    setShowStudentDropdown(false);
+    if (onSelectStudent) onSelectStudent(sid);
+  };
+
   const totalTasks = localSchedule.length;
   const doneTasks = localSchedule.filter((t) => t.is_done).length;
   const completionPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+  /* ─── Find current student name for display ─── */
+  const currentStudent = students.find(s => {
+    const sid = s?.student_id || "";
+    return String(sid).trim().toLowerCase() === String(selectedStudentId).trim().toLowerCase();
+  });
 
   return (
     <div className={`pts-card ${animIn ? "pts-visible" : ""} ${today.isWeekend ? "pts-weekend" : ""}`}>
@@ -200,10 +229,16 @@ export default function PremiumTodaySchedule({
               Today's Schedule
             </h2>
             <p className="pts-subtitle">{today.full}</p>
-            {studentName && (
+            {studentName && !isAdmin && (
               <p className="pts-student-name">
                 <UserCheck size={14} />
                 {studentName}
+              </p>
+            )}
+            {isAdmin && currentStudent && (
+              <p className="pts-student-name">
+                <Users size={14} />
+                Student: {getStudentLabel(currentStudent)}
               </p>
             )}
           </div>
@@ -232,39 +267,90 @@ export default function PremiumTodaySchedule({
         </div>
       )}
 
-      {/* ─── Marhala & Ikhtebar Row ─── */}
+      {/* ─── Controls Row ─── */}
       <div className="pts-controls-row">
-        {/* Marhala Selector */}
-        <div className="pts-selector-group" ref={marhalaRef}>
-          <label className="pts-selector-label">
-            <GraduationCap size={14} />
-            Marhala
-          </label>
-          <button
-            className={`pts-premium-select ${selectedMarhala ? "pts-has-value" : ""}`}
-            onClick={() => setShowMarhalaDropdown(!showMarhalaDropdown)}
-          >
-            <span>{selectedMarhala ? (MARHALA_ARABIC_LABELS[selectedMarhala] || selectedMarhala) : "All Marahil"}</span>
-            <ChevronDown size={14} className={`pts-chevron ${showMarhalaDropdown ? "pts-chevron-up" : ""}`} />
-          </button>
-          {showMarhalaDropdown && (
-            <div className="pts-dropdown pts-marhala-dropdown">
-              <button className="pts-dropdown-item" onClick={() => handleMarhalaChange("")}>
-                <span className="pts-dropdown-label">All Marahil</span>
-              </button>
-              {MARHALA_OPTIONS.map((m) => (
+        {/* Student Selector (admin only) */}
+        {isAdmin && students.length > 0 && (
+          <div className="pts-selector-group" ref={studentRef}>
+            <label className="pts-selector-label">
+              <Users size={14} />
+              Student
+            </label>
+            <button
+              className={`pts-premium-select ${selectedStudentId ? "pts-has-value" : ""}`}
+              onClick={() => setShowStudentDropdown(!showStudentDropdown)}
+            >
+              <span>
+                {currentStudent
+                  ? getStudentLabel(currentStudent)
+                  : selectedStudentId
+                    ? "Selected Student"
+                    : "All Students"}
+              </span>
+              <ChevronDown size={14} className={`pts-chevron ${showStudentDropdown ? "pts-chevron-up" : ""}`} />
+            </button>
+            {showStudentDropdown && (
+              <div className="pts-dropdown pts-student-dropdown">
                 <button
-                  key={m}
-                  className={`pts-dropdown-item ${selectedMarhala === m ? "pts-active" : ""}`}
-                  onClick={() => handleMarhalaChange(m)}
+                  className={`pts-dropdown-item ${!selectedStudentId ? "pts-active" : ""}`}
+                  onClick={() => handleStudentSelect("")}
                 >
-                  <span className="pts-dropdown-label">{MARHALA_ARABIC_LABELS[m] || m}</span>
-                  <span className="pts-dropdown-sub">{m}</span>
+                  <span className="pts-dropdown-label">All Students</span>
+                  <Users size={14} className="pts-dropdown-icon" />
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
+                {students.map((s, i) => {
+                  const sid = s?.student_id || "";
+                  return (
+                    <button
+                      key={sid || i}
+                      className={`pts-dropdown-item ${String(sid).trim().toLowerCase() === String(selectedStudentId).trim().toLowerCase() ? "pts-active" : ""}`}
+                      onClick={() => handleStudentSelect(sid)}
+                    >
+                      <span className="pts-dropdown-label">{getStudentLabel(s)}</span>
+                      {s?.marhala && (
+                        <span className="pts-dropdown-sub">{MARHALA_ARABIC_LABELS[s.marhala] || s.marhala}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Marhala Selector (admin only) */}
+        {isAdmin && (
+          <div className="pts-selector-group" ref={marhalaRef}>
+            <label className="pts-selector-label">
+              <GraduationCap size={14} />
+              Marhala
+            </label>
+            <button
+              className={`pts-premium-select ${selectedMarhala ? "pts-has-value" : ""}`}
+              onClick={() => setShowMarhalaDropdown(!showMarhalaDropdown)}
+            >
+              <span>{selectedMarhala ? (MARHALA_ARABIC_LABELS[selectedMarhala] || selectedMarhala) : "All Marahil"}</span>
+              <ChevronDown size={14} className={`pts-chevron ${showMarhalaDropdown ? "pts-chevron-up" : ""}`} />
+            </button>
+            {showMarhalaDropdown && (
+              <div className="pts-dropdown pts-marhala-dropdown">
+                <button className="pts-dropdown-item" onClick={() => handleMarhalaChange("")}>
+                  <span className="pts-dropdown-label">All Marahil</span>
+                </button>
+                {MARHALA_OPTIONS.map((m) => (
+                  <button
+                    key={m}
+                    className={`pts-dropdown-item ${selectedMarhala === m ? "pts-active" : ""}`}
+                    onClick={() => handleMarhalaChange(m)}
+                  >
+                    <span className="pts-dropdown-label">{MARHALA_ARABIC_LABELS[m] || m}</span>
+                    <span className="pts-dropdown-sub">{m}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Ikhtebar Options */}
         {isAdmin && (
@@ -321,20 +407,22 @@ export default function PremiumTodaySchedule({
                 className={`pts-task-card ${item.is_done ? "pts-task-done" : ""} ${isExpanded ? "pts-task-expanded" : ""}`}
               >
                 <div className="pts-task-main" onClick={() => setExpandedTask(isExpanded ? null : index)}>
-                  {/* Status Indicator */}
-                  <button
-                    className={`pts-task-status ${item.is_done ? "pts-status-done" : "pts-status-pending"}`}
-                    onClick={(e) => { e.stopPropagation(); handleToggleDone(index); }}
-                    title={item.is_done ? "Mark as Pending" : "Mark as Done"}
-                  >
-                    {item.is_done ? (
-                      <CheckCircle size={18} className="pts-check-icon" />
-                    ) : (
-                      <div className="pts-pending-ring">
-                        <div className="pts-pending-dot" />
-                      </div>
-                    )}
-                  </button>
+                  {/* Status Indicator - hidden for parents (read-only) */}
+                  {!isParent && (
+                    <button
+                      className={`pts-task-status ${item.is_done ? "pts-status-done" : "pts-status-pending"}`}
+                      onClick={(e) => { e.stopPropagation(); handleToggleDone(index); }}
+                      title={item.is_done ? "Mark as Pending" : "Mark as Done"}
+                    >
+                      {item.is_done ? (
+                        <CheckCircle size={18} className="pts-check-icon" />
+                      ) : (
+                        <div className="pts-pending-ring">
+                          <div className="pts-pending-dot" />
+                        </div>
+                      )}
+                    </button>
+                  )}
 
                   {/* Task Info */}
                   <div className="pts-task-info">
@@ -439,46 +527,48 @@ export default function PremiumTodaySchedule({
                       </div>
                     )}
 
-                    {/* Reschedule */}
-                    <div className="pts-detail-row">
-                      <label className="pts-detail-label">
-                        <RotateCw size={13} />
-                        Reschedule
-                      </label>
-                      {showRescheduleFor ? (
-                        <div className="pts-reschedule-form">
-                          <input
-                            type="date"
-                            className="pts-date-input"
-                            value={rescheduleDate}
-                            onChange={(e) => setRescheduleDate(e.target.value)}
-                            min={getTodayISO()}
-                          />
-                          <button
-                            className="pts-btn pts-btn-gold"
-                            onClick={() => handleReschedule(index)}
-                            disabled={!rescheduleDate}
-                          >
-                            <ArrowRight size={14} />
-                            Move
-                          </button>
-                          <button
-                            className="pts-btn pts-btn-cancel"
-                            onClick={() => { setShowReschedule(null); setRescheduleDate(""); }}
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          className="pts-btn pts-btn-outline"
-                          onClick={(e) => { e.stopPropagation(); setShowReschedule(index); }}
-                        >
+                    {/* Reschedule - hidden for parents (read-only) */}
+                    {!isParent && (
+                      <div className="pts-detail-row">
+                        <label className="pts-detail-label">
                           <RotateCw size={13} />
                           Reschedule
-                        </button>
-                      )}
-                    </div>
+                        </label>
+                        {showRescheduleFor ? (
+                          <div className="pts-reschedule-form">
+                            <input
+                              type="date"
+                              className="pts-date-input"
+                              value={rescheduleDate}
+                              onChange={(e) => setRescheduleDate(e.target.value)}
+                              min={getTodayISO()}
+                            />
+                            <button
+                              className="pts-btn pts-btn-gold"
+                              onClick={() => handleReschedule(index)}
+                              disabled={!rescheduleDate}
+                            >
+                              <ArrowRight size={14} />
+                              Move
+                            </button>
+                            <button
+                              className="pts-btn pts-btn-cancel"
+                              onClick={() => { setShowReschedule(null); setRescheduleDate(""); }}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="pts-btn pts-btn-outline"
+                            onClick={(e) => { e.stopPropagation(); setShowReschedule(index); }}
+                          >
+                            <RotateCw size={13} />
+                            Reschedule
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {/* Send Notification (admin) */}
                     {isAdmin && onSendNotification && (

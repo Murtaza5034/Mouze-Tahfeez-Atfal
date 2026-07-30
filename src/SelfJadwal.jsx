@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator, Crown, Star, Award, Lock, Gem, Info } from 'lucide-react';
+import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator, Crown, Star, Award, Lock, Gem, Info, Bell } from 'lucide-react';
 import { useFatemiCalendar, summarizeMiqaats } from './fatemiCalendarApi';
 import MiqaatPopup from './MiqaatPopup';
 import './jadwal.css';
@@ -970,17 +970,18 @@ const premiumCardStyle = {
   overflow: 'hidden',
 };
 
-export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
+export const SelfJadwalParentView = ({ userId, userEmail, showAction, onBroadcastNotification }) => {
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState('My Schedule');
+  const [userName, setUserName] = useState('');
   const [hasUnseenChanges, setHasUnseenChanges] = useState(false);
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
   const [editHistory, setEditHistory] = useState({});
   const [miqaatPopup, setMiqaatPopup] = useState(null);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isNotifying, setIsNotifying] = useState(false);
   const saveGenerationRef = useRef(0);
   const autoSaveTimerRef = useRef(null);
   const lastSavedSnapshotRef = useRef('');
@@ -1059,54 +1060,6 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
       if (!error) {
         lastSavedSnapshotRef.current = currentSnapshot;
         if (showAction) showAction('success', 'Self Jadwal saved!');
-        try {
-          await supabase.functions.invoke('fcm-notification', {
-            body: {
-              title: 'Self Jadwal Updated ✏️',
-              body: `${userName} has updated their Self Jadwal schedule.`,
-              targetRole: null,
-              targetUser: userId,
-              data: { redirectPage: 'Self Jadwal', timestamp: new Date().toISOString() }
-            }
-          });
-        } catch (_) {}
-
-        try {
-          const { data: waConfig } = await supabase
-            .from("whatsapp_config")
-            .select("*")
-            .eq("id", 1)
-            .single();
-
-          if (waConfig && waConfig.enabled && waConfig.provider !== 'none' && userId) {
-            const { data: userTeacher } = await supabase
-              .from("teacher_profiles")
-              .select("whatsapp_number")
-              .or(`user_id.eq.${userId},id.eq.${userId}`)
-              .maybeSingle();
-
-            const { data: userParent } = await supabase
-              .from("child_profiles")
-              .select("whatsapp_number")
-              .or(`parent_user_id.eq.${userId},id.eq.${userId}`)
-              .maybeSingle();
-
-            const rawPhone = userTeacher?.whatsapp_number || userParent?.whatsapp_number;
-            if (rawPhone) {
-              let phone = String(rawPhone).replace(/\D/g, '');
-              if (phone.length === 11 && phone.startsWith("0")) {
-                phone = "92" + phone.substring(1);
-              }
-              if (phone.length >= 10) {
-                await supabase.functions.invoke("whatsapp-notification", {
-                  body: { phone, message: `Self Jadwal Updated ✏️\n\n${userName} has updated their Self Jadwal schedule.` }
-                });
-              }
-            }
-          }
-        } catch (waErr) {
-          console.error("WhatsApp Self Jadwal notification failed:", waErr);
-        }
       } else {
         if (showAction) showAction('error', 'Failed to auto-save Self Jadwal: ' + error.message);
       }
@@ -1159,6 +1112,67 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
       lastSavedSnapshotRef.current = JSON.stringify({ data: DEFAULT_SCHEDULE, mode: 'juz-wise' });
     }
     setLoading(false);
+  };
+
+  const handleNotifyUser = async () => {
+    if (!userId) return;
+    setIsNotifying(true);
+    if (showAction) showAction('info', 'Sending notification...');
+
+    if (onBroadcastNotification) {
+      try {
+        // Look up this parent's child to find the teacher
+        let teacherUserId = null;
+        try {
+          const { data: childData } = await supabase
+            .from('child_profiles')
+            .select('teacher_id')
+            .eq('parent_user_id', userId)
+            .limit(1)
+            .maybeSingle();
+
+          if (childData?.teacher_id) {
+            // teacher_id may be stored as numeric id or UUID user_id
+            const { data: teacherData } = await supabase
+              .from('teacher_profiles')
+              .select('user_id')
+              .or(`id.eq.${childData.teacher_id},user_id.eq.${childData.teacher_id}`)
+              .limit(1)
+              .maybeSingle();
+            teacherUserId = teacherData?.user_id || 
+              (typeof childData.teacher_id === 'string' && childData.teacher_id.length > 20 ? childData.teacher_id : null);
+          }
+        } catch (lookupErr) {
+          console.warn('Teacher lookup failed, falling back to teacher role:', lookupErr);
+        }
+
+        if (teacherUserId) {
+          // Send to the specific teacher
+          await onBroadcastNotification(
+            "Self Jadwal Timetable Updated",
+            `${userName || 'A parent'} has updated the Self Jadwal schedule. Please review the changes.`,
+            "user",
+            teacherUserId,
+            "Schedule"
+          );
+          if (showAction) showAction('success', 'Teacher notified successfully');
+        } else {
+          // Fallback: send to all teachers
+          await onBroadcastNotification(
+            "Self Jadwal Timetable Updated",
+            `${userName || 'A parent'} has updated the Self Jadwal schedule. Please review the changes.`,
+            "teacher",
+            null,
+            "Schedule"
+          );
+          if (showAction) showAction('success', 'Teacher notified successfully');
+        }
+      } catch (e) {
+        console.warn("Self Jadwal notification failed:", e);
+        if (showAction) showAction('error', 'Failed to send notification');
+      }
+    }
+    setIsNotifying(false);
   };
 
   const checkWelcomePopup = async () => {
@@ -1389,6 +1403,29 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction }) => {
               ) : (
                 <span style={{ fontSize: '12px', color: '#16a34a', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>✓ Saved</span>
               )}
+              <button
+                onClick={handleNotifyUser}
+                disabled={isNotifying}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 16px', borderRadius: '10px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+                  color: '#fff',
+                  fontSize: '13px', fontWeight: 700,
+                  cursor: isNotifying ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Inter, sans-serif',
+                  opacity: isNotifying ? 0.7 : 1,
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 8px rgba(212, 175, 55, 0.3)'
+                }}
+              >
+                {isNotifying ? (
+                  <><Loader2 size={14} className="spin" /> Notifying...</>
+                ) : (
+                  <><Bell size={14} /> Notify Teacher</>
+                )}
+              </button>
             </div>
           </div>
           <div style={{ padding: '20px' }}>            <SelfJadwalTableStyle
@@ -1648,11 +1685,27 @@ export const SelfJadwalTeacherView
               </select>
               {selectedUserId && (
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button className="jadwal-save-btn" onClick={handleNotifyUser} disabled={saving}>
+                  <button
+                    onClick={handleNotifyUser}
+                    disabled={saving}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '8px',
+                      padding: '10px 20px', borderRadius: '12px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+                      color: '#fff',
+                      fontSize: '14px', fontWeight: 700,
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      fontFamily: 'Inter, sans-serif',
+                      opacity: saving ? 0.7 : 1,
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 3px 12px rgba(212, 175, 55, 0.35)'
+                    }}
+                  >
                     {saving ? (
-                      <><Loader2 className="animate-spin" size={16} /> <span>Notifying...</span></>
+                      <><Loader2 size={16} className="spin" /> Notifying...</>
                     ) : (
-                      <><Save size={16} /> <span>Notify User</span></>
+                      <><Bell size={16} /> Notify Parent</>
                     )}
                   </button>
                 </div>

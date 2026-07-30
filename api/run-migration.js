@@ -34,6 +34,9 @@ ALTER TABLE public.child_profiles ADD COLUMN IF NOT EXISTS date_of_birth DATE;`,
       ALTER TABLE public.child_profiles ADD COLUMN IF NOT EXISTS date_of_birth DATE;
       ALTER TABLE public.jadwal_settings ADD COLUMN IF NOT EXISTS parent_leave_enabled BOOLEAN NOT NULL DEFAULT TRUE;
       UPDATE public.jadwal_settings SET parent_leave_enabled = TRUE WHERE id = 1 AND parent_leave_enabled IS NULL;
+      ALTER TABLE public.schedule ADD COLUMN IF NOT EXISTS schedule_date DATE DEFAULT CURRENT_DATE;
+      ALTER TABLE public.schedule ADD COLUMN IF NOT EXISTS task_body TEXT DEFAULT '';
+      ALTER TABLE public.schedule ADD COLUMN IF NOT EXISTS ikhtebar_type TEXT DEFAULT '';
     `;
     const { error } = await supabase.rpc('exec_sql', { query: sql });
     if (error && error.message?.includes('function "exec_sql" does not exist')) {

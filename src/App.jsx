@@ -70,7 +70,12 @@ import {
   KeyRound,
   LogIn,
   Fingerprint,
-  Smartphone
+  Smartphone,
+  BookMarked,
+  Edit3,
+  Star,
+  MoreHorizontal,
+  ClipboardCheck
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -1022,7 +1027,7 @@ const NAV_ICONS = {
   "Messages": MessageCircle,
   "Email Settings": Mail,
   "Marhala Posts": Heart,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Event Leave": CalendarX,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,
 };
 
 const emptyParentData = {
@@ -4119,6 +4124,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const [timeLeft, setTimeLeft] = useState("");
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [chatLeave, setChatLeave] = useState(null);
+  const [replyText, setReplyText] = useState("");
 
   useEffect(() => {
     checkTime();
@@ -4189,7 +4196,9 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
     if (status === "closed") return;
     if (!leaveType) return showAction("error", "Please select a leave type.");
     
-    if (leaveType === "ILLNESS" && !attachment) return showAction("error", "Medical document is required for illness.");
+    if (leaveType === "ILLNESS") {
+      if (!reason.trim()) return showAction("error", "Please describe the illness details.");
+    }
     if (["EMERGENCY", "Miqaat", "other"].includes(leaveType) && !reason.trim()) return showAction("error", "Please provide details.");
 
     setIsSubmitting(true);
@@ -4247,8 +4256,38 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
     }
   };
 
-  const showTextBox = ["EMERGENCY", "Miqaat", "other"].includes(leaveType);
-  const showUpload = leaveType === "ILLNESS";
+  /* ─── Parent Reply to Admin Chat ─── */
+  const handleParentReply = async () => {
+    if (!chatLeave || !replyText.trim()) return;
+    try {
+      const newMsg = { role: "parent", text: replyText.trim(), timestamp: new Date().toISOString() };
+      const existing = chatLeave.messages || [];
+      const { error } = await supabase
+        .from('student_leaves')
+        .update({ messages: [...existing, newMsg] })
+        .eq('id', chatLeave.id);
+      if (error) throw error;
+
+      await broadcastNotification(
+        "💬 Leave Reply",
+        `${studentProfile?.name}'s parent: ${replyText}`,
+        "admin",
+        null,
+        "Leave Management"
+      );
+
+      // INSTANTLY update chatLeave so the reply appears right in the chat bubble
+      setChatLeave(prev => prev ? { ...prev, messages: [...(prev.messages || []), newMsg] } : prev);
+      setReplyText("");
+      showAction("success", "Reply sent!");
+      fetchHistory();
+    } catch (err) {
+      showAction("error", "Failed to send reply.");
+    }
+  };
+
+  const showTextBox = ["EMERGENCY", "Miqaat", "other", "ILLNESS"].includes(leaveType);
+  const showUpload = false;
 
   return (
     <div className="leave-apply-container card-appear">
@@ -4286,7 +4325,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
               required
             >
               <option value="">-- Choose Category --</option>
-              <option value="ILLNESS">ILLNESS (Document Required)</option>
+              <option value="ILLNESS">ILLNESS</option>
               <option value="EVENT">EVENT</option>
               <option value="EMERGENCY">EMERGENCY (Details Required)</option>
               <option value="Miqaat">Miqaat (Details Required)</option>
@@ -4377,6 +4416,24 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
                 <span className={`status-pill ${item.status.toLowerCase()}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>{item.status}</span>
               </div>
               {item.reason && <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '8px', margin: '8px 0 0' }}>{item.reason}</p>}
+              {/* Messages Button */}
+              <button
+                onClick={() => { setChatLeave(item); setReplyText(""); }}
+                style={{
+                  marginTop: '10px', padding: '7px 14px', borderRadius: 10,
+                  border: '1px solid rgba(212,175,55,0.20)', width: '100%',
+                  background: item.messages?.length ? 'rgba(212,175,55,0.08)' : 'transparent',
+                  color: 'var(--primary-gold)', cursor: 'pointer',
+                  fontSize: '0.75rem', fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  fontFamily: 'inherit', transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(212,175,55,0.12)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = item.messages?.length ? 'rgba(212,175,55,0.08)' : 'transparent'; }}
+              >
+                <MessageCircle size={13} />
+                {item.messages?.length ? `Messages (${item.messages.length})` : "💬 View Messages"}
+              </button>
             </div>
           ))}
           {history.length === 0 && !loadingHistory && (
@@ -4387,6 +4444,109 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
           )}
         </div>
       </div>
+
+      {/* ─── Parent Chat Modal ─── */}
+      {chatLeave && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            display: 'grid', placeItems: 'center', padding: '22px',
+            background: 'radial-gradient(circle at top, rgba(212,175,55,0.18), transparent 34%), rgba(16,12,9,0.58)',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            animation: 'almFadeIn 0.18s ease both',
+          }}
+        >
+          <style>{`@keyframes almFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes almSlideUp { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
+          <div
+            style={{
+              width: 'min(520px, 100%)', borderRadius: 24,
+              background: 'linear-gradient(145deg, #fffcf6, #fcf8ef)',
+              border: '1px solid rgba(212,175,55,0.25)',
+              boxShadow: '0 36px 100px rgba(0,0,0,0.30)',
+              overflow: 'hidden', animation: 'almSlideUp 0.22s ease both',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ padding: '22px 24px 16px', background: 'linear-gradient(135deg, rgba(212,175,55,0.12), transparent)', borderBottom: '1px solid rgba(212,175,55,0.12)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(212,175,55,0.15)', display: 'grid', placeItems: 'center' }}>
+                    <MessageCircle size={18} style={{ color: 'var(--primary-gold)' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)' }}>Messages</h3>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {chatLeave.leave_type} &middot; {chatLeave.leave_date}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => { setChatLeave(null); setReplyText(""); }} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-muted)' }}>
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: '20px 24px' }}>
+              {/* Messages Display */}
+              <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                {(!chatLeave.messages || chatLeave.messages.length === 0) ? (
+                  <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <MessageCircle size={28} style={{ opacity: 0.2, marginBottom: 8 }} />
+                    <p>No messages yet. The admin will reach out if clarification is needed.</p>
+                  </div>
+                ) : chatLeave.messages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      alignSelf: msg.role === 'parent' ? 'flex-end' : 'flex-start',
+                      maxWidth: '80%',
+                      padding: '10px 14px',
+                      borderRadius: msg.role === 'parent' ? '14px 14px 0 14px' : '14px 14px 14px 0',
+                      background: msg.role === 'parent' ? 'rgba(212,175,55,0.12)' : '#f1f0ee',
+                      color: 'var(--deep-brown)',
+                      fontSize: '0.85rem',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <p style={{ margin: 0 }}>{msg.text}</p>
+                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', display: 'block', marginTop: 4, opacity: 0.6 }}>
+                      {msg.role === 'admin' ? 'Admin' : 'You'} &middot; {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Reply Input */}
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Your Reply
+              </label>
+              <textarea
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                placeholder="Type your reply..."
+                rows={3}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(212,175,55,0.20)', fontFamily: 'inherit', fontSize: '13px', color: 'var(--deep-brown)', resize: 'vertical', lineHeight: '1.5', background: 'rgba(255,255,255,0.9)', marginBottom: 12 }}
+              />
+              <button
+                onClick={handleParentReply}
+                disabled={!replyText.trim()}
+                style={{
+                  width: '100%', padding: '11px 20px', borderRadius: 12, border: 'none',
+                  background: replyText.trim() ? 'linear-gradient(135deg, #d4af37, #b8962e)' : '#ddd',
+                  color: '#fff', fontWeight: 700, fontSize: '13px',
+                  cursor: replyText.trim() ? 'pointer' : 'not-allowed',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <Send size={15} />
+                Send Reply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5601,6 +5761,7 @@ function ParentPortal({
               userId={user?.id}
               userEmail={user?.email}
               showAction={showAction}
+              onBroadcastNotification={broadcastNotification}
             />
           </Suspense>
         ) : null}
@@ -6260,6 +6421,10 @@ function AdminLeaveManagement({ onShowAction, students }) {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Pending");
+  const [chatModal, setChatModal] = useState(null); // leave object or null
+  const [chatMessage, setChatMessage] = useState("");
+  const [approveDropdown, setApproveDropdown] = useState(null); // leave.id or null
+  const [sendingAction, setSendingAction] = useState(null); // id being processed
 
   useEffect(() => {
     fetchLeaves();
@@ -6267,149 +6432,770 @@ function AdminLeaveManagement({ onShowAction, students }) {
 
   const fetchLeaves = async () => {
     setLoading(true);
-    console.log("Admin: Fetching all leaves...");
     const { data, error } = await supabase
       .from('student_leaves')
       .select('*')
       .order('created_at', { ascending: false });
-
     if (error) {
       console.error("Admin Leave Fetch Error:", error);
       onShowAction("error", "Database Error: " + error.message);
     } else {
-      console.log("Admin: Leaves fetched:", data?.length);
       setLeaves(data || []);
     }
     setLoading(false);
   };
 
-  const updateStatus = async (id, newStatus) => {
+  const updateStatus = async (id, newStatus, adminMessage = "") => {
     const leaveToUpdate = leaves.find(l => l.id === id);
     const student = students.find(s => s.allIds.includes(String(leaveToUpdate?.student_id)));
-    
+    const studentName = student?.name || "your child";
+    setSendingAction(id);
+
     const { error } = await supabase
       .from('student_leaves')
-      .update({ status: newStatus })
+      .update({ status: newStatus, admin_comment: adminMessage || null })
       .eq('id', id);
 
     if (error) {
       onShowAction("error", "Failed to update status");
-    } else {
-      onShowAction("success", `Leave ${newStatus.toLowerCase()}!`);
-      
-      // Notify Parent
-      if (leaveToUpdate?.parent_id) {
-        supabase.functions.invoke('fcm-notification', {
-          body: {
-            title: `Leave ${newStatus}`,
-            body: `The leave request for ${student?.name || 'your child'} has been ${newStatus.toLowerCase()}.`,
-            targetRole: 'user',
-            targetUser: leaveToUpdate.parent_id // Matched to Edge Function's expected key
-          }
-        });
-      }
-      
-      fetchLeaves();
+      setSendingAction(null);
+      return;
     }
+
+    const statusLabel = newStatus === "Approved" ? "Approved" : "Rejected";
+    const notifyBody = adminMessage
+      ? `Your leave for ${studentName} has been ${statusLabel}. Message: ${adminMessage}`
+      : `Your leave request for ${studentName} has been ${statusLabel}.`;
+
+    onShowAction("success", `Leave ${statusLabel}! Notification sent.`);
+
+    if (leaveToUpdate?.parent_id) {
+      try {
+        await broadcastNotification(
+          `Leave ${statusLabel}`,
+          notifyBody,
+          "user",
+          leaveToUpdate.parent_id,
+          "Apply Leave"
+        );
+      } catch (err) {
+        console.error("Leave notification failed:", err);
+      }
+    }
+
+    setApproveDropdown(null);
+    setChatModal(null);
+    setChatMessage("");
+    setSendingAction(null);
+    fetchLeaves();
   };
+
+  const sendChatMessage = async () => {
+    if (!chatModal || !chatMessage.trim()) return;
+    const student = students.find(s => s.allIds.includes(String(chatModal?.student_id)));
+    const studentName = student?.name || "your child";
+    setSendingAction("chat-" + chatModal.id);
+    try {
+      const newMsg = { role: "admin", text: chatMessage.trim(), timestamp: new Date().toISOString() };
+      const existing = chatModal.messages || [];
+      const { error } = await supabase
+        .from('student_leaves')
+        .update({ messages: [...existing, newMsg] })
+        .eq('id', chatModal.id);
+      if (error) throw error;
+
+      await broadcastNotification(
+        "📝 Leave Clarification",
+        `Regarding ${studentName}'s leave: ${chatMessage}`,
+        "user",
+        chatModal.parent_id,
+        "Apply Leave"
+      );
+
+      // INSTANTLY update chatModal so message appears right in the chat bubble
+      setChatModal(prev => prev ? { ...prev, messages: [...(prev.messages || []), newMsg] } : prev);
+      setChatMessage("");
+      onShowAction("success", "Message sent. Parent can reply.");
+      fetchLeaves();
+    } catch (err) {
+      onShowAction("error", "Failed to send message.");
+    }
+    setSendingAction(null);
+  };
+
+  const getApproveMessages = (leaveType) => {
+    if (leaveType === "ILLNESS") {
+      return [
+        { text: "Khuda shifa aape, Imkan hoi to Hifz kare em Tadbir karvu", val: "Khuda shifa aape, Imkan hoi to Hifz kare em Tadbir karvu" },
+        { text: "Khuda Umur Sehel Kari aape, Imkan hoi to Hifz kare em Tadbir karvu", val: "Khuda Umur Sehel Kari aape, Imkan hoi to Hifz kare em Tadbir karvu" },
+      ];
+    }
+    return [
+      { text: "Imkan hoi to Hifz kare em Tadbir karvu", val: "Imkan hoi to Hifz kare em Tadbir karvu" },
+    ];
+  };
+
+  const LEAVES_CSS = `
+    .alm-modal-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      display: grid; place-items: center; padding: 22px;
+      background: radial-gradient(circle at top, rgba(212,175,55,0.18), transparent 34%), rgba(16,12,9,0.58);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      animation: almFadeIn 0.18s ease both;
+    }
+    @keyframes almFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes almSlideUp { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .alm-chat-card {
+      width: min(520px, 100%); border-radius: 24px;
+      background: linear-gradient(145deg, #fffcf6, #fcf8ef);
+      border: 1px solid rgba(212,175,55,0.25);
+      box-shadow: 0 36px 100px rgba(0,0,0,0.30);
+      overflow: hidden; animation: almSlideUp 0.22s ease both;
+    }
+    .alm-chat-header {
+      padding: 22px 24px 16px;
+      background: linear-gradient(135deg, rgba(212,175,55,0.12), transparent);
+      border-bottom: 1px solid rgba(212,175,55,0.12);
+    }
+    .alm-chat-body { padding: 20px 24px; }
+    .alm-chat-footer { padding: 16px 24px 22px; border-top: 1px solid rgba(212,175,55,0.08); }
+    .alm-premium-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 9px 18px; border-radius: 10px; border: none;
+      font-family: inherit; font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
+    }
+    .alm-premium-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .alm-btn-gold {
+      background: linear-gradient(135deg, #d4af37, #b8962e);
+      color: #fff; box-shadow: 0 4px 14px rgba(184,138,29,0.20);
+    }
+    .alm-btn-gold:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(184,138,29,0.28); }
+    .alm-btn-green {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: #fff; box-shadow: 0 4px 14px rgba(22,163,74,0.20);
+    }
+    .alm-btn-green:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(22,163,74,0.28); }
+    .alm-btn-red {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: #fff; box-shadow: 0 4px 14px rgba(220,38,38,0.20);
+    }
+    .alm-btn-red:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(220,38,38,0.28); }
+    .alm-btn-outline {
+      background: transparent; border: 1px solid rgba(212,175,55,0.30);
+      color: var(--deep-brown);
+    }
+    .alm-btn-outline:hover { border-color: var(--primary-gold); background: rgba(212,175,55,0.06); }
+    .alm-dropdown {
+      position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 50;
+      border-radius: 14px; border: 1px solid rgba(212,175,55,0.20);
+      background: rgba(255,255,255,0.98); backdrop-filter: blur(16px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.12); overflow: hidden;
+      animation: almSlideUp 0.18s ease both;
+    }
+    .alm-dropdown-item {
+      display: block; width: 100%; padding: 12px 16px;
+      background: none; border: none; cursor: pointer;
+      font-family: inherit; font-size: 13px; line-height: 1.4;
+      text-align: left; color: var(--deep-brown);
+      transition: background 0.15s ease;
+    }
+    .alm-dropdown-item:hover { background: rgba(212,175,55,0.10); }
+    .alm-dropdown-item:not(:last-child) { border-bottom: 1px solid rgba(61,43,31,0.06); }
+  `;
 
   const filteredLeaves = leaves.filter(l => l.status === filter);
 
   return (
-    <div className="admin-leave-portal card-appear">
-      <div className="portal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ color: 'var(--deep-brown)', margin: 0 }}>Student Leave Management</h2>
-        <div className="filter-group" style={{ display: 'flex', gap: '10px' }}>
-          {["Pending", "Approved", "Rejected"].map(s => (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`filter-btn ${filter === s ? 'active' : ''}`}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '20px',
-                border: '1px solid #ddd',
-                background: filter === s ? 'var(--primary-gold)' : 'white',
-                color: filter === s ? 'white' : '#666',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                transition: 'all 0.2s'
-              }}
-            >
-              {s}
-            </button>
-          ))}
+    <>
+      <style>{LEAVES_CSS}</style>
+
+      {/* ─── Chat Modal ─── */}
+      {chatModal && (
+        <div className="alm-modal-overlay" onClick={() => { setChatModal(null); setChatMessage(""); }}>
+          <div className="alm-chat-card" onClick={e => e.stopPropagation()}>
+            <div className="alm-chat-header">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(212,175,55,0.15)', display: 'grid', placeItems: 'center' }}>
+                    <MessageCircle size={18} style={{ color: 'var(--primary-gold)' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)' }}>Clarify Leave Reason</h3>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      Send a message to the parent about this leave
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => { setChatModal(null); setChatMessage(""); }} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-muted)' }}>
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="alm-chat-body">
+              <div style={{ padding: '12px 16px', background: 'rgba(212,175,55,0.06)', borderRadius: 12, border: '1px solid rgba(212,175,55,0.12)', marginBottom: 12, fontSize: '0.85rem', color: 'var(--soft-brown)' }}>
+                <strong>Student:</strong> {students.find(s => s.allIds.includes(String(chatModal.student_id)))?.name || "Unknown"} &middot;
+                <strong> Category:</strong> {chatModal.leave_type || "General"} &middot;
+                <strong> Date:</strong> {chatModal.leave_date}
+              </div>
+
+              {/* Messages Display */}
+              <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14, padding: '6px 0' }}>
+                {(!chatModal.messages || chatModal.messages.length === 0) ? (
+                  <div style={{ textAlign: 'center', padding: '20px 10px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                    <MessageCircle size={24} style={{ opacity: 0.2, marginBottom: 6 }} />
+                    <p style={{ margin: 0 }}>No messages yet. Send a message to start the conversation.</p>
+                  </div>
+                ) : chatModal.messages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      alignSelf: msg.role === 'admin' ? 'flex-end' : 'flex-start',
+                      maxWidth: '85%',
+                      padding: '9px 13px',
+                      borderRadius: msg.role === 'admin' ? '14px 14px 0 14px' : '14px 14px 14px 0',
+                      background: msg.role === 'admin' ? 'rgba(212,175,55,0.12)' : '#f1f0ee',
+                      color: 'var(--deep-brown)',
+                      fontSize: '0.82rem',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <p style={{ margin: 0 }}>{msg.text}</p>
+                    <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', display: 'block', marginTop: 3, opacity: 0.6 }}>
+                      {msg.role === 'admin' ? 'You' : 'Parent'} &middot; {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Your Message to Parent
+              </label>
+              <textarea
+                value={chatMessage}
+                onChange={e => setChatMessage(e.target.value)}
+                placeholder="Ask the parent to clarify the reason for leave..."
+                rows={3}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(212,175,55,0.20)', fontFamily: 'inherit', fontSize: '13px', color: 'var(--deep-brown)', resize: 'vertical', lineHeight: '1.5', background: 'rgba(255,255,255,0.9)' }}
+              />
+            </div>
+
+            <div className="alm-chat-footer">
+              <button
+                onClick={sendChatMessage}
+                disabled={!chatMessage.trim() || sendingAction === "chat-" + chatModal.id}
+                className="alm-premium-btn alm-btn-gold"
+                style={{ width: '100%', padding: '11px 20px', fontSize: '13px', marginBottom: '12px' }}
+              >
+                <Send size={16} />
+                {sendingAction === "chat-" + chatModal.id ? "Sending..." : "Send Message to Parent"}
+              </button>
+
+              <p style={{ margin: '0 0 10px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Quick Actions
+              </p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => updateStatus(chatModal.id, "Approved", "")}
+                  disabled={sendingAction === chatModal.id}
+                  className="alm-premium-btn alm-btn-green"
+                  style={{ flex: 1, padding: '11px 16px', fontSize: '13px' }}
+                >
+                  <CheckCircle size={16} />
+                  {sendingAction === chatModal.id ? "Processing..." : "Approve"}
+                </button>
+                <button
+                  onClick={() => updateStatus(chatModal.id, "Rejected", "")}
+                  disabled={sendingAction === chatModal.id}
+                  className="alm-premium-btn alm-btn-red"
+                  style={{ flex: 1, padding: '11px 16px', fontSize: '13px' }}
+                >
+                  <X size={16} />
+                  {sendingAction === chatModal.id ? "Processing..." : "Reject"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Main Content ─── */}
+      <div className="admin-leave-portal card-appear">
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginBottom: '24px', flexWrap: 'wrap', gap: '12px'
+        }}>
+          <div>
+            <h2 style={{ color: 'var(--deep-brown)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.4rem' }}>
+              <CalendarX size={24} style={{ color: 'var(--primary-gold)' }} />
+              Leave Management
+            </h2>
+            <p className="subtitle" style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Review and respond to student leave applications
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {["Pending", "Approved", "Rejected"].map(s => (
+              <button
+                key={s}
+                onClick={() => setFilter(s)}
+                style={{
+                  padding: '8px 18px', borderRadius: '999px', border: 'none',
+                  background: filter === s
+                    ? 'linear-gradient(135deg, #d4af37, #b8962e)'
+                    : 'rgba(61,43,31,0.06)',
+                  color: filter === s ? '#fff' : 'var(--text-muted)',
+                  fontWeight: 700, fontSize: '0.8rem',
+                  cursor: 'pointer', transition: 'all 0.2s ease',
+                  fontFamily: 'inherit', letterSpacing: '0.03em',
+                }}
+              >
+                {s} ({leaves.filter(l => l.status === s).length})
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+          {loading ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px' }}>
+              <Loader2 className="animate-spin" size={32} style={{ color: 'var(--primary-gold)' }} />
+              <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading requests...</p>
+            </div>
+          ) : filteredLeaves.map(leave => {
+            const student = students.find(s => s.allIds.includes(String(leave.student_id)));
+            const isIllness = leave.leave_type === "ILLNESS";
+            const approveMsgs = getApproveMessages(leave.leave_type);
+            const showApproveDropdown = approveDropdown === leave.id;
+
+            return (
+              <div
+                key={leave.id}
+                style={{
+                  borderRadius: 20, overflow: 'hidden',
+                  background: 'linear-gradient(145deg, rgba(255,252,246,0.98), rgba(252,248,239,0.94))',
+                  border: '1px solid ' + (leave.status === 'Approved' ? 'rgba(34,197,94,0.25)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.20)' : 'rgba(212,175,55,0.20)'),
+                  boxShadow: '0 8px 30px rgba(61,43,31,0.06)',
+                  position: 'relative',
+                }}
+              >
+                {/* Top accent strip */}
+                <div style={{
+                  height: 4, width: '100%',
+                  background: leave.status === 'Approved' ? 'linear-gradient(90deg, #22c55e, #16a34a)'
+                    : leave.status === 'Rejected' ? 'linear-gradient(90deg, #ef4444, #dc2626)'
+                    : 'linear-gradient(90deg, #d4af37, #b8962e)',
+                }} />
+
+                <div style={{ padding: '18px 20px' }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)', fontWeight: 700 }}>
+                        {student?.name || "Unknown Student"}
+                      </h4>
+                      <p style={{ margin: '2px 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Applied {new Date(leave.created_at).toLocaleDateString()} at {new Date(leave.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                      </p>
+                    </div>
+                    <span style={{
+                      padding: '5px 12px', borderRadius: '999px', fontSize: '0.7rem', fontWeight: 800,
+                      textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
+                      background: leave.status === 'Approved' ? 'rgba(34,197,94,0.12)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.10)' : 'rgba(212,175,55,0.14)',
+                      color: leave.status === 'Approved' ? '#16a34a' : leave.status === 'Rejected' ? '#dc2626' : '#b8962e',
+                    }}>
+                      {leave.status}
+                    </span>
+                  </div>
+
+                  {/* Category + Reason */}
+                  <div style={{
+                    marginTop: '14px', padding: '12px 14px',
+                    background: 'rgba(212,175,55,0.05)',
+                    borderRadius: 12, border: '1px solid rgba(212,175,55,0.10)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary-gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        {leave.leave_type || "General"}
+                      </span>
+                      {isIllness && (
+                        <span style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.10)', color: '#dc2626', fontWeight: 700 }}>
+                          MEDICAL
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--deep-brown)', lineHeight: '1.5' }}>
+                      {leave.reason || "No details provided."}
+                    </p>
+                  </div>
+
+                  {/* Leave Date */}
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <Calendar size={13} style={{ color: 'var(--primary-gold)' }} />
+                    <strong>Leave Date:</strong> {leave.leave_date}
+                  </div>
+
+                  {/* Medical Document */}
+                  {leave.attachment_url && (
+                    <button
+                      onClick={() => window.open(leave.attachment_url, '_blank')}
+                      style={{
+                        marginTop: '10px', width: '100%', padding: '9px 14px', borderRadius: 10,
+                        border: '1px solid rgba(212,175,55,0.20)', color: 'var(--primary-gold)',
+                        background: 'rgba(212,175,55,0.05)', cursor: 'pointer',
+                        fontSize: '0.8rem', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', gap: '6px', fontWeight: 700, fontFamily: 'inherit',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(212,175,55,0.12)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(212,175,55,0.05)'; }}
+                    >
+                      <FileArchive size={14} /> View Medical Document
+                    </button>
+                  )}
+
+                  {/* Action Buttons for Pending */}
+                  {leave.status === "Pending" && (
+                    <div style={{ marginTop: '16px' }}>
+                      {/* 3 Premium Action Buttons */}
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                        {/* Subject to Approve */}
+                        <button
+                          onClick={() => { setChatModal(leave); setChatMessage(""); }}
+                          className="alm-premium-btn alm-btn-outline"
+                          style={{ flex: 1, padding: '10px 12px', fontSize: '0.75rem' }}
+                        >
+                          <MessageCircle size={14} />
+                          Subject to Approve
+                        </button>
+
+                        {/* Approve with dropdown */}
+                        <div style={{ flex: 1, position: 'relative' }}>
+                          <button
+                            onClick={() => setApproveDropdown(showApproveDropdown ? null : leave.id)}
+                            disabled={sendingAction === leave.id}
+                            className="alm-premium-btn alm-btn-green"
+                            style={{ width: '100%', padding: '10px 12px', fontSize: '0.75rem' }}
+                          >
+                            <CheckCircle size={14} />
+                            {sendingAction === leave.id ? "Processing..." : "Approve"}
+                            <ChevronDown size={12} style={{ marginLeft: 2 }} />
+                          </button>
+
+                          {showApproveDropdown && (
+                            <div className="alm-dropdown">
+                              {approveMsgs.map((msg, i) => (
+                                <button
+                                  key={i}
+                                  className="alm-dropdown-item"
+                                  onClick={() => updateStatus(leave.id, "Approved", msg.val)}
+                                >
+                                  <span style={{ fontSize: '0.78rem', lineHeight: '1.5', display: 'block' }}>
+                                    {msg.text}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Reject */}
+                        <button
+                          onClick={() => {
+                            if (window.confirm("Are you sure you want to reject this leave application?")) {
+                              updateStatus(leave.id, "Rejected", "");
+                            }
+                          }}
+                          disabled={sendingAction === leave.id}
+                          className="alm-premium-btn alm-btn-red"
+                          style={{ flex: 1, padding: '10px 12px', fontSize: '0.75rem' }}
+                        >
+                          <X size={14} />
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {filteredLeaves.length === 0 && !loading && (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ opacity: 0.2 }}>
+                <CalendarCheck size={64} style={{ color: 'var(--primary-gold)' }} />
+              </div>
+              <h3 style={{ color: 'var(--deep-brown)', marginTop: 16 }}>No {filter.toLowerCase()} requests</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                {filter === "Pending"
+                  ? "All leave applications have been reviewed. Great job!"
+                  : `No ${filter.toLowerCase()} leave applications found.`}
+              </p>
+            </div>
+          )}
         </div>
       </div>
+    </>
+  );
+}
 
-      <div className="leave-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-        {loading ? (
-          <div className="loading-state" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px' }}>
-            <Loader2 className="animate-spin" size={32} style={{ color: 'var(--primary-gold)' }} />
-            <p>Loading requests...</p>
+function AdminAttendanceTracking({ students, teacherProfiles }) {
+  const [attendanceMap, setAttendanceMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [expandedTeacherId, setExpandedTeacherId] = useState(null);
+  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  
+  useEffect(() => {
+    fetchTodayAttendance();
+    const interval = setInterval(fetchTodayAttendance, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  const fetchTodayAttendance = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('student_daily_attendance')
+        .select('*')
+        .eq('attendance_date', today);
+      
+      if (!error && data) {
+        const map = {};
+        data.forEach(rec => {
+          map[String(rec.student_id).trim().toLowerCase()] = rec.status;
+        });
+        setAttendanceMap(map);
+      }
+    } catch (e) {
+      console.error("Attendance Tracking fetch error:", e);
+    }
+    setLoading(false);
+  };
+  
+  const teacherData = useMemo(() => {
+    const result = [];
+    const activeTeachers = teacherProfiles.filter(t => t.is_active !== false && t.user_id);
+    
+    activeTeachers.forEach(teacher => {
+      const teacherStudents = students.filter(s => 
+        String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.user_id || "") ||
+        String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.id || "")
+      );
+      
+      if (teacherStudents.length === 0) return;
+      
+      let markedCount = 0;
+      const studentStatuses = teacherStudents.map(s => {
+        const sid = String(s.student_id).trim().toLowerCase();
+        const status = attendanceMap[sid];
+        if (status) markedCount++;
+        return { ...s, attStatus: status || null };
+      });
+      
+      let tag;
+      if (markedCount === teacherStudents.length) tag = 'all';
+      else if (markedCount > 0) tag = 'some';
+      else tag = 'none';
+      
+      result.push({
+        teacher,
+        students: studentStatuses,
+        total: teacherStudents.length,
+        marked: markedCount,
+        tag
+      });
+    });
+    
+    result.sort((a, b) => {
+      const order = { none: 0, some: 1, all: 2 };
+      return order[a.tag] - order[b.tag];
+    });
+    
+    return result;
+  }, [students, teacherProfiles, attendanceMap]);
+  
+  const TagBadge = ({ tag }) => {
+    const config = {
+      all: { label: '✅ All Marked', color: '#16a34a', bg: '#dcfce7' },
+      some: { label: '🟠 Some Marked', color: '#ea580c', bg: '#fff7ed' },
+      none: { label: '❌ Not Marked', color: '#dc2626', bg: '#fef2f2' },
+    };
+    const c = config[tag];
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: '4px',
+        padding: '4px 12px', borderRadius: '999px',
+        fontSize: '0.72rem', fontWeight: 700,
+        color: c.color, background: c.bg,
+        border: `1px solid ${c.color}20`,
+        letterSpacing: '0.02em', whiteSpace: 'nowrap'
+      }}>
+        {c.label}
+      </span>
+    );
+  };
+  
+  const totalTeachers = teacherData.length;
+  const allMarked = teacherData.filter(t => t.tag === 'all').length;
+  const someMarked = teacherData.filter(t => t.tag === 'some').length;
+  const notMarked = teacherData.filter(t => t.tag === 'none').length;
+  
+  return (
+    <div className="overview-container fade-in">
+      <style>{`
+        .att-tracking-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .att-summary-strip { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 24px; }
+        .att-summary-stat { 
+          flex: 1; min-width: 140px; padding: 16px 20px; 
+          border-radius: 16px; background: var(--premium-white); 
+          border: 1px solid var(--glass-border);
+          display: flex; align-items: center; gap: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .att-summary-stat:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        .att-stat-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .att-stat-number { font-size: 1.5rem; font-weight: 800; line-height: 1.2; }
+        .att-stat-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+        .att-teacher-card {
+          background: var(--premium-white); border-radius: 20px;
+          border: 1px solid var(--glass-border);
+          overflow: hidden; margin-bottom: 16px;
+          transition: all 0.25s ease;
+        }
+        .att-teacher-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+        .att-teacher-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 16px 20px; cursor: pointer;
+          border-bottom: 1px solid var(--glass-border);
+          background: linear-gradient(135deg, #faf8f4, #f5f0e8);
+        }
+        .att-teacher-left { display: flex; align-items: center; gap: 12px; }
+        .att-teacher-avatar {
+          width: 38px; height: 38px; border-radius: 50%;
+          background: linear-gradient(135deg, var(--primary-gold), #a07d3a);
+          display: flex; align-items: center; justify-content: center;
+          color: #fff; font-weight: 700; font-size: 0.9rem;
+        }
+        .att-teacher-name { font-weight: 700; font-size: 0.95rem; color: var(--deep-brown); }
+        .att-teacher-count { font-size: 0.75rem; color: var(--text-muted); }
+        .att-student-list { padding: 12px 20px 16px; }
+        .att-student-row {
+          display: flex; align-items: center; gap: 10px;
+          padding: 6px 0; border-bottom: 1px solid #f5f5f5;
+        }
+        .att-student-row:last-child { border-bottom: none; }
+        .att-student-name { flex: 1; font-size: 0.85rem; color: var(--deep-brown); font-weight: 500; }
+        .att-student-status {
+          width: 28px; height: 28px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-weight: 700;
+        }
+        .att-student-status.present { background: #dcfce7; color: #16a34a; }
+        .att-student-status.absent { background: #fef2f2; color: #dc2626; }
+        .att-student-status.unmarked { background: #f5f5f5; color: #9ca3af; }
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .att-animate { animation: fadeSlideUp 0.3s ease both; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .att-spin { animation: spin 1s linear infinite; }
+      `}</style>
+      
+      <div className="att-tracking-container">
+        <div className="section-header" style={{ marginBottom: '8px' }}>
+          <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <ClipboardCheck size={24} style={{ color: 'var(--primary-gold)' }} />
+            Attendance Tracking
+          </h2>
+          <p className="subtitle" style={{ fontSize: '0.82rem', color: 'var(--soft-brown)' }}>
+            Track which teachers have marked daily student attendance — {today}
+          </p>
+        </div>
+        
+        {/* Summary Strip */}
+        <div className="att-summary-strip">
+          <div className="att-summary-stat">
+            <div className="att-stat-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>👥</div>
+            <div>
+              <div className="att-stat-number">{totalTeachers}</div>
+              <div className="att-stat-label">Total Teachers</div>
+            </div>
           </div>
-        ) : filteredLeaves.map(leave => {
-          const student = students.find(s => s.allIds.includes(String(leave.student_id)));
-          return (
-            <div key={leave.id} className="premium-card leave-admin-card" style={{ padding: '20px', borderLeft: `4px solid ${leave.status === 'Approved' ? '#4caf50' : leave.status === 'Rejected' ? '#f44336' : '#ff9800'}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{student?.name || "Unknown Student"}</h4>
-                  <p style={{ margin: '4px 0', fontSize: '0.8rem', opacity: 0.6 }}>Applied: {new Date(leave.created_at).toLocaleDateString()}</p>
+          <div className="att-summary-stat">
+            <div className="att-stat-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>✅</div>
+            <div>
+              <div className="att-stat-number" style={{ color: '#16a34a' }}>{allMarked}</div>
+              <div className="att-stat-label">All Marked</div>
+            </div>
+          </div>
+          <div className="att-summary-stat">
+            <div className="att-stat-icon" style={{ background: '#fff7ed', color: '#ea580c' }}>🟠</div>
+            <div>
+              <div className="att-stat-number" style={{ color: '#ea580c' }}>{someMarked}</div>
+              <div className="att-stat-label">Some Marked</div>
+            </div>
+          </div>
+          <div className="att-summary-stat">
+            <div className="att-stat-icon" style={{ background: '#fef2f2', color: '#dc2626' }}>❌</div>
+            <div>
+              <div className="att-stat-number" style={{ color: '#dc2626' }}>{notMarked}</div>
+              <div className="att-stat-label">Not Marked</div>
+            </div>
+          </div>
+        </div>
+        
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+            <Loader2 size={36} className="att-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+            <p>Loading attendance data...</p>
+          </div>
+        ) : teacherData.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+            <Users size={48} style={{ opacity: 0.2, margin: '0 auto 12px', display: 'block' }} />
+            <p style={{ fontSize: '0.95rem' }}>No teachers with assigned students found.</p>
+          </div>
+        ) : (
+          teacherData.map((item, idx) => (
+            <div key={item.teacher.user_id || item.teacher.id || idx} 
+                 className="att-teacher-card att-animate"
+                 style={{ animationDelay: `${idx * 0.05}s` }}>
+              <div className="att-teacher-header" onClick={() => setExpandedTeacherId(expandedTeacherId === (item.teacher.user_id || item.teacher.id) ? null : (item.teacher.user_id || item.teacher.id))}>
+                <div className="att-teacher-left">
+                  <div className="att-teacher-avatar">
+                    {item.teacher.full_name?.charAt(0) || '?'}
+                  </div>
+                  <div>
+                    <div className="att-teacher-name">{item.teacher.full_name}</div>
+                    <div className="att-teacher-count">{item.marked}/{item.total} students marked • {item.total} total</div>
+                  </div>
                 </div>
-                <span className={`status-badge ${leave.status.toLowerCase()}`} style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', background: leave.status === 'Approved' ? '#e8f5e9' : leave.status === 'Rejected' ? '#ffebee' : '#fff3e0', color: leave.status === 'Approved' ? '#2e7d32' : leave.status === 'Rejected' ? '#c62828' : '#e65100' }}>
-                  {leave.status}
-                </span>
+                <TagBadge tag={item.tag} />
               </div>
               
-              <div style={{ marginTop: '16px', padding: '12px', background: '#f9f9f9', borderRadius: '12px', fontSize: '0.9rem', border: '1px solid #eee' }}>
-                <div style={{ fontWeight: 'bold', color: 'var(--deep-brown)', marginBottom: '4px' }}>Category: {leave.leave_type || "General"}</div>
-                <p style={{ margin: 0, color: '#555', lineHeight: '1.4' }}>{leave.reason || "No details provided."}</p>
-              </div>
-
-              <div style={{ marginTop: '12px', fontSize: '0.85rem', color: '#666' }}>
-                <strong>Leave Date:</strong> {leave.leave_date}
-              </div>
-
-              {leave.attachment_url && (
-                <button 
-                  onClick={() => window.open(leave.attachment_url, '_blank')}
-                  className="view-doc-btn"
-                  style={{ marginTop: '12px', width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)', background: 'transparent', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}
-                >
-                  <FileArchive size={16} /> View Medical Document
-                </button>
-              )}
-
-              {leave.status === "Pending" && (
-                <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                  <button 
-                    onClick={() => updateStatus(leave.id, "Approved")}
-                    style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#4caf50', color: 'white', fontWeight: 'bold', cursor: 'pointer', transition: 'filter 0.2s' }}
-                    onMouseOver={e => e.target.style.filter = 'brightness(1.1)'}
-                    onMouseOut={e => e.target.style.filter = 'none'}
-                  >
-                    Approve
-                  </button>
-                  <button 
-                    onClick={() => updateStatus(leave.id, "Rejected")}
-                    style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#f44336', color: 'white', fontWeight: 'bold', cursor: 'pointer', transition: 'filter 0.2s' }}
-                    onMouseOver={e => e.target.style.filter = 'brightness(1.1)'}
-                    onMouseOut={e => e.target.style.filter = 'none'}
-                  >
-                    Reject
-                  </button>
+              {expandedTeacherId === (item.teacher.user_id || item.teacher.id) && (
+                <div className="att-student-list">
+                  {item.students.map((s, si) => {
+                    const isPresent = s.attStatus === 'present';
+                    const isAbsent = s.attStatus === 'absent';
+                    return (
+                      <div key={s.student_id || si} className="att-student-row" style={{ animationDelay: `${si * 0.03}s` }}>
+                        <div className={"att-student-status " + (isPresent ? 'present' : isAbsent ? 'absent' : 'unmarked')}>
+                          {isPresent ? 'P' : isAbsent ? 'A' : '—'}
+                        </div>
+                        <span className="att-student-name">{s.name || s.full_name || `Student #${s.student_id}`}</span>
+                        <span style={{ fontSize: '0.72rem', color: isPresent ? '#16a34a' : isAbsent ? '#dc2626' : '#9ca3af' }}>
+                          {isPresent ? 'Present' : isAbsent ? 'Absent' : 'Not Marked'}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          );
-        })}
-        {filteredLeaves.length === 0 && !loading && (
-          <div className="empty-state" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px', opacity: 0.3 }}>
-            <Calendar size={64} />
-            <h3 style={{ marginTop: '15px' }}>No {filter.toLowerCase()} requests</h3>
-            <p>All student leave applications are up to date.</p>
-          </div>
+          ))
         )}
       </div>
     </div>
@@ -6773,6 +7559,7 @@ function AdminPortal({
   const [teacherAccessDirty, setTeacherAccessDirty] = useState(false);
   const [uploadingStudentRegistryPhoto, setUploadingStudentRegistryPhoto] = useState(false);
   const [uploadingAssignmentPhoto, setUploadingAssignmentPhoto] = useState(false);
+  const [adminScheduleStudentId, setAdminScheduleStudentId] = useState("");
   const studentPhotoInputRef = useRef(null);
   const assignmentPhotoInputRef = useRef(null);
 
@@ -6840,6 +7627,93 @@ function AdminPortal({
       mainEl.scrollTop = 0;
     }
   }, [activePage]);
+
+  // ── Scheduled Attendance Reminder Notifications (Mon-Sat @ 10:05 PM) ──
+  useEffect(() => {
+    const NOTIF_KEY = 'mauze-attendance-reminder-last-sent';
+    const DAYS = [1,2,3,4,5,6]; // Mon=1 ... Sat=6
+    
+    const checkAndSend = async () => {
+      const now = new Date();
+      const day = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      
+      // Only Mon-Sat at 10:05 PM (±1 minute window)
+      if (!DAYS.includes(day)) return;
+      if (hour !== 22 || Math.abs(minute - 5) > 1) return;
+      
+      // Check if already sent today
+      const todayStr = now.toISOString().split('T')[0];
+      const lastSent = localStorage.getItem(NOTIF_KEY);
+      if (lastSent === todayStr) return;
+      
+      try {
+        // Fetch today's attendance
+        const { data: attData } = await supabase
+          .from('student_daily_attendance')
+          .select('*')
+          .eq('attendance_date', todayStr);
+        
+        const attMap = {};
+        if (attData) {
+          attData.forEach(rec => {
+            attMap[String(rec.student_id).trim().toLowerCase()] = rec.status;
+          });
+        }
+        
+        // For each active teacher, compute their class attendance status
+        const activeTeachers = teacherProfiles.filter(t => t.is_active !== false && t.user_id);
+        
+        for (const teacher of activeTeachers) {
+          const teacherStudents = students.filter(s =>
+            String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.user_id || "") ||
+            String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.id || "")
+          );
+          
+          if (teacherStudents.length === 0) continue;
+          
+          let marked = 0;
+          teacherStudents.forEach(s => {
+            const sid = String(s.student_id).trim().toLowerCase();
+            if (attMap[sid]) marked++;
+          });
+          
+          const total = teacherStudents.length;
+          const missing = total - marked;
+          
+          let title, body;
+          if (marked === total) {
+            title = "✅ Daily Attendance — All Marked";
+            body = `Assalamu Alaykum ${teacher.full_name},\n\nOutstanding! ✅ All ${total} of your students have been marked present for today's attendance. Your diligence is truly appreciated.\n\nJazakallah Khair,\nAdministration`;
+          } else if (marked > 0) {
+            title = "⚠️ Daily Attendance — Some Pending";
+            body = `Assalamu Alaykum ${teacher.full_name},\n\nYou have marked ${marked} out of ${total} students today. ${missing} student${missing > 1 ? 's' : ''} ${missing > 1 ? 'are' : 'is'} still pending. Kindly complete the attendance at your earliest convenience.\n\nJazakallah Khair,\nAdministration`;
+          } else {
+            title = "❌ Daily Attendance — Not Marked";
+            body = `Assalamu Alaykum ${teacher.full_name},\n\nWe noticed that attendance for ${total} student${total > 1 ? 's' : ''} in your class has not been marked today. Please log in and mark the attendance as soon as possible.\n\nJazakallah Khair,\nAdministration`;
+          }
+          
+          await broadcastNotification(
+            title,
+            body,
+            "user",
+            teacher.user_id,
+            "Attendance History"
+          );
+        }
+        
+        // Mark as sent for today
+        localStorage.setItem(NOTIF_KEY, todayStr);
+        console.log("✅ Attendance reminder notifications sent for", todayStr);
+      } catch (e) {
+        console.error("Attendance reminder notification error:", e);
+      }
+    };
+    
+    const interval = setInterval(checkAndSend, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [students, teacherProfiles]);
 
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -7177,7 +8051,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
+  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
@@ -7215,11 +8089,76 @@ const handleDownloadAllReports = async () => {
   }));
 
   const viewedCount = (parentViews || []).filter(v => v.viewed).length;
+
+  // ── Leave Count & Attendance Tracking Overview Stats ──
+  const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  const [attNotMarkedCount, setAttNotMarkedCount] = useState(0);
+  const [attAllMarkedCount, setAttAllMarkedCount] = useState(0);
+  const [overviewAttLoading, setOverviewAttLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOverviewStats = async () => {
+      try {
+        // Fetch pending leave count for today
+        const todayStr = new Date().toISOString().split('T')[0];
+        const { count: leaveCount } = await supabase
+          .from('student_leaves')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending')
+          .gte('created_at', todayStr);
+        setPendingLeaveCount(leaveCount || 0);
+
+        // Fetch today's attendance for teacher tracking
+        const today = todayStr;
+        const { data: attData } = await supabase
+          .from('student_daily_attendance')
+          .select('*')
+          .eq('attendance_date', today);
+
+        const attMap = {};
+        if (attData) {
+          attData.forEach(rec => {
+            attMap[String(rec.student_id).trim().toLowerCase()] = rec.status;
+          });
+        }
+
+        let notMarked = 0;
+        let allMarked = 0;
+        const activeTeachers = teacherProfiles.filter(t => t.is_active !== false && t.user_id);
+        activeTeachers.forEach(teacher => {
+          const teacherStudents = students.filter(s =>
+            String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.user_id || "") ||
+            String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.id || "")
+          );
+          if (teacherStudents.length === 0) return;
+
+          let marked = 0;
+          teacherStudents.forEach(s => {
+            const sid = String(s.student_id).trim().toLowerCase();
+            if (attMap[sid]) marked++;
+          });
+
+          if (marked === teacherStudents.length) allMarked++;
+          else if (marked === 0) notMarked++;
+        });
+
+        setAttNotMarkedCount(notMarked);
+        setAttAllMarkedCount(allMarked);
+      } catch (e) {
+        console.error("Overview stats fetch error:", e);
+      }
+      setOverviewAttLoading(false);
+    };
+    fetchOverviewStats();
+  }, [students, teacherProfiles]);
+
   const stats = [
     { label: "Students", value: students.length, icon: Users, navigateTo: "Student Registry" },
     { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap, navigateTo: "Staff Profiles" },
     { label: "Schedules", value: schedule.length, icon: Calendar, navigateTo: "Schedule" },
     { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye, navigateTo: "Result Tracking" },
+    { label: "Leave Management", value: `${pendingLeaveCount} Pending`, icon: MessageCircle, navigateTo: "Leave Management" },
+    { label: "Attendance Tracking", value: overviewAttLoading ? "..." : `${attNotMarkedCount} Not / ${attAllMarkedCount} All`, icon: ClipboardCheck, navigateTo: "Attendance Tracking" },
   ];
 
   const resultLiveNotificationAlreadySent = async (since) => {
@@ -9447,19 +10386,297 @@ const handleDownloadAllReports = async () => {
 
           {activePage === "Schedule" ? (
             <>
-              <PremiumTodaySchedule
-                schedule={schedule}
-                role="admin"
-                onToggleDone={(index, isDone) => {
-                  showAction("success", isDone ? "Task marked as done! 🎉" : "Task marked as pending");
-                }}
-                onUpdateBody={(index, body) => {
-                  showAction("success", "Body message updated!");
-                }}
-                onUpdateMarhala={(marhala) => {
-                  showAction("info", `Filtered to: ${marhala || "All Marahil"}`);
-                }}
-              />
+              {/* ── Premium Create Schedule Form ── */}
+              <section className="form-card card-appear" style={{ marginTop: '0', borderTop: '3px solid var(--primary-gold)', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '160px', height: '160px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(212,175,55,0.10), transparent 70%)', pointerEvents: 'none' }} />
+                <div className="card-headline" style={{ marginBottom: '18px' }}>
+                  <Calendar size={20} style={{ color: 'var(--primary-gold)' }} />
+                  <h3 style={{ color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Create New Schedule
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', background: 'rgba(212,175,55,0.10)', padding: '2px 10px', borderRadius: '999px', letterSpacing: '0.03em' }}>
+                      Premium
+                    </span>
+                  </h3>
+                </div>
+                <p className="subtitle" style={{ margin: '-10px 0 18px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>
+                  Assign a new schedule task for a student. They will see it in their parent portal instantly.
+                </p>
+
+                <form className="stack-form" onSubmit={onCreateSchedule}>
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                    {/* Student Select */}
+                    <label>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                        <Users size={14} style={{ color: 'var(--primary-gold)' }} />
+                        Select Student
+                      </span>
+                      <select
+                        name="student_id"
+                        value={adminForms.schedule.student_id}
+                        onChange={onAdminFormChange("schedule")}
+                        className="premium-select"
+                        required
+                      >
+                        <option value="">— Choose a student —</option>
+                        {students.map((s, i) => {
+                          const sid = s?.student_id || "";
+                          return (
+                            <option key={sid || i} value={sid}>
+                              {s?.name || s?.full_name || `Student ${i + 1}`} {s?.marhala ? `(${s.marhala})` : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+
+                    {/* Schedule Date */}
+                    <label>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                        <Calendar size={14} style={{ color: 'var(--primary-gold)' }} />
+                        Schedule Date
+                      </span>
+                      <input
+                        type="date"
+                        name="schedule_date"
+                        value={adminForms.schedule.schedule_date}
+                        onChange={onAdminFormChange("schedule")}
+                        className="premium-input"
+                        min={getToday()}
+                        required
+                      />
+                    </label>
+
+                    {/* Task Time */}
+                    <label>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                        <Clock size={14} style={{ color: 'var(--primary-gold)' }} />
+                        Task Time
+                      </span>
+                      <input
+                        type="time"
+                        name="task_time"
+                        value={adminForms.schedule.task_time}
+                        onChange={onAdminFormChange("schedule")}
+                        className="premium-input"
+                        required
+                      />
+                    </label>
+                  </div>
+
+                  {/* Task Name */}
+                  <label style={{ marginTop: '14px', display: 'block' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                      <Edit3 size={14} style={{ color: 'var(--primary-gold)' }} />
+                      Task Name
+                    </span>
+                    <input
+                      type="text"
+                      name="task_name"
+                      value={adminForms.schedule.task_name}
+                      onChange={onAdminFormChange("schedule")}
+                      placeholder="e.g. Daily Murajah Review"
+                      className="premium-input"
+                    />
+                    <small style={{ display: 'block', marginTop: '4px', color: 'var(--text-muted)', fontSize: '11px' }}>
+                      Leave empty to auto-generate from the ikhtebar type below.
+                    </small>
+                  </label>
+
+                  {/* Marhala Selector (premium dropdown) */}
+                  <div style={{ marginTop: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600, marginBottom: '6px', fontSize: '0.9rem' }}>
+                      <GraduationCap size={14} style={{ color: 'var(--primary-gold)' }} />
+                      Marhala (optional)
+                    </label>
+                    <select
+                      name="marhala"
+                      value={adminForms.schedule.marhala}
+                      onChange={onAdminFormChange("schedule")}
+                      className="premium-select"
+                      style={{ maxWidth: '300px' }}
+                    >
+                      <option value="">— All Marahil —</option>
+                      <option value="Marhala Ula">المرحلة الاولى (Marhala Ula)</option>
+                      <option value="Marhala Saniyah">المرحلة الثانية (Marhala Saniyah)</option>
+                      <option value="Marhala Salesah">المرحلة الثالثة (Marhala Salesah)</option>
+                      <option value="Marhala Rabeah">المرحلة الرابعة (Marhala Rabeah)</option>
+                      <option value="Marhala Khamesah">المرحلة الخامسة (Marhala Khamesah)</option>
+                      <option value="Marhala Sadesah">المرحلة السادسة (Marhala Sadesah)</option>
+                      <option value="Marhala Sabeah">المرحلة السابعة (Marhala Sabeah)</option>
+                      <option value="Marhala Saminah">المرحلة الثامنة (Marhala Saminah)</option>
+                    </select>
+                  </div>
+
+                  {/* Ikhtebar Type */}
+                  <div style={{ marginTop: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600, marginBottom: '6px', fontSize: '0.9rem' }}>
+                      <Trophy size={14} style={{ color: 'var(--primary-gold)' }} />
+                      Ikhtebar / Test Type (optional)
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {[
+                        { value: "", label: "None", icon: X },
+                        { value: "murajah", label: "Murajah", icon: BookMarked },
+                        { value: "juz_hali", label: "Juz Hali", icon: Layers3 },
+                        { value: "takhteet", label: "Takhteet", icon: Edit3 },
+                        { value: "jadeed", label: "Jadeed", icon: Star },
+                        { value: "general", label: "General Test", icon: Trophy },
+                        { value: "other", label: "Other", icon: MoreHorizontal },
+                      ].map((opt) => {
+                        const Icon = opt.icon;
+                        const isActive = adminForms.schedule.ikhtebar_type === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              setAdminForms(curr => ({
+                                ...curr,
+                                schedule: {
+                                  ...curr.schedule,
+                                  ikhtebar_type: opt.value,
+                                  ikhtebar_custom: opt.value !== "other" && opt.value !== "general" ? "" : curr.schedule.ikhtebar_custom,
+                                }
+                              }));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '8px 14px',
+                              borderRadius: '10px',
+                              border: isActive ? '2px solid var(--primary-gold)' : '1px solid rgba(212,175,55,0.20)',
+                              background: isActive ? 'linear-gradient(135deg, rgba(212,175,55,0.12), rgba(255,255,255,0.9))' : 'rgba(255,255,255,0.8)',
+                              color: isActive ? 'var(--deep-brown)' : 'var(--text-muted)',
+                              fontWeight: isActive ? 700 : 500,
+                              fontSize: '12px',
+                              fontFamily: 'inherit',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: isActive ? '0 4px 12px rgba(212,175,55,0.15)' : 'none',
+                            }}
+                            onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.borderColor = 'rgba(212,175,55,0.40)'; e.currentTarget.style.background = 'rgba(255,255,255,0.95)'; } }}
+                            onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.borderColor = 'rgba(212,175,55,0.20)'; e.currentTarget.style.background = 'rgba(255,255,255,0.8)'; } }}
+                          >
+                            <Icon size={15} style={{ color: isActive ? 'var(--primary-gold)' : 'var(--text-muted)' }} />
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Custom ikhtebar text field for "Other" or "General Test" */}
+                    {(adminForms.schedule.ikhtebar_type === "other" || adminForms.schedule.ikhtebar_type === "general") && (
+                      <div style={{ marginTop: '10px', animation: 'ptsSlideDown 0.22s ease both' }}>
+                        <input
+                          type="text"
+                          name="ikhtebar_custom"
+                          value={adminForms.schedule.ikhtebar_custom}
+                          onChange={(e) => {
+                            setAdminForms(curr => ({
+                              ...curr,
+                              schedule: {
+                                ...curr.schedule,
+                                ikhtebar_custom: e.target.value,
+                              }
+                            }));
+                          }}
+                          placeholder={adminForms.schedule.ikhtebar_type === "other" ? "Type the custom test name..." : "Describe the general test..."}
+                          className="premium-input"
+                          style={{ width: '100%', maxWidth: '400px' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Task Body / Message */}
+                  <label style={{ marginTop: '16px', display: 'block' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                      <Send size={14} style={{ color: 'var(--primary-gold)' }} />
+                      Message for Parent
+                    </span>
+                    <textarea
+                      name="task_body"
+                      value={adminForms.schedule.task_body}
+                      onChange={onAdminFormChange("schedule")}
+                      placeholder="Write a message explaining today's task, instructions, or any notes for the parent..."
+                      className="premium-input"
+                      rows={3}
+                      style={{ width: '100%', resize: 'vertical', lineHeight: '1.5' }}
+                    />
+                  </label>
+
+                  {/* Send Notification Toggle + Submit */}
+                  <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
+                      <div
+                        onClick={() => {
+                          setAdminForms(curr => ({
+                            ...curr,
+                            schedule: {
+                              ...curr.schedule,
+                              send_notification: !curr.schedule.send_notification,
+                            }
+                          }));
+                        }}
+                        style={{
+                          width: '44px',
+                          height: '24px',
+                          borderRadius: '999px',
+                          background: adminForms.schedule.send_notification ? 'linear-gradient(135deg, #d4af37, #b8962e)' : 'rgba(61,43,31,0.12)',
+                          position: 'relative',
+                          cursor: 'pointer',
+                          transition: 'background 0.25s ease',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          background: '#fff',
+                          position: 'absolute',
+                          top: '3px',
+                          left: adminForms.schedule.send_notification ? '23px' : '3px',
+                          transition: 'left 0.25s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--deep-brown)' }}>
+                        <Bell size={14} style={{ marginRight: '4px', verticalAlign: 'middle', color: adminForms.schedule.send_notification ? 'var(--primary-gold)' : 'var(--text-muted)' }} />
+                        Send Notification to Parent
+                      </span>
+                    </label>
+
+                    <button
+                      type="submit"
+                      className="action-button premium"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 28px',
+                        fontSize: '0.95rem',
+                        fontFamily: 'Inter, sans-serif',
+                        letterSpacing: '0.3px',
+                        background: 'linear-gradient(135deg, #d4af37, #b8962e)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 6px 20px rgba(184,138,29,0.25)',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 28px rgba(184,138,29,0.35)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 6px 20px rgba(184,138,29,0.25)'; }}
+                    >
+                      <Calendar size={18} />
+                      Save Schedule & Notify
+                    </button>
+                  </div>
+                </form>
+              </section>
 
               {/* ── Parent Leave Portal Toggle ── */}
               {(() => {
@@ -10583,6 +11800,12 @@ const handleDownloadAllReports = async () => {
           </div>
           ) : null}
 
+          {activePage === "Attendance Tracking" && (
+            <AdminAttendanceTracking
+              students={students}
+              teacherProfiles={teacherProfiles}
+            />
+          )}
           {activePage === "Event Leave" ? (
             <PremiumEventLeavePage
               onShowAction={onShowAction}
@@ -13618,11 +14841,11 @@ function TeacherPortal({
                          <div className="triple-btn-group">
                            <button className="quick-action-btn sm present-btn" onClick={() => handleQuickMarkAllAttendance('present')} disabled={attendanceLoading}>
                              <UserCheck size={16} />
-                             <span>Present</span>
+                             <span>All Present</span>
                            </button>
                            <button className="quick-action-btn sm absent-btn" onClick={() => handleQuickMarkAllAttendance('absent')} disabled={attendanceLoading}>
                              <UserX size={16} />
-                             <span>Absent</span>
+                             <span>All Absent</span>
                            </button>
                             <button className="quick-action-btn sm child-select-btn" onClick={(e) => { e.stopPropagation(); setShowChildSelect(true); }}>
                              <Users size={16} />
@@ -15896,25 +17119,13 @@ export default function App() {
     let isCurrent = true;
     const check = async () => {
       try {
-        const lastCheck = localStorage.getItem('sj_last_check_' + user.id);
-        const since = lastCheck || new Date(0).toISOString();
         if (portalRole === 'parents') {
-          const { data } = await supabase.from('self_jadwal').select('has_unseen_changes, teacher_updated_at, updated_at').eq('user_id', user.id).maybeSingle();
+          const { data } = await supabase.from('self_jadwal').select('has_unseen_changes').eq('user_id', user.id).maybeSingle();
           if (!isCurrent) return;
           const currentlyUnseen = !!data?.has_unseen_changes;
-          if (currentlyUnseen && !lastUnseenRef.current) {
-            setSelfJadwalPopup({ type: 'teacher_edit', at: data.teacher_updated_at || data.updated_at });
-          }
           lastUnseenRef.current = currentlyUnseen;
-        } else if (portalRole === 'teacher') {
-          const { data } = await supabase.from('system_notifications').select('id, created_at').eq('target_user', user.id).eq('title', 'Self Jadwal Updated').gte('created_at', since).limit(1);
-          if (!isCurrent) return;
-          if (data && data.length > 0) {
-            setSelfJadwalPopup({ type: 'parent_edit' });
-          }
         }
       } catch (_) {}
-      if (isCurrent) localStorage.setItem('sj_last_check_' + user.id, new Date().toISOString());
     };
     check();
     const interval = setInterval(check, 30000);
@@ -16019,8 +17230,14 @@ export default function App() {
     },
     schedule: {
       student_id: "",
+      schedule_date: getToday(),
       task_time: "08:00",
       task_name: "",
+      task_body: "",
+      ikhtebar_type: "",
+      ikhtebar_custom: "",
+      marhala: "",
+      send_notification: true,
     },
     teacherAttendance: {
       teacher_name: "",
@@ -17903,10 +19120,40 @@ const handleSendCustomNotification = async (event) => {
   const handleCreateSchedule = async (event) => {
     event.preventDefault();
 
+    const studentId = String(adminForms.schedule.student_id || "").trim();
+    const ikhtebarType = adminForms.schedule.ikhtebar_type;
+    const ikhtebarCustom = adminForms.schedule.ikhtebar_custom;
+    const sendNotif = adminForms.schedule.send_notification !== false;
+
+    // Determine the effective task type name for display
+    const IKHTEBAR_LABEL_MAP = {
+      murajah: "Murajah",
+      juz_hali: "Juz Hali",
+      takhteet: "Takhteet",
+      jadeed: "Jadeed",
+      general: "General Test",
+    };
+    let displayTaskName = adminForms.schedule.task_name;
+    if (!displayTaskName && ikhtebarType) {
+      if (ikhtebarType === "general" || ikhtebarType === "other") {
+        displayTaskName = ikhtebarCustom ? `Ikhtebar: ${ikhtebarCustom}` : "General Ikhtebar";
+      } else {
+        displayTaskName = IKHTEBAR_LABEL_MAP[ikhtebarType] || ikhtebarType;
+      }
+    }
+
+    const taskTypeForDb = ikhtebarType === "general" || ikhtebarType === "other"
+      ? (ikhtebarCustom || "General")
+      : ikhtebarType;
+
     const payload = {
-      student_id: String(adminForms.schedule.student_id || "").trim(),
+      student_id: studentId,
+      schedule_date: adminForms.schedule.schedule_date || getToday(),
       task_time: adminForms.schedule.task_time,
-      task_name: adminForms.schedule.task_name,
+      task_name: displayTaskName || "Today's Task",
+      task_body: adminForms.schedule.task_body || "",
+      ikhtebar_type: taskTypeForDb,
+      marhala: adminForms.schedule.marhala || "",
       is_done: false,
     };
 
@@ -17925,12 +19172,48 @@ const handleSendCustomNotification = async (event) => {
       ...current,
       schedule: {
         ...current.schedule,
+        schedule_date: getToday(),
         task_name: "",
+        task_body: "",
+        ikhtebar_type: "",
+        ikhtebar_custom: "",
+        marhala: "",
+        send_notification: true,
       },
     }));
-    showAction("success", "Schedule created successfully.");
-    broadcastNotification("Schedule Updated", 
-      `New task added: ${payload.task_name}`, "all", null, "Schedule");
+
+    // Find the student to get parent info
+    const targetStudent = students.find(s => String(s.student_id).trim() === studentId);
+    const studentLabel = targetStudent?.name || targetStudent?.full_name || studentId;
+    const parentUserId = targetStudent?.parent_user_id;
+
+    showAction("success", `Schedule created for ${studentLabel}! 🎉`);
+
+    // Send targeted notification to the specific student's parent if toggled on
+    if (sendNotif) {
+      try {
+        if (parentUserId) {
+          await broadcastNotification(
+            "📋 New Schedule",
+            `New task scheduled for ${studentLabel}: ${payload.task_name}${payload.task_body ? ` — ${payload.task_body}` : ""}`,
+            "user",
+            parentUserId,
+            "Schedule"
+          );
+        } else {
+          // Fallback: broadcast to all parents
+          await broadcastNotification(
+            "📋 Schedule Updated",
+            `New task added for ${studentLabel}: ${payload.task_name}`,
+            "parents",
+            null,
+            "Schedule"
+          );
+        }
+      } catch (err) {
+        console.error("Schedule notification failed:", err);
+      }
+    }
   };
 
   const handleRecordTeacherAttendance = async (event, quickRecord = null) => {
