@@ -401,25 +401,54 @@
 }
 
 .topbar-logout-btn {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 48px;
   height: 48px;
-  background: rgba(212, 175, 55, 0.05);
-  border: 1.5px solid var(--glass-border);
-  color: var(--text-main);
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  border: 1.5px solid #fecdd3;
+  color: #ef4444;
   border-radius: 14px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.12);
+}
+
+.topbar-logout-btn svg {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .topbar-logout-btn:hover {
-  background: var(--light-gold);
-  color: var(--dark-gold);
-  border-color: var(--primary-gold);
-  transform: translateY(-2px);
+  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%);
+  color: #dc2626;
+  border-color: #f87171;
+  box-shadow: 0 6px 22px rgba(239, 68, 68, 0.28);
+  transform: translateY(-2px) scale(1.04);
+}
+
+.topbar-logout-btn:hover svg {
+  transform: rotate(-18deg) scale(1.15);
+}
+
+.topbar-logout-btn:active {
+  transform: scale(0.88);
+  color: #b91c1c;
+  background: linear-gradient(135deg, #fecdd3 0%, #fca5a5 100%);
+  box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.18);
+}
+
+.topbar-logout-btn:active svg {
+  animation: logout-slide 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes logout-slide {
+  0%   { transform: scale(0.8) translateX(0); opacity: 1; }
+  50%  { transform: scale(1.05) translateX(-2px); opacity: 0.85; }
+  100% { transform: scale(0.8) translateX(2px); opacity: 1; }
 }
 
 /* ---- Student Switcher ---- */
@@ -1381,8 +1410,17 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   border-color: var(--primary-gold) !important;
 }
 
+.dark-mode .topbar-logout-btn {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(239, 68, 68, 0.07)) !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  color: #f87171 !important;
+}
+
 .dark-mode .topbar-logout-btn:hover {
-  background: rgba(239, 68, 68, 0.1) !important;
+  background: rgba(239, 68, 68, 0.24) !important;
+  border-color: #ef4444 !important;
+  color: #fca5a5 !important;
+  box-shadow: 0 6px 22px rgba(239, 68, 68, 0.3) !important;
 }
 
 /* ---- Dark Mode Buttons ---- */

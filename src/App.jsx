@@ -14,6 +14,7 @@ import {
   Home,
   Layers3,
   LogOut,
+  Power,
   Menu,
   ShieldCheck,
   Eye,
@@ -1000,6 +1001,26 @@ const STORAGE_KEYS = {
   customGroups: "mauze-custom-groups",
   rememberMe: "mauze-remember-me",
   cachedAuth: "mauze-cached-auth",
+  activePage: "mauze-active-page",
+};
+
+const PAGE_PERSIST_KEY = STORAGE_KEYS.activePage;
+
+const readSavedPages = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PAGE_PERSIST_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+};
+
+const writeSavedPage = (role, page) => {
+  try {
+    const pages = readSavedPages();
+    pages[role] = page;
+    localStorage.setItem(PAGE_PERSIST_KEY, JSON.stringify(pages));
+  } catch (_) {}
 };
 
 const NAV_ICONS = {
@@ -2476,7 +2497,9 @@ async function authorizePortalAccess(user, requestedRole) {
         .single();
       if (settingsData?.teacher_admin_access) {
         const accessList = JSON.parse(settingsData.teacher_admin_access);
-        if (Array.isArray(accessList) && accessList.some(e => normalizeText(e) === normalizeText(user.email))) {
+        if (Array.isArray(accessList) && accessList.some(e =>
+          normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
+        )) {
           return {
             ok: true,
             role: "admin",
@@ -4126,6 +4149,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [chatLeave, setChatLeave] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const chatMessagesRef = useRef(null);
 
   useEffect(() => {
     checkTime();
@@ -4133,6 +4157,73 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
     const timer = setInterval(checkTime, 60000);
     return () => clearInterval(timer);
   }, [studentProfile]);
+
+  // Auto-scroll chat to the latest message (WhatsApp-style)
+  useEffect(() => {
+    if (chatLeave && chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+    }
+  }, [chatLeave?.messages]);
+
+  // Real-time subscription so admin replies appear instantly without refresh
+  useEffect(() => {
+    const studentId = studentProfile?.student_id;
+    if (!studentId) return;
+    const channel = supabase
+      .channel('parent-leaves-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'student_leaves', filter: `student_id=eq.${studentId}` },
+        (payload) => {
+          const updatedRow = payload.new;
+          if (!updatedRow) return;
+          setHistory(prev => {
+            const exists = prev.some(l => String(l.id) === String(updatedRow.id));
+            if (!exists) return [updatedRow, ...prev];
+            return prev.map(l => String(l.id) === String(updatedRow.id) ? { ...l, ...updatedRow } : l);
+          });
+          setChatLeave(prev => {
+            if (!prev) return prev;
+            if (String(prev.id) !== String(updatedRow.id)) return prev;
+            return { ...prev, ...updatedRow };
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [studentProfile?.student_id]);
+
+  // Reliable fallback: poll while this page is visible so new messages
+  // and status changes always appear without a manual refresh.
+  useEffect(() => {
+    if (!studentProfile) return;
+    const poll = async () => {
+      const { data } = await supabase
+        .from('student_leaves')
+        .select('*')
+        .eq('student_id', String(studentProfile.student_id))
+        .order('created_at', { ascending: false });
+      if (!data) return;
+      setHistory(data);
+      setChatLeave(prev => {
+        if (!prev) return prev;
+        const fresh = data.find(l => String(l.id) === String(prev.id));
+        return fresh ? { ...prev, ...fresh } : prev;
+      });
+    };
+    const interval = setInterval(poll, 2500);
+    return () => clearInterval(interval);
+  }, [studentProfile?.student_id]);
+
+  // Lock background scrolling while the chat is open so only the chat
+  // messages area scrolls (WhatsApp-style fullscreen chat on all devices).
+  useEffect(() => {
+    if (!chatLeave) return;
+    const mainEl = document.querySelector('.parent-main');
+    const prevOverflow = mainEl ? mainEl.style.overflow : '';
+    if (mainEl) mainEl.style.overflow = 'hidden';
+    return () => { if (mainEl) mainEl.style.overflow = prevOverflow; };
+  }, [chatLeave]);
 
   const checkTime = () => {
     const now = new Date();
@@ -4448,27 +4539,33 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
       {/* ─── Parent Chat Modal ─── */}
       {chatLeave && (
         <div
+          className="parent-chat-overlay"
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
-            display: 'grid', placeItems: 'center', padding: '22px',
-            background: 'radial-gradient(circle at top, rgba(212,175,55,0.18), transparent 34%), rgba(16,12,9,0.58)',
-            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            background: 'linear-gradient(180deg, #fffdf7, #fbf5e8)',
+            overflow: 'hidden',
+            overscrollBehavior: 'none',
             animation: 'almFadeIn 0.18s ease both',
           }}
         >
           <style>{`@keyframes almFadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes almSlideUp { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
+@keyframes almSlideUp { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.parent-chat-overlay { height: 100vh; height: 100dvh; }
+.parent-chat-card { width: 100%; height: 100vh; height: 100dvh; border-radius: 0; }`}</style>
           <div
+            className="parent-chat-card"
             style={{
-              width: 'min(520px, 100%)', borderRadius: 24,
               background: 'linear-gradient(145deg, #fffcf6, #fcf8ef)',
-              border: '1px solid rgba(212,175,55,0.25)',
-              boxShadow: '0 36px 100px rgba(0,0,0,0.30)',
-              overflow: 'hidden', animation: 'almSlideUp 0.22s ease both',
+              display: 'flex', flexDirection: 'column',
+              animation: 'almSlideUp 0.22s ease both',
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ padding: '22px 24px 16px', background: 'linear-gradient(135deg, rgba(212,175,55,0.12), transparent)', borderBottom: '1px solid rgba(212,175,55,0.12)' }}>
+            <div style={{
+              position: 'sticky', top: 0, zIndex: 5, flexShrink: 0, padding: '16px 20px',
+              background: 'rgba(255,252,246,0.96)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+              borderBottom: '1px solid rgba(212,175,55,0.14)', boxShadow: '0 4px 20px rgba(61,43,31,0.06)',
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(212,175,55,0.15)', display: 'grid', placeItems: 'center' }}>
@@ -4481,15 +4578,28 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
                     </p>
                   </div>
                 </div>
-                <button onClick={() => { setChatLeave(null); setReplyText(""); }} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-muted)' }}>
-                  <X size={18} />
+                <button
+                  onClick={() => { setChatLeave(null); setReplyText(""); }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '7px',
+                    padding: '9px 18px', borderRadius: '999px',
+                    background: 'linear-gradient(135deg, #d4af37, #b8962e)',
+                    color: '#fff', fontFamily: 'inherit', fontSize: '13px', fontWeight: 700,
+                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 14px rgba(184,138,29,0.25)', transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(184,138,29,0.35)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 14px rgba(184,138,29,0.25)'; }}
+                >
+                  <X size={15} />
+                  Close Chat
                 </button>
               </div>
             </div>
 
-            <div style={{ padding: '20px 24px' }}>
+            <div style={{ padding: '20px', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               {/* Messages Display */}
-              <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              <div ref={chatMessagesRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16, overscrollBehavior: 'contain' }}>
                 {(!chatLeave.messages || chatLeave.messages.length === 0) ? (
                   <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                     <MessageCircle size={28} style={{ opacity: 0.2, marginBottom: 8 }} />
@@ -5146,6 +5256,11 @@ function ParentPortal({
         )}
         <nav className="drawer-nav">
           <p className="drawer-section-label">More Pages</p>
+          {pageVisibility["Home"] !== false && (
+            <button className={`drawer-link ${activePage === "Home" ? "active" : ""}`} onClick={() => { setActivePage("Home"); setMenuOpen(false); }}>
+              <Home size={18} /> Home
+            </button>
+          )}
           {pageVisibility["Inbox"] !== false && (
             <button className={`drawer-link ${activePage === "Inbox" ? "active" : ""}`} onClick={() => { setActivePage("Inbox"); setMenuOpen(false); }}>
               <Bell size={18} /> Inbox
@@ -5223,7 +5338,7 @@ function ParentPortal({
         </div>
 
         <button className="topbar-logout-btn" onClick={onLogout} title="Logout">
-          <LogOut size={22} />
+          <Power size={22} />
         </button>
       </header>
 
@@ -6399,25 +6514,27 @@ function ParentPortal({
         )}
       </main>
 
-      <nav className="parent-bottom-nav">
-        {bottomPages.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            className={`bottom-nav-btn ${activePage === key ? "active" : ""}`}
-            onClick={() => setActivePage(key)}
-          >
-            <Icon size={22} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
+      {bottomPages.some(p => p.key === activePage) && (
+        <nav className="parent-bottom-nav">
+          {bottomPages.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              className={`bottom-nav-btn ${activePage === key ? "active" : ""}`}
+              onClick={() => setActivePage(key)}
+            >
+              <Icon size={22} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }
 
 
 
-function AdminLeaveManagement({ onShowAction, students }) {
+function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Pending");
@@ -6425,10 +6542,72 @@ function AdminLeaveManagement({ onShowAction, students }) {
   const [chatMessage, setChatMessage] = useState("");
   const [approveDropdown, setApproveDropdown] = useState(null); // leave.id or null
   const [sendingAction, setSendingAction] = useState(null); // id being processed
+  const chatBodyRef = useRef(null);
 
   useEffect(() => {
     fetchLeaves();
   }, []);
+
+  // Auto-scroll chat to the latest message (WhatsApp-style)
+  useEffect(() => {
+    if (chatModal && chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [chatModal?.messages]);
+
+  // Real-time subscription so new messages appear instantly without refresh
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-leaves-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'student_leaves' },
+        (payload) => {
+          const updatedRow = payload.new;
+          if (!updatedRow) return;
+          setLeaves(prev => {
+            const exists = prev.some(l => String(l.id) === String(updatedRow.id));
+            if (!exists) return [updatedRow, ...prev];
+            return prev.map(l => String(l.id) === String(updatedRow.id) ? { ...l, ...updatedRow } : l);
+          });
+          setChatModal(prev => {
+            if (!prev) return prev;
+            if (String(prev.id) !== String(updatedRow.id)) return prev;
+            return { ...prev, ...updatedRow };
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // Reliable fallback: poll the open chat while it is visible so new
+  // messages always appear without a manual refresh.
+  useEffect(() => {
+    if (!chatModal?.id) return;
+    const poll = async () => {
+      const { data } = await supabase
+        .from('student_leaves')
+        .select('*')
+        .eq('id', chatModal.id)
+        .maybeSingle();
+      if (!data) return;
+      setChatModal(prev => prev && String(prev.id) === String(data.id) ? { ...prev, ...data } : prev);
+      setLeaves(prev => prev.map(l => String(l.id) === String(data.id) ? { ...l, ...data } : l));
+    };
+    const interval = setInterval(poll, 2500);
+    return () => clearInterval(interval);
+  }, [chatModal?.id]);
+
+  // Lock background scrolling while the chat is open so only the chat
+  // messages area scrolls (WhatsApp-style fullscreen chat on all devices).
+  useEffect(() => {
+    if (!chatModal) return;
+    const mainEl = document.querySelector('.admin-main');
+    const prevOverflow = mainEl ? mainEl.style.overflow : '';
+    if (mainEl) mainEl.style.overflow = 'hidden';
+    return () => { if (mainEl) mainEl.style.overflow = prevOverflow; };
+  }, [chatModal]);
 
   const fetchLeaves = async () => {
     setLoading(true);
@@ -6481,6 +6660,30 @@ function AdminLeaveManagement({ onShowAction, students }) {
       } catch (err) {
         console.error("Leave notification failed:", err);
       }
+    }
+
+    // Also notify the student's teacher (muhaffiz) about the approval/rejection
+    try {
+      const teacherIdField = student?.muhaffiz_id || student?.original_teacher_id || student?.teacher_id;
+      if (teacherIdField && teacherProfiles?.length > 0) {
+        const teacherMatch = teacherProfiles.find(t =>
+          String(t.id) === String(teacherIdField) ||
+          String(t.user_id) === String(teacherIdField) ||
+          normalizeText(t.full_name) === normalizeText(student?.teacherName)
+        );
+        const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
+        if (teacherTarget) {
+          await broadcastNotification(
+            `Leave ${statusLabel} – ${studentName}`,
+            `${studentName}'s leave request has been ${statusLabel} by the Admin.${adminMessage ? ` Message: ${adminMessage}` : ""}`,
+            "user",
+            teacherTarget,
+            "Leave Management"
+          );
+        }
+      }
+    } catch (tErr) {
+      console.warn("Could not notify teacher about leave status:", tErr);
     }
 
     setApproveDropdown(null);
@@ -6538,27 +6741,41 @@ function AdminLeaveManagement({ onShowAction, students }) {
   const LEAVES_CSS = `
     .alm-modal-overlay {
       position: fixed; inset: 0; z-index: 9999;
-      display: grid; place-items: center; padding: 22px;
-      background: radial-gradient(circle at top, rgba(212,175,55,0.18), transparent 34%), rgba(16,12,9,0.58);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      background: linear-gradient(180deg, #fffdf7, #fbf5e8);
+      height: 100vh; height: 100dvh;
+      overflow: hidden;
+      overscroll-behavior: none;
       animation: almFadeIn 0.18s ease both;
     }
     @keyframes almFadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes almSlideUp { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
     .alm-chat-card {
-      width: min(520px, 100%); border-radius: 24px;
+      width: 100%; height: 100vh; height: 100dvh; border-radius: 0;
       background: linear-gradient(145deg, #fffcf6, #fcf8ef);
-      border: 1px solid rgba(212,175,55,0.25);
-      box-shadow: 0 36px 100px rgba(0,0,0,0.30);
-      overflow: hidden; animation: almSlideUp 0.22s ease both;
+      display: flex; flex-direction: column;
+      animation: almSlideUp 0.22s ease both;
     }
     .alm-chat-header {
-      padding: 22px 24px 16px;
-      background: linear-gradient(135deg, rgba(212,175,55,0.12), transparent);
-      border-bottom: 1px solid rgba(212,175,55,0.12);
+      position: sticky; top: 0; z-index: 5;
+      flex-shrink: 0;
+      padding: 16px 20px;
+      background: rgba(255,252,246,0.96);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(212,175,55,0.14);
+      box-shadow: 0 4px 20px rgba(61,43,31,0.06);
     }
-    .alm-chat-body { padding: 20px 24px; }
-    .alm-chat-footer { padding: 16px 24px 22px; border-top: 1px solid rgba(212,175,55,0.08); }
+    .alm-chat-body { padding: 20px; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .alm-chat-footer { padding: 16px 20px 22px; flex-shrink: 0; border-top: 1px solid rgba(212,175,55,0.10); background: rgba(255,252,246,0.98); }
+    .alm-btn-close-chat {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 18px; border-radius: 999px;
+      background: linear-gradient(135deg, #d4af37, #b8962e);
+      color: #fff; font-family: inherit; font-size: 13px; font-weight: 700;
+      border: none; cursor: pointer;
+      transition: all 0.2s ease; white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(184,138,29,0.25);
+    }
+    .alm-btn-close-chat:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(184,138,29,0.35); }
     .alm-premium-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 7px;
       padding: 9px 18px; border-radius: 10px; border: none;
@@ -6627,8 +6844,9 @@ function AdminLeaveManagement({ onShowAction, students }) {
                     </p>
                   </div>
                 </div>
-                <button onClick={() => { setChatModal(null); setChatMessage(""); }} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-muted)' }}>
-                  <X size={18} />
+                <button onClick={() => { setChatModal(null); setChatMessage(""); }} className="alm-btn-close-chat">
+                  <X size={15} />
+                  Close Chat
                 </button>
               </div>
             </div>
@@ -6641,7 +6859,7 @@ function AdminLeaveManagement({ onShowAction, students }) {
               </div>
 
               {/* Messages Display */}
-              <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14, padding: '6px 0' }}>
+              <div ref={chatBodyRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14, padding: '6px 0', overscrollBehavior: 'contain' }}>
                 {(!chatModal.messages || chatModal.messages.length === 0) ? (
                   <div style={{ textAlign: 'center', padding: '20px 10px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                     <MessageCircle size={24} style={{ opacity: 0.2, marginBottom: 6 }} />
@@ -7628,92 +7846,8 @@ function AdminPortal({
     }
   }, [activePage]);
 
-  // ── Scheduled Attendance Reminder Notifications (Mon-Sat @ 10:05 PM) ──
-  useEffect(() => {
-    const NOTIF_KEY = 'mauze-attendance-reminder-last-sent';
-    const DAYS = [1,2,3,4,5,6]; // Mon=1 ... Sat=6
-    
-    const checkAndSend = async () => {
-      const now = new Date();
-      const day = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-      const hour = now.getHours();
-      const minute = now.getMinutes();
-      
-      // Only Mon-Sat at 10:05 PM (±1 minute window)
-      if (!DAYS.includes(day)) return;
-      if (hour !== 22 || Math.abs(minute - 5) > 1) return;
-      
-      // Check if already sent today
-      const todayStr = now.toISOString().split('T')[0];
-      const lastSent = localStorage.getItem(NOTIF_KEY);
-      if (lastSent === todayStr) return;
-      
-      try {
-        // Fetch today's attendance
-        const { data: attData } = await supabase
-          .from('student_daily_attendance')
-          .select('*')
-          .eq('attendance_date', todayStr);
-        
-        const attMap = {};
-        if (attData) {
-          attData.forEach(rec => {
-            attMap[String(rec.student_id).trim().toLowerCase()] = rec.status;
-          });
-        }
-        
-        // For each active teacher, compute their class attendance status
-        const activeTeachers = teacherProfiles.filter(t => t.is_active !== false && t.user_id);
-        
-        for (const teacher of activeTeachers) {
-          const teacherStudents = students.filter(s =>
-            String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.user_id || "") ||
-            String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.id || "")
-          );
-          
-          if (teacherStudents.length === 0) continue;
-          
-          let marked = 0;
-          teacherStudents.forEach(s => {
-            const sid = String(s.student_id).trim().toLowerCase();
-            if (attMap[sid]) marked++;
-          });
-          
-          const total = teacherStudents.length;
-          const missing = total - marked;
-          
-          let title, body;
-          if (marked === total) {
-            title = "✅ Daily Attendance — All Marked";
-            body = `Assalamu Alaykum ${teacher.full_name},\n\nOutstanding! ✅ All ${total} of your students have been marked present for today's attendance. Your diligence is truly appreciated.\n\nJazakallah Khair,\nAdministration`;
-          } else if (marked > 0) {
-            title = "⚠️ Daily Attendance — Some Pending";
-            body = `Assalamu Alaykum ${teacher.full_name},\n\nYou have marked ${marked} out of ${total} students today. ${missing} student${missing > 1 ? 's' : ''} ${missing > 1 ? 'are' : 'is'} still pending. Kindly complete the attendance at your earliest convenience.\n\nJazakallah Khair,\nAdministration`;
-          } else {
-            title = "❌ Daily Attendance — Not Marked";
-            body = `Assalamu Alaykum ${teacher.full_name},\n\nWe noticed that attendance for ${total} student${total > 1 ? 's' : ''} in your class has not been marked today. Please log in and mark the attendance as soon as possible.\n\nJazakallah Khair,\nAdministration`;
-          }
-          
-          await broadcastNotification(
-            title,
-            body,
-            "user",
-            teacher.user_id,
-            "Attendance History"
-          );
-        }
-        
-        // Mark as sent for today
-        localStorage.setItem(NOTIF_KEY, todayStr);
-        console.log("✅ Attendance reminder notifications sent for", todayStr);
-      } catch (e) {
-        console.error("Attendance reminder notification error:", e);
-      }
-    };
-    
-    const interval = setInterval(checkAndSend, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, [students, teacherProfiles]);
+  // Attendance reminder notifications are now sent server-side by the
+  // attendance-reminder Supabase Edge Function (Mon-Sat @ 10:00 PM IST).
 
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -8604,7 +8738,7 @@ const handleDownloadAllReports = async () => {
             </button>
             <h2 className="page-title">{activePage}</h2>
           </div>
-          <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
+          <button className="topbar-logout-btn" onClick={onLogout}><Power size={22} /></button>
         </header>
 
         <section className="admin-content-pad">
@@ -8991,8 +9125,10 @@ const handleDownloadAllReports = async () => {
                       a.user_id === teacher.user_id || normalizeText(a.full_name) === normalizeText(teacher.full_name)
                     );
                     const teacherEmail = teacher.email || portalMatch?.email || '';
-                    const isOn = teacherAdminAccessList.includes(teacherEmail);
-                    const canToggle = !!teacherEmail;
+                    const teacherUserId = teacher.user_id || portalMatch?.user_id || '';
+                    const accessKey = teacherEmail || teacherUserId;
+                    const isOn = !!(teacherEmail && teacherAdminAccessList.includes(teacherEmail)) || !!(teacherUserId && teacherAdminAccessList.includes(teacherUserId));
+                    const canToggle = !!accessKey;
                     return (
                       <div key={teacher.user_id || teacher.full_name} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -9020,7 +9156,7 @@ const handleDownloadAllReports = async () => {
                               {teacher.full_name || 'Unknown Teacher'}
                             </div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              {teacherEmail || portalMatch?.portal_role ? `${portalMatch.portal_role} – no email` : 'No email'}
+                              {teacherEmail || (portalMatch?.portal_role ? `${portalMatch.portal_role} – no email` : 'No email')}
                             </div>
                           </div>
                         </div>
@@ -9028,8 +9164,8 @@ const handleDownloadAllReports = async () => {
                           onClick={() => {
                             if (!canToggle) return;
                             const list = isOn
-                              ? teacherAdminAccessList.filter(e => e !== teacherEmail)
-                              : [...teacherAdminAccessList, teacherEmail];
+                              ? teacherAdminAccessList.filter(e => e !== teacherEmail && e !== teacherUserId)
+                              : [...teacherAdminAccessList, accessKey];
                             setTeacherAdminAccessList(list);
                             setTeacherAccessDirty(true);
                           }}
@@ -11778,7 +11914,7 @@ const handleDownloadAllReports = async () => {
           ) : null}
 
           {activePage === "Leave Management" && (
-            <AdminLeaveManagement students={students} onShowAction={onShowAction} />
+            <AdminLeaveManagement students={students} teacherProfiles={teacherProfiles} onShowAction={onShowAction} />
           )}
           {activePage === "Teacher Leaves" ? (
             <div className="overview-container fade-in">
@@ -14620,7 +14756,9 @@ function TeacherPortal({
         <div className="sidebar-footer">
           {(() => {
             const fromMetadata = getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents');
-            const hasAdminAccess = user?.email && teacherAdminAccessList.some(e => normalizeText(e) === normalizeText(user.email));
+            const hasAdminAccess = user?.email && teacherAdminAccessList.some(e =>
+              normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
+            );
             const roles = hasAdminAccess && !fromMetadata.includes('admin')
               ? [...fromMetadata, 'admin']
               : fromMetadata;
@@ -14645,7 +14783,7 @@ function TeacherPortal({
             <h2 className="page-title">{activePage}</h2>
           </div>
 
-          <button className="topbar-logout-btn" onClick={onLogout}><LogOut size={22} /></button>
+          <button className="topbar-logout-btn" onClick={onLogout}><Power size={22} /></button>
         </header>
 
         <section className="admin-content-pad">
@@ -17328,7 +17466,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    setActivePage(DEFAULT_PAGE_BY_ROLE[portalRole] || DEFAULT_PAGE_BY_ROLE.parents);
+    const savedPages = readSavedPages();
+    const restoredPage = savedPages[portalRole];
+    setActivePage(restoredPage || DEFAULT_PAGE_BY_ROLE[portalRole] || DEFAULT_PAGE_BY_ROLE.parents);
     setMenuOpen(false);
     setActionMessage(null);
 
@@ -17359,6 +17499,10 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [portalRole]);
+
+  useEffect(() => {
+    writeSavedPage(portalRole, activePage);
+  }, [activePage, portalRole]);
 
   useEffect(() => {
     // Handle credential storage from eLearning site

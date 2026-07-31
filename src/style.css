@@ -7362,8 +7362,10 @@ n/* --- Full Width Label Helper --- */
 
 /* Topbar logout button */
 .topbar-logout-btn {
-  background: none;
-  border: none;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  border: 1.5px solid #fecdd3;
   color: #ef4444;
   cursor: pointer;
   margin-left: auto;
@@ -7372,11 +7374,43 @@ n/* --- Full Width Label Helper --- */
   justify-content: center;
   width: 48px;
   height: 48px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.12);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.topbar-logout-btn svg {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .topbar-logout-btn:hover {
-  background: #fef2f2;
+  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%);
   color: #dc2626;
+  border-color: #f87171;
+  box-shadow: 0 6px 22px rgba(239, 68, 68, 0.28);
+  transform: translateY(-2px) scale(1.04);
+}
+
+.topbar-logout-btn:hover svg {
+  transform: rotate(-18deg) scale(1.15);
+}
+
+.topbar-logout-btn:active {
+  transform: scale(0.88);
+  color: #b91c1c;
+  background: linear-gradient(135deg, #fecdd3 0%, #fca5a5 100%);
+  box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.18);
+}
+
+.topbar-logout-btn:active svg {
+  animation: logout-slide 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes logout-slide {
+  0%   { transform: scale(0.8) translateX(0); opacity: 1; }
+  50%  { transform: scale(1.05) translateX(-2px); opacity: 0.85; }
+  100% { transform: scale(0.8) translateX(2px); opacity: 1; }
 }
 
 /* ===== PREMIUM SCROLL REVEAL ANIMATIONS ===== */

@@ -1405,6 +1405,21 @@
   }
 }
 
+/* ---------- SelfJadwal dropdowns - golden glow on mobile (parent & teacher) ---------- */
+@media (max-width: 768px) {
+  .jadwal-container.parent-view select.premium-select,
+  .jadwal-container.parent-view .jadwal-table select {
+    border: 2px solid #d4af37 !important;
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.25), 0 0 8px rgba(212, 175, 55, 0.45) !important;
+  }
+  .jadwal-container.parent-view select.premium-select:focus,
+  .jadwal-container.parent-view .jadwal-table select:focus {
+    border-color: #b8860b !important;
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.4), 0 0 12px rgba(212, 175, 55, 0.6) !important;
+    outline: none;
+  }
+}
+
 @media (max-width: 480px) {
   .jadwal-container {
     padding: 10px 8px;
