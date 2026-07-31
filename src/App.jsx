@@ -19597,14 +19597,14 @@ const handleSendCustomNotification = async (event) => {
       parent_email: parentRecord?.email || (parent_id?.includes('@') ? parent_id : null) || null
     };
 
-    if (full_name && full_name.trim()) updatePayload.full_name = full_name.trim();
-    if (arabic_name && arabic_name.trim()) updatePayload.arabic_name = arabic_name.trim();
-    if (group_name && group_name.trim()) updatePayload.group_name = group_name.trim();
-    if (juz && juz.trim()) updatePayload.juz = juz.trim();
-    if (surat && surat.trim()) updatePayload.surat = surat.trim();
-    if (photo_url && photo_url.trim()) updatePayload.photo_url = photo_url.trim();
-    if (its && its.trim()) updatePayload.its = its.trim();
-    if (whatsapp_number !== undefined) updatePayload.whatsapp_number = whatsapp_number ? whatsapp_number.trim() : null;
+    // Editable profile fields: apply them whenever they come from the form
+    // (even empty values, so cleared fields are saved properly instead of being skipped).
+    const editableFields = { full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number };
+    Object.entries(editableFields).forEach(([key, value]) => {
+      if (value === undefined) return;
+      const trimmed = typeof value === 'string' ? value.trim() : '';
+      updatePayload[key] = trimmed || null;
+    });
 
     const { error: profileError } = await supabase
       .from("child_profiles")
@@ -19660,15 +19660,25 @@ const handleSendCustomNotification = async (event) => {
       }
     }
 
-    // Refresh school data locally
+    // Refresh school data locally so edited details show up immediately
     setSchoolData((current) => ({
       ...current,
       students: current.students.map((s) =>
         String(s.student_id) === String(student_id)
           ? {
             ...s,
+            name: full_name !== undefined && String(full_name || '').trim() ? String(full_name).trim() : (s.name || null),
+            arabic_name: arabic_name !== undefined ? (String(arabic_name || '').trim() || null) : s.arabic_name,
+            its: its !== undefined ? (String(its || '').trim() || "...") : s.its,
+            groupName: group_name !== undefined ? (String(group_name || '').trim() || "Ungrouped") : s.groupName,
+            photoUrl: photo_url !== undefined ? (String(photo_url || '').trim() || "") : s.photoUrl,
+            whatsapp_number: whatsapp_number !== undefined ? (String(whatsapp_number || '').trim() || "") : s.whatsapp_number,
+            hifz: {
+              ...(s.hifz || {}),
+              juz: juz !== undefined ? (String(juz || '').trim() || "N-A") : ((s.hifz && s.hifz.juz) || "N-A"),
+              surat: surat !== undefined ? (String(surat || '').trim() || "Pending") : ((s.hifz && s.hifz.surat) || "Pending"),
+            },
             teacherName: teacherRecord?.full_name || "Unassigned teacher",
-            groupName: group_name || "Ungrouped",
             muhaffiz_id: teacherRecord?.user_id || teacher_id || null,
             original_teacher_id: original_teacher_id || teacherRecord?.user_id || teacher_id || null,
             badal_teacher_id: badal_teacher_id || null,
