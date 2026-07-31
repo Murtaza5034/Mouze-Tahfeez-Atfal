@@ -817,7 +817,6 @@ const fixArabicScript = (text) => {
     .normalize("NFKC")
     .replace(/[آأإٱ]/g, "ا")     // All Alef variants -> standard Alef
     .replace(/[ؤ]/g, "و")         // Waw with hamza -> standard Waw
-    .replace(/[ئ]/g, "ي")         // Yeh with hamza -> standard Arabic Yeh
     .replace(/[ىيےی]/g, "ي")     // Alef maksura, Farsi Yeh, Yeh Barree -> Arabic Yeh
     .replace(/[کك]/g, "ك")        // Kaf variants -> standard Arabic Kaf
     .replace(/[ة]/g, "ه")         // Taa marbuta -> standard Arabic Heh
