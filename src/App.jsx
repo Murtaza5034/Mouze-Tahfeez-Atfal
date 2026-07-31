@@ -817,10 +817,11 @@ const fixArabicScript = (text) => {
     .normalize("NFKC")
     .replace(/[آأإٱ]/g, "ا")     // All Alef variants -> standard Alef
     .replace(/[ؤ]/g, "و")         // Waw with hamza -> standard Waw
-    .replace(/[ىيےی]/g, "ي")     // Alef maksura, Farsi Yeh, Yeh Barree -> Arabic Yeh
+    .replace(/[يےی]/g, "ي")     // Farsi Yeh, Yeh Barree -> Arabic Yeh (Alef maksura kept as-is)
     .replace(/[کك]/g, "ك")        // Kaf variants -> standard Arabic Kaf
-    .replace(/[ة]/g, "ه")         // Taa marbuta -> standard Arabic Heh
+    .replace(/[ةۃ]/g, "ه")        // Taa marbuta variants -> standard Arabic Heh
     .replace(/[ھﮭﮟہ]/g, "ه")   // Heh variants -> standard Arabic Heh
+    .replace(/[ں]/g, "ن")         // Noon ghunna -> standard Arabic Noon
     .replace(/[ّٰٓ‍‌]/g, "")     // Remove zero-width joiners, non-joiners, shadda
     .replace(/ـ/g, "")            // Remove tatweel/kashida
     .replace(/[\u064B-\u065F]/g, "") // Remove all Arabic diacritics
