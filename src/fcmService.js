@@ -119,44 +119,64 @@ class FCMService {
   async _initNative(userRole) {
     const { PushNotifications } = await import('@capacitor/push-notifications');
 
+    // Attach the token listener BEFORE register() so the native token event
+    // is never missed. Previously the listener was added after register(),
+    // which could miss the event and leave native push unregistered.
+    let resolveToken = null;
+    let rejectToken = null;
+    let tokenTimer = null;
+    const tokenReady = new Promise((resolve, reject) => {
+      resolveToken = resolve;
+      rejectToken = reject;
+    });
+
+    const settleToken = (value) => {
+      if (tokenTimer) { clearTimeout(tokenTimer); tokenTimer = null; }
+      if (resolveToken) { resolveToken(value); resolveToken = null; rejectToken = null; }
+    };
+
+    await PushNotifications.addListener('registration', (data) => {
+      if (data?.value) {
+        console.log('Capacitor FCM Token:', data.value.substring(0, 20) + '...');
+        this.token = data.value;
+        settleToken(this.token);
+      }
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      console.error('Capacitor Push registration error:', err);
+      if (tokenTimer) { clearTimeout(tokenTimer); tokenTimer = null; }
+      if (rejectToken) { rejectToken(new Error('Push registration failed')); rejectToken = null; resolveToken = null; }
+    });
+
     // Request permission (Android 13+)
-    const permResult = await PushNotifications.requestPermissions();
-    console.log('Capacitor PushNotifications permission:', permResult);
-    if (permResult.receive !== 'granted') {
-      console.error('Push notification permission not granted');
-      return false;
+    try {
+      const permResult = await PushNotifications.requestPermissions();
+      console.log('Capacitor PushNotifications permission:', permResult);
+      if (permResult?.receive === 'denied') {
+        console.error('Push notification permission not granted');
+        return false;
+      }
+    } catch (permErr) {
+      // On some devices requestPermissions may already be granted; continue.
+      console.warn('Push permission request issue (continuing):', permErr);
     }
 
     // Register for push
     await PushNotifications.register();
     console.log('Capacitor PushNotifications registered');
 
-    // Set up a persistent listener that always keeps this.token current
-    PushNotifications.addListener('registration', (token) => {
-      console.log('Capacitor FCM Token:', token.value.substring(0, 20) + '...');
-      this.token = token.value;
-    });
+    // Wait up to 15s for the first native token
+    tokenTimer = setTimeout(() => {
+      if (rejectToken) {
+        const err = new Error('Push registration timed out');
+        rejectToken(err);
+        rejectToken = null;
+        resolveToken = null;
+      }
+    }, 15000);
 
-    PushNotifications.addListener('registrationError', (err) => {
-      console.error('Capacitor Push registration error:', err);
-    });
-
-    // Wait for the first token to arrive
-    const tokenPromise = new Promise((resolve, reject) => {
-      const checkInterval = setInterval(() => {
-        if (this.token) {
-          clearTimeout(timeout);
-          clearInterval(checkInterval);
-          resolve(this.token);
-        }
-      }, 200);
-      const timeout = setTimeout(() => {
-        clearInterval(checkInterval);
-        reject(new Error('Push registration timed out'));
-      }, 15000);
-    });
-
-    this.token = await tokenPromise;
+    this.token = await tokenReady;
 
     // Store token in database
     const stored = await this.storeToken(this.token, userRole);
@@ -166,15 +186,14 @@ class FCMService {
     }
 
     // Listen for incoming notifications (foreground)
-    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
       console.log('Capacitor foreground notification:', notification);
       this.playPremiumChime();
-      // Note: Capacitor handles the native notification display automatically
-      // We just add the chime here
+      // Background/terminated notifications are displayed by the OS automatically
     });
 
     // Listen for notification action (tap)
-    PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+    await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
       console.log('Capacitor notification action:', action);
       const data = action.notification?.data || {};
       const redirectPage = data?.redirectPage || '';
@@ -340,6 +359,7 @@ class FCMService {
         userAgent: navigator.userAgent,
         platform: navigator.platform || (isCapacitor() ? window.Capacitor.getPlatform() : 'unknown'),
         language: navigator.language,
+        deviceType: this.isNative ? 'native' : 'web',
         timestamp: new Date().toISOString()
       };
 

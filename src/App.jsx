@@ -4138,6 +4138,67 @@ function SupportTicketsAdmin({ tickets = [], onRefresh }) {
   );
 }
 
+// Presence hook for the admin <-> parent leave chat. Each side joins a
+// Realtime Presence channel for the leave id while its chat is open and
+// reports its own role; peers see a green signal when the other side's
+// chat is open right now.
+function useChatPresence(leaveId, role) {
+  const [peerOnline, setPeerOnline] = useState(false);
+  const [presenceReady, setPresenceReady] = useState(false);
+
+  useEffect(() => {
+    if (!leaveId || !role) {
+      setPeerOnline(false);
+      setPresenceReady(false);
+      return;
+    }
+    const peerRole = role === "admin" ? "parent" : "admin";
+    const channel = supabase.channel(`leave-presence:${leaveId}`, {
+      config: { presence: { key: `leave-presence:${leaveId}` } },
+    });
+    let subscribed = false;
+    let cancelled = false;
+
+    const refreshState = () => {
+      if (!subscribed || cancelled) return;
+      try {
+        const state = channel.presenceState() || {};
+        const peers = Object.values(state)
+          .flat()
+          .filter((p) => p && p.role === peerRole);
+        setPeerOnline(peers.length > 0);
+        setPresenceReady(true);
+      } catch (err) {
+        console.warn("Presence state read failed:", err);
+      }
+    };
+
+    channel
+      .on("presence", { event: "sync" }, refreshState)
+      .on("presence", { event: "join" }, refreshState)
+      .on("presence", { event: "leave" }, refreshState)
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED" && !cancelled) {
+          subscribed = true;
+          try {
+            await channel.track({ role, leaveId, ts: Date.now() });
+          } catch (err) {
+            console.warn("Presence track failed:", err);
+          }
+          refreshState();
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      subscribed = false;
+      supabase.removeChannel(channel);
+    };
+  }, [leaveId, role]);
+
+  return { peerOnline, presenceReady };
+}
+
 function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
@@ -4150,6 +4211,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const [chatLeave, setChatLeave] = useState(null);
   const [replyText, setReplyText] = useState("");
   const chatMessagesRef = useRef(null);
+  const { peerOnline: adminOnline, presenceReady } = useChatPresence(chatLeave?.id, "parent");
 
   useEffect(() => {
     checkTime();
@@ -4576,6 +4638,17 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
                     <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       {chatLeave.leave_type} &middot; {chatLeave.leave_date}
                     </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: 4 }}>
+                      <span style={{
+                        width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
+                        background: presenceReady && adminOnline ? '#22c55e' : '#b9b2a8',
+                        boxShadow: presenceReady && adminOnline ? '0 0 0 3px rgba(34,197,94,0.18)' : 'none',
+                        transition: 'all 0.25s ease',
+                      }} />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: presenceReady && adminOnline ? '#16a34a' : 'var(--text-muted)' }}>
+                        {!presenceReady ? 'Checking...' : (adminOnline ? 'Admin is online in this chat' : 'Admin is offline')}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <button
@@ -6543,6 +6616,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
   const [approveDropdown, setApproveDropdown] = useState(null); // leave.id or null
   const [sendingAction, setSendingAction] = useState(null); // id being processed
   const chatBodyRef = useRef(null);
+  const { peerOnline: parentOnline, presenceReady } = useChatPresence(chatModal?.id, "admin");
 
   useEffect(() => {
     fetchLeaves();
@@ -6842,6 +6916,17 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                     <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       Send a message to the parent about this leave
                     </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: 4 }}>
+                      <span style={{
+                        width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
+                        background: presenceReady && parentOnline ? '#22c55e' : '#b9b2a8',
+                        boxShadow: presenceReady && parentOnline ? '0 0 0 3px rgba(34,197,94,0.18)' : 'none',
+                        transition: 'all 0.25s ease',
+                      }} />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: presenceReady && parentOnline ? '#16a34a' : 'var(--text-muted)' }}>
+                        {!presenceReady ? 'Checking...' : (parentOnline ? 'Parent is online in this chat' : 'Parent is offline')}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <button onClick={() => { setChatModal(null); setChatMessage(""); }} className="alm-btn-close-chat">
