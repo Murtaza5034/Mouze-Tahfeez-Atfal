@@ -7779,6 +7779,37 @@ function AdminPortal({
   const [adminScheduleStudentId, setAdminScheduleStudentId] = useState("");
   const studentPhotoInputRef = useRef(null);
   const assignmentPhotoInputRef = useRef(null);
+  const [assignModal, setAssignModal] = useState(null);
+  const [assigning, setAssigning] = useState(false);
+
+  const handleAssignClick = async (data) => {
+    if (!data?.student_id) {
+      setAssignModal({ type: "error", title: "Assignment Failed", message: "Please select a student first." });
+      return;
+    }
+    setAssigning(true);
+    try {
+      const result = await onAssignChild(data);
+      if (result && result.ok) {
+        setAssignModal({
+          type: "success",
+          title: "Assigned Successfully",
+          message: "The student details and teacher / parent links have been saved successfully.",
+          studentName: result.studentName || null,
+        });
+      } else {
+        setAssignModal({
+          type: "error",
+          title: "Assignment Failed",
+          message: (result && result.message) || "Something went wrong while saving. Please try again.",
+        });
+      }
+    } catch (err) {
+      setAssignModal({ type: "error", title: "Assignment Failed", message: err?.message || "Something went wrong while saving. Please try again." });
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const handleStudentRegistryPhotoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -11035,7 +11066,7 @@ const handleDownloadAllReports = async () => {
                       its: e.target.its?.value,
                       whatsapp_number: e.target.whatsapp_number?.value,
                     };
-                    if (data.student_id) onAssignChild(data);
+                    if (data.student_id) handleAssignClick(data);
                   }}>
                     <div className="form-grid">
                       <label>
@@ -11182,7 +11213,35 @@ const handleDownloadAllReports = async () => {
                     </div>
 
                     <div className="form-actions-row" style={{ gridColumn: '1 / -1' }}>
-                      <button type="submit" className="action-button">Save Assignments & Updates</button>
+                      <button
+                        type="submit"
+                        className="action-button premium"
+                        disabled={assigning}
+                        style={{
+                          background: 'linear-gradient(135deg, #d4af37 0%, #b8860b 100%)',
+                          color: '#1a1a2e',
+                          border: 'none',
+                          boxShadow: '0 4px 16px rgba(212, 175, 55, 0.45)',
+                          padding: '14px 26px',
+                          fontSize: '15px',
+                          fontWeight: 800,
+                          letterSpacing: '0.5px',
+                          borderRadius: '14px',
+                          fontFamily: 'Inter, sans-serif',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '9px',
+                          cursor: assigning ? 'not-allowed' : 'pointer',
+                          opacity: assigning ? 0.7 : 1,
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        {assigning ? (
+                          <><Loader2 size={19} className="spin" /> Assigning...</>
+                        ) : (
+                          <><CheckCircle2 size={19} /> Assign</>
+                        )}
+                      </button>
                       <button
                         type="button"
                         className="action-button secondary"
@@ -11234,7 +11293,7 @@ const handleDownloadAllReports = async () => {
                                   if (tid) {
                                     /* When admin sets the original teacher, also pass original_teacher_id
                                        and preserve any existing badal_teacher_id */
-                                    onAssignChild({
+                                    handleAssignClick({
                                       student_id: student.student_id,
                                       teacher_id: tid,
                                       original_teacher_id: student.original_teacher_id || tid,
@@ -13529,6 +13588,69 @@ const handleDownloadAllReports = async () => {
               >
                 <MessageCircle size={16} style={{ marginRight: '6px' }} />
                 {sendingWhatsApp ? 'Sending...' : 'Send WhatsApp'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {assignModal && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', padding: '18px',
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setAssignModal(null); }}
+        >
+          <div style={{
+            width: 'min(100%, 430px)', position: 'relative', overflow: 'hidden',
+            borderRadius: '22px', background: 'linear-gradient(160deg, #1b1b33 0%, #14142a 55%, #0f0f22 100%)',
+            border: '1.5px solid rgba(212,175,55,0.55)',
+            boxShadow: '0 0 0 1px rgba(212,175,55,0.12), 0 24px 60px rgba(0,0,0,0.5), 0 0 45px rgba(212,175,55,0.22)',
+            textAlign: 'center', fontFamily: 'Inter, sans-serif', animation: 'fadeIn 0.3s ease',
+          }}>
+            <div style={{ position: 'absolute', top: -40, right: -40, width: 140, height: 140, borderRadius: '50%', background: 'radial-gradient(circle, rgba(212,175,55,0.22) 0%, transparent 70%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: -50, left: -50, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(212,175,55,0.14) 0%, transparent 70%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', zIndex: 1, padding: '30px 26px 12px' }}>
+              <div style={{
+                width: 68, height: 68, margin: '0 auto 14px', borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: assignModal.type === 'success' ? 'rgba(74,222,128,0.14)' : 'rgba(248,113,113,0.14)',
+                border: assignModal.type === 'success' ? '2px solid rgba(74,222,128,0.7)' : '2px solid rgba(248,113,113,0.7)',
+                boxShadow: assignModal.type === 'success' ? '0 0 22px rgba(74,222,128,0.35)' : '0 0 22px rgba(248,113,113,0.35)',
+              }}>
+                {assignModal.type === 'success' ? <CheckCircle2 size={36} color="#4ade80" /> : <XCircle size={36} color="#f87171" />}
+              </div>
+              <div style={{ color: '#b7891f', fontSize: '11px', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 6 }}>
+                {assignModal.type === 'success' ? 'Assignment Complete' : 'Action Failed'}
+              </div>
+              <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: assignModal.type === 'success' ? '#f3e2b2' : '#fca5a5' }}>
+                {assignModal.title}
+              </h3>
+              {assignModal.studentName && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, padding: '6px 14px', borderRadius: 999, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                  <UserCheck size={13} style={{ color: '#d4af37' }} />
+                  <span style={{ color: '#e8d5a3', fontSize: '13px', fontWeight: 600, fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{assignModal.studentName}</span>
+                </div>
+              )}
+              <p style={{ color: '#aab2c8', fontSize: '14px', lineHeight: 1.6, margin: '12px 0 4px' }}>{assignModal.message}</p>
+            </div>
+            <div style={{ position: 'relative', zIndex: 1, padding: '6px 26px 26px' }}>
+              <button
+                onClick={() => setAssignModal(null)}
+                style={{
+                  width: '100%', padding: '13px', borderRadius: '14px', border: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #d4af37 0%, #b8860b 100%)', color: '#1a1a2e',
+                  fontSize: '15px', fontWeight: 800, fontFamily: 'Inter, sans-serif', letterSpacing: '0.4px',
+                  boxShadow: '0 4px 16px rgba(212,175,55,0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  transition: 'transform 0.15s ease',
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                Done
               </button>
             </div>
           </div>
@@ -19447,8 +19569,7 @@ const handleSendCustomNotification = async (event) => {
   const handleAssignChild = async (data) => {
     const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number, original_teacher_id, badal_teacher_id } = data;
     if (!student_id) {
-      showAction("error", "Please select a student first.");
-      return;
+      return { ok: false, message: "Please select a student first." };
     }
 
     console.log("Linking accounts for student:", student_id, { teacher_id, parent_id, original_teacher_id, badal_teacher_id });
@@ -19492,8 +19613,7 @@ const handleSendCustomNotification = async (event) => {
 
     if (profileError) {
       console.error("Link update error:", profileError);
-      showAction("error", `Connection Failed: ${profileError.message}`);
-      return;
+      return { ok: false, message: `Connection Failed: ${profileError.message}` };
     }
 
     // Secondary Check: If we have an ID for parent but it wasn't set, force it
@@ -19559,7 +19679,12 @@ const handleSendCustomNotification = async (event) => {
       ),
     }));
 
-    showAction("success", `Assignment updated successfully.`);
+    return {
+      ok: true,
+      studentName: studentName || existingStudent?.name || null,
+      teacherName: teacherRecord?.full_name || null,
+      parentName: parentRecord?.full_name || null,
+    };
   };
 
   const handleUnassignChild = async (studentId) => {
