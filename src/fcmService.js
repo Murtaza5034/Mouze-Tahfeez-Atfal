@@ -178,6 +178,8 @@ class FCMService {
 
     this.token = await tokenReady;
 
+    this.isNative = true;
+
     // Store token in database
     const stored = await this.storeToken(this.token, userRole);
     if (!stored) {
