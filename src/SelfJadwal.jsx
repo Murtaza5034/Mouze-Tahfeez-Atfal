@@ -224,7 +224,7 @@ const SURAH_PAGE_MAP = {
 
 const getSurahPage = (surahNum) => SURAH_PAGE_MAP[Number(surahNum)] || 1;
 
-const getAyahPage = (surahNum, ayahNum) => {
+export const getAyahPage = (surahNum, ayahNum) => {
   const idx = SURAH_AYAH_DATA.findIndex(s => s.number === Number(surahNum));
   if (idx === -1) return 1;
   const surah = SURAH_AYAH_DATA[idx];
@@ -247,7 +247,7 @@ const getAyahPage = (surahNum, ayahNum) => {
 
 const JUZ_PAGE_MAP = [1,22,42,62,82,102,122,142,162,182,202,222,242,262,282,302,322,342,362,382,402,422,442,462,482,502,522,542,562,582];
 
-const getJuzFromPage = (page) => {
+export const getJuzFromPage = (page) => {
   for (let j = JUZ_PAGE_MAP.length - 1; j >= 0; j--) {
     if (page >= JUZ_PAGE_MAP[j]) return j + 1;
   }

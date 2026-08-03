@@ -255,7 +255,7 @@ export default function TeacherLeaveApprovalPanel({
     setTlComment("");
     setTlSubmitting(false);
     fetchTlLeaves();
-    if (loadPortalData) loadPortalData(portalRole, user);
+    if (loadPortalData) loadPortalData(portalRole, user, null, { silent: true });
     if (onShowAction) onShowAction("success", `Leave approved! ${assigned.length} child(ren) assigned to badal teachers.`);
   };
 

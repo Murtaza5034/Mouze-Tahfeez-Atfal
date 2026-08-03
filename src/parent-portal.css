@@ -3578,3 +3578,1631 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   .section-title { font-size: 1.15rem; }
 }
 
+/* ===== Leave History Page ===== */
+.leave-history-page {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.leave-history-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  background: linear-gradient(135deg, var(--premium-white), #fbf3e3);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 22px;
+  padding: 22px 24px;
+  box-shadow: 0 6px 24px rgba(61, 43, 31, 0.06);
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.leave-history-hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.45), rgba(246, 220, 136, 0.6), rgba(212, 175, 55, 0.45), transparent);
+}
+
+.leave-history-hero-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(212, 175, 55, 0.08));
+  color: var(--primary-gold);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.18);
+}
+
+.leave-history-hero-text {
+  flex: 1;
+  min-width: 200px;
+}
+
+.leave-history-hero-text h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  color: var(--deep-brown);
+  font-weight: 800;
+}
+
+.leave-history-hero-text p {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--soft-brown);
+  line-height: 1.55;
+}
+
+.leave-history-hero-text strong {
+  color: var(--primary-gold);
+}
+
+.leave-history-totals {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.lht-item {
+  min-width: 74px;
+  text-align: center;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(212, 175, 55, 0.16);
+}
+
+.lht-item strong {
+  display: block;
+  font-size: 1.35rem;
+  color: var(--deep-brown);
+  line-height: 1;
+}
+
+.lht-item span {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--soft-brown);
+}
+
+/* Month summary chips */
+.leave-month-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.leave-month-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  background: linear-gradient(135deg, var(--premium-white), #fdf9f0);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 10px rgba(61, 43, 31, 0.04);
+}
+
+.leave-month-summary:hover {
+  transform: translateY(-3px);
+  border-color: rgba(212, 175, 55, 0.4);
+  box-shadow: 0 8px 22px rgba(212, 175, 55, 0.12);
+}
+
+.lms-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--deep-brown);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.lms-count {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--primary-gold);
+  line-height: 1;
+}
+
+.lms-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--soft-brown);
+}
+
+/* Month accordion */
+.leave-month-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.leave-month-card {
+  background: linear-gradient(135deg, var(--premium-white), #fdf9f0);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(61, 43, 31, 0.05);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.leave-month-card.expanded {
+  border-color: rgba(212, 175, 55, 0.45);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.12);
+}
+
+.leave-month-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.leave-month-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.leave-month-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--primary-gold), #e8c86a);
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.14);
+}
+
+.leave-month-head-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.leave-month-name {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--deep-brown);
+}
+
+.leave-month-sub {
+  font-size: 0.72rem;
+  color: var(--soft-brown);
+  margin-top: 2px;
+}
+
+.leave-month-head-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.leave-month-count {
+  min-width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--deep-brown);
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.leave-month-chevron {
+  color: var(--soft-brown);
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.leave-month-chevron.open {
+  transform: rotate(180deg);
+  color: var(--primary-gold);
+}
+
+.leave-month-body {
+  padding: 0 20px 18px;
+  border-top: 1px dashed rgba(212, 175, 55, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.leave-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(212, 175, 55, 0.14);
+  margin-top: 12px;
+  animation: cardAppear 0.3s ease both;
+}
+
+.leave-row.event {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.08), rgba(212, 175, 55, 0.02));
+}
+
+.leave-row-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+.leave-row.student .leave-row-badge {
+  background: rgba(46, 196, 182, 0.12);
+  color: #0b8f84;
+}
+
+.leave-row.event .leave-row-badge {
+  background: rgba(212, 175, 55, 0.16);
+  color: #a87f1a;
+}
+
+.leave-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.leave-row-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--deep-brown);
+  text-transform: capitalize;
+}
+
+.leave-row-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+  font-size: 0.74rem;
+  color: var(--soft-brown);
+}
+
+.leave-row-sep {
+  opacity: 0.5;
+}
+
+.leave-row-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(61, 43, 31, 0.04);
+  font-size: 0.78rem;
+  color: #5d4a3b;
+  line-height: 1.5;
+}
+
+.leave-row-reason svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--primary-gold);
+}
+
+.leave-row-right {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.leave-event-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #d4af37, #b8962e);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(184, 138, 29, 0.25);
+  white-space: nowrap;
+}
+
+/* Loading & empty states */
+.leave-history-loading,
+.leave-history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 50px 20px;
+  text-align: center;
+  color: var(--soft-brown);
+  background: var(--premium-white);
+  border: 1px dashed rgba(212, 175, 55, 0.3);
+  border-radius: 20px;
+}
+
+.leave-history-loading .animate-spin {
+  color: var(--primary-gold);
+}
+
+.leave-history-empty svg {
+  color: var(--primary-gold);
+  opacity: 0.5;
+}
+
+.leave-history-empty h3 {
+  margin: 0;
+  color: var(--deep-brown);
+}
+
+.leave-history-empty p {
+  margin: 0;
+  font-size: 0.85rem;
+  max-width: 360px;
+}
+
+/* ===== Home: Monthly Leave Banner ===== */
+.monthly-leave-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 28px;
+  padding: 18px 22px;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.04), rgba(255, 255, 255, 0.5));
+  box-shadow:
+    0 4px 20px rgba(212, 175, 55, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mlb-dua {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--primary-gold);
+  text-align: center;
+  direction: rtl;
+  padding: 2px 6px;
+  text-shadow:
+    0 1px 1px rgba(255, 255, 255, 0.8),
+    0 0 18px rgba(212, 175, 55, 0.35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+  border-radius: 12px;
+}
+
+.mlb-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.monthly-leave-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.5), rgba(246, 220, 136, 0.7), rgba(212, 175, 55, 0.5), transparent);
+}
+
+.monthly-leave-banner:hover {
+  transform: translateY(-4px);
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow:
+    0 12px 32px rgba(212, 175, 55, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.mlb-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #d4af37, #b8962e);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(184, 138, 29, 0.35);
+}
+
+.mlb-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mlb-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--soft-brown);
+}
+
+.mlb-value {
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: var(--deep-brown);
+  line-height: 1.15;
+}
+
+.mlb-value small {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--soft-brown);
+}
+
+.mlb-sub {
+  font-size: 0.75rem;
+  color: var(--soft-brown);
+  margin-top: 2px;
+}
+
+.mlb-action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d4af37, #b8962e);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(184, 138, 29, 0.3);
+  white-space: nowrap;
+  transition: all 0.25s ease;
+}
+
+.monthly-leave-banner:hover .mlb-action {
+  transform: translateX(4px);
+}
+
+/* Responsive: leave history + home banner */
+@media (max-width: 640px) {
+  .leave-history-hero {
+    padding: 18px 16px;
+    gap: 14px;
+  }
+  .leave-history-totals {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .lht-item {
+    flex: 1;
+  }
+  .monthly-leave-banner {
+    padding: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .mlb-dua {
+    font-size: 1.15rem;
+  }
+  .mlb-action {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .leave-month-header {
+    padding: 14px 14px;
+  }
+  .leave-month-body {
+    padding: 0 14px 14px;
+  }
+  .leave-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .leave-row-right {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .leave-month-sub {
+    display: none;
+  }
+}
+
+/* Dark mode: Leave History + Monthly Leave Banner */
+.dark-mode .leave-history-hero,
+.dark-mode .leave-month-card,
+.dark-mode .leave-month-summary,
+.dark-mode .leave-history-loading,
+.dark-mode .leave-history-empty {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--shadow-premium) !important;
+}
+
+.dark-mode .leave-history-hero-text h2,
+.dark-mode .leave-month-name,
+.dark-mode .leave-row-title,
+.dark-mode .leave-history-empty h3,
+.dark-mode .lht-item strong,
+.dark-mode .mlb-value {
+  color: var(--text-main) !important;
+}
+
+.dark-mode .leave-month-card.expanded {
+  border-color: var(--primary-gold) !important;
+}
+
+.dark-mode .leave-row {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-mode .leave-row.event {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.03)) !important;
+}
+
+.dark-mode .leave-row-reason {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode .leave-row-reason svg {
+  color: var(--primary-gold) !important;
+}
+
+.dark-mode .lht-item {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-mode .monthly-leave-banner {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.03), rgba(255, 255, 255, 0.03)) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-mode .mlb-dua {
+  color: #f0cd6c !important;
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0));
+  text-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+}
+
+.dark-mode .mlb-label,
+.dark-mode .mlb-sub,
+.dark-mode .mlb-value small,
+.dark-mode .leave-month-sub,
+.dark-mode .leave-row-meta,
+.dark-mode .lht-item span,
+.dark-mode .lms-label {
+  color: var(--text-muted) !important;
+}
+
+/* ===== Apply Leave: Fatemi Month Overview ===== */
+.fatemi-month-overview {
+  background: linear-gradient(135deg, var(--premium-white), #fdf9f0);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 22px;
+  padding: 20px 22px 22px;
+  margin-bottom: 26px;
+  box-shadow: 0 6px 24px rgba(61, 43, 31, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.fatemi-verse {
+  display: block;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--primary-gold);
+  text-align: center;
+  direction: rtl;
+  padding: 4px 8px 12px;
+  text-shadow:
+    0 1px 1px rgba(255, 255, 255, 0.85),
+    0 0 20px rgba(212, 175, 55, 0.4);
+}
+
+.fatemi-month-overview::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.45), rgba(246, 220, 136, 0.6), rgba(212, 175, 55, 0.45), transparent);
+}
+
+.fatemi-month-overview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.fmo-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fmo-head-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(212, 175, 55, 0.08));
+  color: var(--primary-gold);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.fmo-head-left h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--deep-brown);
+  font-weight: 800;
+}
+
+.fmo-head-left p {
+  margin: 3px 0 0;
+  font-size: 0.72rem;
+  color: var(--soft-brown);
+}
+
+.fmo-year-badge {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, #d4af37, #b8962e);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(184, 138, 29, 0.28);
+}
+
+.fatemi-month-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  gap: 12px;
+}
+
+.fatemi-month-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 14px 8px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.16);
+  background: rgba(255, 255, 255, 0.6);
+  transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fatemi-month-tile:hover {
+  transform: translateY(-3px);
+  border-color: rgba(212, 175, 55, 0.4);
+  box-shadow: 0 8px 22px rgba(212, 175, 55, 0.12);
+}
+
+.fatemi-month-tile.has-leaves {
+  border-color: rgba(212, 175, 55, 0.45);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.03));
+}
+
+.fmt-ar {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 0.82rem;
+  color: var(--primary-gold);
+  direction: rtl;
+  white-space: nowrap;
+}
+
+.fmt-en {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--deep-brown);
+  text-align: center;
+}
+
+.fmt-count {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #d4af37, #b8962e);
+  box-shadow: 0 3px 10px rgba(184, 138, 29, 0.25);
+  margin-top: 4px;
+}
+
+.fatemi-month-tile:not(.has-leaves) .fmt-count {
+  background: rgba(61, 43, 31, 0.08);
+  color: var(--soft-brown);
+  box-shadow: none;
+}
+
+/* ===== Current Month Highlight ===== */
+@keyframes currentMonthGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(212, 175, 55, 0.5),
+      0 10px 26px rgba(212, 175, 55, 0.32),
+      0 22px 46px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      inset 0 -8px 18px rgba(212, 175, 55, 0.14);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(212, 175, 55, 0.8),
+      0 10px 34px rgba(212, 175, 55, 0.5),
+      0 26px 56px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      inset 0 -8px 22px rgba(212, 175, 55, 0.22);
+  }
+}
+
+.fatemi-month-tile.current-month {
+  position: relative;
+  z-index: 1;
+  transform: translateY(-5px) scale(1.06);
+  border: 1px solid rgba(212, 175, 55, 0.85);
+  background: linear-gradient(145deg, rgba(255, 225, 130, 0.35), rgba(212, 175, 55, 0.12));
+  animation: currentMonthGlow 2.6s ease-in-out infinite;
+}
+
+.fatemi-month-tile.current-month:hover {
+  transform: translateY(-7px) scale(1.07);
+}
+
+.fatemi-month-tile.current-month .fmt-ar {
+  font-size: 1rem;
+  color: #a87d1c;
+  text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+.fatemi-month-tile.current-month .fmt-en {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--primary-gold);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+}
+
+.fatemi-month-tile.current-month .fmt-count {
+  min-width: 34px;
+  height: 34px;
+  font-size: 1.15rem;
+  background: linear-gradient(145deg, #f5d67a, #d4af37 55%, #a87d1c);
+  box-shadow:
+    0 0 18px rgba(212, 175, 55, 0.75),
+    0 6px 16px rgba(168, 125, 28, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.fmt-current-badge {
+  margin-top: 3px;
+  padding: 2px 11px;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, #e6b94e, #a87d1c);
+  box-shadow: 0 3px 12px rgba(168, 125, 28, 0.45);
+}
+
+.dark-mode .fatemi-month-tile.current-month {
+  animation: none;
+  border-color: rgba(212, 175, 55, 0.9) !important;
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.06)) !important;
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.6),
+    0 12px 30px rgba(212, 175, 55, 0.4),
+    0 26px 55px rgba(0, 0, 0, 0.55),
+    inset 0 -10px 24px rgba(212, 175, 55, 0.18) !important;
+}
+
+.dark-mode .fatemi-month-tile.current-month .fmt-en {
+  color: #f0cd6c !important;
+  text-shadow: 0 0 14px rgba(212, 175, 55, 0.55);
+}
+
+.dark-mode .fatemi-month-tile.current-month .fmt-ar {
+  color: #e6b94e !important;
+}
+
+.dark-mode .fmt-current-badge {
+  background: linear-gradient(135deg, #f0cd6c, #b8962e);
+}
+
+/* ===== Apply Leave: Fatemi Date Picker ===== */
+.fatemi-date-range {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.06), rgba(255, 255, 255, 0.4));
+}
+
+.fdr-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--deep-brown);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.fdr-head svg {
+  color: var(--primary-gold);
+  flex-shrink: 0;
+}
+
+.fdr-grid {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fdr-col {
+  flex: 1;
+  min-width: 180px;
+}
+
+.fdr-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--soft-brown);
+  margin-bottom: 7px;
+}
+
+.fdr-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 42px;
+  flex-shrink: 0;
+  color: var(--primary-gold);
+}
+
+.fdr-preview {
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary-gold);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px dashed rgba(212, 175, 55, 0.3);
+}
+
+/* ===== Apply Leave: Fatemi Calendar Picker ===== */
+.fdr-cal-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: var(--premium-white);
+  color: var(--deep-brown);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.fdr-cal-trigger:hover {
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+.fdr-cal-trigger.active {
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.22);
+}
+.fdr-cal-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.fdr-cal-trigger-icon {
+  display: inline-flex;
+  color: var(--primary-gold);
+  flex-shrink: 0;
+}
+.fdr-cal-trigger-text {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fdr-cal-trigger-caret {
+  display: inline-flex;
+  color: var(--soft-brown);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.fdr-cal-trigger.active .fdr-cal-trigger-caret {
+  transform: rotate(180deg);
+}
+
+.fdr-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.fdr-cal-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--primary-gold);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.fdr-cal-nav:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.2);
+}
+.fdr-cal-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.fdr-cal-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.2;
+}
+.fdr-cal-title-en {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--deep-brown);
+}
+.fdr-cal-title-ar {
+  font-size: 0.72rem;
+  color: var(--primary-gold);
+  font-family: 'Al-Kanz', 'Scheherazade', serif;
+}
+.fdr-cal-title-year {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--soft-brown);
+}
+
+.fdr-cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+.fdr-cal-wd {
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--soft-brown);
+  padding: 4px 0;
+}
+
+.fdr-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.fdr-cal-empty {
+  min-height: 46px;
+}
+.fdr-cal-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  min-height: 46px;
+  padding: 5px 2px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--deep-brown);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.fdr-cal-day:hover {
+  background: rgba(212, 175, 55, 0.14);
+  border-color: rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
+}
+.fdr-cal-day.has-miqaat {
+  border-color: rgba(212, 175, 55, 0.5);
+  background: rgba(212, 175, 55, 0.08);
+}
+.fdr-cal-day.is-from,
+.fdr-cal-day.is-till {
+  background: linear-gradient(135deg, var(--primary-gold), #b8912a);
+  border-color: var(--primary-gold);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.45);
+}
+.fdr-cal-day.is-from .fdr-cal-num,
+.fdr-cal-day.is-till .fdr-cal-num {
+  color: #fff;
+}
+.fdr-cal-day.in-range {
+  background: rgba(212, 175, 55, 0.16);
+  border-color: rgba(212, 175, 55, 0.28);
+}
+.fdr-cal-num {
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--deep-brown);
+}
+.fdr-cal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+.fdr-cal-foot-hint {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--soft-brown);
+}
+.fdr-cal-done {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary-gold), #b8912a);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.76rem;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.fdr-cal-done:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(212, 175, 55, 0.55);
+}
+
+/* ===== Premium Fatemi Calendar Modal ===== */
+.fdr-cal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99990;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(212, 175, 55, 0.16), transparent 46%),
+    rgba(18, 13, 8, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: fdrOverlayIn 0.2s ease both;
+}
+
+@keyframes fdrOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fdr-cal-modal {
+  width: min(440px, 100%);
+  max-height: min(92vh, 780px);
+  overflow-y: auto;
+  border-radius: 26px;
+  padding: 20px 20px 18px;
+  position: relative;
+  background:
+    linear-gradient(165deg, #fffdf6, #fbf4e3),
+    radial-gradient(circle at top right, rgba(212, 175, 55, 0.16), transparent 40%);
+  border: 1px solid rgba(212, 175, 55, 0.42);
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(255, 255, 255, 0.55) inset,
+    0 0 40px rgba(212, 175, 55, 0.18);
+  animation: fdrModalIn 0.26s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+@keyframes fdrModalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.fdr-cal-modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 26px 26px 0 0;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.65), #f6dc88, rgba(212, 175, 55, 0.65), transparent);
+}
+
+.fdr-cal-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.fdr-cal-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fdr-cal-modal-title-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.08));
+  color: var(--primary-gold);
+  border: 1px solid rgba(212, 175, 55, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.fdr-cal-modal-title-main {
+  display: block;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--deep-brown);
+}
+
+.fdr-cal-modal-title-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--soft-brown);
+}
+
+.fdr-cal-modal-close {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(61, 43, 31, 0.14);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--deep-brown);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.fdr-cal-modal-close:hover {
+  transform: rotate(90deg);
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--primary-gold);
+}
+
+.fdr-cal-day.is-today {
+  box-shadow: inset 0 0 0 2px rgba(212, 175, 55, 0.5);
+  background: rgba(212, 175, 55, 0.12);
+}
+
+.fdr-cal-day.is-today .fdr-cal-num {
+  color: var(--primary-gold);
+}
+
+.fdr-cal-miqaat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: #8a6d14;
+  background: rgba(212, 175, 55, 0.18);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 999px;
+  padding: 1.5px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fdr-cal-miqaat-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 5px currentColor;
+}
+
+.fdr-cal-day.is-from .fdr-cal-miqaat,
+.fdr-cal-day.is-till .fdr-cal-miqaat {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.fdr-cal-day.is-from .fdr-cal-miqaat-dot,
+.fdr-cal-day.is-till .fdr-cal-miqaat-dot {
+  background: #fff !important;
+  box-shadow: none;
+}
+
+.fdr-cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(212, 175, 55, 0.07);
+  border: 1px dashed rgba(212, 175, 55, 0.28);
+}
+
+.fdr-cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: var(--soft-brown);
+}
+
+.fdr-cal-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
+}
+
+.fdr-cal-today {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--primary-gold);
+  font-weight: 800;
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.15s ease;
+}
+
+.fdr-cal-today:hover {
+  background: rgba(212, 175, 55, 0.2);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 520px) {
+  .fdr-cal-modal {
+    padding: 16px 14px 14px;
+    border-radius: 22px;
+  }
+  .fdr-cal-overlay {
+    padding: 12px;
+    align-items: end;
+  }
+  .fdr-cal-modal {
+    width: 100%;
+    max-height: 88vh;
+  }
+}
+
+/* ===== Apply Leave: Miqaat Dropdown ===== */
+.fatemi-miqaat-box {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.07), rgba(255, 255, 255, 0.4));
+}
+
+.fatemi-event-text {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.07), rgba(255, 255, 255, 0.4));
+}
+
+.fatemi-event-text .premium-textarea:focus {
+  outline: none;
+  border-color: var(--primary-gold) !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+.fmq-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--deep-brown);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.fmq-head svg {
+  color: var(--primary-gold);
+  flex-shrink: 0;
+}
+
+.fmq-hint {
+  margin: 10px 0 0;
+  font-size: 0.76rem;
+  color: var(--soft-brown);
+}
+
+.fmq-hint strong {
+  color: var(--primary-gold);
+}
+
+@media (max-width: 560px) {
+  .fdr-grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .fdr-arrow {
+    height: 20px;
+    transform: rotate(90deg);
+    align-self: center;
+  }
+  .fatemi-month-grid {
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 9px;
+  }
+  .fatemi-verse {
+    font-size: 1.15rem;
+  }
+}
+
+/* Dark mode: Fatemi overview + date picker + miqaat */
+.dark-mode .fatemi-month-overview,
+.dark-mode .fatemi-date-range,
+.dark-mode .fatemi-miqaat-box,
+.dark-mode .fatemi-event-text {
+  background: var(--premium-white) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--shadow-premium) !important;
+}
+
+.dark-mode .fmo-head-left h3,
+.dark-mode .fdr-head,
+.dark-mode .fmq-head {
+  color: var(--text-main) !important;
+}
+
+.dark-mode .fatemi-verse {
+  color: #f0cd6c !important;
+  text-shadow: 0 0 22px rgba(212, 175, 55, 0.55);
+}
+
+.dark-mode .fatemi-month-tile {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.dark-mode .fatemi-month-tile.has-leaves {
+  border-color: var(--primary-gold) !important;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.14), rgba(212, 175, 55, 0.05)) !important;
+}
+
+.dark-mode .fatemi-month-tile:not(.has-leaves) .fmt-count {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--text-muted) !important;
+}
+
+.dark-mode .fdr-preview {
+  background: rgba(212, 175, 55, 0.12) !important;
+  border-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.dark-mode .fdr-cal-trigger {
+  background: #252525 !important;
+  border-color: var(--glass-border) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode .fdr-cal-trigger .fdr-cal-trigger-caret {
+  color: var(--text-muted) !important;
+}
+
+.dark-mode .fdr-cal-nav {
+  background: rgba(212, 175, 55, 0.12) !important;
+  border-color: rgba(212, 175, 55, 0.35) !important;
+}
+
+.dark-mode .fdr-cal-title-en {
+  color: var(--text-main) !important;
+}
+
+.dark-mode .fdr-cal-title-year,
+.dark-mode .fdr-cal-wd {
+  color: var(--text-muted) !important;
+}
+
+.dark-mode .fdr-cal-day {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode .fdr-cal-day:hover {
+  background: rgba(212, 175, 55, 0.18) !important;
+}
+
+.dark-mode .fdr-cal-day.has-miqaat {
+  background: rgba(212, 175, 55, 0.1) !important;
+}
+
+.dark-mode .fdr-cal-day .fdr-cal-num {
+  color: var(--text-main) !important;
+}
+
+.dark-mode .fdr-cal-day.in-range {
+  background: rgba(212, 175, 55, 0.14) !important;
+}
+
+.dark-mode .fdr-cal-miqaat {
+  /* Keep type colors from inline styles working in dark mode (no !important) */
+  color: #f0cd6c;
+  background: rgba(212, 175, 55, 0.16);
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.dark-mode .fdr-cal-foot-hint {
+  color: var(--text-muted) !important;
+}
+
+.dark-mode .fdr-cal-overlay {
+  background:
+    radial-gradient(circle at 50% 8%, rgba(212, 175, 55, 0.12), transparent 46%),
+    rgba(0, 0, 0, 0.66);
+}
+
+.dark-mode .fdr-cal-modal {
+  background:
+    linear-gradient(165deg, #23201b, #1b1813),
+    radial-gradient(circle at top right, rgba(212, 175, 55, 0.1), transparent 40%);
+  border-color: rgba(212, 175, 55, 0.4);
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 36px rgba(212, 175, 55, 0.14);
+}
+
+.dark-mode .fdr-cal-modal-title-main {
+  color: var(--text-main) !important;
+}
+
+.dark-mode .fdr-cal-modal-title-sub {
+  color: var(--text-muted) !important;
+}
+
+.dark-mode .fdr-cal-modal-close {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: var(--glass-border) !important;
+  color: var(--text-main) !important;
+}
+
+.dark-mode .fdr-cal-modal-close:hover {
+  background: rgba(212, 175, 55, 0.18) !important;
+  color: #f0cd6c !important;
+}
+
+.dark-mode .fdr-cal-day.is-today {
+  box-shadow: inset 0 0 0 2px rgba(212, 175, 55, 0.65) !important;
+  background: rgba(212, 175, 55, 0.16) !important;
+}
+
+.dark-mode .fdr-cal-day.is-today .fdr-cal-num {
+  color: #f0cd6c !important;
+}
+
+.dark-mode .fdr-cal-legend {
+  background: rgba(212, 175, 55, 0.08) !important;
+  border-color: rgba(212, 175, 55, 0.25) !important;
+}
+
+.dark-mode .fdr-cal-legend-item {
+  color: var(--text-muted) !important;
+}
+
+.dark-mode .fdr-cal-today {
+  background: rgba(212, 175, 55, 0.12) !important;
+  border-color: rgba(212, 175, 55, 0.4) !important;
+  color: #f0cd6c !important;
+}
+
+

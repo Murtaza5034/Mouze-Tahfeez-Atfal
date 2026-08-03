@@ -4519,6 +4519,106 @@ body {
   font-style: italic;
 }
 
+.badal-label-sub {
+  font-style: normal;
+  font-weight: 600;
+  font-size: 0.66rem;
+  color: #b7891f;
+  letter-spacing: 0.2px;
+  text-transform: none;
+  margin-left: 2px;
+}
+
+.badal-juz-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.badal-juz-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1.5px solid rgba(183,137,31,0.16);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(212,175,55,0.07), rgba(197,160,89,0.03));
+  transition: all 0.25s ease;
+}
+
+.badal-juz-slot:focus-within {
+  border-color: rgba(212,175,55,0.5);
+  box-shadow: 0 0 0 3px rgba(197,160,89,0.12);
+}
+
+.badal-juz-slot-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4af37, #b7891f);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.badal-juz-slot .badal-select {
+  padding: 8px 10px !important;
+  font-size: 0.82rem !important;
+  min-width: 0 !important;
+}
+
+.badal-juz-slot .badal-marks-input {
+  width: 58px !important;
+  padding: 8px 4px !important;
+  font-size: 0.88rem !important;
+}
+
+.badal-range-arrow {
+  color: #b7891f;
+  font-weight: 900;
+  font-size: 1rem;
+}
+
+.badal-range-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #8d7362;
+  font-style: italic;
+  letter-spacing: 0.2px;
+  margin-top: 2px;
+}
+
+.badal-page-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(212,175,55,0.4);
+  background: linear-gradient(135deg, rgba(212,175,55,0.16), rgba(197,160,89,0.07));
+  color: #7a5c10;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.badal-page-badge.empty {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+@media (max-width: 640px) {
+  .badal-juz-slots {
+    grid-template-columns: 1fr;
+  }
+}
+
 .badal-card-footer {
   display: flex;
   justify-content: flex-end;
@@ -7309,14 +7409,14 @@ n/* --- Full Width Label Helper --- */
 .splash-logo-container { position: relative; width: 280px; height: 280px; display: flex; align-items: center; justify-content: center; }
 .splash-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .splash-logo-inner { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; width: 130px; height: 130px; }
-.splash-logo-img { width: 130px; height: 130px; object-fit: contain; opacity: 0; transition: opacity 0.8s ease; }
-.splash-logo-img.visible { opacity: 0.9; }
+.splash-logo-img { width: 130px; height: 130px; object-fit: contain; opacity: 0; transition: opacity 0.25s ease; }
+.splash-logo-img.visible { opacity: 1; }
 .splash-title {
   margin: 12px 0 0; font-size: 2.4rem; font-weight: 700;
   background: linear-gradient(135deg, #d4af37, #f5e6a3, #b8941f);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   background-clip: text; opacity: 0; transform: translateY(10px);
-  transition: opacity 0.8s ease, transform 0.8s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
   font-family: 'Traditional Arabic', 'Amiri', serif;
   letter-spacing: 3px;
 }
@@ -7325,20 +7425,20 @@ n/* --- Full Width Label Helper --- */
   margin: 6px 0 0; font-size: 1.15rem; color: #5d4037;
   letter-spacing: 5px; text-transform: uppercase; font-weight: 500;
   opacity: 0; transform: translateY(6px);
-  transition: opacity 0.8s ease 0.2s, transform 0.8s ease 0.2s;
+  transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
 }
 .splash-subtitle.visible { opacity: 1; transform: translateY(0); }
 .splash-loader { width: 220px; height: 4px; margin-top: 32px; border-radius: 4px; background: rgba(212,175,55,0.15); overflow: hidden; }
 .splash-loader-bar {
   height: 100%; width: 0%; border-radius: 4px;
   background: linear-gradient(90deg, #b8941f, #d4af37, #f5e6a3, #d4af37);
-  animation: splashLoadBar 2s ease-in-out forwards;
+  animation: splashLoadBar 0.85s ease-in-out forwards;
 }
 .splash-loader.done .splash-loader-bar { width: 100%; }
 .splash-message {
   margin-top: 14px; font-size: 0.95rem; color: #6d4c2a;
   letter-spacing: 1.5px; font-weight: 400;
-  opacity: 0; transition: opacity 0.6s ease 0.3s;
+  opacity: 0; transition: opacity 0.25s ease 0.1s;
 }
 .splash-message.visible { opacity: 1; }
 @keyframes splashTrace { to { stroke-dashoffset: 0; } }

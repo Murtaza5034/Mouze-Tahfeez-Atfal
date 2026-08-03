@@ -2,7 +2,7 @@ import "./style.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
-import { getCellEdited, toArabicNum, calcTotalPages, formatJadeed, formatJuzhali, formatMurajah } from "./SelfJadwal";
+import { getCellEdited, toArabicNum, calcTotalPages, formatJadeed, formatJuzhali, formatMurajah, getAyahPage, getJuzFromPage } from "./SelfJadwal";
 import {
   Bell,
   BookOpen,
@@ -53,7 +53,7 @@ import {
   CalendarCheck,
   CalendarX,
   AlertCircle,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronLeft, ChevronRight,
   Paperclip,
   Trash2,
   Pause,
@@ -76,7 +76,10 @@ import {
   Edit3,
   Star,
   MoreHorizontal,
-  ClipboardCheck
+  ClipboardCheck,
+  History,
+  CalendarClock,
+  School
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -179,6 +182,8 @@ const REPORT_SETTING_DEFAULTS = {
   auto_clear_enabled: false,
   auto_clear_day: "Friday",
   auto_clear_time: "11:30",
+  result_live_notify_enabled: false,
+  result_live_last_notified_at: null,
 };
 
 const JADWAL_SETTING_DEFAULTS = {
@@ -2937,18 +2942,17 @@ class PortalErrorBoundary extends React.Component {
 }
 
 function LoadingScreen({ message, onComplete }) {
-  const [phase, setPhase] = useState(0);
+  const [phase, setPhase] = useState(1);
   const completedRef = useRef(false);
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase(1), 1600);
-    const t2 = setTimeout(() => {
+    const t = setTimeout(() => {
       setPhase(2);
       if (!completedRef.current) {
         completedRef.current = true;
         if (onComplete) onComplete();
       }
-    }, 3000);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    }, 950);
+    return () => { clearTimeout(t); };
   }, [onComplete]);
   return (
     <div className="splash-screen">
@@ -2968,30 +2972,30 @@ function LoadingScreen({ message, onComplete }) {
           </defs>
           <circle cx="200" cy="200" r="160" fill="none" stroke="url(#splashGold)" strokeWidth="2"
             className="splash-path" strokeDasharray="1005" strokeDashoffset="1005"
-            style={{ animation: 'splashTrace 1.6s ease-out forwards' }} />
+            style={{ animation: 'splashTrace 0.5s ease-out forwards' }} />
           <circle cx="200" cy="200" r="140" fill="none" stroke="url(#splashGold2)" strokeWidth="1"
             className="splash-path" strokeDasharray="880" strokeDashoffset="880"
-            style={{ animation: 'splashTrace 1.6s ease-out 0.25s forwards' }} />
+            style={{ animation: 'splashTrace 0.5s ease-out 0.15s forwards' }} />
           <path d="M 200 80 L 200 320" fill="none" stroke="url(#splashGold)" strokeWidth="1.5"
             className="splash-path" strokeDasharray="240" strokeDashoffset="240"
-            style={{ animation: 'splashTrace 1s ease-out 0.7s forwards' }} />
+            style={{ animation: 'splashTrace 0.3s ease-out 0.3s forwards' }} />
           <path d="M 140 200 L 260 200" fill="none" stroke="url(#splashGold)" strokeWidth="1.5"
             className="splash-path" strokeDasharray="120" strokeDashoffset="120"
-            style={{ animation: 'splashTrace 1s ease-out 0.9s forwards' }} />
+            style={{ animation: 'splashTrace 0.3s ease-out 0.45s forwards' }} />
           <circle cx="200" cy="200" r="60" fill="none" stroke="url(#splashGold)" strokeWidth="1.5"
             className="splash-path" strokeDasharray="377" strokeDashoffset="377"
-            style={{ animation: 'splashTrace 1.4s ease-out 1.2s forwards' }} />
+            style={{ animation: 'splashTrace 0.4s ease-out 0.55s forwards' }} />
         </svg>
         <div className="splash-logo-inner">
-          <img src="/atfal logo splash.png" alt="" className={`splash-logo-img ${phase >= 1 ? 'visible' : ''}`} />
+          <img src="/atfal logo splash.png" alt="" className="splash-logo-img visible" />
         </div>
       </div>
-      <h1 className={`splash-title ${phase >= 1 ? 'visible' : ''}`}>روضة الأطفال</h1>
-      <p className={`splash-subtitle ${phase >= 1 ? 'visible' : ''}`}>Mauze Tahfeez</p>
+      <h1 className="splash-title visible">روضة الأطفال</h1>
+      <p className="splash-subtitle visible">Mauze Tahfeez</p>
       <div className={`splash-loader ${phase >= 2 ? 'done' : ''}`}>
         <div className="splash-loader-bar" />
       </div>
-      <p className={`splash-message ${phase >= 1 ? 'visible' : ''}`}>{message || 'Loading...'}</p>
+      <p className="splash-message visible">{message || 'Loading...'}</p>
     </div>
   );
 }
@@ -4199,6 +4203,348 @@ function useChatPresence(leaveId, role) {
   return { peerOnline, presenceReady };
 }
 
+const computeLeaveDays = (fromDate, toDate) => {
+  if (!fromDate) return 1;
+  if (!toDate || toDate === fromDate) return 1;
+  try {
+    const from = new Date(fromDate + "T00:00:00");
+    const to = new Date(toDate + "T00:00:00");
+    const diff = Math.round((to - from) / 86400000) + 1;
+    return diff > 0 ? diff : 1;
+  } catch {
+    return 1;
+  }
+};
+
+const formatMonthKeyLabel = (key) => {
+  if (!key) return "Unknown";
+  try {
+    return new Date(key + "-01T00:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  } catch {
+    return key;
+  }
+};
+
+const formatNiceDate = (dateStr) => {
+  if (!dateStr) return "";
+  try {
+    return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return dateStr;
+  }
+};
+
+const groupLeavesByMonth = (leaves) => {
+  const map = {};
+  (leaves || []).forEach((l) => {
+    const key = (l.dateFrom || "").slice(0, 7);
+    if (!key) return;
+    if (!map[key]) map[key] = [];
+    map[key].push(l);
+  });
+  return Object.entries(map)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, items]) => ({
+      key,
+      label: formatMonthKeyLabel(key),
+      items: items.slice().sort((a, b) => String(b.dateFrom).localeCompare(String(a.dateFrom))),
+    }));
+};
+
+function useParentLeaveData(studentId) {
+  const [data, setData] = useState({ leaves: [], loading: true });
+
+  const fetchData = useCallback(async () => {
+    if (!studentId) {
+      setData({ leaves: [], loading: false });
+      return;
+    }
+    setData((prev) => ({ ...prev, loading: true }));
+    const [studentRes, eventRes] = await Promise.all([
+      supabase.from("student_leaves").select("*").eq("student_id", String(studentId)).order("created_at", { ascending: false }),
+      supabase.from("event_leaves").select("*").order("created_at", { ascending: false })
+    ]);
+    const studentLeaves = studentRes.data || [];
+    const eventLeaves = eventRes.data || [];
+    const leaves = [
+      ...studentLeaves.map((l) => ({
+        kind: "student",
+        id: "s-" + l.id,
+        title: l.leave_type || "Leave",
+        dateFrom: l.from_date || l.leave_date,
+        dateTo: l.to_date || l.leave_date,
+        days: computeLeaveDays(l.from_date || l.leave_date, l.to_date || l.leave_date),
+        reason: l.reason || "",
+        status: l.status || "Pending",
+        createdAt: l.created_at,
+        hasMessages: (l.messages || []).length > 0
+      })),
+      ...eventLeaves.map((l) => ({
+        kind: "event",
+        id: "e-" + l.id,
+        title: l.event_name || "School Event",
+        dateFrom: l.from_date,
+        dateTo: l.to_date,
+        days: computeLeaveDays(l.from_date, l.to_date),
+        reason: l.reason || "",
+        status: "Event",
+        createdAt: l.created_at,
+        hasMessages: false
+      }))
+    ];
+    setData({ leaves, loading: false });
+  }, [studentId]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  return { ...data, refresh: fetchData };
+}
+
+function ParentLeaveHistory({ studentProfile, showAction }) {
+  const { leaves, loading } = useParentLeaveData(studentProfile?.student_id);
+  const [expanded, setExpanded] = useState(null);
+  const months = useMemo(() => groupLeavesByMonth(leaves), [leaves]);
+  const totalLeaves = leaves.length;
+  const studentCount = leaves.filter((l) => l.kind === "student").length;
+  const eventCount = leaves.filter((l) => l.kind === "event").length;
+
+  const dateRangeLabel = (l) => {
+    if (l.dateFrom === l.dateTo || !l.dateTo) return formatNiceDate(l.dateFrom);
+    return `${formatNiceDate(l.dateFrom)} → ${formatNiceDate(l.dateTo)}`;
+  };
+
+  return (
+    <div className="leave-history-page card-appear">
+      <div className="leave-history-hero">
+        <div className="leave-history-hero-icon">
+          <CalendarClock size={26} />
+        </div>
+        <div className="leave-history-hero-text">
+          <h2>Leave History</h2>
+          <p>
+            All leaves applied for <strong>{studentProfile?.name || studentProfile?.full_name || "your child"}</strong> — personal
+            requests and school event leaves, grouped by month.
+          </p>
+        </div>
+        <div className="leave-history-totals">
+          <div className="lht-item">
+            <strong>{totalLeaves}</strong>
+            <span>Total</span>
+          </div>
+          <div className="lht-item">
+            <strong>{studentCount}</strong>
+            <span>Personal</span>
+          </div>
+          <div className="lht-item">
+            <strong>{eventCount}</strong>
+            <span>Events</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="leave-month-summary-strip">
+        {months.slice(0, 4).map((m) => (
+          <button
+            key={m.key}
+            className="leave-month-summary"
+            onClick={() => setExpanded((prev) => (prev === m.key ? null : m.key))}
+          >
+            <span className="lms-name">{m.label}</span>
+            <span className="lms-count">{m.items.length}</span>
+            <span className="lms-label">{m.items.length === 1 ? "leave" : "leaves"}</span>
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="leave-history-loading">
+          <Loader2 size={26} className="animate-spin" />
+          <p>Loading leave history...</p>
+        </div>
+      ) : months.length === 0 ? (
+        <div className="leave-history-empty">
+          <CalendarX size={40} />
+          <h3>No leave history yet</h3>
+          <p>When you apply for leave or the school announces event leaves, they will appear here.</p>
+        </div>
+      ) : (
+        <div className="leave-month-list">
+          {months.map((m) => {
+            const monthDays = m.items.reduce((acc, l) => acc + l.days, 0);
+            const isOpen = expanded === m.key;
+            return (
+              <div className={`leave-month-card card-appear ${isOpen ? "expanded" : ""}`} key={m.key}>
+                <button
+                  className="leave-month-header"
+                  onClick={() => setExpanded((prev) => (prev === m.key ? null : m.key))}
+                  aria-expanded={isOpen}
+                >
+                  <div className="leave-month-head-left">
+                    <span className="leave-month-dot" />
+                    <div className="leave-month-head-txt">
+                      <span className="leave-month-name">{m.label}</span>
+                      <span className="leave-month-sub">
+                        {m.items.length} {m.items.length === 1 ? "application" : "applications"} · {monthDays} {monthDays === 1 ? "day" : "days"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="leave-month-head-right">
+                    <span className="leave-month-count">{m.items.length}</span>
+                    <ChevronDown size={20} className={`leave-month-chevron ${isOpen ? "open" : ""}`} />
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="leave-month-body">
+                    {m.items.map((l) => (
+                      <div className={`leave-row ${l.kind}`} key={l.id}>
+                        <div className="leave-row-badge">
+                          {l.kind === "event" ? <School size={13} /> : <User size={13} />}
+                          {l.kind === "event" ? "School Event" : "Personal"}
+                        </div>
+                        <div className="leave-row-main">
+                          <div className="leave-row-title">{l.title}</div>
+                          <div className="leave-row-meta">
+                            <Calendar size={13} />
+                            <span>{dateRangeLabel(l)}</span>
+                            <span className="leave-row-sep">·</span>
+                            <Clock size={13} />
+                            <span>{l.days} {l.days === 1 ? "day" : "days"}</span>
+                          </div>
+                          {l.reason && (
+                            <div className="leave-row-reason">
+                              <MessageCircle size={13} />
+                              <span>{l.reason}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="leave-row-right">
+                          {l.kind === "event" ? (
+                            <span className="leave-event-badge">School Leave</span>
+                          ) : (
+                            <span className={`status-pill ${String(l.status || "Pending").toLowerCase()}`}>
+                              {l.status || "Pending"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MonthlyLeaveCountCard({ studentProfile, onGoApplyLeave }) {
+  const { leaves, loading } = useParentLeaveData(studentProfile?.student_id);
+  const currentKey = getLocalDateKey(new Date()).slice(0, 7);
+  const currentLeaves = (leaves || []).filter((l) => (l.dateFrom || "").slice(0, 7) === currentKey);
+  const count = currentLeaves.length;
+  const studentC = currentLeaves.filter((l) => l.kind === "student").length;
+  const eventC = currentLeaves.filter((l) => l.kind === "event").length;
+  const monthName = formatMonthKeyLabel(currentKey);
+
+  return (
+    <button type="button" className="monthly-leave-banner card-appear" onClick={onGoApplyLeave}>
+      <span className="mlb-dua" dir="rtl">همنالكك اْثثنا فرزند يه اْ مثل رزا طلب كيدي ححهسس</span>
+      <div className="mlb-row">
+        <div className="mlb-icon">
+          <CalendarClock size={26} />
+        </div>
+        <div className="mlb-info">
+          <span className="mlb-label">Monthly Applied Leave</span>
+          <span className="mlb-value">
+            {loading ? "…" : count}
+            <small> this month</small>
+          </span>
+          <span className="mlb-sub">
+            {loading ? "Loading..." : `${monthName} · ${studentC} personal · ${eventC} school event`}
+          </span>
+        </div>
+        <span className="mlb-action">
+          Apply Leave
+          <ArrowRight size={16} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+const FATEMI_YEAR_1448 = 1448;
+const FATEMI_MONTHS_1448 = [
+  { m: 1, en: "Muhrram ul haram", ar: "محرم الحرام" },
+  { m: 2, en: "Safar ul Muzaffar", ar: "صفر المظفر" },
+  { m: 3, en: "Rabi ul Awwal", ar: "ربيع الأول" },
+  { m: 4, en: "Rabi ul Akhar", ar: "ربيع الآخر" },
+  { m: 5, en: "Jumad al Ula", ar: "جمادى الأولى" },
+  { m: 6, en: "Jumad al Ukhra", ar: "جمادى الآخرى" },
+  { m: 7, en: "Rajab ul Asab", ar: "رجب الأصب" }
+];
+
+let fatemiCalCache = null;
+function getFatemiCalendarMap() {
+  if (fatemiCalCache) return fatemiCalCache;
+  const empty = { hijriToGreg: {}, gregToHijri: {}, daysInMonth: { 1: 30, 2: 30, 3: 30, 4: 30, 5: 30, 6: 30, 7: 30 } };
+  try {
+    const fmt = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC'
+    });
+    const hijriToGreg = {};
+    const gregToHijri = {};
+    const daysInMonth = {};
+    const start = new Date('2026-01-01T00:00:00Z');
+    const end = new Date('2027-06-01T00:00:00Z');
+    for (let t = new Date(start); t <= end; t.setUTCDate(t.getUTCDate() + 1)) {
+      const g = t.toISOString().slice(0, 10);
+      const p = fmt.formatToParts(t);
+      const y = +p.find(x => x.type === 'year').value;
+      const m = +p.find(x => x.type === 'month').value;
+      const d = +p.find(x => x.type === 'day').value;
+      if (y === FATEMI_YEAR_1448 && m >= 1 && m <= 7) {
+        hijriToGreg[`${m}-${d}`] = g;
+        gregToHijri[g] = { m, d };
+        if (!daysInMonth[m] || d > daysInMonth[m]) daysInMonth[m] = d;
+      }
+    }
+    fatemiCalCache = { hijriToGreg, gregToHijri, daysInMonth };
+  } catch (err) {
+    console.warn("Fatemi calendar unavailable on this device:", err);
+    fatemiCalCache = empty;
+  }
+  return fatemiCalCache;
+}
+
+const fatemiDateLabel = (m, d) => {
+  const mo = FATEMI_MONTHS_1448.find(x => x.m === Number(m));
+  return `${d} ${mo ? mo.en : m} ${FATEMI_YEAR_1448}`;
+};
+
+// Color-coded styles for miqaat event types shown on the calendar cells
+const MIQAAT_TYPES = {
+  Urus: { color: "#d4af37", bg: "rgba(212,175,55,0.16)" },
+  Eid: { color: "#22c55e", bg: "rgba(34,197,94,0.14)" },
+  Wilaadat: { color: "#3b82f6", bg: "rgba(59,130,246,0.14)" },
+  Wafaat: { color: "#ef4444", bg: "rgba(239,68,68,0.13)" },
+  "Ashara Mubaraka": { color: "#a855f7", bg: "rgba(168,85,247,0.14)" },
+  "Yawme Ashura": { color: "#f97316", bg: "rgba(249,115,22,0.14)" },
+  Event: { color: "#64748b", bg: "rgba(100,116,139,0.14)" },
+};
+
+const getMiqaatStyle = (type) => MIQAAT_TYPES[type] || MIQAAT_TYPES.Event;
+
+const shortMiqaatType = (type) => {
+  if (!type) return "Event";
+  if (type === "Ashara Mubaraka") return "Ashara";
+  return type;
+};
+
 function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
@@ -4212,6 +4558,165 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const [replyText, setReplyText] = useState("");
   const chatMessagesRef = useRef(null);
   const { peerOnline: adminOnline, presenceReady } = useChatPresence(chatLeave?.id, "parent");
+
+  const { leaves: allLeaveRecords, loading: countsLoading, refresh: refreshLeaveCounts } = useParentLeaveData(studentProfile?.student_id);
+  const [miqaats, setMiqaats] = useState([]);
+  const [miqaatEvent, setMiqaatEvent] = useState("");
+  const [fromM, setFromM] = useState(2);
+  const [fromD, setFromD] = useState(17);
+  const [tillM, setTillM] = useState(2);
+  const [tillD, setTillD] = useState(17);
+  const [calOpen, setCalOpen] = useState(null);
+  const [calMonth, setCalMonth] = useState(1);
+  const [calHover, setCalHover] = useState(null);
+  const fatemiCal = getFatemiCalendarMap();
+  const fatemiDays = fatemiCal.daysInMonth;
+
+  const currentFM = (() => {
+    const fi = getFatemiInfo(getLocalDateKey());
+    return Number(fi.year) === FATEMI_YEAR_1448 && fi.month >= 1 && fi.month <= 7 ? fi.month : null;
+  })();
+
+  useEffect(() => {
+    supabase.from("miqaat_calendar").select("*").order("id").then(({ data }) => {
+      if (data) {
+        setMiqaats(data.filter((q) => {
+          const mm = Number(String(q.hijri_date || "").split("-")[0]);
+          return mm >= 1 && mm <= 7;
+        }));
+      }
+    });
+    const todayFi = getFatemiInfo(getLocalDateKey());
+    if (Number(todayFi.year) === FATEMI_YEAR_1448 && todayFi.month >= 1 && todayFi.month <= 7) {
+      setFromM(todayFi.month);
+      setFromD(todayFi.date);
+      setTillM(todayFi.month);
+      setTillD(todayFi.date);
+    }
+  }, []);
+
+  const monthCounts = useMemo(() => {
+    const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+    (allLeaveRecords || []).forEach((l) => {
+      const fi = getFatemiInfo(l.dateFrom);
+      if (Number(fi.year) === FATEMI_YEAR_1448 && fi.month >= 1 && fi.month <= 7) {
+        counts[fi.month] = (counts[fi.month] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [allLeaveRecords]);
+
+  const handleMiqaatChange = (val) => {
+    setMiqaatEvent(val);
+    if (!val) return;
+    const ev = miqaats.find((q) => String(q.id) === String(val));
+    if (!ev) return;
+    const parts = String(ev.hijri_date || "").split("-").map(Number);
+    const mm = parts[0];
+    const dd = parts[1];
+    if (mm >= 1 && mm <= 7 && dd >= 1) {
+      setFromM(mm);
+      setFromD(dd);
+      setTillM(mm);
+      setTillD(dd);
+    }
+  };
+
+  const miqaatsByDate = useMemo(() => {
+    const map = {};
+    (miqaats || []).forEach((q) => {
+      const key = String(q.hijri_date || "");
+      if (!map[key]) map[key] = [];
+      map[key].push(q);
+    });
+    return map;
+  }, [miqaats]);
+
+  const fatemiMonthWeekdayStart = (m) => {
+    const firstGreg = fatemiCal.hijriToGreg[`${m}-1`];
+    if (!firstGreg) return 0;
+    return new Date(firstGreg + "T00:00:00Z").getUTCDay();
+  };
+
+  const calGrid = useMemo(() => {
+    const m = calMonth;
+    const days = fatemiDays[m] || 30;
+    const startDow = fatemiMonthWeekdayStart(m);
+    const cells = [];
+    for (let i = 0; i < startDow; i++) cells.push(null);
+    for (let d = 1; d <= days; d++) cells.push(d);
+    return cells;
+  }, [calMonth]);
+
+  const isSameDate = (m, d, tm, td) => m === tm && d === td;
+  const calInRange = (m, d) => {
+    const fromVal = fromM * 100 + fromD;
+    const tillVal = tillM * 100 + tillD;
+    const val = m * 100 + d;
+    return val > fromVal && val < tillVal;
+  };
+
+  const pickCalDay = (m, d) => {
+    if (calOpen === "from") {
+      setFromM(m);
+      setFromD(d);
+      if (m > tillM || (m === tillM && d > tillD)) {
+        setTillM(m);
+        setTillD(d);
+      }
+      setCalHover(null);
+      // Premium flow: after picking From, auto-advance to the Till step
+      setCalOpen("till");
+    } else if (calOpen === "till") {
+      setTillM(m);
+      setTillD(d);
+      if (m < fromM || (m === fromM && d < fromD)) {
+        setFromM(m);
+        setFromD(d);
+      }
+      setCalHover(null);
+      setCalOpen(null);
+    }
+  };
+
+  const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  // Today's Fatemi date (1448, months 1-7) for the Today shortcut + cell highlight
+  const todayFi = useMemo(() => {
+    const fi = getFatemiInfo(getLocalDateKey());
+    return Number(fi.year) === FATEMI_YEAR_1448 && fi.month >= 1 && fi.month <= 7 ? fi : null;
+  }, []);
+
+  // Unique miqaat types present, shown as the calendar legend
+  const legendTypes = useMemo(() => {
+    const seen = new Set();
+    (miqaats || []).forEach((q) => { if (q.type) seen.add(q.type); });
+    return [...seen];
+  }, [miqaats]);
+
+  const goToday = () => {
+    if (todayFi) {
+      setFromM(todayFi.month);
+      setFromD(todayFi.date);
+      setTillM(todayFi.month);
+      setTillD(todayFi.date);
+      setCalMonth(todayFi.month);
+    }
+    setCalOpen(null);
+  };
+
+  // Close the premium calendar on Escape and lock background scroll while open
+  useEffect(() => {
+    if (!calOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") setCalOpen(null); };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [calOpen]);
 
   useEffect(() => {
     checkTime();
@@ -4354,6 +4859,11 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
     }
     if (["EMERGENCY", "Miqaat", "other"].includes(leaveType) && !reason.trim()) return showAction("error", "Please provide details.");
 
+    const fromGreg = fatemiCal.hijriToGreg[`${fromM}-${fromD}`];
+    const tillGreg = fatemiCal.hijriToGreg[`${tillM}-${tillD}`];
+    if (!fromGreg || !tillGreg) return showAction("error", "Please choose valid leave dates.");
+    if (fromGreg > tillGreg) return showAction("error", "From date must be on or before till date.");
+
     setIsSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -4363,13 +4873,20 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
         leave_type: leaveType,
         reason: reason,
         attachment_url: attachment,
-        leave_date: new Date().toISOString().split('T')[0]
+        leave_date: fromGreg,
+        from_date: fromGreg,
+        to_date: tillGreg
       });
       if (dbErr) throw dbErr;
 
+      const miqaatName = leaveType === "EVENT" && miqaatEvent
+        ? miqaats.find((q) => String(q.id) === String(miqaatEvent))?.name
+        : null;
+      const leaveWindowLabel = `${fatemiDateLabel(fromM, fromD)}${fromGreg !== tillGreg ? ` to ${fatemiDateLabel(tillM, tillD)}` : ""}`;
+
       await broadcastNotification(
         `Leave Application ًں“…`,
-        `${studentProfile?.name} has applied for leave (${leaveType}). Reason: ${reason || 'Not provided'}`,
+        `${studentProfile?.name} has applied for leave (${leaveType})${miqaatName ? `: ${miqaatName}` : ""}. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
         "admin",
         null,
         "Leave Management"
@@ -4387,7 +4904,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
           if (teacherTarget) {
             await broadcastNotification(
               `Leave Application ًں“…`,
-              `${studentProfile?.name} (${leaveType}) has applied for leave. Reason: ${reason || 'Not provided'}`,
+              `${studentProfile?.name} (${leaveType})${miqaatName ? `: ${miqaatName}` : ""} has applied for leave. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
               "user",
               teacherTarget,
               "Leave Management"
@@ -4401,7 +4918,9 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
       showAction("success", "Leave applied successfully!");setLeaveType("");
       setReason("");
       setAttachment(null);
+      setMiqaatEvent("");
       fetchHistory();
+      refreshLeaveCounts();
     } catch (err) {
       showAction("error", "Failed to submit leave.");
     } finally {
@@ -4444,6 +4963,34 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
 
   return (
     <div className="leave-apply-container card-appear">
+      <div className="fatemi-month-overview card-appear">
+        <span className="fatemi-verse" dir="rtl">همنالكك اْثثنا فرزند يه اْ مثل رزا طلب كيدي ححهسس</span>
+        <div className="fatemi-month-overview-head">
+          <div className="fmo-head-left">
+            <span className="fmo-head-icon"><CalendarClock size={20} /></span>
+            <div>
+              <h3>Leave Overview</h3>
+              <p>Fatemi Calendar 1448 · Applied leaves per month</p>
+            </div>
+          </div>
+          <span className="fmo-year-badge">1448H</span>
+        </div>
+        <div className="fatemi-month-grid">
+          {FATEMI_MONTHS_1448.map((mo) => {
+            const c = monthCounts[mo.m] || 0;
+            const isCurrent = currentFM === mo.m;
+            return (
+              <div className={`fatemi-month-tile ${c > 0 ? 'has-leaves' : ''} ${isCurrent ? 'current-month' : ''}`} key={mo.m}>
+                <span className="fmt-ar">{mo.ar}</span>
+                <span className="fmt-en">{mo.en}</span>
+                <span className="fmt-count">{countsLoading ? "…" : c}</span>
+                {isCurrent && <span className="fmt-current-badge">Current</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="premium-card leave-card" style={{ position: 'relative', overflow: 'hidden', marginBottom: '30px' }}>
         <div className="leave-header-strip" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -4485,6 +5032,227 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
               <option value="other">Other (Details Required)</option>
             </select>
           </div>
+
+          <div className="fatemi-date-range card-appear">
+            <div className="fdr-head">
+              <CalendarClock size={18} />
+              <span>Leave Dates (Fatemi Calendar 1448)</span>
+            </div>
+            <div className="fdr-grid">
+              <div className="fdr-col">
+                <span className="fdr-label">From</span>
+                <button
+                  type="button"
+                  className={`fdr-cal-trigger ${calOpen === "from" ? "active" : ""}`}
+                  onClick={() => { setCalMonth(fromM); setCalOpen(calOpen === "from" ? null : "from"); }}
+                  disabled={status === 'closed' || isSubmitting}
+                >
+                  <span className="fdr-cal-trigger-icon"><CalendarCheck size={16} /></span>
+                  <span className="fdr-cal-trigger-text">{fatemiDateLabel(fromM, fromD)}</span>
+                  <span className="fdr-cal-trigger-caret"><ChevronDown size={15} /></span>
+                </button>
+              </div>
+              <span className="fdr-arrow"><ArrowRight size={18} /></span>
+              <div className="fdr-col">
+                <span className="fdr-label">Till</span>
+                <button
+                  type="button"
+                  className={`fdr-cal-trigger ${calOpen === "till" ? "active" : ""}`}
+                  onClick={() => { setCalMonth(tillM); setCalOpen(calOpen === "till" ? null : "till"); }}
+                  disabled={status === 'closed' || isSubmitting}
+                >
+                  <span className="fdr-cal-trigger-icon"><CalendarCheck size={16} /></span>
+                  <span className="fdr-cal-trigger-text">{fatemiDateLabel(tillM, tillD)}</span>
+                  <span className="fdr-cal-trigger-caret"><ChevronDown size={15} /></span>
+                </button>
+              </div>
+            </div>
+
+            {calOpen && createPortal(
+              <div className="fdr-cal-overlay" onClick={() => setCalOpen(null)}>
+                <div className="fdr-cal-modal card-appear" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                  <div className="fdr-cal-modal-head">
+                    <div className="fdr-cal-modal-title">
+                      <span className="fdr-cal-modal-title-icon"><CalendarClock size={18} /></span>
+                      <div>
+                        <span className="fdr-cal-modal-title-main">
+                          {calOpen === "from" ? "Select From Date" : "Select Till Date"}
+                        </span>
+                        <span className="fdr-cal-modal-title-sub">Fatemi Calendar 1448 AH · {FATEMI_MONTHS_1448.find((mo) => mo.m === calMonth)?.en}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="fdr-cal-modal-close"
+                      onClick={() => setCalOpen(null)}
+                      aria-label="Close calendar"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="fdr-cal-head">
+                    <button
+                      type="button"
+                      className="fdr-cal-nav"
+                      onClick={() => setCalMonth((m) => Math.max(1, m - 1))}
+                      disabled={calMonth <= 1}
+                    >
+                      <ChevronLeft size={17} />
+                    </button>
+                    <div className="fdr-cal-title">
+                      <span className="fdr-cal-title-en">{FATEMI_MONTHS_1448.find((mo) => mo.m === calMonth)?.en}</span>
+                      <span className="fdr-cal-title-ar" dir="rtl">{FATEMI_MONTHS_1448.find((mo) => mo.m === calMonth)?.ar}</span>
+                      <span className="fdr-cal-title-year">{FATEMI_YEAR_1448} AH</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="fdr-cal-nav"
+                      onClick={() => setCalMonth((m) => Math.min(7, m + 1))}
+                      disabled={calMonth >= 7}
+                    >
+                      <ChevronRight size={17} />
+                    </button>
+                  </div>
+
+                  <div className="fdr-cal-week">
+                    {WEEKDAY_LABELS.map((w) => <span key={w} className="fdr-cal-wd">{w}</span>)}
+                  </div>
+
+                  <div className="fdr-cal-grid">
+                    {calGrid.map((d, idx) => {
+                      if (d === null) return <span key={`e${idx}`} className="fdr-cal-empty" />;
+                      const mqList = miqaatsByDate[`${String(calMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`] || [];
+                      const isFrom = isSameDate(calMonth, d, fromM, fromD);
+                      const isTill = isSameDate(calMonth, d, tillM, tillD);
+                      const inRange = calInRange(calMonth, d);
+                      const isHover = calHover && calHover.m === calMonth && calInRange(calMonth, d);
+                      const isToday = todayFi && todayFi.month === calMonth && todayFi.date === d;
+                      const mqStyle = mqList.length ? getMiqaatStyle(mqList[0].type) : null;
+                      const cls = [
+                        "fdr-cal-day",
+                        mqList.length ? "has-miqaat" : "",
+                        isFrom ? "is-from" : "",
+                        isTill ? "is-till" : "",
+                        isToday && !isFrom && !isTill ? "is-today" : "",
+                        (inRange || isHover) && !isFrom && !isTill ? "in-range" : "",
+                      ].filter(Boolean).join(" ");
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          className={cls}
+                          onClick={() => pickCalDay(calMonth, d)}
+                          onMouseEnter={() => setCalHover({ m: calMonth, d })}
+                          onMouseLeave={() => setCalHover(null)}
+                          disabled={status === 'closed' || isSubmitting}
+                        >
+                          <span className="fdr-cal-num">{d}</span>
+                          {mqList.length > 0 && mqStyle && (
+                            <span
+                              className="fdr-cal-miqaat"
+                              style={{ color: mqStyle.color, background: mqStyle.bg, borderColor: `${mqStyle.color}55` }}
+                              title={mqList.map((q) => `${q.name} · ${q.type}`).join("\n")}
+                            >
+                              <span className="fdr-cal-miqaat-dot" style={{ background: mqStyle.color }} />
+                              {shortMiqaatType(mqList[0].type)}{mqList.length > 1 ? ` +${mqList.length - 1}` : ""}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {legendTypes.length > 0 && (
+                    <div className="fdr-cal-legend">
+                      {legendTypes.map((t) => {
+                        const s = getMiqaatStyle(t);
+                        return (
+                          <span key={t} className="fdr-cal-legend-item">
+                            <span className="fdr-cal-legend-dot" style={{ background: s.color }} />
+                            {shortMiqaatType(t)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="fdr-cal-foot">
+                    <button type="button" className="fdr-cal-today" onClick={goToday}>
+                      <Clock size={13} /> Today
+                    </button>
+                    <span className="fdr-cal-foot-hint">
+                      {calOpen === "from" ? "Tap a date to set From" : "Tap a date to set Till"}
+                    </span>
+                    <button type="button" className="fdr-cal-done" onClick={() => setCalOpen(null)}>Done</button>
+                  </div>
+                </div>
+              </div>,
+              document.body
+            )}
+
+            <p className="fdr-preview">
+              {fatemiDateLabel(fromM, fromD)} {fromM !== tillM || fromD !== tillD ? `→ ${fatemiDateLabel(tillM, tillD)}` : ""}
+            </p>
+          </div>
+
+          {leaveType === "EVENT" && (
+            <div className="fatemi-miqaat-box card-appear">
+              <div className="fmq-head">
+                <School size={18} />
+                <span>Select Miqaat Event</span>
+              </div>
+              <select
+                className="premium-select"
+                value={miqaatEvent}
+                onChange={(e) => handleMiqaatChange(e.target.value)}
+                disabled={status === 'closed' || isSubmitting}
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #ddd', fontSize: '1rem' }}
+              >
+                <option value="">-- Choose a Miqaat --</option>
+                {miqaats.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.name} ({q.type} · {q.hijri_date} 1448)
+                  </option>
+                ))}
+              </select>
+              {miqaatEvent && (
+                <p className="fmq-hint">
+                  Dates set automatically for <strong>{miqaats.find((q) => String(q.id) === String(miqaatEvent))?.name}</strong>.
+                </p>
+              )}
+            </div>
+          )}
+
+          {leaveType === "EVENT" && (
+            <div className="fatemi-event-text card-appear">
+              <div className="fmq-head">
+                <FileText size={18} />
+                <span>Personal Event Details (Optional)</span>
+              </div>
+              <textarea
+                className="premium-textarea"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Write your own event details here (optional) — e.g., family function, travel, gathering, etc."
+                disabled={status === 'closed' || isSubmitting}
+                rows={3}
+                style={{
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  border: '1px solid #ddd',
+                  fontSize: '0.9rem',
+                  fontFamily: 'inherit',
+                  color: 'var(--deep-brown)',
+                  resize: 'vertical',
+                  lineHeight: '1.5',
+                  background: 'var(--premium-white)'
+                }}
+              />
+            </div>
+          )}
 
           {showUpload && (
             <div className="form-group card-appear" style={{ marginBottom: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '12px', border: '1px dashed var(--primary-gold)' }}>
@@ -4564,7 +5332,10 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--primary-gold)', textTransform: 'uppercase' }}>{item.leave_type}</span>
-                  <h4 style={{ margin: '4px 0', fontSize: '1rem' }}>{item.leave_date}</h4>
+                  <h4 style={{ margin: '4px 0', fontSize: '1rem' }}>
+                    {item.from_date || item.leave_date}
+                    {item.to_date && item.to_date !== (item.from_date || item.leave_date) ? ` → ${item.to_date}` : ""}
+                  </h4>
                 </div>
                 <span className={`status-pill ${item.status.toLowerCase()}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>{item.status}</span>
               </div>
@@ -4748,6 +5519,7 @@ const resolveRedirectPage = (page, role) => {
       "Profile": "Profile",
       "Hub Raqam": "Hub Raqam",
       "Apply Leave": "Apply Leave",
+      "Leave History": "Leave History",
       "Settings": "Settings",
       "Jadwal": "Jadwal",
       "Self Jadwal": "Self Jadwal",
@@ -4882,8 +5654,12 @@ function ParentPortal({
     }
   }, [activePage]);
 
-  useEffect(() => {
-    Promise.all([
+  // Fetch which pages are visible for parents. If the admin disables the
+  // parent leave portal (jadwal_settings.parent_leave_enabled = false),
+  // hide "Apply Leave". Re-fetched on mount, on realtime changes, and via a
+  // polling fallback so toggling the portal takes effect without a reload.
+  const fetchPageVisibility = useCallback(async () => {
+    const [pvRes, jsRes] = await Promise.all([
       supabase.from('page_visibility')
         .select('page_key, visible')
         .eq('role', 'parents'),
@@ -4891,18 +5667,42 @@ function ParentPortal({
         .select('parent_leave_enabled')
         .eq('id', 1)
         .maybeSingle()
-    ]).then(([pvRes, jsRes]) => {
-      const map = {};
-      if (pvRes.data) {
-        pvRes.data.forEach(p => { map[p.page_key] = p.visible; });
-      }
-      // If admin has disabled the parent leave portal, hide Apply Leave
-      if (jsRes.data && jsRes.data.parent_leave_enabled === false) {
-        map['Apply Leave'] = false;
-      }
-      setPageVisibility(map);
-    });
+    ]);
+    const map = {};
+    if (pvRes.data) {
+      pvRes.data.forEach(p => { map[p.page_key] = p.visible; });
+    }
+    // If admin has disabled the parent leave portal, hide Apply Leave
+    if (jsRes.data && jsRes.data.parent_leave_enabled === false) {
+      map['Apply Leave'] = false;
+    }
+    setPageVisibility(map);
   }, []);
+
+  useEffect(() => {
+    fetchPageVisibility().catch(() => {});
+    // Live updates: when the admin toggles the leave portal or page
+    // visibility, the parent portal reflects it immediately.
+    const channel = supabase
+      .channel('parent-page-visibility-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'jadwal_settings', filter: 'id=eq.1' },
+        () => fetchPageVisibility().catch(() => {})
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'page_visibility', filter: 'role=eq.parents' },
+        () => fetchPageVisibility().catch(() => {})
+      )
+      .subscribe();
+    // Fallback poll in case realtime is unavailable or delayed.
+    const poll = setInterval(() => fetchPageVisibility().catch(() => {}), 30000);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(poll);
+    };
+  }, [fetchPageVisibility]);
 
   // Fetch self_jadwal data for read-only view
   const fetchReadJadwal = useCallback(async () => {
@@ -5354,6 +6154,11 @@ function ParentPortal({
               <CalendarX size={18} /> Apply Leave
             </button>
           )}
+          {pageVisibility["Leave History"] !== false && (
+            <button className={`drawer-link ${activePage === "Leave History" ? "active" : ""}`} onClick={() => { setActivePage("Leave History"); setMenuOpen(false); }}>
+              <History size={18} /> Leave History
+            </button>
+          )}
           {pageVisibility["Jadwal"] !== false && (
             <button className={`drawer-link ${activePage === "Jadwal" ? "active" : ""}`} onClick={() => { setActivePage("Jadwal"); setMenuOpen(false); }}>
               <Calendar size={18} /> Jadwal
@@ -5429,6 +6234,8 @@ function ParentPortal({
                { label: "Teacher Profiles", value: "Teachers" },
                 { label: "Hub Raqam (Fees)", value: "Hub Raqam" },
                 { label: "My Profile", value: "Profile" },
+                { label: "Apply Leave", value: "Apply Leave" },
+                { label: "Leave History", value: "Leave History" },
                 { label: "Self Jadwal", value: "Self Jadwal" },
                 { label: "App Settings", value: "Settings" }
               ]} 
@@ -5505,6 +6312,13 @@ function ParentPortal({
                 ));
               })()}
             </div>
+
+            {pageVisibility["Apply Leave"] !== false && (
+              <MonthlyLeaveCountCard
+                studentProfile={studentProfile}
+                onGoApplyLeave={() => { setActionStatusParent('leave', 'info', 'Opening Apply Leave...'); setActivePage('Apply Leave'); setMenuOpen(false); }}
+              />
+            )}
 
             {recentMarhalaPostPreview}
 
@@ -5720,6 +6534,10 @@ function ParentPortal({
 
         {activePage === "Apply Leave" && (
           <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} />
+        )}
+
+        {activePage === "Leave History" && (
+          <ParentLeaveHistory studentProfile={studentProfile} showAction={showAction} />
         )}
 
         {activePage === "Child Summary" ? (
@@ -7825,6 +8643,7 @@ function AdminPortal({
   onDismissAnnounce,
   onClearAllAnnounces,
   parentViews = [],
+  onParentViewsReset,
   whatsappConfig,
   onUpdateWhatsappConfig,
   portalAccessSuccess,
@@ -8338,7 +9157,12 @@ const handleDownloadAllReports = async () => {
     groups: Array.from(item.groups),
   }));
 
-  const viewedCount = (parentViews || []).filter(v => v.viewed).length;
+  const viewedStudentIds = new Set(
+    (parentViews || []).filter(v => v.viewed).map(v => String(v.student_id).trim().toLowerCase())
+  );
+  const viewedCount = students.filter(s =>
+    viewedStudentIds.has(String(s.student_id).trim().toLowerCase())
+  ).length;
 
   // ── Leave Count & Attendance Tracking Overview Stats ──
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
@@ -8411,23 +9235,51 @@ const handleDownloadAllReports = async () => {
     { label: "Attendance Tracking", value: overviewAttLoading ? "..." : `${attNotMarkedCount} Not / ${attAllMarkedCount} All`, icon: ClipboardCheck, navigateTo: "Attendance Tracking" },
   ];
 
-  const resultLiveNotificationAlreadySent = async (since) => {
-    if (!since) return false;
+  const sendResultLiveNotifications = async ({ manual = false } = {}) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("result-live-notifier", {
+        body: { manual },
+      });
+      if (error) throw error;
 
-    const { data, error } = await supabase
-      .from("system_notifications")
-      .select("target_role")
-      .eq("title", "Results are LIVE!")
-      .in("target_role", ["parents", "teacher"])
-      .gte("created_at", since.toISOString());
+      const skipped = data?.skipped;
+      if (skipped) {
+        console.log("Result-live notifier skipped:", skipped);
+        const liveTime = data?.liveAt ? new Date(data.liveAt).toLocaleString() : "";
+        if (skipped === "NOTIFY_DISABLED") {
+          onShowAction("error", "Result notifications are OFF. Turn on the premium toggle first, then press 'Send Notify'.");
+        } else if (skipped === "NOT_LIVE") {
+          onShowAction("error", "Results are currently Hidden. Set Parent Access Mode to 'Live' before notifying.");
+        } else if (skipped === "NOT_YET_LIVE" || skipped === "NOT_YET") {
+          onShowAction("info", `Results go live at ${liveTime || "the scheduled time"}. Parents & teachers will be notified automatically then (toggle is ON).`);
+        } else if (skipped === "ALREADY_NOTIFIED") {
+          onShowAction("success", "Parents and teachers were already notified for this live schedule.");
+        } else {
+          onShowAction("info", "Result-live notifications were not sent right now (" + skipped + ").");
+        }
+        return { sent: false, skipped };
+      }
 
-    if (error) {
-      console.warn("Could not check previous result-live notifications:", error.message);
-      return false;
+      const summary = data?.summary || {};
+      if (summary.delivered > 0) {
+        onShowAction("success", `Results are live. ${summary.children || 0} child notification${summary.children === 1 ? "" : "s"} pushed to ${summary.parents || 0} parent${summary.parents === 1 ? "" : "s"}, plus teachers.`);
+
+        if (whatsappConfig?.auto_send_on_publish) {
+          const waTargetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
+          if (waTargetStudents.length > 0) {
+            setPendingWaTargetCount(waTargetStudents.length);
+            setShowWaConfirmAfterPublish(true);
+          }
+        }
+      } else {
+        onShowAction("success", "Results are live. Notifications processed — some devices may not have an active push token.");
+      }
+      return { sent: true, data };
+    } catch (err) {
+      console.error("Result-live notifier error:", err);
+      onShowAction("error", "Failed to send result-live notifications: " + (err.message || "Unknown error"));
+      return { sent: false, error: err };
     }
-
-    const notifiedRoles = new Set((data || []).map((notification) => notification.target_role));
-    return notifiedRoles.has("parents") && notifiedRoles.has("teacher");
   };
 
   const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
@@ -8435,14 +9287,8 @@ const handleDownloadAllReports = async () => {
     const now = new Date();
     const previousSettings = normalizeReportSettings(reportSettingsObject);
     const nextSettings = normalizeReportSettings({ ...previousSettings, ...updates });
-    const nextActionTime = getReportActionTime(nextSettings);
-    const previousVisible = isReportVisibleNow(previousSettings, now);
-    const isPastScheduledLive = Boolean(nextActionTime && nextActionTime <= now);
-    const shouldSendResultLiveNotification =
-      notifyLive &&
-      updates.reports_live === true &&
-      isReportVisibleNow(nextSettings, now) &&
-      (!previousVisible || isPastScheduledLive);
+    const publishingLive = notifyLive && updates.reports_live === true;
+    const notifyEnabled = Boolean(nextSettings.result_live_notify_enabled);
 
     const { error } = await supabase
       .from("report_settings")
@@ -8457,81 +9303,47 @@ const handleDownloadAllReports = async () => {
 
     onShowAction("success", "System settings updated successfully!");
 
-    if (shouldSendResultLiveNotification) {
-      const alreadyNotified = isPastScheduledLive && previousVisible
-        ? await resultLiveNotificationAlreadySent(nextActionTime)
-        : false;
-
-      if (alreadyNotified) {
-        onShowAction("success", "Reports are live. Parents and teachers were already notified for this live time.");
-        loadPortalData(portalRole, user);
-        return;
-      }
-
+    // Renew the parent view count every time the admin makes reports live so
+    // parents see the latest report card again and the overview card shows a fresh count.
+    if (publishingLive) {
       const { error: resetError } = await supabase
         .from("parent_report_views")
         .update({ viewed: false, view_duration_seconds: 0, updated_at: new Date().toISOString() })
         .neq("student_id", "");
 
       if (resetError) console.warn("Failed to reset parent views on live:", resetError.message);
+      onParentViewsReset?.();
+    }
 
-      const { error: inboxError } = await supabase
-        .from("system_notifications")
-        .insert([
-          {
-            title: "Results are LIVE!",
-            body: "The latest Tahfeez progress reports are now visible in the parent portal.",
-            target_role: "parents",
-            target_user: null,
-            redirect_page: "Progress",
-          },
-          {
-            title: "Results are LIVE!",
-            body: "The latest Tahfeez progress reports are now live for review.",
-            target_role: "teacher",
-            target_user: null,
-            redirect_page: "My Group",
-          },
-        ]);
+    const actionTime = getReportActionTime(nextSettings);
+    const isVisibleNow = isReportVisibleNow(nextSettings, now);
 
-      if (inboxError) {
-        console.error("Result-live inbox notification error:", inboxError);
-      }
-
-      const pushResult = await broadcastNotification(
-        "Results are LIVE!",
-        "The latest Tahfeez progress reports are now visible in your portal.",
-        "all",
-        null,
-        "Progress",
-        true,
-        null,
-        true
-      );
-
-      const notificationFailed = inboxError || pushResult?.fcmError;
-
-      if (notificationFailed) {
-        onShowAction("error", "Reports are live, but some notifications failed. Check console for details.");
-      } else {
-        onShowAction("success", "Reports are live. Parents and teachers have been notified.");
-      }
-
-      if (whatsappConfig?.auto_send_on_publish) {
-        const waTargetStudents = students.filter(s => s.whatsapp_number && s.whatsapp_number.trim() !== "");
-        if (waTargetStudents.length > 0) {
-          setPendingWaTargetCount(waTargetStudents.length);
-          setShowWaConfirmAfterPublish(true);
-        }
-      }
-    } else if (notifyLive && updates.reports_live === true && !isReportVisibleNow(nextSettings, now)) {
-      const actionTime = getReportActionTime(nextSettings);
-      if (actionTime) {
-        onShowAction("success", `Reports are scheduled for ${actionTime.toLocaleString()}. Notifications were not sent early.`);
+    if (publishingLive) {
+      if (!notifyEnabled) {
+        onShowAction("success", "Settings saved. Result notifications are OFF — enable the premium toggle and press 'Send Notify' to alert parents & teachers.");
+      } else if (isVisibleNow) {
+        await sendResultLiveNotifications({ manual: true });
+      } else if (actionTime) {
+        onShowAction("success", `Reports are scheduled for ${actionTime.toLocaleString()}. Parents & teachers will be notified automatically at that time (toggle is ON).`);
       }
     }
 
-    loadPortalData(portalRole, user);
+    loadPortalData(portalRole, user, null, { silent: true });
+  };
+
+  const renewParentViewCounts = async () => {
+    const { error: renewError } = await supabase
+      .from("parent_report_views")
+      .update({ viewed: false, view_duration_seconds: 0, updated_at: new Date().toISOString() })
+      .neq("student_id", "");
+
+    if (renewError) {
+      onShowAction("error", "Failed to renew view counts: " + renewError.message);
+      return;
+    }
+    onParentViewsReset?.();
+    onShowAction("success", "Parent view count renewed. Parents will see the latest report card as new again.");
+    loadPortalData(portalRole, user, null, { silent: true });
   };
 
   const updateReportDraft = (field) => (event) => {
@@ -8558,7 +9370,7 @@ const handleDownloadAllReports = async () => {
           false
         );
         // Refresh data to reflect the cleared state
-        loadPortalData(portalRole, user);
+        loadPortalData(portalRole, user, null, { silent: true });
         onRefreshTeacherData?.();
       } else {
         onShowAction("error", data?.message || "Failed to clear marks. Please try again.");
@@ -8813,7 +9625,7 @@ const handleDownloadAllReports = async () => {
             <div className="status-item">
               <ShieldCheck size={14} /> Portal Users: {portalAccessList.length}
             </div>
-            <button className="refresh-mini-btn" onClick={() => loadPortalData(portalRole, user)}>
+            <button className="refresh-mini-btn" onClick={() => loadPortalData(portalRole, user, null, { silent: true })}>
               <RotateCw size={14} /> Refresh Data
             </button>
           </div>
@@ -9045,7 +9857,7 @@ const handleDownloadAllReports = async () => {
                   } else {
                     showAction("success", "Student added successfully!");
                     e.target.reset();
-                    loadPortalData(portalRole, user);
+                    loadPortalData(portalRole, user, null, { silent: true });
                   }
                 }}>
                   <label>
@@ -10018,8 +10830,52 @@ const handleDownloadAllReports = async () => {
                     <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
                     <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Not Viewed</span>
                   </div>
+                  <button
+                    type="button"
+                    className="action-button premium"
+                    onClick={renewParentViewCounts}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                    title="Reset all parent view counts so parents see the latest report card as new"
+                  >
+                    <RotateCw size={14} /> Renew Count
+                  </button>
                 </div>
               </div>
+
+              {(() => {
+                const total = students.length;
+                const viewedMap = new Set(
+                  (parentViews || []).filter(v => v.viewed).map(v => String(v.student_id).trim().toLowerCase())
+                );
+                const viewed = students.filter(s =>
+                  viewedMap.has(String(s.student_id).trim().toLowerCase())
+                ).length;
+                const notViewed = Math.max(total - viewed, 0);
+                const pct = total > 0 ? Math.round((viewed / total) * 100) : 0;
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                    <div className="data-card card-appear" style={{ padding: '18px', textAlign: 'center', background: 'linear-gradient(135deg, rgba(46,196,182,0.12), rgba(46,196,182,0.04))', border: '1px solid rgba(46,196,182,0.3)', borderRadius: '14px' }}>
+                      <p style={{ margin: '0 0 6px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--soft-brown)' }}>Viewed</p>
+                      <p className="ig-count-anim" style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700, color: '#2ec4b6', lineHeight: 1 }}>{viewed}</p>
+                    </div>
+                    <div className="data-card card-appear" style={{ padding: '18px', textAlign: 'center', background: 'linear-gradient(135deg, rgba(231,29,54,0.12), rgba(231,29,54,0.04))', border: '1px solid rgba(231,29,54,0.3)', borderRadius: '14px' }}>
+                      <p style={{ margin: '0 0 6px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--soft-brown)' }}>Not Viewed</p>
+                      <p className="ig-count-anim" style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700, color: '#e71d36', lineHeight: 1 }}>{notViewed}</p>
+                    </div>
+                    <div className="data-card card-appear" style={{ padding: '18px', textAlign: 'center', background: 'linear-gradient(135deg, rgba(212,175,55,0.12), rgba(212,175,55,0.04))', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '14px' }}>
+                      <p style={{ margin: '0 0 6px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--soft-brown)' }}>Total Students</p>
+                      <p className="ig-count-anim" style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700, color: 'var(--primary-gold)', lineHeight: 1 }}>{total}</p>
+                    </div>
+                    <div className="data-card card-appear" style={{ padding: '18px', background: 'linear-gradient(135deg, rgba(197,160,89,0.10), rgba(197,160,89,0.03))', border: '1px solid rgba(197,160,89,0.28)', borderRadius: '14px' }}>
+                      <p style={{ margin: '0 0 10px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--soft-brown)', textAlign: 'center' }}>View Progress</p>
+                      <div className="ig-bar-track" style={{ background: 'rgba(197,160,89,0.14)', height: '8px', borderRadius: '6px', overflow: 'hidden' }}>
+                        <div className="ig-bar-fill" style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #c5a059, #8b6d31)', boxShadow: '0 0 8px rgba(197,160,89,0.35)', borderRadius: '6px', transition: 'width 0.6s ease' }} />
+                      </div>
+                      <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary-gold)' }}>{pct}%</p>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="assigned-list card-appear">
                 <div className="assigned-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
@@ -12394,7 +13250,7 @@ const handleDownloadAllReports = async () => {
                       return;
                     }
                     onShowAction("success", "Jadwal settings saved successfully!");
-                    loadPortalData(portalRole, user);
+                    loadPortalData(portalRole, user, null, { silent: true });
                   } catch (err) {
                     onShowAction("error", "Failed to save Jadwal settings: " + err.message);
                   } finally {
@@ -13104,7 +13960,9 @@ const handleDownloadAllReports = async () => {
                   const formData = new FormData(e.target);
                   const updates = {
                     reports_live: formData.get("reports_live") === "true",
-                    live_at: formData.get("live_at") ? new Date(formData.get("live_at")).toISOString() : null,                  };
+                    live_at: formData.get("live_at") ? new Date(formData.get("live_at")).toISOString() : null,
+                    result_live_notify_enabled: reportSettingsDraft.result_live_notify_enabled === true,
+                  };
                   saveReportSettings(updates, { notifyLive: true });
                 }}>
                   <div className="form-grid">
@@ -13129,9 +13987,61 @@ const handleDownloadAllReports = async () => {
                     If "Live" is selected, the time schedules when the report will become visible. If "Hidden" is selected, the time schedules when the report will be hidden.
                   </p>
 
-                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
-                    Save Global Settings
-                  </button>
+                  {/* Premium Notify Toggle */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap',
+                    padding: '14px 16px', borderRadius: '14px',
+                    border: `1px solid ${reportSettingsDraft.result_live_notify_enabled ? 'rgba(212,175,55,0.55)' : 'rgba(212,175,55,0.22)'}`,
+                    background: reportSettingsDraft.result_live_notify_enabled
+                      ? 'linear-gradient(135deg, rgba(212,175,55,0.16), rgba(255,255,255,0.55))'
+                      : 'rgba(255,255,255,0.5)',
+                    boxShadow: reportSettingsDraft.result_live_notify_enabled
+                      ? '0 0 18px rgba(212,175,55,0.18), inset 0 1px 0 rgba(255,255,255,0.8)'
+                      : 'inset 0 1px 0 rgba(255,255,255,0.6)',
+                    transition: 'all 0.25s ease',
+                  }}>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.92rem', color: 'var(--deep-brown)' }}>
+                        <Bell size={16} style={{ color: reportSettingsDraft.result_live_notify_enabled ? 'var(--primary-gold)' : 'var(--text-muted)', flexShrink: 0 }} />
+                        Notify Parents &amp; Teachers on Result Live
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--soft-brown)', display: 'block', marginTop: '3px', lineHeight: 1.45 }}>
+                        When ON, pressing "Send Notify" alerts every parent with each child's name (a parent with 2 children gets 2 notifications) plus all teachers — and it fires automatically when the scheduled live time arrives.
+                      </span>
+                    </div>
+                    <div
+                      onClick={() => updateReportDraft("result_live_notify_enabled")({ target: { value: !reportSettingsDraft.result_live_notify_enabled } })}
+                      style={{
+                        width: '48px', height: '26px', borderRadius: '999px', flexShrink: 0, cursor: 'pointer',
+                        background: reportSettingsDraft.result_live_notify_enabled ? 'linear-gradient(135deg, #f0cd6c, #d4af37)' : 'rgba(61,43,31,0.12)',
+                        position: 'relative', transition: 'background 0.25s ease',
+                        boxShadow: reportSettingsDraft.result_live_notify_enabled
+                          ? '0 0 14px rgba(212,175,55,0.55), inset 0 1px 0 rgba(255,255,255,0.6)'
+                          : 'inset 0 1px 2px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      <div style={{
+                        width: '20px', height: '20px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '3px',
+                        left: reportSettingsDraft.result_live_notify_enabled ? '25px' : '3px', transition: 'left 0.25s ease',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.25)',
+                      }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '20px', flexWrap: 'wrap' }}>
+                    <button type="submit" className="action-button premium">
+                      Save Global Settings
+                    </button>
+                    <button
+                      type="button"
+                      className="action-button premium"
+                      style={{ background: 'linear-gradient(135deg, #f0cd6c, #b8962e)', color: '#fff', boxShadow: '0 6px 20px rgba(184,138,29,0.3)' }}
+                      onClick={() => sendResultLiveNotifications({ manual: true })}
+                    >
+                      <Bell size={16} style={{ marginRight: '6px' }} />
+                      Send Notify
+                    </button>
+                  </div>
                 </form>
               </section>
 
@@ -14266,13 +15176,19 @@ function TeacherPortal({
     setSavingBadal(prev => ({ ...prev, [studentId]: true }));
     const weekDate = new Date().toISOString().slice(0, 10);
     const sidStr = String(studentId);
+    const juzPayload = Array.isArray(raw.juz) && raw.juz.some(s => s && s.value) ? raw.juz : (raw.juz && raw.juz.value ? raw.juz : null);
+    let jadeedPayload = raw.jadeed || null;
+    if (jadeedPayload && jadeedPayload.surah && jadeedPayload.ayat && /^\d+$/.test(String(jadeedPayload.surah))) {
+      const page = getAyahPage(Number(jadeedPayload.surah), Number(String(jadeedPayload.ayat).split("-")[0]));
+      jadeedPayload = { ...jadeedPayload, type: "surah_ayat", page };
+    }
     const payload = {
       student_id: sidStr,
       teacher_id: String(teacherId),
       week_date: weekDate,
-      juz: raw.juz ? JSON.stringify(raw.juz) : null,
+      juz: juzPayload ? JSON.stringify(juzPayload) : null,
       juz_hali: raw.juzHali ? JSON.stringify(raw.juzHali) : null,
-      jadeed_surah_ayat: raw.jadeed ? JSON.stringify(raw.jadeed) : null,
+      jadeed_surah_ayat: jadeedPayload ? JSON.stringify(jadeedPayload) : null,
       notes: raw.notes || null,
     };
     const { data: existing } = await supabase.from("badal_progress").select("id").eq("student_id", sidStr).eq("week_date", weekDate).maybeSingle();
@@ -15431,23 +16347,12 @@ function TeacherPortal({
                           const juz = safeParse(badalProgressData[0].juz);
                           const hali = safeParse(badalProgressData[0].juz_hali);
                           const jadeed = safeParse(badalProgressData[0].jadeed_surah_ayat);
-                          const formatJuz = (d) => d?.value ? `Juz ${d.value}${d.marks ? ` — ${d.marks}/10` : ''}` : null;
-                          const formatHali = (d) => {
-                            if (!d) return null;
-                            if (d.type === 'surah') return <><span className="arabic-kanz">{d.from || '?'}</span> → <span className="arabic-kanz">{d.till || '?'}</span>{d.marks ? ` — ${d.marks}/10` : ''}</>;
-                            return `Juz ${d.from || '?'} → ${d.till || '?'}${d.marks ? ` — ${d.marks}/10` : ''}`;
-                          };
-                          const formatJadeed = (d) => {
-                            if (!d) return null;
-                            if (d.type === 'surah_ayat') return <><span className="arabic-kanz">{d.surah || ''}</span> {d.ayat ? `(${d.ayat})` : ''}</>;
-                            return d.from || d.till ? `Pages ${d.from || ''}–${d.till || ''}` : null;
-                          };
                           return (
                             <div className="badal-progress-mini">
                               <span className="badal-progress-mini-label">{isBadalTeacher ? "Your Updates:" : "Badal Progress:"}</span>
-                              {formatJuz(juz) && <span className="badal-mini-item badal-mini-juz">{formatJuz(juz)}</span>}
-                              {formatHali(hali) && <span className="badal-mini-item badal-mini-hali">{formatHali(hali)}</span>}
-                              {formatJadeed(jadeed) && <span className="badal-mini-item badal-mini-jadeed">{formatJadeed(jadeed)}</span>}
+                              {badalFormatJuz(juz) && <span className="badal-mini-item badal-mini-juz">{badalFormatJuz(juz)}</span>}
+                              {badalFormatJuzHali(hali) && <span className="badal-mini-item badal-mini-hali">{badalFormatJuzHali(hali)}</span>}
+                              {badalFormatJadeed(jadeed) && <span className="badal-mini-item badal-mini-jadeed">{badalFormatJadeed(jadeed)}</span>}
                               <span className="badal-progress-mini-date">{new Date(badalProgressData[0].created_at).toLocaleDateString()}</span>
                             </div>
                           );
@@ -15967,6 +16872,41 @@ function TeacherPortal({
                 };
                 const juzNums = Array.from({ length: 30 }, (_, i) => String(i + 1));
                 const setDraft = (path, val) => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], [path]: val } }));
+                const draftJuz = Array.isArray(draft.juz) ? draft.juz.map(s => ({ ...s })) : (draft.juz && draft.juz.value ? [draft.juz] : []);
+                while (draftJuz.length < 3) draftJuz.push({});
+                const setJuzSlot = (i, field, val) => {
+                  const arr = draftJuz.map((s, idx) => idx === i ? { ...s, [field]: val } : { ...s });
+                  setDraft("juz", arr);
+                };
+                const jadeedSurahNum = draft.jadeed?.surah && /^\d+$/.test(String(draft.jadeed.surah)) ? Number(draft.jadeed.surah) : 0;
+                const jadeedAyahFirst = String(draft.jadeed?.ayat || "").split("-")[0].trim();
+                const jadeedAyahNum = jadeedAyahFirst ? Number(jadeedAyahFirst) : 0;
+                const jadeedPage = jadeedSurahNum && jadeedAyahNum ? getAyahPage(jadeedSurahNum, jadeedAyahNum) : 0;
+                const jadeedJuz = jadeedPage ? getJuzFromPage(jadeedPage) : 0;
+                const isLastFiveJuz = jadeedJuz >= 26;
+                const juzhaliRangeStart = jadeedPage ? (isLastFiveJuz ? Math.min(604, jadeedPage + 1) : Math.max(1, jadeedPage - 10)) : 0;
+                const juzhaliRangeEnd = jadeedPage ? (isLastFiveJuz ? Math.min(604, jadeedPage + 10) : Math.max(1, jadeedPage - 1)) : 0;
+                const juzhaliPages = [];
+                for (let p = juzhaliRangeStart; p <= juzhaliRangeEnd && p <= 604; p++) juzhaliPages.push(p);
+                const autoFillJuzhali = (surahNum, ayatNum) => {
+                  const pg = getAyahPage(Number(surahNum), Number(String(ayatNum).split("-")[0]));
+                  if (!pg) return;
+                  const jz = getJuzFromPage(pg);
+                  const last5 = jz >= 26;
+                  const s = last5 ? Math.min(604, pg + 1) : Math.max(1, pg - 10);
+                  const e = last5 ? Math.min(604, pg + 10) : Math.max(1, pg - 1);
+                  setDraft("juzHali", { type: "pages", from: String(s), till: String(e), marks: draft.juzHali?.marks || "" });
+                };
+                const handleJadeedSurah = (num) => {
+                  setDraft("jadeed", { ...draft.jadeed, type: "surah_ayat", surah: num });
+                  if (num && draft.jadeed?.ayat) autoFillJuzhali(num, draft.jadeed.ayat);
+                  else if (!num) setDraft("juzHali", { ...draft.juzHali, from: "", till: "" });
+                };
+                const handleJadeedAyat = (ay) => {
+                  setDraft("jadeed", { ...draft.jadeed, type: "surah_ayat", ayat: ay });
+                  if (draft.jadeed?.surah && ay) autoFillJuzhali(draft.jadeed.surah, ay);
+                  else if (!ay) setDraft("juzHali", { ...draft.juzHali, from: "", till: "" });
+                };
                 const rawId = user?.id || teacherIdentity;
                 const myHistoryEntries = badalProgress
                   .filter(p => String(p.student_id) === sid && String(p.teacher_id) === String(rawId))
@@ -15985,70 +16925,50 @@ function TeacherPortal({
                       <span className="badal-universal-badge">Quick Fill</span>
                     </div>
                     <div className="badal-form-grid">
-                      <div className="badal-field-group">
-                        <span className="badal-field-label">Juz</span>
-                        <div className="badal-field-row">
-                          <select className="badal-select" style={{ flex: 1 }} value={draft.juz?.value || ""} onChange={e => setDraft("juz", { ...draft.juz, value: e.target.value })}>
-                            <option value="">—</option>
-                            {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
-                          </select>
-                          <input className="badal-marks-input" placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juz?.marks ?? ""} onChange={e => setDraft("juz", { ...draft.juz, marks: e.target.value })} />
-                        </div>
-                      </div>
-                      <div className="badal-field-group">
-                        <span className="badal-field-label">Juz Hali</span>
-                        <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
-                          <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.type || "juz"} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: e.target.value, from: "", till: "" })}>
-                            <option value="juz">Juz</option>
-                            <option value="surah">Surah</option>
-                          </select>
-                          {draft.juzHali?.type === "surah" ? (
-                            <>
-                              <select className="badal-select" style={{ flex: 1, minWidth: "80px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
-                                <option value="">From</option>
-                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
-                              </select>
-                              <select className="badal-select" style={{ flex: 1, minWidth: "80px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
-                                <option value="">Till</option>
-                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
-                              </select>
-                            </>
-                          ) : (
-                            <>
-                              <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, from: e.target.value })}>
-                                <option value="">From</option>
+                      <div className="badal-field-group full-width">
+                        <span className="badal-field-label">Juz <em className="badal-label-sub">3 slots</em></span>
+                        <div className="badal-juz-slots">
+                          {[0, 1, 2].map(i => (
+                            <div className="badal-juz-slot" key={i}>
+                              <span className="badal-juz-slot-index">{i + 1}</span>
+                              <select className="badal-select" style={{ flex: 1 }} value={draftJuz[i]?.value || ""} onChange={e => setJuzSlot(i, "value", e.target.value)}>
+                                <option value="">—</option>
                                 {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
                               </select>
-                              <select className="badal-select" style={{ width: "70px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, till: e.target.value })}>
-                                <option value="">Till</option>
-                                {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
-                              </select>
-                            </>
-                          )}
-                          <input className="badal-marks-input" style={{ width: "70px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: e.target.value })} />
+                              <input className="badal-marks-input" style={{ width: "60px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draftJuz[i]?.marks ?? ""} onChange={e => setJuzSlot(i, "marks", e.target.value)} />
+                            </div>
+                          ))}
                         </div>
                       </div>
                       <div className="badal-field-group full-width">
-                        <span className="badal-field-label">Jadeed</span>
+                        <span className="badal-field-label">Juz Hali <em className="badal-label-sub">pages</em></span>
                         <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
-                          <select className="badal-select" style={{ width: "130px" }} value={draft.jadeed?.type || "pages"} onChange={e => setDraft("jadeed", { ...draft.jadeed, type: e.target.value, from: "", till: "", surah: "", ayat: "" })}>
-                            <option value="pages">Pages</option>
-                            <option value="surah_ayat">Surah &amp; Ayat</option>
+                          <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", from: e.target.value })}>
+                            <option value="">From</option>
+                            {juzhaliPages.map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
                           </select>
-                          {draft.jadeed?.type === "surah_ayat" ? (
-                            <>
-                              <select className="badal-select" style={{ flex: 1, minWidth: "100px" }} value={draft.jadeed?.surah || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, surah: e.target.value })}>
-                                <option value="">Surah</option>
-                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={s}>{s}</option>)}
-                              </select>
-                              <input className="badal-premium-input" style={{ width: "100px", textAlign: "center" }} placeholder="Ayat e.g. 1-10" value={draft.jadeed?.ayat || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, ayat: e.target.value })} />
-                            </>
-                          ) : (
-                            <>
-                              <input className="badal-premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="From" type="number" min="1" value={draft.jadeed?.from || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, from: e.target.value })} />
-                              <input className="badal-premium-input" style={{ width: "80px", textAlign: "center" }} placeholder="Till" type="number" min="1" value={draft.jadeed?.till || ""} onChange={e => setDraft("jadeed", { ...draft.jadeed, till: e.target.value })} />
-                            </>
-                          )}
+                          <span className="badal-range-arrow">→</span>
+                          <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", till: e.target.value })}>
+                            <option value="">Till</option>
+                            {juzhaliPages.filter(p => !draft.juzHali?.from || Number(p) >= Number(draft.juzHali.from)).map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
+                          </select>
+                          <input className="badal-marks-input" style={{ width: "60px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: e.target.value })} />
+                        </div>
+                        <span className="badal-range-hint">
+                          {jadeedPage ? (isLastFiveJuz ? `Auto range: 10 pages after Jadeed (Juz ${jadeedJuz} 26–30)` : `Auto range: 10 pages before Jadeed page ${jadeedPage}`) : "Pick Jadeed Surah & Ayat to auto-fill the page range"}
+                        </span>
+                      </div>
+                      <div className="badal-field-group full-width">
+                        <span className="badal-field-label">Jadeed <em className="badal-label-sub">Surah &amp; Ayat</em></span>
+                        <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
+                          <select className="badal-select" style={{ flex: 1, minWidth: "150px" }} value={String(draft.jadeed?.surah || "")} onChange={e => handleJadeedSurah(e.target.value)}>
+                            <option value="">Surah</option>
+                            {SURAH_NAMES_AR.map((s, i) => <option key={i} value={String(i + 1)}>{s}</option>)}
+                          </select>
+                          <input className="badal-premium-input" style={{ width: "90px", textAlign: "center" }} placeholder="Ayat" value={draft.jadeed?.ayat || ""} onChange={e => handleJadeedAyat(e.target.value)} />
+                          <span className={`badal-page-badge${jadeedPage ? "" : " empty"}`}>
+                            <BookOpen size={14} /> Page {jadeedPage || "—"}
+                          </span>
                         </div>
                       </div>
                       <div className="badal-field-group full-width">
@@ -16113,9 +17033,9 @@ function TeacherPortal({
                                     return (
                                       <tr key={entry.id || i}>
                                         <td className="badal-table-date">{dateStr}</td>
-                                        <td className="badal-table-cell">{juz?.value || "—"}{juz?.marks ? <><br /><span className="badal-table-marks">Marks: {juz.marks}/10</span></> : ""}</td>
-                                        <td className="badal-table-cell">{juzHali ? <span>{juzHali.type === "surah" ? <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{juzHali.from || "?"} — {juzHali.till || "?"}</span> : <span>From {juzHali.from || "?"} — Till {juzHali.till || "?"}</span>}{juzHali.marks ? <><br /><span className="badal-table-marks">Marks: {juzHali.marks}/10</span></> : ""}</span> : "—"}</td>
-                                        <td className="badal-table-cell">{jadeed ? (jadeed.type === "surah_ayat" ? <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{jadeed.surah || "?"}{jadeed.ayat ? <><br /><span className="badal-table-marks">Ayat: {jadeed.ayat}</span></> : ""}</span> : <span>Pg {jadeed.from || "?"} — {jadeed.till || "?"}</span>) : "—"}</td>
+                                        <td className="badal-table-cell">{badalFormatJuz(juz) || "—"}</td>
+                                        <td className="badal-table-cell">{badalFormatJuzHali(juzHali) || "—"}</td>
+                                        <td className="badal-table-cell">{badalFormatJadeed(jadeed) || "—"}</td>
                                         <td className="badal-table-cell">{entry.notes || "—"}</td>
                                       </tr>
                                     );
@@ -16277,32 +17197,9 @@ function TeacherPortal({
                                             return (
                                               <tr key={entry.id || i}>
                                                 <td className="badal-table-date">{dateStr}</td>
-                                                <td className="badal-table-cell">
-                                                  {juz ? (
-                                                    <span>{juz.value || "—"}{juz.marks ? <><br /><span className="badal-table-marks">Marks: {juz.marks}/10</span></> : ""}</span>
-                                                  ) : "—"}
-                                                </td>
-                                                <td className="badal-table-cell">
-                                                  {juzHali ? (
-                                                    <span>
-                                                      {juzHali.type === "surah" ? (
-                                                        <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{juzHali.from || "?"} — {juzHali.till || "?"}</span>
-                                                      ) : (
-                                                        <span>From {juzHali.from || "?"} — Till {juzHali.till || "?"}</span>
-                                                      )}
-                                                      {juzHali.marks ? <><br /><span className="badal-table-marks">Marks: {juzHali.marks}/10</span></> : ""}
-                                                    </span>
-                                                  ) : "—"}
-                                                </td>
-                                                <td className="badal-table-cell">
-                                                  {jadeed ? (
-                                                    jadeed.type === "surah_ayat" ? (
-                                                      <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{jadeed.surah || "?"}{jadeed.ayat ? <><br /><span className="badal-table-marks">Ayat: {jadeed.ayat}</span></> : ""}</span>
-                                                    ) : (
-                                                      <span>Pg {jadeed.from || "?"} — {jadeed.till || "?"}</span>
-                                                    )
-                                                  ) : "—"}
-                                                </td>
+                                                <td className="badal-table-cell">{badalFormatJuz(juz) || "—"}</td>
+                                                <td className="badal-table-cell">{badalFormatJuzHali(juzHali) || "—"}</td>
+                                                <td className="badal-table-cell">{badalFormatJadeed(jadeed) || "—"}</td>
                                                 <td className="badal-table-cell">{entry.notes || "—"}</td>
                                               </tr>
                                             );
@@ -17075,6 +17972,44 @@ const SURAH_NAMES_AR = [
   "المسد","الإخلاص","الفلق","الناس"
 ];
 
+// --- Badal progress formatters (handle old single {value,marks} and new 3-slot array shapes) ---
+const badalJuzName = (num) => {
+  if (num == null || num === "") return "";
+  if (/^\d+$/.test(String(num))) return SURAH_NAMES_AR[Number(num) - 1] || `Surah ${num}`;
+  return String(num);
+};
+
+function badalFormatJuz(d) {
+  if (!d) return null;
+  const slots = Array.isArray(d) ? d.filter(s => s && s.value) : (d.value ? [d] : []);
+  if (!slots.length) return null;
+  return slots.map(s => `Juz ${s.value}${s.marks ? ` · ${s.marks}/10` : ''}`).join(' + ');
+}
+
+function badalFormatJuzHali(d) {
+  if (!d) return null;
+  const suffix = d.marks ? ` · ${d.marks}/10` : '';
+  if (d.type === "surah") {
+    return <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{d.from || "?"} → {d.till || "?"}{suffix}</span>;
+  }
+  if (d.type === "pages") return <span>Pages {d.from || "?"} → {d.till || "?"}{suffix}</span>;
+  return <span>Juz {d.from || "?"} → {d.till || "?"}{suffix}</span>;
+}
+
+function badalFormatJadeed(d) {
+  if (!d) return null;
+  if (d.type === "surah_ayat" || (d.surah && d.ayat)) {
+    const name = badalJuzName(d.surah) || "?";
+    return (
+      <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>
+        {name}{d.ayat ? ` · ${d.ayat}` : ""}{d.page ? ` · pg ${d.page}` : ""}
+      </span>
+    );
+  }
+  if (d.type === "pages" || d.from || d.till) return <span>Pg {d.from || "?"} → {d.till || "?"}</span>;
+  return null;
+}
+
 // --- App Lock Components ---
 function AppLockScreen({ onUnlock, isDarkMode }) {
   const [pin, setPin] = useState(['', '', '', '', '']);
@@ -17411,9 +18346,38 @@ export default function App() {
   const [emailLogs, setEmailLogs] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [parentViews, setParentViews] = useState([]);
+  const handleParentViewsReset = useCallback(() => {
+    setParentViews(prev =>
+      (prev || []).map(v => ({
+        ...v,
+        viewed: false,
+        view_duration_seconds: 0,
+        updated_at: new Date().toISOString(),
+      }))
+    );
+  }, []);
   const [portalAccessSuccess, setPortalAccessSuccess] = useState(null);
   const [selfJadwalPopup, setSelfJadwalPopup] = useState(null);
   const lastUnseenRef = useRef(false);
+
+  // Preload all lazy page chunks once the app is ready so navigating to any page
+  // opens instantly without flashing the full-screen loading indicator.
+  useEffect(() => {
+    if (loading || !splashDone) return;
+    const run = () => {
+      import("./Jadwal").catch(() => {});
+      import("./SelfJadwal").catch(() => {});
+      import("./JadwalTrackingView").catch(() => {});
+      import("./TakhteetProgress").catch(() => {});
+      import("./SupportBot").catch(() => {});
+      import("./AppUpdateManager").catch(() => {});
+    };
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      window.requestIdleCallback(() => run(), { timeout: 2000 });
+    } else {
+      setTimeout(run, 150);
+    }
+  }, [loading, splashDone]);
 
   // Midnight day-reset ticker for daily attendance card
 
@@ -17912,7 +18876,7 @@ export default function App() {
                   if (cached.userId === session.user.id) {
                     storeRole(cached.role);
                     setUser(session.user);
-                    loadPortalData(cached.role, session.user).catch(() => {});
+                    loadPortalData(cached.role, session.user, null, { silent: true }).catch(() => {});
                     return;
                   }
                 } catch (_) {}
@@ -17968,7 +18932,7 @@ export default function App() {
         if (cachedRaw) {
           try {
             const cached = JSON.parse(cachedRaw);
-            loadPortalData(cached.role || portalRole, user, null).catch(() => {});
+            loadPortalData(cached.role || portalRole, user, null, { silent: true }).catch(() => {});
           } catch (_) {}
         }
       }
@@ -17981,7 +18945,7 @@ export default function App() {
         if (cachedRaw) {
           try {
             const cached = JSON.parse(cachedRaw);
-            loadPortalData(cached.role || portalRole, user, null).catch(() => {});
+            loadPortalData(cached.role || portalRole, user, null, { silent: true }).catch(() => {});
           } catch (_) {}
         }
       }
@@ -18010,17 +18974,17 @@ export default function App() {
 
   useEffect(() => {
     if (user && portalRole === "parents" && selectedStudentId) {
-      loadPortalData(portalRole, user);
+      loadPortalData(portalRole, user, null, { silent: true });
     }
   }, [selectedStudentId, portalRole, user]);
 
-  async function loadPortalData(role, currentUser, parentProfileOverride = null) {
+  async function loadPortalData(role, currentUser, parentProfileOverride = null, { silent = false } = {}) {
     if (!currentUser) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
 
     try {
       if (role === "parents") {
@@ -18870,7 +19834,7 @@ export default function App() {
                 showAction("success", "A new progress report has been submitted!");
               }
               
-              loadPortalData(portalRole, user);
+              loadPortalData(portalRole, user, null, { silent: true });
             }
           )
           .on(
@@ -18878,7 +19842,7 @@ export default function App() {
             { event: '*', table: 'parent_report_views', schema: 'public' },
             (payload) => {
               console.log("Real-time parent view update:", payload.eventType, payload.new?.student_id);
-              loadPortalData(portalRole, user);
+              loadPortalData(portalRole, user, null, { silent: true });
             }
           )
           .on(
@@ -19969,7 +20933,7 @@ const handleSendCustomNotification = async (event) => {
       if (logError) console.error("Unlock logging error:", logError);
 
       // Refresh data
-      await loadPortalData(portalRole, user, null);
+      await loadPortalData(portalRole, user, null, { silent: true });
 
       setTeacherUnlockStatus(`done-${teacher.id}`);
       showAction("success", `Unlocked progress entry for ${teacher.full_name || teacher.name}. They can now submit reports.`);
@@ -19994,7 +20958,7 @@ const handleSendCustomNotification = async (event) => {
     }
 
     // Refresh school data
-    await loadPortalData(portalRole, user, parentData.studentProfile);
+    await loadPortalData(portalRole, user, parentData.studentProfile, { silent: true });
     showAction("success", "Record deleted successfully.");
   };
 
@@ -20024,7 +20988,7 @@ const handleSendCustomNotification = async (event) => {
     if (table === "scheduled_notifications") {
       await fetchScheduledNotifs();
     } else {
-      await loadPortalData(portalRole, user, parentData.studentProfile);
+      await loadPortalData(portalRole, user, parentData.studentProfile, { silent: true });
     }
 
     showAction("success", `${tableLabel} history cleared.`);
@@ -20085,7 +21049,7 @@ const handleSendCustomNotification = async (event) => {
       }
     }
 
-    await loadPortalData(portalRole, user, parentData.studentProfile);
+    await loadPortalData(portalRole, user, parentData.studentProfile, { silent: true });
     setAdminForms(curr => ({
       ...curr,
       teacherProfile: {
@@ -20331,6 +21295,7 @@ const handleSendCustomNotification = async (event) => {
               supportTickets,
             }}
             parentViews={parentViews}
+            onParentViewsReset={handleParentViewsReset}
             adminForms={adminForms}
             adminTeacherFilter={adminTeacherFilter}
             loadPortalData={loadPortalData}
@@ -20379,7 +21344,7 @@ const handleSendCustomNotification = async (event) => {
                 return;
               }
               onShowAction("success", "Jadwal settings saved successfully!");
-              loadPortalData(portalRole, user);
+              loadPortalData(portalRole, user, null, { silent: true });
             }}
             whatsappConfig={whatsappConfig}
             emailSettings={emailSettings}
