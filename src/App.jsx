@@ -1002,8 +1002,8 @@ const DEFAULT_PAGE_BY_ROLE = {
 const RESULT_NUMERIC_FIELDS = ["murajazah", "juz_hali", "takhteet", "jadeed"];
 
 // Mark limits for the teacher Fill Result form (all allow decimals):
-// Murajah & Juz Hali out of 30, Takhteet out of 20, Jadeed out of 10, Attendance out of 6.
-const RESULT_FIELD_MAX = { murajazah: 30, juz_hali: 30, takhteet: 20, jadeed: 10, attendance_count: 6 };
+// Murajah & Juz Hali out of 30, Takhteet & Jadeed out of 20, Attendance out of 6.
+const RESULT_FIELD_MAX = { murajazah: 30, juz_hali: 30, takhteet: 20, jadeed: 20, attendance_count: 6 };
 
 const clampResultField = (field, val) => {
   const max = RESULT_FIELD_MAX[field];
@@ -16597,7 +16597,7 @@ function TeacherPortal({
                       <input
                         type="number"
                         min="0"
-                        max="10"
+                        max="20"
                         name="jadeed"
                         step="0.1"
                         value={teacherForms.result.jadeed}
@@ -20299,9 +20299,9 @@ export default function App() {
       },
     }));
 
-    // Auto-fill Jadeed marks from Total Jadeed Pages + Unit (all out of 10):
+    // Auto-fill Jadeed marks from Total Jadeed Pages + Unit (all out of 20):
     // Satar(30) = 2 marks per satar, Satar(26-30) = 1 mark per satar,
-    // Safah(1-5) = 7 marks per page, Safah(6-25) = 4 marks per page — capped at 10.
+    // Safah(1-5) = 7 marks per page, Safah(6-25) = 4 marks per page — capped at 20.
     if (name === "total_jadeed_pages" || name === "total_jadeed_unit") {
       setTeacherForms((current) => {
         const pagesRaw = String(current.result.total_jadeed_pages ?? "").trim();
@@ -20310,7 +20310,7 @@ export default function App() {
         let autoMarks = "";
         if (pagesRaw !== "" && Number.isFinite(n) && n >= 0) {
           const per = unit === "سطر 26-30" ? 1 : unit === "صفه 6-25" ? 4 : unit === "سطر" ? 2 : 7;
-          autoMarks = String(Math.min(Math.round(n * per * 100) / 100, 10));
+          autoMarks = String(Math.min(Math.round(n * per * 100) / 100, 20));
         }
         return {
           ...current,
