@@ -1041,6 +1041,15 @@ const countPresentInWeek = (attendanceMap, sid, date, statusOverride) => {
   }
   return count;
 };
+
+// The Sat->Fri school week only completes on Friday. The attendance count in the
+// live result must NOT move during the week (it would disturb the result rank), so
+// it auto-fills only on Friday with the full week's present marks.
+const isFriday = (dateStr) => {
+  if (!dateStr) return false;
+  try { return new Date(String(dateStr).slice(0, 10)).getDay() === 5; } catch { return false; }
+};
+
 const STORAGE_KEYS = {
   role: "mauze-active-role",
   teacherAttendance: "mauze-teacher-attendance",
@@ -14811,15 +14820,20 @@ function TeacherPortal({
     return days;
   }, [currentDate]);
 
-  // Sync attendance_count in Fill Result with the current week's daily marks:
+  // Sync attendance_count in Fill Result with the current week's daily marks —
+  // but ONLY on Friday, when the Sat->Fri week is complete:
   // 1) always fill the field when it is empty, and
   // 2) when a saved result is loaded (student just selected/re-selected), refresh
   //    the count if the daily marks changed since that result was saved.
+  // Mid-week (Sat->Thu) the count stays untouched so the live result rank is stable.
   // A teacher's manual edit is never overwritten (only empty fields or fresh loads).
   const lastAttendSyncSidRef = useRef("");
   useEffect(() => {
     const sid = teacherForms.result.student_id;
     if (!sid) return;
+    // Attendance only auto-fills on Friday — the day the Sat->Fri week completes.
+    // Mid-week marks must not disturb the live result rank.
+    if (!isFriday(currentDate)) return;
     const sidKey = String(sid).trim().toLowerCase();
     const current = teacherForms.result.attendance_count;
     const isEmpty = current === "" || current === null || current === undefined;
@@ -15347,9 +15361,13 @@ function TeacherPortal({
       next[sid] = { ...next[sid], [date]: status };
       return next;
     });
-    const weeklyCount = countPresentInWeek(studentAttendance, sid, date, status);
-    if (String(teacherForms?.result?.student_id) === String(studentId)) {
-      setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: clampResultField("attendance_count", String(weeklyCount)) } }));
+    // Only push the count into the live result when marking on Friday (week-end),
+    // so mid-week daily marks don't disturb the result rank.
+    if (isFriday(date)) {
+      const weeklyCount = countPresentInWeek(studentAttendance, sid, date, status);
+      if (String(teacherForms?.result?.student_id) === String(studentId)) {
+        setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: clampResultField("attendance_count", String(weeklyCount)) } }));
+      }
     }
     const attStudent = overviewStudents.find(s => String(s.student_id) === studentId);
     if (attStudent) {
@@ -15412,10 +15430,14 @@ function TeacherPortal({
       });
       return next;
     });
-    const selectedSid = String(teacherForms?.result?.student_id || '').trim().toLowerCase();
-    if (selectedSid) {
-      const wc = countPresentInWeek(studentAttendance, selectedSid, date, status);
-      setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: clampResultField("attendance_count", String(wc)) } }));
+    // Only push the count into the live result when marking on Friday (week-end),
+    // so mid-week daily marks don't disturb the result rank.
+    if (isFriday(date)) {
+      const selectedSid = String(teacherForms?.result?.student_id || '').trim().toLowerCase();
+      if (selectedSid) {
+        const wc = countPresentInWeek(studentAttendance, selectedSid, date, status);
+        setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: clampResultField("attendance_count", String(wc)) } }));
+      }
     }
     setAttendanceLoading(false);
     if (onShowAction) onShowAction("success", `Marked all as ${status}`);
@@ -16812,17 +16834,25 @@ function TeacherPortal({
                             const num = Number(String(d).slice(8, 10));
                             const label = isSun ? "Holiday" : st === "present" ? "Present" : st === "absent" ? "Absent" : "Not marked";
                             const cls = ["att-week-day", st || "none", isToday ? "today" : ""].filter(Boolean).join(" ");
+                            const dayLocked = isSun || selectedResultLocked || !canTeacherFillProgress;
                             return (
-                              <div key={d} className={cls} title={`${wd} ${num} — ${label}`}>
+                              <button
+                                key={d}
+                                type="button"
+                                className={cls}
+                                disabled={dayLocked}
+                                title={dayLocked ? `${wd} ${num} — ${label}` : `${wd} ${num} — ${label} (tap to toggle Present/Absent)`}
+                                onClick={() => handleMarkAttendance(teacherForms.result.student_id, d, st === "present" ? "absent" : "present")}
+                              >
                                 <span className="att-week-day-name">{wd}</span>
                                 <span className="att-week-day-num">{num}</span>
                                 <span className="att-week-day-dot" />
-                              </div>
+                              </button>
                             );
                           })}
                         </div>
                         <div className="att-week-mini-foot">
-                          Present days auto-fill the Attendance Count above (out of 6).
+                          Tap a day to toggle Present / Absent — the Attendance Count auto-fills on Friday with the week's present days (out of 6).
                         </div>
                       </div>
                     );
@@ -16993,24 +17023,42 @@ function TeacherPortal({
                   const arr = draftJuz.map((s, idx) => idx === i ? { ...s, [field]: cleanVal } : { ...s });
                   setDraft("juz", arr);
                 };
+                const jadeedIsNo = draft.jadeed?.type === "no";
                 const jadeedSurahNum = draft.jadeed?.surah && /^\d+$/.test(String(draft.jadeed.surah)) ? Number(draft.jadeed.surah) : 0;
                 const jadeedAyahFirst = String(draft.jadeed?.ayat || "").split("-")[0].trim();
                 const jadeedAyahNum = jadeedAyahFirst ? Number(jadeedAyahFirst) : 0;
                 const jadeedPage = jadeedSurahNum && jadeedAyahNum ? getAyahPage(jadeedSurahNum, jadeedAyahNum) : 0;
                 const jadeedJuz = jadeedPage ? getJuzFromPage(jadeedPage) : 0;
-                const isLastFiveJuz = jadeedJuz >= 26;
-                const juzhaliRangeStart = jadeedPage ? (isLastFiveJuz ? Math.min(604, jadeedPage + 1) : Math.max(1, jadeedPage - 10)) : 0;
-                const juzhaliRangeEnd = jadeedPage ? (isLastFiveJuz ? Math.min(604, jadeedPage + 10) : Math.max(1, jadeedPage - 1)) : 0;
+                /* Wusool tracker — shown when Jadeed = NO (student recited Juz Hali, not Jadeed) */
+                const wusoolJuz = draft.jadeed?.wusoolJuz || "";
+                const wusoolSurah = draft.jadeed?.wusoolSurah || "";
+                const wusoolAyah = draft.jadeed?.wusoolAyah || "";
+                const wusoolPageTyped = draft.jadeed?.wusoolPage || "";
+                const wusoolSurahNum = wusoolSurah && /^\d+$/.test(String(wusoolSurah)) ? Number(wusoolSurah) : 0;
+                const wusoolAyahNum = wusoolAyah ? Number(String(wusoolAyah).split("-")[0]) : 0;
+                const wusoolPage = (wusoolSurahNum && wusoolAyahNum ? getAyahPage(wusoolSurahNum, wusoolAyahNum) : 0) || Number(wusoolPageTyped) || 0;
+                /* Anchor page drives the Juz Hali 10-page range (Jadeed page normally; Wusool page when Jadeed = NO) */
+                const anchorPage = jadeedIsNo ? wusoolPage : jadeedPage;
+                const anchorJuz = anchorPage ? getJuzFromPage(anchorPage) : 0;
+                const isLastFiveJuz = anchorJuz >= 26;
+                const juzhaliRangeStart = anchorPage ? (isLastFiveJuz ? Math.min(604, anchorPage + 1) : Math.max(1, anchorPage - 10)) : 0;
+                const juzhaliRangeEnd = anchorPage ? (isLastFiveJuz ? Math.min(604, anchorPage + 10) : Math.max(1, anchorPage - 1)) : 0;
                 const juzhaliPages = [];
                 for (let p = juzhaliRangeStart; p <= juzhaliRangeEnd && p <= 604; p++) juzhaliPages.push(p);
-                const autoFillJuzhali = (surahNum, ayatNum) => {
-                  const pg = getAyahPage(Number(surahNum), Number(String(ayatNum).split("-")[0]));
+                const fillJuzhaliRange = (pg) => {
                   if (!pg) return;
+                  /* Never auto-clobber an explicit Juz Hali NO */
+                  if (draft.juzHali?.type === "no") return;
                   const jz = getJuzFromPage(pg);
                   const last5 = jz >= 26;
                   const s = last5 ? Math.min(604, pg + 1) : Math.max(1, pg - 10);
                   const e = last5 ? Math.min(604, pg + 10) : Math.max(1, pg - 1);
                   setDraft("juzHali", { type: "pages", from: String(s), till: String(e), marks: draft.juzHali?.marks || "" });
+                };
+                const autoFillJuzhali = (surahNum, ayatNum) => {
+                  const pg = getAyahPage(Number(surahNum), Number(String(ayatNum).split("-")[0]));
+                  if (!pg) return;
+                  fillJuzhaliRange(pg);
                 };
                 const handleJadeedSurah = (num) => {
                   setDraft("jadeed", { ...draft.jadeed, type: "surah_ayat", surah: num });
@@ -17021,6 +17069,62 @@ function TeacherPortal({
                   setDraft("jadeed", { ...draft.jadeed, type: "surah_ayat", ayat: ay });
                   if (draft.jadeed?.surah && ay) autoFillJuzhali(draft.jadeed.surah, ay);
                   else if (!ay) setDraft("juzHali", { ...draft.juzHali, from: "", till: "" });
+                };
+                /* NO toggles + Wusool tracking handlers */
+                /* Wusool is AUTO-tracked from the child's latest Mark Progress (weekly_results the teacher filled) */
+                const studentWeeklyResults = (schoolData.weeklyResults || [])
+                  .filter(r => String(r.student_id) === String(sid))
+                  .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
+                const latestMarkProgress = studentWeeklyResults.find(r => (r.wusool_juz || r.wusool_surah || r.wusool_page)) || studentWeeklyResults[0] || {};
+                const latestWusoolJuz = latestMarkProgress.wusool_juz || student?.latestResult?.wusool_juz || student?.hifz?.juz || "";
+                const latestWusoolSurahName = latestMarkProgress.wusool_surah || student?.latestResult?.wusool_surah || student?.hifz?.surat || "";
+                const latestWusoolSurahNum = (latestWusoolSurahName && SURAH_NAMES_AR.indexOf(latestWusoolSurahName) >= 0)
+                  ? String(SURAH_NAMES_AR.indexOf(latestWusoolSurahName) + 1)
+                  : (/^\d+$/.test(String(latestWusoolSurahName)) ? String(Number(latestWusoolSurahName)) : "");
+                const latestWusoolPage = latestMarkProgress.wusool_page || student?.latestResult?.wusool_page || "";
+                const handleJadeedNo = () => {
+                  if (jadeedIsNo) {
+                    setDraft("jadeed", { type: "surah_ayat", surah: "", ayat: "" });
+                    return;
+                  }
+                  const next = {
+                    type: "no",
+                    wusoolJuz: latestWusoolJuz || "",
+                    wusoolSurah: latestWusoolSurahNum || "",
+                    wusoolAyah: "",
+                    wusoolPage: latestWusoolPage || "",
+                  };
+                  setDraft("jadeed", next);
+                  const pg = (next.wusoolSurah ? getAyahPage(Number(next.wusoolSurah), 1) : 0) || Number(next.wusoolPage) || 0;
+                  if (pg) fillJuzhaliRange(pg);
+                  else setDraft("juzHali", { ...draft.juzHali, from: "", till: "" });
+                };
+                const handleWusoolJuz = (v) => setDraft("jadeed", { ...draft.jadeed, type: "no", wusoolJuz: v });
+                const handleWusoolSurah = (v) => {
+                  const next = { ...draft.jadeed, type: "no", wusoolSurah: v };
+                  setDraft("jadeed", next);
+                  if (v) {
+                    const pg = getAyahPage(Number(v), Number(String(next.wusoolAyah || "1").split("-")[0]));
+                    if (pg) fillJuzhaliRange(pg);
+                  }
+                };
+                const handleWusoolAyah = (v) => {
+                  const next = { ...draft.jadeed, type: "no", wusoolAyah: v };
+                  setDraft("jadeed", next);
+                  if (wusoolSurahNum && v) {
+                    const pg = getAyahPage(wusoolSurahNum, Number(String(v).split("-")[0]));
+                    if (pg) fillJuzhaliRange(pg);
+                  }
+                };
+                const handleWusoolPage = (v) => {
+                  const next = { ...draft.jadeed, type: "no", wusoolPage: v };
+                  setDraft("jadeed", next);
+                  if (v && Number(v) > 0) fillJuzhaliRange(Number(v));
+                };
+                const juzHaliIsNo = draft.juzHali?.type === "no";
+                const handleJuzHaliNo = () => {
+                  if (juzHaliIsNo) setDraft("juzHali", { type: "pages", from: "", till: "", marks: "" });
+                  else setDraft("juzHali", { type: "no" });
                 };
                 const rawId = user?.id || teacherIdentity;
                 const myHistoryEntries = badalProgress
@@ -17056,35 +17160,73 @@ function TeacherPortal({
                         </div>
                       </div>
                       <div className="badal-field-group full-width">
-                        <span className="badal-field-label">Jadeed <em className="badal-label-sub">Surah &amp; Ayat</em></span>
+                        <span className="badal-field-label">Jadeed <em className="badal-label-sub">{jadeedIsNo ? "NO" : "Surah & Ayat"}</em></span>
                         <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
-                          <select className="badal-select" style={{ flex: 1, minWidth: "150px" }} value={String(draft.jadeed?.surah || "")} onChange={e => handleJadeedSurah(e.target.value)}>
-                            <option value="">Surah</option>
-                            {SURAH_NAMES_AR.map((s, i) => <option key={i} value={String(i + 1)}>{s}</option>)}
-                          </select>
-                          <input className="badal-premium-input" style={{ width: "90px", textAlign: "center" }} placeholder="Ayat" value={draft.jadeed?.ayat || ""} onChange={e => handleJadeedAyat(e.target.value)} />
-                          <span className={`badal-page-badge${jadeedPage ? "" : " empty"}`}>
-                            <BookOpen size={14} /> Page {jadeedPage || "—"}
-                          </span>
+                          <button type="button" className={`badal-no-toggle${jadeedIsNo ? " active" : ""}`} onClick={handleJadeedNo} title={jadeedIsNo ? "Clear NO — fill Jadeed" : "Mark Jadeed as NO (student did not recite Jadeed today)"}>
+                            {jadeedIsNo ? "✕ NO" : "NO"}
+                          </button>
+                          {!jadeedIsNo && (
+                            <>
+                              <select className="badal-select" style={{ flex: 1, minWidth: "150px" }} value={String(draft.jadeed?.surah || "")} onChange={e => handleJadeedSurah(e.target.value)}>
+                                <option value="">Surah</option>
+                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={String(i + 1)}>{s}</option>)}
+                              </select>
+                              <input className="badal-premium-input" style={{ width: "90px", textAlign: "center" }} placeholder="Ayat" value={draft.jadeed?.ayat || ""} onChange={e => handleJadeedAyat(e.target.value)} />
+                              <span className={`badal-page-badge${jadeedPage ? "" : " empty"}`}>
+                                <BookOpen size={14} /> Page {jadeedPage || "—"}
+                              </span>
+                            </>
+                          )}
                         </div>
+                        {jadeedIsNo && (
+                          <div className="badal-wusool-box">
+                            <span className="badal-wusool-title"><BookMarked size={14} /> Wusool — where the child has reached <em className="badal-wusool-auto">· auto from Mark Progress</em></span>
+                            <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
+                              <select className="badal-select" style={{ width: "80px" }} value={wusoolJuz} onChange={e => handleWusoolJuz(e.target.value)}>
+                                <option value="">Juz</option>
+                                {juzNums.map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                              <select className="badal-select" style={{ flex: 1, minWidth: "140px" }} value={wusoolSurah} onChange={e => handleWusoolSurah(e.target.value)}>
+                                <option value="">Surah</option>
+                                {SURAH_NAMES_AR.map((s, i) => <option key={i} value={String(i + 1)}>{s}</option>)}
+                              </select>
+                              <input className="badal-premium-input" style={{ width: "70px", textAlign: "center" }} placeholder="Ayat" value={wusoolAyah} onChange={e => handleWusoolAyah(e.target.value)} />
+                              <input className="badal-premium-input" style={{ width: "70px", textAlign: "center" }} placeholder="Page" value={wusoolPageTyped} onChange={e => handleWusoolPage(e.target.value)} />
+                              <span className={`badal-page-badge${wusoolPage ? "" : " empty"}`}>
+                                <BookOpen size={14} /> Pg {wusoolPage || "—"}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="badal-field-group full-width">
-                        <span className="badal-field-label">Juz Hali <em className="badal-label-sub">pages</em></span>
+                        <span className="badal-field-label">Juz Hali <em className="badal-label-sub">{juzHaliIsNo ? "NO" : "pages"}</em></span>
                         <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
-                          <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", from: e.target.value })}>
-                            <option value="">From</option>
-                            {juzhaliPages.map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
-                          </select>
-                          <span className="badal-range-arrow">→</span>
-                          <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", till: e.target.value })}>
-                            <option value="">Till</option>
-                            {juzhaliPages.filter(p => !draft.juzHali?.from || Number(p) >= Number(draft.juzHali.from)).map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
-                          </select>
-                          <input className="badal-marks-input" style={{ width: "60px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: clampMarks10(e.target.value) })} />
+                          <button type="button" className={`badal-no-toggle${juzHaliIsNo ? " active" : ""}`} onClick={handleJuzHaliNo} title={juzHaliIsNo ? "Clear NO — fill Juz Hali" : "Mark Juz Hali as NO (student did not recite Juz Hali today)"}>
+                            {juzHaliIsNo ? "✕ NO" : "NO"}
+                          </button>
+                          {!juzHaliIsNo && (
+                            <>
+                              <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", from: e.target.value })}>
+                                <option value="">From</option>
+                                {juzhaliPages.map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
+                              </select>
+                              <span className="badal-range-arrow">→</span>
+                              <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", till: e.target.value })}>
+                                <option value="">Till</option>
+                                {juzhaliPages.filter(p => !draft.juzHali?.from || Number(p) >= Number(draft.juzHali.from)).map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
+                              </select>
+                              <input className="badal-marks-input" style={{ width: "60px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: clampMarks10(e.target.value) })} />
+                            </>
+                          )}
                         </div>
-                        <span className="badal-range-hint">
-                          {jadeedPage ? (isLastFiveJuz ? `Auto range: 10 pages after Jadeed (Juz ${jadeedJuz} 26–30)` : `Auto range: 10 pages before Jadeed page ${jadeedPage}`) : "Pick Jadeed Surah & Ayat to auto-fill the page range"}
-                        </span>
+                        {!juzHaliIsNo && (
+                          <span className="badal-range-hint">
+                            {jadeedIsNo
+                              ? (wusoolPage ? (isLastFiveJuz ? `Auto range: 10 pages after Wusool (Juz ${anchorJuz} 26–30)` : `Auto range: 10 pages before Wusool page ${wusoolPage}`) : "Set Wusool Surah & Ayat (or Page) to auto-fill the range")
+                              : (jadeedPage ? (isLastFiveJuz ? `Auto range: 10 pages after Jadeed (Juz ${jadeedJuz} 26–30)` : `Auto range: 10 pages before Jadeed page ${jadeedPage}`) : "Pick Jadeed Surah & Ayat to auto-fill the page range")}
+                          </span>
+                        )}
                       </div>
                       <div className="badal-field-group full-width">
                         <span className="badal-field-label">Notes</span>
@@ -18103,6 +18245,7 @@ function badalFormatJuz(d) {
 
 function badalFormatJuzHali(d) {
   if (!d) return null;
+  if (d.type === "no") return <span className="badal-no-badge">NO</span>;
   const suffix = d.marks ? ` · ${d.marks}/10` : '';
   if (d.type === "surah") {
     return <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{d.from || "?"} → {d.till || "?"}{suffix}</span>;
@@ -18113,6 +18256,14 @@ function badalFormatJuzHali(d) {
 
 function badalFormatJadeed(d) {
   if (!d) return null;
+  if (d.type === "no") {
+    const wj = d.wusoolJuz ? `Juz ${d.wusoolJuz}` : "";
+    const ws = d.wusoolSurah && SURAH_NAMES_AR[Number(d.wusoolSurah) - 1] ? SURAH_NAMES_AR[Number(d.wusoolSurah) - 1] : "";
+    const wa = d.wusoolAyah ? `Ayat ${d.wusoolAyah}` : "";
+    const wp = d.wusoolPage ? `pg ${d.wusoolPage}` : "";
+    const wusoolParts = [wj, ws, wa, wp].filter(Boolean).join(" · ");
+    return <span className="badal-no-badge">NO{wusoolParts ? ` · ${wusoolParts}` : ""}</span>;
+  }
   if (d.type === "surah_ayat" || (d.surah && d.ayat)) {
     const name = badalJuzName(d.surah) || "?";
     return (
