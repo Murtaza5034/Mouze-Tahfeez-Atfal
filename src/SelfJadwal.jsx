@@ -3,7 +3,10 @@ import { supabase } from './supabaseClient';
 import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator, Crown, Star, Award, Lock, Gem, Info, Bell } from 'lucide-react';
 import { useFatemiCalendar, summarizeMiqaats } from './fatemiCalendarApi';
 import MiqaatPopup from './MiqaatPopup';
+import { getAyahPage } from './quranPageMap';
 import './jadwal.css';
+
+export { getAyahPage };
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
@@ -222,28 +225,8 @@ const SURAH_PAGE_MAP = {
   113:604,114:604
 };
 
-const getSurahPage = (surahNum) => SURAH_PAGE_MAP[Number(surahNum)] || 1;
-
-export const getAyahPage = (surahNum, ayahNum) => {
-  const idx = SURAH_AYAH_DATA.findIndex(s => s.number === Number(surahNum));
-  if (idx === -1) return 1;
-  const surah = SURAH_AYAH_DATA[idx];
-  const startPage = getSurahPage(surahNum);
-  let endPage = 604;
-  if (idx < SURAH_AYAH_DATA.length - 1) {
-    for (let i = idx + 1; i < SURAH_AYAH_DATA.length; i++) {
-      const nextStart = getSurahPage(SURAH_AYAH_DATA[i].number);
-      if (nextStart > startPage) {
-        endPage = nextStart - 1;
-        break;
-      }
-    }
-  }
-  const totalPages = Math.max(1, endPage - startPage + 1);
-  const aN = Math.min(Math.max(1, Number(ayahNum)), surah.ayahCount);
-  const pageOffset = Math.floor(((aN - 1) / surah.ayahCount) * totalPages);
-  return Math.min(startPage + pageOffset, endPage);
-};
+// Exact ayah → page lookup now comes from quranPageMap (real 604-page Madani mushaf layout).
+// getAyahPage is imported above and re-exported for App.jsx compatibility.
 
 const JUZ_PAGE_MAP = [1,22,42,62,82,102,122,142,162,182,202,222,242,262,282,302,322,342,362,382,402,422,442,462,482,502,522,542,562,582];
 

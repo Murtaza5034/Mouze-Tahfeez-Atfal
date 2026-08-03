@@ -1000,6 +1000,47 @@ const DEFAULT_PAGE_BY_ROLE = {
 };
 
 const RESULT_NUMERIC_FIELDS = ["murajazah", "juz_hali", "takhteet", "jadeed"];
+
+// Mark limits for the teacher Fill Result form (all allow decimals):
+// Murajah & Juz Hali out of 30, Takhteet & Jadeed out of 20, Attendance out of 6.
+const RESULT_FIELD_MAX = { murajazah: 30, juz_hali: 30, takhteet: 20, jadeed: 20, attendance_count: 6 };
+
+const clampResultField = (field, val) => {
+  const max = RESULT_FIELD_MAX[field];
+  if (max === undefined) return val;
+  if (val === "" || val === null || val === undefined) return "";
+  const raw = String(val);
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return "";
+  if (num < 0) return "0";
+  if (num > max) return String(max);
+  // Keep in-progress decimals like "8." so teachers can type 8.5 naturally
+  if (raw.endsWith(".")) return raw;
+  return String(Math.round(num * 100) / 100);
+};
+
+// Count how many days the student was marked 'present' in the Sat->Fri school week
+// containing `date`. Sunday is auto-holiday (never counts). `statusOverride` is the
+// status just being applied to `date` (used before state catches up). Max is 6.
+const countPresentInWeek = (attendanceMap, sid, date, statusOverride) => {
+  const cursor = new Date(date);
+  const dayOfWeek = cursor.getDay();
+  const satOffset = dayOfWeek === 6 ? 0 : -(dayOfWeek + 1);
+  const saturday = new Date(cursor);
+  saturday.setDate(cursor.getDate() + satOffset);
+  let count = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(saturday);
+    d.setDate(saturday.getDate() + i);
+    if (d.getDay() === 0) continue; // Sunday is Holiday
+    const ds = getLocalDateKey(d);
+    // Override only wins when an actual status is supplied (mark handlers, where
+    // state hasn't caught up yet); otherwise trust the attendance map.
+    const s = ds === date && statusOverride != null ? statusOverride : (attendanceMap[sid]?.[ds] || null);
+    if (s === "present") count++;
+  }
+  return count;
+};
 const STORAGE_KEYS = {
   role: "mauze-active-role",
   teacherAttendance: "mauze-teacher-attendance",
@@ -14671,6 +14712,7 @@ function TeacherPortal({
   setMenuOpen,
   teacherData,
   teacherForms,
+  setTeacherForms,
   user,
   portalAccess,
   monthlySalary,
@@ -14768,6 +14810,35 @@ function TeacherPortal({
     }
     return days;
   }, [currentDate]);
+
+  // Sync attendance_count in Fill Result with the current week's daily marks:
+  // 1) always fill the field when it is empty, and
+  // 2) when a saved result is loaded (student just selected/re-selected), refresh
+  //    the count if the daily marks changed since that result was saved.
+  // A teacher's manual edit is never overwritten (only empty fields or fresh loads).
+  const lastAttendSyncSidRef = useRef("");
+  useEffect(() => {
+    const sid = teacherForms.result.student_id;
+    if (!sid) return;
+    const sidKey = String(sid).trim().toLowerCase();
+    const current = teacherForms.result.attendance_count;
+    const isEmpty = current === "" || current === null || current === undefined;
+    const count = countPresentInWeek(studentAttendance, sidKey, currentDate, null);
+    if (count <= 0) return;
+    const justLoaded = lastAttendSyncSidRef.current !== sidKey;
+    if (justLoaded) lastAttendSyncSidRef.current = sidKey;
+    const savedDiffers = !isEmpty && Number(current) !== count;
+    if (!isEmpty && !(justLoaded && savedDiffers)) return;
+    setTeacherForms(curr => {
+      const curSid = curr.result.student_id;
+      if (String(curSid).trim().toLowerCase() !== sidKey) return curr;
+      const curVal = curr.result.attendance_count;
+      const curEmpty = curVal === "" || curVal === null || curVal === undefined;
+      const curDiffers = !curEmpty && Number(curVal) !== count;
+      if (!curEmpty && !(justLoaded && curDiffers)) return curr;
+      return { ...curr, result: { ...curr.result, attendance_count: clampResultField("attendance_count", String(count)) } };
+    });
+  }, [teacherForms.result.student_id, teacherForms.result.attendance_count, studentAttendance, currentDate]);
 
   const [trackedDays, setTrackedDays] = useState([]);
   const [trackCount, setTrackCount] = useState(0);
@@ -15276,20 +15347,9 @@ function TeacherPortal({
       next[sid] = { ...next[sid], [date]: status };
       return next;
     });
-    const cursor = new Date(date);
-    const monOffset = cursor.getDay() === 0 ? -6 : 1 - cursor.getDay();
-    const mon = new Date(cursor);
-    mon.setDate(cursor.getDate() + monOffset);
-    const sun = new Date(mon);
-    sun.setDate(mon.getDate() + 6);
-    let weeklyCount = 0;
-    for (let d = new Date(mon); d <= sun; d.setDate(d.getDate() + 1)) {
-      const ds = d.toISOString().slice(0, 10);
-      const s = ds === date ? status : (studentAttendance[sid]?.[ds] || null);
-      if (s === 'present') weeklyCount++;
-    }
+    const weeklyCount = countPresentInWeek(studentAttendance, sid, date, status);
     if (String(teacherForms?.result?.student_id) === String(studentId)) {
-      setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: weeklyCount } }));
+      setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: clampResultField("attendance_count", String(weeklyCount)) } }));
     }
     const attStudent = overviewStudents.find(s => String(s.student_id) === studentId);
     if (attStudent) {
@@ -15354,20 +15414,8 @@ function TeacherPortal({
     });
     const selectedSid = String(teacherForms?.result?.student_id || '').trim().toLowerCase();
     if (selectedSid) {
-      const cursor2 = new Date(date);
-      const monOffset2 = cursor2.getDay() === 0 ? -6 : 1 - cursor2.getDay();
-      const mon2 = new Date(cursor2);
-      mon2.setDate(cursor2.getDate() + monOffset2);
-      const sun2 = new Date(mon2);
-      sun2.setDate(mon2.getDate() + 6);
-      let wc = 0;
-      for (let d = new Date(mon2); d <= sun2; d.setDate(d.getDate() + 1)) {
-        const ds = d.toISOString().slice(0, 10);
-        const existing = studentAttendance[selectedSid]?.[ds] || null;
-        const finalStatus = overviewStudents.some(s => String(s.student_id).trim().toLowerCase() === selectedSid) && ds === date ? status : existing;
-        if (finalStatus === 'present') wc++;
-      }
-      setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: wc } }));
+      const wc = countPresentInWeek(studentAttendance, selectedSid, date, status);
+      setTeacherForms(curr => ({ ...curr, result: { ...curr.result, attendance_count: clampResultField("attendance_count", String(wc)) } }));
     }
     setAttendanceLoading(false);
     if (onShowAction) onShowAction("success", `Marked all as ${status}`);
@@ -16485,6 +16533,7 @@ function TeacherPortal({
                       <input
                         type="number"
                         min="0"
+                        max="30"
                         name="murajazah"
                         step="0.1"
                         value={teacherForms.result.murajazah}
@@ -16498,6 +16547,7 @@ function TeacherPortal({
                       <input
                         type="number"
                         min="0"
+                        max="30"
                         step="0.1"
                         name="juz_hali"
                         value={teacherForms.result.juz_hali}
@@ -16511,6 +16561,7 @@ function TeacherPortal({
                       <input
                         type="number"
                         min="0"
+                        max="20"
                         name="takhteet"
                         step="0.1"
                         value={teacherForms.result.takhteet}
@@ -16524,7 +16575,9 @@ function TeacherPortal({
                       <input
                         type="number"
                         min="0"
+                        max="20"
                         name="jadeed"
+                        step="0.1"
                         value={teacherForms.result.jadeed}
                         onChange={onTeacherFormChange}
                         required
@@ -16719,12 +16772,61 @@ function TeacherPortal({
                       <input
                         type="number"
                         min="0"
+                        max="6"
                         name="attendance_count"
                         value={teacherForms.result.attendance_count}
                         onChange={onTeacherFormChange}
                       />
                     </label>
                   </div>
+
+                  {teacherForms.result.student_id && (() => {
+                    const attKey = String(teacherForms.result.student_id).trim().toLowerCase();
+                    const att = studentAttendance[attKey] || {};
+                    let pCount = 0, aCount = 0;
+                    weekDays.forEach((d) => {
+                      const isSun = new Date(d).getDay() === 0;
+                      const st = isSun ? "holiday" : (att[d] || null);
+                      if (st === "present") pCount++;
+                      else if (st === "absent") aCount++;
+                    });
+                    return (
+                      <div className="att-week-mini">
+                        <div className="att-week-mini-head">
+                          <span className="att-week-mini-title">
+                            This Week <strong>Sat → Fri</strong> <em>· Sunday Holiday</em>
+                          </span>
+                          <span className={`att-week-mini-sum ${pCount > 0 ? "has-present" : ""}`}>
+                            <span className="att-week-mini-p">P {pCount}</span>
+                            <span className="att-week-mini-a">A {aCount}</span>
+                            <span className="att-week-mini-o">/ 6</span>
+                          </span>
+                        </div>
+                        <div className="att-week-mini-days">
+                          {weekDays.map((d) => {
+                            const isSun = new Date(d).getDay() === 0;
+                            const st = isSun ? "holiday" : (att[d] || null);
+                            const isToday = d === currentDate;
+                            const dayDate = new Date(d + "T00:00:00");
+                            const wd = dayDate.toLocaleDateString("en-US", { weekday: "short" });
+                            const num = Number(String(d).slice(8, 10));
+                            const label = isSun ? "Holiday" : st === "present" ? "Present" : st === "absent" ? "Absent" : "Not marked";
+                            const cls = ["att-week-day", st || "none", isToday ? "today" : ""].filter(Boolean).join(" ");
+                            return (
+                              <div key={d} className={cls} title={`${wd} ${num} — ${label}`}>
+                                <span className="att-week-day-name">{wd}</span>
+                                <span className="att-week-day-num">{num}</span>
+                                <span className="att-week-day-dot" />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="att-week-mini-foot">
+                          Present days auto-fill the Attendance Count above (out of 6).
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <label>
                     <span>{"Attendance-Performance Note"}</span>
@@ -16871,11 +16973,24 @@ function TeacherPortal({
                   notes: existing.notes ?? latest?.notes ?? "",
                 };
                 const juzNums = Array.from({ length: 30 }, (_, i) => String(i + 1));
+                // Marks are out of 10: block anything below 0 or above 10, keep decimals (e.g. 8.5, 9.75).
+                const clampMarks10 = (val) => {
+                  if (val === "" || val === null || val === undefined) return "";
+                  const raw = String(val);
+                  const num = Number(raw);
+                  if (!Number.isFinite(num)) return "";
+                  if (num < 0) return "0";
+                  if (num > 10) return "10";
+                  // Keep in-progress decimals like "8." so teachers can type 8.5 naturally
+                  if (raw.endsWith(".")) return raw;
+                  return String(Math.round(num * 100) / 100);
+                };
                 const setDraft = (path, val) => setBadalProgressDraft(prev => ({ ...prev, [sid]: { ...prev[sid], [path]: val } }));
                 const draftJuz = Array.isArray(draft.juz) ? draft.juz.map(s => ({ ...s })) : (draft.juz && draft.juz.value ? [draft.juz] : []);
                 while (draftJuz.length < 3) draftJuz.push({});
                 const setJuzSlot = (i, field, val) => {
-                  const arr = draftJuz.map((s, idx) => idx === i ? { ...s, [field]: val } : { ...s });
+                  const cleanVal = field === "marks" ? clampMarks10(val) : val;
+                  const arr = draftJuz.map((s, idx) => idx === i ? { ...s, [field]: cleanVal } : { ...s });
                   setDraft("juz", arr);
                 };
                 const jadeedSurahNum = draft.jadeed?.surah && /^\d+$/.test(String(draft.jadeed.surah)) ? Number(draft.jadeed.surah) : 0;
@@ -16941,24 +17056,6 @@ function TeacherPortal({
                         </div>
                       </div>
                       <div className="badal-field-group full-width">
-                        <span className="badal-field-label">Juz Hali <em className="badal-label-sub">pages</em></span>
-                        <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
-                          <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", from: e.target.value })}>
-                            <option value="">From</option>
-                            {juzhaliPages.map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
-                          </select>
-                          <span className="badal-range-arrow">→</span>
-                          <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", till: e.target.value })}>
-                            <option value="">Till</option>
-                            {juzhaliPages.filter(p => !draft.juzHali?.from || Number(p) >= Number(draft.juzHali.from)).map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
-                          </select>
-                          <input className="badal-marks-input" style={{ width: "60px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: e.target.value })} />
-                        </div>
-                        <span className="badal-range-hint">
-                          {jadeedPage ? (isLastFiveJuz ? `Auto range: 10 pages after Jadeed (Juz ${jadeedJuz} 26–30)` : `Auto range: 10 pages before Jadeed page ${jadeedPage}`) : "Pick Jadeed Surah & Ayat to auto-fill the page range"}
-                        </span>
-                      </div>
-                      <div className="badal-field-group full-width">
                         <span className="badal-field-label">Jadeed <em className="badal-label-sub">Surah &amp; Ayat</em></span>
                         <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
                           <select className="badal-select" style={{ flex: 1, minWidth: "150px" }} value={String(draft.jadeed?.surah || "")} onChange={e => handleJadeedSurah(e.target.value)}>
@@ -16970,6 +17067,24 @@ function TeacherPortal({
                             <BookOpen size={14} /> Page {jadeedPage || "—"}
                           </span>
                         </div>
+                      </div>
+                      <div className="badal-field-group full-width">
+                        <span className="badal-field-label">Juz Hali <em className="badal-label-sub">pages</em></span>
+                        <div className="badal-field-row" style={{ flexWrap: "wrap" }}>
+                          <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.from || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", from: e.target.value })}>
+                            <option value="">From</option>
+                            {juzhaliPages.map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
+                          </select>
+                          <span className="badal-range-arrow">→</span>
+                          <select className="badal-select" style={{ width: "110px" }} value={draft.juzHali?.till || ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, type: "pages", till: e.target.value })}>
+                            <option value="">Till</option>
+                            {juzhaliPages.filter(p => !draft.juzHali?.from || Number(p) >= Number(draft.juzHali.from)).map(p => <option key={p} value={String(p)}>{p} صــ</option>)}
+                          </select>
+                          <input className="badal-marks-input" style={{ width: "60px" }} placeholder="Marks" type="number" step="0.1" min="0" max="10" value={draft.juzHali?.marks ?? ""} onChange={e => setDraft("juzHali", { ...draft.juzHali, marks: clampMarks10(e.target.value) })} />
+                        </div>
+                        <span className="badal-range-hint">
+                          {jadeedPage ? (isLastFiveJuz ? `Auto range: 10 pages after Jadeed (Juz ${jadeedJuz} 26–30)` : `Auto range: 10 pages before Jadeed page ${jadeedPage}`) : "Pick Jadeed Surah & Ayat to auto-fill the page range"}
+                        </span>
                       </div>
                       <div className="badal-field-group full-width">
                         <span className="badal-field-label">Notes</span>
@@ -18620,8 +18735,6 @@ export default function App() {
       }));
     }
   }, [portalRole, schoolData.students, schoolData.weeklyResults]);
-  
-
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -20021,14 +20134,37 @@ export default function App() {
 
   const handleTeacherFormChange = (event) => {
     const { name, value } = event.target;
+    const cleanValue = clampResultField(name, value);
 
     setTeacherForms((current) => ({
       ...current,
       result: {
         ...current.result,
-        [name]: value,
+        [name]: cleanValue,
       },
     }));
+
+    // Auto-fill Jadeed marks from Total Jadeed Pages + Unit:
+    // Safa (صفه) = 7 marks per page, Satar (سطر) = 2 marks per line, capped at 20.
+    if (name === "total_jadeed_pages" || name === "total_jadeed_unit") {
+      setTeacherForms((current) => {
+        const pagesRaw = String(current.result.total_jadeed_pages ?? "").trim();
+        const unit = current.result.total_jadeed_unit;
+        const n = Number(pagesRaw);
+        let autoMarks = "";
+        if (pagesRaw !== "" && Number.isFinite(n) && n >= 0) {
+          const per = unit === "سطر" ? 2 : 7;
+          autoMarks = String(Math.min(Math.round(n * per * 100) / 100, 20));
+        }
+        return {
+          ...current,
+          result: {
+            ...current.result,
+            jadeed: autoMarks,
+          },
+        };
+      });
+    }
 
     if (name === "student_id") {
       const numericId = value && !isNaN(value) ? Number(value) : value;
@@ -21405,6 +21541,7 @@ const handleSendCustomNotification = async (event) => {
             setSelectedAnnouncement={setSelectedAnnouncement}
             teacherData={teacherData}
             teacherForms={teacherForms}
+            setTeacherForms={setTeacherForms}
             teacherProfiles={teacherProfiles}
             schoolData={schoolData}
             selectedNotification={selectedNotification}
