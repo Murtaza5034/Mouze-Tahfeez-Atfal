@@ -10625,7 +10625,7 @@ h4.attendance-rating-text,
 .mark-progress-page .form-card,
 .mark-progress-page .data-card {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 26px;
   border: 1px solid rgba(197, 160, 89, 0.28);
   background:
@@ -10749,7 +10749,7 @@ h4.attendance-rating-text,
 /* ---- Student selector (hero) ---- */
 .mp-student-select {
   position: relative;
-  z-index: 2;
+  z-index: 10;
   padding: 14px 16px;
   margin-bottom: 6px;
   border-radius: 18px;

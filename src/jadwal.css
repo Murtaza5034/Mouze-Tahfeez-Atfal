@@ -2094,6 +2094,137 @@
 
   .self-jadwal-editor .jadwal-table-wrapper {
     border-radius: 12px;
+    overflow: visible;
+    border: none;
+  }
+
+  .self-jadwal-editor .jadwal-table {
+    min-width: 0;
+    display: block;
+  }
+
+  .self-jadwal-editor .jadwal-table thead {
+    display: none;
+  }
+
+  .self-jadwal-editor .jadwal-table tbody {
+    display: block;
+  }
+
+  .self-jadwal-editor .jadwal-table tbody tr {
+    display: block;
+    background: var(--card-bg, #fff);
+    border: 1px solid #eee;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .self-jadwal-editor .jadwal-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: none;
+    padding: 5px 0;
+    text-align: right;
+    gap: 4px;
+    flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .self-jadwal-editor .jadwal-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--soft-brown, #8b6d31);
+    white-space: nowrap;
+    text-align: left;
+    min-width: 55px;
+    flex-shrink: 0;
+  }
+
+  .self-jadwal-editor .jadwal-table td.day-cell {
+    text-align: center;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0 8px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 6px;
+    font-size: 14px;
+    background: transparent;
+  }
+
+  .self-jadwal-editor .jadwal-table td.day-cell::before {
+    display: none;
+  }
+
+  .self-jadwal-editor .jadwal-table td.day-cell .day-fatemi-date {
+    font-size: 0.7rem;
+  }
+
+  .self-jadwal-editor .jadwal-table td.star-cell {
+    justify-content: space-between;
+  }
+
+  .self-jadwal-editor .jadwal-table td.star-cell::before {
+    content: "Star";
+  }
+
+  .self-jadwal-editor .jadwal-table input,
+  .self-jadwal-editor .jadwal-table select {
+    width: auto;
+    min-width: 60px;
+    max-width: 110px;
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+
+  .self-jadwal-editor .jadwal-table select.star-select {
+    width: auto;
+  }
+
+  .self-jadwal-editor .jadwal-table td span {
+    font-size: 12px;
+  }
+
+  .self-jadwal-editor .jadwal-table td[data-label="Jadeed"] > div,
+  .self-jadwal-editor .jadwal-table td[data-label="Juzhali"] > div {
+    flex-wrap: wrap !important;
+    width: 100%;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  .self-jadwal-editor .jadwal-table td[data-label="Jadeed"] select,
+  .self-jadwal-editor .jadwal-table td[data-label="Juzhali"] select {
+    max-width: 95px;
+    min-width: 0;
+    font-size: 11px;
+    padding: 4px 5px;
+  }
+
+  .self-jadwal-editor .jadwal-table td[data-label="Jadeed"] > div > div,
+  .self-jadwal-editor .jadwal-table td[data-label="Juzhali"] > div > div {
+    flex-wrap: wrap !important;
+    width: auto;
+    min-width: 0;
+  }
+
+  .self-jadwal-editor .jadwal-table td[data-label="Jadeed"] .jadwal-jadeed-picker,
+  .self-jadwal-editor .jadwal-table td[data-label="Juzhali"] .jadwal-jadeed-picker {
+    padding: 2px 4px;
+  }
+
+  .self-jadwal-editor .jadwal-table td.star-cell span {
+    font-size: 13px !important;
+    white-space: normal;
+    word-break: break-word;
   }
 }
 
@@ -2117,5 +2248,51 @@
 
   .self-jadwal-editor .sj-empty {
     margin: 0 10px 12px;
+  }
+
+  .self-jadwal-editor .jadwal-table tbody tr {
+    padding: 8px 8px;
+  }
+
+  .self-jadwal-editor .jadwal-table td {
+    padding: 4px 0;
+    font-size: 11px;
+  }
+
+  .self-jadwal-editor .jadwal-table td::before {
+    font-size: 9px;
+    min-width: 50px;
+  }
+
+  .self-jadwal-editor .jadwal-table input,
+  .self-jadwal-editor .jadwal-table select {
+    font-size: 10px;
+    min-width: 50px;
+    max-width: 85px;
+    padding: 3px 5px;
+  }
+
+  .self-jadwal-editor .jadwal-table td[data-label="Jadeed"] select,
+  .self-jadwal-editor .jadwal-table td[data-label="Juzhali"] select {
+    max-width: 80px;
+    font-size: 10px;
+    padding: 3px 4px;
+  }
+
+  .self-jadwal-editor .jadwal-table td.star-cell span {
+    font-size: 11px !important;
+  }
+
+  .self-jadwal-editor .day-fatemi-date {
+    font-size: 9px !important;
+  }
+
+  .self-jadwal-editor .miqaat-badge {
+    font-size: 8px;
+    padding: 2px 6px;
+  }
+  .self-jadwal-editor .miqaat-icon-pulse {
+    width: 8px;
+    height: 8px;
   }
 }

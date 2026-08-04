@@ -4,6 +4,7 @@ import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen,
 import { useFatemiCalendar, summarizeMiqaats } from './fatemiCalendarApi';
 import MiqaatPopup from './MiqaatPopup';
 import { getAyahPage } from './quranPageMap';
+import SearchableSelect from './SearchableSelect';
 import './jadwal.css';
 
 export { getAyahPage };
@@ -1649,23 +1650,14 @@ export const SelfJadwalTeacherView
         <div className="sj-card" style={premiumCardStyle}>
           <div className="sj-toolbar" style={{ padding: '20px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)' }}>
             <div className="student-selector" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="premium-select"
-                style={{ flex: 1, minWidth: '250px', padding: '10px 16px', borderRadius: '10px', border: '1px solid #dfcbb5', background: '#fdfaf4', fontFamily: 'Inter, sans-serif', fontSize: '13px', cursor: 'pointer' }}
-              >
-                <option value="">-- Select Child --</option>
-                {students.length > 0 && (
-                  <optgroup label="👦 Group Children">
-                    {students.map(s => (
-                      <option key={`child-${s.student_id || s.id}`} value={s.student_id || s.id}>
-                        {s.name || s.full_name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+              <SearchableSelect
+                options={students.map(s => ({ value: s.student_id || s.id, label: s.name || s.full_name }))}
+                value={selectedUserId || ""}
+                onChange={(v) => setSelectedUserId(v)}
+                placeholder="-- Select Child --"
+                emptyValue="-- Select Child --"
+                searchPlaceholder="Search child by name…"
+              />
               {selectedUserId && (
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button

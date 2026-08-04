@@ -379,6 +379,40 @@
   flex-shrink: 0;
 }
 
+.pts-dropdown-search {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin: 0;
+  border-bottom: 1px solid rgba(212,175,55,0.18);
+  background: rgba(255,255,255,0.98);
+  color: var(--primary-gold, #d4af37);
+}
+
+.pts-dropdown-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--deep-brown, #2f2118);
+}
+
+.pts-dropdown-search input::placeholder {
+  color: #b8a68c;
+}
+
+.pts-dropdown-scroll {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
 /* ─── Task List ─── */
 .pts-task-list {
   display: flex;

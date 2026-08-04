@@ -7,6 +7,7 @@ import { JadwalNotes } from "./JadwalNotes";
 import { useFatemiCalendar, summarizeMiqaats } from './fatemiCalendarApi';
 import MiqaatPopup from './MiqaatPopup';
 import { getAyahPage } from './quranPageMap';
+import SearchableSelect from './SearchableSelect';
 import './jadwal.css';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -1920,16 +1921,14 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
       <div className="jadwal-header">
         <h2>Teacher Jadwal Editor</h2>
         <div className="student-selector">
-          <select
-            value={selectedStudentId}
-            onChange={(e) => setSelectedStudentId(e.target.value)}
-            className="premium-select"
-          >
-            <option value="">-- Select Student --</option>
-            {(students || []).map(s => (
-              <option key={s.student_id} value={s.student_id}>{s.full_name || s.name}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            options={(students || []).map(s => ({ value: s.student_id, label: s.full_name || s.name }))}
+            value={selectedStudentId || ""}
+            onChange={(v) => setSelectedStudentId(v)}
+            placeholder="-- Select Student --"
+            emptyValue="-- Select Student --"
+            searchPlaceholder="Search student by name…"
+          />
           {selectedStudentId && (
             <div className="jadwal-actions-row">
               <button className="jadwal-save-btn" onClick={handleNotifyParents} disabled={saving}>

@@ -834,6 +834,7 @@ const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
 import AppUpdatePopup from "./AppUpdatePopup";
 import PrivacyPolicy from "./PrivacyPolicy";
 import PremiumTodaySchedule from "./PremiumTodaySchedule";
+import SearchableSelect from "./SearchableSelect";
 import "./premium-today-schedule.css";
 
 const fixArabicScript = (text) => {
@@ -10367,25 +10368,20 @@ const handleDownloadAllReports = async () => {
                   </div>
                   <div className="selection-dropdown-row">
                     <div className="custom-dropdown-wrapper">
-                      <label htmlFor="student-dropdown">Choose Student (Grouped by Muhaffiz)</label>
-                      <select
-                        id="student-dropdown"
-                        className="premium-select"
+                      <label>Choose Student (Grouped by Muhaffiz)</label>
+                      <SearchableSelect
+                        options={teacherSummaries.flatMap(teacher =>
+                          students
+                            .filter(s => (s.teacherName || "Unassigned teacher") === teacher.teacherName)
+                            .map(s => ({ value: s.student_id, label: s.name, group: teacher.teacherName }))
+                        )}
                         value={selectedStudentId || ""}
-                        onChange={(e) => setSelectedStudentId(e.target.value)}
-                      >
-                        <option value="">-- Select Student --</option>
-                        {teacherSummaries.map(teacher => (
-                          <optgroup label={`Muhaffiz: ${teacher.teacherName}`} key={teacher.teacherName}>
-                            {students
-                              .filter(s => (s.teacherName || "Unassigned teacher") === teacher.teacherName)
-                              .map(s => (
-                                <option key={s.student_id} value={s.student_id}>{s.name}</option>
-                              ))
-                            }
-                          </optgroup>
-                        ))}
-                      </select>
+                        onChange={(v) => setSelectedStudentId(v)}
+                        placeholder="-- Select Student --"
+                        emptyValue="-- Select Student --"
+                        searchPlaceholder="Search student by name…"
+                        groupHeaderFor={(g) => `Muhaffiz: ${g}`}
+                      />
                     </div>
                     <button 
                       className="assign-report-btn" 
@@ -10536,18 +10532,19 @@ const handleDownloadAllReports = async () => {
                         <div style={{ marginBottom: '24px' }}>
                           <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.9rem' }}>Select Child</span>
-                            <select
-                              className="premium-select"
-                              value={selChildId}
-                              onChange={e => { setSelChildId(e.target.value); }}
-                              style={{ maxWidth: '400px' }}
-                            >
-                              {studentsList.map(s => (
-                                <option key={s.student_id} value={String(s.student_id)}>
-                                  {s.name || s.full_name} {s.groupName ? `(${s.groupName})` : ''}
-                                </option>
-                              ))}
-                            </select>
+                            <SearchableSelect
+                              options={studentsList.map(s => ({
+                                value: String(s.student_id),
+                                label: s.name || s.full_name,
+                                sub: s.groupName ? `(${s.groupName})` : '',
+                              }))}
+                              value={selChildId || ""}
+                              onChange={(v) => { setSelChildId(v); }}
+                              placeholder="Select child…"
+                              emptyValue="Select child…"
+                              searchPlaceholder="Search child by name…"
+                              className="ss-inline"
+                            />
                           </label>
                         </div>
 
@@ -10816,18 +10813,19 @@ const handleDownloadAllReports = async () => {
                     <div style={{ marginBottom: '24px' }}>
                       <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.9rem' }}>Select Child</span>
-                        <select
-                          className="premium-select"
-                          value={attSelChild}
-                          onChange={e => { setAttSelChild(e.target.value); setAttMonth(""); }}
-                          style={{ maxWidth: '400px' }}
-                        >
-                          {attStudentsList.map(s => (
-                            <option key={s.student_id} value={String(s.student_id)}>
-                              {s.name || s.full_name} {s.groupName ? `(${s.groupName})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                        <SearchableSelect
+                          options={attStudentsList.map(s => ({
+                            value: String(s.student_id),
+                            label: s.name || s.full_name,
+                            sub: s.groupName ? `(${s.groupName})` : '',
+                          }))}
+                          value={attSelChild || ""}
+                          onChange={(v) => { setAttSelChild(v); setAttMonth(""); }}
+                          placeholder="Select child…"
+                          emptyValue="Select child…"
+                          searchPlaceholder="Search child by name…"
+                          className="ss-inline"
+                        />
                       </label>
                     </div>
 
@@ -11689,23 +11687,19 @@ const handleDownloadAllReports = async () => {
                         <Users size={14} style={{ color: 'var(--primary-gold)' }} />
                         Select Student
                       </span>
-                      <select
+                      <SearchableSelect
                         name="student_id"
-                        value={adminForms.schedule.student_id}
-                        onChange={onAdminFormChange("schedule")}
-                        className="premium-select"
-                        required
-                      >
-                        <option value="">— Choose a student —</option>
-                        {students.map((s, i) => {
-                          const sid = s?.student_id || "";
-                          return (
-                            <option key={sid || i} value={sid}>
-                              {s?.name || s?.full_name || `Student ${i + 1}`} {s?.marhala ? `(${s.marhala})` : ""}
-                            </option>
-                          );
-                        })}
-                      </select>
+                        options={students.map((s, i) => ({
+                          value: s?.student_id || "",
+                          label: s?.name || s?.full_name || `Student ${i + 1}`,
+                          sub: s?.marhala ? `(${s.marhala})` : "",
+                        }))}
+                        value={adminForms.schedule.student_id || ""}
+                        onChange={(v) => setAdminForms(curr => ({ ...curr, schedule: { ...curr.schedule, student_id: v } }))}
+                        placeholder="— Choose a student —"
+                        emptyValue="— Choose a student —"
+                        searchPlaceholder="Search student by name…"
+                      />
                     </label>
 
                     {/* Schedule Date */}
@@ -12185,16 +12179,21 @@ const handleDownloadAllReports = async () => {
                     <div className="form-grid">
                       <label>
                         <span>Select Student</span>
-                        <select
+                        <SearchableSelect
                           name="student_id"
-                          className="premium-select"
-                          required
-                          onChange={(e) => {
-                            const val = e.target.value;
+                          options={students && students.length > 0
+                            ? students.map(s => ({
+                                value: s.student_id,
+                                label: s.name || 'Unnamed Student',
+                                sub: s.arabic_name ? `(${s.arabic_name})` : '',
+                              }))
+                            : []}
+                          value={registryStudentId || ""}
+                          onChange={(val, form) => {
+                            setRegistryStudentId(val || "");
                             if (!val) return;
                             const s = students.find(x => x.allIds.includes(String(val)));
-                            if (s) {
-                              const form = e.target.form;
+                            if (s && form) {
                               if (form.full_name) form.full_name.value = s.name || '';
                               if (form.arabic_name) form.arabic_name.value = s.arabic_name || '';
                               if (form.group_name) form.group_name.value = s.groupName === 'Ungrouped' ? '' : (s.groupName || '');
@@ -12208,18 +12207,10 @@ const handleDownloadAllReports = async () => {
                               if (form.gender) form.gender.value = s.gender || 'male';
                             }
                           }}
-                        >
-                          <option value="">-- Choose Student --</option>
-                          {students && students.length > 0 ? (
-                            students.map(s => (
-                              <option key={s.student_id} value={s.student_id}>
-                                {s.name || 'Unnamed Student'} {s.arabic_name ? `(${s.arabic_name})` : ''}
-                              </option>
-                            ))
-                          ) : (
-                            <option value="" disabled>No students found in Registry</option>
-                          )}
-                        </select>
+                          placeholder="-- Choose Student --"
+                          emptyValue="-- Choose Student --"
+                          searchPlaceholder="Search student by name…"
+                        />
                       </label>
 
                       <label>
@@ -13001,18 +12992,19 @@ const handleDownloadAllReports = async () => {
                   <div className="form-grid">
                     <label>
                       <span>Link to Student (Parents only)</span>
-                      <select
+                      <SearchableSelect
                         name="student_id"
-                        value={adminForms.portalAccess.student_id}
-                        onChange={onAdminFormChange("portalAccess")}
-                      >
-                        <option value="">-- No Student Linked --</option>
-                        {students.map((s) => (
-                          <option key={s.student_id} value={s.student_id}>
-                            {s.name} ({s.groupName})
-                          </option>
-                        ))}
-                      </select>
+                        options={students.map(s => ({
+                          value: s.student_id,
+                          label: s.name,
+                          sub: `(${s.groupName})`,
+                        }))}
+                        value={adminForms.portalAccess.student_id || ""}
+                        onChange={(v) => setAdminForms(curr => ({ ...curr, portalAccess: { ...curr.portalAccess, student_id: v } }))}
+                        placeholder="-- No Student Linked --"
+                        emptyValue="-- No Student Linked --"
+                        searchPlaceholder="Search student by name…"
+                      />
                     </label>
                   </div>
 
@@ -16740,26 +16732,26 @@ function TeacherPortal({
                     <span className="mp-student-select-icon"><User size={16} /></span>
                     <label>
                       <span>Child</span>
-                      <select
+                      <SearchableSelect
                         name="student_id"
-                        value={teacherForms.result.student_id}
-                        onChange={onTeacherFormChange}
-                        disabled={selectedResultLocked || !canTeacherFillProgress}
-                        required
-                      >
-                        <option value="">Select child</option>
-                        {filteredStudents.map((student) => {
+                        options={filteredStudents.map((student) => {
                           const existingResult = (schoolData.weeklyResults || []).find(r =>
                             String(r.student_id) === String(student.student_id) &&
                             String(r.week_date) === String(teacherForms.result.week_date)
                           );
-                          return (
-                            <option key={student.student_id} value={student.student_id}>
-                              {student.name}{existingResult ? " - âœ“ Saved" : ""} - {student.groupName}
-                            </option>
-                          );
+                          return {
+                            value: student.student_id,
+                            label: `${student.name}${existingResult ? " - ✓ Saved" : ""}`,
+                            sub: student.groupName,
+                          };
                         })}
-                      </select>
+                        value={teacherForms.result.student_id || ""}
+                        onChange={(v) => onTeacherFormChange({ target: { name: "student_id", value: v } })}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                        placeholder="Select child"
+                        emptyValue="Select child"
+                        searchPlaceholder="Search child by name…"
+                      />
                     </label>
 
                     <button
@@ -17233,23 +17225,37 @@ function TeacherPortal({
               <div className="badal-universal-selector">
                 <div className="badal-universal-selector-inner">
                   <Search size={16} className="badal-universal-search-icon" />
-                  <select
-                    className="badal-universal-select"
+                  <SearchableSelect
+                    options={(() => {
+                      const byTeacher = new Map();
+                      (universalStudents || []).forEach(s => {
+                        const tName = s.teacherName || s.groupName || "Unassigned";
+                        if (!byTeacher.has(tName)) byTeacher.set(tName, []);
+                        byTeacher.get(tName).push(s);
+                      });
+                      const opts = [];
+                      byTeacher.forEach((list, tName) => {
+                        list.forEach(s => opts.push({
+                          value: String(s.student_id),
+                          label: `${s.name}${s.arabic_name ? ` (${s.arabic_name})` : ""}`,
+                          sub: s.groupName || s.class || "",
+                          group: tName,
+                        }));
+                      });
+                      return opts;
+                    })()}
                     value={selectedUniversalStudent || ""}
-                    onChange={e => {
-                      const val = e.target.value;
+                    onChange={(val) => {
                       setSelectedUniversalStudent(val || null);
                       if (val) setSelectedBadalOriginal(null);
                       setSelectedBadalHistory(null);
                     }}
-                  >
-                    <option value="">— Select any student to fill Badal progress —</option>
-                    {universalStudents.map(s => (
-                      <option key={s.student_id} value={String(s.student_id)}>
-                        {s.name} {s.arabic_name ? `(${s.arabic_name})` : ""} — {s.groupName || s.class || ""}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="— Select any student to fill Badal progress —"
+                    emptyValue="— Select any student to fill Badal progress —"
+                    searchPlaceholder="Search student by name…"
+                    groupHeaderFor={(g) => `👤 ${g}`}
+                    className="badal-premium-select"
+                  />
                   {selectedUniversalStudent && (
                     <button className="badal-universal-clear" onClick={() => setSelectedUniversalStudent(null)} title="Clear selection">
                       <X size={14} />
@@ -17868,11 +17874,17 @@ function TeacherPortal({
                     <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
                       <label style={{ flex: '1', minWidth: '200px' }}>
                         <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>Select Student</span>
-                        <select className="premium-select" value={histStudentId} onChange={e => { setHistStudentId(e.target.value); setHistDate(new Date().toISOString().slice(0, 10)); setHistStatus(null); }}>
-                          {histStudents.map(s => (
-                            <option key={s.student_id} value={String(s.student_id)}>{s.name || s.full_name}</option>
-                          ))}
-                        </select>
+                        <SearchableSelect
+                          options={histStudents.map(s => ({
+                            value: String(s.student_id),
+                            label: s.name || s.full_name,
+                          }))}
+                          value={histStudentId || ""}
+                          onChange={(v) => { setHistStudentId(v); setHistDate(new Date().toISOString().slice(0, 10)); setHistStatus(null); }}
+                          placeholder="Select student…"
+                          emptyValue="Select student…"
+                          searchPlaceholder="Search student by name…"
+                        />
                       </label>
                       <label style={{ flex: '1', minWidth: '200px' }}>
                         <span style={{ fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>Select Date</span>
@@ -19299,6 +19311,7 @@ export default function App() {
   const [reduceAnimations, setReduceAnimations] = useState(() => {
     return localStorage.getItem("mauze-reduce-animations") === "true";
   });
+  const [registryStudentId, setRegistryStudentId] = useState("");
 
   useEffect(() => {
     document.body.classList.toggle("dark-mode", isDarkMode);

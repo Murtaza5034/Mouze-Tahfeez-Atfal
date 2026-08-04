@@ -127,6 +127,7 @@ export default function PremiumTodaySchedule({
   const [showIkhtebarOptions, setShowIkhtebarOptions] = useState(false);
   const [showMarhalaDropdown, setShowMarhalaDropdown] = useState(false);
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
   const [expandedTask, setExpandedTask] = useState(null);
   const [bodyEditId, setBodyEditId] = useState(null);
   const [bodyEditValue, setBodyEditValue] = useState("");
@@ -291,28 +292,45 @@ export default function PremiumTodaySchedule({
             </button>
             {showStudentDropdown && (
               <div className="pts-dropdown pts-student-dropdown">
-                <button
-                  className={`pts-dropdown-item ${!selectedStudentId ? "pts-active" : ""}`}
-                  onClick={() => handleStudentSelect("")}
-                >
-                  <span className="pts-dropdown-label">All Students</span>
-                  <Users size={14} className="pts-dropdown-icon" />
-                </button>
-                {students.map((s, i) => {
-                  const sid = s?.student_id || "";
-                  return (
-                    <button
-                      key={sid || i}
-                      className={`pts-dropdown-item ${String(sid).trim().toLowerCase() === String(selectedStudentId).trim().toLowerCase() ? "pts-active" : ""}`}
-                      onClick={() => handleStudentSelect(sid)}
-                    >
-                      <span className="pts-dropdown-label">{getStudentLabel(s)}</span>
-                      {s?.marhala && (
-                        <span className="pts-dropdown-sub">{MARHALA_ARABIC_LABELS[s.marhala] || s.marhala}</span>
-                      )}
-                    </button>
-                  );
-                })}
+                <div className="pts-dropdown-search">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  <input
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    placeholder="Search student…"
+                    autoFocus
+                  />
+                </div>
+                <div className="pts-dropdown-scroll">
+                  <button
+                    className={`pts-dropdown-item ${!selectedStudentId ? "pts-active" : ""}`}
+                    onClick={() => { setStudentSearch(""); handleStudentSelect(""); }}
+                  >
+                    <span className="pts-dropdown-label">All Students</span>
+                    <Users size={14} className="pts-dropdown-icon" />
+                  </button>
+                  {students
+                    .filter((s) => {
+                      const q = studentSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return String(getStudentLabel(s) || "").toLowerCase().includes(q);
+                    })
+                    .map((s, i) => {
+                    const sid = s?.student_id || "";
+                    return (
+                      <button
+                        key={sid || i}
+                        className={`pts-dropdown-item ${String(sid).trim().toLowerCase() === String(selectedStudentId).trim().toLowerCase() ? "pts-active" : ""}`}
+                        onClick={() => { setStudentSearch(""); handleStudentSelect(sid); }}
+                      >
+                        <span className="pts-dropdown-label">{getStudentLabel(s)}</span>
+                        {s?.marhala && (
+                          <span className="pts-dropdown-sub">{MARHALA_ARABIC_LABELS[s.marhala] || s.marhala}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
