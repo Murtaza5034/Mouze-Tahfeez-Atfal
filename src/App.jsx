@@ -8766,6 +8766,24 @@ function AdminPortal({
     }
   };
 
+  const handleToggleStudentGender = async (studentId, currentGender) => {
+    const nextGender = String(currentGender || "male").toLowerCase() === "female" ? "male" : "female";
+    try {
+      const { error } = await supabase
+        .from("child_profiles")
+        .update({ gender: nextGender })
+        .eq("student_id", studentId);
+      if (error) {
+        showAction("error", "Failed to update gender: " + error.message);
+        return;
+      }
+      showAction("success", nextGender === "female" ? "Marked as Girl — Uzur button now available" : "Marked as Boy");
+      loadPortalData(portalRole, user, null, { silent: true });
+    } catch (err) {
+      showAction("error", "Failed to update gender: " + (err?.message || err));
+    }
+  };
+
   const handleStudentRegistryPhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -9899,6 +9917,7 @@ const handleDownloadAllReports = async () => {
                     photo_url: formData.get("photo_url"),
                     group_name: formData.get("group_name"),
                     its: numericIts,
+                    gender: formData.get("gender") || "male",
                     is_active: true
                   }]).select().single();
 
@@ -9952,6 +9971,13 @@ const handleDownloadAllReports = async () => {
                     <span>Group / Class</span>
                     <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
                   </label>
+                  <label>
+                    <span>Gender</span>
+                    <select name="gender" className="premium-input" defaultValue="male">
+                      <option value="male">👦 Boy</option>
+                      <option value="female">👧 Girl</option>
+                    </select>
+                  </label>
                   <button type="submit" className="action-button" style={{ background: 'linear-gradient(135deg, var(--primary-gold), #a07d3a)', width: '100%', padding: '14px', fontSize: '1rem' }}>
                     <UserPlus size={18} /> Add Student to Database
                   </button>
@@ -9980,13 +10006,21 @@ const handleDownloadAllReports = async () => {
                           )}
                         </div>
                       </div>
-                      <button
-                        className="btn-text-only red"
-                        onClick={() => onDeleteRecord("child_profiles", "student_id")(s.student_id)}
-                        style={{ marginTop: '4px', alignSelf: 'flex-start' }}
-                      >
-                        <Trash2 size={14} /> Remove
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                        <button
+                          className={`gender-toggle-btn${String(s.gender || "male").toLowerCase() === "female" ? " girl" : " boy"}`}
+                          onClick={() => handleToggleStudentGender(s.student_id, s.gender)}
+                          title={String(s.gender || "male").toLowerCase() === "female" ? "Marked as Girl — click to switch to Boy" : "Click to mark as Girl (enables Uzur button)"}
+                        >
+                          {String(s.gender || "male").toLowerCase() === "female" ? "👧 Girl" : "👦 Boy"}
+                        </button>
+                        <button
+                          className="btn-text-only red"
+                          onClick={() => onDeleteRecord("child_profiles", "student_id")(s.student_id)}
+                        >
+                          <Trash2 size={14} /> Remove
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -12057,6 +12091,7 @@ const handleDownloadAllReports = async () => {
                       group_name: e.target.group_name?.value,
                       its: e.target.its?.value,
                       whatsapp_number: e.target.whatsapp_number?.value,
+                      gender: e.target.gender?.value || "male",
                     };
                     if (data.student_id) handleAssignClick(data);
                   }}>
@@ -12083,6 +12118,7 @@ const handleDownloadAllReports = async () => {
                               if (form.whatsapp_number) form.whatsapp_number.value = s.whatsapp_number || '';
                               if (form.teacher_id) form.teacher_id.value = s.muhaffiz_id || '';
                               if (form.parent_id) form.parent_id.value = s.user_id || '';
+                              if (form.gender) form.gender.value = s.gender || 'male';
                             }
                           }}
                         >
@@ -12112,6 +12148,14 @@ const handleDownloadAllReports = async () => {
                       <label>
                         <span>Group / Class</span>
                         <input name="group_name" type="text" placeholder="e.g. Group A" className="premium-input" />
+                      </label>
+
+                      <label>
+                        <span>Gender</span>
+                        <select name="gender" className="premium-select" defaultValue="male">
+                          <option value="male">👦 Boy</option>
+                          <option value="female">👧 Girl (Uzur available)</option>
+                        </select>
                       </label>
 
                       <label>
@@ -12322,6 +12366,13 @@ const handleDownloadAllReports = async () => {
                           </div>
                           <div className="child-card-actions">
                             <button
+                              className={`gender-toggle-btn${String(student.gender || "male").toLowerCase() === "female" ? " girl" : " boy"}`}
+                              onClick={() => handleToggleStudentGender(student.student_id, student.gender)}
+                              title={String(student.gender || "male").toLowerCase() === "female" ? "Marked as Girl — click to switch to Boy" : "Click to mark as Girl (enables Uzur button)"}
+                            >
+                              {String(student.gender || "male").toLowerCase() === "female" ? "👧 Girl" : "👦 Boy"}
+                            </button>
+                            <button
                               className="unassign-btn"
                               onClick={() => onUnassignChild(student.student_id)}
                               title="Unlink student"
@@ -12354,6 +12405,15 @@ const handleDownloadAllReports = async () => {
                             <strong>{student.name}</strong>
                             <p>Ready for assignment</p>
                           </div>
+                        </div>
+                        <div className="child-card-actions">
+                          <button
+                            className={`gender-toggle-btn${String(student.gender || "male").toLowerCase() === "female" ? " girl" : " boy"}`}
+                            onClick={() => handleToggleStudentGender(student.student_id, student.gender)}
+                            title={String(student.gender || "male").toLowerCase() === "female" ? "Marked as Girl — click to switch to Boy" : "Click to mark as Girl (enables Uzur button)"}
+                          >
+                            {String(student.gender || "male").toLowerCase() === "female" ? "👧 Girl" : "👦 Boy"}
+                          </button>
                         </div>
                       </article>
                     ))}
@@ -14792,6 +14852,16 @@ function TeacherPortal({
   const [leaveSubmitting, setLeaveSubmitting] = useState(false);
   const [myLeaves, setMyLeaves] = useState([]);
   const [leavesLoading, setLeavesLoading] = useState(true);
+  const [leaveCategory, setLeaveCategory] = useState("");
+  const [leaveEventId, setLeaveEventId] = useState("");
+  const [leaveFromM, setLeaveFromM] = useState(null);
+  const [leaveFromD, setLeaveFromD] = useState(null);
+  const [leaveTillM, setLeaveTillM] = useState(null);
+  const [leaveTillD, setLeaveTillD] = useState(null);
+  const [leaveCalOpen, setLeaveCalOpen] = useState(null);
+  const [leaveCalMonth, setLeaveCalMonth] = useState(1);
+  const [leaveCalHover, setLeaveCalHover] = useState(null);
+  const [teacherMiqaats, setTeacherMiqaats] = useState([]);
   const [badalAssignments, setBadalAssignments] = useState([]);
   const [badalProgress, setBadalProgress] = useState([]);
   const [badalProgressDraft, setBadalProgressDraft] = useState({});
@@ -15097,6 +15167,18 @@ function TeacherPortal({
   useEffect(() => { loadMyLeaves(); }, [teacherIdForLeave]);
 
   useEffect(() => {
+    if (activePage !== "Apply Leave") return;
+    supabase.from("miqaat_calendar").select("*").order("id").then(({ data }) => {
+      if (data) {
+        setTeacherMiqaats(data.filter((q) => {
+          const mm = Number(String(q.hijri_date || "").split("-")[0]);
+          return mm >= 1 && mm <= 7;
+        }));
+      }
+    });
+  }, [activePage]);
+
+  useEffect(() => {
     if (!teacherIdForLeave) return;
     const today = new Date().toISOString().slice(0, 10);
     supabase.from("teacher_leave_badals").select("*").eq("original_teacher_id", String(teacherIdForLeave)).eq("active", true).lte("to_date", today).then(({ data: endedBadals }) => {
@@ -15244,6 +15326,7 @@ function TeacherPortal({
             full_name: p.full_name,
             group_name: p.group_name,
             class: p.class,
+            gender: p.gender || "male",
             original_teacher_id: p.original_teacher_id || null,
             badal_teacher_id: p.badal_teacher_id || null,
             muhaffiz_id: p.teacher_id || null,
@@ -16295,6 +16378,15 @@ function TeacherPortal({
                                   >
                                     <XCircle size={16} />
                                   </button>
+                                  {String(student.gender || '').toLowerCase() === 'female' && new Date(currentDate + "T00:00:00").getDay() !== 0 && (
+                                    <button
+                                      className={`cs-dot cs-dot-uzur ${todayStatus === 'uzur' ? 'active' : ''}`}
+                                      onClick={() => { handleMarkAttendance(student.student_id, currentDate, 'uzur'); if (onShowAction) onShowAction("success", `${student.name} marked uzur (excused)`); }}
+                                      title="Mark Uzur (Excused)"
+                                    >
+                                      <strong className="cs-uzur-letter">U</strong>
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -16480,6 +16572,15 @@ function TeacherPortal({
                                   >
                                     {todayStatus === 'holiday' ? '☾' : ''} Holiday
                                   </button>
+                                  {String(student.gender || '').toLowerCase() === 'female' && (
+                                    <button
+                                      className={`att-btn uzur ${todayStatus === 'uzur' ? 'active' : ''}`}
+                                      onClick={() => handleMarkAttendance(student.student_id, currentDate, 'uzur')}
+                                      disabled={attendanceLoading}
+                                    >
+                                      {todayStatus === 'uzur' ? '♥' : ''} Uzur
+                                    </button>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -16498,11 +16599,12 @@ function TeacherPortal({
           ) : null}
 
           {activePage === "Fill Result" ? (
-            <div className="management-grid two-columns fade-in">
-              <section className="form-card card-appear">
-                <div className="card-headline">
-                  <BookOpen size={18} />
+            <div className="mark-progress-page management-grid two-columns fade-in">
+              <section className="form-card card-appear mp-form-card">
+                <div className="card-headline mp-card-headline">
+                  <span className="mp-card-icon"><BookOpen size={18} /></span>
                   <h3>Fill Tahfeez Report</h3>
+                  <span className="mp-card-badge">Mark Progress</span>
                 </div>
                 {!canTeacherFillProgress && (
                   <div className="status-banner warning" style={{ marginBottom: "16px" }}>
@@ -16520,7 +16622,8 @@ function TeacherPortal({
                   </div>
                 )}
                 <div className="stack-form">
-                  <div className="form-grid">
+                  <div className="mp-student-select">
+                    <span className="mp-student-select-icon"><User size={16} /></span>
                     <label>
                       <span>Child</span>
                       <select
@@ -16549,7 +16652,12 @@ function TeacherPortal({
                   </div>
 
                   <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
-                  <div className="form-grid four-up">
+                  <div className="mp-section">
+                    <div className="mp-section-head">
+                      <span className="mp-section-icon"><GraduationCap size={15} /></span>
+                      <h4>Memorization Scores</h4>
+                    </div>
+                    <div className="form-grid four-up">
                     <label>
                       <span>Murajah</span>
                       <input
@@ -16608,8 +16716,14 @@ function TeacherPortal({
                       />
                     </label>
                   </div>
+                  </div>
 
-                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <div className="mp-section">
+                    <div className="mp-section-head">
+                      <span className="mp-section-icon"><TrendingUp size={15} /></span>
+                      <h4>Jadeed — New Memorization</h4>
+                    </div>
+                    <div className="form-grid mp-grid-two">
 
 
                     <label>
@@ -16636,8 +16750,14 @@ function TeacherPortal({
                       </select>
                     </label>
                   </div>
+                  </div>
 
-                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                  <div className="mp-section">
+                    <div className="mp-section-head">
+                      <span className="mp-section-icon"><BookMarked size={15} /></span>
+                      <h4>Wusool — Where the child has reached</h4>
+                    </div>
+                    <div className="form-grid mp-grid-three">
                     <label>
                       <span>Wusool Juz</span>
                       <select
@@ -16680,8 +16800,14 @@ function TeacherPortal({
                       />
                     </label>
                   </div>
+                  </div>
 
-                  <div className="form-grid">
+                  <div className="mp-section">
+                    <div className="mp-section-head">
+                      <span className="mp-section-icon"><AlertCircle size={15} /></span>
+                      <h4>Issues — Matrookah &amp; Daeefah</h4>
+                    </div>
+                    <div className="form-grid">
                     <label>
                       <span>Matrookah <span className="arabic-kanz">متروكة</span></span>
                       <input
@@ -16703,8 +16829,14 @@ function TeacherPortal({
                       />
                     </label>
                   </div>
+                  </div>
 
-                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                  <div className="mp-section">
+                    <div className="mp-section-head">
+                      <span className="mp-section-icon"><CalendarClock size={15} /></span>
+                      <h4>Next Week Target</h4>
+                    </div>
+                    <div className="form-grid mp-grid-three">
                     <label>
                       <span>Next Week Juz</span>
                       <select
@@ -16747,8 +16879,14 @@ function TeacherPortal({
                       />
                     </label>
                   </div>
+                  </div>
 
-                  <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                  <div className="mp-section">
+                    <div className="mp-section-head">
+                      <span className="mp-section-icon"><Edit3 size={15} /></span>
+                      <h4>Takhteet (Istifadah)</h4>
+                    </div>
+                    <div className="form-grid mp-grid-three">
                     <label>
                       <span>Takhteet Juz</span>
                       <select
@@ -16791,8 +16929,14 @@ function TeacherPortal({
                       />
                     </label>
                   </div>
+                  </div>
 
-                  <div className="form-grid">
+                  <div className="mp-section">
+                    <div className="mp-section-head">
+                      <span className="mp-section-icon"><CalendarCheck size={15} /></span>
+                      <h4>Attendance</h4>
+                    </div>
+                    <div className="form-grid mp-grid-one">
                     <label>
                       <span>Attendance Count</span>
                       <input
@@ -16872,6 +17016,7 @@ function TeacherPortal({
                       placeholder="Behaviour, attendance, or memorization note"
                     />
                   </label>
+                  </div>
 
                   </fieldset>
                   <div className="auto-save-status">
@@ -16888,9 +17033,9 @@ function TeacherPortal({
                 </div>
               </section>
 
-              <section className="data-card">
-                <div className="card-headline">
-                  <Sparkles size={18} />
+              <section className="data-card mp-preview-card">
+                <div className="card-headline mp-card-headline">
+                  <span className="mp-card-icon"><Sparkles size={18} /></span>
                   <h3>Selected Child Preview</h3>
                 </div>
                 {selectedStudent ? (
@@ -16994,6 +17139,13 @@ function TeacherPortal({
                 const sid = selectedUniversalStudent;
                 const student = universalStudents.find(s => String(s.student_id) === sid);
                 if (!student) return null;
+                const isGirl = String(student.gender || "").toLowerCase() === "female";
+                const attKey = String(sid).trim().toLowerCase();
+                const todayAttStatus = studentAttendance[attKey]?.[currentDate] || null;
+                const markBadalAttendance = (status) => {
+                  handleMarkAttendance(student.student_id, currentDate, status);
+                  if (onShowAction) onShowAction("success", `${student.name} marked ${status === "present" ? "present" : status === "absent" ? "absent" : "uzur (excused)"}`);
+                };
                 const latestProgress = badalProgress
                   .filter(p => String(p.student_id) === sid)
                   .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -17145,7 +17297,58 @@ function TeacherPortal({
                           <span className="arabic-kanz" style={{ fontSize: "1.05rem", color: "var(--primary-gold)" }}>{student.arabic_name}</span>
                         )}
                       </div>
+                      {isGirl && new Date(currentDate + "T00:00:00").getDay() !== 0 && (
+                        <button
+                          type="button"
+                          className={`badal-info-uzur-btn${todayAttStatus === 'uzur' ? ' active' : ''}`}
+                          onClick={() => markBadalAttendance('uzur')}
+                          title="Mark Uzur (excused) — girl students"
+                        >
+                          <Heart size={13} /> Uzur
+                        </button>
+                      )}
                       <span className="badal-universal-badge">Quick Fill</span>
+                    </div>
+                    <div className="badal-attendance-row card-appear">
+                      <div className="badal-attendance-head">
+                        <span className="badal-attendance-icon"><CalendarCheck size={15} /></span>
+                        <span className="badal-attendance-label">Today's Attendance</span>
+                        <span className="badal-attendance-date">
+                          {new Date(currentDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" })}
+                        </span>
+                      </div>
+                      <div className="badal-attendance-btns">
+                        {new Date(currentDate + "T00:00:00").getDay() === 0 ? (
+                          <span className="badal-att-btn holiday" style={{ cursor: 'default', opacity: 0.7 }}>☾ Sunday (Holiday)</span>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className={`badal-att-btn present${todayAttStatus === 'present' ? ' active' : ''}`}
+                              onClick={() => markBadalAttendance('present')}
+                            >
+                              <CheckCircle size={14} /> Present
+                            </button>
+                            <button
+                              type="button"
+                              className={`badal-att-btn absent${todayAttStatus === 'absent' ? ' active' : ''}`}
+                              onClick={() => markBadalAttendance('absent')}
+                            >
+                              <XCircle size={14} /> Absent
+                            </button>
+                            {isGirl && (
+                              <button
+                                type="button"
+                                className={`badal-att-btn uzur${todayAttStatus === 'uzur' ? ' active' : ''}`}
+                                onClick={() => markBadalAttendance('uzur')}
+                                title="Excused — girl students only"
+                              >
+                                <Heart size={14} /> Uzur
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="badal-form-grid">
                       <div className="badal-field-group full-width">
@@ -17949,20 +18152,117 @@ function TeacherPortal({
             </>
           ) : null}
 
-          {activePage === "Apply Leave" ? (
-            <div className="management-grid fade-in">
+{activePage === "Apply Leave" ? (
+            <div className="management-grid fade-in teacher-leave-page">
               {(function() {
                 const teacherId = user?.id || teacherIdentity;
+                const teacherName = teacherIdentity || user?.email || "";
+                const leaveCal = getFatemiCalendarMap();
+                const leaveWeekdayStart = (m) => {
+                  const g = leaveCal.hijriToGreg[`${m}-1`];
+                  if (!g) return 0;
+                  return new Date(g + "T00:00:00Z").getUTCDay();
+                };
+                const leaveCalGrid = (() => {
+                  const days = (leaveCal.daysInMonth || {})[leaveCalMonth] || 30;
+                  const startDow = leaveWeekdayStart(leaveCalMonth);
+                  const cells = [];
+                  for (let i = 0; i < startDow; i++) cells.push(null);
+                  for (let d = 1; d <= days; d++) cells.push(d);
+                  return cells;
+                })();
+                const leaveIsSame = (m, d, tm, td) => m === tm && d === td;
+                const leaveInRange = (m, d) => {
+                  if (leaveFromM == null || leaveTillM == null) return false;
+                  const fv = leaveFromM * 100 + (leaveFromD || 0);
+                  const tv = leaveTillM * 100 + (leaveTillD || 0);
+                  const v = m * 100 + d;
+                  return v > fv && v < tv;
+                };
+                const leavePickDay = (m, d) => {
+                  const g = leaveCal.hijriToGreg[`${m}-${d}`] || "";
+                  if (leaveCalOpen === "from") {
+                    setLeaveFromM(m); setLeaveFromD(d);
+                    if (g) setLeaveFrom(g);
+                    if (leaveTillM == null || m > leaveTillM || (m === leaveTillM && d > (leaveTillD || 0))) {
+                      setLeaveTillM(m); setLeaveTillD(d);
+                      if (g) setLeaveTo(g);
+                    }
+                    setLeaveCalHover(null);
+                    setLeaveCalOpen("till");
+                  } else if (leaveCalOpen === "till") {
+                    setLeaveTillM(m); setLeaveTillD(d);
+                    if (g) setLeaveTo(g);
+                    if (leaveFromM == null || m < leaveFromM || (m === leaveFromM && d < (leaveFromD || 0))) {
+                      setLeaveFromM(m); setLeaveFromD(d);
+                      if (g) setLeaveFrom(g);
+                    }
+                    setLeaveCalHover(null);
+                    setLeaveCalOpen(null);
+                  }
+                };
+                const leaveTodayFi = (() => {
+                  const fi = getFatemiInfo(getLocalDateKey());
+                  return Number(fi.year) === FATEMI_YEAR_1448 && fi.month >= 1 && fi.month <= 7 ? fi : null;
+                })();
+                const leaveGoToday = () => {
+                  if (leaveTodayFi) {
+                    setLeaveFromM(leaveTodayFi.month); setLeaveFromD(leaveTodayFi.date);
+                    setLeaveTillM(leaveTodayFi.month); setLeaveTillD(leaveTodayFi.date);
+                    const g = leaveCal.hijriToGreg[`${leaveTodayFi.month}-${leaveTodayFi.date}`] || "";
+                    if (g) { setLeaveFrom(g); setLeaveTo(g); }
+                    setLeaveCalMonth(leaveTodayFi.month);
+                  }
+                  setLeaveCalOpen(null);
+                };
+                const leaveMiqaatsByDate = (() => {
+                  const map = {};
+                  (teacherMiqaats || []).forEach((q) => {
+                    const key = String(q.hijri_date || "");
+                    if (!map[key]) map[key] = [];
+                    map[key].push(q);
+                  });
+                  return map;
+                })();
+                const leaveLegendTypes = (() => {
+                  const seen = new Set();
+                  (teacherMiqaats || []).forEach((q) => { if (q.type) seen.add(q.type); });
+                  return [...seen];
+                })();
+                const handleLeaveCategory = (val) => {
+                  setLeaveCategory(val);
+                  if (val !== "Event") setLeaveEventId("");
+                };
+                const handleLeaveEvent = (val) => {
+                  setLeaveEventId(val);
+                  if (!val) return;
+                  const ev = teacherMiqaats.find((q) => String(q.id) === String(val));
+                  if (!ev) return;
+                  const parts = String(ev.hijri_date || "").split("-").map(Number);
+                  const mm = parts[0], dd = parts[1];
+                  if (mm >= 1 && mm <= 7 && dd >= 1) {
+                    setLeaveFromM(mm); setLeaveFromD(dd);
+                    setLeaveTillM(mm); setLeaveTillD(dd);
+                    const g = leaveCal.hijriToGreg[`${mm}-${dd}`] || "";
+                    if (g) { setLeaveFrom(g); setLeaveTo(g); }
+                    setLeaveCalMonth(mm);
+                  }
+                };
+                const leaveDaysCount = leaveFrom && leaveTo ? Math.max(0, Math.floor((new Date(leaveTo) - new Date(leaveFrom)) / 86400000) + 1) : 0;
+                const leaveValid = !!leaveCategory && !!leaveFrom && !!leaveTo && !!leaveReason && leaveReason.trim().length > 0 && (leaveCategory !== "Event" || !!leaveEventId);
+                const leaveSelectedMiqaat = teacherMiqaats.find((q) => String(q.id) === String(leaveEventId));
                 const handleLeaveSubmit = async () => {
-                  if (!leaveFrom || !leaveTo || !teacherId) return;
+                  if (!leaveValid || !teacherId) return;
                   setLeaveSubmitting(true);
-                  const teacherName = teacherIdentity || user?.email || "";
                   const { error } = await supabase.from("teacher_leaves").insert({
                     teacher_id: String(teacherId),
                     teacher_name: teacherName,
+                    category: leaveCategory,
+                    event_id: leaveEventId ? Number(leaveEventId) : null,
+                    event_name: leaveSelectedMiqaat?.name || "",
                     from_date: leaveFrom,
                     to_date: leaveTo,
-                    reason: leaveReason,
+                    reason: leaveReason.trim(),
                     status: "pending"
                   });
                   setLeaveSubmitting(false);
@@ -17972,174 +18272,246 @@ function TeacherPortal({
                     if (onShowAction) onShowAction("success", "Leave application submitted!");
                     broadcastNotification(
                       "Leave Application",
-                      `${teacherName} applied for leave (${leaveFrom} → ${leaveTo})${leaveReason ? `: ${leaveReason}` : ""}`,
-                      "admin",
-                      null,
-                      "Teacher Leaves"
+                      `${teacherName} ${leaveCategory} leave (${leaveFrom} → ${leaveTo})${leaveSelectedMiqaat ? ` · ${leaveSelectedMiqaat.name}` : ""}: ${leaveReason.trim()}`,
+                      "admin", null, "Teacher Leaves"
                     );
-                    setLeaveFrom("");
-                    setLeaveTo("");
-                    setLeaveReason("");
+                    setLeaveCategory(""); setLeaveEventId("");
+                    setLeaveFrom(""); setLeaveTo(""); setLeaveReason("");
+                    setLeaveFromM(null); setLeaveFromD(null); setLeaveTillM(null); setLeaveTillD(null);
                     loadMyLeaves();
                   }
                 };
 
-                const daysCount = leaveFrom && leaveTo ? Math.max(0, Math.floor((new Date(leaveTo) - new Date(leaveFrom)) / 86400000) + 1) : 0;
-
                 return (
-                  <section className="form-card card-appear" style={{ width: '100%', padding: '0', overflow: 'hidden', borderRadius: '16px' }}>
-                    <div style={{
-                      background: 'linear-gradient(135deg, #fcf8f0, #f5edd9)',
-                      padding: '24px 28px 20px',
-                      borderBottom: '2px solid #d4c9b0',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{
-                          width: '44px', height: '44px', borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #d4af37, #b8860b)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                        }}>
-                          <CalendarX size={22} color="#fff" />
-                        </div>
-                        <div>
-                          <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.15rem', fontWeight: 700 }}>Apply for Leave</h3>
-                          <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--soft-brown)' }}>Submit a leave request for admin approval</p>
-                        </div>
+                  <section className="form-card card-appear teacher-leave-card" style={{ width: '100%', padding: '0', overflow: 'hidden', borderRadius: '16px' }}>
+                    <div className="tl-card-head">
+                      <div className="tl-card-head-icon">
+                        <CalendarX size={22} color="#fff" />
                       </div>
+                      <div>
+                        <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.15rem', fontWeight: 700 }}>Apply for Leave</h3>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--soft-brown)' }}>Submit a leave request for admin approval</p>
+                      </div>
+                      <span className="tl-portal-badge">Teacher</span>
                     </div>
 
                     <div style={{ padding: '24px 28px' }}>
-                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                        <label style={{ flex: '1', minWidth: '180px' }}>
-                          <span style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.8rem', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>From Date</span>
-                          <input type="date" className="premium-input" value={leaveFrom} max={leaveTo || undefined} onChange={e => setLeaveFrom(e.target.value)}
-                            style={{ padding: '12px 14px', borderRadius: '10px', border: '2px solid #e0d8cc', fontSize: '0.9rem', width: '100%', background: '#fff', color: 'var(--deep-brown)', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' }}
-                            onFocus={e => e.target.style.borderColor = 'var(--primary-gold)'}
-                            onBlur={e => e.target.style.borderColor = '#e0d8cc'}
-                          />
-                        </label>
-                        <label style={{ flex: '1', minWidth: '180px' }}>
-                          <span style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.8rem', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>To Date</span>
-                          <input type="date" className="premium-input" value={leaveTo} min={leaveFrom || undefined} onChange={e => setLeaveTo(e.target.value)}
-                            style={{ padding: '12px 14px', borderRadius: '10px', border: '2px solid #e0d8cc', fontSize: '0.9rem', width: '100%', background: '#fff', color: 'var(--deep-brown)', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' }}
-                            onFocus={e => e.target.style.borderColor = 'var(--primary-gold)'}
-                            onBlur={e => e.target.style.borderColor = '#e0d8cc'}
-                          />
-                        </label>
+                      <div className="tl-cat-row">
+                        <label className="tl-label">Leave Category <em>*</em></label>
+                        <select className="premium-select tl-select" value={leaveCategory} onChange={(e) => handleLeaveCategory(e.target.value)}>
+                          <option value="">-- Select Leave Category --</option>
+                          <option value="Sick Leave">🤒 Sick Leave</option>
+                          <option value="Personal Leave">🧑 Personal Leave</option>
+                          <option value="Event">🕌 Event / Miqaat</option>
+                          <option value="Uzur">🚶 Uzur (Excused)</option>
+                          <option value="Other">📝 Other</option>
+                        </select>
                       </div>
-                      {daysCount > 0 && (
-                        <div style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '8px',
-                          padding: '6px 16px', borderRadius: '20px', marginBottom: '18px',
-                          background: 'linear-gradient(135deg, #fcf8f0, #f5edd9)',
-                          border: '1px solid #d4c9b0',
-                        }}>
-                          <Calendar size={14} style={{ color: 'var(--primary-gold)' }} />
-                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--deep-brown)' }}>
-                            {daysCount} day{daysCount > 1 ? 's' : ''} of leave
-                          </span>
+
+                      <div className="fdr-block">
+                        <span className="tl-label">Leave Dates (Fatemi Calendar 1448) <em>*</em></span>
+                        <div className="fdr-grid">
+                          <div className="fdr-col">
+                            <span className="fdr-label">From</span>
+                            <button type="button" className={`fdr-cal-trigger ${leaveCalOpen === "from" ? "active" : ""}`}
+                              onClick={() => { setLeaveCalMonth(leaveFromM || 1); setLeaveCalOpen(leaveCalOpen === "from" ? null : "from"); }}>
+                              <span className="fdr-cal-trigger-icon"><CalendarCheck size={16} /></span>
+                              <span className="fdr-cal-trigger-text">{leaveFromM && leaveFromD ? fatemiDateLabel(leaveFromM, leaveFromD) : "Select From"}</span>
+                              <span className="fdr-cal-trigger-caret"><ChevronDown size={15} /></span>
+                            </button>
+                          </div>
+                          <span className="fdr-arrow"><ArrowRight size={18} /></span>
+                          <div className="fdr-col">
+                            <span className="fdr-label">Till</span>
+                            <button type="button" className={`fdr-cal-trigger ${leaveCalOpen === "till" ? "active" : ""}`}
+                              onClick={() => { setLeaveCalMonth(leaveTillM || leaveFromM || 1); setLeaveCalOpen(leaveCalOpen === "till" ? null : "till"); }}>
+                              <span className="fdr-cal-trigger-icon"><CalendarCheck size={16} /></span>
+                              <span className="fdr-cal-trigger-text">{leaveTillM && leaveTillD ? fatemiDateLabel(leaveTillM, leaveTillD) : "Select Till"}</span>
+                              <span className="fdr-cal-trigger-caret"><ChevronDown size={15} /></span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {leaveCalOpen && createPortal(
+                          <div className="fdr-cal-overlay" onClick={() => setLeaveCalOpen(null)}>
+                            <div className="fdr-cal-modal card-appear" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                              <div className="fdr-cal-modal-head">
+                                <div className="fdr-cal-modal-title">
+                                  <span className="fdr-cal-modal-title-icon"><CalendarClock size={18} /></span>
+                                  <div>
+                                    <span className="fdr-cal-modal-title-main">{leaveCalOpen === "from" ? "Select From Date" : "Select Till Date"}</span>
+                                    <span className="fdr-cal-modal-title-sub">Fatemi Calendar 1448 AH · {FATEMI_MONTHS_1448.find((mo) => mo.m === leaveCalMonth)?.en}</span>
+                                  </div>
+                                </div>
+                                <button type="button" className="fdr-cal-modal-close" onClick={() => setLeaveCalOpen(null)} aria-label="Close calendar"><X size={18} /></button>
+                              </div>
+                              <div className="fdr-cal-head">
+                                <button type="button" className="fdr-cal-nav" onClick={() => setLeaveCalMonth((m) => Math.max(1, m - 1))} disabled={leaveCalMonth <= 1}><ChevronLeft size={17} /></button>
+                                <div className="fdr-cal-title">
+                                  <span className="fdr-cal-title-en">{FATEMI_MONTHS_1448.find((mo) => mo.m === leaveCalMonth)?.en}</span>
+                                  <span className="fdr-cal-title-ar" dir="rtl">{FATEMI_MONTHS_1448.find((mo) => mo.m === leaveCalMonth)?.ar}</span>
+                                  <span className="fdr-cal-title-year">{FATEMI_YEAR_1448} AH</span>
+                                </div>
+                                <button type="button" className="fdr-cal-nav" onClick={() => setLeaveCalMonth((m) => Math.min(7, m + 1))} disabled={leaveCalMonth >= 7}><ChevronRight size={17} /></button>
+                              </div>
+                              <div className="fdr-cal-week">
+                                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((w) => <span key={w} className="fdr-cal-wd">{w}</span>)}
+                              </div>
+                              <div className="fdr-cal-grid">
+                                {leaveCalGrid.map((d, idx) => {
+                                  if (d === null) return <span key={`e${idx}`} className="fdr-cal-empty" />;
+                                  const mqList = leaveMiqaatsByDate[`${String(leaveCalMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`] || [];
+                                  const isFrom = leaveIsSame(leaveCalMonth, d, leaveFromM, leaveFromD);
+                                  const isTill = leaveIsSame(leaveCalMonth, d, leaveTillM, leaveTillD);
+                                  const inRange = leaveInRange(leaveCalMonth, d);
+                                  const isHover = leaveCalHover && leaveCalHover.m === leaveCalMonth && leaveCalHover.d === d;
+                                  const isToday = leaveTodayFi && leaveTodayFi.month === leaveCalMonth && leaveTodayFi.date === d;
+                                  const mqStyle = mqList.length ? getMiqaatStyle(mqList[0].type) : null;
+                                  const cls = [
+                                    "fdr-cal-day",
+                                    mqList.length ? "has-miqaat" : "",
+                                    isFrom ? "is-from" : "",
+                                    isTill ? "is-till" : "",
+                                    isToday && !isFrom && !isTill ? "is-today" : "",
+                                    ((inRange || isHover) && !isFrom && !isTill) ? "in-range" : "",
+                                  ].filter(Boolean).join(" ");
+                                  return (
+                                    <button key={d} type="button" className={cls} onClick={() => leavePickDay(leaveCalMonth, d)}
+                                      onMouseEnter={() => setLeaveCalHover({ m: leaveCalMonth, d })}
+                                      onMouseLeave={() => setLeaveCalHover(null)}>
+                                      <span className="fdr-cal-num">{d}</span>
+                                      {mqList.length > 0 && mqStyle && (
+                                        <span className="fdr-cal-miqaat" style={{ color: mqStyle.color, background: mqStyle.bg, borderColor: `${mqStyle.color}55` }}
+                                          title={mqList.map((q) => `${q.name} · ${q.type}`).join("\n")}>
+                                          <span className="fdr-cal-miqaat-dot" style={{ background: mqStyle.color }} />
+                                          {shortMiqaatType(mqList[0].type)}{mqList.length > 1 ? ` +${mqList.length - 1}` : ""}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {leaveLegendTypes.length > 0 && (
+                                <div className="fdr-cal-legend">
+                                  {leaveLegendTypes.map((t) => {
+                                    const s = getMiqaatStyle(t);
+                                    return (
+                                      <span key={t} className="fdr-cal-legend-item">
+                                        <span className="fdr-cal-legend-dot" style={{ background: s.color }} />
+                                        {shortMiqaatType(t)}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              <div className="fdr-cal-foot">
+                                <button type="button" className="fdr-cal-today" onClick={leaveGoToday}><Clock size={13} /> Today</button>
+                                <span className="fdr-cal-foot-hint">{leaveCalOpen === "from" ? "Tap a date to set From" : "Tap a date to set Till"}</span>
+                                <button type="button" className="fdr-cal-done" onClick={() => setLeaveCalOpen(null)}>Done</button>
+                              </div>
+                            </div>
+                          </div>,
+                          document.body
+                        )}
+
+                        <p className="fdr-preview">
+                          {leaveFromM && leaveFromD ? fatemiDateLabel(leaveFromM, leaveFromD) : ""}
+                          {leaveTillM && leaveTillD && (leaveFromM !== leaveTillM || leaveFromD !== leaveTillD) ? ` → ${fatemiDateLabel(leaveTillM, leaveTillD)}` : ""}
+                        </p>
+                      </div>
+
+                      {leaveCategory === "Event" && (
+                        <div className="fatemi-miqaat-box card-appear tl-miqaat-box">
+                          <div className="fmq-head">
+                            <School size={18} />
+                            <span>Select Miqaat Event</span>
+                          </div>
+                          <select className="premium-select" value={leaveEventId} onChange={(e) => handleLeaveEvent(e.target.value)}>
+                            <option value="">-- Choose a Miqaat --</option>
+                            {teacherMiqaats.map((q) => (
+                              <option key={q.id} value={q.id}>{q.name} ({q.type} · {q.hijri_date} 1448)</option>
+                            ))}
+                          </select>
+                          {leaveEventId && (
+                            <p className="fmq-hint">Dates set automatically for <strong>{leaveSelectedMiqaat?.name}</strong>.</p>
+                          )}
                         </div>
                       )}
 
-                      <label style={{ display: 'block', marginBottom: '20px' }}>
-                        <span style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.8rem', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Reason <span style={{ fontWeight: 400, color: 'var(--soft-brown)', textTransform: 'none' }}>(optional)</span></span>
-                        <textarea value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="Tell admin why you need leave..."
-                          style={{
-                            width: '100%', padding: '12px 14px', borderRadius: '10px', border: '2px solid #e0d8cc',
-                            fontSize: '0.9rem', background: '#fff', color: 'var(--deep-brown)',
-                            resize: 'vertical', minHeight: '70px', outline: 'none', transition: 'border-color 0.2s',
-                            fontFamily: 'inherit',
-                          }}
-                          onFocus={e => e.target.style.borderColor = 'var(--primary-gold)'}
-                          onBlur={e => e.target.style.borderColor = '#e0d8cc'}
-                        />
-                      </label>
+                      {leaveDaysCount > 0 && (
+                        <div className="tl-days-chip">
+                          <Calendar size={14} />
+                          <span>{leaveDaysCount} day{leaveDaysCount > 1 ? 's' : ''} of leave</span>
+                        </div>
+                      )}
 
-                      <button onClick={handleLeaveSubmit} disabled={leaveSubmitting || !leaveFrom || !leaveTo}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                          width: '100%', padding: '14px 24px', borderRadius: '12px', border: 'none',
-                          background: leaveFrom && leaveTo && !leaveSubmitting
-                            ? 'linear-gradient(135deg, #d4af37, #b8860b)'
-                            : 'linear-gradient(135deg, #e8e0d4, #d4c9b0)',
-                          color: leaveFrom && leaveTo && !leaveSubmitting ? '#fff' : '#aaa',
-                          fontWeight: 700, fontSize: '1rem', cursor: leaveFrom && leaveTo && !leaveSubmitting ? 'pointer' : 'default',
-                          transition: 'all 0.25s', marginBottom: '32px',
-                          boxShadow: leaveFrom && leaveTo && !leaveSubmitting ? '0 4px 16px rgba(212,175,55,0.25)' : 'none',
-                        }}
-                        onMouseEnter={e => { if (!leaveSubmitting && leaveFrom && leaveTo) e.target.style.transform = 'translateY(-1px)'; }}
-                        onMouseLeave={e => e.target.style.transform = 'none'}
-                      >
+                      <label className="tl-label tl-reason-label" style={{ display: 'block', marginBottom: '6px' }}>
+                        Reason <em>*</em>
+                      </label>
+                      <textarea value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)}
+                        className="tl-reason-input" rows={3}
+                        placeholder={`Explain your ${leaveCategory ? leaveCategory.toLowerCase() : "leave"} reason...`} />
+
+                      <button onClick={handleLeaveSubmit} disabled={leaveSubmitting || !leaveValid} className="tl-submit">
                         {leaveSubmitting ? (
-                          <><Loader2 size={18} className="animate-spin" /> Submitting...</>
+                          <><Loader2 size={20} className="animate-spin" /> Submitting...</>
                         ) : (
-                          <><CalendarCheck size={20} /> {daysCount > 0 ? `Submit Leave (${daysCount} day${daysCount > 1 ? 's' : ''})` : 'Submit Leave'}</>
+                          <><CalendarCheck size={20} /> {leaveValid ? `Submit Leave (${leaveDaysCount} day${leaveDaysCount > 1 ? 's' : ''})` : 'Complete the required fields'}</>
                         )}
                       </button>
 
-                      <div style={{
-                        borderTop: '2px solid #f0e8d8', paddingTop: '20px',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                          <div style={{ width: '3px', height: '18px', borderRadius: '2px', background: 'linear-gradient(180deg, #d4af37, #b8860b)' }} />
-                          <h4 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '0.95rem', fontWeight: 700 }}>Leave History</h4>
+                      <div className="tl-history">
+                        <div className="tl-history-head">
+                          <div className="tl-history-title">
+                            <div className="tl-history-accent" />
+                            <h4 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '0.95rem', fontWeight: 700 }}>Leave History</h4>
+                          </div>
+                          {myLeaves.length > 0 && <span className="tl-history-count">{myLeaves.length}</span>}
                         </div>
                         {leavesLoading ? (
-                          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} />
+                          <div className="tl-history-empty">
+                            <Loader2 size={20} className="animate-spin" />
                           </div>
                         ) : myLeaves.length === 0 ? (
-                          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                          <div className="tl-history-empty">
                             <CalendarX size={28} style={{ opacity: 0.3, marginBottom: '8px' }} />
                             <div>No leave applications yet.</div>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div className="tl-history-list">
                             {myLeaves.map(lv => {
                               const statusColors = {
                                 pending: { bg: '#fff3cd', text: '#856404', border: '#ffeeba', icon: '⏳', label: 'Pending' },
                                 approved: { bg: '#d4edda', text: '#155724', border: '#c3e6cb', icon: '✓', label: 'Approved' },
                                 rejected: { bg: '#f8d7da', text: '#721c24', border: '#f5c6cb', icon: '✕', label: 'Rejected' },
+                                subject_to_approve: { bg: '#e2e3f9', text: '#3f3f8f', border: '#c9c9ef', icon: '⏱', label: 'Subject to Approve' },
                               };
                               const sc = statusColors[lv.status] || statusColors.pending;
                               const fromD = new Date(lv.from_date);
                               const toD = new Date(lv.to_date);
                               const lvDays = Math.max(0, Math.floor((toD - fromD) / 86400000) + 1);
                               return (
-                                <div key={lv.id} style={{
-                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                  padding: '14px 16px', borderRadius: '12px',
-                                  background: '#faf8f5', border: '1px solid #eee',
-                                  transition: 'all 0.2s',
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                                    <div style={{
-                                      width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                      background: sc.bg, border: `1px solid ${sc.border}`,
-                                      fontSize: '1rem',
-                                    }}>
+                                <div key={lv.id} className="tl-hist-item" style={{ borderLeft: `4px solid ${sc.border}` }}>
+                                  <div className="tl-hist-left">
+                                    <div className="tl-hist-icon" style={{ background: sc.bg, border: `1px solid ${sc.border}` }}>
                                       {sc.icon}
                                     </div>
-                                    <div>
-                                      <div style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '0.88rem' }}>
+                                    <div className="tl-hist-mid">
+                                      <div className="tl-hist-dates">
                                         {new Date(lv.from_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {new Date(lv.to_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                       </div>
-                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '3px' }}>
-                                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--primary-gold)', background: '#fcf8f0', padding: '2px 8px', borderRadius: '4px' }}>{lvDays} day{lvDays > 1 ? 's' : ''}</span>
-                                        {lv.reason && <span style={{ fontSize: '0.78rem', color: 'var(--soft-brown)' }}>{lv.reason.length > 30 ? lv.reason.substring(0, 30) + '…' : lv.reason}</span>}
+                                      <div className="tl-hist-meta">
+                                        {lv.category && <span className="tl-cat-chip">{lv.category}</span>}
+                                        {lv.event_name && <span className="tl-event-chip">🕌 {lv.event_name}</span>}
+                                        <span className="tl-day-chip">{lvDays} day{lvDays > 1 ? 's' : ''}</span>
+                                        {lv.reason && <span className="tl-reason-text">{lv.reason.length > 34 ? lv.reason.substring(0, 34) + '…' : lv.reason}</span>}
                                       </div>
                                       {lv.admin_comment && (
-                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic', padding: '4px 8px', background: '#f5f5f5', borderRadius: '6px', display: 'inline-block' }}>
-                                          Admin: {lv.admin_comment}
-                                        </div>
+                                        <div className="tl-admin-comment">Admin: {lv.admin_comment}</div>
                                       )}
                                     </div>
                                   </div>
-                                  <span style={{
-                                    padding: '5px 14px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
-                                    background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`,
-                                  }}>{sc.label}</span>
+                                  <span className="tl-status-pill" style={{ background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>{sc.label}</span>
                                 </div>
                               );
                             })}
@@ -20909,7 +21281,7 @@ const handleSendCustomNotification = async (event) => {
    *   Badal teacher = can EDIT progress; Original teacher = can VIEW only (read-only for badal data)
    */
   const handleAssignChild = async (data) => {
-    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number, original_teacher_id, badal_teacher_id } = data;
+    const { student_id, teacher_id, parent_id, full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number, gender, original_teacher_id, badal_teacher_id } = data;
     if (!student_id) {
       return { ok: false, message: "Please select a student first." };
     }
@@ -20941,7 +21313,7 @@ const handleSendCustomNotification = async (event) => {
 
     // Editable profile fields: apply them whenever they come from the form
     // (even empty values, so cleared fields are saved properly instead of being skipped).
-    const editableFields = { full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number };
+    const editableFields = { full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number, gender };
     Object.entries(editableFields).forEach(([key, value]) => {
       if (value === undefined) return;
       const trimmed = typeof value === 'string' ? value.trim() : '';
@@ -21015,6 +21387,7 @@ const handleSendCustomNotification = async (event) => {
             groupName: group_name !== undefined ? (String(group_name || '').trim() || "Ungrouped") : s.groupName,
             photoUrl: photo_url !== undefined ? (String(photo_url || '').trim() || "") : s.photoUrl,
             whatsapp_number: whatsapp_number !== undefined ? (String(whatsapp_number || '').trim() || "") : s.whatsapp_number,
+            gender: gender !== undefined ? (String(gender || '').trim() || "male") : s.gender,
             hifz: {
               ...(s.hifz || {}),
               juz: juz !== undefined ? (String(juz || '').trim() || "N-A") : ((s.hifz && s.hifz.juz) || "N-A"),
@@ -22006,7 +22379,6 @@ function QuickAccessPagesUI({ supabase: sb }) {
     </div>
   );
 }
-
 
 
 

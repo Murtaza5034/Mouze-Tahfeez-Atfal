@@ -4588,6 +4588,7 @@ body {
 .badal-card-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 14px;
   margin-bottom: 20px;
   padding-bottom: 16px;
@@ -10368,4 +10369,1107 @@ h4.attendance-rating-text,
   0% { transform: scale(0.8); opacity: 0; }
   50% { transform: scale(1.05); }
   100% { transform: scale(1); opacity: 1; }
+}
+
+/* ===== Premium Boy/Girl gender toggle (Student Registry + Assignment Hub cards) ===== */
+.gender-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1.5px solid #c5a059;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  color: #5d4037;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  white-space: nowrap;
+}
+
+.gender-toggle-btn:hover {
+  transform: translateY(-1px);
+  border-color: #8e24aa;
+  color: #8e24aa;
+  box-shadow: 0 0 12px rgba(142,36,170,0.18);
+}
+
+.gender-toggle-btn.girl {
+  background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+  border-color: #8e24aa;
+  color: #6a1b9a;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(142,36,170,0.25);
+}
+
+.gender-toggle-btn.boy {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  border-color: #1565c0;
+  color: #0d47a1;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(21,101,192,0.22);
+}
+
+/* ===== Quick Panel Uzur dot (girls only) ===== */
+.cs-dot-uzur {
+  border-color: rgba(142, 36, 170, 0.25);
+}
+
+.cs-dot-uzur:hover {
+  background: rgba(142, 36, 170, 0.12);
+  border-color: #8e24aa;
+  color: #8e24aa;
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(142, 36, 170, 0.3);
+}
+
+.cs-dot-uzur.active {
+  background: #8e24aa;
+  border-color: #8e24aa;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(142, 36, 170, 0.4);
+}
+
+.cs-uzur-letter {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  font-family: inherit;
+}
+
+/* ===== Badal Entry premium attendance buttons (Present / Absent / Uzur) ===== */
+.badal-attendance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255,254,251,0.98), rgba(248,239,216,0.75));
+  border: 1px solid rgba(183,137,31,0.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 8px 22px rgba(61,43,31,0.07);
+}
+
+.badal-attendance-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badal-attendance-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  color: var(--primary-gold, #d4af37);
+  background: linear-gradient(145deg, rgba(212,175,55,0.18), rgba(255,255,255,0.75));
+  border: 1px solid rgba(212,175,55,0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+.badal-attendance-label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--deep-brown, #3e2723);
+}
+
+.badal-attendance-date {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted, #8a786a);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(212,175,55,0.1);
+  border: 1px solid rgba(212,175,55,0.16);
+}
+
+.badal-attendance-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badal-att-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 1.5px solid #c5a059;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  color: #5d4037;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.badal-att-btn:hover {
+  transform: translateY(-1px);
+}
+
+.badal-att-btn.present:hover:not(.active) {
+  background: #f0fdf0;
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+
+.badal-att-btn.present.active {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-color: #2e7d32;
+  color: #1b5e20;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(46,125,50,0.28);
+}
+
+.badal-att-btn.absent:hover:not(.active) {
+  background: #fdf0f0;
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.badal-att-btn.absent.active {
+  background: linear-gradient(135deg, #fde8e8, #ffcdd2);
+  border-color: #c62828;
+  color: #b71c1c;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(198,40,40,0.28);
+}
+
+.badal-att-btn.uzur:hover:not(.active) {
+  background: #faf0ff;
+  border-color: #8e24aa;
+  color: #8e24aa;
+}
+
+.badal-att-btn.uzur.active {
+  background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+  border-color: #8e24aa;
+  color: #6a1b9a;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(142,36,170,0.28);
+}
+
+/* Uzur quick button on the Badal Entry student info card header (girls only) */
+.badal-info-uzur-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1.5px solid #c5a059;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  color: #8e24aa;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.badal-info-uzur-btn:hover {
+  background: #f3e5f5;
+  transform: translateY(-1px);
+}
+
+.badal-info-uzur-btn.active {
+  background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+  border-color: #8e24aa;
+  color: #6a1b9a;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(142,36,170,0.28);
+}
+
+/* Uzur button on the Attendance page student cards (girls only) */
+.att-btn.uzur:hover:not(:disabled) {
+  background: #faf0ff;
+  border-color: #8e24aa;
+  color: #8e24aa;
+}
+
+.att-btn.uzur.active {
+  background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+  border-color: #8e24aa;
+  color: #6a1b9a;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06), 0 0 12px rgba(142,36,170,0.28);
+}
+
+@media (max-width: 640px) {
+  .badal-attendance-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .badal-attendance-btns {
+    width: 100%;
+  }
+  .badal-att-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+
+/* ============================================================
+   PREMIUM MARK PROGRESS (Fill Result) — Teacher Portal
+   Scoped to .mark-progress-page so no other page is affected
+   ============================================================ */
+
+.mark-progress-page.management-grid.two-columns {
+  align-items: start;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  gap: 24px;
+}
+
+.mark-progress-page .form-card,
+.mark-progress-page .data-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  border: 1px solid rgba(197, 160, 89, 0.28);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(197, 160, 89, 0.09), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #fffdf7 100%);
+  box-shadow:
+    0 24px 60px rgba(61, 43, 31, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  transition: box-shadow 0.35s ease, border-color 0.35s ease, transform 0.35s ease;
+}
+
+.mark-progress-page .form-card:hover,
+.mark-progress-page .data-card:hover {
+  border-color: rgba(197, 160, 89, 0.5);
+  box-shadow:
+    0 28px 70px rgba(61, 43, 31, 0.14),
+    0 8px 24px rgba(197, 160, 89, 0.18),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+.mark-progress-page .form-card::before,
+.mark-progress-page .data-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 1;
+  background: linear-gradient(90deg, var(--primary-gold) 0%, var(--accent-gold) 50%, var(--primary-gold) 100%);
+  opacity: 0.95;
+}
+
+.mark-progress-page .form-card::after,
+.mark-progress-page .data-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 140px;
+  height: 140px;
+  border-radius: 0 0 0 100%;
+  background: radial-gradient(circle at top right, rgba(212, 175, 55, 0.16), transparent 72%);
+  pointer-events: none;
+}
+
+/* ---- Card headlines ---- */
+.mark-progress-page .mp-card-headline {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px dashed rgba(197, 160, 89, 0.4);
+}
+
+.mark-progress-page .mp-card-icon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: #fffdf6;
+  background: linear-gradient(135deg, var(--accent-gold) 0%, var(--dark-gold) 100%);
+  box-shadow: 0 8px 18px rgba(197, 160, 89, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.mark-progress-page .mp-card-headline h3 {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--deep-brown);
+}
+
+.mark-progress-page .mp-card-badge {
+  margin-left: auto;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dark-gold);
+  background: linear-gradient(135deg, var(--light-gold), #f3e8cd);
+  border: 1px solid rgba(197, 160, 89, 0.35);
+  padding: 6px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(197, 160, 89, 0.12);
+}
+
+/* ---- Status banners ---- */
+.mark-progress-page .status-banner {
+  position: relative;
+  z-index: 2;
+  margin-top: 0;
+  margin-bottom: 18px;
+  border-radius: 15px;
+  padding: 13px 16px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.mark-progress-page .status-banner.warning {
+  background: linear-gradient(135deg, #fff8e6 0%, #fdf0cd 100%);
+  color: #966c13;
+  border: 1px solid rgba(197, 160, 89, 0.4);
+  box-shadow: 0 10px 24px rgba(197, 160, 89, 0.16);
+}
+
+.mark-progress-page .status-banner.success {
+  background: linear-gradient(135deg, #f0fbf2 0%, #def1e0 100%);
+  color: #1c7c3b;
+  border: 1px solid rgba(28, 124, 59, 0.24);
+  box-shadow: 0 10px 24px rgba(28, 124, 59, 0.1);
+}
+
+/* ---- Student selector (hero) ---- */
+.mp-student-select {
+  position: relative;
+  z-index: 2;
+  padding: 14px 16px;
+  margin-bottom: 6px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fff9ec 0%, #f6ecd2 100%);
+  border: 1px solid rgba(197, 160, 89, 0.35);
+  box-shadow: 0 10px 26px rgba(197, 160, 89, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.mp-student-select-icon {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: var(--dark-gold);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(197, 160, 89, 0.3);
+  box-shadow: 0 4px 10px rgba(197, 160, 89, 0.14);
+}
+
+.mp-student-select label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mp-student-select label > span:first-child {
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--soft-brown);
+}
+
+.mp-student-select .premium-select {
+  border-radius: 13px;
+  border-color: rgba(197, 160, 89, 0.4);
+  background-color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--deep-brown);
+  box-shadow: 0 4px 12px rgba(61, 43, 31, 0.06);
+}
+
+/* ---- Section groups ---- */
+.mp-section {
+  position: relative;
+  z-index: 2;
+  padding: 14px 16px 18px;
+  margin-bottom: 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fdfbf5 0%, #faf5e8 100%);
+  border: 1px solid rgba(197, 160, 89, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.mp-section::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--accent-gold), var(--primary-gold));
+  box-shadow: 0 0 12px rgba(197, 160, 89, 0.4);
+}
+
+.mp-section-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed rgba(197, 160, 89, 0.32);
+}
+
+.mp-section-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--dark-gold);
+  background: linear-gradient(135deg, #fdf6e3 0%, #f3e7c6 100%);
+  border: 1px solid rgba(197, 160, 89, 0.32);
+}
+
+.mp-section-head h4 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--deep-brown);
+}
+
+.mp-grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mp-grid-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mp-grid-one { grid-template-columns: 1fr; }
+
+/* ---- Premium inputs ---- */
+.mark-progress-page .stack-form label {
+  color: var(--soft-brown);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.mark-progress-page .stack-form label > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mark-progress-page .stack-form input,
+.mark-progress-page .stack-form select,
+.mark-progress-page .stack-form textarea {
+  border-radius: 13px;
+  border: 1px solid rgba(197, 160, 89, 0.3);
+  background: #fffefa;
+  color: var(--text-main);
+  font-weight: 600;
+  box-shadow: inset 0 1px 2px rgba(61, 43, 31, 0.04);
+  transition: all 0.25s ease;
+}
+
+.mark-progress-page .stack-form input:hover:not(:disabled),
+.mark-progress-page .stack-form select:hover:not(:disabled),
+.mark-progress-page .stack-form textarea:hover:not(:disabled) {
+  border-color: rgba(197, 160, 89, 0.55);
+}
+
+.mark-progress-page .stack-form input:focus,
+.mark-progress-page .stack-form select:focus,
+.mark-progress-page .stack-form textarea:focus {
+  outline: none;
+  border-color: var(--primary-gold);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(197, 160, 89, 0.15), inset 0 1px 2px rgba(61, 43, 31, 0.03);
+}
+
+.mark-progress-page .stack-form input:disabled,
+.mark-progress-page .stack-form select:disabled,
+.mark-progress-page .stack-form textarea:disabled {
+  opacity: 0.6;
+  background: #faf7f0;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+
+.mark-progress-page .premium-select {
+  border-radius: 13px;
+  border-color: rgba(197, 160, 89, 0.3);
+  background-color: #fffefa;
+}
+
+.mark-progress-page .premium-select:focus {
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 4px rgba(197, 160, 89, 0.15);
+}
+
+/* ---- Attendance mini (premium gold) ---- */
+.mark-progress-page .att-week-mini {
+  margin: 4px 0 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(197, 160, 89, 0.28);
+  background: linear-gradient(135deg, #fffdf5 0%, #faf3e0 100%);
+  box-shadow: 0 8px 20px rgba(197, 160, 89, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.mark-progress-page .att-week-mini-title {
+  font-size: 0.76rem;
+  color: var(--soft-brown);
+}
+
+.mark-progress-page .att-week-mini-title strong {
+  color: var(--deep-brown);
+}
+
+.mark-progress-page .att-week-day {
+  background: #ffffff;
+  border-color: #e9e0c8;
+  box-shadow: 0 2px 6px rgba(61, 43, 31, 0.05);
+}
+
+.mark-progress-page .att-week-day:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(197, 160, 89, 0.2);
+  border-color: var(--primary-gold);
+}
+
+/* ---- Auto-save status ---- */
+.mark-progress-page .auto-save-status {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.mark-progress-page .save-status-validation,
+.mark-progress-page .save-status-saving,
+.mark-progress-page .save-status-saved,
+.mark-progress-page .save-status-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.mark-progress-page .save-status-validation {
+  color: #966c13;
+  background: linear-gradient(135deg, #fff8e6, #fbeecb);
+  border: 1px solid rgba(197, 160, 89, 0.4);
+}
+
+.mark-progress-page .save-status-saving {
+  color: var(--soft-brown);
+  background: linear-gradient(135deg, #f5f0e6, #ece3d2);
+  border: 1px solid rgba(197, 160, 89, 0.3);
+  animation: mpPulse 1.2s ease-in-out infinite;
+}
+
+.mark-progress-page .save-status-saved {
+  color: #1c7c3b;
+  background: linear-gradient(135deg, #eefbea, #d9f0d3);
+  border: 1px solid rgba(28, 124, 59, 0.28);
+  box-shadow: 0 6px 16px rgba(28, 124, 59, 0.12);
+}
+
+.mark-progress-page .save-status-error {
+  color: #c33838;
+  background: linear-gradient(135deg, #fff1f1, #f9dede);
+  border: 1px solid rgba(195, 56, 56, 0.3);
+}
+
+@keyframes mpPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ---- Student profile hero (preview) ---- */
+.mark-progress-page .student-profile-hero {
+  position: relative;
+  z-index: 2;
+  padding: 18px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fff9ec 0%, #f5ebcf 100%);
+  border: 1px solid rgba(197, 160, 89, 0.35);
+  box-shadow: 0 12px 30px rgba(197, 160, 89, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.mark-progress-page .student-profile-hero h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--deep-brown);
+}
+
+.mark-progress-page .student-profile-hero p {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--soft-brown);
+}
+
+/* ---- Empty state (preview) ---- */
+.mark-progress-page .empty-state {
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(135deg, #fffdf6 0%, #f9f2e1 100%);
+  border: 1.5px dashed rgba(197, 160, 89, 0.4);
+  border-radius: 20px;
+  color: var(--soft-brown);
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+/* ---- Dark mode: keep white/gold premium cards legible ---- */
+.dark-mode .mark-progress-page .form-card,
+.dark-mode .mark-progress-page .data-card,
+.dark-mode .mark-progress-page .mp-section,
+.dark-mode .mark-progress-page .mp-student-select {
+  background-color: var(--premium-white);
+}
+
+/* ============================================================
+   RESPONSIVE — premium Mark Progress (mobile & tablet)
+   ============================================================ */
+
+@media (max-width: 1024px) {
+  .mark-progress-page.management-grid.two-columns {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  .mark-progress-page .form-card,
+  .mark-progress-page .data-card {
+    border-radius: 22px;
+    padding: 18px 14px;
+  }
+
+  .mark-progress-page .mp-card-headline {
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .mark-progress-page .mp-card-badge {
+    display: none;
+  }
+
+  .mark-progress-page .form-grid.four-up {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mark-progress-page .mp-grid-three {
+    grid-template-columns: 1fr;
+  }
+
+  .mp-student-select {
+    padding: 12px 14px;
+  }
+
+  .mp-student-select-icon {
+    top: 12px;
+    right: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mark-progress-page .form-grid.four-up {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .mark-progress-page .mp-grid-two {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .mark-progress-page .mp-grid-three {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .mark-progress-page .mp-section {
+    padding: 12px 12px 15px;
+  }
+
+  .mark-progress-page .stack-form input,
+  .mark-progress-page .stack-form select,
+  .mark-progress-page .stack-form textarea {
+    min-height: 46px;
+  }
+
+  .mark-progress-page .stack-form textarea {
+    min-height: 88px;
+  }
+
+  .mark-progress-page .status-banner {
+    font-size: 0.8rem;
+    padding: 11px 13px;
+  }
+
+  .mark-progress-page .student-profile-hero {
+    padding: 14px;
+  }
+}
+
+/* ============================================================
+   TEACHER LEAVE - PREMIUM (tl-*)
+   Scoped to the teacher "Apply Leave" page. Reuses fdr-* from
+   parent-portal.css for the Fatemi calendar. These rules only
+   affect the teacher portal leave card + admin panel additions.
+   ============================================================ */
+.teacher-leave-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.teacher-leave-card {
+  border: 1px solid #e5dbc8;
+  box-shadow: 0 10px 30px rgba(120, 90, 40, 0.08);
+}
+
+.tl-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 28px 20px;
+  background: linear-gradient(135deg, #fcf8f0, #f5edd9);
+  border-bottom: 2px solid #d4c9b0;
+}
+
+.tl-card-head-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tl-portal-badge {
+  margin-left: auto;
+  padding: 5px 14px;
+  border-radius: 20px;
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: #8a6d1d;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tl-label {
+  font-weight: 700;
+  color: var(--deep-brown, #4a3a22);
+  font-size: 0.8rem;
+  display: block;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.tl-label em {
+  color: #c0392b;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.tl-cat-row {
+  margin-bottom: 20px;
+}
+
+.tl-select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid #e0d8cc;
+  font-size: 0.9rem;
+  background: #fff;
+  color: var(--deep-brown, #4a3a22);
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.tl-select:focus {
+  border-color: var(--primary-gold, #d4af37);
+}
+
+.fdr-block {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px dashed #d9cfb8;
+  border-radius: 12px;
+  background: #fdfbf7;
+}
+
+.fdr-block .fdr-preview {
+  margin: 10px 0 0;
+}
+
+.tl-miqaat-box {
+  margin-bottom: 20px;
+}
+
+.tl-days-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, #fcf8f0, #f5edd9);
+  border: 1px solid #d4c9b0;
+  color: var(--deep-brown, #4a3a22);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.tl-days-chip svg {
+  color: var(--primary-gold, #d4af37);
+}
+
+.tl-reason-label {
+  margin-bottom: 6px;
+}
+
+.tl-reason-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid #e0d8cc;
+  font-size: 0.9rem;
+  background: #fff;
+  color: var(--deep-brown, #4a3a22);
+  resize: vertical;
+  min-height: 70px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+  margin-bottom: 18px;
+}
+
+.tl-reason-input:focus {
+  border-color: var(--primary-gold, #d4af37);
+}
+
+.tl-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 24px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.25s;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.25);
+}
+
+.tl-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.tl-submit:disabled {
+  background: linear-gradient(135deg, #e8e0d4, #d4c9b0);
+  color: #aaa;
+  cursor: default;
+  box-shadow: none;
+}
+
+.tl-history {
+  border-top: 2px solid #f0e8d8;
+  padding-top: 20px;
+}
+
+.tl-history-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tl-history-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tl-history-accent {
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #d4af37, #b8860b);
+}
+
+.tl-history-count {
+  margin-left: auto;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  background: rgba(212, 175, 55, 0.15);
+  color: #8a6d1d;
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tl-history-empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-muted, #999);
+  font-size: 0.85rem;
+}
+
+.tl-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tl-hist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #faf8f5;
+  border: 1px solid #eee;
+  transition: all 0.2s;
+}
+
+.tl-hist-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(120, 90, 40, 0.08);
+}
+
+.tl-hist-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tl-hist-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.tl-hist-mid {
+  min-width: 0;
+}
+
+.tl-hist-dates {
+  font-weight: 700;
+  color: var(--deep-brown, #4a3a22);
+  font-size: 0.88rem;
+}
+
+.tl-hist-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.tl-cat-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--primary-gold, #b8860b);
+  background: #fcf8f0;
+  border: 1px solid #d4c9b0;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.tl-event-chip {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #2e7d32;
+  background: #edf7ed;
+  border: 1px solid #cfe6cf;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.tl-day-chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--primary-gold, #b8860b);
+  background: #fcf8f0;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.tl-reason-text {
+  font-size: 0.78rem;
+  color: var(--soft-brown, #8b7355);
+}
+
+.tl-admin-comment {
+  font-size: 0.72rem;
+  color: var(--text-muted, #999);
+  margin-top: 4px;
+  font-style: italic;
+  padding: 4px 8px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.tl-status-pill {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .tl-hist-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tl-status-pill {
+    align-self: flex-end;
+  }
+
+  .tl-card-head {
+    padding: 18px;
+  }
 }

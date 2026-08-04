@@ -277,13 +277,31 @@ export default function TeacherLeaveApprovalPanel({
     if (onShowAction) onShowAction("success", "Leave rejected.");
   };
 
+  const handleTlSubjectToApprove = async (lv) => {
+    if (!tlComment.trim()) {
+      if (onShowAction) onShowAction("error", "Please enter an admin comment before marking subject to approve.");
+      return;
+    }
+    await supabase.from("teacher_leaves").update({ status: "subject_to_approve", admin_comment: tlComment }).eq("id", lv.id);
+    broadcastNotification(
+      "Leave Subject To Approve",
+      `Your leave (${lv.from_date} → ${lv.to_date}) has been marked subject to approve. Comment: ${tlComment}`,
+      "user",
+      String(lv.teacher_id),
+      "Apply Leave"
+    );
+    setTlComment("");
+    fetchTlLeaves();
+    if (onShowAction) onShowAction("success", "Leave marked subject to approve.");
+  };
+
   const filteredTl = tlLeaves.filter(l => l.status === tlFilter);
   const teacherProfilesList = teacherProfiles || [];
 
   return (
     <>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '12px' }}>
-        {["pending", "approved", "rejected"].map(f => (
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '12px', flexWrap: 'wrap' }}>
+        {["pending", "subject_to_approve", "approved", "rejected"].map(f => (
           <button key={f} onClick={() => setTlFilter(f)}
             style={{
               padding: '8px 20px', borderRadius: '20px', border: tlFilter === f ? '2px solid var(--primary-gold)' : '1px solid #ddd',
@@ -291,7 +309,7 @@ export default function TeacherLeaveApprovalPanel({
               color: tlFilter === f ? 'white' : '#666', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
               textTransform: 'capitalize'
             }}
-          >{f}</button>
+          >{f.replace(/_/g, ' ')}</button>
         ))}
       </div>
 
@@ -309,26 +327,35 @@ export default function TeacherLeaveApprovalPanel({
             return (
               <div key={lv.id} className="result-card-premium" style={{ padding: '18px', borderRadius: '12px', border: '1px solid #e8e0d4', background: '#fffaf0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '1rem' }}>{teacherName}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--deep-brown)', fontSize: '1rem' }}>{teacherName}</div>
+                      {lv.category && (
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 10px', borderRadius: '12px', background: '#fcf8f0', border: '1px solid #d4c9b0', color: 'var(--primary-gold)' }}>{lv.category}</span>
+                      )}
+                    </div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginTop: '4px' }}>
                       {lv.from_date} → {lv.to_date} <span style={{ fontWeight: 600, color: 'var(--primary-gold)' }}>({days} day{days > 1 ? 's' : ''})</span>
                     </div>
+                    {lv.event_name && <div style={{ fontSize: '0.8rem', color: '#2e7d32', marginTop: '3px', fontWeight: 600 }}>🕌 {lv.event_name}</div>}
                     {lv.reason && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>"{lv.reason}"</div>}
                     {lv.admin_comment && <div style={{ fontSize: '0.75rem', color: 'var(--soft-brown)', marginTop: '2px' }}>Admin: {lv.admin_comment}</div>}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {lv.status === 'pending' && (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {(lv.status === 'pending' || lv.status === 'subject_to_approve') && (
                       <>
                         <input type="text" placeholder="Admin comment..." value={tlComment}
                           onChange={e => setTlComment(e.target.value)}
-                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '0.8rem', width: '180px' }}
+                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '0.8rem', width: '160px' }}
                         />
+                        <button onClick={() => handleTlSubjectToApprove(lv)} disabled={tlSubmitting}
+                          style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #c9a227', background: '#fff7e0', color: '#8a6d1d', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
+                        >Subject To Approve</button>
                         <button onClick={() => handleTlApprove(lv)} disabled={tlSubmitting}
-                          style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#fff', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                          style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#fff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
                         >Approve</button>
                         <button onClick={() => handleTlReject(lv)} disabled={tlSubmitting}
-                          style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', color: '#721c24', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                          style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', color: '#721c24', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
                         >Reject</button>
                       </>
                     )}

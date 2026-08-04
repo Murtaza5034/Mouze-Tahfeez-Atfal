@@ -1620,23 +1620,23 @@ export const SelfJadwalTeacherView
   return (
     <>
       <div className="jadwal-container parent-view self-jadwal-editor">
-        <div style={premiumHeaderStyle}>
+        <div className="sj-header" style={premiumHeaderStyle}>
           <div style={premiumHeaderGlow} />
           <div style={{ position: 'relative', zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <div style={premiumTitleStyle}>
+              <div className="sj-title" style={premiumTitleStyle}>
                 <Crown size={24} style={{ color: '#d4af37' }} />
                 <span>Self Jadwal Schedule</span>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
+            <div className="sj-chips" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+              <div className="sj-chip" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
                 <Star size={14} style={{ color: '#d4af37' }} />
                 <span style={{ color: '#e8d5a3', fontSize: '14px', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
                   {selectedUserName || 'Select a child'}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
+              <div className="sj-chip" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 16px' }}>
                 <Award size={14} style={{ color: '#d4af37' }} />
                 <span style={{ color: '#e8d5a3', fontSize: '13px', fontFamily: 'Inter, sans-serif', opacity: 0.8 }}>
                   Teacher Editor
@@ -1646,8 +1646,8 @@ export const SelfJadwalTeacherView
           </div>
         </div>
 
-        <div style={premiumCardStyle}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)' }}>
+        <div className="sj-card" style={premiumCardStyle}>
+          <div className="sj-toolbar" style={{ padding: '20px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)' }}>
             <div className="student-selector" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <select
                 value={selectedUserId}
@@ -1671,6 +1671,7 @@ export const SelfJadwalTeacherView
                   <button
                     onClick={handleNotifyUser}
                     disabled={saving}
+                    className="sj-notify-btn"
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: '8px',
                       padding: '10px 20px', borderRadius: '12px',
@@ -1700,7 +1701,7 @@ export const SelfJadwalTeacherView
             <div className="loading-spinner" style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
           ) : selectedUserId ? (
             <>
-              <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <div className="sj-modebar" style={{ padding: '16px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                 <label style={{ fontWeight: 600, color: '#5d4037', fontSize: '14px' }}>Mode:</label>
                 <select
                   value={mode}
@@ -1724,7 +1725,7 @@ export const SelfJadwalTeacherView
                   )}
                 </span>
               </div>
-              <div style={{ padding: '20px' }}>
+              <div className="sj-body" style={{ padding: '20px' }}>
                 <SelfJadwalTableStyle
                   mode={mode}
                   scheduleData={scheduleData}
@@ -1737,7 +1738,7 @@ export const SelfJadwalTeacherView
               </div>
             </>
           ) : (
-            <div className="jadwal-empty" style={{ padding: '60px 20px', textAlign: 'center', color: '#999' }}>
+            <div className="jadwal-empty sj-empty" style={{ padding: '60px 20px', textAlign: 'center', color: '#999' }}>
               <Lock size={32} style={{ color: '#d4af37', opacity: 0.4, marginBottom: '12px' }} />
               <p style={{ fontFamily: 'Inter, sans-serif' }}>Select a parent/user from the dropdown to view and edit their Self Jadwal schedule.</p>
             </div>
