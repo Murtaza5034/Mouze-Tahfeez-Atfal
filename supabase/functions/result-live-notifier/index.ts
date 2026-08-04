@@ -317,21 +317,92 @@ Deno.serve(async (req) => {
     }));
 
     // ------------------------------------------------------------
-    // Teachers: one generic notification to all teachers
+    // Teachers: per-child notifications to the specific teacher
+    // assigned to that child (not a broadcast to all teachers).
+    // Scenario 4 — Teacher and Parent both get notified at once.
     // ------------------------------------------------------------
-    const teacherTitle = 'Results are LIVE!';
-    const teacherBody = 'The latest Tahfeez progress reports are now live for review.';
-    const { data: teacherTokens } = await supabase
-      .from('user_fcm_tokens')
-      .select('fcm_token')
-      .eq('user_role', 'teacher');
-    const teacherFcmJobs = (teacherTokens || []).map((row) => ({
-      token: row.fcm_token,
-      title: teacherTitle,
-      body: teacherBody,
-      tag: `result-live-teacher-${now}`,
-      notificationId: `result-live-teacher-${now}`,
-      redirectPage: 'My Group',
+    const { data: teacherProfiles } = await supabase
+      .from('teacher_profiles')
+      .select('id, user_id, full_name');
+
+    // Map teacher id/user_id (as text) → teacher auth user_id + name
+    const teacherUserByKey = new Map<string, { userId: string; name: string }>();
+    (teacherProfiles || []).forEach((t) => {
+      const meta = { userId: String(t.user_id), name: String(t.full_name || 'Teacher') };
+      if (t.id) teacherUserByKey.set(String(t.id).trim().toLowerCase(), meta);
+      if (t.user_id) teacherUserByKey.set(String(t.user_id).trim().toLowerCase(), meta);
+    });
+
+    // Resolve each child's teacher (teacher_id or original_teacher_id)
+    const { data: childTeacherMeta } = await supabase
+      .from('child_profiles')
+      .select('student_id, teacher_id, original_teacher_id, badal_teacher_id');
+    const childTeacherMap = new Map<string, string>(); // student_id → teacher user_id
+    (childTeacherMeta || []).forEach((c) => {
+      const keys = [c.teacher_id, c.original_teacher_id, c.badal_teacher_id]
+        .filter(Boolean)
+        .map((k) => String(k).trim().toLowerCase());
+      for (const key of keys) {
+        const meta = teacherUserByKey.get(key);
+        if (meta) { childTeacherMap.set(String(c.student_id).trim().toLowerCase(), meta.userId); break; }
+      }
+    });
+
+    const teacherJobs: Array<{
+      userId: string
+      studentName: string
+      title: string
+      body: string
+      tag: string
+      notificationId: string
+      redirectPage: string
+    }> = [];
+    const involvedTeacherIds = new Set<string>();
+
+    childJobs.forEach((job) => {
+      const teacherUserId = childTeacherMap.get(String(job.studentId).trim().toLowerCase());
+      if (!teacherUserId) return;
+      involvedTeacherIds.add(teacherUserId);
+      teacherJobs.push({
+        userId: teacherUserId,
+        studentName: job.name,
+        title: `📢 ${job.name}'s Result is Live!`,
+        body: `The result of your student ${job.name} is now live in the teacher portal. Check the My Group page to review the latest report.`,
+        tag: `result-live-teacher-${job.studentId}-${now}`,
+        notificationId: `result-live-teacher-${job.studentId}-${now}`,
+        redirectPage: 'My Group',
+      });
+    });
+
+    // Fetch FCM tokens for the involved teachers only
+    const involvedTeacherIdsArr = [...involvedTeacherIds];
+    const teacherTokensByUser = new Map<string, string[]>();
+    for (let i = 0; i < involvedTeacherIdsArr.length; i += 50) {
+      const batch = involvedTeacherIdsArr.slice(i, i + 50);
+      const { data: tTokens } = await supabase
+        .from('user_fcm_tokens')
+        .select('user_id, fcm_token')
+        .in('user_id', batch);
+      (tTokens || []).forEach((row) => {
+        const list = teacherTokensByUser.get(row.user_id) || [];
+        list.push(row.fcm_token);
+        teacherTokensByUser.set(row.user_id, list);
+      });
+    }
+
+    const teacherFcmJobs: Array<{ token: string; title: string; body: string; tag: string; notificationId: string; redirectPage: string }> = [];
+    teacherJobs.forEach((j) => {
+      const tokens = teacherTokensByUser.get(j.userId) || [];
+      tokens.forEach((token) => teacherFcmJobs.push({ token, title: j.title, body: j.body, tag: j.tag, notificationId: j.notificationId, redirectPage: j.redirectPage }));
+    });
+
+    // Inbox: one notification per involved teacher per child
+    const teacherInboxRows = teacherJobs.map((j) => ({
+      title: j.title,
+      body: j.body,
+      target_role: 'teacher',
+      target_user: j.userId,
+      redirect_page: 'My Group',
     }));
 
     // ------------------------------------------------------------
@@ -350,8 +421,7 @@ Deno.serve(async (req) => {
     }
 
     // Inbox inserts (best-effort)
-    const inboxRows = [...parentInboxRows];
-    inboxRows.push({ title: teacherTitle, body: teacherBody, target_role: 'teacher', target_user: null, redirect_page: 'My Group' });
+    const inboxRows = [...parentInboxRows, ...teacherInboxRows];
     let inboxError = null;
     if (inboxRows.length > 0) {
       const { error } = await supabase.from('system_notifications').insert(inboxRows);
@@ -375,7 +445,8 @@ Deno.serve(async (req) => {
         summary: {
           children: childJobs.length,
           parents: parentUserIds.length,
-          teacherTokens: teacherTokens?.length || 0,
+          teachers: involvedTeacherIds.size,
+          teacherNotifications: teacherJobs.length,
           delivered: deliveredCount,
           failures: failureCount,
           inboxError,

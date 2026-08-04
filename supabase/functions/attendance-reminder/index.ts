@@ -176,15 +176,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Only fire within 14 minutes AFTER 10:00 PM IST (once per day)
+    // Fire strictly at 10:05 PM IST (Mon-Sat, once per day). The cron runs
+    // every minute; a 2-minute window absorbs one missed tick while still
+    // delivering at ~22:05. Daily dedup via attendance_reminder_state
+    // guarantees exactly-once delivery.
     const currentMinutes = todayHour * 60 + todayMinute;
-    const targetMinutes = 22 * 60; // 10:00 PM
+    const targetMinutes = 22 * 60 + 5; // 10:05 PM
     const diff = currentMinutes - targetMinutes;
 
-    if (diff < 0 || diff >= 14) {
-      console.log(`attendance-reminder: Skipping — current ${todayHour}:${todayMinute} is ${diff < 0 ? 'before' : 'more than 14 min after'} 22:00 IST (diff ${diff} min)`);
+    if (diff < 0 || diff >= 2) {
+      console.log(`attendance-reminder: Skipping — current ${todayHour}:${todayMinute} is ${diff < 0 ? 'before' : 'more than 2 min after'} 22:05 IST (diff ${diff} min)`);
       return new Response(
-        JSON.stringify({ success: true, message: 'NOT_YET_TIME', sentCount: 0, info: `Target 22:00 IST, current ${todayHour}:${todayMinute}, diff ${diff}` }),
+        JSON.stringify({ success: true, message: 'NOT_YET_TIME', sentCount: 0, info: `Target 22:05 IST, current ${todayHour}:${todayMinute}, diff ${diff}` }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
@@ -227,19 +230,19 @@ Deno.serve(async (req) => {
     // ── Fetch child profiles to map students → teachers ──
     const { data: childProfiles, error: childErr } = await supabase
       .from('child_profiles')
-      .select('student_id, teacher_id, original_teacher_id');
+      .select('student_id, full_name, teacher_id, original_teacher_id');
 
     if (childErr) {
       throw new Error(`Failed to fetch child profiles: ${childErr.message}`);
     }
 
-    // teacherKey (id or user_id) → set of student ids
-    const teacherStudentsMap = new Map<string, Set<string>>();
+    // teacherKey (id or user_id) → set of student ids with names
+    const teacherStudentsMap = new Map<string, Map<string, string>>();
     for (const cp of childProfiles || []) {
       const tid = String(cp.teacher_id || cp.original_teacher_id || '').trim().toLowerCase();
       if (!tid) continue;
-      if (!teacherStudentsMap.has(tid)) teacherStudentsMap.set(tid, new Set());
-      teacherStudentsMap.get(tid)!.add(String(cp.student_id).trim().toLowerCase());
+      if (!teacherStudentsMap.has(tid)) teacherStudentsMap.set(tid, new Map());
+      teacherStudentsMap.get(tid)!.set(String(cp.student_id).trim().toLowerCase(), String(cp.full_name || 'Student').trim());
     }
 
     // ── Fetch active teachers ──
@@ -267,14 +270,14 @@ Deno.serve(async (req) => {
 
     for (const teacher of activeTeachers) {
       // Gather this teacher's students by matching teacher_id against id OR user_id
-      const students = new Set<string>();
+      const students = new Map<string, string>(); // studentId (lower) -> full_name
       const teacherKeys = [
         String(teacher.user_id || '').trim().toLowerCase(),
         String(teacher.id || '').trim().toLowerCase(),
       ];
       for (const key of teacherKeys) {
         const list = teacherStudentsMap.get(key);
-        if (list) list.forEach(s => students.add(s));
+        if (list) list.forEach((name, sid) => { if (!students.has(sid)) students.set(sid, name); });
       }
 
       if (students.size === 0) {
@@ -283,20 +286,29 @@ Deno.serve(async (req) => {
       }
 
       let marked = 0;
-      students.forEach(sid => { if (attMap.has(sid)) marked++; });
+      const missingStudents: string[] = [];
+      students.forEach((name, sid) => {
+        if (attMap.has(sid)) {
+          marked++;
+        } else {
+          missingStudents.push(name);
+        }
+      });
       const total = students.size;
       const missing = total - marked;
+
+      const missingList = missingStudents.map((n) => `  • ${n}`).join('\n');
 
       let title: string, body: string;
       if (marked === total) {
         title = "✅ Daily Attendance — All Marked";
-        body = `Assalamu Alaykum ${teacher.full_name},\n\nOutstanding! ✅ All ${total} of your students have been marked present for today's attendance. Your diligence is truly appreciated.\n\nJazakallah Khair,\nAdministration`;
+        body = `Assalamu Alaykum ${teacher.full_name},\n\nOutstanding! ✅ All ${total} of your students have been marked present for today's attendance:\n${[...students.values()].map((n) => `  • ${n}`).join('\n')}\n\nYour diligence is truly appreciated.\n\nJazakallah Khair,\nAdministration`;
       } else if (marked > 0) {
         title = "⚠️ Daily Attendance — Some Pending";
-        body = `Assalamu Alaykum ${teacher.full_name},\n\nYou have marked ${marked} out of ${total} students today. ${missing} student${missing > 1 ? 's' : ''} ${missing > 1 ? 'are' : 'is'} still pending. Kindly complete the attendance at your earliest convenience.\n\nJazakallah Khair,\nAdministration`;
+        body = `Assalamu Alaykum ${teacher.full_name},\n\nYou have marked ${marked} out of ${total} students today. ${missing} student${missing > 1 ? 's' : ''} ${missing > 1 ? 'are' : 'is'} still pending:\n${missingList}\n\nKindly complete the attendance at your earliest convenience.\n\nJazakallah Khair,\nAdministration`;
       } else {
         title = "❌ Daily Attendance — Not Marked";
-        body = `Assalamu Alaykum ${teacher.full_name},\n\nWe noticed that attendance for ${total} student${total > 1 ? 's' : ''} in your class has not been marked today. Please log in and mark the attendance as soon as possible.\n\nJazakallah Khair,\nAdministration`;
+        body = `Assalamu Alaykum ${teacher.full_name},\n\nWe noticed that attendance for ${total} student${total > 1 ? 's' : ''} in your class has not been marked today:\n${missingList}\n\nPlease log in and mark the attendance as soon as possible.\n\nJazakallah Khair,\nAdministration`;
       }
 
       // Get teacher's FCM tokens

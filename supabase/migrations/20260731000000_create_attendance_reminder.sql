@@ -33,8 +33,8 @@ CREATE POLICY "Service role manages attendance reminder state"
 
 -- ============================================================
 -- Cron trigger: calls the attendance-reminder edge function.
--- Runs every 2 minutes — the function itself checks the IST
--- time window (10:00 PM IST, Mon-Sat) and dedups per day.
+-- Runs every minute — the function itself checks the exact IST time
+-- (10:05 PM IST, Mon-Sat) and dedups per day.
 -- call_edge_function() was created in
 -- 20260605000001_add_jadwal_notification_settings.sql
 -- ============================================================
@@ -56,7 +56,7 @@ BEGIN
 
     PERFORM cron.schedule(
       'attendance-reminder',
-      '*/2 * * * *',
+      '* * * * *',
       'SELECT trigger_attendance_reminder();'
     );
   END IF;

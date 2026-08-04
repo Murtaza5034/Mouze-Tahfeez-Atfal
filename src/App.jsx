@@ -260,6 +260,26 @@ const createTeacherResultDraft = (overrides = {}) => ({
   ...overrides,
 });
 
+const CLEARED_PROGRESS_KEY = "mauze_cleared_progress_students";
+const getClearedProgressStudents = () => {
+  try {
+    const raw = localStorage.getItem(CLEARED_PROGRESS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch (_) {
+    return new Set();
+  }
+};
+const isStudentCleared = (studentId) => getClearedProgressStudents().has(String(studentId));
+const setStudentCleared = (studentId, cleared) => {
+  const set = getClearedProgressStudents();
+  if (cleared) set.add(String(studentId));
+  else set.delete(String(studentId));
+  try {
+    localStorage.setItem(CLEARED_PROGRESS_KEY, JSON.stringify(Array.from(set)));
+  } catch (_) {}
+};
+
 const calculateEffectiveScore = (r) => {
   if (!r) return 0;
   if (r.total_score !== undefined && r.total_score !== null && r.total_score !== "") return Number(r.total_score);
@@ -2417,12 +2437,14 @@ function getFatemiInfo(dateStr) {
 
   try {
     const date = new Date(dateStr);
+    // Fatemi (Misri) calendar runs 1 day ahead of the standard Islamic tabular calendar
+    const shiftedDate = new Date(date.getTime() + 86400000);
     const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
       day: 'numeric',
       month: 'numeric',
       year: 'numeric',
       timeZone: 'UTC'
-    }).formatToParts(date);
+    }).formatToParts(shiftedDate);
 
     const d = parseInt(parts.find(p => p.type === 'day').value);
     const m = parseInt(parts.find(p => p.type === 'month').value);
@@ -3409,13 +3431,16 @@ function RankPreview({ students }) {
   };
 
   const rankedStudents = useMemo(() => {
-    const withScores = studentList.map(s => ({
-      ...s,
-      score: s.latestResult ? calculateEffectiveScore(s.latestResult) : 0,
-      jadeed: Number(s.latestResult?.jadeed) || 0,
-      jadeedPages: Number(String(s.latestResult?.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0,
-      attendance: Number(s.latestResult?.attendance_count) || 0,
-    }));
+    const withScores = studentList.map(s => {
+      const cleared = isStudentCleared(s.student_id);
+      return {
+        ...s,
+        score: cleared ? 0 : (s.latestResult ? calculateEffectiveScore(s.latestResult) : 0),
+        jadeed: cleared ? 0 : (Number(s.latestResult?.jadeed) || 0),
+        jadeedPages: cleared ? 0 : (Number(String(s.latestResult?.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0),
+        attendance: cleared ? 0 : (Number(s.latestResult?.attendance_count) || 0),
+      };
+    });
     
     withScores.sort((a, b) => {
       const scoreDiff = b.score - a.score;
@@ -4553,7 +4578,9 @@ function getFatemiCalendarMap() {
     const end = new Date('2027-06-01T00:00:00Z');
     for (let t = new Date(start); t <= end; t.setUTCDate(t.getUTCDate() + 1)) {
       const g = t.toISOString().slice(0, 10);
-      const p = fmt.formatToParts(t);
+      // Fatemi (Misri) calendar runs 1 day ahead of the standard Islamic tabular calendar
+      const shifted = new Date(t.getTime() + 86400000);
+      const p = fmt.formatToParts(shifted);
       const y = +p.find(x => x.type === 'year').value;
       const m = +p.find(x => x.type === 'month').value;
       const d = +p.find(x => x.type === 'day').value;
@@ -4755,6 +4782,30 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
     setCalOpen(null);
   };
 
+  const isDefaultFatemiRange = () => fromM === 2 && fromD === 17 && tillM === 2 && tillD === 17;
+
+  const openFromCal = () => {
+    if (todayFi && isDefaultFatemiRange()) {
+      setFromM(todayFi.month);
+      setFromD(todayFi.date);
+      setTillM(todayFi.month);
+      setTillD(todayFi.date);
+    }
+    setCalMonth(todayFi?.month || fromM || 1);
+    setCalOpen(calOpen === "from" ? null : "from");
+  };
+
+  const openTillCal = () => {
+    if (todayFi && isDefaultFatemiRange()) {
+      setFromM(todayFi.month);
+      setFromD(todayFi.date);
+      setTillM(todayFi.month);
+      setTillD(todayFi.date);
+    }
+    setCalMonth(todayFi?.month || tillM || 1);
+    setCalOpen(calOpen === "till" ? null : "till");
+  };
+
   // Close the premium calendar on Escape and lock background scroll while open
   useEffect(() => {
     if (!calOpen) return;
@@ -4935,30 +4986,61 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
       const leaveWindowLabel = `${fatemiDateLabel(fromM, fromD)}${fromGreg !== tillGreg ? ` to ${fatemiDateLabel(tillM, tillD)}` : ""}`;
 
       await broadcastNotification(
-        `Leave Application ًں“…`,
+        `Leave Application 📋`,
         `${studentProfile?.name} has applied for leave (${leaveType})${miqaatName ? `: ${miqaatName}` : ""}. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
         "admin",
         null,
         "Leave Management"
       );
 
-      // Also notify the student's teacher
+      // Also notify the student's teacher (resolve reliably from the DB so the
+      // teacher always gets the leave notification for their group child).
       try {
-        const teacherIdField = studentProfile?.muhaffiz_id || studentProfile?.teacher_id;
-        if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
-          const teacherMatch = teacherProfiles.find(t =>
-            t.id === teacherIdField || t.user_id === teacherIdField ||
-            normalizeText(t.full_name) === normalizeText(studentProfile?.teacherName)
-          );
-          const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
-          if (teacherTarget) {
-            await broadcastNotification(
-              `Leave Application ًں“…`,
-              `${studentProfile?.name} (${leaveType})${miqaatName ? `: ${miqaatName}` : ""} has applied for leave. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
-              "user",
-              teacherTarget,
-              "Leave Management"
-            );
+        const sidRef = studentProfile?.student_id || studentProfile?.allIds?.[0];
+        if (sidRef) {
+          const { data: childRow } = await supabase
+            .from("child_profiles")
+            .select("teacher_id, original_teacher_id, badal_teacher_id")
+            .eq("student_id", String(sidRef))
+            .maybeSingle();
+
+          const teacherIdField =
+            childRow?.teacher_id ||
+            childRow?.original_teacher_id ||
+            childRow?.badal_teacher_id ||
+            studentProfile?.muhaffiz_id ||
+            studentProfile?.teacher_id ||
+            studentProfile?.original_teacher_id;
+
+          if (teacherIdField) {
+            let teacherTarget = null;
+            // teacher_id may hold either the teacher profile id or the auth user_id
+            const { data: teacherRow } = await supabase
+              .from("teacher_profiles")
+              .select("id, user_id")
+              .or(`id.eq.${teacherIdField},user_id.eq.${teacherIdField}`)
+              .maybeSingle();
+            if (teacherRow) teacherTarget = teacherRow.user_id || teacherRow.id;
+
+            if (!teacherTarget && normalizeText) {
+              const nameMatch = (studentProfile?.teacherName || "").trim();
+              const { data: byName } = await supabase
+                .from("teacher_profiles")
+                .select("id, user_id, full_name")
+                .limit(1000);
+              const found = (byName || []).find(t => normalizeText(t.full_name) === normalizeText(nameMatch));
+              if (found) teacherTarget = found.user_id || found.id;
+            }
+
+            if (teacherTarget) {
+              await broadcastNotification(
+                `Leave Application 📋`,
+                `${studentProfile?.name} (${leaveType})${miqaatName ? `: ${miqaatName}` : ""} has applied for leave. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
+                "user",
+                teacherTarget,
+                "Leave Management"
+              );
+            }
           }
         }
       } catch (tErr) {
@@ -5094,7 +5176,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
                 <button
                   type="button"
                   className={`fdr-cal-trigger ${calOpen === "from" ? "active" : ""}`}
-                  onClick={() => { setCalMonth(fromM); setCalOpen(calOpen === "from" ? null : "from"); }}
+                  onClick={openFromCal}
                   disabled={status === 'closed' || isSubmitting}
                 >
                   <span className="fdr-cal-trigger-icon"><CalendarCheck size={16} /></span>
@@ -5108,7 +5190,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
                 <button
                   type="button"
                   className={`fdr-cal-trigger ${calOpen === "till" ? "active" : ""}`}
-                  onClick={() => { setCalMonth(tillM); setCalOpen(calOpen === "till" ? null : "till"); }}
+                  onClick={openTillCal}
                   disabled={status === 'closed' || isSubmitting}
                 >
                   <span className="fdr-cal-trigger-icon"><CalendarCheck size={16} /></span>
@@ -6258,9 +6340,14 @@ function ParentPortal({
           <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
             <Menu size={22} />
           </button>
-          <img src="/logo.png" alt="Logo" className="topbar-logo" />
-          <div>
-            <span className="topbar-brand">Mauze Tahfeez</span>
+          <img
+            src={studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"}
+            alt={studentProfile?.name || "Child"}
+            className="topbar-logo parent-topbar-dp"
+            onError={(e) => { e.target.src = "/logo.png"; }}
+          />
+          <div className="parent-topbar-brand-wrap">
+            <span className="topbar-brand">Rawdat Tahfeez al Atfal-Galiakot</span>
             <span className="topbar-sub">Parents Portal</span>
           </div>
         </div>
@@ -6370,8 +6457,6 @@ function ParentPortal({
               />
             )}
 
-            {recentMarhalaPostPreview}
-
             <div className="dashboard-section" style={{ marginBottom: '20px' }}>
               <div className="section-header">
                 <Bell size={18} />
@@ -6411,6 +6496,8 @@ function ParentPortal({
                 )}
               </div>
             </div>
+
+            {recentMarhalaPostPreview}
 
             <PremiumTodaySchedule
               schedule={pages.Schedule.schedule}
@@ -14831,6 +14918,26 @@ function TeacherPortal({
   const notificationOpenedAtRef = useRef(0);
   const finalRankNotifiedRef = useRef({});
 
+  const handleClearResultFields = () => {
+    if (!teacherForms?.result?.student_id) {
+      if (onShowAction) onShowAction("error", "Select a child before clearing the form.");
+      return;
+    }
+    const draft = createTeacherResultDraft({
+      student_id: teacherForms.result.student_id,
+      week_date: teacherForms.result.week_date || getToday(),
+    });
+    setTeacherForms(curr => ({ ...curr, result: draft }));
+    setStudentCleared(teacherForms.result.student_id, true);
+    if (autoSaveTimerRef?.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    setSaveStatus("");
+    setSaveErrorDetails("");
+    if (onShowAction) onShowAction("success", "All fields cleared. Fill them with this week's marks — or leave it and reload to restore last week's data.");
+  };
+
   const [studentAttendance, setStudentAttendance] = useState({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(() => getLocalDateKey());
@@ -15608,8 +15715,9 @@ function TeacherPortal({
   // Compute merged data + fallback rank synchronously
   const mergedResult = useMemo(() => {
     if (!selectedStudent) return null;
+    if (isStudentCleared(selectedStudent.student_id)) return {};
     const form = teacherForms.result;
-    const latest = selectedStudent.latestResult || {};
+    const latest = selectedStudent.latestResult || selectedResultRecord || {};
 
     // Merge: only override db values with non-empty form values
     const merged = { ...latest };
@@ -15652,6 +15760,7 @@ function TeacherPortal({
     for (let i = 0; i < allStudents.length; i++) {
       const s = allStudents[i];
       const isMe = String(s.student_id) === myId;
+      if (!isMe && isStudentCleared(s.student_id)) continue;
       const result = isMe ? mergedResult : s.latestResult;
       if (!result) continue;
       withScores.push({
@@ -15741,6 +15850,10 @@ function TeacherPortal({
   useEffect(() => {
     if (!selectedStudent || !mergedResult) {
       setLiveResult(null);
+      return;
+    }
+    if (isStudentCleared(selectedStudent.student_id)) {
+      setLiveResult({ ...mergedResult, computedRank: null });
       return;
     }
     const form = teacherForms.result;
@@ -15841,6 +15954,7 @@ function TeacherPortal({
 
     setSaveStatus("saved");
     setTimeout(() => setSaveStatus(""), 2000);
+    if (numericId) setStudentCleared(numericId, false);
 
     // Auto-update child's current Juz in child_profiles when wusool_juz is saved
     const newWusoolJuz = data?.wusool_juz || teacherForms.result.wusool_juz;
@@ -16578,7 +16692,7 @@ function TeacherPortal({
                                       onClick={() => handleMarkAttendance(student.student_id, currentDate, 'uzur')}
                                       disabled={attendanceLoading}
                                     >
-                                      {todayStatus === 'uzur' ? '♥' : ''} Uzur
+                                      {todayStatus === 'uzur' ? <span style={{ background: 'linear-gradient(135deg,#d4af37,#b8860b)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', fontWeight: 900, fontSize: '1.05em' }}>U</span> : ''} Uzur
                                     </button>
                                   )}
                                 </>
@@ -16648,7 +16762,15 @@ function TeacherPortal({
                       </select>
                     </label>
 
-                    
+                    <button
+                      type="button"
+                      className="mp-clear-btn"
+                      onClick={handleClearResultFields}
+                      disabled={!canEditCurrentResult || !teacherForms.result.student_id}
+                      title="Clear all marks/fields so you can fill them fresh. If you don't click this, the fields stay filled with last week's data."
+                    >
+                      <Trash2 size={15} /> Clear All Fields
+                    </button>
                   </div>
 
                   <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
@@ -16805,7 +16927,7 @@ function TeacherPortal({
                   <div className="mp-section">
                     <div className="mp-section-head">
                       <span className="mp-section-icon"><AlertCircle size={15} /></span>
-                      <h4>Issues — Matrookah &amp; Daeefah</h4>
+                      <h4>Matrookah &amp; Daeefah</h4>
                     </div>
                     <div className="form-grid">
                     <label>
@@ -17304,7 +17426,7 @@ function TeacherPortal({
                           onClick={() => markBadalAttendance('uzur')}
                           title="Mark Uzur (excused) — girl students"
                         >
-                          <Heart size={13} /> Uzur
+                          <span style={{ background: 'linear-gradient(135deg,#d4af37,#b8860b)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', fontWeight: 900, fontSize: '1.05em' }}>U</span> Uzur
                         </button>
                       )}
                       <span className="badal-universal-badge">Quick Fill</span>
@@ -17343,7 +17465,7 @@ function TeacherPortal({
                                 onClick={() => markBadalAttendance('uzur')}
                                 title="Excused — girl students only"
                               >
-                                <Heart size={14} /> Uzur
+                                <span style={{ background: 'linear-gradient(135deg,#d4af37,#b8860b)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', fontWeight: 900, fontSize: '1.05em' }}>U</span> Uzur
                               </button>
                             )}
                           </>
@@ -18215,6 +18337,38 @@ function TeacherPortal({
                   }
                   setLeaveCalOpen(null);
                 };
+                const leaveOpenFrom = () => {
+                  if (leaveTodayFi) {
+                    if (leaveFromM == null) {
+                      setLeaveFromM(leaveTodayFi.month); setLeaveFromD(leaveTodayFi.date);
+                      const g = leaveCal.hijriToGreg[`${leaveTodayFi.month}-${leaveTodayFi.date}`] || "";
+                      if (g) setLeaveFrom(g);
+                    }
+                    if (leaveTillM == null) {
+                      setLeaveTillM(leaveTodayFi.month); setLeaveTillD(leaveTodayFi.date);
+                      const g = leaveCal.hijriToGreg[`${leaveTodayFi.month}-${leaveTodayFi.date}`] || "";
+                      if (g) setLeaveTo(g);
+                    }
+                    setLeaveCalMonth(leaveTodayFi.month);
+                  }
+                  setLeaveCalOpen(leaveCalOpen === "from" ? null : "from");
+                };
+                const leaveOpenTill = () => {
+                  if (leaveTodayFi) {
+                    if (leaveTillM == null) {
+                      setLeaveTillM(leaveTodayFi.month); setLeaveTillD(leaveTodayFi.date);
+                      const g = leaveCal.hijriToGreg[`${leaveTodayFi.month}-${leaveTodayFi.date}`] || "";
+                      if (g) setLeaveTo(g);
+                    }
+                    if (leaveFromM == null) {
+                      setLeaveFromM(leaveTodayFi.month); setLeaveFromD(leaveTodayFi.date);
+                      const g = leaveCal.hijriToGreg[`${leaveTodayFi.month}-${leaveTodayFi.date}`] || "";
+                      if (g) setLeaveFrom(g);
+                    }
+                    setLeaveCalMonth(leaveTodayFi.month);
+                  }
+                  setLeaveCalOpen(leaveCalOpen === "till" ? null : "till");
+                };
                 const leaveMiqaatsByDate = (() => {
                   const map = {};
                   (teacherMiqaats || []).forEach((q) => {
@@ -18249,7 +18403,8 @@ function TeacherPortal({
                   }
                 };
                 const leaveDaysCount = leaveFrom && leaveTo ? Math.max(0, Math.floor((new Date(leaveTo) - new Date(leaveFrom)) / 86400000) + 1) : 0;
-                const leaveValid = !!leaveCategory && !!leaveFrom && !!leaveTo && !!leaveReason && leaveReason.trim().length > 0 && (leaveCategory !== "Event" || !!leaveEventId);
+                const leaveReasonRequired = ["Sick Leave", "Personal Leave", "Other"].includes(leaveCategory);
+                const leaveValid = !!leaveCategory && !!leaveFrom && !!leaveTo && (!leaveReasonRequired || (!!leaveReason && leaveReason.trim().length > 0)) && (leaveCategory !== "Event" || !!leaveEventId);
                 const leaveSelectedMiqaat = teacherMiqaats.find((q) => String(q.id) === String(leaveEventId));
                 const handleLeaveSubmit = async () => {
                   if (!leaveValid || !teacherId) return;
@@ -18303,7 +18458,7 @@ function TeacherPortal({
                           <option value="Sick Leave">🤒 Sick Leave</option>
                           <option value="Personal Leave">🧑 Personal Leave</option>
                           <option value="Event">🕌 Event / Miqaat</option>
-                          <option value="Uzur">🚶 Uzur (Excused)</option>
+                          <option value="Uzur">🚶 Uzur</option>
                           <option value="Other">📝 Other</option>
                         </select>
                       </div>
@@ -18314,7 +18469,7 @@ function TeacherPortal({
                           <div className="fdr-col">
                             <span className="fdr-label">From</span>
                             <button type="button" className={`fdr-cal-trigger ${leaveCalOpen === "from" ? "active" : ""}`}
-                              onClick={() => { setLeaveCalMonth(leaveFromM || 1); setLeaveCalOpen(leaveCalOpen === "from" ? null : "from"); }}>
+                              onClick={leaveOpenFrom}>
                               <span className="fdr-cal-trigger-icon"><CalendarCheck size={16} /></span>
                               <span className="fdr-cal-trigger-text">{leaveFromM && leaveFromD ? fatemiDateLabel(leaveFromM, leaveFromD) : "Select From"}</span>
                               <span className="fdr-cal-trigger-caret"><ChevronDown size={15} /></span>
@@ -18324,7 +18479,7 @@ function TeacherPortal({
                           <div className="fdr-col">
                             <span className="fdr-label">Till</span>
                             <button type="button" className={`fdr-cal-trigger ${leaveCalOpen === "till" ? "active" : ""}`}
-                              onClick={() => { setLeaveCalMonth(leaveTillM || leaveFromM || 1); setLeaveCalOpen(leaveCalOpen === "till" ? null : "till"); }}>
+                              onClick={leaveOpenTill}>
                               <span className="fdr-cal-trigger-icon"><CalendarCheck size={16} /></span>
                               <span className="fdr-cal-trigger-text">{leaveTillM && leaveTillD ? fatemiDateLabel(leaveTillM, leaveTillD) : "Select Till"}</span>
                               <span className="fdr-cal-trigger-caret"><ChevronDown size={15} /></span>
@@ -18446,7 +18601,7 @@ function TeacherPortal({
                       )}
 
                       <label className="tl-label tl-reason-label" style={{ display: 'block', marginBottom: '6px' }}>
-                        Reason <em>*</em>
+                        Reason {leaveReasonRequired ? <em>*</em> : null}
                       </label>
                       <textarea value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)}
                         className="tl-reason-input" rows={3}
@@ -19250,7 +19405,12 @@ export default function App() {
       .filter(r => String(r.student_id) === String(numericId))
       .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
     
-    if (studentResults.length > 0) {
+    if (isStudentCleared(numericId)) {
+      setTeacherForms(curr => ({
+        ...curr,
+        result: createTeacherResultDraft({ student_id: numericId })
+      }));
+    } else if (studentResults.length > 0) {
       setTeacherForms(curr => ({
         ...curr,
         result: { ...curr.result, ...studentResults[0], wusool_surah: studentResults[0]?.wusool_surah || "", next_week_surah: studentResults[0]?.next_week_surah || "", istifadah_surah: studentResults[0]?.istifadah_surah || "", student_id: numericId }
@@ -19955,6 +20115,9 @@ export default function App() {
             const matchingResults = freshResults
               .filter(r => String(r.student_id) === String(currentSid))
               .sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
+            if (isStudentCleared(currentSid)) {
+              return { ...current, result: createTeacherResultDraft({ student_id: currentSid }) };
+            }
             const latestResult = matchingResults.length > 0 ? matchingResults[0] : {};
             return {
               ...current,
@@ -20031,6 +20194,11 @@ export default function App() {
         });
 
     const filteredStudents = [...matchedStudents].sort((a, b) => {
+      const cA = isStudentCleared(a.student_id);
+      const cB = isStudentCleared(b.student_id);
+      if (cA && cB) return String(a.name || "").localeCompare(String(b.name || ""));
+      if (cA) return 1;
+      if (cB) return -1;
       const rA = a.latestResult?.computedRank;
       const rB = b.latestResult?.computedRank;
       if (rA && rB) return rA - rB;
@@ -20704,7 +20872,12 @@ export default function App() {
 
         const todayResult = studentResults.find(r => r.week_date === today);
 
-        if (todayResult) {
+        if (isStudentCleared(numericId)) {
+          setTeacherForms(curr => ({
+            ...curr,
+            result: createTeacherResultDraft({ student_id: numericId }),
+          }));
+        } else if (todayResult) {
           setTeacherForms(curr => ({
             ...curr,
             result: { ...curr.result, ...todayResult, wusool_surah: todayResult?.wusool_surah || "", next_week_surah: todayResult?.next_week_surah || "", istifadah_surah: todayResult?.istifadah_surah || "", student_id: numericId }

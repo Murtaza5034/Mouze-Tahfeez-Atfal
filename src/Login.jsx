@@ -111,7 +111,8 @@ export default function Login({ onLoginSuccess }) {
     const msg = (err.message || err.name || '').toLowerCase();
     return msg.includes('fetch') || msg.includes('network') || msg.includes('networkerror') ||
       msg.includes('typeerror') || msg.includes('failed to fetch') || msg.includes('internet') ||
-      err.name === 'TypeError' || err.code === 'NETWORK_ERROR';
+      msg.includes('abort') || msg.includes('timeout') || msg.includes('body timeout') ||
+      err.name === 'TypeError' || err.name === 'AbortError' || err.code === 'NETWORK_ERROR';
   }
 
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -123,12 +124,35 @@ export default function Login({ onLoginSuccess }) {
     setButtonFeedback(null);
 
     let lastError = null;
-    const maxRetries = 2;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+    const maxRetries = 5;
+    const timeoutMs = 15000;
+    const backoffs = [2000, 3000, 5000, 8000, 10000];
+
+    // Wrap the auth call in a timeout so a slow/hung mobile request can't block
+    // the UI forever; we re-attempt with adaptive backoff on weak connections.
+    const attemptAuth = () => new Promise((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve({ data: null, error: { name: 'AbortError', message: 'Request timed out' } });
+      }, timeoutMs);
+      supabase.auth.signInWithPassword({ email, password }).then((result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      }).catch((err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ data: null, error: err });
       });
+    });
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) setError(`Connection unstable. Retrying... (${attempt}/${maxRetries})`);
+      const { data, error: authError } = await attemptAuth();
 
       if (!authError) {
         setButtonFeedback("success");
@@ -147,8 +171,7 @@ export default function Login({ onLoginSuccess }) {
       lastError = authError;
 
       if (isNetworkError(authError) && attempt < maxRetries) {
-        setError(`Connection unstable. Retrying... (${attempt + 1}/${maxRetries})`);
-        await delay(1500 * (attempt + 1));
+        await delay(backoffs[Math.min(attempt, backoffs.length - 1)]);
         continue;
       }
       break;

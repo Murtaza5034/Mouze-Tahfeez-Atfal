@@ -10797,6 +10797,39 @@ h4.attendance-rating-text,
   box-shadow: 0 4px 12px rgba(61, 43, 31, 0.06);
 }
 
+.mp-clear-btn {
+  margin-top: 12px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border-radius: 11px;
+  border: 1px solid rgba(190, 140, 40, 0.45);
+  background: linear-gradient(135deg, #fff7e0, #f9eccd);
+  color: #8a6d1d;
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 10px rgba(197, 160, 89, 0.12);
+}
+
+.mp-clear-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(197, 160, 89, 0.28);
+}
+
+.mp-clear-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: saturate(0.4);
+}
+
 /* ---- Section groups ---- */
 .mp-section {
   position: relative;
