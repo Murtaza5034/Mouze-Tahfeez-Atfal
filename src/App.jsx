@@ -5837,14 +5837,15 @@ function ParentPortal({
     };
   }, [fetchPageVisibility]);
 
-  // Fetch self_jadwal data for read-only view
+  // Fetch self_jadwal data for read-only view (parent sees child's jadwal)
   const fetchReadJadwal = useCallback(async () => {
-    if (!user?.id) return;
+    const childUserId = parentData?.studentProfile?.parent_user_id || parentData?.studentProfile?.user_id;
+    if (!childUserId) return;
     setReadJadwalLoading(true);
     const { data, error } = await supabase
       .from('self_jadwal')
       .select('schedule_data, has_unseen_changes')
-      .eq('user_id', user.id)
+      .eq('user_id', childUserId)
       .single();
     if (error && error.code !== 'PGRST116') {
       console.error('Failed to fetch Self Jadwal:', error);
@@ -5864,7 +5865,7 @@ function ParentPortal({
       setReadJadwalUnseen(false);
     }
     setReadJadwalLoading(false);
-  }, [user?.id]);
+  }, [parentData?.studentProfile?.parent_user_id, parentData?.studentProfile?.user_id, selfJadwalRefreshKey]);
 
   useEffect(() => {
     fetchReadJadwal();
@@ -5872,22 +5873,24 @@ function ParentPortal({
 
   // Mark as viewed when opening
   useEffect(() => {
-    if (activePage === "Jadwal" && user?.id && readJadwalUnseen) {
-      supabase.from('self_jadwal').update({ has_unseen_changes: false }).eq('user_id', user.id).then(() => setReadJadwalUnseen(false));
+    const childUserId = parentData?.studentProfile?.parent_user_id || parentData?.studentProfile?.user_id;
+    if (activePage === "Jadwal" && childUserId && readJadwalUnseen) {
+      supabase.from('self_jadwal').update({ has_unseen_changes: false }).eq('user_id', childUserId).then(() => setReadJadwalUnseen(false));
     }
-  }, [activePage, user?.id]);
+  }, [activePage, parentData?.studentProfile?.parent_user_id, parentData?.studentProfile?.user_id, readJadwalUnseen]);
 
   // Real-time subscription for instant updates
   useEffect(() => {
-    if (!user?.id) return;
+    const childUserId = parentData?.studentProfile?.parent_user_id || parentData?.studentProfile?.user_id;
+    if (!childUserId) return;
     const channel = supabase.channel('self-jadwal-realtime')
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'self_jadwal', filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'self_jadwal', filter: `user_id=eq.${childUserId}` },
         () => { setSelfJadwalRefreshKey(k => k + 1); setReadJadwalUnseen(true); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id]);
+  }, [parentData?.studentProfile?.parent_user_id, parentData?.studentProfile?.user_id]);
 
   const openNotificationDetail = (event, notification) => {
     event?.preventDefault?.();
