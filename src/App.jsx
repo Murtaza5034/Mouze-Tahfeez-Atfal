@@ -19270,10 +19270,13 @@ export default function App() {
     // Cache-first: if cached auth exists, start with loading already false so the
     // first paint is the restored portal (any age of cached data) — never a loading
     // screen. Fresh data silently replaces the cached view in the background.
+    // Cached auth is only ever WRITTEN when the user chose "Remember me"
+    // (handleLoginSuccess), so its presence alone is sufficient — no need to re-read
+    // the rememberMe flag (which the Login page may store as "false" and would then
+    // wrongly force a loading screen on every open).
     try {
-      const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
       const cachedAuthRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
-      if (!rememberMe || !cachedAuthRaw) return true;
+      if (!cachedAuthRaw) return true;
       const cachedAuth = JSON.parse(cachedAuthRaw);
       if (!cachedAuth?.userId || !cachedAuth?.role) return true;
       return false;
@@ -19725,9 +19728,8 @@ export default function App() {
     // page instantly with no loading screen. Network data then refreshes silently.
     function restoreCacheSync() {
       try {
-        const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
         const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
-        if (!rememberMe || !cachedRaw) return null;
+        if (!cachedRaw) return null;
         const cached = JSON.parse(cachedRaw);
         if (!cached.userId || !cached.role) return null;
 
@@ -19757,9 +19759,8 @@ export default function App() {
     }
 
     async function tryRestoreCachedAuth(retries = 2) {
-      const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
       const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
-      if (!rememberMe || !cachedRaw) return false;
+      if (!cachedRaw) return false;
       try {
         const cached = JSON.parse(cachedRaw);
         if (!cached.userId || !cached.role) return false;
