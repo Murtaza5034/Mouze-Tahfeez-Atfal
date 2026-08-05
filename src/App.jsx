@@ -4858,8 +4858,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
           });
         }
       )
-      .subscribe()
-      .catch(() => {});
+      // subscribe() returns a Channel (not a Promise), so it has no .catch()
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [studentProfile?.student_id]);
 
@@ -5829,8 +5829,7 @@ function ParentPortal({
         { event: '*', schema: 'public', table: 'page_visibility', filter: 'role=eq.parents' },
         () => fetchPageVisibility().catch(() => {})
       )
-      .subscribe()
-      .catch(() => {});
+      .subscribe();
     // Fallback poll in case realtime is unavailable or delayed.
     const poll = setInterval(() => fetchPageVisibility().catch(() => {}), 30000);
     return () => {
@@ -5890,8 +5889,7 @@ function ParentPortal({
         { event: '*', schema: 'public', table: 'self_jadwal', filter: `user_id=eq.${childUserId}` },
         () => { setSelfJadwalRefreshKey(k => k + 1); setReadJadwalUnseen(true); }
       )
-      .subscribe()
-      .catch(() => {});
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [parentData?.studentProfile?.parent_user_id, parentData?.studentProfile?.user_id]);
 
@@ -7613,8 +7611,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
           });
         }
       )
-      .subscribe()
-      .catch(() => {});
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
 
