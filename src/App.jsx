@@ -2547,24 +2547,6 @@ async function authorizePortalAccess(user, requestedRole) {
     };
   }
 
-  if (tableAccess?.is_active && tableAccess.portal_role && tableAccess.portal_role !== requestedRole) {
-    return {
-      ok: false,
-      message: `This account is assigned to the ${ROLE_LABELS[tableAccess.portal_role] || tableAccess.portal_role
-        } portal in Supabase. It cannot open the ${requestedLabel} portal.`,
-    };
-  }
-
-  if (assignedRoles.includes(requestedRole)) {
-    return {
-      ok: true,
-      role: requestedRole,
-      assignedRoles,
-      parentProfile: null,
-      accessRow: null,
-    };
-  }
-
   // Allow admin access if teacher's email is in teacher_admin_access list
   if (requestedRole === "admin" && user?.email) {
     try {
@@ -2583,11 +2565,19 @@ async function authorizePortalAccess(user, requestedRole) {
             role: "admin",
             assignedRoles: [...assignedRoles, "admin"],
             parentProfile: null,
-            accessRow: null,
+            accessRow: tableAccess || null,
           };
         }
       }
     } catch (_) {}
+  }
+
+  if (tableAccess?.is_active && tableAccess.portal_role && tableAccess.portal_role !== requestedRole) {
+    return {
+      ok: false,
+      message: `This account is assigned to the ${ROLE_LABELS[tableAccess.portal_role] || tableAccess.portal_role
+        } portal in Supabase. It cannot open the ${requestedLabel} portal.`,
+    };
   }
 
   if (requestedRole === "parents") {
@@ -2628,18 +2618,18 @@ async function authorizePortalAccess(user, requestedRole) {
 }
 
 async function resolveInitialPortal(user, preferredRole) {
-  const tableAccess = await findPortalAccess(user.id);
-  const assignedRoles = getAssignedRoles(user);
-
-  if (tableAccess?.is_active && tableAccess.portal_role) {
-    return authorizePortalAccess(user, tableAccess.portal_role);
-  }
-
   if (preferredRole) {
     const preferredAccess = await authorizePortalAccess(user, preferredRole);
     if (preferredAccess.ok) {
       return preferredAccess;
     }
+  }
+
+  const tableAccess = await findPortalAccess(user.id);
+  const assignedRoles = getAssignedRoles(user);
+
+  if (tableAccess?.is_active && tableAccess.portal_role) {
+    return authorizePortalAccess(user, tableAccess.portal_role);
   }
 
   for (const role of assignedRoles) {
@@ -4623,7 +4613,7 @@ const shortMiqaatType = (type) => {
   return type;
 };
 
-function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
+function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], forceOpen = false }) {
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
   const [attachment, setAttachment] = useState(null);
@@ -4825,7 +4815,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
     fetchHistory();
     const timer = setInterval(checkTime, 60000);
     return () => clearInterval(timer);
-  }, [studentProfile]);
+  }, [studentProfile, forceOpen]);
 
   // Auto-scroll chat to the latest message (WhatsApp-style)
   useEffect(() => {
@@ -4898,6 +4888,13 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
   const checkTime = () => {
     const now = new Date();
     const hours = now.getHours();
+    // When the admin has turned the Parent Leave Portal ON, the apply window is
+    // force-open at any hour (parents can submit even after the normal 4pm close).
+    if (forceOpen) {
+      setStatus("open");
+      setTimeLeft("Leave portal is open by the school");
+      return;
+    }
     if (hours >= 0 && hours < 16) {
       setStatus("open");
       const closingTime = new Date();
@@ -5733,6 +5730,7 @@ function ParentPortal({
   const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
   const [secondsSpent, setSecondsSpent] = useState(0);
   const [pageVisibility, setPageVisibility] = useState({});
+  const [parentLeaveForceOpen, setParentLeaveForceOpen] = useState(false);
   const [parentArchiveResults, setParentArchiveResults] = useState([]);
   const [parentArchiveMonth, setParentArchiveMonth] = useState("");
   const [parentArchiveLoading, setParentArchiveLoading] = useState(false);
@@ -5806,10 +5804,14 @@ function ParentPortal({
     if (pvRes.data) {
       pvRes.data.forEach(p => { map[p.page_key] = p.visible; });
     }
-    // If admin has disabled the parent leave portal, hide Apply Leave
-    if (jsRes.data && jsRes.data.parent_leave_enabled === false) {
-      map['Apply Leave'] = false;
-    }
+    // Toggle semantics:
+    //   ON  (parent_leave_enabled = true)  → force-open the apply window at any
+    //       hour (parents can submit even after the normal 4pm close).
+    //   OFF (false/absent)                 → the normal 12am-4pm window applies
+    //       (form shows "closed, opens again at 12:00 AM" outside it).
+    // The page itself stays visible via page_visibility (admins can still hide
+    // the whole page there independently).
+    setParentLeaveForceOpen(jsRes.data?.parent_leave_enabled === true);
     setPageVisibility(map);
   }, []);
 
@@ -6675,7 +6677,7 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Apply Leave" && (
-          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} />
+          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} forceOpen={parentLeaveForceOpen} />
         )}
 
         {activePage === "Leave History" && (
@@ -11958,7 +11960,7 @@ const handleDownloadAllReports = async () => {
               {/* ── Parent Leave Portal Toggle ── */}
               {(() => {
                 const jsRow = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
-                const leaveEnabled = jsRow.parent_leave_enabled !== false;
+                const leaveEnabled = jsRow.parent_leave_enabled === true;
                 return (
                   <section className="form-card card-appear" style={{ marginTop: '24px', borderTop: '3px solid ' + (leaveEnabled ? '#16a34a' : '#dc2626') }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
@@ -11968,7 +11970,7 @@ const handleDownloadAllReports = async () => {
                           <h3 style={{ color: 'var(--deep-brown)' }}>Parent Leave Portal</h3>
                         </div>
                         <p className="subtitle" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--soft-brown)', maxWidth: '460px' }}>
-                          When enabled, parents can access the "Apply Leave" page in the parent portal to submit leave applications for their children.
+                          When ON, parents can submit leave applications at any time — including outside the normal 12:00 AM–4:00 PM window. When OFF, the regular window schedule applies.
                         </p>
                         <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{
@@ -11979,7 +11981,7 @@ const handleDownloadAllReports = async () => {
                             boxShadow: '0 0 8px ' + (leaveEnabled ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)'),
                           }} />
                           <span style={{ fontWeight: 700, fontSize: '0.9rem', color: leaveEnabled ? '#16a34a' : '#dc2626', fontFamily: 'Inter, sans-serif', letterSpacing: '0.5px' }}>
-                            {leaveEnabled ? '● LIVE — Parents can apply leave' : '● OFFLINE — Leave portal is hidden'}
+                            {leaveEnabled ? '● OPEN — Parents can apply leave anytime' : '● SCHEDULE — 12:00 AM–4:00 PM window'}
                           </span>
                         </div>
                       </div>
@@ -12009,7 +12011,7 @@ const handleDownloadAllReports = async () => {
                         onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px ' + (leaveEnabled ? 'rgba(220,38,38,0.2)' : 'rgba(22,163,74,0.2)'); }}
                         onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 14px ' + (leaveEnabled ? 'rgba(220,38,38,0.15)' : 'rgba(22,163,74,0.15)'); }}
                       >
-                        {leaveEnabled ? <><Lock size={18} /> Turn Off Leave Portal</> : <><Unlock size={18} /> Turn On Leave Portal</>}
+                        {leaveEnabled ? <><Lock size={18} /> Turn Off (Use Window Schedule)</> : <><Unlock size={18} /> Turn On Leave Portal (Force Open)</>}
                       </button>
                     </div>
                   </section>
@@ -19200,6 +19202,10 @@ export default function App() {
     "Notification" in window ? Notification.permission : "denied"
   );
   const fcmInitKeyRef = useRef(null);
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    isFirstRender.current = false;
+  }, []);
   const autoSaveTimerRef = useRef(null);
   const performAutoSaveRef = useRef(null);
   const currentStudentIdRef = useRef(null);
@@ -19669,7 +19675,7 @@ export default function App() {
     // When switching to admin role, reload data via get_all_child_profiles RPC
     // to bypass RLS (teachers toggled for admin access would otherwise see only their students).
     // On initial login, user is null here so this won't double-load.
-    if (user && portalRole === "admin") {
+    if (!isFirstRender.current && user && portalRole === "admin") {
       setLoading(true);
       loadPortalData(portalRole, user).catch(() => {
         if (typeof setLoading === 'function') setLoading(false);
@@ -19800,7 +19806,7 @@ export default function App() {
 
         for (let attempt = 0; attempt <= retries; attempt++) {
           try {
-            await loadPortalData(cached.role, { id: cached.userId, email: cached.email });
+            await loadPortalData(cached.role, { id: cached.userId, email: cached.email }, null, { silent: true });
             return true;
           } catch (e) {
             console.warn(`Offline: portal data unavailable (attempt ${attempt + 1}/${retries + 1})`, e);
@@ -19879,9 +19885,23 @@ export default function App() {
     async function handleAuthChange(event, session, options = {}) {
       if (!mounted) return;
 
+      // Determine if the current session matches the cached user auth to enable silent operation
+      const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      let isCached = false;
+      if (cachedRaw) {
+        try {
+          const cached = JSON.parse(cachedRaw);
+          if (cached.userId && cached.role && session && session.user && cached.userId === session.user.id) {
+            isCached = true;
+          }
+        } catch (_) {}
+      }
+
+      const silent = options.silent || isCached;
+
       // Prevent portal flicker by showing loading screen during role resolution,
       // unless we already rendered the portal from cache (silent background refresh).
-      if (!options.silent) setLoading(true);
+      if (!silent) setLoading(true);
 
       if (session) {
         setUser(session.user);
@@ -19918,6 +19938,7 @@ export default function App() {
             }
 
             // Restore cached data instantly while fresh data loads
+            let silentFetch = silent;
             try {
               const cachedRaw = localStorage.getItem('mauze_portal_cache');
               if (cachedRaw) {
@@ -19929,12 +19950,22 @@ export default function App() {
                     setSchoolData(cached.schoolData);
                   }
                   setLoading(false);
+                } else {
+                  // Role has changed! Show loading spinner and fetch new data
+                  silentFetch = false;
+                  setLoading(true);
                 }
+              } else {
+                silentFetch = false;
+                setLoading(true);
               }
-            } catch (_) {}
+            } catch (_) {
+              silentFetch = false;
+              setLoading(true);
+            }
 
-            if (options.silent) setLoading(false);
-            await loadPortalData(access.role, session.user, access.parentProfile, options.silent ? { silent: true } : undefined);
+            if (silentFetch) setLoading(false);
+            await loadPortalData(access.role, session.user, access.parentProfile, silentFetch ? { silent: true } : undefined);
           }
           } catch (err) {
           console.error("Auth initialization error:", err);
@@ -19980,7 +20011,20 @@ export default function App() {
           if (key.startsWith('sb-')) localStorage.removeItem(key);
         }
       }
-      handleAuthChange(event, session);
+
+      // Determine if we should handle silently based on cache matching the session
+      let isCached = false;
+      try {
+        const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached.userId && session?.user && cached.userId === session.user.id) {
+            isCached = true;
+          }
+        }
+      } catch (_) {}
+
+      handleAuthChange(event, session, isCached ? { silent: true } : undefined);
     });
 
     initialize();
@@ -20567,6 +20611,14 @@ export default function App() {
     setPortalRole(role);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEYS.role, role);
+      try {
+        const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          cached.role = role;
+          localStorage.setItem(STORAGE_KEYS.cachedAuth, JSON.stringify(cached));
+        }
+      } catch (_) {}
     }
   }
 
