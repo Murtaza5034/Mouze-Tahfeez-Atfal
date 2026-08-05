@@ -43,7 +43,7 @@ export default function AppUpdatePopup() {
       setLoading(true);
       const { data, error } = await supabase
         .from("app_releases")
-        .select("version_name, version_code, release_notes, created_at, force_update")
+        .select("version_name, version_code, release_notes, created_at, status, console_status")
         .eq("status", "live")
         .eq("console_status", "published")
         .order("created_at", { ascending: false })
@@ -79,7 +79,7 @@ export default function AppUpdatePopup() {
       }
 
       const currentDismissed = getDismissedVersion();
-      if (data.version_name === currentDismissed && !data.force_update) {
+      if (data.version_name === currentDismissed) {
         setDismissed(true); return;
       }
 

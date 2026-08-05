@@ -33,7 +33,7 @@ export function getRefreshReg() {
     },
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      injectRegister: 'inline',
       includeAssets: [
         'logo.png',
         'favicon.ico',
@@ -46,7 +46,7 @@ export function getRefreshReg() {
         'Qilka-Bold.otf',
       ],
       workbox: {
-        maximumFileSizeToCacheInBytes: 5242880,
+        maximumFileSizeToCacheInBytes: 10485760,
         globPatterns: ['**/*.{js,css,html,json,png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,otf}'],
         globIgnores: ['**/login background.jpg', '**/kanz-al-marjaan-webfont.svg'],
         runtimeCaching: [
@@ -118,14 +118,54 @@ export function getRefreshReg() {
   base: '/',
   build: {
     sourcemap: false,
-    minify: true,
+    minify: 'esbuild',
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('react/') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('@supabase/supabase-js')) {
+              return 'vendor-supabase';
+            }
+            if (id.includes('firebase')) {
+              return 'vendor-firebase';
+            }
+            if (id.includes('html2canvas') || id.includes('jspdf') || id.includes('jszip') || id.includes('file-saver')) {
+              return 'vendor-export';
+            }
+            if (id.includes('lottie-web') || id.includes('@lottiefiles/lottie-player')) {
+              return 'vendor-lottie';
+            }
+            if (id.includes('ai') || id.includes('@ai-sdk')) {
+              return 'vendor-ai';
+            }
             return 'vendor';
           }
+          if (id.includes('src/Jadwal') || id.includes('src/SelfJadwal') || id.includes('src/JadwalTrackingView')) {
+            return 'pages-jadwal';
+          }
+          if (id.includes('src/MarhalaPosts')) {
+            return 'pages-marhala';
+          }
+          if (id.includes('src/TakhteetProgress')) {
+            return 'pages-takhteet';
+          }
+          if (id.includes('src/SupportBot')) {
+            return 'pages-support';
+          }
+          if (id.includes('src/AppUpdateManager') || id.includes('src/AppUpdatePopup')) {
+            return 'pages-update';
+          }
         },
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
     chunkSizeWarningLimit: 1000,

@@ -225,6 +225,7 @@ const TakhteetProgress = ({ weeklyResult, currentJuz, reportSettings }) => {
   const wusoolPage = weeklyResult?.wusool_page;
   const nextWeekPage = weeklyResult?.next_week_page;
   const totalJadeedPages = weeklyResult?.total_jadeed_pages;
+  const totalJadeedUnit = weeklyResult?.total_jadeed_unit || 'صفه';
 
   const currentJuzNum = currentJuz ? parseInt(String(currentJuz).trim(), 10) : NaN;
   const isJuz1to25 = !isNaN(currentJuzNum) && currentJuzNum >= 1 && currentJuzNum <= 25;
@@ -377,14 +378,16 @@ const TakhteetProgress = ({ weeklyResult, currentJuz, reportSettings }) => {
             >
               <div className="done-weekly-display">
                 <span className="done-weekly-value kanz-font">{toArabicDigits(totalJadeedPages || '0')}</span>
-                <span className="done-weekly-unit">Pages</span>
+                <span className="done-weekly-unit kanz-font">
+                  {totalJadeedUnit && (totalJadeedUnit.includes('سطر') ? 'جملة صــ' : 'جملة صــ')}
+                </span>
               </div>
               <div className="metric-footer">
                 <span className="metric-pages done-highlight">
                   {totalJadeedPages ? (
-                    <>🎯 <span className="kanz-font">{toArabicDigits(totalJadeedPages)}</span> pages completed this week</>
+                    <>🎯 <span className="kanz-font">{toArabicDigits(totalJadeedPages)}</span> {totalJadeedUnit && (totalJadeedUnit.includes('سطر') ? 'سطر' : 'صفح')} <span className="kanz-font">تم هذا الأسبوع</span></>
                   ) : (
-                    <span className="muted">No pages recorded yet</span>
+                    <span className="muted kanz-font">لم تسجل صفحات بعد</span>
                   )}
                 </span>
               </div>

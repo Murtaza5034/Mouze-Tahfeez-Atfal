@@ -3024,7 +3024,7 @@ function LoadingScreen({ message, onComplete }) {
         completedRef.current = true;
         if (onComplete) onComplete();
       }
-    }, 950);
+    }, 100);
     return () => { clearTimeout(t); };
   }, [onComplete]);
   return (
@@ -4858,7 +4858,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [] }) {
           });
         }
       )
-      .subscribe();
+      .subscribe()
+      .catch(() => {});
     return () => { supabase.removeChannel(channel); };
   }, [studentProfile?.student_id]);
 
@@ -5828,7 +5829,8 @@ function ParentPortal({
         { event: '*', schema: 'public', table: 'page_visibility', filter: 'role=eq.parents' },
         () => fetchPageVisibility().catch(() => {})
       )
-      .subscribe();
+      .subscribe()
+      .catch(() => {});
     // Fallback poll in case realtime is unavailable or delayed.
     const poll = setInterval(() => fetchPageVisibility().catch(() => {}), 30000);
     return () => {
@@ -5888,7 +5890,8 @@ function ParentPortal({
         { event: '*', schema: 'public', table: 'self_jadwal', filter: `user_id=eq.${childUserId}` },
         () => { setSelfJadwalRefreshKey(k => k + 1); setReadJadwalUnseen(true); }
       )
-      .subscribe();
+      .subscribe()
+      .catch(() => {});
     return () => { supabase.removeChannel(channel); };
   }, [parentData?.studentProfile?.parent_user_id, parentData?.studentProfile?.user_id]);
 
@@ -7610,7 +7613,8 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
           });
         }
       )
-      .subscribe();
+      .subscribe()
+      .catch(() => {});
     return () => { supabase.removeChannel(channel); };
   }, []);
 
@@ -17599,24 +17603,57 @@ function TeacherPortal({
                       <div className="badal-premium-popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedBadalHistory(null); }}>
                         <div className="badal-premium-popup">
                           <div className="badal-premium-popup-header">
-                            <StudentAvatar student={student} size="small" />
-                            <div>
-                              <h4>{student.name} — My Entries</h4>
+                            <div className="badal-popup-avatar-wrapper">
+                              <StudentAvatar student={student} size="medium" />
+                              <span className="badal-popup-avatar-ring" />
+                            </div>
+                            <div className="badal-popup-student-info">
+                              <h4 className="badal-popup-student-name">{student.name} <span className="badal-history-label kanz-font">— سجل إدخالاتي</span></h4>
+                              {student.arabic_name && (
+                                <span className="badal-popup-student-arabic kanz-font">{student.arabic_name}</span>
+                              )}
+                              <div className="badal-popup-meta-row">
+                                <span className="badal-popup-meta-item">
+                                  <span className="badal-popup-meta-label">Juz</span>
+                                  <span className="badal-popup-meta-value">{student.juz || "—"}</span>
+                                </span>
+                                <span className="badal-popup-meta-divider" />
+                                <span className="badal-popup-meta-item">
+                                  <span className="badal-popup-meta-label">Surah</span>
+                                  <span className="badal-popup-meta-value arabic-text">{student.surat || "—"}</span>
+                                </span>
+                                <span className="badal-popup-meta-divider" />
+                                <span className="badal-popup-meta-item">
+                                  <span className="badal-popup-meta-label">Page</span>
+                                  <span className="badal-popup-meta-value">{student.page || student.safa || "—"}</span>
+                                </span>
+                              </div>
+                            </div>
+                            <div className="badal-popup-badges">
+                              <span className="badal-popup-badge badal-badge-history">
+                                <span className="badal-badge-icon">📜</span>
+                                <span className="kanz-font">تاريخ الإدخالات</span>
+                                <span className="badal-badge-count kanz-font">{myHistoryEntries.length}</span>
+                              </span>
                             </div>
                             <button className="badal-popup-close" onClick={() => setSelectedBadalHistory(null)}><X size={18} /></button>
                           </div>
                           {badalStudentHistory.length === 0 ? (
-                            <p style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)", fontStyle: "italic" }}>No entries yet for this student.</p>
+                            <div className="badal-popup-empty">
+                              <FileText size={32} style={{ color: 'var(--text-muted)', marginBottom: '12px', opacity: 0.5 }} />
+                              <p className="badal-empty-title kanz-font">لا توجد إدخالات بعد</p>
+                              <p className="badal-empty-subtitle kanz-font">إدخالاتك لهذا الطالب ستظهر هنا</p>
+                            </div>
                           ) : (
                             <div className="badal-table-wrap">
                               <table className="badal-premium-table">
                                 <thead>
                                   <tr>
-                                    <th>Date</th>
-                                    <th>Juz</th>
-                                    <th>Juz Hali</th>
-                                    <th>Jadeed</th>
-                                    <th>Notes</th>
+                                    <th className="kanz-font"><span className="th-icon">📅</span> التاريخ</th>
+                                    <th className="kanz-font"><span className="th-icon">📖</span> الجزء</th>
+                                    <th className="kanz-font"><span className="th-icon">📚</span> الجزء الحالي</th>
+                                    <th className="kanz-font"><span className="th-icon">✨</span> الجديد</th>
+                                    <th className="kanz-font"><span className="th-icon">📝</span> الملاحظات</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -17625,9 +17662,13 @@ function TeacherPortal({
                                     const juzHali = safeParse(entry.juz_hali);
                                     const jadeed = safeParse(entry.jadeed_surah_ayat);
                                     const dateStr = new Date(entry.created_at || entry.week_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                                    const arabicDate = new Date(entry.created_at || entry.week_date).toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric" });
                                     return (
                                       <tr key={entry.id || i}>
-                                        <td className="badal-table-date">{dateStr}</td>
+                                        <td className="badal-table-date">
+                                          <span className="date-en">{dateStr}</span>
+                                          <span className="date-ar kanz-font">{arabicDate}</span>
+                                        </td>
                                         <td className="badal-table-cell">{badalFormatJuz(juz) || "—"}</td>
                                         <td className="badal-table-cell">{badalFormatJuzHali(juzHali) || "—"}</td>
                                         <td className="badal-table-cell">{badalFormatJadeed(jadeed) || "—"}</td>
@@ -17749,38 +17790,104 @@ function TeacherPortal({
                             const student = selectedItem.student;
                             const displayData = badalTabProgress.length > 0 && String(badalTabProgress[0]?.student_id) === String(sid) ? badalTabProgress : [];
                             const safeParse = (v) => { if (!v) return null; try { return JSON.parse(v); } catch { return null; } };
+                            const getStudentInfo = () => {
+                              const base = (schoolData?.students || []).find(s => String(s.student_id) === String(sid));
+                              return base || student;
+                            };
+                            const studentInfo = getStudentInfo();
+                            const originalTeacherName = selectedItem.original_teacher_id 
+                              ? (teacherProfiles.find(p => p.user_id === selectedItem.original_teacher_id)?.full_name || 
+                                 (schoolData?.portalAccessList || []).find(p => p.user_id === selectedItem.original_teacher_id)?.full_name ||
+                                 "—")
+                              : "—";
+                            const badalTeacherName = selectedItem.badalTeacherInfo?.full_name || "—";
+                            const currentWeek = new Date().toISOString().slice(0, 10);
+                            const hasTodayEntry = displayData.some(p => 
+                              String(p.teacher_id) === String(rawId) && 
+                              (p.week_date === currentWeek || (p.created_at && p.created_at.slice(0, 10) === currentWeek))
+                            );
                             return (
                               <div className="badal-premium-popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedBadalOriginal(null); }}>
                                 <div className="badal-premium-popup">
                                   <div className="badal-premium-popup-header">
-                                    <StudentAvatar student={student} size="small" />
-                                    <div>
-                                      <h4>{student.name}</h4>
+                                    <div className="badal-popup-avatar-wrapper">
+                                      <StudentAvatar student={student} size="medium" />
+                                      <span className="badal-popup-avatar-ring" />
+                                    </div>
+                                    <div className="badal-popup-student-info">
+                                      <h4 className="badal-popup-student-name">{student.name}</h4>
                                       {student.arabic_name && (
-                                        <span className="arabic-kanz" style={{ fontSize: "1rem", color: "var(--primary-gold)" }}>{student.arabic_name}</span>
+                                        <span className="badal-popup-student-arabic kanz-font">{student.arabic_name}</span>
+                                      )}
+                                      <div className="badal-popup-meta-row">
+                                        <span className="badal-popup-meta-item">
+                                          <span className="badal-popup-meta-label">Juz</span>
+                                          <span className="badal-popup-meta-value">{studentInfo.juz || "—"}</span>
+                                        </span>
+                                        <span className="badal-popup-meta-divider" />
+                                        <span className="badal-popup-meta-item">
+                                          <span className="badal-popup-meta-label">Surah</span>
+                                          <span className="badal-popup-meta-value arabic-text">{studentInfo.surat || "—"}</span>
+                                        </span>
+                                        <span className="badal-popup-meta-divider" />
+                                        <span className="badal-popup-meta-item">
+                                          <span className="badal-popup-meta-label">Page</span>
+                                          <span className="badal-popup-meta-value">{studentInfo.page || studentInfo.safa || "—"}</span>
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="badal-popup-badges">
+                                      {selectedItem.type === "original" && (
+                                        <span className="badal-popup-badge badal-badge-original">
+                                          <span className="badal-badge-icon">👑</span>
+                                          <span className="kanz-font">أستاذ أصلي</span>
+                                          <span className="badal-badge-teacher kanz-font">{originalTeacherName}</span>
+                                        </span>
+                                      )}
+                                      {selectedItem.type === "badal" && (
+                                        <span className="badal-popup-badge badal-badge-badal">
+                                          <span className="badal-badge-icon">⚡</span>
+                                          <span className="kanz-font">بدل</span>
+                                          <span className="badal-badge-teacher kanz-font">{badalTeacherName}</span>
+                                        </span>
+                                      )}
+                                      {hasTodayEntry && (
+                                        <span className="badal-popup-badge badal-badge-today">
+                                          <span className="badal-badge-icon">✓</span>
+                                          <span className="kanz-font">تم اليوم</span>
+                                        </span>
                                       )}
                                     </div>
-                                    {selectedItem.type === "original" && selectedItem.badalTeacherInfo && (
-                                      <span className="badal-popup-badge">⚡ Badal: {selectedItem.badalTeacherInfo.full_name}</span>
-                                    )}
                                     <button className="badal-popup-close" onClick={() => setSelectedBadalOriginal(null)}><X size={18} /></button>
                                   </div>
                                   {badalTabLoading ? (
-                                    <p style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)", fontStyle: "italic" }}>Loading...</p>
+                                    <div className="badal-popup-loading">
+                                      <div className="badal-loader" />
+                                      <p className="kanz-font">جاري التحميل...</p>
+                                    </div>
                                   ) : displayData.length === 0 ? (
-                                    <p style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)", fontStyle: "italic" }}>
-                                      {selectedItem.type === "original" ? "No progress updates yet from the badal teacher." : "No entries yet. Fill a Badal Entry for this student."}
-                                    </p>
+                                    <div className="badal-popup-empty">
+                                      <RotateCw size={32} style={{ color: 'var(--text-muted)', marginBottom: '12px', opacity: 0.5 }} />
+                                      <p className="badal-empty-title kanz-font">
+                                        {selectedItem.type === "original" ? "لا توجد تحديثات من أستاذ البدل بعد" : "لا توجد إدخالات بعد. أضف إدخال بدل لهذا الطالب"}
+                                      </p>
+                                      <p className="badal-empty-subtitle kanz-font">
+                                        {selectedItem.type === "original" 
+                                          ? "سيظهر تقدم الطالب هنا بمجرد أن يسجل أستاذ البدل التحديثات"
+                                          : "اضغط على \"إدخال بدل\" لإضافة تقدم لهذا الطالب"}
+                                      </p>
+                                    </div>
                                   ) : (
                                     <div className="badal-table-wrap">
                                       <table className="badal-premium-table">
                                         <thead>
                                           <tr>
-                                            <th>Date</th>
-                                            <th>Juz</th>
-                                            <th>Juz Hali</th>
-                                            <th>Jadeed</th>
-                                            <th>Notes</th>
+                                            <th className="kanz-font"><span className="th-icon">📅</span> التاريخ</th>
+                                            <th className="kanz-font"><span className="th-icon">📖</span> الجزء</th>
+                                            <th className="kanz-font"><span className="th-icon">📚</span> الجزء الحالي</th>
+                                            <th className="kanz-font"><span className="th-icon">✨</span> الجديد</th>
+                                            <th className="kanz-font"><span className="th-icon">📝</span> الملاحظات</th>
+                                            <th className="th-teacher kanz-font">الأستاز</th>
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -17789,13 +17896,25 @@ function TeacherPortal({
                                             const juzHali = safeParse(entry.juz_hali);
                                             const jadeed = safeParse(entry.jadeed_surah_ayat);
                                             const dateStr = new Date(entry.created_at || entry.week_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                                            const arabicDate = new Date(entry.created_at || entry.week_date).toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric" });
+                                            const teacherName = entry.teacher_id 
+                                              ? (teacherProfiles.find(p => p.user_id === entry.teacher_id)?.full_name || "—")
+                                              : "—";
+                                            const isMyEntry = String(entry.teacher_id) === String(rawId);
                                             return (
-                                              <tr key={entry.id || i}>
-                                                <td className="badal-table-date">{dateStr}</td>
+                                              <tr key={entry.id || i} className={isMyEntry ? "my-entry" : ""}>
+                                                <td className="badal-table-date">
+                                                  <span className="date-en">{dateStr}</span>
+                                                  <span className="date-ar kanz-font">{arabicDate}</span>
+                                                </td>
                                                 <td className="badal-table-cell">{badalFormatJuz(juz) || "—"}</td>
                                                 <td className="badal-table-cell">{badalFormatJuzHali(juzHali) || "—"}</td>
                                                 <td className="badal-table-cell">{badalFormatJadeed(jadeed) || "—"}</td>
                                                 <td className="badal-table-cell">{entry.notes || "—"}</td>
+                                                <td className="badal-table-teacher">
+                                                  <span className={isMyEntry ? "teacher-me" : ""}>{teacherName}</span>
+                                                  {isMyEntry && <span className="teacher-me-badge">أنت</span>}
+                                                </td>
                                               </tr>
                                             );
                                           })}
@@ -18794,7 +18913,14 @@ function badalFormatJuzHali(d) {
   if (d.type === "no") return <span className="badal-no-badge">NO</span>;
   const suffix = d.marks ? ` · ${d.marks}/10` : '';
   if (d.type === "surah") {
-    return <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>{d.from || "?"} → {d.till || "?"}{suffix}</span>;
+    return (
+      <span style={{ fontSize: "0.85rem" }}>
+        <span className="arabic-kanz">{d.from || "?"}</span>
+        <span className="badal-latin-text"> → </span>
+        <span className="arabic-kanz">{d.till || "?"}</span>
+        <span className="badal-latin-text">{suffix}</span>
+      </span>
+    );
   }
   if (d.type === "pages") return <span>Pages {d.from || "?"} → {d.till || "?"}{suffix}</span>;
   return <span>Juz {d.from || "?"} → {d.till || "?"}{suffix}</span>;
@@ -18807,14 +18933,25 @@ function badalFormatJadeed(d) {
     const ws = d.wusoolSurah && SURAH_NAMES_AR[Number(d.wusoolSurah) - 1] ? SURAH_NAMES_AR[Number(d.wusoolSurah) - 1] : "";
     const wa = d.wusoolAyah ? `Ayat ${d.wusoolAyah}` : "";
     const wp = d.wusoolPage ? `pg ${d.wusoolPage}` : "";
-    const wusoolParts = [wj, ws, wa, wp].filter(Boolean).join(" · ");
-    return <span className="badal-no-badge">NO{wusoolParts ? ` · ${wusoolParts}` : ""}</span>;
+    const wusoolParts = [wj, ws, wa, wp].filter(Boolean);
+    if (!wusoolParts.length) return <span className="badal-no-badge">NO</span>;
+    return (
+      <span className="badal-no-badge">NO ·{" "}
+        {wusoolParts.map((p, i) => (
+          <span key={i} className="badal-latin-text">
+            {p === ws ? <span className="arabic-kanz">{p}</span> : p}
+            {i < wusoolParts.length - 1 ? " · " : ""}
+          </span>
+        ))}
+      </span>
+    );
   }
   if (d.type === "surah_ayat" || (d.surah && d.ayat)) {
     const name = badalJuzName(d.surah) || "?";
     return (
-      <span className="arabic-kanz" style={{ fontSize: "0.85rem" }}>
-        {name}{d.ayat ? ` · ${d.ayat}` : ""}{d.page ? ` · pg ${d.page}` : ""}
+      <span style={{ fontSize: "0.85rem" }}>
+        <span className="arabic-kanz">{name}</span>
+        <span className="badal-latin-text">{d.ayat ? ` · ${d.ayat}` : ""}{d.page ? ` · pg ${d.page}` : ""}</span>
       </span>
     );
   }
@@ -19071,7 +19208,17 @@ export default function App() {
   const currentStudentIdRef = useRef(null);
   const [saveStatus, setSaveStatus] = useState("");
   const [saveErrorDetails, setSaveErrorDetails] = useState("");
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const cachedAuthRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (!cachedAuthRaw) return null;
+      const cached = JSON.parse(cachedAuthRaw);
+      if (cached?.userId) return { id: cached.userId, email: cached.email };
+      return null;
+    } catch (_) {
+      return null;
+    }
+  });
 
 
   const [portalAccess, setPortalAccess] = useState(emptyPortalAccess);
@@ -19079,8 +19226,15 @@ export default function App() {
     if (typeof window === "undefined") {
       return "parents";
     }
-
-    return "parents"; // Start with a safe default, will be overridden by auth
+    try {
+      const cachedAuthRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (cachedAuthRaw) {
+        const cached = JSON.parse(cachedAuthRaw);
+        if (cached?.role) return cached.role;
+      }
+    } catch (_) {}
+    const saved = localStorage.getItem(STORAGE_KEYS.role);
+    return saved || "parents";
   });
   const [activePage, setActivePage] = useState(DEFAULT_PAGE_BY_ROLE.parents);
   const [searchPageLoading, setSearchPageLoading] = useState(false);
@@ -19096,12 +19250,15 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    // Cleanup old service workers (like OneSignal) to prevent conflicts with FCM
+    // Cleanup only legacy OneSignal service workers (not the app's own sw.js / workbox
+    // or the firebase-messaging-sw). Unregistering the Workbox service worker here would
+    // wipe the PWA cache on every mount and force a full network load each open.
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (const registration of registrations) {
-          if (!registration.active?.scriptURL.includes('firebase-messaging-sw.js')) {
-            console.log('Unregistering old service worker:', registration.active?.scriptURL);
+          const url = registration.active?.scriptURL || '';
+          if (url.includes('OneSignalSDK') || url.includes('onesignal')) {
+            console.log('Unregistering legacy OneSignal service worker:', url);
             registration.unregister();
           }
         }
@@ -19109,8 +19266,22 @@ export default function App() {
     }
   }, []);
 
-  const [loading, setLoading] = useState(true);
-  const [splashDone, setSplashDone] = useState(false);
+  const [loading, setLoading] = useState(() => {
+    // Cache-first: if cached auth exists, start with loading already false so the
+    // first paint is the restored portal (any age of cached data) — never a loading
+    // screen. Fresh data silently replaces the cached view in the background.
+    try {
+      const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
+      const cachedAuthRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (!rememberMe || !cachedAuthRaw) return true;
+      const cachedAuth = JSON.parse(cachedAuthRaw);
+      if (!cachedAuth?.userId || !cachedAuth?.role) return true;
+      return false;
+    } catch (_) {
+      return true;
+    }
+  });
+  const [splashDone, setSplashDone] = useState(true);
   const [appLockEnabled, setAppLockEnabled] = useState(() => isAppLockEnabled());
   const [appLocked, setAppLocked] = useState(() => {
     const enabled = isAppLockEnabled();
@@ -19127,15 +19298,51 @@ export default function App() {
   const [attachedFileUrl, setAttachedFileUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadingTeacherPhoto, setUploadingTeacherPhoto] = useState(false);
-  const [parentData, setParentData] = useState(emptyParentData);
-  const [schoolData, setSchoolData] = useState({
-    students: [],
-    weeklyResults: [],
-    announcements: [],
-    schedule: [],
-    portalAccessList: [],
-    teacherProfiles: [],
-    weeklyResultsArchive: [],
+  const [parentData, setParentData] = useState(() => {
+    try {
+      const raw = localStorage.getItem('mauze_portal_cache');
+      if (!raw) return emptyParentData;
+      const cache = JSON.parse(raw);
+      if (cache?.role === 'parents' && cache?.parentData) return cache.parentData;
+      return emptyParentData;
+    } catch (_) {
+      return emptyParentData;
+    }
+  });
+  const [schoolData, setSchoolData] = useState(() => {
+    try {
+      const raw = localStorage.getItem('mauze_portal_cache');
+      if (!raw) return {
+        students: [],
+        weeklyResults: [],
+        announcements: [],
+        schedule: [],
+        portalAccessList: [],
+        teacherProfiles: [],
+        weeklyResultsArchive: [],
+      };
+      const cache = JSON.parse(raw);
+      if (cache?.role !== 'parents' && cache?.schoolData) return cache.schoolData;
+      return {
+        students: [],
+        weeklyResults: [],
+        announcements: [],
+        schedule: [],
+        portalAccessList: [],
+        teacherProfiles: [],
+        weeklyResultsArchive: [],
+      };
+    } catch (_) {
+      return {
+        students: [],
+        weeklyResults: [],
+        announcements: [],
+        schedule: [],
+        portalAccessList: [],
+        teacherProfiles: [],
+        weeklyResultsArchive: [],
+      };
+    }
   });
   const [customGroups, setCustomGroups] = useState([]);
   const [teacherAttendance, setTeacherAttendance] = useState([]);
@@ -19175,7 +19382,7 @@ export default function App() {
   // Preload all lazy page chunks once the app is ready so navigating to any page
   // opens instantly without flashing the full-screen loading indicator.
   useEffect(() => {
-    if (loading || !splashDone) return;
+    if (loading) return;
     const run = () => {
       import("./Jadwal").catch(() => {});
       import("./SelfJadwal").catch(() => {});
@@ -19189,7 +19396,7 @@ export default function App() {
     } else {
       setTimeout(run, 150);
     }
-  }, [loading, splashDone]);
+  }, [loading]);
 
   // Midnight day-reset ticker for daily attendance card
 
@@ -19513,6 +19720,42 @@ export default function App() {
       if (mounted) setLoading(false);
     }, 3500);
 
+    // CACHE-FIRST STARTUP: Synchronously restore user + role + cached portal data
+    // from localStorage BEFORE any network call, so returning users see their last
+    // page instantly with no loading screen. Network data then refreshes silently.
+    function restoreCacheSync() {
+      try {
+        const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
+        const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+        if (!rememberMe || !cachedRaw) return null;
+        const cached = JSON.parse(cachedRaw);
+        if (!cached.userId || !cached.role) return null;
+
+        setUser({ id: cached.userId, email: cached.email });
+        storeRole(cached.role);
+        setPortalAccess(emptyPortalAccess);
+
+        try {
+          const cacheRaw = localStorage.getItem('mauze_portal_cache');
+          if (cacheRaw) {
+            const cacheData = JSON.parse(cacheRaw);
+            if (cacheData.role === cached.role) {
+              if (cached.role === 'parents' && cacheData.parentData) {
+                setParentData(cacheData.parentData);
+              } else if (cacheData.schoolData) {
+                setSchoolData(cacheData.schoolData);
+              }
+            }
+          }
+        } catch (_) {}
+
+        setLoading(false);
+        return cached;
+      } catch (_) {
+        return null;
+      }
+    }
+
     async function tryRestoreCachedAuth(retries = 2) {
       const rememberMe = localStorage.getItem(STORAGE_KEYS.rememberMe) === "true";
       const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
@@ -19578,6 +19821,9 @@ export default function App() {
       // OTP flag in sessionStorage persists across page refreshes (no OTP prompt)
       // but is automatically cleared when the tab/browser closes (OTP prompt shown).
       // localStorage keeps a copy for tryRestoreCachedAuth fallback.
+      // Cache-first: restore instantly so returning users never see a loading screen.
+      const cacheRestored = restoreCacheSync();
+
       // Check session FIRST before deleting tokens
       let session = null;
       try {
@@ -19591,6 +19837,11 @@ export default function App() {
       if (!mounted) return;
 
       if (session) {
+        if (cacheRestored) {
+          // Portal already rendered from cache — just refresh data silently.
+          handleAuthChange("INITIAL_SESSION", session, { silent: true });
+          return;
+        }
         handleAuthChange("INITIAL_SESSION", session);
         return;
       }
@@ -19599,6 +19850,10 @@ export default function App() {
       try {
         const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
         if (refreshedSession && mounted) {
+          if (cacheRestored) {
+            handleAuthChange("SIGNED_IN", refreshedSession, { silent: true });
+            return;
+          }
           handleAuthChange("SIGNED_IN", refreshedSession);
           return;
         }
@@ -19623,11 +19878,12 @@ export default function App() {
       }
     }
 
-    async function handleAuthChange(event, session) {
+    async function handleAuthChange(event, session, options = {}) {
       if (!mounted) return;
 
-      // Prevent portal flicker by showing loading screen during role resolution
-      setLoading(true);
+      // Prevent portal flicker by showing loading screen during role resolution,
+      // unless we already rendered the portal from cache (silent background refresh).
+      if (!options.silent) setLoading(true);
 
       if (session) {
         setUser(session.user);
@@ -19668,7 +19924,7 @@ export default function App() {
               const cachedRaw = localStorage.getItem('mauze_portal_cache');
               if (cachedRaw) {
                 const cached = JSON.parse(cachedRaw);
-                if (cached.role === access.role && Date.now() - cached._t < 86400000) {
+                if (cached.role === access.role) {
                   if (access.role === 'parents' && cached.parentData) {
                     setParentData(cached.parentData);
                   } else if (cached.schoolData) {
@@ -19679,7 +19935,8 @@ export default function App() {
               }
             } catch (_) {}
 
-            await loadPortalData(access.role, session.user, access.parentProfile);
+            if (options.silent) setLoading(false);
+            await loadPortalData(access.role, session.user, access.parentProfile, options.silent ? { silent: true } : undefined);
           }
           } catch (err) {
           console.error("Auth initialization error:", err);
@@ -19793,6 +20050,54 @@ export default function App() {
       loadPortalData(portalRole, user, null, { silent: true });
     }
   }, [selectedStudentId, portalRole, user]);
+
+  // REALTIME: Listen for backend changes to the key portal tables and update the UI
+  // instantly in the background — no manual refresh, no loading screen. Debounced so
+  // rapid changes (e.g. a teacher filling many rows) only trigger one refresh.
+  useEffect(() => {
+    if (!user || !portalRole) return;
+
+    let refreshTimer = null;
+    const scheduleRefresh = () => {
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        loadPortalData(portalRole, user, null, { silent: true }).catch(() => {});
+      }, 400);
+    };
+
+    const tables =
+      portalRole === "parents"
+        ? ["weekly_results", "student_daily_attendance", "schedule", "events", "child_profiles", "report_settings", "jadwal_settings"]
+        : portalRole === "teacher"
+          ? ["weekly_results", "student_daily_attendance", "teacher_profiles", "schedule", "events", "report_settings", "jadwal_settings", "child_profiles"]
+          : ["weekly_results", "student_daily_attendance", "teacher_profiles", "schedule", "events", "report_settings", "jadwal_settings", "child_profiles", "portal_access"];
+
+    const channel = supabase.channel(`portal-realtime-${portalRole}`);
+    tables.forEach((table) => {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table },
+        scheduleRefresh
+      );
+    });
+    channel.subscribe((status) => {
+      if (status !== "SUBSCRIBED" && status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") {
+        // Keep a fallback poll for browsers/networks without realtime support.
+      }
+    });
+
+    const fallbackPoll = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadPortalData(portalRole, user, null, { silent: true }).catch(() => {});
+      }
+    }, 60000);
+
+    return () => {
+      clearTimeout(refreshTimer);
+      clearInterval(fallbackPoll);
+      supabase.removeChannel(channel);
+    };
+  }, [portalRole, user]);
 
   async function loadPortalData(role, currentUser, parentProfileOverride = null, { silent = false } = {}) {
     if (!currentUser) {
@@ -20718,8 +21023,9 @@ export default function App() {
           );
         
         notificationChannel.subscribe((status) => {
-          if (status === 'CHANNEL_ERROR') {
-            console.warn("Realtime subscription blocked or failed. This is often caused by ad-blockers.");
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            // Realtime may be blocked (ad-blocker/firewall) or slow — silently fall
+            // back to periodic silent refreshes so updates still arrive.
           }
         });
       } catch (err) {
@@ -22066,11 +22372,6 @@ const handleSendCustomNotification = async (event) => {
 
 
 
-  if (loading || !splashDone) {
-    return <LoadingScreen message="Connecting to Mauze Tahfeez..." onComplete={() => setSplashDone(true)} />;
-  }
-
-
   // Public route: Show Privacy Policy without authentication
   // Supports both /privacy path and ?page=privacy query param
   if (typeof window !== "undefined" && (
@@ -22084,6 +22385,40 @@ const handleSendCustomNotification = async (event) => {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: '#fffdf8',
+        flexDirection: 'column',
+        gap: '16px',
+        padding: '20px',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          border: '3px solid #f0e6d3',
+          borderTopColor: '#d4af37',
+          animation: 'spin 0.8s linear infinite'
+        }}></div>
+        <p style={{
+          color: '#8a786a',
+          fontFamily: "'Segoe UI',system-ui,sans-serif",
+          fontSize: '14px',
+          letterSpacing: '0.05em',
+          margin: 0
+        }}>Loading...</p>
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
 
 
   return (
