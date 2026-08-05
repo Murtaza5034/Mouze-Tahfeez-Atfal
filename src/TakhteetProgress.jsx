@@ -379,7 +379,7 @@ const TakhteetProgress = ({ weeklyResult, currentJuz, reportSettings }) => {
               <div className="done-weekly-display">
                 <span className="done-weekly-value kanz-font">{toArabicDigits(totalJadeedPages || '0')}</span>
                 <span className="done-weekly-unit kanz-font">
-                  {totalJadeedUnit && (totalJadeedUnit.includes('سطر') ? 'جملة صــ' : 'جملة صــ')}
+                  {totalJadeedUnit && (String(totalJadeedUnit).startsWith('سطر') ? 'جملة سطر' : 'جملة صــ')}
                 </span>
               </div>
               <div className="metric-footer">
