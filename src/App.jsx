@@ -4892,7 +4892,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
     // force-open at any hour (parents can submit even after the normal 4pm close).
     if (forceOpen) {
       setStatus("open");
-      setTimeLeft("Leave portal is open by the school");
+      setTimeLeft("Leave portal is open by the Admin");
       return;
     }
     if (hours >= 0 && hours < 16) {
