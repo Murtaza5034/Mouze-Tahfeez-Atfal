@@ -5061,6 +5061,428 @@ function AdminTahfeezTracker({ sb }) {
   );
 }
 
+/* ─── Realtime Presence Hook for Online Tahfeez ─── */
+function useTahfeezPresence({ userId, userRole, userName, isCalling = false, activeCallTargetId = null }) {
+  const [onlineUsers, setOnlineUsers] = useState({});
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase.channel('tahfeez-global-presence', {
+      config: { presence: { key: `${userRole}_${userId}` } }
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const map = {};
+        Object.values(state).flat().forEach(item => {
+          if (item.userId) {
+            map[item.userId] = item;
+          }
+        });
+        setOnlineUsers(map);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            userId,
+            userRole,
+            userName,
+            isCalling,
+            activeCallTargetId,
+            onlineAt: new Date().toISOString()
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, userRole, userName, isCalling, activeCallTargetId]);
+
+  return onlineUsers;
+}
+
+/* ─── Busy / Waiting Queue Modal for Online Tahfeez ─── */
+function TahfeezBusyWaitingModal({ teacherName, onClose }) {
+  return createPortal(
+    <div className="card-appear" style={{
+      position: 'fixed', inset: 0, zIndex: 9999999,
+      background: 'rgba(10, 8, 6, 0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center'
+    }}>
+      <div style={{
+        maxWidth: 460, width: '100%', background: 'linear-gradient(135deg, #1f1912, #2b2216)',
+        border: '1px solid rgba(212,175,55,0.4)', borderRadius: 24, padding: 32,
+        textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', color: '#fff'
+      }}>
+        <div style={{
+          width: 70, height: 70, borderRadius: '50%', background: 'rgba(212,175,55,0.15)',
+          border: '2px solid #d4af37', margin: '0 auto 20px', display: 'grid', placeItems: 'center',
+          boxShadow: '0 0 20px rgba(212,175,55,0.3)'
+        }}>
+          <Clock size={36} style={{ color: '#d4af37' }} className="animate-spin" />
+        </div>
+
+        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.3rem', color: '#d4af37' }}>
+          Teacher is Currently in a Call
+        </h3>
+        <p style={{ fontSize: '0.9rem', color: '#e2e8f0', lineHeight: 1.5, margin: '0 0 20px 0' }}>
+          {teacherName || 'Your Muhaffiz'} is currently conducting a 4K Tahfeez session with another student.
+          <br/><strong style={{ color: '#86efac' }}>They will join you soon! Please stay on this screen.</strong>
+        </p>
+
+        <div style={{
+          background: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 18px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 24,
+          border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <Radio size={18} style={{ color: '#22c55e' }} className="animate-pulse" />
+          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Standing by for auto-connect...</span>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            padding: '10px 24px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.2)',
+            background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer'
+          }}
+        >
+          Cancel & Return
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ─── Parent Home Online Tahfeez Premium Card ─── */
+function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisibility, onStartCall }) {
+  const isHidden = pageVisibility?.online_tahfeez === false || pageVisibility?.["Online Tahfeez"] === false;
+
+  const mTeacher = (teacherProfiles || []).find(t => {
+    const mName = normalizeText(studentProfile?.teacherName || "");
+    return (mName && normalizeText(t.full_name) === mName) ||
+      String(t.id) === String(studentProfile?.muhaffiz_id) ||
+      String(t.user_id) === String(studentProfile?.muhaffiz_id) ||
+      String(t.id) === String(studentProfile?.original_teacher_id) ||
+      String(t.user_id) === String(studentProfile?.original_teacher_id);
+  });
+
+  const teacherName = mTeacher?.full_name || studentProfile?.teacherName || "Teacher";
+  const teacherId = mTeacher?.user_id || mTeacher?.id || studentProfile?.original_teacher_id || "t1";
+  const studentId = studentProfile?.student_id || "001";
+  const studentName = studentProfile?.name || studentProfile?.full_name || "Student";
+
+  const onlinePresence = useTahfeezPresence({
+    userId: studentId,
+    userRole: "parent",
+    userName: studentName
+  });
+
+  const teacherPresence = Object.values(onlinePresence || {}).find(
+    p => String(p.userId) === String(teacherId) || p.userRole === "teacher"
+  );
+
+  const isTeacherOnline = Boolean(teacherPresence);
+  const isTeacherBusy = teacherPresence?.isCalling === true && teacherPresence?.activeCallTargetId !== studentId;
+
+  return (
+    <div className="card-appear" style={{ marginBottom: '20px' }}>
+      <div style={{
+        background: isHidden
+          ? 'linear-gradient(135deg, #1c1917, #292524)'
+          : 'linear-gradient(135deg, #1a150e, #2c2215)',
+        color: '#fff', padding: '20px 24px', borderRadius: '20px',
+        border: `1px solid ${isHidden ? 'rgba(255,255,255,0.1)' : 'rgba(212,175,55,0.4)'}`,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.25)', position: 'relative', overflow: 'hidden'
+      }}>
+        <div style={{
+          position: 'absolute', top: -30, right: -30, width: 140, height: 140, borderRadius: '50%',
+          background: isHidden ? 'rgba(255,255,255,0.03)' : 'rgba(212,175,55,0.08)', pointerEvents: 'none'
+        }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: '16px',
+              background: isHidden ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #d4af37, #b8860b)',
+              display: 'grid', placeItems: 'center', color: isHidden ? '#a1a1aa' : '#000', flexShrink: 0,
+              boxShadow: isHidden ? 'none' : '0 4px 16px rgba(212,175,55,0.4)'
+            }}>
+              <Video size={26} />
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0, color: isHidden ? '#a1a1aa' : '#d4af37', fontSize: '1.1rem', fontWeight: 800 }}>
+                  Online Tahfeez 4K HD
+                </h3>
+
+                {isHidden ? (
+                  <span style={{ background: 'rgba(239,68,68,0.2)', color: '#fca5a5', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.3)' }}>
+                    OFF BY ADMIN
+                  </span>
+                ) : (
+                  <span style={{ background: '#d4af37', color: '#000', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 12 }}>
+                    4K ULTRA HD
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, fontSize: '0.84rem' }}>
+                <span style={{ color: '#cbd5e1' }}>Teacher: <strong>{teacherName}</strong></span>
+                {!isHidden && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', padding: '2px 10px', borderRadius: 12 }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: isTeacherOnline ? '#22c55e' : '#ef4444',
+                      boxShadow: isTeacherOnline ? '0 0 8px #22c55e' : '0 0 6px #ef4444'
+                    }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isTeacherOnline ? '#86efac' : '#fca5a5' }}>
+                      {isTeacherOnline ? (isTeacherBusy ? 'In Another Call ⏳' : 'Online 🟢') : 'Offline 🔴'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            {isHidden ? (
+              <div style={{ fontSize: '0.8rem', color: '#a1a1aa', fontStyle: 'italic', background: 'rgba(255,255,255,0.05)', padding: '8px 14px', borderRadius: 10 }}>
+                🔒 Feature is currently turned OFF by Admin.
+              </div>
+            ) : (
+              <button
+                onClick={() => onStartCall({
+                  id: `tahfeez_${studentId}_${Date.now()}`,
+                  student_id: studentId,
+                  student_name: studentName,
+                  teacher_id: teacherId,
+                  teacher_name: teacherName,
+                  started_at: new Date().toISOString(),
+                  isTeacherBusy
+                })}
+                style={{
+                  padding: '12px 22px', borderRadius: 28, border: 'none',
+                  background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
+                  fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                  boxShadow: '0 6px 20px rgba(212,175,55,0.4)', transition: 'all 0.2s ease'
+                }}
+              >
+                <Video size={18} /> {isTeacherBusy ? 'Teacher Busy (Join Queue)' : 'Join 4K Tahfeez Call'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Teacher Online Tahfeez Full Page ─── */
+function TeacherOnlineTahfeezPage({ students, teacherIdentity, pageVisibility, onStartCall }) {
+  const [selectedGroup, setSelectedGroup] = useState("All");
+  const [search, setSearch] = useState("");
+
+  const isHidden = pageVisibility?.online_tahfeez === false || pageVisibility?.["Online Tahfeez"] === false;
+
+  const teacherId = teacherIdentity?.user_id || teacherIdentity?.id || "t1";
+  const teacherName = teacherIdentity?.full_name || "Teacher";
+
+  const onlinePresence = useTahfeezPresence({
+    userId: teacherId,
+    userRole: "teacher",
+    userName: teacherName
+  });
+
+  const availableGroups = useMemo(() => {
+    const groups = new Set((students || []).map(s => s.groupName || s.class_level || "Group 1"));
+    return ["All", ...Array.from(groups)];
+  }, [students]);
+
+  const filtered = (students || []).filter(s => {
+    const matchGroup = selectedGroup === "All" || (s.groupName || s.class_level || "Group 1") === selectedGroup;
+    const matchSearch = (s.full_name || s.name || "").toLowerCase().includes(search.toLowerCase());
+    return matchGroup && matchSearch;
+  });
+
+  return (
+    <div className="card-appear" style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 40 }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #1b160e, #2b2216)',
+        color: '#fff', padding: '24px', borderRadius: '20px', marginBottom: '24px',
+        border: '1px solid rgba(212,175,55,0.4)', boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: '18px',
+            background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+            display: 'grid', placeItems: 'center', color: '#000', flexShrink: 0,
+            boxShadow: '0 4px 18px rgba(212,175,55,0.4)'
+          }}>
+            <Video size={28} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, color: '#d4af37', fontSize: '1.3rem', fontWeight: 800 }}>
+                Online Tahfeez (4K HD)
+              </h2>
+              <span style={{ background: '#d4af37', color: '#000', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6 }}>
+                4K ULTRA HD
+              </span>
+            </div>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#cbd5e1' }}>
+              Conduct 4K HD live video Tahfeez sessions with your assigned students. (Camera: Default OFF for Teacher)
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', padding: '8px 16px', borderRadius: 20 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: isHidden ? '#ef4444' : '#22c55e', boxShadow: isHidden ? '0 0 8px #ef4444' : '0 0 10px #22c55e' }} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isHidden ? '#fca5a5' : '#86efac' }}>
+            {isHidden ? 'Feature Off by Admin 🔒' : 'System Live & Online 🟢'}
+          </span>
+        </div>
+      </div>
+
+      {isHidden ? (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.08)', border: '2px dashed rgba(239, 68, 68, 0.4)',
+          borderRadius: 20, padding: '40px 24px', textAlign: 'center', color: '#ef4444',
+          pointerEvents: 'none', userSelect: 'none'
+        }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
+            <Lock size={32} />
+          </div>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', color: '#dc2626' }}>
+            Online Tahfeez Feature is Turned OFF by Admin
+          </h3>
+          <p style={{ margin: 0, fontSize: '0.9rem', color: '#7f1d1d', maxWidth: 500, margin: '0 auto', lineHeight: 1.5 }}>
+            Online video calling, real-time presence tracking, and student calls are currently disabled by administration settings.
+            <br/>Please contact the system administrator to re-enable this feature.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--deep-brown)', marginRight: 4 }}>Group:</span>
+              {availableGroups.map(grp => (
+                <button
+                  key={grp}
+                  onClick={() => setSelectedGroup(grp)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 20, border: 'none', fontWeight: 700, fontSize: '0.8rem',
+                    cursor: 'pointer', transition: 'all 0.2s ease',
+                    background: selectedGroup === grp ? 'linear-gradient(135deg, #d4af37, #b8860b)' : '#fff',
+                    color: selectedGroup === grp ? '#000' : '#555',
+                    boxShadow: selectedGroup === grp ? '0 2px 8px rgba(212,175,55,0.4)' : '0 1px 3px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  {grp}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', padding: '8px 14px', borderRadius: 20, border: '1px solid #ddd', width: '100%', maxWidth: 280 }}>
+              <Search size={16} style={{ color: '#888' }} />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search student..."
+                style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.88rem' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
+            {filtered.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 20px', background: '#fff', borderRadius: 16, color: '#888' }}>
+                No students found in this group.
+              </div>
+            ) : filtered.map(s => {
+              const sid = s.student_id || s.id;
+              const sPresence = Object.values(onlinePresence || {}).find(
+                p => String(p.userId) === String(sid) || (p.userName && p.userName.toLowerCase() === (s.full_name || s.name || "").toLowerCase())
+              );
+              const isStudentOnline = Boolean(sPresence);
+
+              return (
+                <div key={sid} className="premium-card" style={{
+                  padding: '18px', borderRadius: '16px', background: '#fff',
+                  border: isStudentOnline ? '2px solid #22c55e' : '1px solid #e2e8f0',
+                  boxShadow: isStudentOnline ? '0 4px 16px rgba(34,197,94,0.15)' : '0 2px 8px rgba(0,0,0,0.05)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 14
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ position: 'relative' }}>
+                      <img
+                        src={s.photoUrl || s.photo_url || "/logo.png"}
+                        alt={s.full_name || s.name}
+                        style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #d4af37' }}
+                        onError={e => { e.target.src = "/logo.png"; }}
+                      />
+                      <span style={{
+                        position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: '50%',
+                        background: isStudentOnline ? '#22c55e' : '#ef4444',
+                        border: '2px solid #fff', boxShadow: isStudentOnline ? '0 0 6px #22c55e' : 'none'
+                      }} />
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {s.full_name || s.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        Group: {s.groupName || s.class_level || "Group 1"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        padding: '3px 8px', borderRadius: 12, fontSize: '0.72rem', fontWeight: 700,
+                        background: isStudentOnline ? '#dcfce7' : '#fee2e2',
+                        color: isStudentOnline ? '#15803d' : '#b91c1c'
+                      }}>
+                        {isStudentOnline ? 'Online 🟢' : 'Offline 🔴'}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => onStartCall({
+                        id: `tahfeez_${sid}_${Date.now()}`,
+                        student_id: sid,
+                        student_name: s.full_name || s.name,
+                        teacher_id: teacherId,
+                        teacher_name: teacherName,
+                        started_at: new Date().toISOString()
+                      })}
+                      style={{
+                        padding: '8px 14px', borderRadius: 20, border: 'none',
+                        background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
+                        fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        boxShadow: '0 2px 8px rgba(212,175,55,0.3)'
+                      }}
+                    >
+                      <Video size={14} /> Start 4K Call
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const groupLeavesByMonth = (leaves) => {
   const map = {};
   (leaves || []).forEach((l) => {
@@ -6726,6 +7148,8 @@ function ParentPortal({
   const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
   const [secondsSpent, setSecondsSpent] = useState(0);
   const [pageVisibility, setPageVisibility] = useState({});
+  const [tahfeezCall, setTahfeezCall] = useState(null);
+  const [busyTeacherName, setBusyTeacherName] = useState(null);
   const [parentLeaveForceOpen, setParentLeaveForceOpen] = useState(false);
   const [parentArchiveResults, setParentArchiveResults] = useState([]);
   const [parentArchiveMonth, setParentArchiveMonth] = useState("");
@@ -7452,6 +7876,35 @@ function ParentPortal({
                 ));
               })()}
             </div>
+
+            <OnlineTahfeezParentHomeCard
+              studentProfile={studentProfile}
+              teacherProfiles={teacherProfiles}
+              pageVisibility={pageVisibility}
+              onStartCall={(callData) => {
+                if (callData.isTeacherBusy) {
+                  setBusyTeacherName(callData.teacher_name);
+                } else {
+                  setTahfeezCall(callData);
+                }
+              }}
+            />
+
+            {busyTeacherName && (
+              <TahfeezBusyWaitingModal
+                teacherName={busyTeacherName}
+                onClose={() => setBusyTeacherName(null)}
+              />
+            )}
+
+            {tahfeezCall && (
+              <OnlineTahfeezRoom
+                sessionData={tahfeezCall}
+                userRole="parent"
+                currentUser={studentProfile ? { full_name: studentProfile.name } : { full_name: "Parent" }}
+                onClose={() => setTahfeezCall(null)}
+              />
+            )}
 
             {pageVisibility["Apply Leave"] !== false && (
               <MonthlyLeaveCountCard
@@ -16871,7 +17324,7 @@ function TeacherPortal({
   }, []);
   useEffect(() => {
     if (!pageVisibility || Object.keys(pageVisibility).length === 0) return;
-    if (pageVisibility[activePage] === false) {
+    if (activePage !== 'Online Tahfeez' && pageVisibility[activePage] === false) {
       setActivePage('My Group');
     }
   }, [activePage, pageVisibility]);
@@ -17311,6 +17764,7 @@ function TeacherPortal({
           {[
             { id: "Home", label: "Home", icon: Sparkles },
             { id: "My Group", label: "Students", icon: Users },
+            { id: "Online Tahfeez", label: "Online Tahfeez", icon: Video },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
             { id: "Jadwal", label: "Jadwal", icon: Calendar },
@@ -17321,7 +17775,7 @@ function TeacherPortal({
             { id: "Attendance History", label: "Attendance History", icon: CalendarCheck },
             { id: "Apply Leave", label: "Apply Leave", icon: CalendarX },
             { id: "Settings", label: "Settings", icon: Settings },
-          ].filter(p => pageVisibility[p.id] !== false).map(page => (
+          ].filter(p => p.id === "Online Tahfeez" || pageVisibility[p.id] !== false).map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
               <page.icon size={18} /> {page.label}
             </button>
@@ -17436,6 +17890,15 @@ function TeacherPortal({
               onClose={() => setTahfeezCall(null)}
             />
           )}
+
+           {activePage === "Online Tahfeez" && (
+             <TeacherOnlineTahfeezPage
+               students={visibleStudents}
+               teacherIdentity={teacherIdentity}
+               pageVisibility={pageVisibility}
+               onStartCall={(callData) => setTahfeezCall(callData)}
+             />
+           )}
 
            {activePage === "Jadwal" && (
               <Suspense fallback={null}>
