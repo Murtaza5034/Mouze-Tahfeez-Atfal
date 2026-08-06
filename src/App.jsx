@@ -4626,9 +4626,14 @@ const WHATSAPP_LEAVE_CHAT_CSS = `
   .wac-modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     z-index: 999999;
-    background: #efeae2;
-    background-image: radial-gradient(rgba(212, 175, 55, 0.09) 1px, transparent 0);
-    background-size: 20px 20px;
+    background-color: #efeae2;
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(212, 175, 55, 0.05) 0%, transparent 80%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg fill='%238c734b' fill-opacity='0.07'%3E%3Cpath d='M25 20a10 10 0 0 1 10-10h30a10 10 0 0 1 10 10v15a10 10 0 0 1-10 10H38l-8 7v-7a10 10 0 0 1-5-10V20zm115 15a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm-55 45a15 15 0 1 0 0 30 15 15 0 0 0 0-30zm60 40a12 12 0 1 0 0-24 12 12 0 0 0 0 24zm-110 35a9 9 0 1 0 18 0 9 9 0 0 0-18 0z'/%3E%3Cpath d='M140 15a3 3 0 0 1 3 3v8h8a3 3 0 0 1 0 6h-8v8a3 3 0 0 1-6 0v-8h-8a3 3 0 0 1 0-6h8v-8a3 3 0 0 1 3-3zM30 110a12 12 0 0 1 12-12h14a12 12 0 0 1 12 12v6a12 12 0 0 1-12 12H44l-6 5v-5a12 12 0 0 1-8-11v-7zm100-25c-5 0-9 4-9 9s4 9 9 9 9-4 9-9-9-9zm-50 65c-6 0-11 5-11 11s5 11 11 11 11-5 11-11-5-11-11-11z'/%3E%3Cpath d='M90 20l3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7zm-70 50l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5zm130 70l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 240px 240px;
+    background-position: center;
+    background-attachment: fixed;
     height: 100vh; height: 100dvh; width: 100vw;
     display: flex; flex-direction: column;
     overflow: hidden; overscroll-behavior: none;
