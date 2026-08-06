@@ -5253,8 +5253,21 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
   /* ─── Parent Reply to Admin Chat ─── */
   const handleParentReply = async () => {
     if (!chatLeave || !replyText.trim()) return;
+    const textToSend = replyText.trim();
+    const newMsg = { role: "parent", text: textToSend, timestamp: new Date().toISOString() };
+
+    // 1. Optimistic UI update: Instantly show message bubble and clear input with 0ms delay
+    setReplyText("");
+    setChatLeave(prev => prev ? { ...prev, messages: [...(prev.messages || []), newMsg] } : prev);
+    setHistory(prev => prev.map(l => String(l.id) === String(chatLeave.id) ? { ...l, messages: [...(l.messages || []), newMsg] } : l));
+
+    setTimeout(() => {
+      if (chatMessagesRef.current) {
+        chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+      }
+    }, 40);
+
     try {
-      const newMsg = { role: "parent", text: replyText.trim(), timestamp: new Date().toISOString() };
       const existing = chatLeave.messages || [];
       const { error } = await supabase
         .from('student_leaves')
@@ -5262,21 +5275,19 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         .eq('id', chatLeave.id);
       if (error) throw error;
 
-      await broadcastNotification(
-        "💬 Leave Reply",
-        `${studentProfile?.name}'s parent: ${replyText}`,
-        "admin",
-        null,
-        "Leave Management"
-      );
-
-      // INSTANTLY update chatLeave so the reply appears right in the chat bubble
-      setChatLeave(prev => prev ? { ...prev, messages: [...(prev.messages || []), newMsg] } : prev);
-      setReplyText("");
-      showAction("success", "Reply sent!");
-      fetchHistory();
+      // 2. Smart Notification: ONLY send outside FCM push notification if Admin is OFFLINE / has closed the chat room
+      if (!adminOnline) {
+        await broadcastNotification(
+          "💬 Leave Reply",
+          `${studentProfile?.name || 'Student'}'s parent: ${textToSend}`,
+          "admin",
+          null,
+          "Leave Management"
+        );
+      }
     } catch (err) {
-      showAction("error", "Failed to send reply.");
+      console.error("Failed to send parent reply:", err);
+      showAction("error", "Failed to send message. Please check internet connection.");
     }
   };
 
@@ -7896,11 +7907,24 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
 
   const sendChatMessage = async () => {
     if (!chatModal || !chatMessage.trim()) return;
+    const textToSend = chatMessage.trim();
     const student = students.find(s => s.allIds.includes(String(chatModal?.student_id)));
     const studentName = student?.name || "your child";
+    const newMsg = { role: "admin", text: textToSend, timestamp: new Date().toISOString() };
+
+    // 1. Optimistic UI update: Instantly show message bubble and clear input with 0ms delay
+    setChatMessage("");
+    setChatModal(prev => prev ? { ...prev, messages: [...(prev.messages || []), newMsg] } : prev);
+    setLeaves(prev => prev.map(l => String(l.id) === String(chatModal.id) ? { ...l, messages: [...(l.messages || []), newMsg] } : l));
+
+    setTimeout(() => {
+      if (chatBodyRef.current) {
+        chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+      }
+    }, 40);
+
     setSendingAction("chat-" + chatModal.id);
     try {
-      const newMsg = { role: "admin", text: chatMessage.trim(), timestamp: new Date().toISOString() };
       const existing = chatModal.messages || [];
       const { error } = await supabase
         .from('student_leaves')
@@ -7908,23 +7932,22 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
         .eq('id', chatModal.id);
       if (error) throw error;
 
-      await broadcastNotification(
-        "📝 Leave Clarification",
-        `Regarding ${studentName}'s leave: ${chatMessage}`,
-        "user",
-        chatModal.parent_id,
-        "Apply Leave"
-      );
-
-      // INSTANTLY update chatModal so message appears right in the chat bubble
-      setChatModal(prev => prev ? { ...prev, messages: [...(prev.messages || []), newMsg] } : prev);
-      setChatMessage("");
-      onShowAction("success", "Message sent. Parent can reply.");
-      fetchLeaves();
+      // 2. Smart Notification: ONLY send outside FCM push notification if Parent is OFFLINE / has closed the chat room
+      if (!parentOnline) {
+        await broadcastNotification(
+          "📝 Leave Clarification",
+          `Regarding ${studentName}'s leave: ${textToSend}`,
+          "user",
+          chatModal.parent_id,
+          "Apply Leave"
+        );
+      }
     } catch (err) {
-      onShowAction("error", "Failed to send message.");
+      console.error("Failed to send admin message:", err);
+      onShowAction("error", "Failed to send message. Please check internet connection.");
+    } finally {
+      setSendingAction(null);
     }
-    setSendingAction(null);
   };
 
   const getApproveMessages = (leaveType) => {
