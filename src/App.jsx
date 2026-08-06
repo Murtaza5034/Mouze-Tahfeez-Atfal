@@ -4786,11 +4786,17 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [chatLeave, setChatLeave] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const chatMessagesRef = useRef(null);
   const { peerOnline: adminOnline, presenceReady } = useChatPresence(chatLeave?.id, "parent");
 
   useEffect(() => {
     if (chatLeave) {
       document.body.style.overflow = 'hidden';
+      setTimeout(() => {
+        if (chatMessagesRef.current) {
+          chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+        }
+      }, 100);
     } else {
       document.body.style.overflow = '';
     }
