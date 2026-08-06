@@ -80,7 +80,15 @@ import {
   ClipboardCheck,
   History,
   CalendarClock,
-  School
+  School,
+  Video,
+  VideoOff,
+  MicOff,
+  Camera,
+  EyeOff,
+  Radio,
+  PhoneOff,
+  MessageSquare
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -4309,6 +4317,750 @@ const formatNiceDate = (dateStr) => {
   }
 };
 
+/* ─── Online Tahfeez 4K Video Room ─── */
+const ONLINE_TAHFEEZ_CSS = `
+  .oth-room-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 9999999;
+    background: #090807;
+    height: 100vh; height: 100dvh; width: 100vw;
+    display: flex; flex-direction: column;
+    overflow: hidden; user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .oth-header {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 50;
+    padding: max(14px, env(safe-area-inset-top)) 16px 14px 16px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    color: #fff;
+  }
+  .oth-header-info { display: flex; align-items: center; gap: 10px; }
+  .oth-badge-4k {
+    background: linear-gradient(135deg, #d4af37, #b8860b);
+    color: #000; font-weight: 800; font-size: 0.7rem;
+    padding: 3px 8px; border-radius: 6px; letter-spacing: 0.5px;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+  }
+  .oth-timer {
+    display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600;
+    color: #e2e8f0; background: rgba(255,255,255,0.12); padding: 4px 12px; border-radius: 20px;
+    backdrop-filter: blur(8px);
+  }
+  .oth-video-container {
+    position: relative; flex: 1; width: 100%; height: 100%; background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .oth-remote-video {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .oth-pip-video-wrap {
+    position: absolute; bottom: 90px; right: 16px; z-index: 40;
+    width: 130px; height: 180px; border-radius: 14px; overflow: hidden;
+    border: 2px solid rgba(212, 175, 55, 0.6);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5); background: #1a1612;
+    transition: all 0.3s ease;
+  }
+  @media (min-width: 768px) {
+    .oth-pip-video-wrap { width: 200px; height: 260px; bottom: 100px; right: 24px; }
+  }
+  .oth-pip-video { width: 100%; height: 100%; object-fit: cover; }
+  .oth-pip-label {
+    position: absolute; bottom: 6px; left: 8px; font-size: 0.65rem; font-weight: 700;
+    color: #fff; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;
+  }
+
+  .oth-controls-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 50;
+    padding: 16px 20px max(18px, env(safe-area-inset-bottom)) 20px;
+    background: linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0) 100%);
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+  }
+  .oth-btn-control {
+    width: 50px; height: 50px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,0.16); color: #fff;
+    display: grid; place-items: center; cursor: pointer;
+    backdrop-filter: blur(10px); transition: all 0.2s ease;
+    position: relative;
+  }
+  .oth-btn-control:hover { background: rgba(255,255,255,0.28); transform: scale(1.05); }
+  .oth-btn-control-active { background: #d4af37; color: #000; }
+  .oth-btn-endcall {
+    background: #ef4444; color: #fff; width: 56px; height: 56px;
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
+  }
+  .oth-btn-endcall:hover { background: #dc2626; transform: scale(1.08); }
+
+  .oth-chat-drawer {
+    position: absolute; top: 0; right: 0; bottom: 0; z-index: 60;
+    width: 100%; max-width: 360px; background: rgba(18, 15, 12, 0.95);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(212, 175, 55, 0.25);
+    display: flex; flex-direction: column;
+    animation: othSlideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+  }
+  @keyframes othSlideLeft { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  
+  .oth-chat-header {
+    padding: max(14px, env(safe-area-inset-top)) 16px 14px 16px;
+    background: rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: space-between; color: #fff;
+  }
+  .oth-chat-messages {
+    flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .oth-chat-banner {
+    background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5; font-size: 0.76rem; padding: 8px 12px; border-radius: 8px;
+    text-align: center; margin-bottom: 8px; line-height: 1.4;
+  }
+  .oth-chat-banner-online {
+    background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #86efac; font-size: 0.76rem; padding: 8px 12px; border-radius: 8px;
+    text-align: center; margin-bottom: 8px; line-height: 1.4;
+  }
+  .oth-chat-input-row {
+    padding: 12px 14px max(14px, env(safe-area-inset-bottom)) 14px;
+    background: rgba(0,0,0,0.4); border-top: 1px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .oth-chat-input {
+    flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 20px; padding: 8px 14px; color: #fff; outline: none; font-size: 0.88rem;
+  }
+  .oth-chat-send-btn {
+    width: 38px; height: 38px; border-radius: 50%; background: #d4af37; color: #000;
+    border: none; display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+  }
+  .oth-chat-send-btn:disabled { background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.4); cursor: not-allowed; }
+`;
+
+function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComplete }) {
+  const [micMuted, setMicMuted] = useState(false);
+  const [camOff, setCamOff] = useState(userRole === "teacher"); // Teacher Camera DEFAULT OFF as requested!
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [inputMsg, setInputMsg] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [callDuration, setCallDuration] = useState(0);
+  const [peerConnected, setPeerConnected] = useState(false);
+  const [statusText, setStatusText] = useState("Connecting to 4K HD Room...");
+
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const pcRef = useRef(null);
+  const channelRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+
+  const isStudent = userRole === "student" || userRole === "parent";
+  const isTeacher = userRole === "teacher";
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCallDuration(d => d + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function initCall() {
+      try {
+        const constraints = {
+          audio: true,
+          video: {
+            width: { ideal: 3840, min: 1280 },
+            height: { ideal: 2160, min: 720 },
+            facingMode: "user"
+          }
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (!mounted) return;
+        localStreamRef.current = stream;
+
+        // Teacher Camera DEFAULT OFF requirement
+        if (isTeacher) {
+          const videoTrack = stream.getVideoTracks()[0];
+          if (videoTrack) videoTrack.enabled = false;
+        }
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+
+        try {
+          const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+          };
+          recorder.start(5000);
+          mediaRecorderRef.current = recorder;
+        } catch (recErr) {
+          console.warn("MediaRecorder fallback:", recErr);
+        }
+
+        const pc = new RTCPeerConnection({
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "stun:stun2.l.google.com:19302" }
+          ]
+        });
+        pcRef.current = pc;
+
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        pc.ontrack = (event) => {
+          if (remoteVideoRef.current && event.streams[0]) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+            setPeerConnected(true);
+            setStatusText("Connected • 4K Ultra HD");
+          }
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate && channelRef.current) {
+            channelRef.current.send({
+              type: "broadcast",
+              event: "ice-candidate",
+              payload: { candidate: event.candidate, sender: userRole }
+            });
+          }
+        };
+
+        const channel = supabase.channel(`tahfeez-room:${sessionData.id}`, {
+          config: { presence: { key: `${userRole}_${sessionData.id}` } }
+        });
+        channelRef.current = channel;
+
+        channel
+          .on("presence", { event: "sync" }, () => {
+            const state = channel.presenceState();
+            const peerRole = isTeacher ? "parent" : "teacher";
+            const peerPresent = Object.values(state).flat().some(p => p.role === peerRole || p.userRole === peerRole);
+            setPeerConnected(peerPresent);
+            if (peerPresent) setStatusText("Connected • 4K Ultra HD");
+          })
+          .on("broadcast", { event: "signal-offer" }, async ({ payload }) => {
+            if (payload.sender !== userRole && pcRef.current) {
+              await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.offer));
+              const answer = await pcRef.current.createAnswer();
+              await pcRef.current.setLocalDescription(answer);
+              channel.send({
+                type: "broadcast",
+                event: "signal-answer",
+                payload: { answer, sender: userRole }
+              });
+            }
+          })
+          .on("broadcast", { event: "signal-answer" }, async ({ payload }) => {
+            if (payload.sender !== userRole && pcRef.current) {
+              await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
+            }
+          })
+          .on("broadcast", { event: "ice-candidate" }, async ({ payload }) => {
+            if (payload.sender !== userRole && pcRef.current && payload.candidate) {
+              try {
+                await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
+              } catch (_) {}
+            }
+          })
+          .on("broadcast", { event: "in-call-chat" }, ({ payload }) => {
+            if (payload.sender !== (currentUser?.full_name || currentUser?.name)) {
+              setMessages(prev => [...prev, payload]);
+              setUnreadCount(u => u + 1);
+            }
+          })
+          .subscribe(async (status) => {
+            if (status === "SUBSCRIBED") {
+              await channel.track({ role: userRole, userRole, name: currentUser?.full_name || currentUser?.name });
+              if (isTeacher) {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                channel.send({
+                  type: "broadcast",
+                  event: "signal-offer",
+                  payload: { offer, sender: userRole }
+                });
+              }
+            }
+          });
+
+      } catch (err) {
+        console.error("Camera/Mic access error:", err);
+        setStatusText("Camera/Microphone Access Ready");
+      }
+    }
+
+    initCall();
+
+    return () => {
+      mounted = false;
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+      if (pcRef.current) pcRef.current.close();
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
+  }, [sessionData.id, userRole]);
+
+  const toggleMic = () => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setMicMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
+  const toggleCam = () => {
+    if (isStudent) return; // Student camera is MANDATORY ON!
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setCamOff(!videoTrack.enabled);
+      }
+    }
+  };
+
+  const handleSendChat = () => {
+    if (!inputMsg.trim() || !peerConnected) return;
+    const msgObj = {
+      sender: currentUser?.full_name || currentUser?.name || (isTeacher ? "Teacher" : "Student"),
+      role: userRole,
+      text: inputMsg.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages(prev => [...prev, msgObj]);
+    setInputMsg("");
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "in-call-chat",
+        payload: msgObj
+      });
+    }
+  };
+
+  const handleEndCall = async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch (_) {}
+    }
+
+    const sessionSummary = {
+      id: sessionData.id,
+      student_id: sessionData.student_id,
+      student_name: sessionData.student_name,
+      teacher_id: sessionData.teacher_id,
+      teacher_name: sessionData.teacher_name,
+      started_at: sessionData.started_at || new Date().toISOString(),
+      ended_at: new Date().toISOString(),
+      duration_seconds: callDuration,
+      status: "completed",
+      chat_messages: messages
+    };
+
+    try {
+      await supabase.from("tahfeez_sessions").insert([sessionSummary]);
+    } catch (_) {}
+
+    try {
+      const stored = JSON.parse(localStorage.getItem("admin_tahfeez_sessions") || "[]");
+      localStorage.setItem("admin_tahfeez_sessions", JSON.stringify([sessionSummary, ...stored]));
+    } catch (_) {}
+
+    if (onComplete) onComplete(sessionSummary);
+    onClose();
+  };
+
+  const formatSecs = (s) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
+  return createPortal(
+    <div className="oth-room-overlay">
+      <style>{ONLINE_TAHFEEZ_CSS}</style>
+
+      {/* Header Bar */}
+      <div className="oth-header">
+        <div className="oth-header-info">
+          <span className="oth-badge-4k">4K HD</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{sessionData.student_name || "Online Tahfeez"}</div>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+              Teacher: {sessionData.teacher_name || "Teacher"} &middot; {statusText}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="oth-timer">
+            <Radio size={14} style={{ color: '#ef4444' }} className="animate-pulse" />
+            {formatSecs(callDuration)}
+          </div>
+          <button className="oth-btn-control" onClick={() => { setChatOpen(!chatOpen); setUnreadCount(0); }} title="In-Call Chat">
+            <MessageSquare size={20} />
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute', top: 2, right: 2, background: '#ef4444', color: '#fff',
+                borderRadius: '50%', width: 18, height: 18, fontSize: '0.65rem', fontWeight: 800,
+                display: 'grid', placeItems: 'center'
+              }}>
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Main 4K Video View */}
+      <div className="oth-video-container">
+        <video ref={remoteVideoRef} autoPlay playsInline className="oth-remote-video" />
+        
+        {!peerConnected && (
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyCenter: 'center', justifyContent: 'center',
+            background: 'rgba(10,10,12,0.85)', color: '#fff', textAlign: 'center', padding: 20
+          }}>
+            <Loader2 size={40} className="animate-spin" style={{ color: '#d4af37', marginBottom: 12 }} />
+            <h4 style={{ margin: 0, fontSize: '1.2rem' }}>Waiting for {isTeacher ? (sessionData.student_name || "Student") : "Teacher"} to connect...</h4>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: 6 }}>
+              {isTeacher ? "Teacher Camera is Default OFF • Student Camera is Mandatory ON" : "Student Camera is Mandatory ON for Tahfeez"}
+            </p>
+          </div>
+        )}
+
+        {/* PIP Self-View Window */}
+        <div className="oth-pip-video-wrap">
+          <video ref={localVideoRef} autoPlay playsInline muted className="oth-pip-video" />
+          <span className="oth-pip-label">
+            {isTeacher ? (camOff ? "You (Cam OFF)" : "You (Teacher)") : "You (Student - Cam ON)"}
+          </span>
+        </div>
+      </div>
+
+      {/* Floating Control Bar */}
+      <div className="oth-controls-bar">
+        <button
+          className={`oth-btn-control ${micMuted ? '' : 'oth-btn-control-active'}`}
+          onClick={toggleMic}
+          title={micMuted ? "Unmute Mic" : "Mute Mic"}
+        >
+          {micMuted ? <MicOff size={22} /> : <Mic size={22} />}
+        </button>
+
+        <button
+          className={`oth-btn-control ${!camOff ? 'oth-btn-control-active' : ''}`}
+          onClick={toggleCam}
+          disabled={isStudent}
+          title={isStudent ? "Student Camera is Mandatory ON" : (camOff ? "Turn Camera ON" : "Turn Camera OFF")}
+          style={{ opacity: isStudent ? 0.6 : 1, cursor: isStudent ? 'not-allowed' : 'pointer' }}
+        >
+          {camOff ? <VideoOff size={22} /> : <Video size={22} />}
+        </button>
+
+        <button className="oth-btn-control oth-btn-endcall" onClick={handleEndCall} title="End Tahfeez Call">
+          <PhoneOff size={24} />
+        </button>
+      </div>
+
+      {/* In-Call Chat Drawer (Active ONLY when BOTH connected!) */}
+      {chatOpen && (
+        <div className="oth-chat-drawer">
+          <div className="oth-chat-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+              <MessageSquare size={18} style={{ color: '#d4af37' }} /> In-Call Tahfeez Chat
+            </div>
+            <button
+              onClick={() => { setChatOpen(false); setUnreadCount(0); }}
+              style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="oth-chat-messages">
+            {peerConnected ? (
+              <div className="oth-chat-banner-online">
+                🟢 <strong>Both Online Connected</strong> &middot; Real-time in-call chat is active to resolve doubts.
+              </div>
+            ) : (
+              <div className="oth-chat-banner">
+                🔒 <strong>In-Call Chat Locked</strong> &middot; Chat is enabled only when both Teacher and Student are online in this call.
+              </div>
+            )}
+
+            {messages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8', fontSize: '0.82rem' }}>
+                No in-call chat messages yet. Type below to clarify doubts during video call.
+              </div>
+            ) : messages.map((m, idx) => (
+              <div key={idx} style={{
+                alignSelf: m.role === userRole ? 'flex-end' : 'flex-start',
+                background: m.role === userRole ? 'linear-gradient(135deg, #d4af37, #b8860b)' : 'rgba(255,255,255,0.12)',
+                color: m.role === userRole ? '#000' : '#fff',
+                padding: '8px 12px', borderRadius: 12, maxWidth: '85%', fontSize: '0.85rem'
+              }}>
+                <div style={{ fontSize: '0.68rem', opacity: 0.75, marginBottom: 2 }}>{m.sender} &middot; {m.timestamp}</div>
+                <div>{m.text}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="oth-chat-input-row">
+            <input
+              className="oth-chat-input"
+              value={inputMsg}
+              onChange={e => setInputMsg(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSendChat(); }}
+              placeholder={peerConnected ? "Type a message..." : "Waiting for peer to connect..."}
+              disabled={!peerConnected}
+            />
+            <button
+              className="oth-chat-send-btn"
+              onClick={handleSendChat}
+              disabled={!inputMsg.trim() || !peerConnected}
+            >
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
+/* ─── Admin Online Tahfeez Audit Tracker & Feature Control ─── */
+function AdminTahfeezTracker({ sb }) {
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [visibilityData, setVisibilityData] = useState({ teacher: true, parents: true });
+  const [toggling, setToggling] = useState(false);
+
+  const fetchAuditData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [sessRes, visRes] = await Promise.all([
+        sb.from("tahfeez_sessions").select("*").order("created_at", { ascending: false }),
+        sb.from("page_visibility").select("*").eq("page_key", "online_tahfeez")
+      ]);
+
+      if (sessRes.data && sessRes.data.length > 0) {
+        setSessions(sessRes.data);
+      } else {
+        const local = JSON.parse(localStorage.getItem("admin_tahfeez_sessions") || "[]");
+        setSessions(local);
+      }
+
+      if (visRes.data) {
+        const vMap = { teacher: true, parents: true };
+        visRes.data.forEach(item => { vMap[item.role] = item.visible; });
+        setVisibilityData(vMap);
+      }
+    } catch (_) {
+      const local = JSON.parse(localStorage.getItem("admin_tahfeez_sessions") || "[]");
+      setSessions(local);
+    }
+    setLoading(false);
+  }, [sb]);
+
+  useEffect(() => {
+    fetchAuditData();
+  }, [fetchAuditData]);
+
+  const toggleFeatureVisibility = async (role) => {
+    setToggling(true);
+    const newVis = !visibilityData[role];
+    try {
+      await sb.from("page_visibility").upsert({
+        page_key: "online_tahfeez",
+        role: role,
+        label: "Online Tahfeez (4K HD)",
+        visible: newVis,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "page_key,role" });
+
+      setVisibilityData(prev => ({ ...prev, [role]: newVis }));
+    } catch (err) {
+      console.error("Failed to toggle online tahfeez:", err);
+    }
+    setToggling(false);
+  };
+
+  const filtered = sessions.filter(s =>
+    (s.student_name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (s.teacher_name || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="card-appear" style={{ maxWidth: 1000, margin: '0 auto', padding: '10px 0' }}>
+      {/* Admin Feature Control Card (Hide / Unhide Toggle) */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1f1912, #2b2216)',
+        color: '#fff', padding: '20px', borderRadius: '16px', marginBottom: '24px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid rgba(212,175,55,0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#d4af37', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Video size={22} /> Online Tahfeez (4K HD) Feature Control
+            </h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#d1d5db' }}>
+              Hide or Unhide Online Tahfeez 4K HD Video calling feature for Teachers and Parents.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Teacher Access:</span>
+              <button
+                onClick={() => toggleFeatureVisibility('teacher')}
+                disabled={toggling}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, border: 'none', fontWeight: 700,
+                  fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  background: visibilityData.teacher ? '#22c55e' : '#64748b', color: '#fff'
+                }}
+              >
+                {visibilityData.teacher ? <Eye size={14} /> : <EyeOff size={14} />}
+                {visibilityData.teacher ? "Unhidden (Allowed)" : "Hidden (Blocked)"}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Parent Access:</span>
+              <button
+                onClick={() => toggleFeatureVisibility('parents')}
+                disabled={toggling}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, border: 'none', fontWeight: 700,
+                  fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  background: visibilityData.parents ? '#22c55e' : '#64748b', color: '#fff'
+                }}
+              >
+                {visibilityData.parents ? <Eye size={14} /> : <EyeOff size={14} />}
+                {visibilityData.parents ? "Unhidden (Allowed)" : "Hidden (Blocked)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Audit Search Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.15rem' }}>
+          Online Tahfeez Sessions Audit ({filtered.length})
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', padding: '6px 12px', borderRadius: 20, border: '1px solid #ddd' }}>
+          <Search size={16} style={{ color: '#888' }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search student or teacher..."
+            style={{ border: 'none', outline: 'none', fontSize: '0.88rem' }}
+          />
+        </div>
+      </div>
+
+      {/* Audit Log Table */}
+      <div className="table-responsive-wrapper" style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+          <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <tr>
+              <th style={{ padding: '12px 14px' }}>Student</th>
+              <th style={{ padding: '12px 14px' }}>Teacher</th>
+              <th style={{ padding: '12px 14px' }}>Started At</th>
+              <th style={{ padding: '12px 14px' }}>Duration</th>
+              <th style={{ padding: '12px 14px' }}>Status</th>
+              <th style={{ padding: '12px 14px' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30 }}>Loading audit records...</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: '#888' }}>No Tahfeez sessions recorded yet.</td></tr>
+            ) : filtered.map((s, idx) => (
+              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '12px 14px', fontWeight: 600 }}>{s.student_name}</td>
+                <td style={{ padding: '12px 14px' }}>{s.teacher_name}</td>
+                <td style={{ padding: '12px 14px', color: '#64748b' }}>
+                  {s.started_at ? new Date(s.started_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : "N/A"}
+                </td>
+                <td style={{ padding: '12px 14px', fontWeight: 600 }}>
+                  {Math.floor((s.duration_seconds || 0) / 60)}m {(s.duration_seconds || 0) % 60}s
+                </td>
+                <td style={{ padding: '12px 14px' }}>
+                  <span style={{
+                    padding: '3px 10px', borderRadius: 12, fontSize: '0.75rem', fontWeight: 700,
+                    background: s.status === 'completed' ? '#dcfce7' : '#fef3c7',
+                    color: s.status === 'completed' ? '#15803d' : '#92400e'
+                  }}>
+                    {s.status === 'completed' ? 'Done' : 'In Progress'}
+                  </span>
+                </td>
+                <td style={{ padding: '12px 14px' }}>
+                  <button
+                    onClick={() => setSelectedSession(s)}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d4af37', background: 'rgba(212,175,55,0.1)', color: '#b8860b', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Details & Chat
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Audit Detail Modal */}
+      {selectedSession && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(0,0,0,0.6)', display: 'grid', placeItems: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 16, maxWidth: 500, width: '100%', padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>Tahfeez Session Audit Details</h3>
+              <button onClick={() => setSelectedSession(null)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            
+            <div style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>
+              <p><strong>Student:</strong> {selectedSession.student_name}</p>
+              <p><strong>Teacher:</strong> {selectedSession.teacher_name}</p>
+              <p><strong>Started:</strong> {new Date(selectedSession.started_at).toLocaleString()}</p>
+              <p><strong>Ended:</strong> {selectedSession.ended_at ? new Date(selectedSession.ended_at).toLocaleString() : "N/A"}</p>
+              <p><strong>Duration:</strong> {Math.floor((selectedSession.duration_seconds || 0) / 60)} minutes {(selectedSession.duration_seconds || 0) % 60} seconds</p>
+              <p><strong>Status:</strong> {selectedSession.status}</p>
+
+              <h4 style={{ marginTop: 16, marginBottom: 8, color: '#b8860b' }}>In-Call Chat Log ({selectedSession.chat_messages?.length || 0})</h4>
+              <div style={{ maxHeight: 180, overflowY: 'auto', background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                {!selectedSession.chat_messages || selectedSession.chat_messages.length === 0 ? (
+                  <div style={{ color: '#888', fontSize: '0.82rem' }}>No in-call chat messages were exchanged during this session.</div>
+                ) : selectedSession.chat_messages.map((m, i) => (
+                  <div key={i} style={{ marginBottom: 6, fontSize: '0.83rem' }}>
+                    <strong>{m.sender}:</strong> {m.text} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>({m.timestamp})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 const groupLeavesByMonth = (leaves) => {
   const map = {};
   (leaves || []).forEach((l) => {
@@ -4801,6 +5553,20 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
   const [replyText, setReplyText] = useState("");
   const chatMessagesRef = useRef(null);
   const { peerOnline: adminOnline, presenceReady } = useChatPresence(chatLeave?.id, "parent");
+
+  const [tahfeezCall, setTahfeezCall] = useState(null);
+  const [tahfeezVisible, setTahfeezVisible] = useState(true);
+
+  useEffect(() => {
+    supabase.from('page_visibility')
+      .select('visible')
+      .eq('role', 'parents')
+      .eq('page_key', 'online_tahfeez')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setTahfeezVisible(data.visible);
+      });
+  }, []);
 
   useEffect(() => {
     if (chatLeave) {
@@ -5296,6 +6062,60 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
   return (
     <div className="leave-apply-container card-appear">
+      {/* ─── Online Tahfeez 4K HD Video Launch Card (Parent Side) ─── */}
+      {tahfeezVisible && (
+        <div style={{
+          background: 'linear-gradient(135deg, #1b160e, #2b2216)',
+          color: '#fff', padding: '16px 20px', borderRadius: '16px', marginBottom: '20px',
+          border: '1px solid rgba(212,175,55,0.4)', boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+              display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0, boxShadow: '0 2px 10px rgba(212,175,55,0.4)'
+            }}>
+              <Video size={22} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, color: '#d4af37', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                Online Tahfeez 4K HD <span style={{ background: '#d4af37', color: '#000', fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4 }}>LIVE</span>
+              </h4>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                Connect live with Teacher for 4K HD video Tahfeez session. (Student Camera: Mandatory ON)
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setTahfeezCall({
+              id: `tahfeez_${studentProfile?.student_id || '001'}_${Date.now()}`,
+              student_id: studentProfile?.student_id || '001',
+              student_name: studentProfile?.name || 'Student',
+              teacher_id: studentProfile?.original_teacher_id || 't1',
+              teacher_name: studentProfile?.teacherName || 'Teacher',
+              started_at: new Date().toISOString()
+            })}
+            style={{
+              padding: '10px 18px', borderRadius: 24, border: 'none',
+              background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
+              fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+              boxShadow: '0 4px 14px rgba(212,175,55,0.4)', transition: 'all 0.2s ease'
+            }}
+          >
+            <Video size={16} /> Join 4K Tahfeez Call
+          </button>
+        </div>
+      )}
+
+      {tahfeezCall && (
+        <OnlineTahfeezRoom
+          sessionData={tahfeezCall}
+          userRole="parent"
+          currentUser={studentProfile ? { full_name: studentProfile.name } : { full_name: "Parent" }}
+          onClose={() => setTahfeezCall(null)}
+        />
+      )}
       <div className="fatemi-month-overview card-appear">
         <span className="fatemi-verse" dir="rtl">همنالكك اْثثنا فرزند يه اْ مثل رزا طلب كيدي ححهسس</span>
         <div className="fatemi-month-overview-head">
@@ -9607,7 +10427,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
+  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Online Tahfeez", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
@@ -13433,6 +14253,10 @@ const handleDownloadAllReports = async () => {
             <SupportTicketsAdmin tickets={supportTickets} onRefresh={loadPortalData} />
           ) : null}
 
+          {activePage === "Online Tahfeez" && (
+            <AdminTahfeezTracker sb={supabase} />
+          )}
+
           {activePage === "Leave Management" && (
             <AdminLeaveManagement students={students} teacherProfiles={teacherProfiles} onShowAction={onShowAction} />
           )}
@@ -15284,6 +16108,20 @@ function TeacherPortal({
     if (onShowAction) onShowAction("success", "All fields cleared. Fill them with this week's marks — or leave it and reload to restore last week's data.");
   };
 
+  const [tahfeezCall, setTahfeezCall] = useState(null);
+  const [tahfeezVisible, setTahfeezVisible] = useState(true);
+
+  useEffect(() => {
+    supabase.from('page_visibility')
+      .select('visible')
+      .eq('role', 'teacher')
+      .eq('page_key', 'online_tahfeez')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setTahfeezVisible(data.visible);
+      });
+  }, []);
+
   const [studentAttendance, setStudentAttendance] = useState({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(() => getLocalDateKey());
@@ -16538,6 +17376,65 @@ function TeacherPortal({
           )}
           {actionMessage && (
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
+          )}
+
+          {/* ─── Online Tahfeez 4K HD Video Launch Card (Teacher Side) ─── */}
+          {tahfeezVisible && (
+            <div style={{
+              background: 'linear-gradient(135deg, #1f1912, #2b2216)',
+              color: '#fff', padding: '16px 20px', borderRadius: '16px', marginBottom: '20px',
+              border: '1px solid rgba(212,175,55,0.4)', boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+                  display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0, boxShadow: '0 2px 10px rgba(212,175,55,0.4)'
+                }}>
+                  <Video size={22} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, color: '#d4af37', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Online Tahfeez 4K HD <span style={{ background: '#d4af37', color: '#000', fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4 }}>LIVE</span>
+                  </h4>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    Start 4K HD video Tahfeez session with student. (Camera: Default OFF for Teacher)
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  const firstSid = (filteredStudents && filteredStudents[0]) ? filteredStudents[0].student_id : '001';
+                  const firstSName = (filteredStudents && filteredStudents[0]) ? (filteredStudents[0].full_name || filteredStudents[0].name) : 'Student';
+                  setTahfeezCall({
+                    id: `tahfeez_${firstSid}_${Date.now()}`,
+                    student_id: firstSid,
+                    student_name: firstSName,
+                    teacher_id: teacherIdentity?.user_id || 't1',
+                    teacher_name: teacherIdentity?.full_name || 'Teacher',
+                    started_at: new Date().toISOString()
+                  });
+                }}
+                style={{
+                  padding: '10px 18px', borderRadius: 24, border: 'none',
+                  background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
+                  fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  boxShadow: '0 4px 14px rgba(212,175,55,0.4)', transition: 'all 0.2s ease'
+                }}
+              >
+                <Video size={16} /> Start 4K Tahfeez Call
+              </button>
+            </div>
+          )}
+
+          {tahfeezCall && (
+            <OnlineTahfeezRoom
+              sessionData={tahfeezCall}
+              userRole="teacher"
+              currentUser={teacherIdentity || { full_name: "Teacher" }}
+              onClose={() => setTahfeezCall(null)}
+            />
           )}
 
            {activePage === "Jadwal" && (
