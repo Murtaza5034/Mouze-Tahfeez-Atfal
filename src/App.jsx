@@ -4530,11 +4530,24 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
           console.warn("MediaRecorder fallback:", recErr);
         }
 
+        const iceQueue = [];
+        const flushIceQueue = async () => {
+          if (!pcRef.current || !pcRef.current.remoteDescription) return;
+          while (iceQueue.length > 0) {
+            const cand = iceQueue.shift();
+            try {
+              await pcRef.current.addIceCandidate(new RTCIceCandidate(cand));
+            } catch (_) {}
+          }
+        };
+
         const pc = new RTCPeerConnection({
           iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
             { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "stun:stun2.l.google.com:19302" }
+            { urls: "stun:stun2.l.google.com:19302" },
+            { urls: "stun:stun3.l.google.com:19302" },
+            { urls: "stun:stun4.l.google.com:19302" }
           ]
         });
         pcRef.current = pc;
@@ -4544,6 +4557,14 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
         pc.ontrack = (event) => {
           if (remoteVideoRef.current && event.streams[0]) {
             remoteVideoRef.current.srcObject = event.streams[0];
+            remoteVideoRef.current.play().catch(() => {});
+            setPeerConnected(true);
+            setStatusText("Connected • 4K Ultra HD");
+          }
+        };
+
+        pc.onconnectionstatechange = () => {
+          if (pc.connectionState === "connected") {
             setPeerConnected(true);
             setStatusText("Connected • 4K Ultra HD");
           }
@@ -4582,21 +4603,21 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
           }
         };
 
+        let autoRecoveryTimer = null;
+
         channel
           .on("presence", { event: "sync" }, async () => {
             const state = channel.presenceState();
             const peerRole = isTeacher ? "parent" : "teacher";
             const peerPresent = Object.values(state).flat().some(p => p.role === peerRole || p.userRole === peerRole);
-            setPeerConnected(peerPresent);
             if (peerPresent) {
+              setPeerConnected(true);
               setStatusText("Connected • 4K Ultra HD");
               if (isTeacher) await sendTeacherOffer();
             }
           })
           .on("broadcast", { event: "peer-ready" }, async ({ payload }) => {
             if (payload.sender !== userRole) {
-              setPeerConnected(true);
-              setStatusText("Connected • 4K Ultra HD");
               if (isTeacher) await sendTeacherOffer();
             }
           })
@@ -4604,6 +4625,7 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
             if (payload.sender !== userRole && pcRef.current) {
               try {
                 await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.offer));
+                await flushIceQueue();
                 const answer = await pcRef.current.createAnswer();
                 await pcRef.current.setLocalDescription(answer);
                 channel.send({
@@ -4623,6 +4645,7 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
               try {
                 if (pcRef.current.signalingState !== "stable") {
                   await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
+                  await flushIceQueue();
                 }
                 setPeerConnected(true);
                 setStatusText("Connected • 4K Ultra HD");
@@ -4632,10 +4655,14 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
             }
           })
           .on("broadcast", { event: "ice-candidate" }, async ({ payload }) => {
-            if (payload.sender !== userRole && pcRef.current && payload.candidate) {
-              try {
-                await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
-              } catch (_) {}
+            if (payload.sender !== userRole && payload.candidate) {
+              if (pcRef.current && pcRef.current.remoteDescription && pcRef.current.remoteDescription.type) {
+                try {
+                  await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
+                } catch (_) {}
+              } else {
+                iceQueue.push(payload.candidate);
+              }
             }
           })
           .on("broadcast", { event: "in-call-chat" }, ({ payload }) => {
@@ -4653,6 +4680,24 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
                 payload: { sender: userRole }
               });
               if (isTeacher) await sendTeacherOffer();
+
+              // Auto-Recovery Polling every 2s until connected
+              autoRecoveryTimer = setInterval(() => {
+                if (!mounted) return;
+                if (pcRef.current && pcRef.current.connectionState === "connected") {
+                  if (autoRecoveryTimer) clearInterval(autoRecoveryTimer);
+                  return;
+                }
+                if (isTeacher) {
+                  sendTeacherOffer();
+                } else {
+                  channel.send({
+                    type: "broadcast",
+                    event: "peer-ready",
+                    payload: { sender: userRole }
+                  });
+                }
+              }, 2000);
             }
           });
 
@@ -4888,8 +4933,7 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
               value={inputMsg}
               onChange={e => setInputMsg(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSendChat(); }}
-              placeholder={peerConnected ? "Type a message..." : "Waiting for peer to connect..."}
-              disabled={!peerConnected}
+              placeholder={peerConnected ? "Type a message..." : "Waiting for peer..."}
             />
             <button
               className="oth-chat-send-btn"
@@ -4912,10 +4956,34 @@ function AdminTahfeezTracker({ sb, students = [] }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
+  const [studentAccessFilter, setStudentAccessFilter] = useState("all");
   const [selectedSession, setSelectedSession] = useState(null);
   const [visibilityData, setVisibilityData] = useState({ teacher: true, parents: true });
   const [studentAccessMap, setStudentAccessMap] = useState({});
   const [toggling, setToggling] = useState(false);
+
+  const savePageVisibilityToDB = async (pageKey, role, label, visible) => {
+    try {
+      const { data: existing } = await sb
+        .from("page_visibility")
+        .select("id")
+        .eq("page_key", pageKey)
+        .maybeSingle();
+
+      if (existing && existing.id) {
+        await sb
+          .from("page_visibility")
+          .update({ visible, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await sb
+          .from("page_visibility")
+          .insert([{ page_key: pageKey, role, label, visible, updated_at: new Date().toISOString() }]);
+      }
+    } catch (err) {
+      console.warn(`Error persisting ${pageKey} to Supabase DB:`, err);
+    }
+  };
 
   const fetchAuditData = useCallback(async () => {
     setLoading(true);
@@ -4927,46 +4995,28 @@ function AdminTahfeezTracker({ sb, students = [] }) {
 
       if (sessRes && !sessRes.error && sessRes.data && sessRes.data.length > 0) {
         setSessions(sessRes.data);
-      } else {
-        const local = JSON.parse(localStorage.getItem("admin_tahfeez_sessions") || "[]");
-        setSessions(local);
       }
 
       const vMap = { teacher: true, parents: true };
-      try {
-        const cachedGlobal = JSON.parse(localStorage.getItem("admin_global_tahfeez_access") || "{}");
-        Object.assign(vMap, cachedGlobal);
-      } catch (_) {}
-
       const stMap = {};
-      try {
-        const localStMap = JSON.parse(localStorage.getItem("admin_student_tahfeez_access") || "{}");
-        Object.assign(stMap, localStMap);
-      } catch (_) {}
 
-      if (visRes.data) {
+      if (visRes.data && visRes.data.length > 0) {
         visRes.data.forEach(item => {
-          if (item.page_key === "online_tahfeez" || item.page_key === "online_tahfeez_teacher") {
-            vMap.teacher = item.visible;
-          }
-          if (item.page_key === "online_tahfeez" || item.page_key === "online_tahfeez_parents") {
-            vMap.parents = item.visible;
-          }
+          if (item.page_key === "online_tahfeez_teacher") vMap.teacher = item.visible;
+          if (item.page_key === "online_tahfeez_parents") vMap.parents = item.visible;
+          if (item.page_key === "online_tahfeez" && item.role) vMap[item.role] = item.visible;
+
           if (item.page_key && item.page_key.startsWith("online_tahfeez_student_")) {
             const sid = item.page_key.replace("online_tahfeez_student_", "");
             stMap[sid] = item.visible;
           }
         });
       }
+
       setVisibilityData(vMap);
       setStudentAccessMap(stMap);
-      try {
-        localStorage.setItem("admin_global_tahfeez_access", JSON.stringify(vMap));
-        localStorage.setItem("admin_student_tahfeez_access", JSON.stringify(stMap));
-      } catch (_) {}
-    } catch (_) {
-      const local = JSON.parse(localStorage.getItem("admin_tahfeez_sessions") || "[]");
-      setSessions(local);
+    } catch (err) {
+      console.error("Error fetching admin audit data:", err);
     }
     setLoading(false);
   }, [sb]);
@@ -4980,16 +5030,11 @@ function AdminTahfeezTracker({ sb, students = [] }) {
     const newVis = !visibilityData[role];
     const updatedGlobal = { ...visibilityData, [role]: newVis };
     setVisibilityData(updatedGlobal);
-    try { localStorage.setItem("admin_global_tahfeez_access", JSON.stringify(updatedGlobal)); } catch (_) {}
 
-    try {
-      await sb.from("page_visibility").upsert([
-        { page_key: `online_tahfeez_${role}`, role: role, label: `Online Tahfeez (${role})`, visible: newVis, updated_at: new Date().toISOString() },
-        { page_key: "online_tahfeez", role: role, label: "Online Tahfeez (4K HD)", visible: newVis, updated_at: new Date().toISOString() }
-      ]);
-    } catch (err) {
-      console.warn("Failed to persist online tahfeez global visibility to DB:", err);
-    }
+    await Promise.all([
+      savePageVisibilityToDB(`online_tahfeez_${role}`, role, `Online Tahfeez (${role})`, newVis),
+      savePageVisibilityToDB("online_tahfeez", role, "Online Tahfeez Global", newVis)
+    ]);
     setToggling(false);
   };
 
@@ -4998,115 +5043,243 @@ function AdminTahfeezTracker({ sb, students = [] }) {
     const newVis = !current;
     const updatedMap = { ...studentAccessMap, [studentId]: newVis };
     setStudentAccessMap(updatedMap);
-    try { localStorage.setItem("admin_student_tahfeez_access", JSON.stringify(updatedMap)); } catch (_) {}
 
-    try {
-      await sb.from("page_visibility").upsert({
-        page_key: `online_tahfeez_student_${studentId}`,
-        role: "student",
-        label: `Online Tahfeez Access for Student ${studentId}`,
-        visible: newVis,
-        updated_at: new Date().toISOString()
-      });
-    } catch (err) {
-      console.warn("Failed to persist student access to DB:", err);
-    }
+    await savePageVisibilityToDB(`online_tahfeez_student_${studentId}`, "student", `Online Tahfeez Student ${studentId}`, newVis);
   };
+
+  const setBatchStudentAccess = async (allowAll) => {
+    const updatedMap = { ...studentAccessMap };
+    (students || []).forEach(st => {
+      const sid = st.student_id || st.id;
+      updatedMap[sid] = allowAll;
+    });
+    setStudentAccessMap(updatedMap);
+
+    const promises = (students || []).map(st => {
+      const sid = st.student_id || st.id;
+      return savePageVisibilityToDB(`online_tahfeez_student_${sid}`, "student", `Online Tahfeez Student ${sid}`, allowAll);
+    });
+    await Promise.all(promises);
+  };
+
+  const totalSessions = sessions.length;
+  const totalMinutes = Math.round(sessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) / 60);
+  const disabledStudentsCount = Object.values(studentAccessMap).filter(v => v === false).length;
+  const allowedStudentsCount = (students || []).length - disabledStudentsCount;
 
   const filtered = sessions.filter(s =>
     (s.student_name || "").toLowerCase().includes(search.toLowerCase()) ||
     (s.teacher_name || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredStudentsForAccess = (students || []).filter(s =>
-    (s.full_name || s.name || "").toLowerCase().includes(studentSearch.toLowerCase()) ||
-    (s.groupName || s.class_level || "").toLowerCase().includes(studentSearch.toLowerCase())
-  );
+  const filteredStudentsForAccess = (students || []).filter(s => {
+    const sid = s.student_id || s.id;
+    const hasAccess = studentAccessMap[sid] !== false;
+    const matchFilter =
+      studentAccessFilter === "all" ||
+      (studentAccessFilter === "allowed" && hasAccess) ||
+      (studentAccessFilter === "disabled" && !hasAccess);
+    const matchSearch =
+      (s.full_name || s.name || "").toLowerCase().includes(studentSearch.toLowerCase()) ||
+      (s.groupName || s.class_level || "").toLowerCase().includes(studentSearch.toLowerCase());
+    return matchFilter && matchSearch;
+  });
 
   return (
-    <div className="card-appear" style={{ maxWidth: 1000, margin: '0 auto', padding: '10px 0' }}>
-      {/* Admin Global Feature Control Card */}
+    <div className="card-appear" style={{ maxWidth: 1050, margin: '0 auto', paddingBottom: 40 }}>
+      {/* ─── Ultra-Premium Admin Command Header Banner ─── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #18130b, #2c2114, #120e07)',
+        color: '#fff', padding: '28px 30px', borderRadius: '24px', marginBottom: '24px',
+        border: '1px solid rgba(212,175,55,0.4)', boxShadow: '0 10px 40px rgba(0,0,0,0.35)',
+        position: 'relative', overflow: 'hidden'
+      }}>
+        <div style={{
+          position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%',
+          background: 'rgba(212,175,55,0.08)', pointerEvents: 'none'
+        }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{
+              width: 58, height: 58, borderRadius: '18px',
+              background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+              display: 'grid', placeItems: 'center', color: '#000', flexShrink: 0,
+              boxShadow: '0 4px 20px rgba(212,175,55,0.4)'
+            }}>
+              <Video size={30} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <h2 style={{ margin: 0, color: '#d4af37', fontSize: '1.4rem', fontWeight: 800 }}>
+                  Online Tahfeez Command Center
+                </h2>
+                <span style={{ background: '#d4af37', color: '#000', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6 }}>
+                  4K ULTRA HD
+                </span>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#cbd5e1' }}>
+                Database-driven global feature control, student access matrix, and live audit telemetry.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.08)', padding: '8px 16px', borderRadius: 20 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 10px #22c55e' }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#86efac' }}>
+              Database Active 🟢
+            </span>
+          </div>
+        </div>
+
+        {/* Live Telemetry Stats Counter Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginTop: 24, zIndex: 2, position: 'relative' }}>
+          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: 700 }}>Total Completed Sessions</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#d4af37', marginTop: 4 }}>{totalSessions}</div>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: 700 }}>Recitation Time</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#38bdf8', marginTop: 4 }}>{totalMinutes} mins</div>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: 700 }}>Students Access Allowed</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#4ade80', marginTop: 4 }}>{allowedStudentsCount} 🟢</div>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: 700 }}>Students Access Disabled</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>{disabledStudentsCount} 🔒</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Global Feature Control Card ─── */}
       <div style={{
         background: 'linear-gradient(135deg, #1f1912, #2b2216)',
-        color: '#fff', padding: '20px', borderRadius: '16px', marginBottom: '24px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid rgba(212,175,55,0.3)'
+        color: '#fff', padding: '22px 24px', borderRadius: '20px', marginBottom: '24px',
+        boxShadow: '0 6px 25px rgba(0,0,0,0.2)', border: '1px solid rgba(212,175,55,0.3)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#d4af37', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Video size={22} /> Online Tahfeez (4K HD) Global Feature Control
+            <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#d4af37', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800 }}>
+              <Video size={22} /> Global Portal Online Tahfeez Visibility (Database Synced)
             </h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#d1d5db' }}>
-              Hide or Unhide Online Tahfeez 4K HD Video calling globally for Teachers and Parents.
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#cbd5e1' }}>
+              Hide or unhide the entire Online Tahfeez 4K HD feature globally for Teacher or Parent portals.
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Teacher Access:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.06)', padding: '6px 14px', borderRadius: 20 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#cbd5e1' }}>Teacher Portal:</span>
               <button
                 onClick={() => toggleFeatureVisibility('teacher')}
                 disabled={toggling}
                 style={{
-                  padding: '6px 14px', borderRadius: 20, border: 'none', fontWeight: 700,
-                  fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                  background: visibilityData.teacher ? '#22c55e' : '#64748b', color: '#fff'
+                  padding: '6px 16px', borderRadius: 20, border: 'none', fontWeight: 800,
+                  fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  background: visibilityData.teacher ? '#22c55e' : '#dc2626', color: '#fff',
+                  boxShadow: visibilityData.teacher ? '0 2px 10px rgba(34,197,94,0.3)' : '0 2px 10px rgba(220,38,38,0.3)'
                 }}
               >
-                {visibilityData.teacher ? <Eye size={14} /> : <EyeOff size={14} />}
-                {visibilityData.teacher ? "Unhidden (Allowed)" : "Hidden (Blocked)"}
+                {visibilityData.teacher ? <Eye size={15} /> : <EyeOff size={15} />}
+                {visibilityData.teacher ? "Unhidden 🟢" : "Hidden 🔒"}
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Parent Access:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.06)', padding: '6px 14px', borderRadius: 20 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#cbd5e1' }}>Parent Portal:</span>
               <button
                 onClick={() => toggleFeatureVisibility('parents')}
                 disabled={toggling}
                 style={{
-                  padding: '6px 14px', borderRadius: 20, border: 'none', fontWeight: 700,
-                  fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                  background: visibilityData.parents ? '#22c55e' : '#64748b', color: '#fff'
+                  padding: '6px 16px', borderRadius: 20, border: 'none', fontWeight: 800,
+                  fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  background: visibilityData.parents ? '#22c55e' : '#dc2626', color: '#fff',
+                  boxShadow: visibilityData.parents ? '0 2px 10px rgba(34,197,94,0.3)' : '0 2px 10px rgba(220,38,38,0.3)'
                 }}
               >
-                {visibilityData.parents ? <Eye size={14} /> : <EyeOff size={14} />}
-                {visibilityData.parents ? "Unhidden (Allowed)" : "Hidden (Blocked)"}
+                {visibilityData.parents ? <Eye size={15} /> : <EyeOff size={15} />}
+                {visibilityData.parents ? "Unhidden 🟢" : "Hidden 🔒"}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Individual Student Access Control Card */}
+      {/* ─── Individual Student Access Management Matrix ─── */}
       <div style={{
-        background: '#fff', padding: '20px', borderRadius: '16px', marginBottom: '24px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)'
+        background: '#fff', padding: '24px', borderRadius: '20px', marginBottom: '24px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Users size={20} style={{ color: '#b8860b' }} /> Individual Student Online Class Access Management
+            <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800 }}>
+              <Users size={22} style={{ color: '#b8860b' }} /> Individual Student Class Access Matrix
             </h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.83rem', color: '#64748b' }}>
-              Enable or disable Online 4K Tahfeez video class access for specific children individually.
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+              Control 4K video class access per student. Saved directly to Supabase database.
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '6px 12px', borderRadius: 20, border: '1px solid #cbd5e1' }}>
-            <Search size={15} style={{ color: '#64748b' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setBatchStudentAccess(true)}
+              style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid #22c55e', background: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
+            >
+              Allow All Students 🟢
+            </button>
+            <button
+              onClick={() => setBatchStudentAccess(false)}
+              style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid #ef4444', background: '#fee2e2', color: '#b91c1c', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
+            >
+              Disable All Students 🔒
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Controls & Search */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>Filter:</span>
+            {[
+              { id: 'all', label: `All (${(students || []).length})` },
+              { id: 'allowed', label: `Allowed 🟢 (${allowedStudentsCount})` },
+              { id: 'disabled', label: `Disabled 🔒 (${disabledStudentsCount})` }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setStudentAccessFilter(f.id)}
+                style={{
+                  padding: '5px 14px', borderRadius: 16, border: 'none', fontWeight: 700, fontSize: '0.78rem',
+                  cursor: 'pointer', transition: 'all 0.2s ease',
+                  background: studentAccessFilter === f.id ? 'linear-gradient(135deg, #d4af37, #b8860b)' : '#f1f5f9',
+                  color: studentAccessFilter === f.id ? '#000' : '#64748b'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '8px 14px', borderRadius: 20, border: '1px solid #cbd5e1', width: '100%', maxWidth: 280 }}>
+            <Search size={16} style={{ color: '#64748b' }} />
             <input
               value={studentSearch}
               onChange={e => setStudentSearch(e.target.value)}
               placeholder="Search student or group..."
-              style={{ border: 'none', outline: 'none', fontSize: '0.85rem', background: 'transparent' }}
+              style={{ border: 'none', outline: 'none', fontSize: '0.85rem', background: 'transparent', width: '100%' }}
             />
           </div>
         </div>
 
-        <div style={{ maxHeight: 280, overflowY: 'auto', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+        <div style={{ maxHeight: 380, overflowY: 'auto', borderRadius: 14, border: '1px solid #e2e8f0' }}>
           {filteredStudentsForAccess.length === 0 ? (
-            <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-              No students found matching "{studentSearch}".
+            <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem' }}>
+              No students found matching your filter criteria.
             </div>
           ) : (
             filteredStudentsForAccess.map(st => {
@@ -5116,21 +5289,22 @@ function AdminTahfeezTracker({ sb, students = [] }) {
               return (
                 <div key={stId} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: hasAccess ? '#fff' : '#fff5f5'
+                  padding: '12px 18px', borderBottom: '1px solid #f1f5f9', background: hasAccess ? '#fff' : '#fff5f5',
+                  transition: 'all 0.15s ease'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                     <img
                       src={st.photoUrl || st.photo_url || "/logo.png"}
                       alt={st.full_name || st.name}
-                      style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', border: '1px solid #d4af37' }}
+                      style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', border: '2px solid #d4af37' }}
                       onError={e => { e.target.src = "/logo.png"; }}
                     />
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#1e293b' }}>
                         {st.full_name || st.name}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        ITS: {st.its || st.student_id || stId} • Group: {st.groupName || st.class_level || "Group 1"}
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
+                        ITS: {st.its || st.student_id || stId} &middot; Group: {st.groupName || st.class_level || "Group 1"}
                       </div>
                     </div>
                   </div>
@@ -5138,14 +5312,14 @@ function AdminTahfeezTracker({ sb, students = [] }) {
                   <button
                     onClick={() => toggleStudentAccess(stId)}
                     style={{
-                      padding: '6px 14px', borderRadius: 20, border: 'none', fontWeight: 700,
-                      fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '7px 16px', borderRadius: 20, border: 'none', fontWeight: 800,
+                      fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                       background: hasAccess ? 'linear-gradient(135deg, #16a34a, #15803d)' : '#dc2626', color: '#fff',
-                      boxShadow: hasAccess ? '0 2px 8px rgba(22,163,74,0.3)' : '0 2px 8px rgba(220,38,38,0.3)'
+                      boxShadow: hasAccess ? '0 3px 10px rgba(22,163,74,0.3)' : '0 3px 10px rgba(220,38,38,0.3)'
                     }}
                   >
-                    {hasAccess ? <Eye size={14} /> : <Lock size={14} />}
-                    {hasAccess ? "Online Class Allowed 🟢" : "Online Class Disabled 🔒"}
+                    {hasAccess ? <Eye size={15} /> : <Lock size={15} />}
+                    {hasAccess ? "Access Allowed 🟢" : "Access Disabled 🔒"}
                   </button>
                 </div>
               );
@@ -5154,51 +5328,51 @@ function AdminTahfeezTracker({ sb, students = [] }) {
         </div>
       </div>
 
-      {/* Audit Search Bar */}
+      {/* ─── Audit Log Table Header & Search ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-        <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.15rem' }}>
-          Online Tahfeez Sessions Audit ({filtered.length})
+        <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.2rem', fontWeight: 800 }}>
+          Online Tahfeez Completed Session Audit Logs ({filtered.length})
         </h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', padding: '6px 12px', borderRadius: 20, border: '1px solid #ddd' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', padding: '8px 14px', borderRadius: 20, border: '1px solid #ddd', width: '100%', maxWidth: 280 }}>
           <Search size={16} style={{ color: '#888' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search student or teacher..."
-            style={{ border: 'none', outline: 'none', fontSize: '0.88rem' }}
+            style={{ border: 'none', outline: 'none', fontSize: '0.88rem', width: '100%' }}
           />
         </div>
       </div>
 
       {/* Audit Log Table */}
-      <div className="table-responsive-wrapper" style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+      <div className="table-responsive-wrapper" style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
           <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
             <tr>
-              <th style={{ padding: '12px 14px' }}>Student</th>
-              <th style={{ padding: '12px 14px' }}>Teacher</th>
-              <th style={{ padding: '12px 14px' }}>Started At</th>
-              <th style={{ padding: '12px 14px' }}>Duration</th>
-              <th style={{ padding: '12px 14px' }}>Status</th>
-              <th style={{ padding: '12px 14px' }}>Actions</th>
+              <th style={{ padding: '14px 16px' }}>Student</th>
+              <th style={{ padding: '14px 16px' }}>Teacher</th>
+              <th style={{ padding: '14px 16px' }}>Started At</th>
+              <th style={{ padding: '14px 16px' }}>Duration</th>
+              <th style={{ padding: '14px 16px' }}>Status</th>
+              <th style={{ padding: '14px 16px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30 }}>Loading audit records...</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 35 }}>Loading database audit records...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: '#888' }}>No Tahfeez sessions recorded yet.</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 35, color: '#888' }}>No Tahfeez sessions recorded yet.</td></tr>
             ) : filtered.map((s, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '12px 14px', fontWeight: 600 }}>{s.student_name}</td>
-                <td style={{ padding: '12px 14px' }}>{s.teacher_name}</td>
-                <td style={{ padding: '12px 14px', color: '#64748b' }}>
+                <td style={{ padding: '14px 16px', fontWeight: 700 }}>{s.student_name}</td>
+                <td style={{ padding: '14px 16px' }}>{s.teacher_name}</td>
+                <td style={{ padding: '14px 16px', color: '#64748b' }}>
                   {s.started_at ? new Date(s.started_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : "N/A"}
                 </td>
-                <td style={{ padding: '12px 14px', fontWeight: 600 }}>
+                <td style={{ padding: '14px 16px', fontWeight: 700, color: '#b8860b' }}>
                   {Math.floor((s.duration_seconds || 0) / 60)}m {(s.duration_seconds || 0) % 60}s
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '14px 16px' }}>
                   <span style={{
                     padding: '3px 10px', borderRadius: 12, fontSize: '0.75rem', fontWeight: 700,
                     background: s.status === 'completed' ? '#dcfce7' : '#fef3c7',
@@ -5207,10 +5381,10 @@ function AdminTahfeezTracker({ sb, students = [] }) {
                     {s.status === 'completed' ? 'Done' : 'In Progress'}
                   </span>
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '14px 16px' }}>
                   <button
                     onClick={() => setSelectedSession(s)}
-                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d4af37', background: 'rgba(212,175,55,0.1)', color: '#b8860b', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d4af37', background: 'rgba(212,175,55,0.1)', color: '#b8860b', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Details & Chat
                   </button>
@@ -5221,37 +5395,38 @@ function AdminTahfeezTracker({ sb, students = [] }) {
         </table>
       </div>
 
-      {/* Audit Detail Modal */}
-      {selectedSession && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(0,0,0,0.6)', display: 'grid', placeItems: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 16, maxWidth: 500, width: '100%', padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
+      {/* Session Details Modal */}
+      {selectedSession && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999,
+          display: 'grid', placeItems: 'center', padding: 20
+        }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 24, maxWidth: 500, width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, color: 'var(--deep-brown)' }}>Tahfeez Session Audit Details</h3>
-              <button onClick={() => setSelectedSession(null)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X size={20} /></button>
+              <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.15rem' }}>Tahfeez Session Audit Details</h3>
+              <button onClick={() => setSelectedSession(null)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
             </div>
-            
-            <div style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>
-              <p><strong>Student:</strong> {selectedSession.student_name}</p>
-              <p><strong>Teacher:</strong> {selectedSession.teacher_name}</p>
-              <p><strong>Started:</strong> {new Date(selectedSession.started_at).toLocaleString()}</p>
-              <p><strong>Ended:</strong> {selectedSession.ended_at ? new Date(selectedSession.ended_at).toLocaleString() : "N/A"}</p>
-              <p><strong>Duration:</strong> {Math.floor((selectedSession.duration_seconds || 0) / 60)} minutes {(selectedSession.duration_seconds || 0) % 60} seconds</p>
-              <p><strong>Status:</strong> {selectedSession.status}</p>
-
-              <h4 style={{ marginTop: 16, marginBottom: 8, color: '#b8860b' }}>In-Call Chat Log ({selectedSession.chat_messages?.length || 0})</h4>
-              <div style={{ maxHeight: 180, overflowY: 'auto', background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                {!selectedSession.chat_messages || selectedSession.chat_messages.length === 0 ? (
-                  <div style={{ color: '#888', fontSize: '0.82rem' }}>No in-call chat messages were exchanged during this session.</div>
-                ) : selectedSession.chat_messages.map((m, i) => (
-                  <div key={i} style={{ marginBottom: 6, fontSize: '0.83rem' }}>
-                    <strong>{m.sender}:</strong> {m.text} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>({m.timestamp})</span>
-                  </div>
-                ))}
-              </div>
+            <div style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, marginBottom: 16 }}>
+              <div><strong>Student:</strong> {selectedSession.student_name}</div>
+              <div><strong>Teacher:</strong> {selectedSession.teacher_name}</div>
+              <div><strong>Duration:</strong> {Math.floor((selectedSession.duration_seconds || 0) / 60)}m {(selectedSession.duration_seconds || 0) % 60}s</div>
+              <div><strong>Started At:</strong> {selectedSession.started_at ? new Date(selectedSession.started_at).toLocaleString() : 'N/A'}</div>
+              <div><strong>Status:</strong> {selectedSession.status}</div>
+            </div>
+            <h4 style={{ margin: '16px 0 8px 0', fontSize: '0.92rem', color: '#b8860b' }}>In-Call Chat Log ({selectedSession.chat_messages?.length || 0})</h4>
+            <div style={{ maxHeight: 180, overflowY: 'auto', background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              {!selectedSession.chat_messages || selectedSession.chat_messages.length === 0 ? (
+                <div style={{ color: '#888', fontSize: '0.82rem' }}>No in-call chat messages were exchanged during this session.</div>
+              ) : selectedSession.chat_messages.map((m, i) => (
+                <div key={i} style={{ marginBottom: 6, fontSize: '0.83rem' }}>
+                  <strong>{m.sender}:</strong> {m.text} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>({m.timestamp})</span>
+                </div>
+              ))}
             </div>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );
