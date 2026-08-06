@@ -4456,11 +4456,8 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
   const localStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
-  const iceQueueRef = useRef([]);
-  const processedSignalsRef = useRef(new Set());
   const offerInFlightRef = useRef(false);
   const connectedRef = useRef(false);
-  const mountedRef = useRef(true);
 
   const isStudent = userRole === "student" || userRole === "parent";
   const isTeacher = userRole === "teacher";
@@ -4478,7 +4475,6 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
 
   useEffect(() => {
     let mounted = true;
-    mountedRef.current = true;
 
     const iceQueue = [];
     const processedSignals = new Set();
@@ -4759,6 +4755,7 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
         sigChannelRef.current = sigChannel;
 
         // ─── DB Poll Fallback (keeps working even if realtime is unavailable) ───
+        let lastCleanupAt = 0;
         const dbPollInterval = setInterval(async () => {
           if (!mounted) return;
           if (connectedRef.current) {
@@ -4768,7 +4765,7 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
           try {
             const { data: dbSignals } = await supabase
               .from("tahfeez_signals")
-              .select("id, type, payload")
+              .select("id, type, payload, sender")
               .eq("room_id", roomId)
               .order("id", { ascending: true })
               .limit(60);
@@ -4789,6 +4786,16 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
           if (isTeacher && (!pcRef.current || pcRef.current.connectionState !== "connected")) {
             sendOffer();
           }
+
+          // Tidy up: delete stale signals for this room every ~2 min so the
+          // relay table never grows unbounded across many classes.
+          if (Date.now() - lastCleanupAt > 120000) {
+            lastCleanupAt = Date.now();
+            const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+            try {
+              await supabase.from("tahfeez_signals").delete().eq("room_id", roomId).lt("created_at", cutoff);
+            } catch (_) {}
+          }
         }, 1500);
 
         return () => {
@@ -4804,7 +4811,6 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
 
     return () => {
       mounted = false;
-      mountedRef.current = false;
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         try { mediaRecorderRef.current.stop(); } catch (_) {}
       }
@@ -4943,11 +4949,21 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
             alignItems: 'center', justifyCenter: 'center', justifyContent: 'center',
             background: 'rgba(10,10,12,0.85)', color: '#fff', textAlign: 'center', padding: 20
           }}>
-            <Loader2 size={40} className="animate-spin" style={{ color: '#d4af37', marginBottom: 12 }} />
-            <h4 style={{ margin: 0, fontSize: '1.2rem' }}>Waiting for {isTeacher ? (sessionData.student_name || "Student") : "Teacher"} to connect...</h4>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: 6 }}>
-              {isTeacher ? "Teacher Camera is Default OFF • Student Camera is Mandatory ON" : "Student Camera is Mandatory ON for Tahfeez"}
-            </p>
+            {errorMsg ? (
+              <>
+                <AlertCircle size={40} style={{ color: '#ef4444', marginBottom: 12 }} />
+                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#fca5a5' }}>Camera / Microphone Unavailable</h4>
+                <p style={{ fontSize: '0.85rem', color: '#fecaca', marginTop: 6, maxWidth: 420 }}>{errorMsg}</p>
+              </>
+            ) : (
+              <>
+                <Loader2 size={40} className="animate-spin" style={{ color: '#d4af37', marginBottom: 12 }} />
+                <h4 style={{ margin: 0, fontSize: '1.2rem' }}>Waiting for {isTeacher ? (sessionData.student_name || "Student") : "Teacher"} to connect...</h4>
+                <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: 6 }}>
+                  {isTeacher ? "Teacher Camera is Default OFF • Student Camera is Mandatory ON" : "Student Camera is Mandatory ON for Tahfeez"}
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -5061,27 +5077,26 @@ function AdminTahfeezTracker({ sb, students = [] }) {
   const [visibilityData, setVisibilityData] = useState({ teacher: true, parents: true });
   const [studentAccessMap, setStudentAccessMap] = useState({});
   const [toggling, setToggling] = useState(false);
+  const [feedback, setFeedback] = useState(null);
 
+  // Atomic upsert keyed on (page_key, role) so toggles ALWAYS persist, even
+  // when the same page_key exists for both 'parents' and 'teacher' roles.
   const savePageVisibilityToDB = async (pageKey, role, label, visible) => {
     try {
-      const { data: existing } = await sb
-        .from("page_visibility")
-        .select("id")
-        .eq("page_key", pageKey)
-        .maybeSingle();
-
-      if (existing && existing.id) {
-        await sb
-          .from("page_visibility")
-          .update({ visible, updated_at: new Date().toISOString() })
-          .eq("id", existing.id);
-      } else {
-        await sb
-          .from("page_visibility")
-          .insert([{ page_key: pageKey, role, label, visible, updated_at: new Date().toISOString() }]);
-      }
+      const { error } = await sb.from("page_visibility").upsert(
+        {
+          page_key: pageKey,
+          role,
+          label,
+          visible,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: "page_key,role" }
+      );
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
     } catch (err) {
-      console.warn(`Error persisting ${pageKey} to Supabase DB:`, err);
+      return { ok: false, error: err.message };
     }
   };
 
@@ -5099,18 +5114,36 @@ function AdminTahfeezTracker({ sb, students = [] }) {
 
       const vMap = { teacher: true, parents: true };
       const stMap = {};
+      // The generic `online_tahfeez` row (keyed by role) is the canonical source
+      // written by BOTH the dedicated Online Tahfeez admin and the general
+      // visibility admin. Per-portal rows (`online_tahfeez_teacher`/`..._parents`)
+      // are only a fallback so reads are deterministic and never flip on refresh.
+      const genericMap = {};
+      const portalMap = {};
 
       if (visRes.data && visRes.data.length > 0) {
         visRes.data.forEach(item => {
-          if (item.page_key === "online_tahfeez_teacher") vMap.teacher = item.visible;
-          if (item.page_key === "online_tahfeez_parents") vMap.parents = item.visible;
-          if (item.page_key === "online_tahfeez" && item.role) vMap[item.role] = item.visible;
+          if (item.page_key === "online_tahfeez" && item.role) {
+            genericMap[item.role] = item.visible;
+          } else if (item.page_key === "online_tahfeez_teacher") {
+            portalMap.teacher = item.visible;
+          } else if (item.page_key === "online_tahfeez_parents") {
+            portalMap.parents = item.visible;
+          }
 
           if (item.page_key && item.page_key.startsWith("online_tahfeez_student_")) {
             const sid = item.page_key.replace("online_tahfeez_student_", "");
-            stMap[sid] = item.visible;
+            // Prefer the admin-written `parents` row; stale `student` duplicates
+            // only fill in when no `parents` row exists yet.
+            if (item.role === "parents" || stMap[sid] === undefined) stMap[sid] = item.visible;
           }
         });
+
+        if (genericMap.parents !== undefined) vMap.parents = genericMap.parents;
+        else if (portalMap.parents !== undefined) vMap.parents = portalMap.parents;
+
+        if (genericMap.teacher !== undefined) vMap.teacher = genericMap.teacher;
+        else if (portalMap.teacher !== undefined) vMap.teacher = portalMap.teacher;
       }
 
       setVisibilityData(vMap);
@@ -5125,26 +5158,55 @@ function AdminTahfeezTracker({ sb, students = [] }) {
     fetchAuditData();
   }, [fetchAuditData]);
 
+  // Keep the admin dashboard in sync with the database in realtime so any
+  // toggle (here or from another device) is reflected instantly.
+  useEffect(() => {
+    const channel = sb
+      .channel('admin-tahfeez-visibility-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'page_visibility' },
+        () => fetchAuditData()
+      )
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [sb, fetchAuditData]);
+
   const toggleFeatureVisibility = async (role) => {
     setToggling(true);
     const newVis = !visibilityData[role];
-    const updatedGlobal = { ...visibilityData, [role]: newVis };
-    setVisibilityData(updatedGlobal);
+    setFeedback({ type: "info", text: `Saving Online Tahfeez (${role}) settings...` });
 
-    await Promise.all([
+    const results = await Promise.all([
       savePageVisibilityToDB(`online_tahfeez_${role}`, role, `Online Tahfeez (${role})`, newVis),
       savePageVisibilityToDB("online_tahfeez", role, "Online Tahfeez Global", newVis)
     ]);
+
+    const failed = results.find(r => !r.ok);
+    if (failed) {
+      setFeedback({ type: "error", text: `Save failed for (${role}): ${failed.error}. Please check your connection and try again.` });
+    } else {
+      setFeedback({ type: "success", text: `Online Tahfeez (${role}) is now ${newVis ? "Unhidden (ON)" : "Hidden (OFF)"}. Saved to database.` });
+    }
+    // Re-sync from DB so the UI always shows the true saved state.
+    await fetchAuditData();
     setToggling(false);
+    setTimeout(() => setFeedback(null), 3500);
   };
 
   const toggleStudentAccess = async (studentId) => {
     const current = studentAccessMap[studentId] !== false; // default true
     const newVis = !current;
-    const updatedMap = { ...studentAccessMap, [studentId]: newVis };
-    setStudentAccessMap(updatedMap);
+    setStudentAccessMap({ ...studentAccessMap, [studentId]: newVis });
 
-    await savePageVisibilityToDB(`online_tahfeez_student_${studentId}`, "student", `Online Tahfeez Student ${studentId}`, newVis);
+    const result = await savePageVisibilityToDB(`online_tahfeez_student_${studentId}`, "parents", `Online Tahfeez Student ${studentId}`, newVis);
+    if (result.ok) {
+      setFeedback({ type: "success", text: `Student ${studentId} access ${newVis ? "allowed" : "disabled"}. Saved to database.` });
+    } else {
+      setFeedback({ type: "error", text: `Failed to save student ${studentId} access: ${result.error}` });
+      await fetchAuditData();
+    }
+    setTimeout(() => setFeedback(null), 3000);
   };
 
   const setBatchStudentAccess = async (allowAll) => {
@@ -5154,12 +5216,21 @@ function AdminTahfeezTracker({ sb, students = [] }) {
       updatedMap[sid] = allowAll;
     });
     setStudentAccessMap(updatedMap);
+    setFeedback({ type: "info", text: `${allowAll ? "Allowing" : "Disabling"} all students...` });
 
-    const promises = (students || []).map(st => {
+    const results = await Promise.all((students || []).map(st => {
       const sid = st.student_id || st.id;
-      return savePageVisibilityToDB(`online_tahfeez_student_${sid}`, "student", `Online Tahfeez Student ${sid}`, allowAll);
-    });
-    await Promise.all(promises);
+      return savePageVisibilityToDB(`online_tahfeez_student_${sid}`, "parents", `Online Tahfeez Student ${sid}`, allowAll);
+    }));
+
+    const failed = results.find(r => !r.ok);
+    if (failed) {
+      setFeedback({ type: "error", text: `Batch save failed: ${failed.error}` });
+      await fetchAuditData();
+    } else {
+      setFeedback({ type: "success", text: `All students ${allowAll ? "allowed" : "disabled"}. Saved to database.` });
+    }
+    setTimeout(() => setFeedback(null), 3500);
   };
 
   const totalSessions = sessions.length;
@@ -5187,6 +5258,22 @@ function AdminTahfeezTracker({ sb, students = [] }) {
 
   return (
     <div className="card-appear" style={{ maxWidth: 1050, margin: '0 auto', paddingBottom: 40 }}>
+      {feedback && (
+        <div style={{
+          padding: '12px 18px', borderRadius: 14, marginBottom: 18, fontWeight: 700,
+          fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: 10,
+          background: feedback.type === 'error'
+            ? 'rgba(239,68,68,0.12)'
+            : feedback.type === 'success'
+              ? 'rgba(34,197,94,0.12)'
+              : 'rgba(59,130,246,0.12)',
+          border: `1px solid ${feedback.type === 'error' ? '#ef4444' : feedback.type === 'success' ? '#22c55e' : '#3b82f6'}`,
+          color: feedback.type === 'error' ? '#ef4444' : feedback.type === 'success' ? '#16a34a' : '#2563eb'
+        }}>
+          {feedback.type === 'success' ? <CheckCircle size={18} /> : feedback.type === 'error' ? <AlertCircle size={18} /> : <Loader2 size={18} className="animate-spin" />}
+          <span>{feedback.text}</span>
+        </div>
+      )}
       {/* ─── Ultra-Premium Admin Command Header Banner ─── */}
       <div style={{
         background: 'linear-gradient(135deg, #18130b, #2c2114, #120e07)',
@@ -5659,13 +5746,6 @@ function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisi
   const isTeacherOnline = Boolean(teacherPresence);
   const isTeacherBusy = teacherPresence?.isCalling === true && teacherPresence?.activeCallTargetId !== studentId;
 
-  // Granted when teacher explicitly turned ON access for child or teacher is online/calling
-  const isTeacherGranted = Boolean(
-    pageVisibility?.[`online_tahfeez_teacher_granted_${studentId}`] === true ||
-    isTeacherOnline ||
-    isTeacherBusy
-  );
-
   const [waitingInQueue, setWaitingInQueue] = useState(false);
 
   useEffect(() => {
@@ -5683,35 +5763,6 @@ function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisi
     }
   }, [waitingInQueue, isTeacherBusy, studentId, studentName, teacherId, teacherName, onStartCall]);
 
-  if (!isTeacherGranted && !isHidden) {
-    return (
-      <div className="card-appear" style={{ marginBottom: '20px' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, #18181b, #27272a)',
-          color: '#a1a1aa', padding: '16px 20px', borderRadius: '16px',
-          border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '12px', background: 'rgba(255,255,255,0.06)', display: 'grid', placeItems: 'center', color: '#d4af37' }}>
-              <Video size={22} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#e4e4e7' }}>
-                Online Tahfeez 4K Class Session
-              </div>
-              <div style={{ fontSize: '0.78rem', color: '#a1a1aa' }}>
-                Your Muhaffiz ({teacherName}) will enable access when class begins.
-              </div>
-            </div>
-          </div>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.15)', padding: '4px 10px', borderRadius: 12, border: '1px solid rgba(245,158,11,0.3)' }}>
-            Class Standby ⏳
-          </span>
-        </div>
-      </div>
-    );
-  }
-
   const handleJoinClick = () => {
     if (isTeacherBusy) {
       setWaitingInQueue(true);
@@ -5727,6 +5778,11 @@ function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisi
       });
     }
   };
+
+  // Full hide (not just a greyed-out card): when the admin hides Online Tahfeez
+  // for parents, or disables this child, the card completely disappears from the
+  // home page. When re-enabled it renders again in the same spot.
+  if (isHidden) return null;
 
   return (
     <div className="card-appear" style={{ marginBottom: '20px' }}>
@@ -5954,7 +6010,7 @@ function TeacherOnlineTahfeezPage({ students, teacherIdentity, pageVisibility, o
           <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', color: '#dc2626' }}>
             Online Tahfeez Feature is Turned OFF by Admin
           </h3>
-          <p style={{ margin: 0, fontSize: '0.9rem', color: '#7f1d1d', maxWidth: 500, margin: '0 auto', lineHeight: 1.5 }}>
+          <p style={{ margin: '10px auto 0 auto', fontSize: '0.9rem', color: '#7f1d1d', maxWidth: 500, lineHeight: 1.5 }}>
             Online video calling, real-time presence tracking, and student calls are currently disabled by administration settings.
             <br/>Please contact the system administrator to re-enable this feature.
           </p>
@@ -7826,12 +7882,23 @@ function ParentPortal({
     } catch (_) {}
 
     if (pvRes.data) {
+      // The generic `online_tahfeez` row for role=parents is canonical; per-portal
+      // `online_tahfeez_parents` is only a fallback. Filter by role so a `teacher`
+      // generic row can never overwrite the parent's global flag.
+      let genParents, portalParents;
       pvRes.data.forEach(p => {
-        map[p.page_key] = p.visible;
-        if (p.page_key === "online_tahfeez_parents") {
-          map.online_tahfeez = p.visible;
+        if (p.page_key === "online_tahfeez") {
+          if (p.role === "parents") genParents = p.visible;
+        } else if (p.page_key === "online_tahfeez_parents") {
+          portalParents = p.visible;
+        } else if (p.page_key && p.page_key.startsWith("online_tahfeez_student_")) {
+          if (p.role === "parents" || map[p.page_key] === undefined) map[p.page_key] = p.visible;
+        } else {
+          map[p.page_key] = p.visible;
         }
       });
+      if (genParents !== undefined) map.online_tahfeez = genParents;
+      else if (portalParents !== undefined) map.online_tahfeez = portalParents;
     }
     setParentLeaveForceOpen(jsRes.data?.parent_leave_enabled === true);
     setPageVisibility(map);
@@ -7850,7 +7917,7 @@ function ParentPortal({
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'page_visibility', filter: 'role=eq.parents' },
+        { event: '*', schema: 'public', table: 'page_visibility' },
         () => fetchPageVisibility().catch(() => {})
       )
       .subscribe();
@@ -17915,27 +17982,58 @@ function TeacherPortal({
   const canTeacherFillProgress = reportSettingsObject?.allow_teacher_progress_entry !== false;
 
   const [pageVisibility, setPageVisibility] = useState({});
-  useEffect(() => {
-    supabase.from('page_visibility').select('page_key, role, visible').then(({ data }) => {
-      const map = {};
-      try {
-        const cachedGlobal = JSON.parse(localStorage.getItem("admin_global_tahfeez_access") || "{}");
-        if (cachedGlobal.teacher !== undefined) map.online_tahfeez = cachedGlobal.teacher;
-        const localStMap = JSON.parse(localStorage.getItem("admin_student_tahfeez_access") || "{}");
-        Object.keys(localStMap).forEach(sid => { map[`online_tahfeez_student_${sid}`] = localStMap[sid]; });
-      } catch (_) {}
+  const fetchTeacherPageVisibility = useCallback(async () => {
+    const { data } = await supabase
+      .from('page_visibility')
+      .select('page_key, role, visible')
+      .catch(() => ({ data: null }));
+    const map = {};
+    try {
+      const cachedGlobal = JSON.parse(localStorage.getItem("admin_global_tahfeez_access") || "{}");
+      if (cachedGlobal.teacher !== undefined) map.online_tahfeez = cachedGlobal.teacher;
+      const localStMap = JSON.parse(localStorage.getItem("admin_student_tahfeez_access") || "{}");
+      Object.keys(localStMap).forEach(sid => { map[`online_tahfeez_student_${sid}`] = localStMap[sid]; });
+    } catch (_) {}
 
-      if (data) {
-        data.forEach(p => {
+    if (data) {
+      // The generic `online_tahfeez` row for role=teacher is canonical; per-portal
+      // `online_tahfeez_teacher` is only a fallback. Filter by role so a `parents`
+      // generic row can never overwrite the teacher's global flag.
+      let genTeacher, portalTeacher;
+      data.forEach(p => {
+        if (p.page_key === "online_tahfeez") {
+          if (p.role === "teacher") genTeacher = p.visible;
+        } else if (p.page_key === "online_tahfeez_teacher") {
+          portalTeacher = p.visible;
+        } else if (p.page_key && p.page_key.startsWith("online_tahfeez_student_")) {
+          if (p.role === "parents" || map[p.page_key] === undefined) map[p.page_key] = p.visible;
+        } else {
           map[p.page_key] = p.visible;
-          if (p.page_key === "online_tahfeez_teacher") {
-            map.online_tahfeez = p.visible;
-          }
-        });
-      }
-      setPageVisibility(map);
-    });
+        }
+      });
+      if (genTeacher !== undefined) map.online_tahfeez = genTeacher;
+      else if (portalTeacher !== undefined) map.online_tahfeez = portalTeacher;
+    }
+    setPageVisibility(map);
   }, []);
+
+  useEffect(() => {
+    fetchTeacherPageVisibility();
+    // Live updates: reflect admin global + individual student toggles immediately.
+    const channel = supabase
+      .channel('teacher-page-visibility-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'page_visibility' },
+        () => fetchTeacherPageVisibility()
+      )
+      .subscribe();
+    const poll = setInterval(() => fetchTeacherPageVisibility(), 30000);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(poll);
+    };
+  }, [fetchTeacherPageVisibility]);
   useEffect(() => {
     if (!pageVisibility || Object.keys(pageVisibility).length === 0) return;
     if (activePage !== 'Online Tahfeez' && pageVisibility[activePage] === false) {
