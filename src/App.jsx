@@ -4932,6 +4932,12 @@ function AdminTahfeezTracker({ sb, students = [] }) {
         setSessions(local);
       }
 
+      const vMap = { teacher: true, parents: true };
+      try {
+        const cachedGlobal = JSON.parse(localStorage.getItem("admin_global_tahfeez_access") || "{}");
+        Object.assign(vMap, cachedGlobal);
+      } catch (_) {}
+
       const stMap = {};
       try {
         const localStMap = JSON.parse(localStorage.getItem("admin_student_tahfeez_access") || "{}");
@@ -4939,18 +4945,25 @@ function AdminTahfeezTracker({ sb, students = [] }) {
       } catch (_) {}
 
       if (visRes.data) {
-        const vMap = { teacher: true, parents: true };
         visRes.data.forEach(item => {
-          if (item.page_key === "online_tahfeez") {
-            vMap[item.role] = item.visible;
-          } else if (item.page_key && item.page_key.startsWith("online_tahfeez_student_")) {
+          if (item.page_key === "online_tahfeez" || item.page_key === "online_tahfeez_teacher") {
+            vMap.teacher = item.visible;
+          }
+          if (item.page_key === "online_tahfeez" || item.page_key === "online_tahfeez_parents") {
+            vMap.parents = item.visible;
+          }
+          if (item.page_key && item.page_key.startsWith("online_tahfeez_student_")) {
             const sid = item.page_key.replace("online_tahfeez_student_", "");
             stMap[sid] = item.visible;
           }
         });
-        setVisibilityData(vMap);
       }
+      setVisibilityData(vMap);
       setStudentAccessMap(stMap);
+      try {
+        localStorage.setItem("admin_global_tahfeez_access", JSON.stringify(vMap));
+        localStorage.setItem("admin_student_tahfeez_access", JSON.stringify(stMap));
+      } catch (_) {}
     } catch (_) {
       const local = JSON.parse(localStorage.getItem("admin_tahfeez_sessions") || "[]");
       setSessions(local);
@@ -4965,18 +4978,17 @@ function AdminTahfeezTracker({ sb, students = [] }) {
   const toggleFeatureVisibility = async (role) => {
     setToggling(true);
     const newVis = !visibilityData[role];
-    try {
-      await sb.from("page_visibility").upsert({
-        page_key: "online_tahfeez",
-        role: role,
-        label: "Online Tahfeez (4K HD)",
-        visible: newVis,
-        updated_at: new Date().toISOString()
-      }, { onConflict: "page_key,role" });
+    const updatedGlobal = { ...visibilityData, [role]: newVis };
+    setVisibilityData(updatedGlobal);
+    try { localStorage.setItem("admin_global_tahfeez_access", JSON.stringify(updatedGlobal)); } catch (_) {}
 
-      setVisibilityData(prev => ({ ...prev, [role]: newVis }));
+    try {
+      await sb.from("page_visibility").upsert([
+        { page_key: `online_tahfeez_${role}`, role: role, label: `Online Tahfeez (${role})`, visible: newVis, updated_at: new Date().toISOString() },
+        { page_key: "online_tahfeez", role: role, label: "Online Tahfeez (4K HD)", visible: newVis, updated_at: new Date().toISOString() }
+      ]);
     } catch (err) {
-      console.error("Failed to toggle online tahfeez:", err);
+      console.warn("Failed to persist online tahfeez global visibility to DB:", err);
     }
     setToggling(false);
   };
@@ -4984,11 +4996,9 @@ function AdminTahfeezTracker({ sb, students = [] }) {
   const toggleStudentAccess = async (studentId) => {
     const current = studentAccessMap[studentId] !== false; // default true
     const newVis = !current;
-    setStudentAccessMap(prev => {
-      const updated = { ...prev, [studentId]: newVis };
-      try { localStorage.setItem("admin_student_tahfeez_access", JSON.stringify(updated)); } catch (_) {}
-      return updated;
-    });
+    const updatedMap = { ...studentAccessMap, [studentId]: newVis };
+    setStudentAccessMap(updatedMap);
+    try { localStorage.setItem("admin_student_tahfeez_access", JSON.stringify(updatedMap)); } catch (_) {}
 
     try {
       await sb.from("page_visibility").upsert({
@@ -4997,7 +5007,7 @@ function AdminTahfeezTracker({ sb, students = [] }) {
         label: `Online Tahfeez Access for Student ${studentId}`,
         visible: newVis,
         updated_at: new Date().toISOString()
-      }, { onConflict: "page_key,role" });
+      });
     } catch (err) {
       console.warn("Failed to persist student access to DB:", err);
     }
@@ -5381,6 +5391,23 @@ function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisi
     isTeacherBusy
   );
 
+  const [waitingInQueue, setWaitingInQueue] = useState(false);
+
+  useEffect(() => {
+    if (waitingInQueue && !isTeacherBusy) {
+      setWaitingInQueue(false);
+      onStartCall({
+        id: `tahfeez_room_${studentId}`,
+        room_id: `tahfeez_room_${studentId}`,
+        student_id: studentId,
+        student_name: studentName,
+        teacher_id: teacherId,
+        teacher_name: teacherName,
+        started_at: new Date().toISOString()
+      });
+    }
+  }, [waitingInQueue, isTeacherBusy, studentId, studentName, teacherId, teacherName, onStartCall]);
+
   if (!isTeacherGranted && !isHidden) {
     return (
       <div className="card-appear" style={{ marginBottom: '20px' }}>
@@ -5410,8 +5437,48 @@ function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisi
     );
   }
 
+  const handleJoinClick = () => {
+    if (isTeacherBusy) {
+      setWaitingInQueue(true);
+    } else {
+      onStartCall({
+        id: `tahfeez_room_${studentId}`,
+        room_id: `tahfeez_room_${studentId}`,
+        student_id: studentId,
+        student_name: studentName,
+        teacher_id: teacherId,
+        teacher_name: teacherName,
+        started_at: new Date().toISOString()
+      });
+    }
+  };
+
   return (
     <div className="card-appear" style={{ marginBottom: '20px' }}>
+      {waitingInQueue && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999,
+          display: 'grid', placeItems: 'center', color: '#fff', padding: 24
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1b160e, #2b2216)', border: '1px solid #d4af37',
+            borderRadius: 24, padding: 32, textAlign: 'center', maxWidth: 420, boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+          }}>
+            <Loader2 size={48} className="animate-spin" style={{ color: '#d4af37', margin: '0 auto 16px' }} />
+            <h3 style={{ color: '#d4af37', margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 800 }}>Standing by for {teacherName}</h3>
+            <p style={{ fontSize: '0.88rem', color: '#cbd5e1', marginBottom: 20, lineHeight: 1.5 }}>
+              Muhaffiz is currently in a 4K Tahfeez session with another student. You are in queue! The call will auto-connect the instant they finish.
+            </p>
+            <button
+              onClick={() => setWaitingInQueue(false)}
+              style={{ padding: '8px 20px', borderRadius: 20, border: 'none', background: '#334155', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Cancel Waiting
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{
         background: isHidden
           ? 'linear-gradient(135deg, #1c1917, #292524)'
@@ -5478,16 +5545,7 @@ function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisi
               </div>
             ) : (
               <button
-                onClick={() => onStartCall({
-                  id: `tahfeez_room_${studentId}`,
-                  room_id: `tahfeez_room_${studentId}`,
-                  student_id: studentId,
-                  student_name: studentName,
-                  teacher_id: teacherId,
-                  teacher_name: teacherName,
-                  started_at: new Date().toISOString(),
-                  isTeacherBusy
-                })}
+                onClick={handleJoinClick}
                 style={{
                   padding: '12px 22px', borderRadius: 28, border: 'none',
                   background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
@@ -7478,24 +7536,28 @@ function ParentPortal({
   const fetchPageVisibility = useCallback(async () => {
     const [pvRes, jsRes] = await Promise.all([
       supabase.from('page_visibility')
-        .select('page_key, visible')
-        .eq('role', 'parents'),
+        .select('page_key, role, visible'),
       supabase.from('jadwal_settings')
         .select('parent_leave_enabled')
         .eq('id', 1)
         .maybeSingle()
     ]);
     const map = {};
+    try {
+      const cachedGlobal = JSON.parse(localStorage.getItem("admin_global_tahfeez_access") || "{}");
+      if (cachedGlobal.parents !== undefined) map.online_tahfeez = cachedGlobal.parents;
+      const localStMap = JSON.parse(localStorage.getItem("admin_student_tahfeez_access") || "{}");
+      Object.keys(localStMap).forEach(sid => { map[`online_tahfeez_student_${sid}`] = localStMap[sid]; });
+    } catch (_) {}
+
     if (pvRes.data) {
-      pvRes.data.forEach(p => { map[p.page_key] = p.visible; });
+      pvRes.data.forEach(p => {
+        map[p.page_key] = p.visible;
+        if (p.page_key === "online_tahfeez_parents") {
+          map.online_tahfeez = p.visible;
+        }
+      });
     }
-    // Toggle semantics:
-    //   ON  (parent_leave_enabled = true)  → force-open the apply window at any
-    //       hour (parents can submit even after the normal 4pm close).
-    //   OFF (false/absent)                 → the normal 12am-4pm window applies
-    //       (form shows "closed, opens again at 12:00 AM" outside it).
-    // The page itself stays visible via page_visibility (admins can still hide
-    // the whole page there independently).
     setParentLeaveForceOpen(jsRes.data?.parent_leave_enabled === true);
     setPageVisibility(map);
   }, []);
@@ -17579,12 +17641,24 @@ function TeacherPortal({
 
   const [pageVisibility, setPageVisibility] = useState({});
   useEffect(() => {
-    supabase.from('page_visibility').select('page_key, visible').eq('role', 'teacher').then(({ data }) => {
+    supabase.from('page_visibility').select('page_key, role, visible').then(({ data }) => {
+      const map = {};
+      try {
+        const cachedGlobal = JSON.parse(localStorage.getItem("admin_global_tahfeez_access") || "{}");
+        if (cachedGlobal.teacher !== undefined) map.online_tahfeez = cachedGlobal.teacher;
+        const localStMap = JSON.parse(localStorage.getItem("admin_student_tahfeez_access") || "{}");
+        Object.keys(localStMap).forEach(sid => { map[`online_tahfeez_student_${sid}`] = localStMap[sid]; });
+      } catch (_) {}
+
       if (data) {
-        const map = {};
-        data.forEach(p => { map[p.page_key] = p.visible; });
-        setPageVisibility(map);
+        data.forEach(p => {
+          map[p.page_key] = p.visible;
+          if (p.page_key === "online_tahfeez_teacher") {
+            map.online_tahfeez = p.visible;
+          }
+        });
       }
+      setPageVisibility(map);
     });
   }, []);
   useEffect(() => {
