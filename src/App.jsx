@@ -4616,31 +4616,42 @@ const shortMiqaatType = (type) => {
 
 const WHATSAPP_LEAVE_CHAT_CSS = `
   .wac-modal-overlay {
-    position: fixed; inset: 0; z-index: 99999;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 999999;
     background: #efeae2;
-    background-image: radial-gradient(rgba(212, 175, 55, 0.08) 1px, transparent 0);
+    background-image: radial-gradient(rgba(212, 175, 55, 0.09) 1px, transparent 0);
     background-size: 20px 20px;
     height: 100vh; height: 100dvh; width: 100vw;
     display: flex; flex-direction: column;
     overflow: hidden; overscroll-behavior: none;
-    animation: wacFadeIn 0.2s ease both;
+    animation: wacFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
-  @keyframes wacFadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes wacSlideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes wacFadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+  @keyframes wacSlideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
   .wac-header {
-    position: sticky; top: 0; z-index: 10; flex-shrink: 0;
-    padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+    position: sticky; top: 0; z-index: 20; flex-shrink: 0;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: 12px;
+    padding-left: 12px;
+    padding-right: 14px;
     background: linear-gradient(135deg, #1b160e, #2b2216);
-    color: #ffffff; box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    color: #ffffff; box-shadow: 0 2px 14px rgba(0,0,0,0.22);
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
   .wac-header-left {
-    display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;
+    display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;
   }
+  .wac-back-btn {
+    width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.1);
+    border: none; color: #fff; display: grid; place-items: center; cursor: pointer;
+    transition: all 0.2s ease; flex-shrink: 0;
+  }
+  .wac-back-btn:hover { background: rgba(255,255,255,0.22); transform: translateX(-2px); }
+
   .wac-avatar-wrap {
-    position: relative; width: 38px; height: 38px; border-radius: 50%;
+    position: relative; width: 40px; height: 40px; border-radius: 50%;
     background: linear-gradient(135deg, #d4af37, #b8860b);
     display: grid; place-items: center; color: #fff; flex-shrink: 0;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
@@ -4653,8 +4664,8 @@ const WHATSAPP_LEAVE_CHAT_CSS = `
   .wac-status-offline { background: #9ca3af; }
   
   .wac-header-info { display: flex; flex-direction: column; min-width: 0; }
-  .wac-header-title { font-size: 0.95rem; font-weight: 700; color: #ffffff; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wac-header-sub { font-size: 0.72rem; color: #d4af37; margin-top: 1px; display: flex; align-items: center; gap: 4px; font-weight: 500; }
+  .wac-header-title { font-size: 0.98rem; font-weight: 700; color: #ffffff; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wac-header-sub { font-size: 0.73rem; color: #d4af37; margin-top: 1px; display: flex; align-items: center; gap: 4px; font-weight: 500; }
   
   .wac-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .wac-close-btn {
@@ -4666,46 +4677,46 @@ const WHATSAPP_LEAVE_CHAT_CSS = `
   
   .wac-messages-area {
     flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-    padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    padding: 16px 14px; display: flex; flex-direction: column; gap: 10px;
     -webkit-overflow-scrolling: touch;
   }
   .wac-chip-info {
-    align-self: center; background: rgba(255, 248, 230, 0.92);
-    border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 12px;
-    padding: 6px 14px; max-width: 90%; text-align: center;
-    font-size: 0.75rem; color: #4a3820; line-height: 1.4;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.04); margin-bottom: 4px;
+    align-self: center; background: rgba(255, 248, 230, 0.95);
+    border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 12px;
+    padding: 7px 16px; max-width: 92%; text-align: center;
+    font-size: 0.78rem; color: #4a3820; line-height: 1.45;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 6px;
   }
   
   .wac-bubble {
-    position: relative; max-width: 80%; padding: 8px 12px 6px 12px;
-    font-size: 0.88rem; line-height: 1.45; animation: wacSlideUp 0.18s ease both;
+    position: relative; max-width: 82%; padding: 9px 13px 7px 13px;
+    font-size: 0.9rem; line-height: 1.45; animation: wacSlideUp 0.18s ease both;
     word-break: break-word;
   }
   .wac-bubble-outgoing {
     align-self: flex-end;
     background: linear-gradient(135deg, #f3e5b8, #e8d08d);
-    color: #261a0a; border-radius: 14px 14px 2px 14px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid rgba(212, 175, 55, 0.3);
+    color: #261a0a; border-radius: 16px 16px 2px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid rgba(212, 175, 55, 0.35);
   }
   .wac-bubble-incoming {
     align-self: flex-start;
     background: #ffffff; color: #1a1a1a;
-    border-radius: 14px 14px 14px 2px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 16px 16px 16px 2px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.07);
   }
   .wac-bubble-meta {
     display: flex; align-items: center; justify-content: flex-end; gap: 3px;
-    margin-top: 3px; font-size: 0.62rem; color: rgba(0,0,0,0.45);
+    margin-top: 3px; font-size: 0.64rem; color: rgba(0,0,0,0.45);
   }
   .wac-bubble-outgoing .wac-bubble-meta { color: rgba(60, 40, 10, 0.65); }
 
   .wac-input-container {
     flex-shrink: 0; background: rgba(255, 253, 248, 0.98);
     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(212, 175, 55, 0.18);
-    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.04);
+    border-top: 1px solid rgba(212, 175, 55, 0.2);
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
   }
   .wac-quick-actions {
     display: flex; align-items: center; gap: 6px;
@@ -4775,8 +4786,18 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [chatLeave, setChatLeave] = useState(null);
   const [replyText, setReplyText] = useState("");
-  const chatMessagesRef = useRef(null);
   const { peerOnline: adminOnline, presenceReady } = useChatPresence(chatLeave?.id, "parent");
+
+  useEffect(() => {
+    if (chatLeave) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [chatLeave]);
 
   const { leaves: allLeaveRecords, loading: countsLoading, refresh: refreshLeaveCounts } = useParentLeaveData(studentProfile?.student_id);
   const [miqaats, setMiqaats] = useState([]);
@@ -5651,8 +5672,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         </div>
       </div>
 
-      {/* ─── Parent WhatsApp Chat Modal ─── */}
-      {chatLeave && (
+      {/* ─── Parent WhatsApp Chat Modal (Dedicated Full Screen View) ─── */}
+      {chatLeave && createPortal(
         <div className="wac-modal-overlay" onClick={() => { setChatLeave(null); setReplyText(""); }}>
           <style>{WHATSAPP_LEAVE_CHAT_CSS}</style>
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }} onClick={e => e.stopPropagation()}>
@@ -5660,6 +5681,14 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
             {/* Header */}
             <div className="wac-header">
               <div className="wac-header-left">
+                <button
+                  type="button"
+                  className="wac-back-btn"
+                  onClick={() => { setChatLeave(null); setReplyText(""); }}
+                  title="Back to Leave History"
+                >
+                  <ArrowLeft size={20} />
+                </button>
                 <div className="wac-avatar-wrap">
                   <MessageCircle size={19} />
                   <span className={`wac-status-badge ${presenceReady && adminOnline ? 'wac-status-online' : 'wac-status-offline'}`} />
@@ -5746,7 +5775,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -7979,8 +8009,8 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
     <>
       <style>{LEAVES_CSS}</style>
 
-      {/* ─── Admin WhatsApp Chat Modal ─── */}
-      {chatModal && (
+      {/* ─── Admin WhatsApp Chat Modal (Dedicated Full Screen View) ─── */}
+      {chatModal && createPortal(
         <div className="wac-modal-overlay" onClick={() => { setChatModal(null); setChatMessage(""); }}>
           <style>{WHATSAPP_LEAVE_CHAT_CSS}</style>
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }} onClick={e => e.stopPropagation()}>
@@ -7988,6 +8018,14 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
             {/* Header */}
             <div className="wac-header">
               <div className="wac-header-left">
+                <button
+                  type="button"
+                  className="wac-back-btn"
+                  onClick={() => { setChatModal(null); setChatMessage(""); }}
+                  title="Back to Leave Applications"
+                >
+                  <ArrowLeft size={20} />
+                </button>
                 <div className="wac-avatar-wrap">
                   <User size={19} />
                   <span className={`wac-status-badge ${presenceReady && parentOnline ? 'wac-status-online' : 'wac-status-offline'}`} />
@@ -8107,7 +8145,8 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ─── Main Content ─── */}
