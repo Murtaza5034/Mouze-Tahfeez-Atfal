@@ -4684,8 +4684,9 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
     }
   };
 
+  const iceCandidateQueueRef = useRef([]);
+
   const toggleCam = () => {
-    if (isStudent) return; // Student camera is MANDATORY ON!
     if (localStreamRef.current) {
       const videoTrack = localStreamRef.current.getVideoTracks()[0];
       if (videoTrack) {
@@ -4827,9 +4828,8 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
         <button
           className={`oth-btn-control ${!camOff ? 'oth-btn-control-active' : ''}`}
           onClick={toggleCam}
-          disabled={isStudent}
-          title={isStudent ? "Student Camera is Mandatory ON" : (camOff ? "Turn Camera ON" : "Turn Camera OFF")}
-          style={{ opacity: isStudent ? 0.6 : 1, cursor: isStudent ? 'not-allowed' : 'pointer' }}
+          title={camOff ? "Turn Camera ON" : "Turn Camera OFF"}
+          style={{ opacity: 1, cursor: 'pointer' }}
         >
           {camOff ? <VideoOff size={22} /> : <Video size={22} />}
         </button>
@@ -5374,6 +5374,42 @@ function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisi
   const isTeacherOnline = Boolean(teacherPresence);
   const isTeacherBusy = teacherPresence?.isCalling === true && teacherPresence?.activeCallTargetId !== studentId;
 
+  // Granted when teacher explicitly turned ON access for child or teacher is online/calling
+  const isTeacherGranted = Boolean(
+    pageVisibility?.[`online_tahfeez_teacher_granted_${studentId}`] === true ||
+    isTeacherOnline ||
+    isTeacherBusy
+  );
+
+  if (!isTeacherGranted && !isHidden) {
+    return (
+      <div className="card-appear" style={{ marginBottom: '20px' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #18181b, #27272a)',
+          color: '#a1a1aa', padding: '16px 20px', borderRadius: '16px',
+          border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '12px', background: 'rgba(255,255,255,0.06)', display: 'grid', placeItems: 'center', color: '#d4af37' }}>
+              <Video size={22} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#e4e4e7' }}>
+                Online Tahfeez 4K Class Session
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#a1a1aa' }}>
+                Your Muhaffiz ({teacherName}) will enable access when class begins.
+              </div>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.15)', padding: '4px 10px', borderRadius: 12, border: '1px solid rgba(245,158,11,0.3)' }}>
+            Class Standby ⏳
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card-appear" style={{ marginBottom: '20px' }}>
       <div style={{
@@ -5473,11 +5509,48 @@ function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisi
 function TeacherOnlineTahfeezPage({ students, teacherIdentity, pageVisibility, onStartCall }) {
   const [selectedGroup, setSelectedGroup] = useState("All");
   const [search, setSearch] = useState("");
+  const [grantedMap, setGrantedMap] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("admin_teacher_granted_access") || "{}");
+    } catch (_) { return {}; }
+  });
 
   const isHidden = pageVisibility?.online_tahfeez === false || pageVisibility?.["Online Tahfeez"] === false;
 
   const teacherId = teacherIdentity?.user_id || teacherIdentity?.id || "t1";
   const teacherName = teacherIdentity?.full_name || "Teacher";
+
+  const toggleTeacherGrant = async (sid) => {
+    const nextVal = !(grantedMap[sid] || pageVisibility?.[`online_tahfeez_teacher_granted_${sid}`] === true);
+    setGrantedMap(prev => {
+      const updated = { ...prev, [sid]: nextVal };
+      try { localStorage.setItem("admin_teacher_granted_access", JSON.stringify(updated)); } catch (_) {}
+      return updated;
+    });
+
+    try {
+      await supabase.from("page_visibility").upsert({
+        page_key: `online_tahfeez_teacher_granted_${sid}`,
+        role: "teacher",
+        label: `Teacher Granted Access for Student ${sid}`,
+        visible: nextVal,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "page_key,role" });
+    } catch (_) {}
+  };
+
+  const handleStartCallWithGrant = (sid, studentName) => {
+    toggleTeacherGrant(sid);
+    onStartCall({
+      id: `tahfeez_room_${sid}`,
+      room_id: `tahfeez_room_${sid}`,
+      student_id: sid,
+      student_name: studentName,
+      teacher_id: teacherId,
+      teacher_name: teacherName,
+      started_at: new Date().toISOString()
+    });
+  };
 
   const onlinePresence = useTahfeezPresence({
     userId: teacherId,
@@ -5594,6 +5667,7 @@ function TeacherOnlineTahfeezPage({ students, teacherIdentity, pageVisibility, o
             ) : filtered.map(s => {
               const sid = s.student_id || s.id;
               const isStudentDisabled = pageVisibility?.[`online_tahfeez_student_${sid}`] === false;
+              const isGrantedByTeacher = Boolean(grantedMap[sid] || pageVisibility?.[`online_tahfeez_teacher_granted_${sid}`] === true);
               const sPresence = Object.values(onlinePresence || {}).find(
                 p => String(p.userId) === String(sid) || (p.userName && p.userName.toLowerCase() === (s.full_name || s.name || "").toLowerCase())
               );
@@ -5631,46 +5705,27 @@ function TeacherOnlineTahfeezPage({ students, teacherIdentity, pageVisibility, o
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {isStudentDisabled ? (
-                        <span style={{ padding: '3px 8px', borderRadius: 12, fontSize: '0.72rem', fontWeight: 700, background: '#fee2e2', color: '#dc2626' }}>
-                          Disabled by Admin 🔒
-                        </span>
-                      ) : (
-                        <span style={{
-                          padding: '3px 8px', borderRadius: 12, fontSize: '0.72rem', fontWeight: 700,
-                          background: isStudentOnline ? '#dcfce7' : '#fee2e2',
-                          color: isStudentOnline ? '#15803d' : '#b91c1c'
-                        }}>
-                          {isStudentOnline ? 'Online 🟢' : 'Offline 🔴'}
-                        </span>
-                      )}
-                    </div>
-
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
                     {isStudentDisabled ? (
-                      <button
-                        disabled
-                        style={{
-                          padding: '8px 14px', borderRadius: 20, border: 'none',
-                          background: '#cbd5e1', color: '#64748b',
-                          fontWeight: 700, fontSize: '0.78rem', cursor: 'not-allowed',
-                          display: 'flex', alignItems: 'center', gap: 6
-                        }}
-                      >
-                        <Lock size={14} /> Access Off
-                      </button>
+                      <span style={{ padding: '3px 8px', borderRadius: 12, fontSize: '0.72rem', fontWeight: 700, background: '#fee2e2', color: '#dc2626' }}>
+                        Disabled by Admin 🔒
+                      </span>
                     ) : (
                       <button
-                        onClick={() => onStartCall({
-                          id: `tahfeez_room_${sid}`,
-                          room_id: `tahfeez_room_${sid}`,
-                          student_id: sid,
-                          student_name: s.full_name || s.name,
-                          teacher_id: teacherId,
-                          teacher_name: teacherName,
-                          started_at: new Date().toISOString()
-                        })}
+                        onClick={() => toggleTeacherGrant(sid)}
+                        style={{
+                          padding: '5px 10px', borderRadius: 16, border: 'none', fontWeight: 700, fontSize: '0.73rem', cursor: 'pointer',
+                          background: isGrantedByTeacher ? '#dcfce7' : '#f1f5f9',
+                          color: isGrantedByTeacher ? '#15803d' : '#64748b'
+                        }}
+                      >
+                        {isGrantedByTeacher ? "Access Granted 🟢" : "Grant Access 🔒"}
+                      </button>
+                    )}
+
+                    {!isStudentDisabled && (
+                      <button
+                        onClick={() => handleStartCallWithGrant(sid, s.full_name || s.name)}
                         style={{
                           padding: '8px 14px', borderRadius: 20, border: 'none',
                           background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
@@ -18042,55 +18097,7 @@ function TeacherPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
-          {/* ─── Online Tahfeez 4K HD Video Launch Card (Teacher Side) ─── */}
-          {tahfeezVisible && (
-            <div style={{
-              background: 'linear-gradient(135deg, #1f1912, #2b2216)',
-              color: '#fff', padding: '16px 20px', borderRadius: '16px', marginBottom: '20px',
-              border: '1px solid rgba(212,175,55,0.4)', boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #d4af37, #b8860b)',
-                  display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0, boxShadow: '0 2px 10px rgba(212,175,55,0.4)'
-                }}>
-                  <Video size={22} />
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, color: '#d4af37', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    Online Tahfeez 4K HD <span style={{ background: '#d4af37', color: '#000', fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4 }}>LIVE</span>
-                  </h4>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#cbd5e1' }}>
-                    Start 4K HD video Tahfeez session with student. (Camera: Default OFF for Teacher)
-                  </p>
-                </div>
-              </div>
 
-              <button
-                onClick={() => {
-                  const firstSid = (filteredStudents && filteredStudents[0]) ? filteredStudents[0].student_id : '001';
-                  const firstSName = (filteredStudents && filteredStudents[0]) ? (filteredStudents[0].full_name || filteredStudents[0].name) : 'Student';
-                  setTahfeezCall({
-                    id: `tahfeez_${firstSid}_${Date.now()}`,
-                    student_id: firstSid,
-                    student_name: firstSName,
-                    teacher_id: teacherIdentity?.user_id || 't1',
-                    teacher_name: teacherIdentity?.full_name || 'Teacher',
-                    started_at: new Date().toISOString()
-                  });
-                }}
-                style={{
-                  padding: '10px 18px', borderRadius: 24, border: 'none',
-                  background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
-                  fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                  boxShadow: '0 4px 14px rgba(212,175,55,0.4)', transition: 'all 0.2s ease'
-                }}
-              >
-                <Video size={16} /> Start 4K Tahfeez Call
-              </button>
-            </div>
-          )}
 
           {tahfeezCall && (
             <OnlineTahfeezRoom
