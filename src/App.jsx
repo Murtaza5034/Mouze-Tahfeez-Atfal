@@ -4445,18 +4445,29 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
   const [unreadCount, setUnreadCount] = useState(0);
   const [callDuration, setCallDuration] = useState(0);
   const [peerConnected, setPeerConnected] = useState(false);
-  const [statusText, setStatusText] = useState("Connecting to 4K HD Room...");
+  const [statusText, setStatusText] = useState("Connecting to HD Room...");
+  const [errorMsg, setErrorMsg] = useState("");
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const pcRef = useRef(null);
   const channelRef = useRef(null);
+  const sigChannelRef = useRef(null);
   const localStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
+  const iceQueueRef = useRef([]);
+  const processedSignalsRef = useRef(new Set());
+  const offerInFlightRef = useRef(false);
+  const connectedRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const isStudent = userRole === "student" || userRole === "parent";
   const isTeacher = userRole === "teacher";
+
+  const studentId = sessionData.student_id || sessionData.id || "001";
+  const roomId = sessionData.room_id || `tahfeez_room_${studentId}`;
+  const peerRole = isTeacher ? "parent" : "teacher";
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -4467,23 +4478,138 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
 
   useEffect(() => {
     let mounted = true;
+    mountedRef.current = true;
+
+    const iceQueue = [];
+    const processedSignals = new Set();
+
+    const flushIceQueue = async () => {
+      if (!pcRef.current || !pcRef.current.remoteDescription || !pcRef.current.remoteDescription.type) return;
+      while (iceQueue.length > 0) {
+        const cand = iceQueue.shift();
+        try {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (_) {}
+      }
+    };
+
+    const addIce = async (candidate) => {
+      if (!candidate) return;
+      if (pcRef.current && pcRef.current.remoteDescription && pcRef.current.remoteDescription.type) {
+        try {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (_) {}
+      } else {
+        iceQueue.push(candidate);
+      }
+    };
+
+    const emitSignal = async (type, payload) => {
+      const row = { room_id: roomId, sender: userRole, type, payload };
+      // Fast path: realtime broadcast on the room channel.
+      if (channelRef.current) {
+        try {
+          channelRef.current.send({ type: "broadcast", event: `sig:${type}`, payload });
+        } catch (_) {}
+      }
+      // Reliable path: DB relay (realtime postgres_changes + poll fallback).
+      try {
+        await supabase.from("tahfeez_signals").insert(row);
+      } catch (_) {}
+    };
+
+    const sendOffer = async () => {
+      if (!isTeacher || !pcRef.current || !mounted) return;
+      if (offerInFlightRef.current) return;
+      const pc = pcRef.current;
+      const state = pc.signalingState;
+      if (state === "have-remote-offer" || state === "have-local-pranswer" || state === "have-remote-pranswer") return;
+      offerInFlightRef.current = true;
+      try {
+        const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+        await pc.setLocalDescription(offer);
+        await emitSignal("offer", {
+          sigId: `o_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          offer: pc.localDescription,
+          sender: userRole,
+          ts: Date.now()
+        });
+      } catch (e) {
+        console.warn("Error creating SDP offer:", e);
+      } finally {
+        offerInFlightRef.current = false;
+      }
+    };
+
+    const handleOffer = async (payload) => {
+      if (!payload || payload.sender === userRole || isTeacher) return;
+      if (!pcRef.current) return;
+      const pc = pcRef.current;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+        await flushIceQueue();
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await emitSignal("answer", {
+          sigId: `a_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          answer: pc.localDescription,
+          sender: userRole,
+          ts: Date.now()
+        });
+        setPeerConnected(true);
+        setStatusText("Connected • HD");
+      } catch (err) {
+        console.warn("Signal offer handling error:", err);
+      }
+    };
+
+    const handleAnswer = async (payload) => {
+      if (!payload || payload.sender === userRole) return;
+      if (!pcRef.current) return;
+      try {
+        if (pcRef.current.signalingState !== "stable") {
+          await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
+          await flushIceQueue();
+        }
+        setPeerConnected(true);
+        setStatusText("Connected • HD");
+      } catch (err) {
+        console.warn("Signal answer handling error:", err);
+      }
+    };
+
+    const payloadKey = (payload) => {
+      if (payload?.sigId) return `sig:${payload.sigId}`;
+      try { return `p:${JSON.stringify(payload)}`; } catch (_) { return `r:${Math.random()}`; }
+    };
+
+    const dispatchSignal = async (type, payload) => {
+      if (!payload || !mounted) return;
+      const key = payloadKey(payload);
+      if (processedSignals.has(key)) return;
+      processedSignals.add(key);
+      if (type === "offer") await handleOffer(payload);
+      else if (type === "answer") await handleAnswer(payload);
+      else if (type === "ice") await addIce(payload.candidate);
+      else if (type === "peer-ready" && isTeacher) await sendOffer();
+    };
 
     async function initCall() {
       try {
         let stream = null;
 
-        // Stage 1: Try 4K/HD Video + Audio
+        // Stage 1: Try HD Video + Audio (1280x720 ideal keeps calls smooth)
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: true,
             video: {
-              width: { ideal: 3840 },
-              height: { ideal: 2160 },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
               facingMode: "user"
             }
           });
         } catch (e1) {
-          console.warn("4K/HD getUserMedia fallback, trying standard video:", e1);
+          console.warn("HD getUserMedia fallback, trying standard video:", e1);
           // Stage 2: Try Standard Video + Audio
           try {
             stream = await navigator.mediaDevices.getUserMedia({
@@ -4530,27 +4656,16 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
           console.warn("MediaRecorder fallback:", recErr);
         }
 
-        const iceQueue = [];
-        const processedSignals = new Set();
-
-        const flushIceQueue = async () => {
-          if (!pcRef.current || !pcRef.current.remoteDescription) return;
-          while (iceQueue.length > 0) {
-            const cand = iceQueue.shift();
-            try {
-              await pcRef.current.addIceCandidate(new RTCIceCandidate(cand));
-            } catch (_) {}
-          }
-        };
-
         const pc = new RTCPeerConnection({
           iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
             { urls: "stun:stun1.l.google.com:19302" },
             { urls: "stun:stun2.l.google.com:19302" },
             { urls: "stun:stun3.l.google.com:19302" },
-            { urls: "stun:stun4.l.google.com:19302" }
-          ]
+            { urls: "stun:stun4.l.google.com:19302" },
+            { urls: "stun:stun.services.mozilla.com:3478" }
+          ],
+          iceCandidatePoolSize: 4
         });
         pcRef.current = pc;
 
@@ -4560,145 +4675,57 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
           if (remoteVideoRef.current && event.streams[0]) {
             remoteVideoRef.current.srcObject = event.streams[0];
             remoteVideoRef.current.play().catch(() => {});
+            connectedRef.current = true;
             setPeerConnected(true);
-            setStatusText("Connected • 4K Ultra HD");
+            setStatusText("Connected • HD");
           }
         };
 
         pc.onconnectionstatechange = () => {
-          if (pc.connectionState === "connected") {
+          const st = pc.connectionState;
+          if (st === "connected") {
+            connectedRef.current = true;
             setPeerConnected(true);
-            setStatusText("Connected • 4K Ultra HD");
+            setStatusText("Connected • HD");
+          } else if (st === "failed" || st === "disconnected") {
+            connectedRef.current = false;
+            setStatusText("Reconnecting...");
+            if (isTeacher) {
+              setTimeout(() => sendOffer(), 1200);
+            }
           }
         };
 
-        let iceSeq = 0;
-        pc.onicecandidate = async (event) => {
+        pc.onicecandidate = (event) => {
           if (event.candidate && mounted) {
-            const payload = { candidate: event.candidate, sender: userRole };
-            if (channelRef.current) {
-              try { channelRef.current.send({ type: "broadcast", event: "ice-candidate", payload }); } catch (_) {}
-            }
-            try {
-              await supabase.from("page_visibility").insert([{
-                page_key: `sig_${roomId}_ice_${userRole}_${iceSeq++}`,
-                role: userRole,
-                label: JSON.stringify(payload),
-                visible: true,
-                updated_at: new Date().toISOString()
-              }]);
-            } catch (_) {}
+            emitSignal("ice", { candidate: event.candidate, sender: userRole, ts: Date.now() });
           }
         };
 
-        const roomId = sessionData.room_id || (sessionData.student_id ? `tahfeez_room_${sessionData.student_id}` : sessionData.id);
-
-        const emitSignalDB = async (evtType, payload) => {
-          try {
-            await supabase.from("page_visibility").insert([{
-              page_key: `sig_${roomId}_${evtType}_${Date.now()}`,
-              role: userRole,
-              label: JSON.stringify(payload),
-              visible: true,
-              updated_at: new Date().toISOString()
-            }]);
-          } catch (_) {}
-        };
-
-        const sendTeacherOffer = async () => {
-          if (isTeacher && pcRef.current) {
-            try {
-              const offer = await pcRef.current.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-              await pcRef.current.setLocalDescription(offer);
-              const payload = { offer, sender: userRole };
-
-              if (channelRef.current) {
-                channelRef.current.send({ type: "broadcast", event: "signal-offer", payload });
-              }
-              await emitSignalDB("offer", payload);
-            } catch (e) {
-              console.warn("Error creating SDP offer:", e);
-            }
-          }
-        };
-
-        const handleOfferSignal = async (payload) => {
-          if (payload.sender !== userRole && pcRef.current) {
-            try {
-              await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.offer));
-              await flushIceQueue();
-              const answer = await pcRef.current.createAnswer();
-              await pcRef.current.setLocalDescription(answer);
-              const ansPayload = { answer, sender: userRole };
-
-              if (channelRef.current) {
-                channelRef.current.send({ type: "broadcast", event: "signal-answer", payload: ansPayload });
-              }
-              await emitSignalDB("answer", ansPayload);
-              setPeerConnected(true);
-              setStatusText("Connected • 4K Ultra HD");
-            } catch (err) {
-              console.warn("Signal offer handling error:", err);
-            }
-          }
-        };
-
-        const handleAnswerSignal = async (payload) => {
-          if (payload.sender !== userRole && pcRef.current) {
-            try {
-              if (pcRef.current.signalingState !== "stable") {
-                await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
-                await flushIceQueue();
-              }
-              setPeerConnected(true);
-              setStatusText("Connected • 4K Ultra HD");
-            } catch (err) {
-              console.warn("Signal answer handling error:", err);
-            }
-          }
-        };
-
-        const handleIceCandidateSignal = async (payload) => {
-          if (payload.sender !== userRole && payload.candidate) {
-            if (pcRef.current && pcRef.current.remoteDescription && pcRef.current.remoteDescription.type) {
-              try {
-                await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
-              } catch (_) {}
-            } else {
-              iceQueue.push(payload.candidate);
-            }
-          }
-        };
-
-        const channel = supabase.channel(`tahfeez-room:${roomId}`, {
-          config: { presence: { key: `${userRole}_${sessionData.student_id || sessionData.id}` } }
+        const roomChannel = supabase.channel(`tahfeez-room:${roomId}`, {
+          config: { presence: { key: `${userRole}_${studentId}` } }
         });
-        channelRef.current = channel;
+        channelRef.current = roomChannel;
 
-        channel
-          .on("presence", { event: "sync" }, async () => {
-            const state = channel.presenceState();
-            const peerRole = isTeacher ? "parent" : "teacher";
+        roomChannel
+          .on("presence", { event: "sync" }, () => {
+            const state = roomChannel.presenceState();
             const peerPresent = Object.values(state).flat().some(p => p.role === peerRole || p.userRole === peerRole);
-            if (peerPresent) {
-              setPeerConnected(true);
-              setStatusText("Connected • 4K Ultra HD");
-              if (isTeacher) await sendTeacherOffer();
+            if (peerPresent && isTeacher) sendOffer();
+          })
+          .on("broadcast", { event: "peer-ready" }, ({ payload }) => {
+            if (payload.sender !== userRole) {
+              if (isTeacher) sendOffer();
             }
           })
-          .on("broadcast", { event: "peer-ready" }, async ({ payload }) => {
-            if (payload.sender !== userRole && isTeacher) {
-              await sendTeacherOffer();
-            }
+          .on("broadcast", { event: "sig:offer" }, ({ payload }) => {
+            dispatchSignal("offer", payload);
           })
-          .on("broadcast", { event: "signal-offer" }, async ({ payload }) => {
-            await handleOfferSignal(payload);
+          .on("broadcast", { event: "sig:answer" }, ({ payload }) => {
+            dispatchSignal("answer", payload);
           })
-          .on("broadcast", { event: "signal-answer" }, async ({ payload }) => {
-            await handleAnswerSignal(payload);
-          })
-          .on("broadcast", { event: "ice-candidate" }, async ({ payload }) => {
-            await handleIceCandidateSignal(payload);
+          .on("broadcast", { event: "sig:ice" }, ({ payload }) => {
+            dispatchSignal("ice", payload);
           })
           .on("broadcast", { event: "in-call-chat" }, ({ payload }) => {
             if (payload.sender !== (currentUser?.full_name || currentUser?.name)) {
@@ -4708,52 +4735,65 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
           })
           .subscribe(async (status) => {
             if (status === "SUBSCRIBED") {
-              await channel.track({ role: userRole, userRole, name: currentUser?.full_name || currentUser?.name });
-              channel.send({ type: "broadcast", event: "peer-ready", payload: { sender: userRole } });
-              if (isTeacher) await sendTeacherOffer();
+              await roomChannel.track({ role: userRole, userRole, name: currentUser?.full_name || currentUser?.name });
+              roomChannel.send({ type: "broadcast", event: "peer-ready", payload: { sender: userRole, sigId: `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` } });
+              if (isTeacher) await sendOffer();
             }
           });
 
-        // ─── Database Signaling Sync Poller (Runs every 1s) ───
+        // Reliable signaling via DB realtime (INSERT on tahfeez_signals)
+        const sigChannel = supabase
+          .channel(`tahfeez-signals:${roomId}`)
+          .on("postgres_changes", {
+            event: "INSERT",
+            schema: "public",
+            table: "tahfeez_signals",
+            filter: `room_id=eq.${roomId}`
+          }, (change) => {
+            const row = change.new;
+            if (!row || row.sender === userRole) return;
+            if (row.id) processedSignals.add(`row:${row.id}`);
+            dispatchSignal(row.type, row.payload);
+          })
+          .subscribe();
+        sigChannelRef.current = sigChannel;
+
+        // ─── DB Poll Fallback (keeps working even if realtime is unavailable) ───
         const dbPollInterval = setInterval(async () => {
           if (!mounted) return;
+          if (connectedRef.current) {
+            // Peer is connected: nothing to negotiate, but still allow late ICE.
+            return;
+          }
           try {
             const { data: dbSignals } = await supabase
-              .from("page_visibility")
-              .select("id, page_key, label")
-              .like("page_key", `sig_${roomId}_%`)
-              .order("id", { ascending: true });
+              .from("tahfeez_signals")
+              .select("id, type, payload")
+              .eq("room_id", roomId)
+              .order("id", { ascending: true })
+              .limit(60);
 
             if (dbSignals && dbSignals.length > 0) {
               for (const sig of dbSignals) {
-                if (processedSignals.has(sig.id)) continue;
-                processedSignals.add(sig.id);
-
-                try {
-                  const payload = JSON.parse(sig.label);
-                  if (payload.sender === userRole) continue;
-
-                  if (sig.page_key.includes("_offer_")) {
-                    await handleOfferSignal(payload);
-                  } else if (sig.page_key.includes("_answer_")) {
-                    await handleAnswerSignal(payload);
-                  } else if (sig.page_key.includes("_ice_")) {
-                    await handleIceCandidateSignal(payload);
-                  }
-                } catch (_) {}
+                if (sig.id) {
+                  if (processedSignals.has(`row:${sig.id}`)) continue;
+                  processedSignals.add(`row:${sig.id}`);
+                }
+                if (sig.sender === userRole) continue;
+                await dispatchSignal(sig.type, sig.payload);
               }
             }
           } catch (_) {}
 
+          // Teacher keeps retrying the offer until a peer connects.
           if (isTeacher && (!pcRef.current || pcRef.current.connectionState !== "connected")) {
-            sendTeacherOffer();
+            sendOffer();
           }
-        }, 1000);
+        }, 1500);
 
         return () => {
           clearInterval(dbPollInterval);
         };
-
       } catch (err) {
         console.error("Camera/Mic access error:", err);
         setStatusText("Camera/Microphone Access Ready");
@@ -4764,13 +4804,20 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
 
     return () => {
       mounted = false;
+      mountedRef.current = false;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch (_) {}
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => t.stop());
       }
-      if (pcRef.current) pcRef.current.close();
+      if (pcRef.current) {
+        try { pcRef.current.close(); } catch (_) {}
+      }
       if (channelRef.current) supabase.removeChannel(channelRef.current);
+      if (sigChannelRef.current) supabase.removeChannel(sigChannelRef.current);
     };
-  }, [sessionData.id, userRole]);
+  }, [roomId, userRole]);
 
   const toggleMic = () => {
     if (localStreamRef.current) {
@@ -21466,7 +21513,40 @@ export default function App() {
     const saved = localStorage.getItem(STORAGE_KEYS.role);
     return saved || "parents";
   });
-  const [activePage, setActivePage] = useState(DEFAULT_PAGE_BY_ROLE.parents);
+  const [activePage, setActivePage] = useState(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_PAGE_BY_ROLE.parents;
+    }
+    try {
+      let role = "parents";
+      const cachedAuthRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+      if (cachedAuthRaw) {
+        const cached = JSON.parse(cachedAuthRaw);
+        if (cached?.role) role = cached.role;
+      } else {
+        const savedRole = localStorage.getItem(STORAGE_KEYS.role);
+        if (savedRole) role = savedRole;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const redirectFromNotif = params.get('redirectPage');
+      if (redirectFromNotif) {
+        let targetPage = redirectFromNotif;
+        if (targetPage.startsWith("Jadwal:")) {
+          targetPage = "Jadwal";
+        }
+        return targetPage;
+      }
+
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.activePage) || "{}");
+      if (parsed && parsed[role]) {
+        return parsed[role];
+      }
+      return DEFAULT_PAGE_BY_ROLE[role] || DEFAULT_PAGE_BY_ROLE.parents;
+    } catch (_) {
+      return DEFAULT_PAGE_BY_ROLE.parents;
+    }
+  });
   const [searchPageLoading, setSearchPageLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
