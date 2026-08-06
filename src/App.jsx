@@ -4470,15 +4470,42 @@ function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComp
 
     async function initCall() {
       try {
-        const constraints = {
-          audio: true,
-          video: {
-            width: { ideal: 3840, min: 1280 },
-            height: { ideal: 2160, min: 720 },
-            facingMode: "user"
+        let stream = null;
+
+        // Stage 1: Try 4K/HD Video + Audio
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: {
+              width: { ideal: 3840 },
+              height: { ideal: 2160 },
+              facingMode: "user"
+            }
+          });
+        } catch (e1) {
+          console.warn("4K/HD getUserMedia fallback, trying standard video:", e1);
+          // Stage 2: Try Standard Video + Audio
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+              video: true
+            });
+          } catch (e2) {
+            console.warn("Standard video getUserMedia fallback, trying audio-only:", e2);
+            // Stage 3: Try Audio-Only (for devices without camera)
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: false
+              });
+            } catch (e3) {
+              console.error("Camera/Mic access error:", e3);
+              if (mounted) setErrorMsg("Unable to access microphone or camera. Please check device permissions.");
+              return;
+            }
           }
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        }
+
         if (!mounted) return;
         localStreamRef.current = stream;
 
@@ -4853,11 +4880,11 @@ function AdminTahfeezTracker({ sb }) {
     setLoading(true);
     try {
       const [sessRes, visRes] = await Promise.all([
-        sb.from("tahfeez_sessions").select("*").order("created_at", { ascending: false }),
-        sb.from("page_visibility").select("*").eq("page_key", "online_tahfeez")
+        sb.from("tahfeez_sessions").select("*").order("created_at", { ascending: false }).catch(() => ({ data: null, error: true })),
+        sb.from("page_visibility").select("*").eq("page_key", "online_tahfeez").catch(() => ({ data: null, error: true }))
       ]);
 
-      if (sessRes.data && sessRes.data.length > 0) {
+      if (sessRes && !sessRes.error && sessRes.data && sessRes.data.length > 0) {
         setSessions(sessRes.data);
       } else {
         const local = JSON.parse(localStorage.getItem("admin_tahfeez_sessions") || "[]");
