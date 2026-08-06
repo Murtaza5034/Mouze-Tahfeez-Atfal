@@ -4223,20 +4223,23 @@ function useChatPresence(leaveId, role) {
       setPresenceReady(false);
       return;
     }
+
     const peerRole = role === "admin" ? "parent" : "admin";
+    // Generate distinct key per role so Admin & Parent presence don't collide in Supabase
+    const presenceKey = `${role}_${leaveId}`;
     const channel = supabase.channel(`leave-presence:${leaveId}`, {
-      config: { presence: { key: `leave-presence:${leaveId}` } },
+      config: { presence: { key: presenceKey } },
     });
-    let subscribed = false;
-    let cancelled = false;
+
+    let isCancelled = false;
 
     const refreshState = () => {
-      if (!subscribed || cancelled) return;
+      if (isCancelled) return;
       try {
         const state = channel.presenceState() || {};
         const peers = Object.values(state)
           .flat()
-          .filter((p) => p && p.role === peerRole);
+          .filter((p) => p && (p.role === peerRole || p.userRole === peerRole));
         setPeerOnline(peers.length > 0);
         setPresenceReady(true);
       } catch (err) {
@@ -4249,10 +4252,9 @@ function useChatPresence(leaveId, role) {
       .on("presence", { event: "join" }, refreshState)
       .on("presence", { event: "leave" }, refreshState)
       .subscribe(async (status) => {
-        if (status === "SUBSCRIBED" && !cancelled) {
-          subscribed = true;
+        if (status === "SUBSCRIBED" && !isCancelled) {
           try {
-            await channel.track({ role, leaveId, ts: Date.now() });
+            await channel.track({ role, userRole: role, leaveId, ts: Date.now() });
           } catch (err) {
             console.warn("Presence track failed:", err);
           }
@@ -4260,9 +4262,15 @@ function useChatPresence(leaveId, role) {
         }
       });
 
+    // 2-second heartbeat interval for instant real-time status updates
+    const pollInterval = setInterval(refreshState, 2000);
+
     return () => {
-      cancelled = true;
-      subscribed = false;
+      isCancelled = true;
+      clearInterval(pollInterval);
+      try {
+        channel.untrack();
+      } catch (_) {}
       supabase.removeChannel(channel);
     };
   }, [leaveId, role]);
