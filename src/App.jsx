@@ -32,6 +32,7 @@ import {
   ArrowUp,
   ArrowDown,
   CheckCircle,
+  CheckCheck,
   UserCheck,
   UserX,
   RotateCw,
@@ -4613,6 +4614,156 @@ const shortMiqaatType = (type) => {
   return type;
 };
 
+const WHATSAPP_LEAVE_CHAT_CSS = `
+  .wac-modal-overlay {
+    position: fixed; inset: 0; z-index: 99999;
+    background: #efeae2;
+    background-image: radial-gradient(rgba(212, 175, 55, 0.08) 1px, transparent 0);
+    background-size: 20px 20px;
+    height: 100vh; height: 100dvh; width: 100vw;
+    display: flex; flex-direction: column;
+    overflow: hidden; overscroll-behavior: none;
+    animation: wacFadeIn 0.2s ease both;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @keyframes wacFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes wacSlideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .wac-header {
+    position: sticky; top: 0; z-index: 10; flex-shrink: 0;
+    padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+    background: linear-gradient(135deg, #1b160e, #2b2216);
+    color: #ffffff; box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .wac-header-left {
+    display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;
+  }
+  .wac-avatar-wrap {
+    position: relative; width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(135deg, #d4af37, #b8860b);
+    display: grid; place-items: center; color: #fff; flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .wac-status-badge {
+    position: absolute; bottom: 0; right: 0; width: 11px; height: 11px;
+    border-radius: 50%; border: 2px solid #1b160e; transition: all 0.25s ease;
+  }
+  .wac-status-online { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+  .wac-status-offline { background: #9ca3af; }
+  
+  .wac-header-info { display: flex; flex-direction: column; min-width: 0; }
+  .wac-header-title { font-size: 0.95rem; font-weight: 700; color: #ffffff; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wac-header-sub { font-size: 0.72rem; color: #d4af37; margin-top: 1px; display: flex; align-items: center; gap: 4px; font-weight: 500; }
+  
+  .wac-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .wac-close-btn {
+    width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.12);
+    border: none; color: #fff; display: grid; place-items: center; cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .wac-close-btn:hover { background: rgba(255,255,255,0.25); transform: scale(1.05); }
+  
+  .wac-messages-area {
+    flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .wac-chip-info {
+    align-self: center; background: rgba(255, 248, 230, 0.92);
+    border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 12px;
+    padding: 6px 14px; max-width: 90%; text-align: center;
+    font-size: 0.75rem; color: #4a3820; line-height: 1.4;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04); margin-bottom: 4px;
+  }
+  
+  .wac-bubble {
+    position: relative; max-width: 80%; padding: 8px 12px 6px 12px;
+    font-size: 0.88rem; line-height: 1.45; animation: wacSlideUp 0.18s ease both;
+    word-break: break-word;
+  }
+  .wac-bubble-outgoing {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #f3e5b8, #e8d08d);
+    color: #261a0a; border-radius: 14px 14px 2px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid rgba(212, 175, 55, 0.3);
+  }
+  .wac-bubble-incoming {
+    align-self: flex-start;
+    background: #ffffff; color: #1a1a1a;
+    border-radius: 14px 14px 14px 2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.06);
+  }
+  .wac-bubble-meta {
+    display: flex; align-items: center; justify-content: flex-end; gap: 3px;
+    margin-top: 3px; font-size: 0.62rem; color: rgba(0,0,0,0.45);
+  }
+  .wac-bubble-outgoing .wac-bubble-meta { color: rgba(60, 40, 10, 0.65); }
+
+  .wac-input-container {
+    flex-shrink: 0; background: rgba(255, 253, 248, 0.98);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(212, 175, 55, 0.18);
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.04);
+  }
+  .wac-quick-actions {
+    display: flex; align-items: center; gap: 6px;
+    overflow-x: auto; padding-bottom: 8px; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .wac-quick-actions::-webkit-scrollbar { display: none; }
+  .wac-action-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 12px; border-radius: 18px; font-size: 0.75rem; font-weight: 700;
+    white-space: nowrap; border: none; cursor: pointer;
+    transition: all 0.18s ease; flex-shrink: 0;
+  }
+  .wac-chip-approve { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  .wac-chip-approve:hover { background: #bbf7d0; }
+  .wac-chip-reject { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+  .wac-chip-reject:hover { background: #fca5a5; }
+  .wac-chip-preset { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  .wac-chip-preset:hover { background: #fde68a; }
+
+  .wac-bar-wrapper {
+    display: flex; align-items: flex-end; gap: 8px;
+  }
+  .wac-pill-input {
+    flex: 1; background: #ffffff;
+    border: 1.5px solid rgba(212, 175, 55, 0.35);
+    border-radius: 22px; padding: 4px 14px;
+    display: flex; align-items: center; min-height: 42px; max-height: 110px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); transition: all 0.2s ease;
+  }
+  .wac-pill-input:focus-within {
+    border-color: #d4af37; box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+  }
+  .wac-textarea {
+    width: 100%; border: none; background: transparent; outline: none;
+    font-family: inherit; font-size: 0.92rem; color: #2a1b0a;
+    resize: none; line-height: 1.35; max-height: 100px; padding: 6px 0;
+  }
+  .wac-send-btn {
+    width: 44px; height: 44px; border-radius: 50%; border: none;
+    display: grid; place-items: center; flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+  .wac-send-btn-active {
+    background: linear-gradient(135deg, #d4af37, #b8860b);
+    color: #ffffff; cursor: pointer;
+    box-shadow: 0 3px 12px rgba(184, 134, 11, 0.4);
+    transform: scale(1.02);
+  }
+  .wac-send-btn-active:hover {
+    transform: scale(1.08); box-shadow: 0 4px 16px rgba(184, 134, 11, 0.5);
+  }
+  .wac-send-btn-disabled {
+    background: #ded7cb; color: #9c9384;
+    cursor: not-allowed; opacity: 0.7;
+  }
+`;
+
 function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], forceOpen = false }) {
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
@@ -5500,135 +5651,100 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         </div>
       </div>
 
-      {/* ─── Parent Chat Modal ─── */}
+      {/* ─── Parent WhatsApp Chat Modal ─── */}
       {chatLeave && (
-        <div
-          className="parent-chat-overlay"
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'linear-gradient(180deg, #fffdf7, #fbf5e8)',
-            overflow: 'hidden',
-            overscrollBehavior: 'none',
-            animation: 'almFadeIn 0.18s ease both',
-          }}
-        >
-          <style>{`@keyframes almFadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes almSlideUp { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.parent-chat-overlay { height: 100vh; height: 100dvh; }
-.parent-chat-card { width: 100%; height: 100vh; height: 100dvh; border-radius: 0; }`}</style>
-          <div
-            className="parent-chat-card"
-            style={{
-              background: 'linear-gradient(145deg, #fffcf6, #fcf8ef)',
-              display: 'flex', flexDirection: 'column',
-              animation: 'almSlideUp 0.22s ease both',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{
-              position: 'sticky', top: 0, zIndex: 5, flexShrink: 0, padding: '16px 20px',
-              background: 'rgba(255,252,246,0.96)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
-              borderBottom: '1px solid rgba(212,175,55,0.14)', boxShadow: '0 4px 20px rgba(61,43,31,0.06)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(212,175,55,0.15)', display: 'grid', placeItems: 'center' }}>
-                    <MessageCircle size={18} style={{ color: 'var(--primary-gold)' }} />
-                  </div>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)' }}>Messages</h3>
-                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {chatLeave.leave_type} &middot; {chatLeave.leave_date}
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: 4 }}>
-                      <span style={{
-                        width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
-                        background: presenceReady && adminOnline ? '#22c55e' : '#b9b2a8',
-                        boxShadow: presenceReady && adminOnline ? '0 0 0 3px rgba(34,197,94,0.18)' : 'none',
-                        transition: 'all 0.25s ease',
-                      }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: presenceReady && adminOnline ? '#16a34a' : 'var(--text-muted)' }}>
-                        {!presenceReady ? 'Checking...' : (adminOnline ? 'Admin is online in this chat' : 'Admin is offline')}
-                      </span>
-                    </div>
-                  </div>
+        <div className="wac-modal-overlay" onClick={() => { setChatLeave(null); setReplyText(""); }}>
+          <style>{WHATSAPP_LEAVE_CHAT_CSS}</style>
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }} onClick={e => e.stopPropagation()}>
+            
+            {/* Header */}
+            <div className="wac-header">
+              <div className="wac-header-left">
+                <div className="wac-avatar-wrap">
+                  <MessageCircle size={19} />
+                  <span className={`wac-status-badge ${presenceReady && adminOnline ? 'wac-status-online' : 'wac-status-offline'}`} />
                 </div>
+                <div className="wac-header-info">
+                  <h4 className="wac-header-title">Admin Support</h4>
+                  <span className="wac-header-sub">
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: presenceReady && adminOnline ? '#22c55e' : '#9ca3af', display: 'inline-block' }} />
+                    {!presenceReady ? 'Checking status...' : (adminOnline ? 'Online now' : 'Offline')}
+                  </span>
+                </div>
+              </div>
+              <div className="wac-header-right">
                 <button
+                  type="button"
+                  className="wac-close-btn"
                   onClick={() => { setChatLeave(null); setReplyText(""); }}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '7px',
-                    padding: '9px 18px', borderRadius: '999px',
-                    background: 'linear-gradient(135deg, #d4af37, #b8962e)',
-                    color: '#fff', fontFamily: 'inherit', fontSize: '13px', fontWeight: 700,
-                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                    boxShadow: '0 4px 14px rgba(184,138,29,0.25)', transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(184,138,29,0.35)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 14px rgba(184,138,29,0.25)'; }}
+                  title="Close Chat"
                 >
-                  <X size={15} />
-                  Close Chat
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div style={{ padding: '20px', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              {/* Messages Display */}
-              <div ref={chatMessagesRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16, overscrollBehavior: 'contain' }}>
-                {(!chatLeave.messages || chatLeave.messages.length === 0) ? (
-                  <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    <MessageCircle size={28} style={{ opacity: 0.2, marginBottom: 8 }} />
-                    <p>No messages yet. The admin will reach out if clarification is needed.</p>
-                  </div>
-                ) : chatLeave.messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      alignSelf: msg.role === 'parent' ? 'flex-end' : 'flex-start',
-                      maxWidth: '80%',
-                      padding: '10px 14px',
-                      borderRadius: msg.role === 'parent' ? '14px 14px 0 14px' : '14px 14px 14px 0',
-                      background: msg.role === 'parent' ? 'rgba(212,175,55,0.12)' : '#f1f0ee',
-                      color: 'var(--deep-brown)',
-                      fontSize: '0.85rem',
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    <p style={{ margin: 0 }}>{msg.text}</p>
-                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', display: 'block', marginTop: 4, opacity: 0.6 }}>
-                      {msg.role === 'admin' ? 'Admin' : 'You'} &middot; {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                ))}
+            {/* Messages Area */}
+            <div className="wac-messages-area" ref={chatMessagesRef}>
+              <div className="wac-chip-info">
+                <strong>{chatLeave.leave_type || "Leave"} Request</strong> &middot; {chatLeave.leave_date || chatLeave.from_date}
+                {chatLeave.to_date && chatLeave.to_date !== chatLeave.leave_date ? ` to ${chatLeave.to_date}` : ""}
               </div>
 
-              {/* Reply Input */}
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Your Reply
-              </label>
-              <textarea
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                placeholder="Type your reply..."
-                rows={3}
-                style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(212,175,55,0.20)', fontFamily: 'inherit', fontSize: '13px', color: 'var(--deep-brown)', resize: 'vertical', lineHeight: '1.5', background: 'rgba(255,255,255,0.9)', marginBottom: 12 }}
-              />
-              <button
-                onClick={handleParentReply}
-                disabled={!replyText.trim()}
-                style={{
-                  width: '100%', padding: '11px 20px', borderRadius: 12, border: 'none',
-                  background: replyText.trim() ? 'linear-gradient(135deg, #d4af37, #b8962e)' : '#ddd',
-                  color: '#fff', fontWeight: 700, fontSize: '13px',
-                  cursor: replyText.trim() ? 'pointer' : 'not-allowed',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                  fontFamily: 'inherit',
-                }}
-              >
-                <Send size={15} />
-                Send Reply
-              </button>
+              {(!chatLeave.messages || chatLeave.messages.length === 0) ? (
+                <div style={{ textAlign: 'center', padding: '40px 10px', color: '#8a7860', fontSize: '0.85rem' }}>
+                  <MessageCircle size={32} style={{ opacity: 0.25, marginBottom: 8 }} />
+                  <p style={{ margin: 0, fontWeight: 500 }}>No messages yet. Write a message below to reach Admin.</p>
+                </div>
+              ) : chatLeave.messages.map((msg, idx) => {
+                const isUser = msg.role === 'parent';
+                return (
+                  <div key={idx} className={`wac-bubble ${isUser ? 'wac-bubble-outgoing' : 'wac-bubble-incoming'}`}>
+                    <p className="wac-msg-text">{msg.text}</p>
+                    <div className="wac-bubble-meta">
+                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      {isUser && <CheckCheck size={13} style={{ color: '#b8860b' }} />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+
+            {/* Floating Input Bar */}
+            <div className="wac-input-container">
+              <div className="wac-bar-wrapper">
+                <div className="wac-pill-input">
+                  <textarea
+                    className="wac-textarea"
+                    value={replyText}
+                    onChange={e => setReplyText(e.target.value)}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        if (chatMessagesRef.current) chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+                      }, 150);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (replyText.trim()) handleParentReply();
+                      }
+                    }}
+                    placeholder="Type a message..."
+                    rows={1}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleParentReply}
+                  disabled={!replyText.trim()}
+                  className={`wac-send-btn ${replyText.trim() ? 'wac-send-btn-active' : 'wac-send-btn-disabled'}`}
+                  title="Send Message"
+                >
+                  <Send size={18} />
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
@@ -7863,124 +7979,133 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
     <>
       <style>{LEAVES_CSS}</style>
 
-      {/* ─── Chat Modal ─── */}
+      {/* ─── Admin WhatsApp Chat Modal ─── */}
       {chatModal && (
-        <div className="alm-modal-overlay" onClick={() => { setChatModal(null); setChatMessage(""); }}>
-          <div className="alm-chat-card" onClick={e => e.stopPropagation()}>
-            <div className="alm-chat-header">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(212,175,55,0.15)', display: 'grid', placeItems: 'center' }}>
-                    <MessageCircle size={18} style={{ color: 'var(--primary-gold)' }} />
-                  </div>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)' }}>Clarify Leave Reason</h3>
-                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      Send a message to the parent about this leave
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: 4 }}>
-                      <span style={{
-                        width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
-                        background: presenceReady && parentOnline ? '#22c55e' : '#b9b2a8',
-                        boxShadow: presenceReady && parentOnline ? '0 0 0 3px rgba(34,197,94,0.18)' : 'none',
-                        transition: 'all 0.25s ease',
-                      }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: presenceReady && parentOnline ? '#16a34a' : 'var(--text-muted)' }}>
-                        {!presenceReady ? 'Checking...' : (parentOnline ? 'Parent is online in this chat' : 'Parent is offline')}
-                      </span>
-                    </div>
-                  </div>
+        <div className="wac-modal-overlay" onClick={() => { setChatModal(null); setChatMessage(""); }}>
+          <style>{WHATSAPP_LEAVE_CHAT_CSS}</style>
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }} onClick={e => e.stopPropagation()}>
+            
+            {/* Header */}
+            <div className="wac-header">
+              <div className="wac-header-left">
+                <div className="wac-avatar-wrap">
+                  <User size={19} />
+                  <span className={`wac-status-badge ${presenceReady && parentOnline ? 'wac-status-online' : 'wac-status-offline'}`} />
                 </div>
-                <button onClick={() => { setChatModal(null); setChatMessage(""); }} className="alm-btn-close-chat">
-                  <X size={15} />
-                  Close Chat
+                <div className="wac-header-info">
+                  <h4 className="wac-header-title">
+                    {students.find(s => s.allIds.includes(String(chatModal.student_id)))?.name || "Parent Chat"}
+                  </h4>
+                  <span className="wac-header-sub">
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: presenceReady && parentOnline ? '#22c55e' : '#9ca3af', display: 'inline-block' }} />
+                    {!presenceReady ? 'Checking status...' : (parentOnline ? 'Parent is online' : 'Parent is offline')}
+                  </span>
+                </div>
+              </div>
+              <div className="wac-header-right">
+                <button
+                  type="button"
+                  className="wac-close-btn"
+                  onClick={() => { setChatModal(null); setChatMessage(""); }}
+                  title="Close Chat"
+                >
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="alm-chat-body">
-              <div style={{ padding: '12px 16px', background: 'rgba(212,175,55,0.06)', borderRadius: 12, border: '1px solid rgba(212,175,55,0.12)', marginBottom: 12, fontSize: '0.85rem', color: 'var(--soft-brown)' }}>
-                <strong>Student:</strong> {students.find(s => s.allIds.includes(String(chatModal.student_id)))?.name || "Unknown"} &middot;
-                <strong> Category:</strong> {chatModal.leave_type || "General"} &middot;
-                <strong> Date:</strong> {chatModal.leave_date}
+            {/* Messages Area */}
+            <div className="wac-messages-area" ref={chatBodyRef}>
+              <div className="wac-chip-info">
+                <strong>{chatModal.leave_type || "Leave"} Application</strong> &middot; {chatModal.leave_date || chatModal.from_date}
+                {chatModal.to_date && chatModal.to_date !== chatModal.leave_date ? ` to ${chatModal.to_date}` : ""}
               </div>
 
-              {/* Messages Display */}
-              <div ref={chatBodyRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14, padding: '6px 0', overscrollBehavior: 'contain' }}>
-                {(!chatModal.messages || chatModal.messages.length === 0) ? (
-                  <div style={{ textAlign: 'center', padding: '20px 10px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    <MessageCircle size={24} style={{ opacity: 0.2, marginBottom: 6 }} />
-                    <p style={{ margin: 0 }}>No messages yet. Send a message to start the conversation.</p>
+              {(!chatModal.messages || chatModal.messages.length === 0) ? (
+                <div style={{ textAlign: 'center', padding: '40px 10px', color: '#8a7860', fontSize: '0.85rem' }}>
+                  <MessageCircle size={32} style={{ opacity: 0.25, marginBottom: 8 }} />
+                  <p style={{ margin: 0, fontWeight: 500 }}>No messages yet. Send a message to start conversation with Parent.</p>
+                </div>
+              ) : chatModal.messages.map((msg, idx) => {
+                const isUser = msg.role === 'admin';
+                return (
+                  <div key={idx} className={`wac-bubble ${isUser ? 'wac-bubble-outgoing' : 'wac-bubble-incoming'}`}>
+                    <p className="wac-msg-text">{msg.text}</p>
+                    <div className="wac-bubble-meta">
+                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      {isUser && <CheckCheck size={13} style={{ color: '#b8860b' }} />}
+                    </div>
                   </div>
-                ) : chatModal.messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      alignSelf: msg.role === 'admin' ? 'flex-end' : 'flex-start',
-                      maxWidth: '85%',
-                      padding: '9px 13px',
-                      borderRadius: msg.role === 'admin' ? '14px 14px 0 14px' : '14px 14px 14px 0',
-                      background: msg.role === 'admin' ? 'rgba(212,175,55,0.12)' : '#f1f0ee',
-                      color: 'var(--deep-brown)',
-                      fontSize: '0.82rem',
-                      lineHeight: 1.4,
-                    }}
+                );
+              })}
+            </div>
+
+            {/* Floating Input Bar + Quick Actions */}
+            <div className="wac-input-container">
+              <div className="wac-quick-actions">
+                <button
+                  type="button"
+                  onClick={() => updateStatus(chatModal.id, "Approved", "")}
+                  disabled={sendingAction === chatModal.id}
+                  className="wac-action-chip wac-chip-approve"
+                >
+                  <CheckCircle size={13} />
+                  {sendingAction === chatModal.id ? "Approving..." : "Approve Leave"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateStatus(chatModal.id, "Rejected", "")}
+                  disabled={sendingAction === chatModal.id}
+                  className="wac-action-chip wac-chip-reject"
+                >
+                  <XCircle size={13} />
+                  {sendingAction === chatModal.id ? "Rejecting..." : "Reject Leave"}
+                </button>
+                {getApproveMessages(chatModal.leave_type).map((m, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setChatMessage(m.val)}
+                    className="wac-action-chip wac-chip-preset"
                   >
-                    <p style={{ margin: 0 }}>{msg.text}</p>
-                    <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', display: 'block', marginTop: 3, opacity: 0.6 }}>
-                      {msg.role === 'admin' ? 'You' : 'Parent'} &middot; {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
+                    💬 {m.text.substring(0, 24)}...
+                  </button>
                 ))}
               </div>
 
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Your Message to Parent
-              </label>
-              <textarea
-                value={chatMessage}
-                onChange={e => setChatMessage(e.target.value)}
-                placeholder="Ask the parent to clarify the reason for leave..."
-                rows={3}
-                style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(212,175,55,0.20)', fontFamily: 'inherit', fontSize: '13px', color: 'var(--deep-brown)', resize: 'vertical', lineHeight: '1.5', background: 'rgba(255,255,255,0.9)' }}
-              />
-            </div>
-
-            <div className="alm-chat-footer">
-              <button
-                onClick={sendChatMessage}
-                disabled={!chatMessage.trim() || sendingAction === "chat-" + chatModal.id}
-                className="alm-premium-btn alm-btn-gold"
-                style={{ width: '100%', padding: '11px 20px', fontSize: '13px', marginBottom: '12px' }}
-              >
-                <Send size={16} />
-                {sendingAction === "chat-" + chatModal.id ? "Sending..." : "Send Message to Parent"}
-              </button>
-
-              <p style={{ margin: '0 0 10px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Quick Actions
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="wac-bar-wrapper">
+                <div className="wac-pill-input">
+                  <textarea
+                    className="wac-textarea"
+                    value={chatMessage}
+                    onChange={e => setChatMessage(e.target.value)}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        if (chatBodyRef.current) chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+                      }, 150);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (chatMessage.trim() && sendingAction !== "chat-" + chatModal.id) sendChatMessage();
+                      }
+                    }}
+                    placeholder="Ask the parent to clarify the reason..."
+                    rows={1}
+                  />
+                </div>
                 <button
-                  onClick={() => updateStatus(chatModal.id, "Approved", "")}
-                  disabled={sendingAction === chatModal.id}
-                  className="alm-premium-btn alm-btn-green"
-                  style={{ flex: 1, padding: '11px 16px', fontSize: '13px' }}
+                  type="button"
+                  onClick={sendChatMessage}
+                  disabled={!chatMessage.trim() || sendingAction === "chat-" + chatModal.id}
+                  className={`wac-send-btn ${chatMessage.trim() && sendingAction !== "chat-" + chatModal.id ? 'wac-send-btn-active' : 'wac-send-btn-disabled'}`}
+                  title="Send Message"
                 >
-                  <CheckCircle size={16} />
-                  {sendingAction === chatModal.id ? "Processing..." : "Approve"}
-                </button>
-                <button
-                  onClick={() => updateStatus(chatModal.id, "Rejected", "")}
-                  disabled={sendingAction === chatModal.id}
-                  className="alm-premium-btn alm-btn-red"
-                  style={{ flex: 1, padding: '11px 16px', fontSize: '13px' }}
-                >
-                  <X size={16} />
-                  {sendingAction === chatModal.id ? "Processing..." : "Reject"}
+                  {sendingAction === "chat-" + chatModal.id ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                 </button>
               </div>
             </div>
+
           </div>
         </div>
       )}
@@ -8022,7 +8147,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
           {loading ? (
             <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px' }}>
               <Loader2 className="animate-spin" size={32} style={{ color: 'var(--primary-gold)' }} />
@@ -8033,6 +8158,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
             const isIllness = leave.leave_type === "ILLNESS";
             const approveMsgs = getApproveMessages(leave.leave_type);
             const showApproveDropdown = approveDropdown === leave.id;
+            const hasMessages = leave.messages && leave.messages.length > 0;
 
             return (
               <div
@@ -8040,12 +8166,13 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                 style={{
                   borderRadius: 20, overflow: 'hidden',
                   background: 'linear-gradient(145deg, rgba(255,252,246,0.98), rgba(252,248,239,0.94))',
-                  border: '1px solid ' + (leave.status === 'Approved' ? 'rgba(34,197,94,0.25)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.20)' : 'rgba(212,175,55,0.20)'),
+                  border: '1px solid ' + (leave.status === 'Approved' ? 'rgba(34,197,94,0.30)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.25)' : 'rgba(212,175,55,0.25)'),
                   boxShadow: '0 8px 30px rgba(61,43,31,0.06)',
                   position: 'relative',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                 }}
               >
-                {/* Top accent strip */}
+                {/* Top accent status bar */}
                 <div style={{
                   height: 4, width: '100%',
                   background: leave.status === 'Approved' ? 'linear-gradient(90deg, #22c55e, #16a34a)'
@@ -8053,61 +8180,74 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                     : 'linear-gradient(90deg, #d4af37, #b8962e)',
                 }} />
 
-                <div style={{ padding: '18px 20px' }}>
-                  {/* Header */}
+                <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  {/* Header: Student Name & Status Badge */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)', fontWeight: 700 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {student?.name || "Unknown Student"}
                       </h4>
-                      <p style={{ margin: '2px 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Applied {new Date(leave.created_at).toLocaleDateString()} at {new Date(leave.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                      <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Applied {new Date(leave.created_at).toLocaleDateString()} &middot; {new Date(leave.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                       </p>
                     </div>
                     <span style={{
                       padding: '5px 12px', borderRadius: '999px', fontSize: '0.7rem', fontWeight: 800,
-                      textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
+                      textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', flexShrink: 0,
                       background: leave.status === 'Approved' ? 'rgba(34,197,94,0.12)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.10)' : 'rgba(212,175,55,0.14)',
                       color: leave.status === 'Approved' ? '#16a34a' : leave.status === 'Rejected' ? '#dc2626' : '#b8962e',
+                      border: '1px solid ' + (leave.status === 'Approved' ? 'rgba(34,197,94,0.3)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.3)' : 'rgba(212,175,55,0.3)'),
                     }}>
                       {leave.status}
                     </span>
                   </div>
 
-                  {/* Category + Reason */}
+                  {/* Category + Reason Details Box */}
                   <div style={{
                     marginTop: '14px', padding: '12px 14px',
-                    background: 'rgba(212,175,55,0.05)',
-                    borderRadius: 12, border: '1px solid rgba(212,175,55,0.10)',
+                    background: 'rgba(212,175,55,0.06)',
+                    borderRadius: 14, border: '1px solid rgba(212,175,55,0.14)',
+                    flex: 1,
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: 4 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary-gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: 6 }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--primary-gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                         {leave.leave_type || "General"}
                       </span>
                       {isIllness && (
-                        <span style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.10)', color: '#dc2626', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: 4, background: 'rgba(239,68,68,0.12)', color: '#dc2626', fontWeight: 700 }}>
                           MEDICAL
                         </span>
                       )}
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--deep-brown)', lineHeight: '1.5' }}>
-                      {leave.reason || "No details provided."}
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--deep-brown)', lineHeight: '1.5', fontStyle: leave.reason ? 'normal' : 'italic' }}>
+                      {leave.reason ? `"${leave.reason}"` : "No details provided."}
                     </p>
                   </div>
 
-                  {/* Leave Date */}
-                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    <Calendar size={13} style={{ color: 'var(--primary-gold)' }} />
-                    <strong>Leave Date:</strong> {leave.leave_date}
+                  {/* Leave Date Range */}
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: 'var(--deep-brown)', background: 'rgba(255,255,255,0.7)', padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(212,175,55,0.12)' }}>
+                    <Calendar size={15} style={{ color: 'var(--primary-gold)', flexShrink: 0 }} />
+                    <span>
+                      <strong>Dates:</strong> {leave.leave_date || leave.from_date}
+                      {leave.to_date && leave.to_date !== (leave.leave_date || leave.from_date) ? ` → ${leave.to_date}` : ""}
+                    </span>
                   </div>
 
-                  {/* Medical Document */}
+                  {/* Admin Comment if present */}
+                  {leave.admin_comment && (
+                    <div style={{ marginTop: '8px', fontSize: '0.78rem', color: 'var(--soft-brown)', background: 'rgba(212,175,55,0.08)', padding: '6px 10px', borderRadius: 8 }}>
+                      <strong>Admin note:</strong> {leave.admin_comment}
+                    </div>
+                  )}
+
+                  {/* Medical Document Button */}
                   {leave.attachment_url && (
                     <button
+                      type="button"
                       onClick={() => window.open(leave.attachment_url, '_blank')}
                       style={{
                         marginTop: '10px', width: '100%', padding: '9px 14px', borderRadius: 10,
-                        border: '1px solid rgba(212,175,55,0.20)', color: 'var(--primary-gold)',
+                        border: '1px solid rgba(212,175,55,0.25)', color: 'var(--primary-gold)',
                         background: 'rgba(212,175,55,0.05)', cursor: 'pointer',
                         fontSize: '0.8rem', display: 'flex', alignItems: 'center',
                         justifyContent: 'center', gap: '6px', fontWeight: 700, fontFamily: 'inherit',
@@ -8120,68 +8260,91 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                     </button>
                   )}
 
-                  {/* Action Buttons for Pending */}
-                  {leave.status === "Pending" && (
-                    <div style={{ marginTop: '16px' }}>
-                      {/* 3 Premium Action Buttons */}
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                        {/* Subject to Approve */}
-                        <button
-                          onClick={() => { setChatModal(leave); setChatMessage(""); }}
-                          className="alm-premium-btn alm-btn-outline"
-                          style={{ flex: 1, padding: '10px 12px', fontSize: '0.75rem' }}
-                        >
-                          <MessageCircle size={14} />
-                          Subject to Approve
-                        </button>
+                  {/* Action Buttons */}
+                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {leave.status === "Pending" ? (
+                      <>
+                        {/* Row 1: Approve & Reject (Side-by-Side 50/50, zero text overflow!) */}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {/* Approve with dropdown */}
+                          <div style={{ flex: 1, position: 'relative' }}>
+                            <button
+                              type="button"
+                              onClick={() => setApproveDropdown(showApproveDropdown ? null : leave.id)}
+                              disabled={sendingAction === leave.id}
+                              className="alm-premium-btn alm-btn-green"
+                              style={{ width: '100%', padding: '11px 12px', fontSize: '0.8rem' }}
+                            >
+                              <CheckCircle size={15} />
+                              {sendingAction === leave.id ? "..." : "Approve"}
+                              <ChevronDown size={13} style={{ marginLeft: 2 }} />
+                            </button>
 
-                        {/* Approve with dropdown */}
-                        <div style={{ flex: 1, position: 'relative' }}>
+                            {showApproveDropdown && (
+                              <div className="alm-dropdown">
+                                {approveMsgs.map((msg, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    className="alm-dropdown-item"
+                                    onClick={() => updateStatus(leave.id, "Approved", msg.val)}
+                                  >
+                                    <span style={{ fontSize: '0.78rem', lineHeight: '1.4', display: 'block' }}>
+                                      {msg.text}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Reject */}
                           <button
-                            onClick={() => setApproveDropdown(showApproveDropdown ? null : leave.id)}
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to reject this leave application?")) {
+                                updateStatus(leave.id, "Rejected", "");
+                              }
+                            }}
                             disabled={sendingAction === leave.id}
-                            className="alm-premium-btn alm-btn-green"
-                            style={{ width: '100%', padding: '10px 12px', fontSize: '0.75rem' }}
+                            className="alm-premium-btn alm-btn-red"
+                            style={{ flex: 1, padding: '11px 12px', fontSize: '0.8rem' }}
                           >
-                            <CheckCircle size={14} />
-                            {sendingAction === leave.id ? "Processing..." : "Approve"}
-                            <ChevronDown size={12} style={{ marginLeft: 2 }} />
+                            <X size={15} />
+                            Reject
                           </button>
-
-                          {showApproveDropdown && (
-                            <div className="alm-dropdown">
-                              {approveMsgs.map((msg, i) => (
-                                <button
-                                  key={i}
-                                  className="alm-dropdown-item"
-                                  onClick={() => updateStatus(leave.id, "Approved", msg.val)}
-                                >
-                                  <span style={{ fontSize: '0.78rem', lineHeight: '1.5', display: 'block' }}>
-                                    {msg.text}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
                         </div>
 
-                        {/* Reject */}
+                        {/* Row 2: Subject to Approve / Chat Button (Full Width) */}
                         <button
-                          onClick={() => {
-                            if (window.confirm("Are you sure you want to reject this leave application?")) {
-                              updateStatus(leave.id, "Rejected", "");
-                            }
-                          }}
-                          disabled={sendingAction === leave.id}
-                          className="alm-premium-btn alm-btn-red"
-                          style={{ flex: 1, padding: '10px 12px', fontSize: '0.75rem' }}
+                          type="button"
+                          onClick={() => { setChatModal(leave); setChatMessage(""); }}
+                          className="alm-premium-btn alm-btn-outline"
+                          style={{ width: '100%', padding: '10px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
                         >
-                          <X size={14} />
-                          Reject
+                          <MessageCircle size={15} style={{ color: 'var(--primary-gold)' }} />
+                          <span>Clarify / Subject to Approve</span>
+                          {hasMessages && (
+                            <span style={{ padding: '2px 7px', borderRadius: 99, background: 'rgba(212,175,55,0.2)', color: 'var(--primary-gold)', fontSize: '0.7rem', fontWeight: 800 }}>
+                              {leave.messages.length}
+                            </span>
+                          )}
                         </button>
-                      </div>
-                    </div>
-                  )}
+                      </>
+                    ) : (
+                      /* Approved/Rejected leaves: Open Chat & History Button */
+                      <button
+                        type="button"
+                        onClick={() => { setChatModal(leave); setChatMessage(""); }}
+                        className="alm-premium-btn alm-btn-outline"
+                        style={{ width: '100%', padding: '10px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
+                      >
+                        <MessageCircle size={15} style={{ color: 'var(--primary-gold)' }} />
+                        <span>{hasMessages ? `Chat History (${leave.messages.length})` : "Open Chat"}</span>
+                      </button>
+                    )}
+                  </div>
+
                 </div>
               </div>
             );
@@ -8206,11 +8369,56 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
   );
 }
 
-function AdminAttendanceTracking({ students, teacherProfiles }) {
+function AdminAttendanceTracking({ students, teacherProfiles, onShowAction }) {
   const [attendanceMap, setAttendanceMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandedTeacherId, setExpandedTeacherId] = useState(null);
+  const [testingReminder, setTestingReminder] = useState(false);
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const handleTestReminder = async () => {
+    setTestingReminder(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id;
+
+      const { data, error } = await supabase.functions.invoke('attendance-reminder', {
+        body: { force: true, targetUserId: currentUserId }
+      });
+      if (error) throw error;
+
+      // Trigger immediate local OS notification banner + chime on device
+      try {
+        const fcmService = await import("./fcmService.js").then(m => m.default);
+        if (fcmService) {
+          fcmService.playPremiumChime();
+          const sampleTitle = data?.sampleNotification?.title || "🔔 Daily Attendance Reminder (Test)";
+          const sampleBody = data?.sampleNotification?.body || `10:00 PM Reminder: Dispatched summary notifications to active teachers.`;
+          
+          fcmService.showNotification({
+            notification: {
+              title: sampleTitle,
+              body: sampleBody,
+              image: '/logo.png',
+            },
+            data: { redirectPage: 'Attendance Records' }
+          });
+        }
+      } catch (fcmErr) {
+        console.warn("Local notification preview error:", fcmErr);
+      }
+
+      if (onShowAction) {
+        onShowAction("success", `🔔 10:00 PM Reminder Dispatched! (Delivered to ${data?.sentCount || 0} device(s))`);
+      }
+    } catch (err) {
+      if (onShowAction) {
+        onShowAction("error", "Reminder failed: " + err.message);
+      }
+    } finally {
+      setTestingReminder(false);
+    }
+  };
   
   useEffect(() => {
     fetchTodayAttendance();
@@ -8370,14 +8578,35 @@ function AdminAttendanceTracking({ students, teacherProfiles }) {
       `}</style>
       
       <div className="att-tracking-container">
-        <div className="section-header" style={{ marginBottom: '8px' }}>
-          <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ClipboardCheck size={24} style={{ color: 'var(--primary-gold)' }} />
-            Attendance Tracking
-          </h2>
-          <p className="subtitle" style={{ fontSize: '0.82rem', color: 'var(--soft-brown)' }}>
-            Track which teachers have marked daily student attendance — {today}
-          </p>
+        <div className="section-header" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+          <div>
+            <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+              <ClipboardCheck size={24} style={{ color: 'var(--primary-gold)' }} />
+              Attendance Tracking
+            </h2>
+            <p className="subtitle" style={{ fontSize: '0.82rem', color: 'var(--soft-brown)', margin: '4px 0 0' }}>
+              Track which teachers have marked daily student attendance — {today}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleTestReminder}
+            disabled={testingReminder}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '10px 18px', borderRadius: '999px', border: 'none',
+              background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+              color: '#ffffff', fontWeight: 700, fontSize: '0.82rem',
+              cursor: testingReminder ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 16px rgba(184, 134, 11, 0.3)',
+              transition: 'all 0.2s ease', fontFamily: 'inherit',
+              opacity: testingReminder ? 0.7 : 1, whiteSpace: 'nowrap',
+            }}
+          >
+            {testingReminder ? <Loader2 size={16} className="animate-spin" /> : <Bell size={16} />}
+            <span>{testingReminder ? 'Sending Test Reminder...' : '🔔 Test 10:00 PM Reminder'}</span>
+          </button>
         </div>
         
         {/* Summary Strip */}
@@ -8944,7 +9173,22 @@ function AdminPortal({
   }, [activePage]);
 
   // Attendance reminder notifications are now sent server-side by the
-  // attendance-reminder Supabase Edge Function (Mon-Sat @ 10:00 PM IST).
+  const [testingAttendanceReminder, setTestingAttendanceReminder] = useState(false);
+
+  const triggerAttendanceReminderNow = async () => {
+    setTestingAttendanceReminder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('attendance-reminder', {
+        body: { force: true }
+      });
+      if (error) throw error;
+      onShowAction("success", `10:00 PM Attendance Reminder sent! (Sent: ${data?.sentCount || 0}, Skipped: ${data?.skippedCount || 0})`);
+    } catch (err) {
+      onShowAction("error", "Failed to send reminder: " + err.message);
+    } finally {
+      setTestingAttendanceReminder(false);
+    }
+  };
 
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -13135,6 +13379,7 @@ const handleDownloadAllReports = async () => {
             <AdminAttendanceTracking
               students={students}
               teacherProfiles={teacherProfiles}
+              onShowAction={onShowAction}
             />
           )}
           {activePage === "Event Leave" ? (
@@ -13880,6 +14125,28 @@ const handleDownloadAllReports = async () => {
                         The time of day the reminder notification is sent. Uses Indian Standard Time (IST, UTC+5:30).
                       </small>
                     </label>
+                  </div>
+
+                  <div style={{ marginTop: '20px', padding: '16px', borderRadius: 14, background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.18)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 6 }}>
+                      <Bell size={16} style={{ color: 'var(--primary-gold)' }} />
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--deep-brown)' }}>
+                        Teacher Daily Attendance Reminder (Mon–Sat @ 10:00 PM IST)
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 12px 0', lineHeight: 1.45 }}>
+                      Calculates marked vs. pending student attendance for each teacher and dispatches push notifications to their mobile devices + inbox notifications inside the app.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={triggerAttendanceReminderNow}
+                      disabled={testingAttendanceReminder}
+                      className="alm-premium-btn alm-btn-gold"
+                      style={{ padding: '9px 18px', fontSize: '0.82rem' }}
+                    >
+                      {testingAttendanceReminder ? <Loader2 size={15} className="animate-spin" /> : <Bell size={15} />}
+                      {testingAttendanceReminder ? 'Dispatching Notifications...' : 'Trigger 10:00 PM Teacher Reminder Now'}
+                    </button>
                   </div>
 
                   <button type="submit" className="action-button premium" style={{ marginTop: '20px', position: 'relative', transition: 'all 0.25s ease', opacity: jadwalSaving ? 0.7 : 1 }} disabled={jadwalSaving}>

@@ -144,6 +144,13 @@ Deno.serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Read optional force trigger parameter from request body (for manual admin trigger/test)
+    let isForce = false;
+    try {
+      const body = await req.json();
+      if (body?.force === true) isForce = true;
+    } catch (_) {}
+
     // ── Use IST for everything (reminder is scheduled in Indian Standard Time) ──
     const now = new Date();
     const istParts = new Intl.DateTimeFormat('en-CA', {
@@ -165,10 +172,10 @@ Deno.serve(async (req) => {
     };
     const dayOfWeek = DAY_MAP[weekdayName] ?? now.getDay();
 
-    console.log(`attendance-reminder: Running for ${weekdayName} (${todayDateStr}) at ${todayHour}:${todayMinute} IST`);
+    console.log(`attendance-reminder: Running for ${weekdayName} (${todayDateStr}) at ${todayHour}:${todayMinute} IST (isForce=${isForce})`);
 
-    // Only Mon-Sat (skip Sunday)
-    if (dayOfWeek === 0) {
+    // Only Mon-Sat (skip Sunday unless forced)
+    if (dayOfWeek === 0 && !isForce) {
       console.log('attendance-reminder: Sunday — skipping');
       return new Response(
         JSON.stringify({ success: true, message: 'SUNDAY_SKIPPED', sentCount: 0 }),
@@ -176,39 +183,40 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fire strictly at 10:05 PM IST (Mon-Sat, once per day). The cron runs
-    // every minute; a 2-minute window absorbs one missed tick while still
-    // delivering at ~22:05. Daily dedup via attendance_reminder_state
-    // guarantees exactly-once delivery.
+    // Fire starting at 10:00 PM IST (22:00 IST, Mon-Sat).
+    // Target is 22:00 (10:00 PM IST = 1320 minutes). Window spans 22:00 IST to 23:59 IST.
+    // Daily dedup via attendance_reminder_state guarantees exactly-once delivery per day.
     const currentMinutes = todayHour * 60 + todayMinute;
-    const targetMinutes = 22 * 60 + 5; // 10:05 PM
+    const targetMinutes = 22 * 60; // 10:00 PM IST
     const diff = currentMinutes - targetMinutes;
 
-    if (diff < 0 || diff >= 2) {
-      console.log(`attendance-reminder: Skipping — current ${todayHour}:${todayMinute} is ${diff < 0 ? 'before' : 'more than 2 min after'} 22:05 IST (diff ${diff} min)`);
+    if (!isForce && (diff < 0 || diff >= 120)) {
+      console.log(`attendance-reminder: Skipping — current ${todayHour}:${todayMinute} IST is outside 10:00 PM IST window (diff ${diff} min)`);
       return new Response(
-        JSON.stringify({ success: true, message: 'NOT_YET_TIME', sentCount: 0, info: `Target 22:05 IST, current ${todayHour}:${todayMinute}, diff ${diff}` }),
+        JSON.stringify({ success: true, message: 'NOT_YET_TIME', sentCount: 0, info: `Target 22:00 IST, current ${todayHour}:${todayMinute}, diff ${diff}` }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // ── Dedup: only send once per IST day ──
-    const { data: stateRow } = await supabase
-      .from('attendance_reminder_state')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle();
+    // ── Dedup: only send once per IST day (unless forced) ──
+    if (!isForce) {
+      const { data: stateRow } = await supabase
+        .from('attendance_reminder_state')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
 
-    const lastSent = stateRow?.last_sent_at;
-    if (lastSent) {
-      const lastSentDate = new Date(lastSent);
-      const todayStart = new Date(todayDateStr + 'T00:00:00+05:30');
-      if (lastSentDate >= todayStart) {
-        console.log(`attendance-reminder: Already sent today (last sent: ${lastSent})`);
-        return new Response(
-          JSON.stringify({ success: true, message: 'ALREADY_SENT_TODAY', sentCount: 0 }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-        );
+      const lastSent = stateRow?.last_sent_at;
+      if (lastSent) {
+        const lastSentDate = new Date(lastSent);
+        const todayStart = new Date(todayDateStr + 'T00:00:00+05:30');
+        if (lastSentDate >= todayStart) {
+          console.log(`attendance-reminder: Already sent today (last sent: ${lastSent})`);
+          return new Response(
+            JSON.stringify({ success: true, message: 'ALREADY_SENT_TODAY', sentCount: 0 }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
       }
     }
 
@@ -267,6 +275,7 @@ Deno.serve(async (req) => {
     let skippedCount = 0;
     let errorCount = 0;
     const details: Array<{ teacherId: string; status: string; message?: string }> = [];
+    let sampleNotification = { title: "", body: "" };
 
     for (const teacher of activeTeachers) {
       // Gather this teacher's students by matching teacher_id against id OR user_id
@@ -286,29 +295,50 @@ Deno.serve(async (req) => {
       }
 
       let marked = 0;
-      const missingStudents: string[] = [];
+      const markedStudentsList: string[] = [];
+      const missingStudentsList: string[] = [];
+
       students.forEach((name, sid) => {
         if (attMap.has(sid)) {
           marked++;
+          markedStudentsList.push(name);
         } else {
-          missingStudents.push(name);
+          missingStudentsList.push(name);
         }
       });
       const total = students.size;
       const missing = total - marked;
 
-      const missingList = missingStudents.map((n) => `  • ${n}`).join('\n');
-
       let title: string, body: string;
+      const markedFormatted = markedStudentsList.length > 0 ? `\n✅ Marked (${marked}/${total}):\n` + markedStudentsList.map((n) => `  • ${n}`).join('\n') : '';
+      const missingFormatted = missingStudentsList.length > 0 ? `\n❌ Pending (${missing}/${total}):\n` + missingStudentsList.map((n) => `  • ${n}`).join('\n') : '';
+
       if (marked === total) {
         title = "✅ Daily Attendance — All Marked";
-        body = `Assalamu Alaykum ${teacher.full_name},\n\nOutstanding! ✅ All ${total} of your students have been marked present for today's attendance:\n${[...students.values()].map((n) => `  • ${n}`).join('\n')}\n\nYour diligence is truly appreciated.\n\nJazakallah Khair,\nAdministration`;
+        body = `Assalamu Alaykum ${teacher.full_name},\n\nExcellent! All ${total} students in your class have attendance marked for today:\n${markedStudentsList.map((n) => `  • ${n}`).join('\n')}\n\nJazakallah Khair,\nAdministration`;
       } else if (marked > 0) {
-        title = "⚠️ Daily Attendance — Some Pending";
-        body = `Assalamu Alaykum ${teacher.full_name},\n\nYou have marked ${marked} out of ${total} students today. ${missing} student${missing > 1 ? 's' : ''} ${missing > 1 ? 'are' : 'is'} still pending:\n${missingList}\n\nKindly complete the attendance at your earliest convenience.\n\nJazakallah Khair,\nAdministration`;
+        title = "⚠️ Daily Attendance Reminder (10:00 PM)";
+        body = `Assalamu Alaykum ${teacher.full_name},\n\nDaily Attendance Summary for Today:${markedFormatted}${missingFormatted}\n\nKindly complete the pending attendance at your earliest convenience.\n\nJazakallah Khair,\nAdministration`;
       } else {
-        title = "❌ Daily Attendance — Not Marked";
-        body = `Assalamu Alaykum ${teacher.full_name},\n\nWe noticed that attendance for ${total} student${total > 1 ? 's' : ''} in your class has not been marked today:\n${missingList}\n\nPlease log in and mark the attendance as soon as possible.\n\nJazakallah Khair,\nAdministration`;
+        title = "❌ Daily Attendance Reminder (10:00 PM)";
+        body = `Assalamu Alaykum ${teacher.full_name},\n\nAttendance for all ${total} student${total > 1 ? 's' : ''} in your class has NOT been marked today:\n${missingFormatted}\n\nPlease log in and mark the attendance as soon as possible.\n\nJazakallah Khair,\nAdministration`;
+      }
+
+      if (!sampleNotification.title) {
+        sampleNotification = { title, body };
+      }
+
+      // Save inbox notification so it appears in the teacher's Inbox & Notifications inside the app
+      try {
+        await supabase.from('system_notifications').insert([{
+          title,
+          body,
+          target_role: 'user',
+          target_user: teacher.user_id,
+          redirect_page: 'Attendance Records',
+        }]);
+      } catch (inboxErr) {
+        console.warn(`attendance-reminder: Inbox insert failed for ${teacher.user_id}:`, inboxErr);
       }
 
       // Get teacher's FCM tokens
@@ -350,24 +380,39 @@ Deno.serve(async (req) => {
           .in('fcm_token', staleTokens);
       }
 
-      // Save inbox notification so it appears in the app's Attendance History too
-      try {
-        await supabase.from('system_notifications').insert([{
-          title,
-          body,
-          target_role: 'user',
-          target_user: teacher.user_id,
-          redirect_page: 'Attendance History',
-        }]);
-      } catch (inboxErr) {
-        console.warn(`attendance-reminder: Inbox insert failed for ${teacher.user_id}:`, inboxErr);
-      }
-
       details.push({ teacherId: teacher.user_id, status: 'sent', message: `Sent to ${tokens.length} device(s)` });
     }
 
-    // Mark as sent today (only if we actually sent something)
-    if (sentCount > 0) {
+    // If targetUserId (testing admin) is provided during test trigger, send test notification directly to testing user as well
+    if (isForce && targetUserId) {
+      const testTitle = sampleNotification.title || "🔔 [Test] Daily Attendance Reminder (10:00 PM)";
+      const testBody = sampleNotification.body || `Daily Attendance Reminder Test: Evaluated ${activeTeachers.length} active teacher(s).`;
+
+      try {
+        await supabase.from('system_notifications').insert([{
+          title: testTitle,
+          body: testBody,
+          target_role: 'user',
+          target_user: targetUserId,
+          redirect_page: 'Attendance Records',
+        }]);
+      } catch (_) {}
+
+      const { data: adminTokens } = await supabase
+        .from('user_fcm_tokens')
+        .select('fcm_token')
+        .eq('user_id', targetUserId);
+
+      if (adminTokens && adminTokens.length > 0) {
+        for (const { fcm_token } of adminTokens) {
+          const res = await sendFCMNotification(fcm_token, testTitle, testBody, accessToken, projectId, targetUserId);
+          if (res.success) sentCount++;
+        }
+      }
+    }
+
+    // Mark as sent today (only if we actually sent something and not forced)
+    if (sentCount > 0 && !isForce) {
       await supabase
         .from('attendance_reminder_state')
         .upsert({ id: 1, last_sent_at: new Date().toISOString() });
