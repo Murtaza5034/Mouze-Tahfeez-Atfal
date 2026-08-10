@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { AlertCircle, Check, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, Users, X } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import lottie from "lottie-web";
+// Bundled at build time so the welcome animation never depends on a network
+// fetch (the deployed site's catch-all route used to serve HTML for .json
+// paths on first visits, and lottie-web's XHR loader crashed on the result).
+import welcomeAnimation from "./assets/Welcome.json";
 
 import "./Login.css";
 
@@ -71,30 +75,21 @@ export default function Login({ onLoginSuccess }) {
   useEffect(() => {
     if (!welcomeRef.current) return;
     let anim = null;
-    let cancelled = false;
-    // Fetch the animation JSON ourselves and pass `animationData` instead of
-    // `path`: lottie-web v5.13.0's XHR loader reads `xhr.responseText` while
-    // `responseType` is 'json', which throws an uncaught InvalidStateError in
-    // Chrome. Fetching directly also surfaces failures in the try/catch below.
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch("/Welcome.json");
-        const data = await res.json();
-        if (cancelled || !welcomeRef.current) return;
-        anim = lottie.loadAnimation({
-          container: welcomeRef.current,
-          renderer: "svg",
-          loop: true,
-          autoplay: true,
-          animationData: data,
-        });
-      } catch (e) {
-        console.warn("Lottie animation failed to load:", e);
-      }
-    }, 300);
+    // animationData is bundled with the app - no network, no lottie-web XHR
+    // loader (which reads responseText with responseType 'json' and throws an
+    // uncaught InvalidStateError in Chrome).
+    try {
+      anim = lottie.loadAnimation({
+        container: welcomeRef.current,
+        renderer: "svg",
+        loop: true,
+        autoplay: true,
+        animationData: welcomeAnimation,
+      });
+    } catch (e) {
+      console.warn("Lottie animation failed to load:", e);
+    }
     return () => {
-      clearTimeout(timer);
-      cancelled = true;
       if (anim) anim.destroy();
     };
   }, []);
