@@ -31,6 +31,50 @@ const firebaseConfig = {
     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "B5W2bPUAQQmqbmDf5lF-6g",
 };
 
+// ---------------------------------------------------------------------------
+// Misconfiguration guard: fail loud in the console instead of a cryptic
+// `Firebase: Error (auth/invalid-api-key)` thrown deep inside getAuth().
+// Also catches placeholder values copied from .env.example (e.g.
+// "your_firebase_api_key"), which are truthy and would otherwise win over
+// the hardcoded fallbacks below.
+// ---------------------------------------------------------------------------
+const PLACEHOLDER_KEYS = [
+  "your_firebase_api_key",
+  "your_app_id",
+  "your_messaging_sender_id",
+  "your_project_id",
+];
+
+function checkFirebaseConfig(config) {
+  const problems = [];
+  const isPlaceholder = (value, keys) =>
+    !value || keys.some((p) => String(value).includes(p));
+
+  if (isPlaceholder(config.apiKey, PLACEHOLDER_KEYS)) {
+    problems.push("VITE_FIREBASE_API_KEY (missing or placeholder)");
+  }
+  if (!config.messagingSenderId) problems.push("VITE_FIREBASE_MESSAGING_SENDER_ID (missing)");
+  if (!config.appId) problems.push("VITE_FIREBASE_APP_ID (missing)");
+  if (isPlaceholder(config.projectId, ["your_project_id"])) {
+    problems.push("VITE_FIREBASE_PROJECT_ID (missing or placeholder)");
+  }
+  if (isPlaceholder(config.authDomain, ["your_project_id", "your_auth_domain"])) {
+    problems.push("VITE_FIREBASE_AUTH_DOMAIN (missing or placeholder)");
+  }
+  if (problems.length === 0) return;
+
+  console.error(
+    "%c[Firebase Config] MISCONFIGURED BUILD" +
+      " - " + problems.join(", ") + ".\n" +
+      "Firebase Auth / FCM may fail to initialize (e.g. auth/invalid-api-key).\n" +
+      "Fix: set the VITE_FIREBASE_* vars at build time (.env, Vercel/CI env vars)\n" +
+      "or correct the fallbacks in src/firebase/config.js.",
+    "background:#d93025;color:#fff;font-weight:bold;padding:2px 6px;border-radius:3px"
+  );
+}
+
+checkFirebaseConfig(firebaseConfig);
+
 export const firebaseProjectId = projectId;
 
 let app = null;

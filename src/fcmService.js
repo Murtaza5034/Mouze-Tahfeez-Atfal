@@ -351,7 +351,9 @@ class FCMService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error('No authenticated user found - cannot store FCM token');
+        // Expected when FCM initializes before login (e.g. the "Enable Device
+        // Alerts" button) - not an error, just nothing to attach the token to.
+        console.warn('FCM: no authenticated user yet - skipping token storage');
         return false;
       }
 

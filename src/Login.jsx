@@ -71,14 +71,22 @@ export default function Login({ onLoginSuccess }) {
   useEffect(() => {
     if (!welcomeRef.current) return;
     let anim = null;
-    const timer = setTimeout(() => {
+    let cancelled = false;
+    // Fetch the animation JSON ourselves and pass `animationData` instead of
+    // `path`: lottie-web v5.13.0's XHR loader reads `xhr.responseText` while
+    // `responseType` is 'json', which throws an uncaught InvalidStateError in
+    // Chrome. Fetching directly also surfaces failures in the try/catch below.
+    const timer = setTimeout(async () => {
       try {
+        const res = await fetch("/Welcome.json");
+        const data = await res.json();
+        if (cancelled || !welcomeRef.current) return;
         anim = lottie.loadAnimation({
           container: welcomeRef.current,
           renderer: "svg",
           loop: true,
           autoplay: true,
-          path: "/Welcome.json",
+          animationData: data,
         });
       } catch (e) {
         console.warn("Lottie animation failed to load:", e);
@@ -86,6 +94,7 @@ export default function Login({ onLoginSuccess }) {
     }, 300);
     return () => {
       clearTimeout(timer);
+      cancelled = true;
       if (anim) anim.destroy();
     };
   }, []);
