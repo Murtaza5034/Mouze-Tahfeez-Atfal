@@ -86,6 +86,8 @@ Mauze-Tahfeez*.aab
 
 # Service account keys (DO NOT COMMIT)
 keys/
+al-mawaid-1ihvq0-firebase-adminsdk-fbsvc-*.json
+*-firebase-adminsdk-*.json
 
 .vercel
 *.py

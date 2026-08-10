@@ -1,5 +1,10 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+
+// Web FCM lives on the mawaid-b929a project. It is initialized as a NAMED app
+// so it never collides with the default app used by src/firebase/ (which also
+// targets mawaid-b929a for Firestore data + callable functions).
+const FCM_APP_NAME = "webFcm";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAxoLoIPRZum286Y0uXM3Vq98V3403L7Uo",
@@ -11,8 +16,8 @@ const firebaseConfig = {
   measurementId: "B5W2bPUAQQmqbmDf5lF-6g"
 };
 
-// Initialize Firebase
-const firebaseApp = initializeApp(firebaseConfig);
+// Initialize Firebase as the named FCM app (getting/reuse safe)
+const firebaseApp = getApps().find(a => a.name === FCM_APP_NAME) || initializeApp(firebaseConfig, FCM_APP_NAME);
 
 // Initialize Firebase Cloud Messaging
 const messaging = getMessaging(firebaseApp);
@@ -47,7 +52,7 @@ export const getFCMToken = async (retries = 3) => {
         await navigator.serviceWorker.ready;
         
         const currentToken = await getToken(messaging, { 
-          vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || "BGrvEM2dyLW86HLnNNIDibzCT7NHZka42OFBlVxyA86wBieuXZ09vJldEnQazc9h3VQgBbikEh0oqfiG0xeeyfg",
+          vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || "BNWhCt5Y0FaHfo6H4O5c3I8vtkZVbSduNgy65bZ7Il5BogYCif7s4RGmSMJzC73Y6bdCrJRwmUsXKALXJXlm2Sk",
           serviceWorkerRegistration: registration
         });
         

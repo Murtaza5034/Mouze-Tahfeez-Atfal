@@ -49,11 +49,6 @@ const APP_KB = [
     answer: 'Self Jadwal allows your child to view their personalized schedule. It shows the weekly plan with subjects and timings.'
   },
   {
-    keywords: ['marhala', 'post', 'news', 'announce'],
-    page: 'Marhala Posts',
-    answer: 'Marhala Posts is a feed of school announcements, news, and updates from the administration — similar to a notice board.'
-  },
-  {
     keywords: ['archive', 'history', 'past result', 'old report'],
     page: 'Results Archive',
     answer: 'The Results Archive stores all past weekly Tahfeez report cards. You can browse historical results to track your child\'s progress over time.'

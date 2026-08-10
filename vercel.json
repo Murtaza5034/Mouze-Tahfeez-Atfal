@@ -23,17 +23,12 @@
       "dest": "/api/$1"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1",
-      "headers": { "cache-control": "public, max-age=31536000, immutable" }
-    },
-    {
       "src": "/sw.js",
-      "dest": "/sw.js"
-    },
-    {
-      "src": "/workbox-(.*)",
-      "dest": "/workbox-$1"
+      "dest": "/sw.js",
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate",
+        "service-worker-allowed": "/"
+      }
     },
     {
       "src": "/manifest.webmanifest",
@@ -41,8 +36,14 @@
       "headers": { "content-type": "application/manifest+json" }
     },
     {
-      "src": "/(.*)\\.(js|css|json|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|otf|webp|xml|txt)(\\?.*)?$",
-      "dest": "/$1.$2"
+      "src": "/(.*)\\.(js|css)(\\?.*)?$",
+      "dest": "/$1.$2",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" }
+    },
+    {
+      "src": "/(.*)\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|otf|xml|txt)(\\?.*)?$",
+      "dest": "/$1.$2",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" }
     },
     {
       "src": "/privacy",
@@ -54,11 +55,13 @@
     },
     {
       "src": "/(.*)\\.html$",
-      "dest": "/$1.html"
+      "dest": "/$1.html",
+      "headers": { "cache-control": "public, max-age=0, must-revalidate" }
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/index.html",
+      "headers": { "cache-control": "public, max-age=0, must-revalidate" }
     }
   ]
 }

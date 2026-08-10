@@ -1,7 +1,7 @@
 import "./style.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "./supabaseClient";
 import { getCellEdited, toArabicNum, calcTotalPages, formatJadeed, formatJuzhali, formatMurajah, getAyahPage, getJuzFromPage } from "./SelfJadwal";
 import {
   Bell,
@@ -61,7 +61,6 @@ import {
   Play,
   Mail,
   Send,
-  Heart,
   Upload,
   Image,
   XCircle,
@@ -81,14 +80,6 @@ import {
   History,
   CalendarClock,
   School,
-  Video,
-  VideoOff,
-  MicOff,
-  Camera,
-  EyeOff,
-  Radio,
-  PhoneOff,
-  MessageSquare
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -98,7 +89,6 @@ import "./salary.css";
 import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
-import "./marhala-posts.css";
 
 const LottieTrophy = ({ size = 120 }) => {
   return (
@@ -219,10 +209,25 @@ const JADWAL_SETTING_DEFAULTS = {
 const REPORT_BACKGROUND_BUCKET = "report_backgrounds";
 const MAX_REPORT_BACKGROUND_SIZE = 5 * 1024 * 1024;
 
-const normalizeReportSettings = (reportSettings) => ({
-  ...REPORT_SETTING_DEFAULTS,
-  ...(getReportSettingsObject(reportSettings) || {}),
-});
+const BOOLEAN_REPORT_FIELDS = [
+  "auto_lock_enabled",
+  "auto_clear_enabled",
+  "result_live_notify_enabled",
+  "reports_live",
+];
+
+const normalizeReportSettings = (reportSettings) => {
+  const base = {
+    ...REPORT_SETTING_DEFAULTS,
+    ...(getReportSettingsObject(reportSettings) || {}),
+  };
+  for (const key of BOOLEAN_REPORT_FIELDS) {
+    const v = base[key];
+    if (v === "true" || v === true) base[key] = true;
+    else if (v === "false" || v === false) base[key] = false;
+  }
+  return base;
+};
 
 const normalizeJadwalSettings = (settings) => ({
   ...JADWAL_SETTING_DEFAULTS,
@@ -838,7 +843,6 @@ const LazySelfJadwalTeacherView = React.lazy(() =>
 const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
 const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
 const LazySupportBot = React.lazy(() => import("./SupportBot"));
-import MarhalaPosts from "./MarhalaPosts";
 const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
 import AppUpdatePopup from "./AppUpdatePopup";
 import PrivacyPolicy from "./PrivacyPolicy";
@@ -1132,7 +1136,6 @@ const NAV_ICONS = {
   "Global Settings": Settings,
   "Messages": MessageCircle,
   "Email Settings": Mail,
-  "Marhala Posts": Heart,
   "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,
 };
 
@@ -1201,7 +1204,6 @@ function writeLocalArray(key, value) {
 }
 
 // Celebration component removed as requested.
-
 
 
 const normalizePhoneNumber = (phone) => {
@@ -2534,12 +2536,68 @@ async function findParentProfiles(userId, email = null) {
 
   const { data, error } = await query;
 
-  if (error) {
-    throw error;
-  }
-
   return data || [];
 }
+
+// Fallback used when direct child_profiles reads are blocked/recursing under RLS.
+// Calls the scoped SECURITY DEFINER RPC, which filters server-side to THIS parent
+// only (by user id or email) — never downloads the whole table.
+async function findParentProfilesFallback(userId, email = null) {
+  // Preferred: the scoped SECURITY DEFINER RPC (filters server-side to this
+  // parent only). If the function is not deployed yet (older DB), fall back to
+  // the legacy full-table RPC and filter client-side so parents never see an
+  // empty portal while the migration is pending.
+  try {
+    const { data, error } = await supabase.rpc("get_my_child_profiles", {
+      p_user_id: userId,
+      p_email: email || null,
+    });
+    if (!error && Array.isArray(data)) return data;
+  } catch (_e) {}
+
+  console.warn("get_my_child_profiles RPC unavailable; using legacy fallback. Apply the performance migration to remove this fallback.");
+  try {
+    const { data, error } = await supabase.rpc("get_all_child_profiles");
+    if (error || !Array.isArray(data)) return [];
+    const uId = String(userId || "").trim().toLowerCase();
+    const em = String(email || "").trim().toLowerCase();
+    return data.filter(p => {
+      const pu = String(p.parent_user_id || "").trim().toLowerCase();
+      const pe = String(p.parent_email || "").trim().toLowerCase();
+      const matchUserId = uId && pu && pu === uId;
+      const matchEmail = em && pe && (pe === em || pe.includes(em) || em.includes(pe));
+      return matchUserId || matchEmail;
+    });
+  } catch (_e) {
+    return [];
+  }
+}
+
+
+// TTL-cached global ranks so realtime refreshes / 60s polls don't re-invoke
+// the get-global-rank edge function (which scans ALL weekly results) every time.
+let globalRanksCache = { data: null, fetchedAt: 0 };
+const GLOBAL_RANKS_TTL = 2 * 60 * 1000; // 2 minutes
+
+async function fetchGlobalRanks() {
+  if (globalRanksCache.data && Date.now() - globalRanksCache.fetchedAt < GLOBAL_RANKS_TTL) {
+    return globalRanksCache.data;
+  }
+  try {
+    const ranksPromise = supabase.functions.invoke("get-global-rank", { body: { return_all: true } });
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Rank timeout")), 1500));
+    const { data, error } = await Promise.race([ranksPromise, timeoutPromise]);
+    if (!error && data?.ranks) {
+      globalRanksCache = { data, fetchedAt: Date.now() };
+    }
+    return data || null;
+  } catch (_e) {
+    return globalRanksCache.data || null;
+  }
+}
+
+// Prevent stacked full-portal reloads when many realtime events fire at once.
+let portalLoadInFlight = false;
 
 async function authorizePortalAccess(user, requestedRole) {
   const tableAccess = await findPortalAccess(user.id);
@@ -2590,7 +2648,13 @@ async function authorizePortalAccess(user, requestedRole) {
   }
 
   if (requestedRole === "parents") {
-    const parentProfiles = await findParentProfiles(user.id, user.email);
+    let parentProfiles = [];
+    try {
+      parentProfiles = await findParentProfiles(user.id, user.email);
+    } catch (_) {}
+    if (!parentProfiles || parentProfiles.length === 0) {
+      parentProfiles = await findParentProfilesFallback(user.id, user.email);
+    }
 
     if (parentProfiles.length > 0) {
       return {
@@ -3073,12 +3137,14 @@ function LoadingScreen({ message, onComplete }) {
 }
 
 function StudentAvatar({ student, size = "regular" }) {
-  if (student?.photoUrl) {
+  const [imgFailed, setImgFailed] = useState(false);
+  if (student?.photoUrl && !imgFailed) {
     return (
       <img
         src={student.photoUrl}
         alt={student.name || "Student"}
         className={`student-avatar ${size}`}
+        onError={() => setImgFailed(true)}
       />
     );
   }
@@ -4317,1826 +4383,6 @@ const formatNiceDate = (dateStr) => {
   }
 };
 
-/* ─── Online Tahfeez 4K Video Room ─── */
-const ONLINE_TAHFEEZ_CSS = `
-  .oth-room-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 9999999;
-    background: #090807;
-    height: 100vh; height: 100dvh; width: 100vw;
-    display: flex; flex-direction: column;
-    overflow: hidden; user-select: none;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  }
-  .oth-header {
-    position: absolute; top: 0; left: 0; right: 0; z-index: 50;
-    padding: max(14px, env(safe-area-inset-top)) 16px 14px 16px;
-    background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    color: #fff;
-  }
-  .oth-header-info { display: flex; align-items: center; gap: 10px; }
-  .oth-badge-4k {
-    background: linear-gradient(135deg, #d4af37, #b8860b);
-    color: #000; font-weight: 800; font-size: 0.7rem;
-    padding: 3px 8px; border-radius: 6px; letter-spacing: 0.5px;
-    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
-  }
-  .oth-timer {
-    display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600;
-    color: #e2e8f0; background: rgba(255,255,255,0.12); padding: 4px 12px; border-radius: 20px;
-    backdrop-filter: blur(8px);
-  }
-  .oth-video-container {
-    position: relative; flex: 1; width: 100%; height: 100%; background: #000;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .oth-remote-video {
-    width: 100%; height: 100%; object-fit: cover;
-  }
-  .oth-pip-video-wrap {
-    position: absolute; bottom: 90px; right: 16px; z-index: 40;
-    width: 130px; height: 180px; border-radius: 14px; overflow: hidden;
-    border: 2px solid rgba(212, 175, 55, 0.6);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5); background: #1a1612;
-    transition: all 0.3s ease;
-  }
-  @media (min-width: 768px) {
-    .oth-pip-video-wrap { width: 200px; height: 260px; bottom: 100px; right: 24px; }
-  }
-  .oth-pip-video { width: 100%; height: 100%; object-fit: cover; }
-  .oth-pip-label {
-    position: absolute; bottom: 6px; left: 8px; font-size: 0.65rem; font-weight: 700;
-    color: #fff; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;
-  }
-
-  .oth-controls-bar {
-    position: absolute; bottom: 0; left: 0; right: 0; z-index: 50;
-    padding: 16px 20px max(18px, env(safe-area-inset-bottom)) 20px;
-    background: linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0) 100%);
-    display: flex; align-items: center; justify-content: center; gap: 16px;
-  }
-  .oth-btn-control {
-    width: 50px; height: 50px; border-radius: 50%; border: none;
-    background: rgba(255,255,255,0.16); color: #fff;
-    display: grid; place-items: center; cursor: pointer;
-    backdrop-filter: blur(10px); transition: all 0.2s ease;
-    position: relative;
-  }
-  .oth-btn-control:hover { background: rgba(255,255,255,0.28); transform: scale(1.05); }
-  .oth-btn-control-active { background: #d4af37; color: #000; }
-  .oth-btn-endcall {
-    background: #ef4444; color: #fff; width: 56px; height: 56px;
-    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
-  }
-  .oth-btn-endcall:hover { background: #dc2626; transform: scale(1.08); }
-
-  .oth-chat-drawer {
-    position: absolute; top: 0; right: 0; bottom: 0; z-index: 60;
-    width: 100%; max-width: 360px; background: rgba(18, 15, 12, 0.95);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-left: 1px solid rgba(212, 175, 55, 0.25);
-    display: flex; flex-direction: column;
-    animation: othSlideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
-  }
-  @keyframes othSlideLeft { from { transform: translateX(100%); } to { transform: translateX(0); } }
-  
-  .oth-chat-header {
-    padding: max(14px, env(safe-area-inset-top)) 16px 14px 16px;
-    background: rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex; align-items: center; justify-content: space-between; color: #fff;
-  }
-  .oth-chat-messages {
-    flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px;
-  }
-  .oth-chat-banner {
-    background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #fca5a5; font-size: 0.76rem; padding: 8px 12px; border-radius: 8px;
-    text-align: center; margin-bottom: 8px; line-height: 1.4;
-  }
-  .oth-chat-banner-online {
-    background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #86efac; font-size: 0.76rem; padding: 8px 12px; border-radius: 8px;
-    text-align: center; margin-bottom: 8px; line-height: 1.4;
-  }
-  .oth-chat-input-row {
-    padding: 12px 14px max(14px, env(safe-area-inset-bottom)) 14px;
-    background: rgba(0,0,0,0.4); border-top: 1px solid rgba(255,255,255,0.1);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .oth-chat-input {
-    flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(212, 175, 55, 0.3);
-    border-radius: 20px; padding: 8px 14px; color: #fff; outline: none; font-size: 0.88rem;
-  }
-  .oth-chat-send-btn {
-    width: 38px; height: 38px; border-radius: 50%; background: #d4af37; color: #000;
-    border: none; display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
-  }
-  .oth-chat-send-btn:disabled { background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.4); cursor: not-allowed; }
-`;
-
-function OnlineTahfeezRoom({ sessionData, userRole, currentUser, onClose, onComplete }) {
-  const [micMuted, setMicMuted] = useState(false);
-  const [camOff, setCamOff] = useState(userRole === "teacher"); // Teacher Camera DEFAULT OFF as requested!
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [inputMsg, setInputMsg] = useState("");
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [callDuration, setCallDuration] = useState(0);
-  const [peerConnected, setPeerConnected] = useState(false);
-  const [statusText, setStatusText] = useState("Connecting to HD Room...");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const pcRef = useRef(null);
-  const channelRef = useRef(null);
-  const sigChannelRef = useRef(null);
-  const localStreamRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const recordedChunksRef = useRef([]);
-  const offerInFlightRef = useRef(false);
-  const connectedRef = useRef(false);
-
-  const isStudent = userRole === "student" || userRole === "parent";
-  const isTeacher = userRole === "teacher";
-
-  const studentId = sessionData.student_id || sessionData.id || "001";
-  const roomId = sessionData.room_id || `tahfeez_room_${studentId}`;
-  const peerRole = isTeacher ? "parent" : "teacher";
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCallDuration(d => d + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const iceQueue = [];
-    const processedSignals = new Set();
-
-    const flushIceQueue = async () => {
-      if (!pcRef.current || !pcRef.current.remoteDescription || !pcRef.current.remoteDescription.type) return;
-      while (iceQueue.length > 0) {
-        const cand = iceQueue.shift();
-        try {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(cand));
-        } catch (_) {}
-      }
-    };
-
-    const addIce = async (candidate) => {
-      if (!candidate) return;
-      if (pcRef.current && pcRef.current.remoteDescription && pcRef.current.remoteDescription.type) {
-        try {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (_) {}
-      } else {
-        iceQueue.push(candidate);
-      }
-    };
-
-    const emitSignal = async (type, payload) => {
-      const row = { room_id: roomId, sender: userRole, type, payload };
-      // Fast path: realtime broadcast on the room channel.
-      if (channelRef.current) {
-        try {
-          channelRef.current.send({ type: "broadcast", event: `sig:${type}`, payload });
-        } catch (_) {}
-      }
-      // Reliable path: DB relay (realtime postgres_changes + poll fallback).
-      try {
-        await supabase.from("tahfeez_signals").insert(row);
-      } catch (_) {}
-    };
-
-    const sendOffer = async () => {
-      if (!isTeacher || !pcRef.current || !mounted) return;
-      if (offerInFlightRef.current) return;
-      const pc = pcRef.current;
-      const state = pc.signalingState;
-      if (state === "have-remote-offer" || state === "have-local-pranswer" || state === "have-remote-pranswer") return;
-      offerInFlightRef.current = true;
-      try {
-        const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-        await pc.setLocalDescription(offer);
-        await emitSignal("offer", {
-          sigId: `o_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          offer: pc.localDescription,
-          sender: userRole,
-          ts: Date.now()
-        });
-      } catch (e) {
-        console.warn("Error creating SDP offer:", e);
-      } finally {
-        offerInFlightRef.current = false;
-      }
-    };
-
-    const handleOffer = async (payload) => {
-      if (!payload || payload.sender === userRole || isTeacher) return;
-      if (!pcRef.current) return;
-      const pc = pcRef.current;
-      try {
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
-        await flushIceQueue();
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await emitSignal("answer", {
-          sigId: `a_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          answer: pc.localDescription,
-          sender: userRole,
-          ts: Date.now()
-        });
-        setPeerConnected(true);
-        setStatusText("Connected • HD");
-      } catch (err) {
-        console.warn("Signal offer handling error:", err);
-      }
-    };
-
-    const handleAnswer = async (payload) => {
-      if (!payload || payload.sender === userRole) return;
-      if (!pcRef.current) return;
-      try {
-        if (pcRef.current.signalingState !== "stable") {
-          await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
-          await flushIceQueue();
-        }
-        setPeerConnected(true);
-        setStatusText("Connected • HD");
-      } catch (err) {
-        console.warn("Signal answer handling error:", err);
-      }
-    };
-
-    const payloadKey = (payload) => {
-      if (payload?.sigId) return `sig:${payload.sigId}`;
-      try { return `p:${JSON.stringify(payload)}`; } catch (_) { return `r:${Math.random()}`; }
-    };
-
-    const dispatchSignal = async (type, payload) => {
-      if (!payload || !mounted) return;
-      const key = payloadKey(payload);
-      if (processedSignals.has(key)) return;
-      processedSignals.add(key);
-      if (type === "offer") await handleOffer(payload);
-      else if (type === "answer") await handleAnswer(payload);
-      else if (type === "ice") await addIce(payload.candidate);
-      else if (type === "peer-ready" && isTeacher) await sendOffer();
-    };
-
-    async function initCall() {
-      try {
-        let stream = null;
-
-        // Stage 1: Try HD Video + Audio (1280x720 ideal keeps calls smooth)
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: {
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              facingMode: "user"
-            }
-          });
-        } catch (e1) {
-          console.warn("HD getUserMedia fallback, trying standard video:", e1);
-          // Stage 2: Try Standard Video + Audio
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({
-              audio: true,
-              video: true
-            });
-          } catch (e2) {
-            console.warn("Standard video getUserMedia fallback, trying audio-only:", e2);
-            // Stage 3: Try Audio-Only (for devices without camera)
-            try {
-              stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
-                video: false
-              });
-            } catch (e3) {
-              console.error("Camera/Mic access error:", e3);
-              if (mounted) setErrorMsg("Unable to access microphone or camera. Please check device permissions.");
-              return;
-            }
-          }
-        }
-
-        if (!mounted) return;
-        localStreamRef.current = stream;
-
-        // Teacher Camera DEFAULT OFF requirement
-        if (isTeacher) {
-          const videoTrack = stream.getVideoTracks()[0];
-          if (videoTrack) videoTrack.enabled = false;
-        }
-
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-
-        try {
-          const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
-          recorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
-          };
-          recorder.start(5000);
-          mediaRecorderRef.current = recorder;
-        } catch (recErr) {
-          console.warn("MediaRecorder fallback:", recErr);
-        }
-
-        const pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "stun:stun2.l.google.com:19302" },
-            { urls: "stun:stun3.l.google.com:19302" },
-            { urls: "stun:stun4.l.google.com:19302" },
-            { urls: "stun:stun.services.mozilla.com:3478" }
-          ],
-          iceCandidatePoolSize: 4
-        });
-        pcRef.current = pc;
-
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-        pc.ontrack = (event) => {
-          if (remoteVideoRef.current && event.streams[0]) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-            remoteVideoRef.current.play().catch(() => {});
-            connectedRef.current = true;
-            setPeerConnected(true);
-            setStatusText("Connected • HD");
-          }
-        };
-
-        pc.onconnectionstatechange = () => {
-          const st = pc.connectionState;
-          if (st === "connected") {
-            connectedRef.current = true;
-            setPeerConnected(true);
-            setStatusText("Connected • HD");
-          } else if (st === "failed" || st === "disconnected") {
-            connectedRef.current = false;
-            setStatusText("Reconnecting...");
-            if (isTeacher) {
-              setTimeout(() => sendOffer(), 1200);
-            }
-          }
-        };
-
-        pc.onicecandidate = (event) => {
-          if (event.candidate && mounted) {
-            emitSignal("ice", { candidate: event.candidate, sender: userRole, ts: Date.now() });
-          }
-        };
-
-        const roomChannel = supabase.channel(`tahfeez-room:${roomId}`, {
-          config: { presence: { key: `${userRole}_${studentId}` } }
-        });
-        channelRef.current = roomChannel;
-
-        roomChannel
-          .on("presence", { event: "sync" }, () => {
-            const state = roomChannel.presenceState();
-            const peerPresent = Object.values(state).flat().some(p => p.role === peerRole || p.userRole === peerRole);
-            if (peerPresent && isTeacher) sendOffer();
-          })
-          .on("broadcast", { event: "peer-ready" }, ({ payload }) => {
-            if (payload.sender !== userRole) {
-              if (isTeacher) sendOffer();
-            }
-          })
-          .on("broadcast", { event: "sig:offer" }, ({ payload }) => {
-            dispatchSignal("offer", payload);
-          })
-          .on("broadcast", { event: "sig:answer" }, ({ payload }) => {
-            dispatchSignal("answer", payload);
-          })
-          .on("broadcast", { event: "sig:ice" }, ({ payload }) => {
-            dispatchSignal("ice", payload);
-          })
-          .on("broadcast", { event: "in-call-chat" }, ({ payload }) => {
-            if (payload.sender !== (currentUser?.full_name || currentUser?.name)) {
-              setMessages(prev => [...prev, payload]);
-              setUnreadCount(u => u + 1);
-            }
-          })
-          .subscribe(async (status) => {
-            if (status === "SUBSCRIBED") {
-              await roomChannel.track({ role: userRole, userRole, name: currentUser?.full_name || currentUser?.name });
-              roomChannel.send({ type: "broadcast", event: "peer-ready", payload: { sender: userRole, sigId: `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` } });
-              if (isTeacher) await sendOffer();
-            }
-          });
-
-        // Reliable signaling via DB realtime (INSERT on tahfeez_signals)
-        const sigChannel = supabase
-          .channel(`tahfeez-signals:${roomId}`)
-          .on("postgres_changes", {
-            event: "INSERT",
-            schema: "public",
-            table: "tahfeez_signals",
-            filter: `room_id=eq.${roomId}`
-          }, (change) => {
-            const row = change.new;
-            if (!row || row.sender === userRole) return;
-            if (row.id) processedSignals.add(`row:${row.id}`);
-            dispatchSignal(row.type, row.payload);
-          })
-          .subscribe();
-        sigChannelRef.current = sigChannel;
-
-        // ─── DB Poll Fallback (keeps working even if realtime is unavailable) ───
-        let lastCleanupAt = 0;
-        const dbPollInterval = setInterval(async () => {
-          if (!mounted) return;
-          if (connectedRef.current) {
-            // Peer is connected: nothing to negotiate, but still allow late ICE.
-            return;
-          }
-          try {
-            const { data: dbSignals } = await supabase
-              .from("tahfeez_signals")
-              .select("id, type, payload, sender")
-              .eq("room_id", roomId)
-              .order("id", { ascending: true })
-              .limit(60);
-
-            if (dbSignals && dbSignals.length > 0) {
-              for (const sig of dbSignals) {
-                if (sig.id) {
-                  if (processedSignals.has(`row:${sig.id}`)) continue;
-                  processedSignals.add(`row:${sig.id}`);
-                }
-                if (sig.sender === userRole) continue;
-                await dispatchSignal(sig.type, sig.payload);
-              }
-            }
-          } catch (_) {}
-
-          // Teacher keeps retrying the offer until a peer connects.
-          if (isTeacher && (!pcRef.current || pcRef.current.connectionState !== "connected")) {
-            sendOffer();
-          }
-
-          // Tidy up: delete stale signals for this room every ~2 min so the
-          // relay table never grows unbounded across many classes.
-          if (Date.now() - lastCleanupAt > 120000) {
-            lastCleanupAt = Date.now();
-            const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-            try {
-              await supabase.from("tahfeez_signals").delete().eq("room_id", roomId).lt("created_at", cutoff);
-            } catch (_) {}
-          }
-        }, 1500);
-
-        return () => {
-          clearInterval(dbPollInterval);
-        };
-      } catch (err) {
-        console.error("Camera/Mic access error:", err);
-        setStatusText("Camera/Microphone Access Ready");
-      }
-    }
-
-    initCall();
-
-    return () => {
-      mounted = false;
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        try { mediaRecorderRef.current.stop(); } catch (_) {}
-      }
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => t.stop());
-      }
-      if (pcRef.current) {
-        try { pcRef.current.close(); } catch (_) {}
-      }
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-      if (sigChannelRef.current) supabase.removeChannel(sigChannelRef.current);
-    };
-  }, [roomId, userRole]);
-
-  const toggleMic = () => {
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setMicMuted(!audioTrack.enabled);
-      }
-    }
-  };
-
-  const iceCandidateQueueRef = useRef([]);
-
-  const toggleCam = () => {
-    if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setCamOff(!videoTrack.enabled);
-      }
-    }
-  };
-
-  const handleSendChat = () => {
-    if (!inputMsg.trim() || !peerConnected) return;
-    const msgObj = {
-      sender: currentUser?.full_name || currentUser?.name || (isTeacher ? "Teacher" : "Student"),
-      role: userRole,
-      text: inputMsg.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setMessages(prev => [...prev, msgObj]);
-    setInputMsg("");
-    if (channelRef.current) {
-      channelRef.current.send({
-        type: "broadcast",
-        event: "in-call-chat",
-        payload: msgObj
-      });
-    }
-  };
-
-  const handleEndCall = async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop(); } catch (_) {}
-    }
-
-    const sessionSummary = {
-      id: sessionData.id,
-      student_id: sessionData.student_id,
-      student_name: sessionData.student_name,
-      teacher_id: sessionData.teacher_id,
-      teacher_name: sessionData.teacher_name,
-      started_at: sessionData.started_at || new Date().toISOString(),
-      ended_at: new Date().toISOString(),
-      duration_seconds: callDuration,
-      status: "completed",
-      chat_messages: messages
-    };
-
-    try {
-      await supabase.from("tahfeez_sessions").insert([sessionSummary]);
-    } catch (_) {}
-
-    try {
-      const stored = JSON.parse(localStorage.getItem("admin_tahfeez_sessions") || "[]");
-      localStorage.setItem("admin_tahfeez_sessions", JSON.stringify([sessionSummary, ...stored]));
-    } catch (_) {}
-
-    if (onComplete) onComplete(sessionSummary);
-    onClose();
-  };
-
-  const formatSecs = (s) => {
-    const mins = Math.floor(s / 60);
-    const secs = s % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  return createPortal(
-    <div className="oth-room-overlay">
-      <style>{ONLINE_TAHFEEZ_CSS}</style>
-
-      {/* Header Bar */}
-      <div className="oth-header">
-        <div className="oth-header-info">
-          <span className="oth-badge-4k">4K HD</span>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{sessionData.student_name || "Online Tahfeez"}</div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-              Teacher: {sessionData.teacher_name || "Teacher"} &middot; {statusText}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="oth-timer">
-            <Radio size={14} style={{ color: '#ef4444' }} className="animate-pulse" />
-            {formatSecs(callDuration)}
-          </div>
-          <button className="oth-btn-control" onClick={() => { setChatOpen(!chatOpen); setUnreadCount(0); }} title="In-Call Chat">
-            <MessageSquare size={20} />
-            {unreadCount > 0 && (
-              <span style={{
-                position: 'absolute', top: 2, right: 2, background: '#ef4444', color: '#fff',
-                borderRadius: '50%', width: 18, height: 18, fontSize: '0.65rem', fontWeight: 800,
-                display: 'grid', placeItems: 'center'
-              }}>
-                {unreadCount}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Main 4K Video View */}
-      <div className="oth-video-container">
-        <video ref={remoteVideoRef} autoPlay playsInline className="oth-remote-video" />
-        
-        {!peerConnected && (
-          <div style={{
-            position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyCenter: 'center', justifyContent: 'center',
-            background: 'rgba(10,10,12,0.85)', color: '#fff', textAlign: 'center', padding: 20
-          }}>
-            {errorMsg ? (
-              <>
-                <AlertCircle size={40} style={{ color: '#ef4444', marginBottom: 12 }} />
-                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#fca5a5' }}>Camera / Microphone Unavailable</h4>
-                <p style={{ fontSize: '0.85rem', color: '#fecaca', marginTop: 6, maxWidth: 420 }}>{errorMsg}</p>
-              </>
-            ) : (
-              <>
-                <Loader2 size={40} className="animate-spin" style={{ color: '#d4af37', marginBottom: 12 }} />
-                <h4 style={{ margin: 0, fontSize: '1.2rem' }}>Waiting for {isTeacher ? (sessionData.student_name || "Student") : "Teacher"} to connect...</h4>
-                <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: 6 }}>
-                  {isTeacher ? "Teacher Camera is Default OFF • Student Camera is Mandatory ON" : "Student Camera is Mandatory ON for Tahfeez"}
-                </p>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* PIP Self-View Window */}
-        <div className="oth-pip-video-wrap">
-          <video ref={localVideoRef} autoPlay playsInline muted className="oth-pip-video" />
-          <span className="oth-pip-label">
-            {isTeacher ? (camOff ? "You (Cam OFF)" : "You (Teacher)") : "You (Student - Cam ON)"}
-          </span>
-        </div>
-      </div>
-
-      {/* Floating Control Bar */}
-      <div className="oth-controls-bar">
-        <button
-          className={`oth-btn-control ${micMuted ? '' : 'oth-btn-control-active'}`}
-          onClick={toggleMic}
-          title={micMuted ? "Unmute Mic" : "Mute Mic"}
-        >
-          {micMuted ? <MicOff size={22} /> : <Mic size={22} />}
-        </button>
-
-        <button
-          className={`oth-btn-control ${!camOff ? 'oth-btn-control-active' : ''}`}
-          onClick={toggleCam}
-          title={camOff ? "Turn Camera ON" : "Turn Camera OFF"}
-          style={{ opacity: 1, cursor: 'pointer' }}
-        >
-          {camOff ? <VideoOff size={22} /> : <Video size={22} />}
-        </button>
-
-        <button className="oth-btn-control oth-btn-endcall" onClick={handleEndCall} title="End Tahfeez Call">
-          <PhoneOff size={24} />
-        </button>
-      </div>
-
-      {/* In-Call Chat Drawer (Active ONLY when BOTH connected!) */}
-      {chatOpen && (
-        <div className="oth-chat-drawer">
-          <div className="oth-chat-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
-              <MessageSquare size={18} style={{ color: '#d4af37' }} /> In-Call Tahfeez Chat
-            </div>
-            <button
-              onClick={() => { setChatOpen(false); setUnreadCount(0); }}
-              style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="oth-chat-messages">
-            {peerConnected ? (
-              <div className="oth-chat-banner-online">
-                🟢 <strong>Both Online Connected</strong> &middot; Real-time in-call chat is active to resolve doubts.
-              </div>
-            ) : (
-              <div className="oth-chat-banner">
-                🔒 <strong>In-Call Chat Locked</strong> &middot; Chat is enabled only when both Teacher and Student are online in this call.
-              </div>
-            )}
-
-            {messages.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8', fontSize: '0.82rem' }}>
-                No in-call chat messages yet. Type below to clarify doubts during video call.
-              </div>
-            ) : messages.map((m, idx) => (
-              <div key={idx} style={{
-                alignSelf: m.role === userRole ? 'flex-end' : 'flex-start',
-                background: m.role === userRole ? 'linear-gradient(135deg, #d4af37, #b8860b)' : 'rgba(255,255,255,0.12)',
-                color: m.role === userRole ? '#000' : '#fff',
-                padding: '8px 12px', borderRadius: 12, maxWidth: '85%', fontSize: '0.85rem'
-              }}>
-                <div style={{ fontSize: '0.68rem', opacity: 0.75, marginBottom: 2 }}>{m.sender} &middot; {m.timestamp}</div>
-                <div>{m.text}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="oth-chat-input-row">
-            <input
-              className="oth-chat-input"
-              value={inputMsg}
-              onChange={e => setInputMsg(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSendChat(); }}
-              placeholder={peerConnected ? "Type a message..." : "Waiting for peer..."}
-            />
-            <button
-              className="oth-chat-send-btn"
-              onClick={handleSendChat}
-              disabled={!inputMsg.trim() || !peerConnected}
-            >
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>,
-    document.body
-  );
-}
-
-/* ─── Admin Online Tahfeez Audit Tracker & Feature Control ─── */
-function AdminTahfeezTracker({ sb, students = [] }) {
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [studentSearch, setStudentSearch] = useState("");
-  const [studentAccessFilter, setStudentAccessFilter] = useState("all");
-  const [selectedSession, setSelectedSession] = useState(null);
-  const [visibilityData, setVisibilityData] = useState({ teacher: true, parents: true });
-  const [studentAccessMap, setStudentAccessMap] = useState({});
-  const [toggling, setToggling] = useState(false);
-  const [feedback, setFeedback] = useState(null);
-
-  // Atomic upsert keyed on (page_key, role) so toggles ALWAYS persist, even
-  // when the same page_key exists for both 'parents' and 'teacher' roles.
-  const savePageVisibilityToDB = async (pageKey, role, label, visible) => {
-    try {
-      const { error } = await sb.from("page_visibility").upsert(
-        {
-          page_key: pageKey,
-          role,
-          label,
-          visible,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: "page_key,role" }
-      );
-      if (error) return { ok: false, error: error.message };
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, error: err.message };
-    }
-  };
-
-  const fetchAuditData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [sessRes, visRes] = await Promise.all([
-        sb.from("tahfeez_sessions").select("*").order("created_at", { ascending: false }).catch(() => ({ data: null, error: true })),
-        sb.from("page_visibility").select("*").catch(() => ({ data: null, error: true }))
-      ]);
-
-      if (sessRes && !sessRes.error && sessRes.data && sessRes.data.length > 0) {
-        setSessions(sessRes.data);
-      }
-
-      const vMap = { teacher: true, parents: true };
-      const stMap = {};
-      // The generic `online_tahfeez` row (keyed by role) is the canonical source
-      // written by BOTH the dedicated Online Tahfeez admin and the general
-      // visibility admin. Per-portal rows (`online_tahfeez_teacher`/`..._parents`)
-      // are only a fallback so reads are deterministic and never flip on refresh.
-      const genericMap = {};
-      const portalMap = {};
-
-      if (visRes.data && visRes.data.length > 0) {
-        visRes.data.forEach(item => {
-          if (item.page_key === "online_tahfeez" && item.role) {
-            genericMap[item.role] = item.visible;
-          } else if (item.page_key === "online_tahfeez_teacher") {
-            portalMap.teacher = item.visible;
-          } else if (item.page_key === "online_tahfeez_parents") {
-            portalMap.parents = item.visible;
-          }
-
-          if (item.page_key && item.page_key.startsWith("online_tahfeez_student_")) {
-            const sid = item.page_key.replace("online_tahfeez_student_", "");
-            // Prefer the admin-written `parents` row; stale `student` duplicates
-            // only fill in when no `parents` row exists yet.
-            if (item.role === "parents" || stMap[sid] === undefined) stMap[sid] = item.visible;
-          }
-        });
-
-        if (genericMap.parents !== undefined) vMap.parents = genericMap.parents;
-        else if (portalMap.parents !== undefined) vMap.parents = portalMap.parents;
-
-        if (genericMap.teacher !== undefined) vMap.teacher = genericMap.teacher;
-        else if (portalMap.teacher !== undefined) vMap.teacher = portalMap.teacher;
-      }
-
-      setVisibilityData(vMap);
-      setStudentAccessMap(stMap);
-    } catch (err) {
-      console.error("Error fetching admin audit data:", err);
-    }
-    setLoading(false);
-  }, [sb]);
-
-  useEffect(() => {
-    fetchAuditData();
-  }, [fetchAuditData]);
-
-  // Keep the admin dashboard in sync with the database in realtime so any
-  // toggle (here or from another device) is reflected instantly.
-  useEffect(() => {
-    const channel = sb
-      .channel('admin-tahfeez-visibility-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'page_visibility' },
-        () => fetchAuditData()
-      )
-      .subscribe();
-    return () => { sb.removeChannel(channel); };
-  }, [sb, fetchAuditData]);
-
-  const toggleFeatureVisibility = async (role) => {
-    setToggling(true);
-    const newVis = !visibilityData[role];
-    setFeedback({ type: "info", text: `Saving Online Tahfeez (${role}) settings...` });
-
-    const results = await Promise.all([
-      savePageVisibilityToDB(`online_tahfeez_${role}`, role, `Online Tahfeez (${role})`, newVis),
-      savePageVisibilityToDB("online_tahfeez", role, "Online Tahfeez Global", newVis)
-    ]);
-
-    const failed = results.find(r => !r.ok);
-    if (failed) {
-      setFeedback({ type: "error", text: `Save failed for (${role}): ${failed.error}. Please check your connection and try again.` });
-    } else {
-      setFeedback({ type: "success", text: `Online Tahfeez (${role}) is now ${newVis ? "Unhidden (ON)" : "Hidden (OFF)"}. Saved to database.` });
-    }
-    // Re-sync from DB so the UI always shows the true saved state.
-    await fetchAuditData();
-    setToggling(false);
-    setTimeout(() => setFeedback(null), 3500);
-  };
-
-  const toggleStudentAccess = async (studentId) => {
-    const current = studentAccessMap[studentId] !== false; // default true
-    const newVis = !current;
-    setStudentAccessMap({ ...studentAccessMap, [studentId]: newVis });
-
-    const result = await savePageVisibilityToDB(`online_tahfeez_student_${studentId}`, "parents", `Online Tahfeez Student ${studentId}`, newVis);
-    if (result.ok) {
-      setFeedback({ type: "success", text: `Student ${studentId} access ${newVis ? "allowed" : "disabled"}. Saved to database.` });
-    } else {
-      setFeedback({ type: "error", text: `Failed to save student ${studentId} access: ${result.error}` });
-      await fetchAuditData();
-    }
-    setTimeout(() => setFeedback(null), 3000);
-  };
-
-  const setBatchStudentAccess = async (allowAll) => {
-    const updatedMap = { ...studentAccessMap };
-    (students || []).forEach(st => {
-      const sid = st.student_id || st.id;
-      updatedMap[sid] = allowAll;
-    });
-    setStudentAccessMap(updatedMap);
-    setFeedback({ type: "info", text: `${allowAll ? "Allowing" : "Disabling"} all students...` });
-
-    const results = await Promise.all((students || []).map(st => {
-      const sid = st.student_id || st.id;
-      return savePageVisibilityToDB(`online_tahfeez_student_${sid}`, "parents", `Online Tahfeez Student ${sid}`, allowAll);
-    }));
-
-    const failed = results.find(r => !r.ok);
-    if (failed) {
-      setFeedback({ type: "error", text: `Batch save failed: ${failed.error}` });
-      await fetchAuditData();
-    } else {
-      setFeedback({ type: "success", text: `All students ${allowAll ? "allowed" : "disabled"}. Saved to database.` });
-    }
-    setTimeout(() => setFeedback(null), 3500);
-  };
-
-  const totalSessions = sessions.length;
-  const totalMinutes = Math.round(sessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) / 60);
-  const disabledStudentsCount = Object.values(studentAccessMap).filter(v => v === false).length;
-  const allowedStudentsCount = (students || []).length - disabledStudentsCount;
-
-  const filtered = sessions.filter(s =>
-    (s.student_name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (s.teacher_name || "").toLowerCase().includes(search.toLowerCase())
-  );
-
-  const filteredStudentsForAccess = (students || []).filter(s => {
-    const sid = s.student_id || s.id;
-    const hasAccess = studentAccessMap[sid] !== false;
-    const matchFilter =
-      studentAccessFilter === "all" ||
-      (studentAccessFilter === "allowed" && hasAccess) ||
-      (studentAccessFilter === "disabled" && !hasAccess);
-    const matchSearch =
-      (s.full_name || s.name || "").toLowerCase().includes(studentSearch.toLowerCase()) ||
-      (s.groupName || s.class_level || "").toLowerCase().includes(studentSearch.toLowerCase());
-    return matchFilter && matchSearch;
-  });
-
-  return (
-    <div className="card-appear" style={{ maxWidth: 1050, margin: '0 auto', paddingBottom: 40 }}>
-      {feedback && (
-        <div style={{
-          padding: '12px 18px', borderRadius: 14, marginBottom: 18, fontWeight: 700,
-          fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: 10,
-          background: feedback.type === 'error'
-            ? 'rgba(239,68,68,0.12)'
-            : feedback.type === 'success'
-              ? 'rgba(34,197,94,0.12)'
-              : 'rgba(59,130,246,0.12)',
-          border: `1px solid ${feedback.type === 'error' ? '#ef4444' : feedback.type === 'success' ? '#22c55e' : '#3b82f6'}`,
-          color: feedback.type === 'error' ? '#ef4444' : feedback.type === 'success' ? '#16a34a' : '#2563eb'
-        }}>
-          {feedback.type === 'success' ? <CheckCircle size={18} /> : feedback.type === 'error' ? <AlertCircle size={18} /> : <Loader2 size={18} className="animate-spin" />}
-          <span>{feedback.text}</span>
-        </div>
-      )}
-      {/* ─── Ultra-Premium Admin Command Header Banner ─── */}
-      <div style={{
-        background: 'linear-gradient(135deg, #18130b, #2c2114, #120e07)',
-        color: '#fff', padding: '28px 30px', borderRadius: '24px', marginBottom: '24px',
-        border: '1px solid rgba(212,175,55,0.4)', boxShadow: '0 10px 40px rgba(0,0,0,0.35)',
-        position: 'relative', overflow: 'hidden'
-      }}>
-        <div style={{
-          position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%',
-          background: 'rgba(212,175,55,0.08)', pointerEvents: 'none'
-        }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, position: 'relative', zIndex: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 58, height: 58, borderRadius: '18px',
-              background: 'linear-gradient(135deg, #d4af37, #b8860b)',
-              display: 'grid', placeItems: 'center', color: '#000', flexShrink: 0,
-              boxShadow: '0 4px 20px rgba(212,175,55,0.4)'
-            }}>
-              <Video size={30} />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <h2 style={{ margin: 0, color: '#d4af37', fontSize: '1.4rem', fontWeight: 800 }}>
-                  Online Tahfeez Command Center
-                </h2>
-                <span style={{ background: '#d4af37', color: '#000', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6 }}>
-                  4K ULTRA HD
-                </span>
-              </div>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#cbd5e1' }}>
-                Database-driven global feature control, student access matrix, and live audit telemetry.
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.08)', padding: '8px 16px', borderRadius: 20 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 10px #22c55e' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#86efac' }}>
-              Database Active 🟢
-            </span>
-          </div>
-        </div>
-
-        {/* Live Telemetry Stats Counter Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginTop: 24, zIndex: 2, position: 'relative' }}>
-          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: 700 }}>Total Completed Sessions</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#d4af37', marginTop: 4 }}>{totalSessions}</div>
-          </div>
-
-          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: 700 }}>Recitation Time</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#38bdf8', marginTop: 4 }}>{totalMinutes} mins</div>
-          </div>
-
-          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: 700 }}>Students Access Allowed</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#4ade80', marginTop: 4 }}>{allowedStudentsCount} 🟢</div>
-          </div>
-
-          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: 700 }}>Students Access Disabled</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>{disabledStudentsCount} 🔒</div>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Global Feature Control Card ─── */}
-      <div style={{
-        background: 'linear-gradient(135deg, #1f1912, #2b2216)',
-        color: '#fff', padding: '22px 24px', borderRadius: '20px', marginBottom: '24px',
-        boxShadow: '0 6px 25px rgba(0,0,0,0.2)', border: '1px solid rgba(212,175,55,0.3)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#d4af37', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800 }}>
-              <Video size={22} /> Global Portal Online Tahfeez Visibility (Database Synced)
-            </h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#cbd5e1' }}>
-              Hide or unhide the entire Online Tahfeez 4K HD feature globally for Teacher or Parent portals.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.06)', padding: '6px 14px', borderRadius: 20 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#cbd5e1' }}>Teacher Portal:</span>
-              <button
-                onClick={() => toggleFeatureVisibility('teacher')}
-                disabled={toggling}
-                style={{
-                  padding: '6px 16px', borderRadius: 20, border: 'none', fontWeight: 800,
-                  fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                  background: visibilityData.teacher ? '#22c55e' : '#dc2626', color: '#fff',
-                  boxShadow: visibilityData.teacher ? '0 2px 10px rgba(34,197,94,0.3)' : '0 2px 10px rgba(220,38,38,0.3)'
-                }}
-              >
-                {visibilityData.teacher ? <Eye size={15} /> : <EyeOff size={15} />}
-                {visibilityData.teacher ? "Unhidden 🟢" : "Hidden 🔒"}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.06)', padding: '6px 14px', borderRadius: 20 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#cbd5e1' }}>Parent Portal:</span>
-              <button
-                onClick={() => toggleFeatureVisibility('parents')}
-                disabled={toggling}
-                style={{
-                  padding: '6px 16px', borderRadius: 20, border: 'none', fontWeight: 800,
-                  fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                  background: visibilityData.parents ? '#22c55e' : '#dc2626', color: '#fff',
-                  boxShadow: visibilityData.parents ? '0 2px 10px rgba(34,197,94,0.3)' : '0 2px 10px rgba(220,38,38,0.3)'
-                }}
-              >
-                {visibilityData.parents ? <Eye size={15} /> : <EyeOff size={15} />}
-                {visibilityData.parents ? "Unhidden 🟢" : "Hidden 🔒"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Individual Student Access Management Matrix ─── */}
-      <div style={{
-        background: '#fff', padding: '24px', borderRadius: '20px', marginBottom: '24px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--deep-brown)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800 }}>
-              <Users size={22} style={{ color: '#b8860b' }} /> Individual Student Class Access Matrix
-            </h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-              Control 4K video class access per student. Saved directly to Supabase database.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setBatchStudentAccess(true)}
-              style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid #22c55e', background: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
-            >
-              Allow All Students 🟢
-            </button>
-            <button
-              onClick={() => setBatchStudentAccess(false)}
-              style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid #ef4444', background: '#fee2e2', color: '#b91c1c', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
-            >
-              Disable All Students 🔒
-            </button>
-          </div>
-        </div>
-
-        {/* Filter Controls & Search */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>Filter:</span>
-            {[
-              { id: 'all', label: `All (${(students || []).length})` },
-              { id: 'allowed', label: `Allowed 🟢 (${allowedStudentsCount})` },
-              { id: 'disabled', label: `Disabled 🔒 (${disabledStudentsCount})` }
-            ].map(f => (
-              <button
-                key={f.id}
-                onClick={() => setStudentAccessFilter(f.id)}
-                style={{
-                  padding: '5px 14px', borderRadius: 16, border: 'none', fontWeight: 700, fontSize: '0.78rem',
-                  cursor: 'pointer', transition: 'all 0.2s ease',
-                  background: studentAccessFilter === f.id ? 'linear-gradient(135deg, #d4af37, #b8860b)' : '#f1f5f9',
-                  color: studentAccessFilter === f.id ? '#000' : '#64748b'
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '8px 14px', borderRadius: 20, border: '1px solid #cbd5e1', width: '100%', maxWidth: 280 }}>
-            <Search size={16} style={{ color: '#64748b' }} />
-            <input
-              value={studentSearch}
-              onChange={e => setStudentSearch(e.target.value)}
-              placeholder="Search student or group..."
-              style={{ border: 'none', outline: 'none', fontSize: '0.85rem', background: 'transparent', width: '100%' }}
-            />
-          </div>
-        </div>
-
-        <div style={{ maxHeight: 380, overflowY: 'auto', borderRadius: 14, border: '1px solid #e2e8f0' }}>
-          {filteredStudentsForAccess.length === 0 ? (
-            <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem' }}>
-              No students found matching your filter criteria.
-            </div>
-          ) : (
-            filteredStudentsForAccess.map(st => {
-              const stId = st.student_id || st.id;
-              const hasAccess = studentAccessMap[stId] !== false;
-
-              return (
-                <div key={stId} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 18px', borderBottom: '1px solid #f1f5f9', background: hasAccess ? '#fff' : '#fff5f5',
-                  transition: 'all 0.15s ease'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <img
-                      src={st.photoUrl || st.photo_url || "/logo.png"}
-                      alt={st.full_name || st.name}
-                      style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', border: '2px solid #d4af37' }}
-                      onError={e => { e.target.src = "/logo.png"; }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#1e293b' }}>
-                        {st.full_name || st.name}
-                      </div>
-                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
-                        ITS: {st.its || st.student_id || stId} &middot; Group: {st.groupName || st.class_level || "Group 1"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => toggleStudentAccess(stId)}
-                    style={{
-                      padding: '7px 16px', borderRadius: 20, border: 'none', fontWeight: 800,
-                      fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                      background: hasAccess ? 'linear-gradient(135deg, #16a34a, #15803d)' : '#dc2626', color: '#fff',
-                      boxShadow: hasAccess ? '0 3px 10px rgba(22,163,74,0.3)' : '0 3px 10px rgba(220,38,38,0.3)'
-                    }}
-                  >
-                    {hasAccess ? <Eye size={15} /> : <Lock size={15} />}
-                    {hasAccess ? "Access Allowed 🟢" : "Access Disabled 🔒"}
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* ─── Audit Log Table Header & Search ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-        <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.2rem', fontWeight: 800 }}>
-          Online Tahfeez Completed Session Audit Logs ({filtered.length})
-        </h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', padding: '8px 14px', borderRadius: 20, border: '1px solid #ddd', width: '100%', maxWidth: 280 }}>
-          <Search size={16} style={{ color: '#888' }} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search student or teacher..."
-            style={{ border: 'none', outline: 'none', fontSize: '0.88rem', width: '100%' }}
-          />
-        </div>
-      </div>
-
-      {/* Audit Log Table */}
-      <div className="table-responsive-wrapper" style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-          <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            <tr>
-              <th style={{ padding: '14px 16px' }}>Student</th>
-              <th style={{ padding: '14px 16px' }}>Teacher</th>
-              <th style={{ padding: '14px 16px' }}>Started At</th>
-              <th style={{ padding: '14px 16px' }}>Duration</th>
-              <th style={{ padding: '14px 16px' }}>Status</th>
-              <th style={{ padding: '14px 16px' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 35 }}>Loading database audit records...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 35, color: '#888' }}>No Tahfeez sessions recorded yet.</td></tr>
-            ) : filtered.map((s, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '14px 16px', fontWeight: 700 }}>{s.student_name}</td>
-                <td style={{ padding: '14px 16px' }}>{s.teacher_name}</td>
-                <td style={{ padding: '14px 16px', color: '#64748b' }}>
-                  {s.started_at ? new Date(s.started_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : "N/A"}
-                </td>
-                <td style={{ padding: '14px 16px', fontWeight: 700, color: '#b8860b' }}>
-                  {Math.floor((s.duration_seconds || 0) / 60)}m {(s.duration_seconds || 0) % 60}s
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <span style={{
-                    padding: '3px 10px', borderRadius: 12, fontSize: '0.75rem', fontWeight: 700,
-                    background: s.status === 'completed' ? '#dcfce7' : '#fef3c7',
-                    color: s.status === 'completed' ? '#15803d' : '#92400e'
-                  }}>
-                    {s.status === 'completed' ? 'Done' : 'In Progress'}
-                  </span>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <button
-                    onClick={() => setSelectedSession(s)}
-                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d4af37', background: 'rgba(212,175,55,0.1)', color: '#b8860b', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Details & Chat
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Session Details Modal */}
-      {selectedSession && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999,
-          display: 'grid', placeItems: 'center', padding: 20
-        }}>
-          <div style={{ background: '#fff', borderRadius: 20, padding: 24, maxWidth: 500, width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.15rem' }}>Tahfeez Session Audit Details</h3>
-              <button onClick={() => setSelectedSession(null)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-            <div style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, marginBottom: 16 }}>
-              <div><strong>Student:</strong> {selectedSession.student_name}</div>
-              <div><strong>Teacher:</strong> {selectedSession.teacher_name}</div>
-              <div><strong>Duration:</strong> {Math.floor((selectedSession.duration_seconds || 0) / 60)}m {(selectedSession.duration_seconds || 0) % 60}s</div>
-              <div><strong>Started At:</strong> {selectedSession.started_at ? new Date(selectedSession.started_at).toLocaleString() : 'N/A'}</div>
-              <div><strong>Status:</strong> {selectedSession.status}</div>
-            </div>
-            <h4 style={{ margin: '16px 0 8px 0', fontSize: '0.92rem', color: '#b8860b' }}>In-Call Chat Log ({selectedSession.chat_messages?.length || 0})</h4>
-            <div style={{ maxHeight: 180, overflowY: 'auto', background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              {!selectedSession.chat_messages || selectedSession.chat_messages.length === 0 ? (
-                <div style={{ color: '#888', fontSize: '0.82rem' }}>No in-call chat messages were exchanged during this session.</div>
-              ) : selectedSession.chat_messages.map((m, i) => (
-                <div key={i} style={{ marginBottom: 6, fontSize: '0.83rem' }}>
-                  <strong>{m.sender}:</strong> {m.text} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>({m.timestamp})</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Realtime Presence Hook for Online Tahfeez ─── */
-function useTahfeezPresence({ userId, userRole, userName, isCalling = false, activeCallTargetId = null }) {
-  const [onlineUsers, setOnlineUsers] = useState({});
-
-  useEffect(() => {
-    if (!userId) return;
-    const channel = supabase.channel('tahfeez-global-presence', {
-      config: { presence: { key: `${userRole}_${userId}` } }
-    });
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const map = {};
-        Object.values(state).flat().forEach(item => {
-          if (item.userId) {
-            map[item.userId] = item;
-          }
-        });
-        setOnlineUsers(map);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            userId,
-            userRole,
-            userName,
-            isCalling,
-            activeCallTargetId,
-            onlineAt: new Date().toISOString()
-          });
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, userRole, userName, isCalling, activeCallTargetId]);
-
-  return onlineUsers;
-}
-
-/* ─── Busy / Waiting Queue Modal for Online Tahfeez ─── */
-function TahfeezBusyWaitingModal({ teacherName, onClose }) {
-  return createPortal(
-    <div className="card-appear" style={{
-      position: 'fixed', inset: 0, zIndex: 9999999,
-      background: 'rgba(10, 8, 6, 0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center'
-    }}>
-      <div style={{
-        maxWidth: 460, width: '100%', background: 'linear-gradient(135deg, #1f1912, #2b2216)',
-        border: '1px solid rgba(212,175,55,0.4)', borderRadius: 24, padding: 32,
-        textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', color: '#fff'
-      }}>
-        <div style={{
-          width: 70, height: 70, borderRadius: '50%', background: 'rgba(212,175,55,0.15)',
-          border: '2px solid #d4af37', margin: '0 auto 20px', display: 'grid', placeItems: 'center',
-          boxShadow: '0 0 20px rgba(212,175,55,0.3)'
-        }}>
-          <Clock size={36} style={{ color: '#d4af37' }} className="animate-spin" />
-        </div>
-
-        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.3rem', color: '#d4af37' }}>
-          Teacher is Currently in a Call
-        </h3>
-        <p style={{ fontSize: '0.9rem', color: '#e2e8f0', lineHeight: 1.5, margin: '0 0 20px 0' }}>
-          {teacherName || 'Your Muhaffiz'} is currently conducting a 4K Tahfeez session with another student.
-          <br/><strong style={{ color: '#86efac' }}>They will join you soon! Please stay on this screen.</strong>
-        </p>
-
-        <div style={{
-          background: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 18px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 24,
-          border: '1px solid rgba(255,255,255,0.1)'
-        }}>
-          <Radio size={18} style={{ color: '#22c55e' }} className="animate-pulse" />
-          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Standing by for auto-connect...</span>
-        </div>
-
-        <button
-          onClick={onClose}
-          style={{
-            padding: '10px 24px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.2)',
-            background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer'
-          }}
-        >
-          Cancel & Return
-        </button>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
-/* ─── Parent Home Online Tahfeez Premium Card ─── */
-function OnlineTahfeezParentHomeCard({ studentProfile, teacherProfiles, pageVisibility, onStartCall }) {
-  const studentId = studentProfile?.student_id || "001";
-  const isStudentDisabled = pageVisibility?.[`online_tahfeez_student_${studentId}`] === false;
-  const isHidden = pageVisibility?.online_tahfeez === false || pageVisibility?.["Online Tahfeez"] === false || isStudentDisabled;
-
-  const mTeacher = (teacherProfiles || []).find(t => {
-    const mName = normalizeText(studentProfile?.teacherName || "");
-    return (mName && normalizeText(t.full_name) === mName) ||
-      String(t.id) === String(studentProfile?.muhaffiz_id) ||
-      String(t.user_id) === String(studentProfile?.muhaffiz_id) ||
-      String(t.id) === String(studentProfile?.original_teacher_id) ||
-      String(t.user_id) === String(studentProfile?.original_teacher_id);
-  });
-
-  const teacherName = mTeacher?.full_name || studentProfile?.teacherName || "Teacher";
-  const teacherId = mTeacher?.user_id || mTeacher?.id || studentProfile?.original_teacher_id || "t1";
-  const studentName = studentProfile?.name || studentProfile?.full_name || "Student";
-
-  const onlinePresence = useTahfeezPresence({
-    userId: studentId,
-    userRole: "parent",
-    userName: studentName
-  });
-
-  const teacherPresence = Object.values(onlinePresence || {}).find(
-    p => String(p.userId) === String(teacherId) || p.userRole === "teacher"
-  );
-
-  const isTeacherOnline = Boolean(teacherPresence);
-  const isTeacherBusy = teacherPresence?.isCalling === true && teacherPresence?.activeCallTargetId !== studentId;
-
-  const [waitingInQueue, setWaitingInQueue] = useState(false);
-
-  useEffect(() => {
-    if (waitingInQueue && !isTeacherBusy) {
-      setWaitingInQueue(false);
-      onStartCall({
-        id: `tahfeez_room_${studentId}`,
-        room_id: `tahfeez_room_${studentId}`,
-        student_id: studentId,
-        student_name: studentName,
-        teacher_id: teacherId,
-        teacher_name: teacherName,
-        started_at: new Date().toISOString()
-      });
-    }
-  }, [waitingInQueue, isTeacherBusy, studentId, studentName, teacherId, teacherName, onStartCall]);
-
-  const handleJoinClick = () => {
-    if (isTeacherBusy) {
-      setWaitingInQueue(true);
-    } else {
-      onStartCall({
-        id: `tahfeez_room_${studentId}`,
-        room_id: `tahfeez_room_${studentId}`,
-        student_id: studentId,
-        student_name: studentName,
-        teacher_id: teacherId,
-        teacher_name: teacherName,
-        started_at: new Date().toISOString()
-      });
-    }
-  };
-
-  // Full hide (not just a greyed-out card): when the admin hides Online Tahfeez
-  // for parents, or disables this child, the card completely disappears from the
-  // home page. When re-enabled it renders again in the same spot.
-  if (isHidden) return null;
-
-  return (
-    <div className="card-appear" style={{ marginBottom: '20px' }}>
-      {waitingInQueue && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999,
-          display: 'grid', placeItems: 'center', color: '#fff', padding: 24
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #1b160e, #2b2216)', border: '1px solid #d4af37',
-            borderRadius: 24, padding: 32, textAlign: 'center', maxWidth: 420, boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
-          }}>
-            <Loader2 size={48} className="animate-spin" style={{ color: '#d4af37', margin: '0 auto 16px' }} />
-            <h3 style={{ color: '#d4af37', margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 800 }}>Standing by for {teacherName}</h3>
-            <p style={{ fontSize: '0.88rem', color: '#cbd5e1', marginBottom: 20, lineHeight: 1.5 }}>
-              Muhaffiz is currently in a 4K Tahfeez session with another student. You are in queue! The call will auto-connect the instant they finish.
-            </p>
-            <button
-              onClick={() => setWaitingInQueue(false)}
-              style={{ padding: '8px 20px', borderRadius: 20, border: 'none', background: '#334155', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-            >
-              Cancel Waiting
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div style={{
-        background: isHidden
-          ? 'linear-gradient(135deg, #1c1917, #292524)'
-          : 'linear-gradient(135deg, #1a150e, #2c2215)',
-        color: '#fff', padding: '20px 24px', borderRadius: '20px',
-        border: `1px solid ${isHidden ? 'rgba(255,255,255,0.1)' : 'rgba(212,175,55,0.4)'}`,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.25)', position: 'relative', overflow: 'hidden'
-      }}>
-        <div style={{
-          position: 'absolute', top: -30, right: -30, width: 140, height: 140, borderRadius: '50%',
-          background: isHidden ? 'rgba(255,255,255,0.03)' : 'rgba(212,175,55,0.08)', pointerEvents: 'none'
-        }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, position: 'relative', zIndex: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: '16px',
-              background: isHidden ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #d4af37, #b8860b)',
-              display: 'grid', placeItems: 'center', color: isHidden ? '#a1a1aa' : '#000', flexShrink: 0,
-              boxShadow: isHidden ? 'none' : '0 4px 16px rgba(212,175,55,0.4)'
-            }}>
-              <Video size={26} />
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <h3 style={{ margin: 0, color: isHidden ? '#a1a1aa' : '#d4af37', fontSize: '1.1rem', fontWeight: 800 }}>
-                  Online Tahfeez 4K HD
-                </h3>
-
-                {isHidden ? (
-                  <span style={{ background: 'rgba(239,68,68,0.2)', color: '#fca5a5', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.3)' }}>
-                    {isStudentDisabled ? "CHILD ACCESS OFF BY ADMIN 🔒" : "OFF BY ADMIN"}
-                  </span>
-                ) : (
-                  <span style={{ background: '#d4af37', color: '#000', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 12 }}>
-                    4K ULTRA HD
-                  </span>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, fontSize: '0.84rem' }}>
-                <span style={{ color: '#cbd5e1' }}>Teacher: <strong>{teacherName}</strong></span>
-                {!isHidden && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', padding: '2px 10px', borderRadius: 12 }}>
-                    <span style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: isTeacherOnline ? '#22c55e' : '#ef4444',
-                      boxShadow: isTeacherOnline ? '0 0 8px #22c55e' : '0 0 6px #ef4444'
-                    }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isTeacherOnline ? '#86efac' : '#fca5a5' }}>
-                      {isTeacherOnline ? (isTeacherBusy ? 'In Another Call ⏳' : 'Online 🟢') : 'Offline 🔴'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            {isHidden ? (
-              <div style={{ fontSize: '0.8rem', color: '#a1a1aa', fontStyle: 'italic', background: 'rgba(255,255,255,0.05)', padding: '8px 14px', borderRadius: 10 }}>
-                {isStudentDisabled ? `🔒 Online class disabled for ${studentName} by Admin.` : "🔒 Feature is currently turned OFF by Admin."}
-              </div>
-            ) : (
-              <button
-                onClick={handleJoinClick}
-                style={{
-                  padding: '12px 22px', borderRadius: 28, border: 'none',
-                  background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
-                  fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-                  boxShadow: '0 6px 20px rgba(212,175,55,0.4)', transition: 'all 0.2s ease'
-                }}
-              >
-                <Video size={18} /> {isTeacherBusy ? 'Teacher Busy (Join Queue)' : 'Join 4K Tahfeez Call'}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Teacher Online Tahfeez Full Page ─── */
-function TeacherOnlineTahfeezPage({ students, teacherIdentity, pageVisibility, onStartCall }) {
-  const [selectedGroup, setSelectedGroup] = useState("All");
-  const [search, setSearch] = useState("");
-  const [grantedMap, setGrantedMap] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("admin_teacher_granted_access") || "{}");
-    } catch (_) { return {}; }
-  });
-
-  const isHidden = pageVisibility?.online_tahfeez === false || pageVisibility?.["Online Tahfeez"] === false;
-
-  const teacherId = teacherIdentity?.user_id || teacherIdentity?.id || "t1";
-  const teacherName = teacherIdentity?.full_name || "Teacher";
-
-  const toggleTeacherGrant = async (sid) => {
-    const nextVal = !(grantedMap[sid] || pageVisibility?.[`online_tahfeez_teacher_granted_${sid}`] === true);
-    setGrantedMap(prev => {
-      const updated = { ...prev, [sid]: nextVal };
-      try { localStorage.setItem("admin_teacher_granted_access", JSON.stringify(updated)); } catch (_) {}
-      return updated;
-    });
-
-    try {
-      await supabase.from("page_visibility").upsert({
-        page_key: `online_tahfeez_teacher_granted_${sid}`,
-        role: "teacher",
-        label: `Teacher Granted Access for Student ${sid}`,
-        visible: nextVal,
-        updated_at: new Date().toISOString()
-      }, { onConflict: "page_key,role" });
-    } catch (_) {}
-  };
-
-  const handleStartCallWithGrant = (sid, studentName) => {
-    toggleTeacherGrant(sid);
-    onStartCall({
-      id: `tahfeez_room_${sid}`,
-      room_id: `tahfeez_room_${sid}`,
-      student_id: sid,
-      student_name: studentName,
-      teacher_id: teacherId,
-      teacher_name: teacherName,
-      started_at: new Date().toISOString()
-    });
-  };
-
-  const onlinePresence = useTahfeezPresence({
-    userId: teacherId,
-    userRole: "teacher",
-    userName: teacherName
-  });
-
-  const availableGroups = useMemo(() => {
-    const groups = new Set((students || []).map(s => s.groupName || s.class_level || "Group 1"));
-    return ["All", ...Array.from(groups)];
-  }, [students]);
-
-  const filtered = (students || []).filter(s => {
-    const matchGroup = selectedGroup === "All" || (s.groupName || s.class_level || "Group 1") === selectedGroup;
-    const matchSearch = (s.full_name || s.name || "").toLowerCase().includes(search.toLowerCase());
-    return matchGroup && matchSearch;
-  });
-
-  return (
-    <div className="card-appear" style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 40 }}>
-      <div style={{
-        background: 'linear-gradient(135deg, #1b160e, #2b2216)',
-        color: '#fff', padding: '24px', borderRadius: '20px', marginBottom: '24px',
-        border: '1px solid rgba(212,175,55,0.4)', boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: '18px',
-            background: 'linear-gradient(135deg, #d4af37, #b8860b)',
-            display: 'grid', placeItems: 'center', color: '#000', flexShrink: 0,
-            boxShadow: '0 4px 18px rgba(212,175,55,0.4)'
-          }}>
-            <Video size={28} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, color: '#d4af37', fontSize: '1.3rem', fontWeight: 800 }}>
-                Online Tahfeez (4K HD)
-              </h2>
-              <span style={{ background: '#d4af37', color: '#000', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6 }}>
-                4K ULTRA HD
-              </span>
-            </div>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#cbd5e1' }}>
-              Conduct 4K HD live video Tahfeez sessions with your assigned students. (Camera: Default OFF for Teacher)
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', padding: '8px 16px', borderRadius: 20 }}>
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: isHidden ? '#ef4444' : '#22c55e', boxShadow: isHidden ? '0 0 8px #ef4444' : '0 0 10px #22c55e' }} />
-          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isHidden ? '#fca5a5' : '#86efac' }}>
-            {isHidden ? 'Feature Off by Admin 🔒' : 'System Live & Online 🟢'}
-          </span>
-        </div>
-      </div>
-
-      {isHidden ? (
-        <div style={{
-          background: 'rgba(239, 68, 68, 0.08)', border: '2px dashed rgba(239, 68, 68, 0.4)',
-          borderRadius: 20, padding: '40px 24px', textAlign: 'center', color: '#ef4444',
-          pointerEvents: 'none', userSelect: 'none'
-        }}>
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
-            <Lock size={32} />
-          </div>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', color: '#dc2626' }}>
-            Online Tahfeez Feature is Turned OFF by Admin
-          </h3>
-          <p style={{ margin: '10px auto 0 auto', fontSize: '0.9rem', color: '#7f1d1d', maxWidth: 500, lineHeight: 1.5 }}>
-            Online video calling, real-time presence tracking, and student calls are currently disabled by administration settings.
-            <br/>Please contact the system administrator to re-enable this feature.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--deep-brown)', marginRight: 4 }}>Group:</span>
-              {availableGroups.map(grp => (
-                <button
-                  key={grp}
-                  onClick={() => setSelectedGroup(grp)}
-                  style={{
-                    padding: '6px 14px', borderRadius: 20, border: 'none', fontWeight: 700, fontSize: '0.8rem',
-                    cursor: 'pointer', transition: 'all 0.2s ease',
-                    background: selectedGroup === grp ? 'linear-gradient(135deg, #d4af37, #b8860b)' : '#fff',
-                    color: selectedGroup === grp ? '#000' : '#555',
-                    boxShadow: selectedGroup === grp ? '0 2px 8px rgba(212,175,55,0.4)' : '0 1px 3px rgba(0,0,0,0.1)'
-                  }}
-                >
-                  {grp}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', padding: '8px 14px', borderRadius: 20, border: '1px solid #ddd', width: '100%', maxWidth: 280 }}>
-              <Search size={16} style={{ color: '#888' }} />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search student..."
-                style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.88rem' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
-            {filtered.length === 0 ? (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 20px', background: '#fff', borderRadius: 16, color: '#888' }}>
-                No students found in this group.
-              </div>
-            ) : filtered.map(s => {
-              const sid = s.student_id || s.id;
-              const isStudentDisabled = pageVisibility?.[`online_tahfeez_student_${sid}`] === false;
-              const isGrantedByTeacher = Boolean(grantedMap[sid] || pageVisibility?.[`online_tahfeez_teacher_granted_${sid}`] === true);
-              const sPresence = Object.values(onlinePresence || {}).find(
-                p => String(p.userId) === String(sid) || (p.userName && p.userName.toLowerCase() === (s.full_name || s.name || "").toLowerCase())
-              );
-              const isStudentOnline = Boolean(sPresence);
-
-              return (
-                <div key={sid} className="premium-card" style={{
-                  padding: '18px', borderRadius: '16px', background: isStudentDisabled ? '#fff5f5' : '#fff',
-                  border: isStudentDisabled ? '1px dashed #ef4444' : (isStudentOnline ? '2px solid #22c55e' : '1px solid #e2e8f0'),
-                  boxShadow: isStudentOnline && !isStudentDisabled ? '0 4px 16px rgba(34,197,94,0.15)' : '0 2px 8px rgba(0,0,0,0.05)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 14
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ position: 'relative' }}>
-                      <img
-                        src={s.photoUrl || s.photo_url || "/logo.png"}
-                        alt={s.full_name || s.name}
-                        style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #d4af37' }}
-                        onError={e => { e.target.src = "/logo.png"; }}
-                      />
-                      <span style={{
-                        position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: '50%',
-                        background: isStudentDisabled ? '#94a3b8' : (isStudentOnline ? '#22c55e' : '#ef4444'),
-                        border: '2px solid #fff', boxShadow: isStudentOnline && !isStudentDisabled ? '0 0 6px #22c55e' : 'none'
-                      }} />
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--deep-brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {s.full_name || s.name}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        Group: {s.groupName || s.class_level || "Group 1"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-                    {isStudentDisabled ? (
-                      <span style={{ padding: '3px 8px', borderRadius: 12, fontSize: '0.72rem', fontWeight: 700, background: '#fee2e2', color: '#dc2626' }}>
-                        Disabled by Admin 🔒
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => toggleTeacherGrant(sid)}
-                        style={{
-                          padding: '5px 10px', borderRadius: 16, border: 'none', fontWeight: 700, fontSize: '0.73rem', cursor: 'pointer',
-                          background: isGrantedByTeacher ? '#dcfce7' : '#f1f5f9',
-                          color: isGrantedByTeacher ? '#15803d' : '#64748b'
-                        }}
-                      >
-                        {isGrantedByTeacher ? "Access Granted 🟢" : "Grant Access 🔒"}
-                      </button>
-                    )}
-
-                    {!isStudentDisabled && (
-                      <button
-                        onClick={() => handleStartCallWithGrant(sid, s.full_name || s.name)}
-                        style={{
-                          padding: '8px 14px', borderRadius: 20, border: 'none',
-                          background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
-                          fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 6,
-                          boxShadow: '0 2px 8px rgba(212,175,55,0.3)'
-                        }}
-                      >
-                        <Video size={14} /> Start 4K Call
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 const groupLeavesByMonth = (leaves) => {
   const map = {};
   (leaves || []).forEach((l) => {
@@ -6630,20 +4876,6 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
   const chatMessagesRef = useRef(null);
   const { peerOnline: adminOnline, presenceReady } = useChatPresence(chatLeave?.id, "parent");
 
-  const [tahfeezCall, setTahfeezCall] = useState(null);
-  const [tahfeezVisible, setTahfeezVisible] = useState(true);
-
-  useEffect(() => {
-    supabase.from('page_visibility')
-      .select('visible')
-      .eq('role', 'parents')
-      .eq('page_key', 'online_tahfeez')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setTahfeezVisible(data.visible);
-      });
-  }, []);
-
   useEffect(() => {
     if (chatLeave) {
       document.body.style.overflow = 'hidden';
@@ -7008,7 +5240,9 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         attachment_url: attachment,
         leave_date: fromGreg,
         from_date: fromGreg,
-        to_date: tillGreg
+        to_date: tillGreg,
+        status: 'Pending',
+        created_at: new Date().toISOString()
       });
       if (dbErr) throw dbErr;
 
@@ -7138,60 +5372,6 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
   return (
     <div className="leave-apply-container card-appear">
-      {/* ─── Online Tahfeez 4K HD Video Launch Card (Parent Side) ─── */}
-      {tahfeezVisible && (
-        <div style={{
-          background: 'linear-gradient(135deg, #1b160e, #2b2216)',
-          color: '#fff', padding: '16px 20px', borderRadius: '16px', marginBottom: '20px',
-          border: '1px solid rgba(212,175,55,0.4)', boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #d4af37, #b8860b)',
-              display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0, boxShadow: '0 2px 10px rgba(212,175,55,0.4)'
-            }}>
-              <Video size={22} />
-            </div>
-            <div>
-              <h4 style={{ margin: 0, color: '#d4af37', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                Online Tahfeez 4K HD <span style={{ background: '#d4af37', color: '#000', fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4 }}>LIVE</span>
-              </h4>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#cbd5e1' }}>
-                Connect live with Teacher for 4K HD video Tahfeez session. (Student Camera: Mandatory ON)
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setTahfeezCall({
-              id: `tahfeez_${studentProfile?.student_id || '001'}_${Date.now()}`,
-              student_id: studentProfile?.student_id || '001',
-              student_name: studentProfile?.name || 'Student',
-              teacher_id: studentProfile?.original_teacher_id || 't1',
-              teacher_name: studentProfile?.teacherName || 'Teacher',
-              started_at: new Date().toISOString()
-            })}
-            style={{
-              padding: '10px 18px', borderRadius: 24, border: 'none',
-              background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000',
-              fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: '0 4px 14px rgba(212,175,55,0.4)', transition: 'all 0.2s ease'
-            }}
-          >
-            <Video size={16} /> Join 4K Tahfeez Call
-          </button>
-        </div>
-      )}
-
-      {tahfeezCall && (
-        <OnlineTahfeezRoom
-          sessionData={tahfeezCall}
-          userRole="parent"
-          currentUser={studentProfile ? { full_name: studentProfile.name } : { full_name: "Parent" }}
-          onClose={() => setTahfeezCall(null)}
-        />
-      )}
       <div className="fatemi-month-overview card-appear">
         <span className="fatemi-verse" dir="rtl">همنالكك اْثثنا فرزند يه اْ مثل رزا طلب كيدي ححهسس</span>
         <div className="fatemi-month-overview-head">
@@ -7566,7 +5746,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
                     {item.to_date && item.to_date !== (item.from_date || item.leave_date) ? ` → ${item.to_date}` : ""}
                   </h4>
                 </div>
-                <span className={`status-pill ${item.status.toLowerCase()}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>{item.status}</span>
+                <span className={`status-pill ${String(item.status || 'Pending').toLowerCase()}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>{item.status || 'Pending'}</span>
               </div>
               {item.reason && <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '8px', margin: '8px 0 0' }}>{item.reason}</p>}
               {/* Messages Button */}
@@ -7802,8 +5982,6 @@ function ParentPortal({
   const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
   const [secondsSpent, setSecondsSpent] = useState(0);
   const [pageVisibility, setPageVisibility] = useState({});
-  const [tahfeezCall, setTahfeezCall] = useState(null);
-  const [busyTeacherName, setBusyTeacherName] = useState(null);
   const [parentLeaveForceOpen, setParentLeaveForceOpen] = useState(false);
   const [parentArchiveResults, setParentArchiveResults] = useState([]);
   const [parentArchiveMonth, setParentArchiveMonth] = useState("");
@@ -7874,31 +6052,8 @@ function ParentPortal({
         .maybeSingle()
     ]);
     const map = {};
-    try {
-      const cachedGlobal = JSON.parse(localStorage.getItem("admin_global_tahfeez_access") || "{}");
-      if (cachedGlobal.parents !== undefined) map.online_tahfeez = cachedGlobal.parents;
-      const localStMap = JSON.parse(localStorage.getItem("admin_student_tahfeez_access") || "{}");
-      Object.keys(localStMap).forEach(sid => { map[`online_tahfeez_student_${sid}`] = localStMap[sid]; });
-    } catch (_) {}
-
     if (pvRes.data) {
-      // The generic `online_tahfeez` row for role=parents is canonical; per-portal
-      // `online_tahfeez_parents` is only a fallback. Filter by role so a `teacher`
-      // generic row can never overwrite the parent's global flag.
-      let genParents, portalParents;
-      pvRes.data.forEach(p => {
-        if (p.page_key === "online_tahfeez") {
-          if (p.role === "parents") genParents = p.visible;
-        } else if (p.page_key === "online_tahfeez_parents") {
-          portalParents = p.visible;
-        } else if (p.page_key && p.page_key.startsWith("online_tahfeez_student_")) {
-          if (p.role === "parents" || map[p.page_key] === undefined) map[p.page_key] = p.visible;
-        } else {
-          map[p.page_key] = p.visible;
-        }
-      });
-      if (genParents !== undefined) map.online_tahfeez = genParents;
-      else if (portalParents !== undefined) map.online_tahfeez = portalParents;
+      pvRes.data.forEach(p => { if (p.page_key) map[p.page_key] = p.visible; });
     }
     setParentLeaveForceOpen(jsRes.data?.parent_leave_enabled === true);
     setPageVisibility(map);
@@ -8222,21 +6377,6 @@ function ParentPortal({
     return [myTeacher, ...teacherProfiles.filter(t => t.id !== myTeacher.id)];
   }, [teacherProfiles, myTeacher]);
 
-  const recentMarhalaPostPreview = (
-    <Suspense fallback={null}>
-      <MarhalaPosts
-        role="parents"
-        studentProfile={studentProfile}
-        onShowAction={showAction}
-        maxAgeHours={24}
-        limit={3}
-        hideEmpty
-        homePreview
-        className="mp-home-preview"
-      />
-    </Suspense>
-  );
-
   if (loading && !studentProfile && user) {
     return <LoadingScreen message="Fetching your child's data..." />;
   }
@@ -8397,11 +6537,6 @@ function ParentPortal({
               <Crown size={18} /> Self Jadwal
             </button>
           )}
-          {pageVisibility["Marhala Posts"] !== false && (
-            <button className={`drawer-link ${activePage === "Marhala Posts" ? "active" : ""}`} onClick={() => { setActivePage("Marhala Posts"); setMenuOpen(false); }}>
-              <Heart size={18} /> Marhala Posts
-            </button>
-          )}
           {pageVisibility["Results Archive"] !== false && (
             <button className={`drawer-link ${activePage === "Results Archive" ? "active" : ""}`} onClick={() => { setActivePage("Results Archive"); setMenuOpen(false); }}>
               <FileArchive size={18} /> Results Archive
@@ -8546,35 +6681,6 @@ function ParentPortal({
               })()}
             </div>
 
-            <OnlineTahfeezParentHomeCard
-              studentProfile={studentProfile}
-              teacherProfiles={teacherProfiles}
-              pageVisibility={pageVisibility}
-              onStartCall={(callData) => {
-                if (callData.isTeacherBusy) {
-                  setBusyTeacherName(callData.teacher_name);
-                } else {
-                  setTahfeezCall(callData);
-                }
-              }}
-            />
-
-            {busyTeacherName && (
-              <TahfeezBusyWaitingModal
-                teacherName={busyTeacherName}
-                onClose={() => setBusyTeacherName(null)}
-              />
-            )}
-
-            {tahfeezCall && (
-              <OnlineTahfeezRoom
-                sessionData={tahfeezCall}
-                userRole="parent"
-                currentUser={studentProfile ? { full_name: studentProfile.name } : { full_name: "Parent" }}
-                onClose={() => setTahfeezCall(null)}
-              />
-            )}
-
             {pageVisibility["Apply Leave"] !== false && (
               <MonthlyLeaveCountCard
                 studentProfile={studentProfile}
@@ -8621,8 +6727,6 @@ function ParentPortal({
                 )}
               </div>
             </div>
-
-            {recentMarhalaPostPreview}
 
             <PremiumTodaySchedule
               schedule={pages.Schedule.schedule}
@@ -9215,14 +7319,6 @@ function ParentPortal({
           </div>
         ) : null}
 
-        {activePage === "Marhala Posts" ? (
-          <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
-            <MarhalaPosts
-              onShowAction={showAction}
-            />
-          </Suspense>
-        ) : null}
-
         {activePage === "Settings" ? (
           <SettingsPage 
             isDarkMode={isDarkMode}
@@ -9238,7 +7334,6 @@ function ParentPortal({
             onAppLockToggle={onAppLockToggle}
           />
         ) : null}
-
 
 
         {activePage === "Inbox" && (
@@ -9684,7 +7779,6 @@ function ParentPortal({
     </div>
   );
 }
-
 
 
 function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) {
@@ -10395,54 +8489,9 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
 function AdminAttendanceTracking({ students, teacherProfiles, onShowAction }) {
   const [attendanceMap, setAttendanceMap] = useState({});
   const [loading, setLoading] = useState(true);
-  const [expandedTeacherId, setExpandedTeacherId] = useState(null);
-  const [testingReminder, setTestingReminder] = useState(false);
+const [expandedTeacherId, setExpandedTeacherId] = useState(null);
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  const handleTestReminder = async () => {
-    setTestingReminder(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserId = session?.user?.id;
-
-      const { data, error } = await supabase.functions.invoke('attendance-reminder', {
-        body: { force: true, targetUserId: currentUserId }
-      });
-      if (error) throw error;
-
-      // Trigger immediate local OS notification banner + chime on device
-      try {
-        const fcmService = await import("./fcmService.js").then(m => m.default);
-        if (fcmService) {
-          fcmService.playPremiumChime();
-          const sampleTitle = data?.sampleNotification?.title || "🔔 Daily Attendance Reminder (Test)";
-          const sampleBody = data?.sampleNotification?.body || `10:00 PM Reminder: Dispatched summary notifications to active teachers.`;
-          
-          fcmService.showNotification({
-            notification: {
-              title: sampleTitle,
-              body: sampleBody,
-              image: '/logo.png',
-            },
-            data: { redirectPage: 'Attendance Records' }
-          });
-        }
-      } catch (fcmErr) {
-        console.warn("Local notification preview error:", fcmErr);
-      }
-
-      if (onShowAction) {
-        onShowAction("success", `🔔 10:00 PM Reminder Dispatched! (Delivered to ${data?.sentCount || 0} device(s))`);
-      }
-    } catch (err) {
-      if (onShowAction) {
-        onShowAction("error", "Reminder failed: " + err.message);
-      }
-    } finally {
-      setTestingReminder(false);
-    }
-  };
-  
   useEffect(() => {
     fetchTodayAttendance();
     const interval = setInterval(fetchTodayAttendance, 60000);
@@ -10612,25 +8661,7 @@ function AdminAttendanceTracking({ students, teacherProfiles, onShowAction }) {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleTestReminder}
-            disabled={testingReminder}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '8px',
-              padding: '10px 18px', borderRadius: '999px', border: 'none',
-              background: 'linear-gradient(135deg, #d4af37, #b8860b)',
-              color: '#ffffff', fontWeight: 700, fontSize: '0.82rem',
-              cursor: testingReminder ? 'not-allowed' : 'pointer',
-              boxShadow: '0 4px 16px rgba(184, 134, 11, 0.3)',
-              transition: 'all 0.2s ease', fontFamily: 'inherit',
-              opacity: testingReminder ? 0.7 : 1, whiteSpace: 'nowrap',
-            }}
-          >
-            {testingReminder ? <Loader2 size={16} className="animate-spin" /> : <Bell size={16} />}
-            <span>{testingReminder ? 'Sending Test Reminder...' : '🔔 Test 10:00 PM Reminder'}</span>
-          </button>
-        </div>
+          </div>
         
         {/* Summary Strip */}
         <div className="att-summary-strip">
@@ -10983,6 +9014,55 @@ function PortalAccessSuccessModal({ payload, onClose }) {
   );
 }
 
+function ReportSettingsSavedModal({ open, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="portal-access-success-overlay" onClick={onClose} role="presentation">
+      <div className="portal-access-success-card card-appear" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="portal-access-success-close" onClick={onClose} aria-label="Close success popup">
+          ×
+        </button>
+        <div className="portal-access-success-badge">
+          <CheckCircle size={24} />
+        </div>
+        <p className="portal-access-success-kicker">Report Settings Saved</p>
+        <h3 className="portal-access-success-title">
+          All Settings Applied Successfully
+        </h3>
+        <p className="portal-access-success-copy">
+          Your Report Heading Settings and Teacher Result Lock Settings have been saved and are now active.
+        </p>
+        <div className="portal-access-success-grid">
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Report Headings</span>
+            <strong className="portal-access-success-value">Updated</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Progress Card Theme</span>
+            <strong className="portal-access-success-value">Applied</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Teacher Result Lock</span>
+            <strong className="portal-access-success-value">Saved</strong>
+          </div>
+          <div className="portal-access-success-item">
+            <span className="portal-access-success-label">Score Labels</span>
+            <strong className="portal-access-success-value">Updated</strong>
+          </div>
+        </div>
+        <div className="portal-access-success-footer">
+          <span className="portal-access-success-meta">
+            Changes take effect immediately
+          </span>
+          <button type="button" className="portal-access-success-button" onClick={onClose}>
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminPortal({
   activePage,
   actionMessage,
@@ -11052,7 +9132,6 @@ function AdminPortal({
   onUpdateEmailConfig,
   onSendIndividualEmail,
   onTriggerEmailNotifications,
-  onMarhalaPostCreated,
   onSetSendingEmail,
   onSetEmailProgress,
   onSetEmailLogs,
@@ -11078,10 +9157,12 @@ function AdminPortal({
   const [uploadingStudentRegistryPhoto, setUploadingStudentRegistryPhoto] = useState(false);
   const [uploadingAssignmentPhoto, setUploadingAssignmentPhoto] = useState(false);
   const [adminScheduleStudentId, setAdminScheduleStudentId] = useState("");
+  const [registryStudentId, setRegistryStudentId] = useState("");
   const studentPhotoInputRef = useRef(null);
   const assignmentPhotoInputRef = useRef(null);
   const [assignModal, setAssignModal] = useState(null);
   const [assigning, setAssigning] = useState(false);
+  const [reportSettingsSaved, setReportSettingsSaved] = useState(false);
 
   const handleAssignClick = async (data) => {
     if (!data?.student_id) {
@@ -11194,24 +9275,6 @@ function AdminPortal({
       mainEl.scrollTop = 0;
     }
   }, [activePage]);
-
-  // Attendance reminder notifications are now sent server-side by the
-  const [testingAttendanceReminder, setTestingAttendanceReminder] = useState(false);
-
-  const triggerAttendanceReminderNow = async () => {
-    setTestingAttendanceReminder(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('attendance-reminder', {
-        body: { force: true }
-      });
-      if (error) throw error;
-      onShowAction("success", `10:00 PM Attendance Reminder sent! (Sent: ${data?.sentCount || 0}, Skipped: ${data?.skippedCount || 0})`);
-    } catch (err) {
-      onShowAction("error", "Failed to send reminder: " + err.message);
-    } finally {
-      setTestingAttendanceReminder(false);
-    }
-  };
 
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -11549,7 +9612,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Online Tahfeez", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Global Settings", "Email Settings", "Marhala Posts", "App Update"];
+  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Global Settings", "Email Settings", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
@@ -11711,7 +9774,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
+const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
     const settingsId = reportSettingsObject?.id || 1;
     const now = new Date();
     const previousSettings = normalizeReportSettings(reportSettingsObject);
@@ -11727,13 +9790,11 @@ const handleDownloadAllReports = async () => {
 
     if (error) {
       onShowAction("error", "Failed to update settings: " + error.message);
-      return;
+      return false;
     }
 
     onShowAction("success", "System settings updated successfully!");
 
-    // Renew the parent view count every time the admin makes reports live so
-    // parents see the latest report card again and the overview card shows a fresh count.
     if (publishingLive) {
       const { error: resetError } = await supabase
         .from("parent_report_views")
@@ -11749,7 +9810,7 @@ const handleDownloadAllReports = async () => {
 
     if (publishingLive) {
       if (!notifyEnabled) {
-        onShowAction("success", "Settings saved. Result notifications are OFF — enable the premium toggle and press 'Send Notify' to alert parents & teachers.");
+        onShowAction("success", "Settings saved. Result notifications are OFF �?? enable the premium toggle and press 'Send Notify' to alert parents & teachers.");
       } else if (isVisibleNow) {
         await sendResultLiveNotifications({ manual: true });
       } else if (actionTime) {
@@ -11758,6 +9819,7 @@ const handleDownloadAllReports = async () => {
     }
 
     loadPortalData(portalRole, user, null, { silent: true });
+    return true;
   };
 
   const renewParentViewCounts = async () => {
@@ -12229,16 +10291,6 @@ const handleDownloadAllReports = async () => {
                 </div>
               </div>
             </section>
-          ) : null}
-          {activePage === "Marhala Posts" ? (
-            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Marhala Posts...</p></div>}>
-              <MarhalaPosts
-                role="admin"
-                students={students}
-                onShowAction={onShowAction}
-                onPostCreated={onMarhalaPostCreated}
-              />
-            </Suspense>
           ) : null}
           {activePage === "App Update" ? (
             <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading App Update Manager...</p></div>}>
@@ -13726,7 +11778,7 @@ const handleDownloadAllReports = async () => {
                       <div className="card-primary-info">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px', padding: '2px 8px' }}>
-                            {item.target_role.toUpperCase()}
+                            {(item.target_role || 'user').toUpperCase()}
                           </span>
                           <strong style={{ fontSize: '13px' }}>{item.title}</strong>
                         </div>
@@ -13788,14 +11840,14 @@ const handleDownloadAllReports = async () => {
                       <p style={{ color: '#bbb', fontSize: '12px', margin: '4px 0 0' }}>Toggle the switch above to schedule one.</p>
                     </div>
                   ) : (
-                    scheduledNotifs.map((item) => {
+                    scheduledNotifs.map((item, index) => {
                       const scheduleLabel =
                         item.schedule_type === 'daily' ? 'Every day' :
                         item.schedule_type === 'weekly' ?
                           `Every ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][item.schedule_day] || 'week'}` :
                           `Every month on day ${item.schedule_day}`;
                       return (
-                        <article key={item.id} className="record-card flex-row-card" style={{
+                        <article key={item.id || index} className="record-card flex-row-card" style={{
                           marginBottom: '8px',
                           borderRadius: '10px',
                           border: item.is_active ? '1px solid rgba(212,175,55,0.15)' : '1px solid rgba(0,0,0,0.06)',
@@ -13807,7 +11859,7 @@ const handleDownloadAllReports = async () => {
                           <div className="card-primary-info" style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
                               <span className={`mini-pill ${item.target_role === 'all' ? 'gold' : 'brown'}`} style={{ fontSize: '9px', padding: '2px 8px' }}>
-                                {item.target_role === 'all' ? 'All' : item.target_role.toUpperCase()}
+                                {item.target_role === 'all' ? 'All' : (item.target_role || 'user').toUpperCase()}
                               </span>
                               <strong style={{ fontSize: '13px', color: '#3d2b1f' }}>{item.title}</strong>
                               <span style={{
@@ -14351,71 +12403,6 @@ const handleDownloadAllReports = async () => {
                   <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
                     Save Auto Lock Settings
                   </button>
-                </form>
-              </section>
-
-              {/* ── Auto Clear Progress Settings ── */}
-              <section className="form-card card-appear">
-                <div className="card-headline">
-                  <Trash2 size={18} />
-                  <h3>Auto Clear Progress</h3>
-                </div>
-                <form className="stack-form" onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.target);
-                  const updates = {
-                    auto_clear_enabled: formData.get("auto_clear_enabled") === "true",
-                    auto_clear_day: formData.get("auto_clear_day"),
-                    auto_clear_time: formData.get("auto_clear_time"),
-                  };
-                  saveReportSettings(updates);
-                }}>
-                  <div className="form-grid">
-                    <label>
-                      <span>Enable Auto Clear</span>
-                      <select name="auto_clear_enabled" defaultValue={String(reportSettingsDraft.auto_clear_enabled ?? false)} className="premium-select">
-                        <option value="true">Enabled</option>
-                        <option value="false">Disabled</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Clear Day</span>
-                      <select name="auto_clear_day" defaultValue={reportSettingsDraft.auto_clear_day || "Friday"} className="premium-select">
-                        <option value="Sunday">Sunday</option>
-                        <option value="Monday">Monday</option>
-                        <option value="Tuesday">Tuesday</option>
-                        <option value="Wednesday">Wednesday</option>
-                        <option value="Thursday">Thursday</option>
-                        <option value="Friday">Friday</option>
-                        <option value="Saturday">Saturday</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Clear Time</span>
-                      <input name="auto_clear_time" type="time" defaultValue={reportSettingsDraft.auto_clear_time || "11:30"} className="premium-input" />
-                    </label>
-                  </div>
-                  <p className="hint-text" style={{ marginBottom: '20px' }}>
-                    When enabled, all teacher marks/progress will be automatically cleared every {reportSettingsDraft.auto_clear_day || "Friday"} at {reportSettingsDraft.auto_clear_time || "11:30"} so teachers can fill new progress for the next week. Uses the {reportSettingsDraft.auto_clear_day || "Friday"} time.
-                  </p>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <button type="submit" className="action-button premium">
-                      Save Auto Clear Settings
-                    </button>
-                    <button
-                      type="button"
-                      className="action-button"
-                      style={{ background: '#dc2626', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      onClick={async () => {
-                        if (!window.confirm("Are you sure you want to immediately clear ALL teacher progress marks? This will reset all filled scores for all teachers and cannot be undone.")) return;
-                        if (!window.confirm("FINAL WARNING: This action will clear ALL murajah, juz hali, takhteet, jadeed, and attendance records for all teachers. Proceed?")) return;
-                        await handleClearAllMarks();
-                      }}
-                    >
-                      <Trash2 size={16} />
-                      Clear All Marks Now
-                    </button>
-                  </div>
                 </form>
               </section>
             </div>
@@ -15305,8 +13292,8 @@ const handleDownloadAllReports = async () => {
                     <div className="audit-col">Action</div>
                   </div>
                   <div className="portal-audit-list">
-                    {portalAccessList && portalAccessList.map((access) => (
-                      <div key={access.id} className="portal-audit-item card-appear">
+                    {portalAccessList && portalAccessList.map((access, idx) => (
+                      <div key={access.id || idx} className="portal-audit-item card-appear">
                         <div className="audit-col name-col">
                           <span className="mobile-label">Name:</span>
                           <strong>{access.full_name}</strong>
@@ -15375,10 +13362,6 @@ const handleDownloadAllReports = async () => {
             <SupportTicketsAdmin tickets={supportTickets} onRefresh={loadPortalData} />
           ) : null}
 
-          {activePage === "Online Tahfeez" && (
-            <AdminTahfeezTracker sb={supabase} students={students} />
-          )}
-
           {activePage === "Leave Management" && (
             <AdminLeaveManagement students={students} teacherProfiles={teacherProfiles} onShowAction={onShowAction} />
           )}
@@ -15422,6 +13405,12 @@ const handleDownloadAllReports = async () => {
               onClose={onClosePortalAccessSuccess}
             />
           )}
+          {reportSettingsSaved && (
+            <ReportSettingsSavedModal
+              open={reportSettingsSaved}
+              onClose={() => setReportSettingsSaved(false)}
+            />
+          )}
           {activePage === "Report Settings" ? (
             <div className="management-grid two-columns">
               <section className="form-card card-appear">
@@ -15429,9 +13418,10 @@ const handleDownloadAllReports = async () => {
                   <Palette size={18} />
                   <h3>Report Heading Settings</h3>
                 </div>
-                <form className="stack-form" onSubmit={(e) => {
+                <form className="stack-form" onSubmit={async (e) => {
                   e.preventDefault();
-                  saveReportSettings(reportSettingsDraft);
+                  const ok = await saveReportSettings(reportSettingsDraft);
+                  if (ok) setReportSettingsSaved(true);
                 }}>
                   <div className="form-grid">
                     <label>
@@ -15547,6 +13537,55 @@ const handleDownloadAllReports = async () => {
                     <label><span>Its Page</span><input name="istifadah_page_heading" type="text" value={reportSettingsDraft.istifadah_page_heading} onChange={updateReportDraft("istifadah_page_heading")} className="premium-input" /></label>
                   </div>
 
+                  <div className="card-headline" style={{ marginTop: '20px', padding: '0', border: 'none' }}>
+                    <Lock size={18} />
+                    <h4 style={{ margin: '0 0 0 8px', fontSize: '1rem' }}>Teacher Result Lock Settings</h4>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Enable Auto Lock</span>
+                      <select name="auto_lock_enabled" value={String(reportSettingsDraft?.auto_lock_enabled ?? true)} className="premium-select" onChange={(e) => setReportSettingsDraft((prev) => ({ ...prev, auto_lock_enabled: e.target.value === "true" }))}>
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Lock Day</span>
+                      <select name="auto_lock_day" value={reportSettingsDraft?.auto_lock_day || "Saturday"} className="premium-select" onChange={(e) => updateReportDraft("auto_lock_day")(e.target.value)}>
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Lock Time</span>
+                      <input name="auto_lock_time" type="time" value={reportSettingsDraft?.auto_lock_time || "00:00"} className="premium-input" onChange={(e) => updateReportDraft("auto_lock_time")(e.target.value)} />
+                    </label>
+                    <label>
+                      <span>Unlock Day</span>
+                      <select name="auto_unlock_day" value={reportSettingsDraft?.auto_unlock_day || "Friday"} className="premium-select" onChange={(e) => updateReportDraft("auto_unlock_day")(e.target.value)}>
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Unlock Time</span>
+                      <input name="auto_unlock_time" type="time" value={reportSettingsDraft?.auto_unlock_time || "16:30"} className="premium-input" onChange={(e) => updateReportDraft("auto_unlock_time")(e.target.value)} />
+                    </label>
+                  </div>
+                  <small style={{ display: 'block', marginTop: '6px', color: 'var(--soft-brown)', lineHeight: 1.4 }}>
+                    Teachers can fill progress reports during the unlock window (e.g., {reportSettingsDraft?.auto_unlock_day || "Friday"} {reportSettingsDraft?.auto_unlock_time || "16:30"} to {reportSettingsDraft?.auto_lock_day || "Saturday"} {reportSettingsDraft?.auto_lock_time || "00:00"}). Outside this window, progress entry is locked.
+                  </small>
+
                   <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
                     Save Report Settings
                   </button>
@@ -15604,8 +13643,8 @@ const handleDownloadAllReports = async () => {
                         <p style={{ margin: 0 }}>No WhatsApp logs yet. Logs appear here when you send WhatsApp notifications.</p>
                       </div>
                     ) : (
-                      waPersistentLogs.map((log) => (
-                        <div key={log.id} style={{
+                      waPersistentLogs.map((log, idx) => (
+                        <div key={log.id || idx} style={{
                           display: 'flex', gap: '8px', padding: '4px 0',
                           borderBottom: '1px solid rgba(0,0,0,0.04)',
                           color: log.type === 'success' ? '#2e7d32' :
@@ -16152,28 +14191,6 @@ const handleDownloadAllReports = async () => {
                         The time of day the reminder notification is sent. Uses Indian Standard Time (IST, UTC+5:30).
                       </small>
                     </label>
-                  </div>
-
-                  <div style={{ marginTop: '20px', padding: '16px', borderRadius: 14, background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.18)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 6 }}>
-                      <Bell size={16} style={{ color: 'var(--primary-gold)' }} />
-                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--deep-brown)' }}>
-                        Teacher Daily Attendance Reminder (Mon–Sat @ 10:00 PM IST)
-                      </span>
-                    </div>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 12px 0', lineHeight: 1.45 }}>
-                      Calculates marked vs. pending student attendance for each teacher and dispatches push notifications to their mobile devices + inbox notifications inside the app.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={triggerAttendanceReminderNow}
-                      disabled={testingAttendanceReminder}
-                      className="alm-premium-btn alm-btn-gold"
-                      style={{ padding: '9px 18px', fontSize: '0.82rem' }}
-                    >
-                      {testingAttendanceReminder ? <Loader2 size={15} className="animate-spin" /> : <Bell size={15} />}
-                      {testingAttendanceReminder ? 'Dispatching Notifications...' : 'Trigger 10:00 PM Teacher Reminder Now'}
-                    </button>
                   </div>
 
                   <button type="submit" className="action-button premium" style={{ marginTop: '20px', position: 'relative', transition: 'all 0.25s ease', opacity: jadwalSaving ? 0.7 : 1 }} disabled={jadwalSaving}>
@@ -17230,20 +15247,6 @@ function TeacherPortal({
     if (onShowAction) onShowAction("success", "All fields cleared. Fill them with this week's marks — or leave it and reload to restore last week's data.");
   };
 
-  const [tahfeezCall, setTahfeezCall] = useState(null);
-  const [tahfeezVisible, setTahfeezVisible] = useState(true);
-
-  useEffect(() => {
-    supabase.from('page_visibility')
-      .select('visible')
-      .eq('role', 'teacher')
-      .eq('page_key', 'online_tahfeez')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setTahfeezVisible(data.visible);
-      });
-  }, []);
-
   const [studentAttendance, setStudentAttendance] = useState({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(() => getLocalDateKey());
@@ -17986,33 +15989,10 @@ function TeacherPortal({
     const { data } = await supabase
       .from('page_visibility')
       .select('page_key, role, visible')
-      .catch(() => ({ data: null }));
+      .then(r => r, () => ({ data: null }));
     const map = {};
-    try {
-      const cachedGlobal = JSON.parse(localStorage.getItem("admin_global_tahfeez_access") || "{}");
-      if (cachedGlobal.teacher !== undefined) map.online_tahfeez = cachedGlobal.teacher;
-      const localStMap = JSON.parse(localStorage.getItem("admin_student_tahfeez_access") || "{}");
-      Object.keys(localStMap).forEach(sid => { map[`online_tahfeez_student_${sid}`] = localStMap[sid]; });
-    } catch (_) {}
-
     if (data) {
-      // The generic `online_tahfeez` row for role=teacher is canonical; per-portal
-      // `online_tahfeez_teacher` is only a fallback. Filter by role so a `parents`
-      // generic row can never overwrite the teacher's global flag.
-      let genTeacher, portalTeacher;
-      data.forEach(p => {
-        if (p.page_key === "online_tahfeez") {
-          if (p.role === "teacher") genTeacher = p.visible;
-        } else if (p.page_key === "online_tahfeez_teacher") {
-          portalTeacher = p.visible;
-        } else if (p.page_key && p.page_key.startsWith("online_tahfeez_student_")) {
-          if (p.role === "parents" || map[p.page_key] === undefined) map[p.page_key] = p.visible;
-        } else {
-          map[p.page_key] = p.visible;
-        }
-      });
-      if (genTeacher !== undefined) map.online_tahfeez = genTeacher;
-      else if (portalTeacher !== undefined) map.online_tahfeez = portalTeacher;
+      data.forEach(p => { if (p.page_key) map[p.page_key] = p.visible; });
     }
     setPageVisibility(map);
   }, []);
@@ -18036,7 +16016,7 @@ function TeacherPortal({
   }, [fetchTeacherPageVisibility]);
   useEffect(() => {
     if (!pageVisibility || Object.keys(pageVisibility).length === 0) return;
-    if (activePage !== 'Online Tahfeez' && pageVisibility[activePage] === false) {
+    if (pageVisibility[activePage] === false) {
       setActivePage('My Group');
     }
   }, [activePage, pageVisibility]);
@@ -18287,11 +16267,20 @@ function TeacherPortal({
 
     setSaveStatus("saving");
 
-    const { data, error } = await supabase
-      .from("weekly_results")
-      .upsert([payload], { onConflict: "student_id,week_date" })
-      .select()
-      .single();
+    let data, error;
+    try {
+      ({ data, error } = await supabase
+        .from("weekly_results")
+        .upsert([payload], { onConflict: "student_id,week_date" })
+        .select()
+        .single());
+    } catch (err) {
+      console.error("Auto-save failed:", err);
+      setSaveErrorDetails("[REJECTED] " + (err?.message || "Request failed"));
+      setSaveStatus("error");
+      setTimeout(() => { setSaveErrorDetails(""); }, 8000);
+      return;
+    }
 
     if (error) {
       console.error("Auto-save error:", error);
@@ -18440,21 +16429,6 @@ function TeacherPortal({
     ).length;
   }, [filteredStudents, parentViews]);
 
-  const recentMarhalaPostPreview = (
-     <Suspense fallback={null}>
-       <MarhalaPosts
-         role="teacher"
-         students={visibleStudents}
-         onShowAction={onShowAction}
-         maxAgeHours={24}
-         limit={3}
-         hideEmpty
-         homePreview
-         className="mp-home-preview"
-       />
-    </Suspense>
-  );
-
   return (
     <div className="admin-shell">
       <style>{PREMIUM_NOTIFICATION_CSS}</style>
@@ -18476,7 +16450,6 @@ function TeacherPortal({
           {[
             { id: "Home", label: "Home", icon: Sparkles },
             { id: "My Group", label: "Students", icon: Users },
-            { id: "Online Tahfeez", label: "Online Tahfeez", icon: Video },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             { id: "Overview", label: "Performance", icon: Layers3 },
             { id: "Jadwal", label: "Jadwal", icon: Calendar },
@@ -18487,7 +16460,7 @@ function TeacherPortal({
             { id: "Attendance History", label: "Attendance History", icon: CalendarCheck },
             { id: "Apply Leave", label: "Apply Leave", icon: CalendarX },
             { id: "Settings", label: "Settings", icon: Settings },
-          ].filter(p => p.id === "Online Tahfeez" || pageVisibility[p.id] !== false).map(page => (
+          ].filter(p => pageVisibility[p.id] !== false).map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
               <page.icon size={18} /> {page.label}
             </button>
@@ -18544,25 +16517,6 @@ function TeacherPortal({
             <div className={`status-banner ${actionMessage.type}`}>{actionMessage.text}</div>
           )}
 
-
-
-          {tahfeezCall && (
-            <OnlineTahfeezRoom
-              sessionData={tahfeezCall}
-              userRole="teacher"
-              currentUser={teacherIdentity || { full_name: "Teacher" }}
-              onClose={() => setTahfeezCall(null)}
-            />
-          )}
-
-           {activePage === "Online Tahfeez" && (
-             <TeacherOnlineTahfeezPage
-               students={visibleStudents}
-               teacherIdentity={teacherIdentity}
-               pageVisibility={pageVisibility}
-               onStartCall={(callData) => setTahfeezCall(callData)}
-             />
-           )}
 
            {activePage === "Jadwal" && (
               <Suspense fallback={null}>
@@ -18925,7 +16879,6 @@ function TeacherPortal({
                  </section>
                )}
 
-               {recentMarhalaPostPreview}
              </div>
            ) : null}
 
@@ -19288,6 +17241,9 @@ function TeacherPortal({
                         name="wusool_page"
                         value={teacherForms.result.wusool_page}
                         onChange={onTeacherFormChange}
+                        readOnly
+                        title="Auto-filled from selected surah"
+                        placeholder="Auto from surah"
                         disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
@@ -19367,6 +17323,9 @@ function TeacherPortal({
                         name="next_week_page"
                         value={teacherForms.result.next_week_page}
                         onChange={onTeacherFormChange}
+                        readOnly
+                        title="Auto-filled from selected surah"
+                        placeholder="Auto from surah"
                         disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
@@ -19417,6 +17376,9 @@ function TeacherPortal({
                         name="istifadah_page"
                         value={teacherForms.result.istifadah_page}
                         onChange={onTeacherFormChange}
+                        readOnly
+                        title="Auto-filled from selected surah"
+                        placeholder="Auto from surah"
                         disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
@@ -20272,7 +18234,7 @@ function TeacherPortal({
                                               ? (teacherProfiles.find(p => p.user_id === entry.teacher_id)?.full_name || "—")
                                               : "—";
                                             const isMyEntry = String(entry.teacher_id) === String(rawId);
-                                            return (
+  return (
                                               <tr key={entry.id || i} className={isMyEntry ? "my-entry" : ""}>
                                                 <td className="badal-table-date">
                                                   <span className="date-en">{dateStr}</span>
@@ -20318,19 +18280,24 @@ function TeacherPortal({
 
                   if (existing === status) return;
 
-                  if (existing) {
-                    await supabase
-                      .from("student_daily_attendance")
-                      .update({ status })
-                      .eq("student_id", String(histStudentId))
-                      .eq("attendance_date", date);
-                  } else {
-                    await supabase
-                      .from("student_daily_attendance")
-                      .upsert(
-                        { student_id: String(histStudentId), teacher_id: String(teacherId), attendance_date: date, status },
-                        { onConflict: "student_id,attendance_date" }
-                      );
+                  try {
+                    if (existing) {
+                      await supabase
+                        .from("student_daily_attendance")
+                        .update({ status })
+                        .eq("student_id", String(histStudentId))
+                        .eq("attendance_date", date);
+                    } else {
+                      await supabase
+                        .from("student_daily_attendance")
+                        .upsert(
+                          { student_id: String(histStudentId), teacher_id: String(teacherId), attendance_date: date, status },
+                          { onConflict: "student_id,attendance_date" }
+                        );
+                    }
+                  } catch (err) {
+                    if (onShowAction) onShowAction("error", err?.message || "Failed to mark attendance");
+                    return;
                   }
 
                   setHistRecords(prev => ({ ...prev, [date]: status }));
@@ -21264,6 +19231,124 @@ const SURAH_NAMES_AR = [
   "قريش","الماعون","الكوثر","الكافرون","النصر",
   "المسد","الإخلاص","الفلق","الناس"
 ];
+
+// --- Misri Quran Surah to Page Mapping (Standard 604-page Mushaf) ---
+const SURAH_TO_PAGE = {
+  1: 1,    // Al-Fatiha
+  2: 2,    // Al-Baqarah
+  3: 50,   // Aal-Imran
+  4: 77,   // An-Nisa
+  5: 106,  // Al-Ma'idah
+  6: 128,  // Al-An'am
+  7: 151,  // Al-A'raf
+  8: 177,  // Al-Anfal
+  9: 187,  // At-Tawbah
+  10: 208, // Yunus
+  11: 221, // Hud
+  12: 235, // Yusuf
+  13: 249, // Ar-Ra'd
+  14: 255, // Ibrahim
+  15: 262, // Al-Hijr
+  16: 267, // An-Nahl
+  17: 282, // Al-Isra
+  18: 293, // Al-Kahf
+  19: 305, // Maryam
+  20: 312, // Ta-Ha
+  21: 322, // Al-Anbiya
+  22: 332, // Al-Hajj
+  23: 342, // Al-Mu'minun
+  24: 349, // An-Nur
+  25: 359, // Al-Furqan
+  26: 367, // Ash-Shu'ara
+  27: 377, // An-Naml
+  28: 385, // Al-Qasas
+  29: 396, // Al-Ankabut
+  30: 404, // Ar-Rum
+  31: 411, // Luqman
+  32: 415, // As-Sajdah
+  33: 418, // Al-Ahzab
+  34: 428, // Saba
+  35: 434, // Fatir
+  36: 440, // Ya-Sin
+  37: 446, // As-Saffat
+  38: 453, // Sad
+  39: 458, // Az-Zumar
+  40: 467, // Ghafir
+  41: 477, // Fussilat
+  42: 483, // Ash-Shura
+  43: 489, // Az-Zukhruf
+  44: 496, // Ad-Dukhan
+  45: 499, // Al-Jathiyah
+  46: 502, // Al-Ahqaf
+  47: 507, // Muhammad
+  48: 511, // Al-Fath
+  49: 515, // Al-Hujurat
+  50: 518, // Qaf
+  51: 520, // Adh-Dhariyat
+  52: 523, // At-Tur
+  53: 526, // An-Najm
+  54: 528, // Al-Qamar
+  55: 531, // Ar-Rahman
+  56: 534, // Al-Waqi'ah
+  57: 537, // Al-Hadid
+  58: 542, // Al-Mujadilah
+  59: 545, // Al-Hashr
+  60: 548, // Al-Mumtahanah
+  61: 551, // As-Saff
+  62: 553, // Al-Jumu'ah
+  63: 555, // Al-Munafiqun
+  64: 557, // At-Taghabun
+  65: 559, // At-Talaq
+  66: 561, // At-Tahrim
+  67: 563, // Al-Mulk
+  68: 566, // Al-Qalam
+  69: 568, // Al-Haqqah
+  70: 570, // Al-Ma'arij
+  71: 572, // Nuh
+  72: 574, // Al-Jinn
+  73: 576, // Al-Muzzammil
+  74: 578, // Al-Muddaththir
+  75: 580, // Al-Qiyamah
+  76: 581, // Al-Insan
+  77: 583, // Al-Mursalat
+  78: 584, // An-Naba
+  79: 586, // An-Nazi'at
+  80: 587, // Abasa
+  81: 588, // At-Takwir
+  82: 589, // Al-Infitar
+  83: 590, // Al-Mutaffifin
+  84: 591, // Al-Inshiqaq
+  85: 592, // Al-Buruj
+  86: 593, // At-Tariq
+  87: 593, // Al-A'la
+  88: 594, // Al-Ghashiyah
+  89: 595, // Al-Fajr
+  90: 596, // Al-Balad
+  91: 596, // Ash-Shams
+  92: 597, // Al-Layl
+  93: 597, // Ad-Duha
+  94: 597, // Ash-Sharh
+  95: 598, // At-Tin
+  96: 598, // Al-Alaq
+  97: 598, // Al-Qadr
+  98: 599, // Al-Bayyinah
+  99: 599, // Al-Zalzalah
+  100: 600, // Al-Adiyat
+  101: 600, // Al-Qari'ah
+  102: 601, // At-Takathur
+  103: 601, // Al-Asr
+  104: 601, // Al-Humazah
+  105: 601, // Al-Fil
+  106: 601, // Quraysh
+  107: 602, // Al-Ma'un
+  108: 602, // Al-Kawthar
+  109: 602, // Al-Kafirun
+  110: 602, // An-Nasr
+  111: 603, // Al-Masad
+  112: 603, // Al-Ikhlas
+  113: 603, // Al-Falaq
+  114: 603, // An-Nas
+};
 
 // --- Badal progress formatters (handle old single {value,marks} and new 3-slot array shapes) ---
 const badalJuzName = (num) => {
@@ -22508,8 +20593,9 @@ export default function App() {
     const scheduleRefresh = () => {
       clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
+        if (portalLoadInFlight) return;
         loadPortalData(portalRole, user, null, { silent: true }).catch(() => {});
-      }, 400);
+      }, 1200);
     };
 
     const tables =
@@ -22534,10 +20620,10 @@ export default function App() {
     });
 
     const fallbackPoll = setInterval(() => {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState === "visible" && !portalLoadInFlight) {
         loadPortalData(portalRole, user, null, { silent: true }).catch(() => {});
       }
-    }, 60000);
+    }, 120000);
 
     return () => {
       clearTimeout(refreshTimer);
@@ -22552,11 +20638,27 @@ export default function App() {
       return;
     }
 
+    if (portalLoadInFlight) {
+      // A full reload is already running; skip this overlapping call.
+      if (silent) return;
+    }
+    portalLoadInFlight = true;
+
     if (!silent) setLoading(true);
 
     try {
       if (role === "parents") {
-        const rawProfiles = parentProfileOverride ? [parentProfileOverride] : (await findParentProfiles(currentUser.id, currentUser.email));
+        let rawProfiles = parentProfileOverride ? [parentProfileOverride] : null;
+        if (!rawProfiles || rawProfiles.length === 0) {
+          try {
+            rawProfiles = await findParentProfiles(currentUser.id, currentUser.email);
+          } catch (err) {
+            console.warn("child_profiles read blocked; using fallback RPC", err);
+          }
+        }
+        if (!rawProfiles || rawProfiles.length === 0) {
+          rawProfiles = await findParentProfilesFallback(currentUser.id, currentUser.email);
+        }
 
         let nextParentState = {
           studentProfile: null,
@@ -22604,9 +20706,10 @@ export default function App() {
             supabase
               .from("weekly_results")
               .select("*")
+              .in("student_id", studentQueryIds)
               .order("week_date", { ascending: false })
               .limit(5000),
-            supabase.from("events").select("*").order("event_date", { ascending: false }),
+            supabase.from("events").select("*").order("event_date", { ascending: false }).limit(200),
             supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
             supabase.from("report_settings").select("*"),
             supabase.from("jadwal_settings").select("*"),
@@ -22640,10 +20743,8 @@ export default function App() {
           // Get global ranks from Edge Function (bypasses RLS) so ALL portals see
           // the exact same global rank as the admin's Rank Preview page
           try {
-            const { data: allRanksData, error: allRanksError } = await supabase.functions.invoke("get-global-rank", {
-              body: { return_all: true },
-            });
-            if (!allRanksError && allRanksData?.ranks) {
+            const allRanksData = await fetchGlobalRanks();
+            if (allRanksData?.ranks) {
               const globalRanks = allRanksData.ranks;
               processedStudents.forEach(s => {
                 const sid = String(s.student_id).trim().toLowerCase();
@@ -22657,7 +20758,7 @@ export default function App() {
               activeResult = updatedActive?.latestResult || activeResult;
             }
           } catch (_e) {
-            // Fall back to buildStudents rank
+            // Fall back to buildStudents rank if network or timeout
           }
 
           const todayStr = getToday();
@@ -22713,12 +20814,12 @@ export default function App() {
         setTeacherProfiles(nextParentState.teacherProfiles || []);
         try { localStorage.setItem('mauze_portal_cache', JSON.stringify({ role: 'parents', parentData: nextParentState, schoolData: null, _t: Date.now() })); } catch (_) {}
       } else {
-        // For admin role, use get_all_child_profiles RPC (SECURITY DEFINER, bypasses RLS)
-        // so teachers toggled for admin access can see all students.
-        const profilesPromise = role === "admin"
+        // For admin and teacher roles, use get_all_child_profiles RPC (SECURITY DEFINER, bypasses RLS)
+        // so teachers and admins can view all assigned students and Badal substitutes without RLS truncation.
+        const profilesPromise = (role === "admin" || role === "teacher")
           ? supabase.rpc("get_all_child_profiles")
               .then(({ data, error }) => {
-                if (error || !data) {
+                if (error || !data || data.length === 0) {
                   return supabase.from("child_profiles").select("*").order("full_name", { ascending: true });
                 }
                 return { data, error: null };
@@ -22743,17 +20844,17 @@ export default function App() {
           parentViewsResponse,
         ] = await Promise.all([
           profilesPromise,
-          supabase.from("weekly_results").select("*").order("week_date", { ascending: false }),
-          supabase.from("events").select("*").order("event_date", { ascending: false }),
-          supabase.from("schedule").select("*").order("task_time", { ascending: true }),
-          supabase.from("user_portal_access").select("*").order("created_at", { ascending: false }),
-          supabase.from("custom_groups").select("*").order("group_name", { ascending: true }),
-          supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }),
+          supabase.from("weekly_results").select("*").order("week_date", { ascending: false }).limit(10000),
+          supabase.from("events").select("*").order("event_date", { ascending: false }).limit(200),
+          supabase.from("schedule").select("*").order("task_time", { ascending: true }).limit(5000),
+          supabase.from("user_portal_access").select("*").order("created_at", { ascending: false }).then(r => r, () => ({ data: [], error: null })),
+          supabase.from("custom_groups").select("*").order("group_name", { ascending: true }).then(r => r, () => ({ data: [], error: null })),
+          supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }).limit(2000).then(r => r, () => ({ data: [], error: null })),
           supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
           supabase.from("report_settings").select("*"),
           supabase.from("jadwal_settings").select("*"),
-          supabase.from("portal_issues").select("*").order("created_at", { ascending: false }),
-          supabase.from("parent_report_views").select("*"),
+          supabase.from("portal_issues").select("*").order("created_at", { ascending: false }).limit(500).then(r => r, () => ({ data: [], error: null })),
+          supabase.from("parent_report_views").select("*").limit(2000).then(r => r, () => ({ data: [], error: null })),
         ]);
 
         let archiveData = [];
@@ -22761,14 +20862,15 @@ export default function App() {
           const { data: archiveResponseData, error: archiveError } = await supabase
             .from("weekly_results_archive")
             .select("*")
-            .order("week_date", { ascending: false });
+            .order("week_date", { ascending: false })
+            .limit(5000);
           if (!archiveError && archiveResponseData) archiveData = archiveResponseData;
         } catch (_e) {}
 
-        if (supportTicketsResponse.data) setSupportTickets(supportTicketsResponse.data);
+        if (supportTicketsResponse?.data) setSupportTickets(supportTicketsResponse.data);
 
-        if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
-        if (jadwalSettingsResponse.data) setJadwalSettings(jadwalSettingsResponse.data);
+        if (reportSettingsResponse?.data) setReportSettings(reportSettingsResponse.data);
+        if (jadwalSettingsResponse?.data) setJadwalSettings(jadwalSettingsResponse.data);
 
         if (parentViewsResponse && parentViewsResponse.data) {
           setParentViews(parentViewsResponse.data);
@@ -22776,20 +20878,10 @@ export default function App() {
           setParentViews([]);
         }
 
-        const dbErrors = [
-          profilesResponse.error,
-          resultsResponse.error,
-          eventsResponse.error,
-          scheduleResponse.error,
-          portalAccessResponse.error,
-          groupsResponse.error,
-          attendanceResponse.error,
-          teacherProfilesResponse.error
-        ].filter(Boolean);
-
-        if (dbErrors.length > 0) {
-          console.error("Database errors detected:", dbErrors);
-          throw new Error(dbErrors.map(e => e.message).join(" | "));
+        // Only profilesResponse is critical; optional queries failing should not block portal loading.
+        if (profilesResponse?.error && (!profilesResponse?.data || profilesResponse.data.length === 0)) {
+          console.error("Critical student profiles fetch error:", profilesResponse.error);
+          throw new Error("Unable to load student profiles. Please check database permissions.");
         }
 
         const enrichedProfiles = (teacherProfilesResponse.data || []).map(profile => {
@@ -22833,10 +20925,8 @@ export default function App() {
         // Fetch global ranks from Edge Function (bypasses RLS) so ALL portals see
         // the exact same global rank as the admin's Rank Preview page
         try {
-          const { data: allRanksData, error: allRanksError } = await supabase.functions.invoke("get-global-rank", {
-            body: { return_all: true },
-          });
-          if (!allRanksError && allRanksData?.ranks) {
+          const allRanksData = await fetchGlobalRanks();
+          if (allRanksData?.ranks) {
             const globalRanks = allRanksData.ranks;
             students.forEach(s => {
               const sid = String(s.student_id).trim().toLowerCase();
@@ -22908,6 +20998,7 @@ export default function App() {
         text: `Data Error: ${error?.message || "Some data could not be loaded. Please check your table permissions and try again."}`,
       });
     } finally {
+      portalLoadInFlight = false;
       setLoading(false);
     }
   }
@@ -22940,19 +21031,31 @@ export default function App() {
     if (rawId) allTeacherIds.push(String(rawId));
     if (user?.id && teacherIdentity && String(user.id) !== String(teacherIdentity)) allTeacherIds.push(String(teacherIdentity));
     (Array.isArray(schoolData?.portalAccessList) ? schoolData.portalAccessList : [])
-      .filter(a => { const m = String(a.user_id) === String(rawId) || (a.full_name && normalizeText(a.full_name) === normalizeText(teacherIdentity)); return m && a.user_id; })
-      .forEach(a => { if (!allTeacherIds.includes(String(a.user_id))) allTeacherIds.push(String(a.user_id)); });
+      .filter(a => { const m = String(a.user_id) === String(rawId) || String(a.id) === String(rawId) || (a.full_name && normalizeText(a.full_name) === normalizeText(teacherIdentity)); return m; })
+      .forEach(a => {
+        if (a.user_id && !allTeacherIds.includes(String(a.user_id))) allTeacherIds.push(String(a.user_id));
+        if (a.id && !allTeacherIds.includes(String(a.id))) allTeacherIds.push(String(a.id));
+      });
     (Array.isArray(teacherProfiles) ? teacherProfiles : [])
-      .filter(p => { const m = String(p.user_id) === String(rawId) || (p.full_name && normalizeText(p.full_name) === normalizeText(teacherIdentity)); return m && p.user_id; })
-      .forEach(p => { if (!allTeacherIds.includes(String(p.user_id))) allTeacherIds.push(String(p.user_id)); });
+      .filter(p => {
+        const m = String(p.user_id) === String(rawId) ||
+                  String(p.id) === String(rawId) ||
+                  (p.full_name && normalizeText(p.full_name) === normalizeText(teacherIdentity));
+        return m;
+      })
+      .forEach(p => {
+        if (p.user_id && !allTeacherIds.includes(String(p.user_id))) allTeacherIds.push(String(p.user_id));
+        if (p.id && !allTeacherIds.includes(String(p.id))) allTeacherIds.push(String(p.id));
+      });
 
     const matchedStudents = portalRole === "admin"
       ? [...schoolData.students]
       : schoolData.students.filter((student) => {
           const idMatch = allTeacherIds.some(uid =>
-            String(student.muhaffiz_id).trim() === String(uid).trim() ||
-            String(student.original_teacher_id).trim() === String(uid).trim() ||
-            String(student.badal_teacher_id).trim() === String(uid).trim()
+            String(student.muhaffiz_id || "").trim() === String(uid).trim() ||
+            String(student.teacher_id || "").trim() === String(uid).trim() ||
+            String(student.original_teacher_id || "").trim() === String(uid).trim() ||
+            String(student.badal_teacher_id || "").trim() === String(uid).trim()
           );
           const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
           /* Also try matching badal_teacher_id against user email as a fallback */
@@ -23615,6 +21718,25 @@ export default function App() {
         [name]: cleanValue,
       },
     }));
+
+    // Auto-fill Quran page number from selected surah (Misri 604-page mushaf):
+    // wusool_surah -> wusool_page, next_week_surah -> next_week_page, istifadah_surah -> istifadah_page
+    const surahToPageField = {
+      wusool_surah: "wusool_page",
+      next_week_surah: "next_week_page",
+      istifadah_surah: "istifadah_page",
+    };
+    if (surahToPageField[name]) {
+      const surahIdx = SURAH_NAMES_AR.indexOf(value);
+      const page = surahIdx >= 0 ? SURAH_TO_PAGE[surahIdx + 1] : undefined;
+      setTeacherForms((current) => ({
+        ...current,
+        result: {
+          ...current.result,
+          [surahToPageField[name]]: page ? String(page) : "",
+        },
+      }));
+    }
 
     // Auto-fill Jadeed marks from Total Jadeed Pages + Unit (all out of 20):
     // Satar(30) = 2 marks per satar, Satar(26-30) = 1 mark per satar,
@@ -24728,11 +22850,17 @@ const handleSendCustomNotification = async (event) => {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("weekly_results")
-      .upsert([payload], { onConflict: "student_id,week_date" })
-      .select()
-      .single();
+    let data, error;
+    try {
+      ({ data, error } = await supabase
+        .from("weekly_results")
+        .upsert([payload], { onConflict: "student_id,week_date" })
+        .select()
+        .single());
+    } catch (err) {
+      showAction("error", err?.message || "Failed to save result. Please try again.");
+      return;
+    }
 
     if (error) {
       showAction("error", error.message);
@@ -24808,23 +22936,6 @@ const handleSendCustomNotification = async (event) => {
       );
     }
   };
-
-  const handleMarhalaPostCreated = async (post) => {
-    const studentName = post?.student_name || "a student";
-    const marhalaName = post?.marhala_name ? ` for ${post.marhala_name}` : "";
-    const title = "New Marhala Post";
-    const body = `${studentName} has a new Marhala achievement post${marhalaName}. Open your home page to view and like it.`;
-
-    const [parentResult, teacherResult] = await Promise.all([
-      broadcastNotification(title, body, "parents", null, "Home"),
-      broadcastNotification(title, body, "teacher", null, "Home"),
-    ]);
-
-    if (parentResult?.inboxError || parentResult?.fcmError || teacherResult?.inboxError || teacherResult?.fcmError) {
-      showAction("error", "Post saved, but some Marhala notifications failed.");
-    }
-  };
-
 
 
   // Public route: Show Privacy Policy without authentication
@@ -24998,7 +23109,6 @@ const handleSendCustomNotification = async (event) => {
             emailProgress={emailProgress}
             emailLogs={emailLogs}
             onTriggerEmailNotifications={triggerEmailNotifications}
-            onMarhalaPostCreated={handleMarhalaPostCreated}
             onSetSendingEmail={setSendingEmail}
             onSetEmailProgress={setEmailProgress}
             onSetEmailLogs={setEmailLogs}
@@ -25358,7 +23468,6 @@ function QuickAccessPagesUI({ supabase: sb }) {
     </div>
   );
 }
-
 
 
 

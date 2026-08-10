@@ -197,3 +197,26 @@
   color: #b8a68c;
   font-size: 0.85rem;
 }
+
+/* Let the dropdown panel overflow instead of being clipped by the card.
+   Wrapping cards (.form-card / .management-grid / .premium-card) normally apply
+   `contain: paint` + `transform: translateZ(0)`, which hide the absolutely
+   positioned panel below the card. Neutralise that only when a dropdown is present. */
+.form-card:has(.searchable-select),
+.premium-card:has(.searchable-select),
+.overview-container:has(.searchable-select) {
+  contain: layout style;
+  content-visibility: visible;
+  transform: none;
+}
+
+.management-grid:has(.searchable-select) {
+  content-visibility: visible;
+  contain: layout style;
+}
+
+/* Raise the open card above following siblings so the panel is never hidden. */
+.form-card:has(.searchable-select.is-open),
+.premium-card:has(.searchable-select.is-open) {
+  z-index: 60;
+}

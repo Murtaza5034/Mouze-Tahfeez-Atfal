@@ -1,25 +1,26 @@
-import { createClient } from '@supabase/supabase-js'
+// Data-access layer for Mauze Tahfeez.
+//
+// This module used to export the Supabase client. The backend has moved to
+// Firebase (project: mawaid-b929a) — Auth, Firestore, Cloud Functions and
+// Storage. `supabase` is now a Firebase-backed adapter that keeps the exact
+// same query surface the app already uses, so the UI code is unchanged.
+//
+// See docs/FIREBASE_MIGRATION.md for the full blueprint.
 
-const fallbackSupabaseUrl = 'https://medypnbcsjytbxiwenob.supabase.co'
-const fallbackSupabaseAnonKey =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lZHlwbmJjc2p5dGJ4aXdlbm9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2ODkxNDYsImV4cCI6MjA5MjI2NTE0Nn0.uuZr6KQ0AB2jGxk40AcTdUYcMHT-sI4P6sMYV_0L_uQ'
+import firebaseCompat, { createClient as createFirebaseClient } from "./firebase/db-adapter.js";
 
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || fallbackSupabaseUrl
+export const supabase = firebaseCompat;
+
+export const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL || "https://medypnbcsjytbxiwenob.supabase.co";
+
 export const supabaseAnonKey =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || fallbackSupabaseAnonKey
+  import.meta.env.VITE_SUPABASE_ANON_KEY || "anon";
 
-// Supabase initialization with optional environment variables and built-in fallbacks.
-// Disable Realtime auto-connect to prevent WebSocket errors on page load
+// Supabase's createClient() is used once (admin portal-account creation) with
+// a throw-away client. Return a Firebase-backed shim instead.
+export function createClient(url, key, options) {
+  return createFirebaseClient(url, key, options);
+}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
-  // Disable auto-connect to realtime channels to prevent WebSocket errors
-  // when auth is not yet established
-  db: {
-    schema: 'public',
-  },
-})
+export default firebaseCompat;

@@ -28,7 +28,7 @@ import {
 import { supabase } from "./supabaseClient";
 import "./premium-today-schedule.css";
 
-/* ─── Marhala Options (reused from MarhalaPosts) ─── */
+/* ─── Marhala Options ─── */
 const MARHALA_OPTIONS = [
   "Marhala Ula",
   "Marhala Saniyah",

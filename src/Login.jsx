@@ -124,9 +124,9 @@ export default function Login({ onLoginSuccess }) {
     setButtonFeedback(null);
 
     let lastError = null;
-    const maxRetries = 5;
-    const timeoutMs = 15000;
-    const backoffs = [2000, 3000, 5000, 8000, 10000];
+    const maxRetries = 2;
+    const timeoutMs = 10000;
+    const backoffs = [1200, 2500];
 
     // Wrap the auth call in a timeout so a slow/hung mobile request can't block
     // the UI forever; we re-attempt with adaptive backoff on weak connections.
@@ -155,16 +155,14 @@ export default function Login({ onLoginSuccess }) {
       const { data, error: authError } = await attemptAuth();
 
       if (!authError) {
-        setButtonFeedback("success");
-        setTimeout(() => {
-          setButtonFeedback(null);
-          onLoginSuccess(data.user, selectedRole, rememberMe).then((result) => {
-            setLoading(false);
-            if (!result?.ok) {
-              setError(result?.message || "This account cannot access the selected portal.");
-            }
-          });
-        }, 1000);
+        onLoginSuccess(data.user, selectedRole, rememberMe).then((result) => {
+          setLoading(false);
+          if (!result?.ok) {
+            setError(result?.message || "This account cannot access the selected portal.");
+          } else {
+            setButtonFeedback("success");
+          }
+        });
         return;
       }
 
@@ -178,13 +176,11 @@ export default function Login({ onLoginSuccess }) {
     }
 
     setButtonFeedback("error");
-    setTimeout(() => {
-      setError(isNetworkError(lastError)
-        ? "Unable to connect. Please check your internet and try again."
-        : lastError.message);
-      setLoading(false);
-      setButtonFeedback(null);
-    }, 1200);
+    setError(isNetworkError(lastError)
+      ? "Unable to connect. Please check your internet and try again."
+      : lastError.message);
+    setButtonFeedback(null);
+    setLoading(false);
   };
 
   const handleRoleSwitch = (roleId) => {

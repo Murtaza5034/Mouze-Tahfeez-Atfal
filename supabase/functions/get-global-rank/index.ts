@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
 
   try {
     const bodyText = await req.text().catch(() => '{}')
-    const { student_id, week_date, return_all, preview }: RankRequest = JSON.parse(bodyText)
+    const { student_id, return_all, preview }: RankRequest = JSON.parse(bodyText)
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -35,16 +35,45 @@ Deno.serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: rawResults, error } = await supabase
-      .from('weekly_results')
-      .select('student_id, murajazah, juz_hali, takhteet, jadeed, total_jadeed_pages, attendance_count, total_score')
-      .order('week_date', { ascending: false })
+    // ── FAST PATH: no preview → compute the whole leaderboard in SQL.
+    // The get_global_ranks_any() RPC reads latest-result-per-student via a
+    // single ordered index scan (see 20260809...migration). It never scans
+    // the full weekly_results table, so it drops to microseconds and removes
+    // the disk IO wait. ──────────────────────────────────────────────────────
+    if (!preview) {
+      const { data, error } = await supabase.rpc("get_global_ranks_any")
+      if (!error && data && typeof data === 'object') {
+        const ranks = data.ranks || {}
+        const total = data.total || 0
 
-    if (error) throw error
+        if (return_all) {
+          return new Response(
+            JSON.stringify({ ranks, total }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          )
+        }
+        if (!student_id) {
+          throw new Error('Missing required field: student_id')
+        }
+        const targetRank = ranks[String(student_id).trim().toLowerCase()] || null
+        return new Response(
+          JSON.stringify({ rank: targetRank, total }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        )
+      }
+      // RPC missing (migration not applied yet) → fall through to legacy path.
+    }
+
+    // ── LEGACY / PREVIEW path: only download ONE row per student (the latest),
+    // not the entire table. Used when a teacher previews an unsaved score. ──
+    const { data: latestRows, error: latestErr } = await supabase
+      .rpc("get_latest_weekly_results")
+    if (latestErr) {
+      throw new Error(`Failed to fetch latest results: ${latestErr.message}`)
+    }
 
     const latestResultMap = new Map<string, any>()
-
-    for (const result of rawResults || []) {
+    for (const result of latestRows || []) {
       const resultId = String(result.student_id || '').trim().toLowerCase()
       if (resultId && !latestResultMap.has(resultId)) {
         latestResultMap.set(resultId, result)
@@ -79,8 +108,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Restrict ranking to only students that exist in child_profiles so the rank
-    // set matches what buildStudents() and RankPreview compute locally.
     const { data: childProfiles } = await supabase
       .from('child_profiles')
       .select('student_id')
@@ -123,7 +150,6 @@ Deno.serve(async (req) => {
         return b.attendance - a.attendance
       })
 
-    // Build global ranks map for ALL students
     const allRanks: Record<string, number> = {}
     let globalPrevRank = 1
     ranked.forEach((r, idx) => {
@@ -138,7 +164,6 @@ Deno.serve(async (req) => {
       allRanks[String(r.student_id).trim().toLowerCase()] = currentRank
     })
 
-    // return_all mode: send back all ranks at once
     if (return_all) {
       return new Response(
         JSON.stringify({ ranks: allRanks, total: ranked.length }),
@@ -146,7 +171,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Single-student mode: find and return just one rank
     if (!student_id) {
       throw new Error('Missing required field: student_id')
     }

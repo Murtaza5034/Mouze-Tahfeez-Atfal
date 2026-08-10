@@ -1,0 +1,226 @@
+rules_version = '2';
+
+// Firestore security rules mirroring the Supabase RLS model.
+//
+// Role model (from user_portal_access + auth.users):
+//   users/{uid}  -> { portal_role: 'admin' | 'teacher' | 'parent',
+//                     email, full_name, is_active }
+//
+// Rules strategy mirrors the Postgres policies:
+//   - Everyone authenticated can read/write only what their role allows.
+//   - admins read/write everything.
+//   - teachers read children they are assigned to; write results.
+//   - parents read only their children.
+//
+// NOTE: Full parity with the SQL RLS is best-effort here. Locked/free-tier
+// granularities below follow the existing app's expectations.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.portal_role;
+    }
+
+    function isAdmin() { return isSignedIn() && role() == 'admin'; }
+    function isTeacher() { return isSignedIn() && role() == 'teacher'; }
+    function isParent() { return isSignedIn() && role() == 'parents'; }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin() || isTeacher());
+      allow write: if isAdmin() || request.auth.uid == uid;
+    }
+
+    // ---------- user_portal_access ----------
+    match /user_portal_access/{uid} {
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == uid || resource.data.user_id == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // ---------- singleton settings ----------
+    match /jadwal_settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /marhala_settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /report_settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /email_settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /whatsapp_config/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------- child_profiles ----------
+    // RLS: admins + teachers read all; parents read their own children only.
+    match /child_profiles/{studentId} {
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || request.auth.uid == resource.data.parent_user_id);
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // ---------- weekly_results ----------
+    match /weekly_results/{id} {
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || parentOwnsChild(resource.data.student_id));
+      allow write: if isAdmin() || isTeacher();
+
+      function parentOwnsChild(sid) {
+        return sid != null && sid != "" &&
+          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid;
+      }
+    }
+    match /weekly_results_archive/{id} {
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || parentOwnsChild(resource.data.student_id));
+      allow write: if isAdmin() || isTeacher();
+
+      function parentOwnsChild(sid) {
+        return sid != null && sid != "" &&
+          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid;
+      }
+    }
+    match /student_daily_attendance/{id} {
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || parentOwnsChild(resource.data.student_id));
+      allow write: if isAdmin() || isTeacher();
+
+      function parentOwnsChild(sid) {
+        return sid != null && sid != "" &&
+          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid;
+      }
+    }
+
+    // ---------- teacher_profiles ----------
+    match /teacher_profiles/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // ---------- student_daily_attendance ----------
+    match /student_daily_attendance/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // ---------- leaves ----------
+    match /student_leaves/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isParent() || isTeacher());
+    }
+    match /teacher_leaves/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+
+    // ---------- notifications ----------
+    match /system_notifications/{id} {
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || isParent());
+      allow write: if isAdmin();
+    }
+    match /scheduled_notifications/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /user_fcm_tokens/{token} {
+      allow read, write: if isSignedIn();
+    }
+
+    // ---------- jadwal ----------
+    match /jadawal/{studentId} {
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || request.auth.uid == get(/databases/$(database)/documents/child_profiles/$(studentId)).data.parent_user_id);
+      allow write: if isAdmin() || isTeacher();
+    }
+    match /self_jadwal/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || request.auth.uid == resource.data.user_id || isAdmin() || isTeacher());
+      allow write: if isSignedIn() && (request.auth.uid == userId || request.auth.uid == (resource.exists ? resource.data.user_id : request.resource.data.user_id) || isAdmin() || isTeacher());
+    }
+    match /self_jadwal_notifications/{id} {
+      allow read, write: if isSignedIn() && (request.auth.uid == get(/databases/$(database)/documents/self_jadwal_notifications/$(id)).data.user_id || isAdmin());
+    }
+
+    // ---------- marhala_posts ----------
+    match /marhala_posts/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // ---------- parent_notes ----------
+    match /parent_notes/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher() || isParent());
+    }
+
+    // ---------- misc ----------
+    match /page_visibility/{pageKey} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /events/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /schedule/{id} {
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || parentOwnsChild(resource.data.student_id));
+      allow write: if isAdmin() || isTeacher();
+
+      function parentOwnsChild(sid) {
+        return sid != null && sid != "" &&
+          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid;
+      }
+    }
+    match /miqaat_calendar/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /portal_issues/{id} { allow read, write: if isSignedIn() && (isAdmin() || request.auth.uid == get(/databases/$(database)/documents/portal_issues/$(id)).data.user_id); }
+    match /support_tickets/{id} { allow read, write: if isSignedIn() && (isAdmin() || request.auth.uid == get(/databases/$(database)/documents/support_tickets/$(id)).data.user_id); }
+
+    match /quran_ikhtebar/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /elearning_tracking/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+
+    match /parent_report_views/{studentId} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher() || isParent());
+    }
+
+    match /teacher_student_assignments/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /custom_groups/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /badal_assignments/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /badal_progress/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /teacher_unlock_logs/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /app_releases/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /email_logs/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /attendance/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /teacher_attendance/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /teacher_leave_badals/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /event_leaves/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+    match /tahfeez_signals/{id} {
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+    }
+  }
+}

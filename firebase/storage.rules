@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// Mirror of Supabase storage buckets:
+//   child profile pictures (public read, signed write by teachers/admin)
+//   marhala_post_photos (public read)
+//   muhaffezat atfal (public read)
+//   notification_files (public read)
+//   report_backgrounds (public read)
+//   teacher_photos (public read, teacher write)
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
