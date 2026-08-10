@@ -11,7 +11,11 @@ dist
 .vercel
 
 # Environment variables
-.env
+# NOTE: `.env` is intentionally committed — it holds ONLY public client-side
+# config (Firebase web keys + legacy Supabase anon URL/key) that Vite inlines
+# at build time. Never add secrets here; put those in the Vercel dashboard /
+# CI environment instead.
+!.env
 .env.local
 .env*.local
 .env.production

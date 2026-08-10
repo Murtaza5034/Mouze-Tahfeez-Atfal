@@ -19743,7 +19743,7 @@ export default function App() {
   }, [activePage]);
 
   useEffect(() => {
-    // Cleanup only legacy OneSignal service workers (not the app's own sw.js / workbox
+    // Cleanup only legacy OneSignal service workers + caches (not the app's own sw.js / workbox
     // or the firebase-messaging-sw). Unregistering the Workbox service worker here would
     // wipe the PWA cache on every mount and force a full network load each open.
     if ('serviceWorker' in navigator) {
@@ -19756,6 +19756,18 @@ export default function App() {
           }
         }
       });
+      // Purge OneSignal caches left behind by the old SDK. Its page SDK / SW
+      // registered an `unload` listener, which triggered Chrome's
+      // "Permissions policy violation: unload is not allowed" console warning.
+      if ('caches' in window) {
+        caches.keys().then((keys) => {
+          keys
+            .filter((k) => k.toLowerCase().includes('onesignal'))
+            .forEach((k) =>
+              caches.delete(k).then(() => console.log('Removed legacy OneSignal cache:', k))
+            );
+        });
+      }
     }
   }, []);
 
