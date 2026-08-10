@@ -14,4 +14,6 @@ android
 fix.js
 supabase/migrations
 supabase/functions
-public/*.json
+# NOTE: public/*.json was previously ignored here, which silently broke every
+# lottie animation JSON the app loads (Trophyanimation.json + the rank/celebration
+# animations referenced in src/App.jsx). Keep JSON assets deployable.
