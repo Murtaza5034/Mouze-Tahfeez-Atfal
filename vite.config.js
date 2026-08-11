@@ -51,15 +51,6 @@ export function getRefreshReg() {
         globIgnores: ['**/login background.jpg', '**/kanz-al-marjaan-webfont.svg'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/medypnbcsjytbxiwenob\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-api-cache',
-              expiration: { maxEntries: 300, maxAgeSeconds: 86400 },
-              networkTimeoutSeconds: 4,
-            }
-          },
-          {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico|webp)(?:\?.*)?$/,
             handler: 'CacheFirst',
             options: {
@@ -129,9 +120,6 @@ export function getRefreshReg() {
             }
             if (id.includes('lucide-react')) {
               return 'vendor-icons';
-            }
-            if (id.includes('@supabase/supabase-js')) {
-              return 'vendor-supabase';
             }
             if (id.includes('firebase')) {
               return 'vendor-firebase';

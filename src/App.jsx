@@ -20394,6 +20394,8 @@ export default function App() {
         for (const key of Object.keys(localStorage)) {
           if (key.startsWith('sb-')) localStorage.removeItem(key);
         }
+        localStorage.removeItem(STORAGE_KEYS.cachedAuth);
+        setUser(null);
         setLoading(false);
       }
     }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase, supabaseUrl } from "./supabaseClient";
+import { supabase } from "./supabaseClient";
 import {
   Upload,
   Smartphone,
@@ -196,13 +196,6 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
     };
 
     try {
-      const formData = new FormData();
-      formData.append("aab", selectedFile);
-      formData.append("track", selectedTrack);
-      formData.append("versionName", versionName.trim());
-      formData.append("versionCode", parseInt(versionCode, 10).toString());
-      formData.append("releaseNotes", releaseNotes.trim());
-
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -216,33 +209,46 @@ export default function AppUpdateManager({ onBroadcastNotification }) {
       stageTimer3 = setTimeout(() => setDeployStage(3), 15000);
       stageTimer4 = setTimeout(() => setDeployStage(4), 20000);
 
-      const functionUrl = `${supabaseUrl}/functions/v1/deploy-android-app`;
-      const response = await fetch(functionUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: formData,
+      // 1. Upload AAB to Firebase Storage (using our mapped public bucket folder "notification_files")
+      const filePath = `releases/${Date.now()}_${selectedFile.name}`;
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from("notification_files")
+        .upload(filePath, selectedFile, { contentType: "application/octet-stream" });
+
+      if (uploadErr) {
+        throw new Error(`Failed to upload AAB to storage: ${uploadErr.message}`);
+      }
+
+      // 2. Resolve the public download URL
+      const { data: urlData, error: urlErr } = await supabase.storage
+        .from("notification_files")
+        .getPublicUrl(filePath);
+
+      if (urlErr || !urlData?.publicUrl) {
+        throw new Error(`Failed to resolve AAB download URL: ${urlErr?.message || "unknown"}`);
+      }
+
+      // 3. Call the Firebase Cloud Function
+      const { data, error } = await supabase.functions.invoke("deploy-android-app", {
+        body: {
+          aabUrl: urlData.publicUrl,
+          aabFileName: selectedFile.name,
+          aabFileSize: selectedFile.size,
+          track: selectedTrack,
+          versionName: versionName.trim(),
+          versionCode: parseInt(versionCode, 10),
+          releaseNotes: releaseNotes.trim(),
+        }
       });
 
       clearStageTimers();
 
-      let data;
-      try {
-        const text = await response.text();
-        data = JSON.parse(text);
-      } catch {
-        throw new Error(
-          `Server returned an invalid response (${response.status}). Check Supabase Edge Function logs and ensure GOOGLE_PLAY_SERVICE_ACCOUNT_KEY is set correctly.`
-        );
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || `Deploy failed (${response.status})`);
+      if (error) {
+        throw new Error(error.message || "Deployment failed.");
       }
 
       setDeployStage(-1);
-      setDeployMessage(data.message || "App deployed successfully!");
+      setDeployMessage((data && data.message) || "App deployed successfully!");
 
       // Reset form
       setSelectedFile(null);

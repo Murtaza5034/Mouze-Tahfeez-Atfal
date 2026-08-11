@@ -193,6 +193,7 @@ function createClient(url, key, options = {}) {
       updateUser: authApi.updateUser,
       onAuthStateChange: authApi.onAuthStateChange,
       getSession: authApi.getSession,
+      refreshSession: authApi.refreshSession,
     },
   };
 }

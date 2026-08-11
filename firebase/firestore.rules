@@ -21,11 +21,11 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
 
     function role() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      let uRole = u.exists && u.data.portal_role != null && u.data.portal_role != "" ? u.data.portal_role : null;
-      let a = get(/databases/$(database)/documents/user_portal_access/$(request.auth.uid));
-      let aRole = a.exists && a.data.portal_role != null && a.data.portal_role != "" ? a.data.portal_role : null;
-      return uRole != null ? uRole : aRole;
+      let uPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let aPath = /databases/$(database)/documents/user_portal_access/$(request.auth.uid);
+      let uRole = exists(uPath) ? get(uPath).data.portal_role : null;
+      let aRole = exists(aPath) ? get(aPath).data.portal_role : null;
+      return uRole != null && uRole != "" ? uRole : (aRole != null && aRole != "" ? aRole : null);
     }
 
     function isAdmin() { return isSignedIn() && role() == 'admin'; }
@@ -190,7 +190,9 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
     }
     match /elearning_tracking/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && (isAdmin() || isTeacher() || request.resource.data.user_id == request.auth.uid);
+      allow update, delete: if isSignedIn() && (isAdmin() || isTeacher() || resource.data.user_id == request.auth.uid);
     }
 
     match /parent_report_views/{studentId} {

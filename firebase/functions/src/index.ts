@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { GoogleAuth } from "google-auth-library";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -955,12 +956,284 @@ export const autoClearProgress = onSchedule("every 30 minutes", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// deployAndroidApp (stub: full Play upload requires AAB file bytes)
+// deployAndroidApp (Upload AAB and deploy to Google Play)
 // ---------------------------------------------------------------------------
 
-export const deployAndroidApp = onCall(async () => {
-  throw new HttpsError(
-    "unimplemented",
-    "Android upload requires direct AAB access. Build the release AAB and upload it via the Google Play Console."
-  );
+const PLAY_API_BASE = 'https://androidpublisher.googleapis.com/androidpublisher/v3';
+const PLAY_UPLOAD_BASE = 'https://androidpublisher.googleapis.com/upload/androidpublisher/v3';
+const PLAY_TRACKS = ['internal', 'alpha', 'beta', 'production'] as const;
+type PlayTrack = typeof PLAY_TRACKS[number];
+
+function parseServiceAccountKey(rawKey: string): Record<string, any> {
+  let cleaned = rawKey.trim();
+  if (
+    (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith('`') && cleaned.endsWith('`'))
+  ) {
+    cleaned = cleaned.substring(1, cleaned.length - 1).trim();
+  }
+  let sanitized = "";
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (escaped) {
+      sanitized += char;
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      sanitized += char;
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      sanitized += char;
+      continue;
+    }
+    if (inString && (char === '\n' || char === '\r')) {
+      if (char === '\n') {
+        sanitized += '\\n';
+      }
+      continue;
+    }
+    sanitized += char;
+  }
+  try {
+    return JSON.parse(sanitized);
+  } catch (err) {
+    try {
+      const unescaped = sanitized.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      return JSON.parse(unescaped);
+    } catch {
+      throw new Error(`GOOGLE_PLAY_SERVICE_ACCOUNT_KEY is not valid JSON. Parse error: ${(err as Error).message}`);
+    }
+  }
+}
+
+async function getPlayAccessToken(serviceAccountJson: string): Promise<{ token: string; clientEmail: string }> {
+  const credentials = parseServiceAccountKey(serviceAccountJson);
+  const clientEmail = String(credentials.client_email || "unknown");
+  const auth = new GoogleAuth({
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+  });
+  const client = await auth.getClient();
+  const token = await client.getAccessToken();
+  if (!token?.token) {
+    throw new Error("Failed to generate Google Play access token. Check your service account key.");
+  }
+  return { token: token.token, clientEmail };
+}
+
+async function deleteEdit(accessToken: string, packageName: string, editId: string) {
+  try {
+    await fetch(`${PLAY_API_BASE}/applications/${packageName}/edits/${editId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    // Best-effort cleanup
+  }
+}
+
+async function deployToPlayStore(
+  accessToken: string,
+  clientEmail: string,
+  packageName: string,
+  track: PlayTrack,
+  aabBytes: Buffer,
+  versionName: string,
+  versionCode: number,
+  releaseNotes: string
+) {
+  console.log('Creating edit...');
+  const editRes = await fetch(`${PLAY_API_BASE}/applications/${packageName}/edits`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!editRes.ok) {
+    const err = await editRes.text();
+    throw new Error(`Failed to create edit: ${editRes.status} — ${err}. (Package Name: "${packageName}", Service Account Email: "${clientEmail}".)`);
+  }
+
+  const edit = await editRes.json() as any;
+  const editId: string = edit.id;
+  console.log(`Edit created: ${editId}`);
+
+  try {
+    console.log(`Uploading AAB bundle (${(aabBytes.length / (1024 * 1024)).toFixed(1)} MB)...`);
+    const uploadUrl = `${PLAY_UPLOAD_BASE}/applications/${packageName}/edits/${editId}/bundles?uploadType=media`;
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: aabBytes as any,
+    });
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text();
+      throw new Error(`Failed to upload AAB: ${uploadRes.status} — ${err}`);
+    }
+
+    const bundle = await uploadRes.json() as any;
+    const bundleVersionCode: number = bundle.versionCode;
+    console.log(`AAB uploaded. Version code: ${bundleVersionCode}`);
+
+    console.log(`Assigning to track: ${track}...`);
+    const trackUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}/tracks/${track}`;
+    const trackPayload = {
+      track,
+      releases: [
+        {
+          name: versionName,
+          versionCodes: [bundleVersionCode],
+          releaseNotes: releaseNotes
+            ? [{ language: 'en-US', text: releaseNotes }]
+            : [],
+          status: 'completed',
+        },
+      ],
+    };
+
+    const trackRes = await fetch(trackUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(trackPayload),
+    });
+
+    if (!trackRes.ok) {
+      const err = await trackRes.text();
+      throw new Error(`Failed to assign to track: ${trackRes.status} — ${err}`);
+    }
+
+    console.log(`Assigned to track "${track}" successfully.`);
+
+    console.log('Committing edit...');
+    const commitUrl = `${PLAY_API_BASE}/applications/${packageName}/edits/${editId}:commit`;
+    const commitRes = await fetch(commitUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!commitRes.ok) {
+      const err = await commitRes.text();
+      throw new Error(`Failed to commit edit: ${commitRes.status} — ${err}`);
+    }
+
+    const commitResult = await commitRes.json();
+    console.log('Edit committed successfully.');
+
+    return {
+      editId,
+      bundleVersionCode,
+      commitResult,
+    };
+  } catch (deployError) {
+    console.log(`Cleaning up edit ${editId}...`);
+    await deleteEdit(accessToken, packageName, editId);
+    throw deployError;
+  }
+}
+
+export const deployAndroidApp = onCall({ timeoutSeconds: 300 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Unauthorized — please log in again.");
+  }
+
+  const { aabUrl, aabFileName, aabFileSize, track, versionName, versionCode, releaseNotes } = request.data || {};
+
+  if (!aabUrl) throw new HttpsError("invalid-argument", "AAB URL is required");
+  if (!track || !PLAY_TRACKS.includes(track as PlayTrack)) {
+    throw new HttpsError("invalid-argument", `Track must be one of: ${PLAY_TRACKS.join(', ')}`);
+  }
+  if (!versionName) throw new HttpsError("invalid-argument", "Version name is required");
+  if (!versionCode) throw new HttpsError("invalid-argument", "Version code is required");
+
+  // Create pending release record
+  const releaseRef = await db.collection("app_releases").add({
+    version_name: versionName,
+    version_code: versionCode,
+    track,
+    release_notes: releaseNotes || "",
+    aab_file_name: aabFileName || "release.aab",
+    aab_file_size: aabFileSize || 0,
+    status: "deploying",
+    console_status: "in_review",
+    created_at: new Date().toISOString(),
+    created_by: request.auth.uid,
+  });
+
+  const releaseId = releaseRef.id;
+
+  try {
+    const serviceAccountJson = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountJson) {
+      throw new Error("GOOGLE_PLAY_SERVICE_ACCOUNT_KEY environment variable is not set. Google Play upload is disabled.");
+    }
+    const packageName = process.env.GOOGLE_PLAY_PACKAGE_NAME || "com.mauzetahfeez.myapp";
+
+    // 1. Get Google Play access token
+    const { token: accessToken, clientEmail } = await getPlayAccessToken(serviceAccountJson);
+
+    // 2. Download AAB file from storage url
+    const fileRes = await fetch(aabUrl);
+    if (!fileRes.ok) {
+      throw new Error(`Failed to download AAB file from storage: ${fileRes.status}`);
+    }
+    const aabBytes = Buffer.from(await fileRes.arrayBuffer());
+
+    // 3. Deploy to Play Store
+    const { editId, bundleVersionCode } = await deployToPlayStore(
+      accessToken,
+      clientEmail,
+      packageName,
+      track as PlayTrack,
+      aabBytes,
+      versionName,
+      versionCode,
+      releaseNotes || ""
+    );
+
+    // 4. Update status to live
+    await db.collection("app_releases").doc(releaseId).update({
+      status: "live",
+      edit_id: editId,
+      bundle_version_code: bundleVersionCode,
+    });
+
+    return {
+      success: true,
+      message: `App v${versionName} deployed to ${track} track successfully!`,
+      release: {
+        id: releaseId,
+        versionName,
+        versionCode,
+        track,
+        editId,
+        bundleVersionCode,
+      },
+    };
+  } catch (err) {
+    console.error("Deploy error:", err);
+    await db.collection("app_releases").doc(releaseId).update({
+      status: "failed",
+      error_message: (err as Error).message,
+    });
+    throw new HttpsError("internal", (err as Error).message);
+  }
 });

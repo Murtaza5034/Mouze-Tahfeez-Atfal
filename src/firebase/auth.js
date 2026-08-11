@@ -96,6 +96,32 @@ const authApi = {
     };
   },
 
+  refreshSession: async () => {
+    await waitForAuthReady();
+    const fbUser = auth.currentUser;
+    if (!fbUser) {
+      return { data: { session: null, user: null }, error: { message: "No session" } };
+    }
+    try {
+      const idToken = await getIdToken(fbUser, true);
+      const user = fbUserToSupabaseUser(fbUser);
+      return {
+        data: {
+          session: {
+            access_token: idToken,
+            refresh_token: null,
+            expires_at: null,
+            user,
+          },
+          user,
+        },
+        error: null,
+      };
+    } catch (err) {
+      return { data: { session: null, user: null }, error: fbError(err) };
+    }
+  },
+
   signInWithPassword: async ({ email, password }) => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
