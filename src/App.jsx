@@ -5153,7 +5153,9 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         return fresh ? { ...prev, ...fresh } : prev;
       });
     };
-    const interval = setInterval(poll, 2500);
+    // Realtime (parent-leaves-realtime) pushes instant updates; this slower
+    // poll is only a safety net so we don't hammer Firestore while a chat is open.
+    const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
   }, [studentProfile?.student_id]);
 
@@ -7861,7 +7863,9 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
       setChatModal(prev => prev && String(prev.id) === String(data.id) ? { ...prev, ...data } : prev);
       setLeaves(prev => prev.map(l => String(l.id) === String(data.id) ? { ...l, ...data } : l));
     };
-    const interval = setInterval(poll, 2500);
+    // Realtime (admin-leaves-realtime) pushes instant updates; this slower
+    // poll is only a safety net so we don't hammer Firestore while a chat is open.
+    const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
   }, [chatModal?.id]);
 

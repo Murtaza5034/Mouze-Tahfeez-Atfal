@@ -1,5 +1,8 @@
 import {
+  initializeFirestore,
   getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   doc,
   getDocs,
@@ -35,7 +38,21 @@ import { firebaseApp } from "./config.js";
 // migrate.ts writes docs using exactly this scheme.
 // ---------------------------------------------------------------------------
 
-const db = getFirestore(firebaseApp);
+// Enable IndexedDB offline persistence + multi-tab cache. Once data is cached
+// locally, repeat page loads render instantly (no network round-trip) and the
+// realtime onSnapshot listeners keep the cache fresh in the background.
+// Falls back to plain in-memory Firestore if IndexedDB is unavailable (e.g.
+// private/incognito browsing) so the app never breaks.
+let db;
+try {
+  db = initializeFirestore(firebaseApp, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch (_e) {
+  db = getFirestore(firebaseApp);
+}
 
 export { db };
 
