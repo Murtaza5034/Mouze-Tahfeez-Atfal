@@ -13,6 +13,16 @@ import { initializeApp, getApps } from "firebase/app";
 const projectId =
   import.meta.env.VITE_FIREBASE_PROJECT_ID || "mawaid-b929a";
 
+// Normalize a legacy `PROJECT_ID.appspot.com` storage bucket to the current
+// `PROJECT_ID.firebasestorage.app` domain. Firebase Storage buckets are only
+// reachable via the .firebasestorage.app host now — the old .appspot.com name
+// 404s and fails the CORS preflight (which is exactly what broke photo uploads
+// when a stale VITE_FIREBASE_STORAGE_BUCKET was set in a build environment).
+// This guard runs at build time so a stale env var can never poison the bundle
+// again, regardless of where the build happens (local shell, Vercel, CI).
+const normalizeStorageBucket = (bucket) =>
+  String(bucket || "").replace(/\.appspot\.com$/i, ".firebasestorage.app");
+
 const firebaseConfig = {
   apiKey:
     import.meta.env.VITE_FIREBASE_API_KEY ||
@@ -20,8 +30,9 @@ const firebaseConfig = {
   authDomain:
     import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
   projectId,
-  storageBucket:
-    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
+  storageBucket: normalizeStorageBucket(
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`
+  ),
   messagingSenderId:
     import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "353078822685",
   appId:
