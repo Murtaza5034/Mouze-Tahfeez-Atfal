@@ -2615,6 +2615,10 @@ async function fetchGlobalRanks() {
 
 // Prevent stacked full-portal reloads when many realtime events fire at once.
 let portalLoadInFlight = false;
+// When a reload is requested while another one is still running (e.g. the parent
+// switches child mid-refresh), remember that a fresh run is needed so the latest
+// child selection is honored instead of being silently dropped.
+let portalLoadPending = false;
 
 async function authorizePortalAccess(user, requestedRole) {
   const tableAccess = await findPortalAccess(user.id);
@@ -5961,6 +5965,7 @@ function ParentPortal({
   onRoleChange,
   teacherProfiles = [],
   setSelectedStudentId,
+  onSelectChild,
   onLogout,
   loadPortalData,
   portalRole,
@@ -6508,7 +6513,7 @@ function ParentPortal({
                 <button
                   key={p.student_id}
                   className={`drawer-link ${String(p.student_id) === String(studentProfile?.student_id) ? "active" : ""}`}
-                  onClick={() => { setSelectedStudentId(p.student_id); setMenuOpen(false); }}
+                  onClick={() => { onSelectChild(p.student_id); setMenuOpen(false); }}
                 >
                   <User size={16} /> {p.full_name}
                 </button>
@@ -7406,7 +7411,7 @@ function ParentPortal({
                               if (targetPage.startsWith("Jadwal")) {
                                 const parts = targetPage.split(":");
                                 if (parts[1]) {
-                                  setSelectedStudentId(parts[1]);
+                                  onSelectChild(parts[1]);
                                 }
                                 targetPage = "Jadwal";
                               }
@@ -7497,7 +7502,7 @@ function ParentPortal({
                       if (targetPage.startsWith("Jadwal")) {
                         const parts = targetPage.split(":");
                         if (parts[1]) {
-                          setSelectedStudentId(parts[1]);
+                          onSelectChild(parts[1]);
                         }
                         targetPage = "Jadwal";
                       }
@@ -19789,7 +19794,28 @@ export default function App() {
     return enabled && wasLocked;
   });
   const [actionMessage, setActionMessage] = useState(null);
-  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState(() => {
+    // Restore the last child the parent was viewing so a page refresh does not
+    // bounce the portal back to the first child. Only restored when it still
+    // belongs to the cached parent profiles (avoids cross-account mixups).
+    try {
+      const saved = localStorage.getItem("mauze-selected-child");
+      if (!saved) return "";
+      const raw = localStorage.getItem("mauze_portal_cache");
+      if (raw) {
+        const cache = JSON.parse(raw);
+        if (cache?.role === "parents" && Array.isArray(cache?.parentData?.allProfiles)) {
+          const match = cache.parentData.allProfiles.find(p => String(p.student_id) === String(saved));
+          if (match) return String(saved);
+        }
+      }
+    } catch (_) {}
+    return "";
+  });
+  const selectedStudentIdRef = useRef(null);
+  useEffect(() => {
+    selectedStudentIdRef.current = selectedStudentId;
+  }, [selectedStudentId]);
   const [activeStudentId, setActiveStudentId] = useState(null);
   const [attachedFileUrl, setAttachedFileUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -20638,9 +20664,21 @@ export default function App() {
       return;
     }
 
+    // NOTE: Do NOT sync selectedStudentIdRef here. The ref is kept current by
+    // the effect on [selectedStudentId] and by selectParentChild, and this
+    // function may be invoked from an older render closure (background/realtime
+    // refreshes, or the click handler) whose selectedStudentId is stale — syncing
+    // here would clobber the latest selection and revert the portal to child 1.
+
     if (portalLoadInFlight) {
-      // A full reload is already running; skip this overlapping call.
-      if (silent) return;
+      // A full reload is already running. Instead of silently dropping this
+      // request (which used to swallow parent child-switch clicks during
+      // background refreshes), remember that a fresh run is needed and re-run
+      // once the current reload finishes so the newest selection is honored.
+      if (silent) {
+        portalLoadPending = true;
+        return;
+      }
     }
     portalLoadInFlight = true;
 
@@ -20735,7 +20773,8 @@ export default function App() {
           );
 
           // If multiple students, and none selected, use first
-          const activeStudent = processedStudents.find(p => String(p.student_id) === String(selectedStudentId)) || processedStudents[0];
+          const currentSelectedId = selectedStudentIdRef.current || selectedStudentId;
+          const activeStudent = processedStudents.find(p => String(p.student_id) === String(currentSelectedId)) || processedStudents[0];
           
           // Bulletproof search for activeResult using the already matched latestResult from buildStudents
           let activeResult = activeStudent.latestResult;
@@ -20754,7 +20793,7 @@ export default function App() {
                 }
               });
               // Re-find active result after rank override
-              const updatedActive = processedStudents.find(p => String(p.student_id) === String(selectedStudentId)) || processedStudents[0];
+              const updatedActive = processedStudents.find(p => String(p.student_id) === String(currentSelectedId)) || processedStudents[0];
               activeResult = updatedActive?.latestResult || activeResult;
             }
           } catch (_e) {
@@ -20807,7 +20846,9 @@ export default function App() {
             reportSettings: reportSettingsResponse.data || [],
           };
 
-          if (!selectedStudentId) { setSelectedStudentId(activeStudent.student_id); }
+          if (!selectedStudentIdRef.current) { setSelectedStudentId(activeStudent.student_id); }
+          // Remember the active child so a page refresh returns to the same child.
+          try { localStorage.setItem("mauze-selected-child", String(activeStudent.student_id)); } catch (_) {}
         }
 
         setParentData(nextParentState);
@@ -21012,9 +21053,31 @@ export default function App() {
       });
     } finally {
       portalLoadInFlight = false;
+      if (portalLoadPending) {
+        // A child switch (or other update) was requested while we were loading.
+        // Re-run once so the latest selection is applied instead of being lost.
+        portalLoadPending = false;
+        loadPortalData(role, currentUser, parentProfileOverride, { silent: true }).catch(() => {});
+      }
       setLoading(false);
     }
   }
+
+  // Switch the active child in the parent portal. Sets state, persists the
+  // choice (so page refreshes keep the same child), and forces a data reload
+  // that cannot be lost to an in-flight background refresh.
+  const selectParentChild = useCallback((childId) => {
+    const id = childId ? String(childId) : "";
+    selectedStudentIdRef.current = id;
+    setSelectedStudentId(id);
+    try {
+      if (id) localStorage.setItem("mauze-selected-child", id);
+      else localStorage.removeItem("mauze-selected-child");
+    } catch (_) {}
+    if (user && portalRole === "parents") {
+      loadPortalData(portalRole, user, null, { silent: true }).catch(() => {});
+    }
+  }, [user, portalRole]);
 
   const teacherIdentity = useMemo(() => guessTeacherIdentity(user, portalAccess), [user, portalAccess]);
 
@@ -23120,6 +23183,7 @@ const handleSendCustomNotification = async (event) => {
             setMenuOpen={setMenuOpen}
             setSelectedAnnouncement={setSelectedAnnouncement}
             setSelectedStudentId={setSelectedStudentId}
+            onSelectChild={selectParentChild}
             showAction={showAction}
             teacherProfiles={teacherProfiles}
             user={user}
