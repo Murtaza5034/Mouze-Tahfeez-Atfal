@@ -134,7 +134,7 @@ to the corresponding `firestore.rules` `allow` statement. Stub
 Buckets: `child profile pictures`, `marhala_post_photos`, `muhaffezat atfal`,
 `notification_files`, `report_backgrounds`, `teacher_photos`.
 
-Firebase Storage bucket: `al-mawaid-1ihvq0.appspot.com`.
+Firebase Storage bucket: `mawaid-b929a.firebasestorage.app`.
 Mirror rules with `storage.rules`.
 
 ## 7. Client adapter

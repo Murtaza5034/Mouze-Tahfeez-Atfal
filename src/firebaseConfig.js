@@ -10,7 +10,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAxoLoIPRZum286Y0uXM3Vq98V3403L7Uo",
   authDomain: "mawaid-b929a.firebaseapp.com",
   projectId: "mawaid-b929a",
-  storageBucket: "mawaid-b929a.appspot.com",
+  storageBucket: "mawaid-b929a.firebasestorage.app",
   messagingSenderId: "353078822685",
   appId: "1:353078822685:android:8f83b293733213472bc3f4",
   measurementId: "B5W2bPUAQQmqbmDf5lF-6g"

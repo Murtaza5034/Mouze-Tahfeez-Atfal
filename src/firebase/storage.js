@@ -27,7 +27,24 @@ function joinPath(bucket, path) {
 
 function supabaseError(error) {
   if (!error) return { message: "Storage error" };
-  return { message: error.message || String(error) };
+  return { message: error.message || String(error), code: error.code || undefined };
+}
+
+// Hard bound on every upload so a hung token fetch, stalled XHR, or dead
+// network can never leave a caller stuck at an indefinite "Uploading..."
+// state with no way out.
+function withTimeout(promise, ms, message) {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const err = new Error(message || `Request timed out after ${Math.round(ms / 1000)}s`);
+        err.code = "storage/timeout";
+        reject(err);
+      }, ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 function buildStorageFrom(bucketName) {
@@ -44,7 +61,11 @@ function buildStorageFrom(bucketName) {
           metadata.contentType = options.contentType;
         }
         if (options.upsert !== false) metadata.upsertFlag = true; // updateBytes overwrites anyway
-        const snap = await uploadBytes(storageRef, file, metadata);
+        const snap = await withTimeout(
+          uploadBytes(storageRef, file, metadata),
+          60000,
+          "Upload timed out after 60s. Please check your internet connection and try again."
+        );
         return { data: { path: snap.metadata.fullPath }, error: null };
       } catch (error) {
         return { data: null, error: supabaseError(error) };
@@ -136,7 +157,7 @@ function buildStorageFrom(bucketName) {
 
 function firebaseStoragePublicUrl(fullPath) {
   const encoded = encodeURIComponent(fullPath);
-  const bucket = storage.app.options.storageBucket || "mawaid-b929a.appspot.com";
+  const bucket = storage.app.options.storageBucket || "mawaid-b929a.firebasestorage.app";
   return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encoded}?alt=media`;
 }
 

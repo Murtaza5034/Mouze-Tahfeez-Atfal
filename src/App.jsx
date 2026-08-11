@@ -1177,6 +1177,23 @@ function getFileNameFromUrl(url) {
   }
 }
 
+// Some profile photos were migrated from a deleted Supabase project
+// (xmlmfijikkptvwbkkoil.supabase.co) whose host no longer resolves on the
+// internet. Rendering those URLs fires ERR_NAME_NOT_RESOLVED requests. Filter
+// them out so the UI falls back to the default avatar without ever requesting
+// the dead host.
+const DEAD_PHOTO_HOSTS = ["xmlmfijikkptvwbkkoil.supabase.co"];
+function cleanPhotoUrl(url) {
+  if (!url) return "";
+  try {
+    const host = new URL(url).hostname;
+    if (DEAD_PHOTO_HOSTS.includes(host)) return "";
+  } catch (_) {
+    return "";
+  }
+  return url;
+}
+
 async function downloadFile(...args) {
   const { downloadFile: df } = await import("./downloadUtils");
   return df(...args);
@@ -2056,7 +2073,7 @@ function QuranIkhtebar({ studentProfile, hifzDetails }) {
         const { error: uploadError } = await supabase.storage.from("ikhtebar_recordings").upload(fileName, blob);
         if (uploadError) return;
 
-        const { data: publicUrlData } = supabase.storage.from("ikhtebar_recordings").getPublicUrl(fileName);
+        const { data: publicUrlData } = await supabase.storage.from("ikhtebar_recordings").getPublicUrl(fileName);
 
         // Calculate score/stars
         const starCount = calculateStars(mistakes.length);
@@ -2957,7 +2974,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       badal_teacher_id: profile.badal_teacher_id || null,
       user_id: profile.parent_user_id || null,
       parent_email: profile.parent_email || null,
-      photoUrl: profile.photo_url || "",
+      photoUrl: cleanPhotoUrl(profile.photo_url || ""),
       whatsapp_number: profile.whatsapp_number || "",
       hifz: {
         juz: profile.juz || "N-A",
@@ -3315,7 +3332,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             <div className="report-student-name" style={{ marginTop: '28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', border: '3px solid var(--primary-gold)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8' }}>
                 {student?.photoUrl || student?.photo_url ? (
-                  <img src={student.photoUrl || student.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={student.photoUrl || student.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/logo.png"; }} />
                 ) : (
                   <span style={{ fontSize: '32px', lineHeight: '70px', color: 'var(--soft-brown)' }}>👤</span>
                 )}
@@ -3669,7 +3686,7 @@ function RankPreview({ students }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', background: '#f0ede8', flexShrink: 0 }}>
                         {s.photoUrl ? (
-                          <img src={s.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={s.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/logo.png"; }} />
                         ) : (
                           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>\U0001F464</div>
                         )}
@@ -6045,7 +6062,8 @@ function ParentPortal({
   const fetchPageVisibility = useCallback(async () => {
     const [pvRes, jsRes] = await Promise.all([
       supabase.from('page_visibility')
-        .select('page_key, role, visible'),
+        .select('page_key, role, visible')
+        .eq('role', 'parents'),
       supabase.from('jadwal_settings')
         .select('parent_leave_enabled')
         .eq('id', 1)
@@ -7167,7 +7185,7 @@ function ParentPortal({
                           <Sparkles size={12} /> My Child's {muhaffizTag(t)}
                         </div>
                         <div className="teacher-card-inner">
-                          <img src={photo} alt={t.full_name} className="teacher-photo-square" />
+                          <img src={photo} alt={t.full_name} className="teacher-photo-square" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.LOGO; }} />
                           <div className="teacher-details">
                             <h3>{t.full_name}</h3>
                             <p className="teacher-specialty">Assigned {muhaffizTag(t)}</p>
@@ -7220,7 +7238,7 @@ function ParentPortal({
                           return (
                             <article key={t.id} className="premium-card teacher-profile-card">
                               <div className="teacher-card-inner">
-                                <img src={photo} alt={t.full_name} className="teacher-photo-square" />
+                                <img src={photo} alt={t.full_name} className="teacher-photo-square" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.LOGO; }} />
                                 <div className="teacher-details">
                                   <h3>{t.full_name}</h3>
                                   <p className="teacher-specialty">{roleLabel(t.teacher_role)}</p>
@@ -9220,7 +9238,7 @@ function AdminPortal({
       const fileName = `student-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
       const { error } = await supabase.storage.from("teacher_photos").upload(fileName, file);
       if (error) throw error;
-      const { data: publicUrlData } = supabase.storage.from("teacher_photos").getPublicUrl(fileName);
+      const { data: publicUrlData } = await supabase.storage.from("teacher_photos").getPublicUrl(fileName);
       const input = document.querySelector('form.stack-form input[name="photo_url"]');
       if (input) input.value = publicUrlData.publicUrl;
       onShowAction("success", "Photo uploaded!");
@@ -9241,7 +9259,7 @@ function AdminPortal({
       const fileName = `student-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
       const { error } = await supabase.storage.from("teacher_photos").upload(fileName, file);
       if (error) throw error;
-      const { data: publicUrlData } = supabase.storage.from("teacher_photos").getPublicUrl(fileName);
+      const { data: publicUrlData } = await supabase.storage.from("teacher_photos").getPublicUrl(fileName);
       const form = document.querySelector('.assignment-form-complex form');
       if (form && form.photo_url) form.photo_url.value = publicUrlData.publicUrl;
       onShowAction("success", "Photo uploaded!");
@@ -9913,7 +9931,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage
+      const { data: publicUrlData } = await supabase.storage
         .from(REPORT_BACKGROUND_BUCKET)
         .getPublicUrl(filePath);
 
@@ -9980,7 +9998,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage
+      const { data: publicUrlData } = await supabase.storage
         .from(REPORT_BACKGROUND_BUCKET)
         .getPublicUrl(filePath);
 
@@ -10038,7 +10056,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           contentType: file.type,
         });
       if (uploadError) throw uploadError;
-      const { data: publicUrlData } = supabase.storage
+      const { data: publicUrlData } = await supabase.storage
         .from(REPORT_BACKGROUND_BUCKET)
         .getPublicUrl(filePath);
       const logoUrl = publicUrlData?.publicUrl;
@@ -12858,7 +12876,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
                   <div className="form-section">
                     <div className="form-section-title">Profile Photo</div>
-                    <label>
+                    <div className="photo-upload-field">
                       <div className="photo-upload-row">
                         <label className="photo-upload-btn">
                           <input
@@ -12878,14 +12896,21 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                             </span>
                           )}
                         </label>
-                        {adminForms.teacherProfile.photo_url && (
-                          <img
-                            src={adminForms.teacherProfile.photo_url}
-                            alt="Preview"
-                            className="photo-preview-circle"
-                            onError={(e) => { e.target.style.display = 'none'; }}
-                          />
-                        )}
+                        {adminForms.teacherProfile.photo_url ? (
+                          <div className="photo-preview-wrap">
+                            <img
+                              key={adminForms.teacherProfile.photo_url}
+                              src={adminForms.teacherProfile.photo_url}
+                              alt="Uploaded photo preview"
+                              className="photo-preview-circle"
+                              onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+                            />
+                            <span className="photo-preview-fallback" aria-hidden="true">👤</span>
+                            <span className="photo-uploaded-badge">
+                              <CheckCircle size={12} /> Uploaded
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                       <input
                         type="text"
@@ -12895,7 +12920,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         placeholder="https://example.com/photo.jpg"
                         className="photo-url-input"
                       />
-                    </label>
+                    </div>
                   </div>
 
                   <div className="form-section">
@@ -12972,10 +12997,10 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                     <div className="preview-card">
                       <div className="preview-card-header">
                         <img
-                          src={sel.photo_url || "/default-avatar.png"}
+                          src={sel.photo_url || "/logo.png"}
                           alt=""
                           className="preview-avatar"
-                          onError={(e) => { e.target.src = "/default-avatar.png"; }}
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/logo.png"; }}
                         />
                         <div className="preview-info">
                           <strong>{sel.full_name}</strong>
@@ -13022,7 +13047,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                   {teacherProfiles.map(profile => (
                     <article key={profile.id} className="record-card flex-row-card">
                       <div className="profile-identity-row">
-                        <img src={profile.photo_url || "/default-avatar.png"} alt="" className="user-dp-badge" />
+                        <img src={profile.photo_url || "/logo.png"} alt="" className="user-dp-badge" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/logo.png"; }} />
                         <div>
                           <strong>{profile.full_name}</strong>
                           <p className="record-sub" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -13090,7 +13115,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                               <div className="p-faculty-profile">
                                 <div className="p-faculty-avatar-container">
                                   {profile.photo_url ? (
-                                    <img src={profile.photo_url} alt={profile.full_name} className="p-faculty-img" />
+                                    <img src={profile.photo_url} alt={profile.full_name} className="p-faculty-img" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/logo.png"; }} />
                                   ) : (
                                     <div className="p-faculty-avatar-fallback">
                                       {profile.full_name.charAt(0)}
@@ -13965,8 +13990,16 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                             }
                             setResetPasswordLoading(true);
                             try {
+                              const targetEmail = (resetPasswordTarget.email || "").trim();
+                              const targetUserId = resetPasswordTarget.user_id || "";
+                              if (!targetEmail && !targetUserId) {
+                                setResetPasswordError("This staff member has no linked email or user ID. Add an email to their portal access first.");
+                                setResetPasswordLoading(false);
+                                return;
+                              }
                               const { data, error } = await supabase.rpc("reset_user_password", {
-                                target_email: resetPasswordTarget.email,
+                                target_email: targetEmail || undefined,
+                                target_user_id: targetUserId || undefined,
                                 new_password: resetPasswordNewPass
                               });
                               if (error) {
@@ -15738,7 +15771,7 @@ function TeacherPortal({
             name: p.full_name || "",
             arabic_name: fixArabicScript(p.arabic_name),
             groupName: p.group_name || "Ungrouped",
-            photoUrl: p.photo_url || "",
+            photoUrl: cleanPhotoUrl(p.photo_url || ""),
             full_name: p.full_name,
             group_name: p.group_name,
             class: p.class,
@@ -15989,6 +16022,7 @@ function TeacherPortal({
     const { data } = await supabase
       .from('page_visibility')
       .select('page_key, role, visible')
+      .eq('role', 'teacher')
       .then(r => r, () => ({ data: null }));
     const map = {};
     if (data) {
@@ -17084,16 +17118,6 @@ function TeacherPortal({
                         searchPlaceholder="Search child by name…"
                       />
                     </label>
-
-                    <button
-                      type="button"
-                      className="mp-clear-btn"
-                      onClick={handleClearResultFields}
-                      disabled={!canEditCurrentResult || !teacherForms.result.student_id}
-                      title="Clear all marks/fields so you can fill them fresh. If you don't click this, the fields stay filled with last week's data."
-                    >
-                      <Trash2 size={15} /> Clear All Fields
-                    </button>
                   </div>
 
                   <fieldset disabled={!canEditCurrentResult} style={{ border: 0, padding: 0, margin: 0 }}>
@@ -17236,14 +17260,12 @@ function TeacherPortal({
                     </label>
                     <label>
                       <span>Wusool Page</span>
-                      <input
-                        type="text"
-                        name="wusool_page"
+                      <SurahPagePicker
+                        juz={teacherForms.result.wusool_juz}
+                        surah={teacherForms.result.wusool_surah}
                         value={teacherForms.result.wusool_page}
+                        name="wusool_page"
                         onChange={onTeacherFormChange}
-                        readOnly
-                        title="Auto-filled from selected surah"
-                        placeholder="Auto from surah"
                         disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
@@ -17318,14 +17340,12 @@ function TeacherPortal({
                     </label>
                     <label>
                       <span>Next Week Page</span>
-                      <input
-                        type="text"
-                        name="next_week_page"
+                      <SurahPagePicker
+                        juz={teacherForms.result.next_week_juz}
+                        surah={teacherForms.result.next_week_surah}
                         value={teacherForms.result.next_week_page}
+                        name="next_week_page"
                         onChange={onTeacherFormChange}
-                        readOnly
-                        title="Auto-filled from selected surah"
-                        placeholder="Auto from surah"
                         disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
@@ -17371,14 +17391,12 @@ function TeacherPortal({
                     </label>
                     <label>
                       <span>Takhteet Page</span>
-                      <input
-                        type="text"
-                        name="istifadah_page"
+                      <SurahPagePicker
+                        juz={teacherForms.result.istifadah_juz}
+                        surah={teacherForms.result.istifadah_surah}
                         value={teacherForms.result.istifadah_page}
+                        name="istifadah_page"
                         onChange={onTeacherFormChange}
-                        readOnly
-                        title="Auto-filled from selected surah"
-                        placeholder="Auto from surah"
                         disabled={selectedResultLocked || !canTeacherFillProgress}
                       />
                     </label>
@@ -17470,6 +17488,18 @@ function TeacherPortal({
                       placeholder="Behaviour, attendance, or memorization note"
                     />
                   </label>
+
+                  <div className="mp-form-actions">
+                    <button
+                      type="button"
+                      className="mp-clear-btn"
+                      onClick={handleClearResultFields}
+                      disabled={!canEditCurrentResult || !teacherForms.result.student_id}
+                      title="Clear all marks/fields so you can fill them fresh. If you don't click this, the fields stay filled with last week's data."
+                    >
+                      <Trash2 size={15} /> Clear All Fields
+                    </button>
+                  </div>
                   </div>
 
                   </fieldset>
@@ -19232,122 +19262,74 @@ const SURAH_NAMES_AR = [
   "المسد","الإخلاص","الفلق","الناس"
 ];
 
-// --- Misri Quran Surah to Page Mapping (Standard 604-page Mushaf) ---
-const SURAH_TO_PAGE = {
-  1: 1,    // Al-Fatiha
-  2: 2,    // Al-Baqarah
-  3: 50,   // Aal-Imran
-  4: 77,   // An-Nisa
-  5: 106,  // Al-Ma'idah
-  6: 128,  // Al-An'am
-  7: 151,  // Al-A'raf
-  8: 177,  // Al-Anfal
-  9: 187,  // At-Tawbah
-  10: 208, // Yunus
-  11: 221, // Hud
-  12: 235, // Yusuf
-  13: 249, // Ar-Ra'd
-  14: 255, // Ibrahim
-  15: 262, // Al-Hijr
-  16: 267, // An-Nahl
-  17: 282, // Al-Isra
-  18: 293, // Al-Kahf
-  19: 305, // Maryam
-  20: 312, // Ta-Ha
-  21: 322, // Al-Anbiya
-  22: 332, // Al-Hajj
-  23: 342, // Al-Mu'minun
-  24: 349, // An-Nur
-  25: 359, // Al-Furqan
-  26: 367, // Ash-Shu'ara
-  27: 377, // An-Naml
-  28: 385, // Al-Qasas
-  29: 396, // Al-Ankabut
-  30: 404, // Ar-Rum
-  31: 411, // Luqman
-  32: 415, // As-Sajdah
-  33: 418, // Al-Ahzab
-  34: 428, // Saba
-  35: 434, // Fatir
-  36: 440, // Ya-Sin
-  37: 446, // As-Saffat
-  38: 453, // Sad
-  39: 458, // Az-Zumar
-  40: 467, // Ghafir
-  41: 477, // Fussilat
-  42: 483, // Ash-Shura
-  43: 489, // Az-Zukhruf
-  44: 496, // Ad-Dukhan
-  45: 499, // Al-Jathiyah
-  46: 502, // Al-Ahqaf
-  47: 507, // Muhammad
-  48: 511, // Al-Fath
-  49: 515, // Al-Hujurat
-  50: 518, // Qaf
-  51: 520, // Adh-Dhariyat
-  52: 523, // At-Tur
-  53: 526, // An-Najm
-  54: 528, // Al-Qamar
-  55: 531, // Ar-Rahman
-  56: 534, // Al-Waqi'ah
-  57: 537, // Al-Hadid
-  58: 542, // Al-Mujadilah
-  59: 545, // Al-Hashr
-  60: 548, // Al-Mumtahanah
-  61: 551, // As-Saff
-  62: 553, // Al-Jumu'ah
-  63: 555, // Al-Munafiqun
-  64: 557, // At-Taghabun
-  65: 559, // At-Talaq
-  66: 561, // At-Tahrim
-  67: 563, // Al-Mulk
-  68: 566, // Al-Qalam
-  69: 568, // Al-Haqqah
-  70: 570, // Al-Ma'arij
-  71: 572, // Nuh
-  72: 574, // Al-Jinn
-  73: 576, // Al-Muzzammil
-  74: 578, // Al-Muddaththir
-  75: 580, // Al-Qiyamah
-  76: 581, // Al-Insan
-  77: 583, // Al-Mursalat
-  78: 584, // An-Naba
-  79: 586, // An-Nazi'at
-  80: 587, // Abasa
-  81: 588, // At-Takwir
-  82: 589, // Al-Infitar
-  83: 590, // Al-Mutaffifin
-  84: 591, // Al-Inshiqaq
-  85: 592, // Al-Buruj
-  86: 593, // At-Tariq
-  87: 593, // Al-A'la
-  88: 594, // Al-Ghashiyah
-  89: 595, // Al-Fajr
-  90: 596, // Al-Balad
-  91: 596, // Ash-Shams
-  92: 597, // Al-Layl
-  93: 597, // Ad-Duha
-  94: 597, // Ash-Sharh
-  95: 598, // At-Tin
-  96: 598, // Al-Alaq
-  97: 598, // Al-Qadr
-  98: 599, // Al-Bayyinah
-  99: 599, // Al-Zalzalah
-  100: 600, // Al-Adiyat
-  101: 600, // Al-Qari'ah
-  102: 601, // At-Takathur
-  103: 601, // Al-Asr
-  104: 601, // Al-Humazah
-  105: 601, // Al-Fil
-  106: 601, // Quraysh
-  107: 602, // Al-Ma'un
-  108: 602, // Al-Kawthar
-  109: 602, // Al-Kafirun
-  110: 602, // An-Nasr
-  111: 603, // Al-Masad
-  112: 603, // Al-Ikhlas
-  113: 603, // Al-Falaq
-  114: 603, // An-Nas
+// Exact surah page resolution for the teacher progress form (Misri/Madani 604-page mushaf):
+// - juz 26-30 (or no juz yet) → the exact page where the selected surah starts
+// - juz 1-25 → any page within the selected surah's range (start page .. last page of the surah)
+const resolveSurahPage = (juz, surahNum, currentPage) => {
+  const start = getAyahPage(surahNum, 1);
+  const end = surahNum < 114 ? Math.max(start, getAyahPage(surahNum + 1, 1) - 1) : 604;
+  if (!juz || juz < 1 || juz >= 26) return start;
+  const cur = Number(currentPage);
+  return Number.isFinite(cur) && cur >= start && cur <= end ? cur : start;
+};
+
+// Page field for Wusool / Next Week / Target Till:
+// exact auto-filled page for juz 26-30, or a dropdown of the surah's page range for juz 1-25.
+const SurahPagePicker = ({ juz, surah, value, name, onChange, disabled }) => {
+  const surahIdx = SURAH_NAMES_AR.indexOf(surah);
+  const surahNum = surahIdx + 1;
+  const juzNum = Number(juz);
+  const hasSurah = surahIdx >= 0;
+  const isRangeMode = hasSurah && juzNum >= 1 && juzNum <= 25;
+  const raw = String(value ?? "").trim();
+  const isPure = /^\d+$/.test(raw);
+  const cur = isPure ? Number(raw) : NaN;
+  const startPage = hasSurah ? getAyahPage(surahNum, 1) : 0;
+  const endPage = hasSurah ? (surahNum < 114 ? Math.max(startPage, getAyahPage(surahNum + 1, 1) - 1) : 604) : 0;
+
+  // Keep the saved page value in sync with the current mode (exact vs range):
+  // fills empty pages and corrects stale ones (e.g. old off-by-2 data).
+  useEffect(() => {
+    if (!hasSurah || disabled || (raw !== "" && !isPure)) return;
+    const expected = resolveSurahPage(juzNum, surahNum, value);
+    if (String(expected) !== raw) onChange({ target: { name, value: String(expected) } });
+  }, [hasSurah, disabled, raw, isPure, juzNum, surahNum, value, name, onChange]);
+
+  if (!hasSurah) {
+    return <input type="text" value="" readOnly disabled={disabled} placeholder="Select Surah first" />;
+  }
+
+  if (!isRangeMode) {
+    return (
+      <input
+        type="text"
+        name={name}
+        value={raw !== "" && !isPure ? raw : String(startPage)}
+        readOnly
+        title="Auto-filled exact surah page (Misri 604-page mushaf)"
+        placeholder="Auto from surah"
+        disabled={disabled}
+      />
+    );
+  }
+
+  const options = [];
+  for (let p = startPage; p <= endPage; p++) options.push(p);
+  const selectValue = isPure && cur >= startPage && cur <= endPage ? raw : String(startPage);
+  return (
+    <select
+      name={name}
+      value={selectValue}
+      onChange={onChange}
+      disabled={disabled}
+      className="premium-select kanz-font"
+      title={`Surah pages ${startPage}–${endPage} (Misri 604-page mushaf)`}
+    >
+      {options.map((p) => (
+        <option key={p} value={String(p)}>{p}</option>
+      ))}
+    </select>
+  );
 };
 
 // --- Badal progress formatters (handle old single {value,marks} and new 3-slot array shapes) ---
@@ -20815,7 +20797,7 @@ export default function App() {
             schedule: activeSchedule,
             attendance: activeAttendance || null,
             weeklyResult: activeResult || null,
-            teacherProfiles: teacherProfilesResponse.data || [],
+            teacherProfiles: (teacherProfilesResponse.data || []).map(p => ({ ...p, photo_url: cleanPhotoUrl(p.photo_url || "") })),
             reportSettings: reportSettingsResponse.data || [],
           };
 
@@ -20896,14 +20878,27 @@ export default function App() {
           throw new Error("Unable to load student profiles. Please check database permissions.");
         }
 
-        const enrichedProfiles = (teacherProfilesResponse.data || []).map(profile => {
+        // Enrich teacher profiles with portal-access data (email + salary
+        // visibility) and dedupe by user_id. Duplicates happen when a profile
+        // was saved before the update-by-id fix (upsert created a second doc
+        // under the user_id key) - keeping one row avoids showing two entries.
+        const profileByKey = new Map();
+        for (const profile of teacherProfilesResponse.data || []) {
           const access = (portalAccessResponse.data || []).find(a => normalizeText(a.full_name) === normalizeText(profile.full_name));
-          return {
+          const enriched = {
             ...profile,
+            photo_url: cleanPhotoUrl(profile.photo_url || ""),
+            email: profile.email || access?.email || "",
+            user_id: profile.user_id || access?.user_id || "",
             salary_per_minute: profile.salary_per_minute || access?.salary_per_minute || 2.3,
             show_salary_card: profile.show_salary_card ?? access?.show_salary_card ?? true
           };
-        });
+          const key = String(enriched.user_id || "") || String(profile.id || "");
+          if (!profileByKey.has(key)) profileByKey.set(key, enriched);
+        }
+        const enrichedProfiles = [...profileByKey.values()].sort((a, b) =>
+          String(a.full_name || "").localeCompare(String(b.full_name || ""))
+        );
         setTeacherProfiles(enrichedProfiles);
 
         const students = buildStudents(
@@ -21731,23 +21726,56 @@ export default function App() {
       },
     }));
 
-    // Auto-fill Quran page number from selected surah (Misri 604-page mushaf):
-    // wusool_surah -> wusool_page, next_week_surah -> next_week_page, istifadah_surah -> istifadah_page
+    // Auto-fill the Quran page from the selected surah (Misri/Madani 604-page mushaf):
+    // juz 26-30 → exact surah start page; juz 1-25 → first page of the surah's range (teacher picks the exact page in the dropdown)
     const surahToPageField = {
       wusool_surah: "wusool_page",
       next_week_surah: "next_week_page",
       istifadah_surah: "istifadah_page",
     };
+    const surahToJuzField = {
+      wusool_surah: "wusool_juz",
+      next_week_surah: "next_week_juz",
+      istifadah_surah: "istifadah_juz",
+    };
     if (surahToPageField[name]) {
       const surahIdx = SURAH_NAMES_AR.indexOf(value);
-      const page = surahIdx >= 0 ? SURAH_TO_PAGE[surahIdx + 1] : undefined;
-      setTeacherForms((current) => ({
-        ...current,
-        result: {
-          ...current.result,
-          [surahToPageField[name]]: page ? String(page) : "",
-        },
-      }));
+      if (surahIdx >= 0) {
+        setTeacherForms((cur) => {
+          const page = resolveSurahPage(
+            Number(cur.result[surahToJuzField[name]]),
+            surahIdx + 1,
+            cur.result[surahToPageField[name]]
+          );
+          return {
+            ...cur,
+            result: { ...cur.result, [surahToPageField[name]]: String(page) },
+          };
+        });
+      }
+    }
+
+    // When the juz changes, re-resolve the page (26-30 → exact surah page, 1-25 → within the surah's range)
+    const juzToSurahField = {
+      wusool_juz: "wusool_surah",
+      next_week_juz: "next_week_surah",
+      istifadah_juz: "istifadah_surah",
+    };
+    const juzToPageField = {
+      wusool_juz: "wusool_page",
+      next_week_juz: "next_week_page",
+      istifadah_juz: "istifadah_page",
+    };
+    if (juzToSurahField[name]) {
+      setTeacherForms((cur) => {
+        const surahIdx = SURAH_NAMES_AR.indexOf(cur.result[juzToSurahField[name]]);
+        if (surahIdx < 0) return cur;
+        const page = resolveSurahPage(Number(value), surahIdx + 1, cur.result[juzToPageField[name]]);
+        return {
+          ...cur,
+          result: { ...cur.result, [juzToPageField[name]]: String(page) },
+        };
+      });
     }
 
     // Auto-fill Jadeed marks from Total Jadeed Pages + Unit (all out of 20):
@@ -21854,7 +21882,7 @@ export default function App() {
         throw error;
       }
 
-      const { data: publicUrlData } = supabase.storage
+      const { data: publicUrlData } = await supabase.storage
         .from("notification_files")
         .getPublicUrl(filePath);
 
@@ -21869,38 +21897,67 @@ export default function App() {
   };
 
   const handleTeacherPhotoUpload = async (e) => {
-    const file = e.target.files[0];
+    const input = e.target;
+    const file = input && input.files && input.files[0];
     if (!file) return;
+
+    // Validate the selection before uploading so a bad file can't fail the
+    // Firebase Storage write and leave the form half-updated.
+    if (file.type && !file.type.startsWith("image/")) {
+      showAction("error", "Please choose an image file (JPG, PNG, WEBP, etc.).");
+      if (input) input.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showAction("error", "Photo must be 5 MB or smaller.");
+      if (input) input.value = "";
+      return;
+    }
 
     setUploadingTeacherPhoto(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      // Pre-flight auth check: a stale/expired session would otherwise make the
+      // storage SDK hang waiting for a token, leaving the button stuck on
+      // "Uploading..." with no error. Surface it clearly instead. Any
+      // incidental auth error is ignored — the storage call will surface it.
+      let hasUser = false;
+      try {
+        hasUser = Boolean((await supabase.auth.getUser())?.data?.user);
+      } catch (_) {}
+      if (!hasUser) {
+        throw new Error("Your session expired. Please log out and log back in, then retry the photo upload.");
+      }
+
+      const fileExt = (file.name.split('.').pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
       const fileName = `teacher-photos/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
 
       const { data, error } = await supabase.storage
         .from("teacher_photos")
-        .upload(fileName, file);
+        .upload(fileName, file, { contentType: file.type || "image/jpeg", upsert: true });
 
       if (error) throw error;
 
-      const { data: publicUrlData } = supabase.storage
+      const { data: publicUrlData } = await supabase.storage
         .from("teacher_photos")
         .getPublicUrl(fileName);
+      const photoUrl = (publicUrlData && publicUrlData.publicUrl) || "";
+      if (!photoUrl) throw new Error("Could not generate a public URL for the uploaded photo.");
 
       // Update the teacher profile form with the uploaded photo URL
       setAdminForms(curr => ({
         ...curr,
         teacherProfile: {
           ...curr.teacherProfile,
-          photo_url: publicUrlData.publicUrl
+          photo_url: photoUrl
         }
       }));
       showAction("success", "Photo uploaded successfully!");
     } catch (error) {
       console.error("Photo upload failed:", error);
-      showAction("error", `Photo upload failed: ${error.message}`);
+      showAction("error", `Photo upload failed: ${error.message || "Please try again."}`);
     } finally {
       setUploadingTeacherPhoto(false);
+      if (input) input.value = "";
     }
   };
 
@@ -22761,26 +22818,52 @@ const handleSendCustomNotification = async (event) => {
       return;
     }
 
+    // Find the existing teacher_profiles doc first. The Firestore-backed
+    // upsert keys new docs by `user_id`, but legacy/migrated rows may live
+    // under a different doc id - blindly upserting then created a SECOND doc
+    // instead of updating the existing one (duplicates + "didn't save").
+    const { data: existingProfiles } = await supabase
+      .from("teacher_profiles")
+      .select("*")
+      .eq("user_id", resolvedUserId);
+
+    const existingRows = Array.isArray(existingProfiles) ? existingProfiles : [];
+    const canonical = existingRows.find(r => String(r.id) === String(resolvedUserId));
+    const existingRow = canonical || existingRows[0] || null;
+
+    const resolvedEmail = (payload.email || selectedAccess?.email || existingRow?.email || "").trim();
+
+    const profilePayload = {
+      user_id: resolvedUserId,
+      full_name: payload.full_name,
+      photo_url: payload.photo_url,
+      phone_number: payload.phone_number,
+      whatsapp_number: payload.whatsapp_number,
+      salary_per_minute: Number(payload.salary_per_minute || 2.3),
+      show_salary_card: !!payload.show_salary_card,
+      teacher_role: payload.teacher_role || "muhaffiz",
+      is_active: true,
+    };
+    if (existingRow?.id) profilePayload.id = existingRow.id;
+    if (resolvedEmail) profilePayload.email = resolvedEmail;
+
     const { error: profileError } = await supabase
       .from("teacher_profiles")
-      .upsert(
-        {
-          user_id: resolvedUserId,
-          full_name: payload.full_name,
-          photo_url: payload.photo_url,
-          phone_number: payload.phone_number,
-          whatsapp_number: payload.whatsapp_number,
-          salary_per_minute: Number(payload.salary_per_minute || 2.3),
-          show_salary_card: !!payload.show_salary_card,
-          teacher_role: payload.teacher_role || "muhaffiz",
-          is_active: true,
-        },
-        { onConflict: "user_id" }
-      );
+      .upsert(profilePayload, { onConflict: "user_id" });
 
     if (profileError) {
       showAction("error", profileError.message);
       return;
+    }
+
+    // Clean up stale duplicate docs left by older buggy saves (a legacy doc id
+    // plus a user_id-keyed doc for the same teacher). The load-time dedupe
+    // hides them, this removes them for good now that the canonical one is saved.
+    if (existingRows.length > 1 && existingRow) {
+      const staleRows = existingRows.filter(r => String(r.id) !== String(existingRow.id));
+      await Promise.all(staleRows.map(r =>
+        supabase.from("teacher_profiles").delete().eq("id", r.id)
+      ));
     }
 
     if (selectedAccess) {
@@ -22802,11 +22885,13 @@ const handleSendCustomNotification = async (event) => {
     setAdminForms(curr => ({
       ...curr,
       teacherProfile: {
+        id: existingRow?.id || "",
         user_id: resolvedUserId,
         full_name: payload.full_name,
         photo_url: payload.photo_url || "",
         phone_number: payload.phone_number || "",
         whatsapp_number: payload.whatsapp_number || "",
+        email: resolvedEmail,
         salary_per_minute: String(payload.salary_per_minute || "2.3"),
         show_salary_card: !!payload.show_salary_card,
         teacher_role: payload.teacher_role || "muhaffiz",
@@ -23298,6 +23383,41 @@ const handleSendCustomNotification = async (event) => {
   );
 }
 
+// Every portal page that can be hidden, with its admin-facing label. Rows saved in
+// page_visibility override these defaults (default = visible). Kept in sync with the
+// seed migration so every page the portals render has a working toggle.
+const PAGE_VISIBILITY_DEFAULTS = [
+  // ===== PARENTS PORTAL PAGES =====
+  { page_key: "Home", role: "parents", label: "Home" },
+  { page_key: "Profile", role: "parents", label: "My Profile" },
+  { page_key: "Child Summary", role: "parents", label: "Progress" },
+  { page_key: "Policy", role: "parents", label: "Policy" },
+  { page_key: "Schedule", role: "parents", label: "Schedule" },
+  { page_key: "Teachers", role: "parents", label: "Teachers" },
+  { page_key: "Inbox", role: "parents", label: "Inbox" },
+  { page_key: "Hub Raqam", role: "parents", label: "Hub Raqam" },
+  { page_key: "Apply Leave", role: "parents", label: "Apply Leave" },
+  { page_key: "Leave History", role: "parents", label: "Leave History" },
+  { page_key: "Jadwal", role: "parents", label: "Jadwal" },
+  { page_key: "Self Jadwal", role: "parents", label: "Self Jadwal" },
+  { page_key: "Marhala Posts", role: "parents", label: "Marhala Posts" },
+  { page_key: "Results Archive", role: "parents", label: "Results Archive" },
+  { page_key: "Settings", role: "parents", label: "Settings" },
+  // ===== TEACHER PORTAL PAGES =====
+  { page_key: "Home", role: "teacher", label: "Home" },
+  { page_key: "My Group", role: "teacher", label: "Students" },
+  { page_key: "Fill Result", role: "teacher", label: "Mark Progress" },
+  { page_key: "Overview", role: "teacher", label: "Performance" },
+  { page_key: "Jadwal", role: "teacher", label: "Jadwal" },
+  { page_key: "Self Jadwal", role: "teacher", label: "Self Jadwal" },
+  { page_key: "Inbox", role: "teacher", label: "Inbox" },
+  { page_key: "BadalEntry", role: "teacher", label: "Badal Entry" },
+  { page_key: "Badal", role: "teacher", label: "Badal Update" },
+  { page_key: "Attendance History", role: "teacher", label: "Attendance History" },
+  { page_key: "Apply Leave", role: "teacher", label: "Apply Leave" },
+  { page_key: "Settings", role: "teacher", label: "Settings" },
+];
+
 function QuickAccessPagesUI({ supabase: sb }) {
   const [visData, setVisData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23308,7 +23428,23 @@ function QuickAccessPagesUI({ supabase: sb }) {
   const fetchVis = useCallback(async () => {
     setLoading(true);
     const { data } = await sb.from('page_visibility').select('*').order('role').order('label');
-    if (data) setVisData(data);
+    // Merge saved rows over the full known page list so every portal page is
+    // toggleable (saved rows win; missing rows default to visible).
+    const byKey = {};
+    (data || []).forEach((r) => { byKey[`${r.role}:${r.page_key}`] = r; });
+    const seen = new Set();
+    const merged = [];
+    for (const d of PAGE_VISIBILITY_DEFAULTS) {
+      const k = `${d.role}:${d.page_key}`;
+      seen.add(k);
+      merged.push(byKey[k] || { page_key: d.page_key, role: d.role, label: d.label, visible: true });
+    }
+    // Keep any extra rows saved in the DB that aren't in the defaults (legacy/custom keys)
+    (data || []).forEach((r) => {
+      const k = `${r.role}:${r.page_key}`;
+      if (!seen.has(k)) { seen.add(k); merged.push(r); }
+    });
+    setVisData(merged);
     setLoading(false);
   }, [sb]);
 

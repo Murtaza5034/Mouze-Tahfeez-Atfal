@@ -525,15 +525,38 @@ export const getUserByEmail = onCall(async (request) => {
 });
 
 export const resetUserPassword = onCall(async (request) => {
-  const input = (request.data || {}) as { target_email?: string; new_password?: string };
-  const email = normalizeEmail(input.target_email);
+  const input = (request.data || {}) as {
+    target_email?: string;
+    target_user_id?: string;
+    new_password?: string;
+  };
   const password = String(input.new_password || "");
-  if (!email || password.length < 6) throw new HttpsError("invalid-argument", "target_email and new_password required");
+  if (password.length < 6)
+    throw new HttpsError("invalid-argument", "new_password required (min 6 characters)");
   try {
-    const rec = await auth.getUserByEmail(email);
+    // Resolve the account by email OR Firebase user id - teacher_profiles rows
+    // often lack an email field, so the admin portal passes target_user_id.
+    const email = normalizeEmail(input.target_email);
+    let rec: admin.auth.UserRecord | null = null;
+    if (email) {
+      rec = await auth.getUserByEmail(email);
+    } else if (input.target_user_id) {
+      rec = await auth.getUser(String(input.target_user_id));
+    }
+    if (!rec) {
+      throw new HttpsError("not-found", "No Firebase Auth account found for this staff member.");
+    }
     await auth.updateUser(rec.uid, { password });
-    return { success: true, message: `Password reset successfully for ${email}` };
+    return {
+      success: true,
+      message: `Password reset successfully for ${email || rec.email || rec.uid}`,
+    };
   } catch (err: any) {
+    if (err instanceof HttpsError) throw err;
+    const raw = String(err?.message || err?.code || "");
+    if (raw.includes("user-not-found") || raw.includes("no user record")) {
+      throw new HttpsError("not-found", "No Firebase Auth account found for this staff member.");
+    }
     throw new HttpsError("unavailable", err.message || "Password reset failed");
   }
 });
