@@ -2495,7 +2495,7 @@ async function findPortalAccess(userId) {
   const { data, error } = await supabase
     .from("user_portal_access")
     .select("*")
-    .eq("user_id", userId)
+    .eq("id", userId)
     .maybeSingle();
 
   if (error) {
