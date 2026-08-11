@@ -21,7 +21,11 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
 
     function role() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.portal_role;
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      let uRole = u.exists && u.data.portal_role != null && u.data.portal_role != "" ? u.data.portal_role : null;
+      let a = get(/databases/$(database)/documents/user_portal_access/$(request.auth.uid));
+      let aRole = a.exists && a.data.portal_role != null && a.data.portal_role != "" ? a.data.portal_role : null;
+      return uRole != null ? uRole : aRole;
     }
 
     function isAdmin() { return isSignedIn() && role() == 'admin'; }

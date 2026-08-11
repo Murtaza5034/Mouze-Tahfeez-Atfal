@@ -21402,6 +21402,27 @@ export default function App() {
         return;
       }
       accessRecord = data || null;
+
+      // Keep `users/{uid}` in sync so Firestore rules (role()) can resolve this
+      // account's portal_role. New users get this doc server-side from
+      // provisionUser, but already-registered accounts need it written here too.
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from("users")
+        .upsert({
+          id: createdUserId,
+          email: targetEmail,
+          full_name: payload.full_name,
+          portal_role: payload.portal_role,
+          is_active: true,
+          salary_per_minute: payload.portal_role === "teacher" ? 2.3 : 0,
+          show_salary_card: payload.portal_role === "teacher",
+          created_at: nowIso,
+          updated_at: nowIso
+        }, { onConflict: 'id' })
+        .then(r => {
+          if (r.error) console.warn("users doc upsert failed:", r.error);
+        });
     } else {
       const { data, error: fetchError } = await supabase
         .from("user_portal_access")

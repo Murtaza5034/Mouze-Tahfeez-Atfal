@@ -495,13 +495,30 @@ export const provisionUser = onCall(async (request) => {
   const email = normalizeEmail(input.email);
   const password = String(input.password || "");
   if (!email || password.length < 6) throw new HttpsError("invalid-argument", "email and password (min 6 chars) are required");
+  const fullName = String(input.data?.full_name || "").trim() || null;
+  const portalRole = String(input.data?.portal_role || "parents").trim().toLowerCase();
   try {
     const rec = await auth.createUser({
       email,
       password,
-      displayName: input.data?.full_name || null,
+      displayName: fullName,
       emailVerified: true,
     });
+    // Keep `users/{uid}` in sync so Firestore rules (role()) can resolve this
+    // account's portal_role for admin/teacher/parent data reads.
+    const now = new Date().toISOString();
+    const userDoc = {
+      email,
+      full_name: fullName || email.split("@")[0],
+      portal_role: portalRole,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+      salary_per_minute: portalRole === "teacher" ? 2.3 : 0,
+      show_salary_card: portalRole === "teacher",
+      id: rec.uid,
+    };
+    await db.collection("users").doc(rec.uid).set(userDoc, { merge: true });
     return { user: { id: rec.uid, email: rec.email } };
   } catch (err: any) {
     if (err && (err.code === "auth/email-already-exists" || /email.*already/i.test(err.message || ""))) {
