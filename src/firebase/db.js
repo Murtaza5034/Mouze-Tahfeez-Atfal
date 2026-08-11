@@ -446,6 +446,7 @@ async function executeSelect(state) {
   try {
     rows = await loadCandidates(state, ref);
   } catch (err) {
+    console.error(`Firestore select error on collection "${state.collection}":`, err);
     return { data: null, error: { message: err.message || String(err) } };
   }
 
@@ -486,17 +487,22 @@ async function executeInsert(state) {
     ? state.pendingInsert
     : [state.pendingInsert];
   const rows = [];
-  for (const value of values || []) {
-    const clean = sanitizeWrite(value);
-    let id = docIdFor(state.collection, value);
-    let docId;
-    if (id) {
-      await setDoc(doc(db, state.collection, id), clean);
-      docId = id;
-    } else {
-      docId = (await addDoc(collection(db, state.collection), clean)).id;
+  try {
+    for (const value of values || []) {
+      const clean = sanitizeWrite(value);
+      let id = docIdFor(state.collection, value);
+      let docId;
+      if (id) {
+        await setDoc(doc(db, state.collection, id), clean);
+        docId = id;
+      } else {
+        docId = (await addDoc(collection(db, state.collection), clean)).id;
+      }
+      rows.push({ ...sanitizeValue(value), id: docId });
     }
-    rows.push({ ...sanitizeValue(value), id: docId });
+  } catch (e) {
+    console.error(`Firestore insert error on collection "${state.collection}":`, e);
+    return { data: null, error: { message: e.message || String(e) } };
   }
   if (!state.markSelectAfterWrite) return { data: null, error: null };
   return filterAfterRows(rows, state);
@@ -521,6 +527,7 @@ async function executeUpsert(state) {
     try {
       await setDoc(doc(db, state.collection, id), clean, { merge: true });
     } catch (e) {
+      console.error(`Firestore upsert error on collection "${state.collection}":`, e);
       return {
         data: null,
         error: { message: e.message || String(e), code: e.code || "write-failed" },

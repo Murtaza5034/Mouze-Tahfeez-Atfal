@@ -2536,24 +2536,50 @@ function formatRoleList(roles) {
 }
 
 async function findParentProfiles(userId, email = null) {
-  let query = supabase
-    .from("child_profiles")
-    .select("*");
+  let data1 = [];
+  let data2 = [];
 
-  if (userId && email) {
-    // If we have both, use a more robust check. We use .or() with explicit casting hint for userId
-    query = query.or(`parent_user_id.eq.${userId},parent_email.ilike.%${email.trim()}%`);
-  } else if (userId) {
-    query = query.eq("parent_user_id", userId);
-  } else if (email) {
-    query = query.ilike("parent_email", email.trim());
-  } else {
-    return [];
+  if (userId) {
+    const { data, error } = await supabase
+      .from("child_profiles")
+      .select("*")
+      .eq("parent_user_id", userId);
+    if (!error && data) {
+      data1 = data;
+    }
   }
 
-  const { data, error } = await query;
+  if (email && email.trim() !== "") {
+    const cleanEmail = email.trim();
+    const { data: d1, error: e1 } = await supabase
+      .from("child_profiles")
+      .select("*")
+      .eq("parent_email", cleanEmail);
+    if (!e1 && d1) {
+      data2 = [...data2, ...d1];
+    }
+    const { data: d2, error: e2 } = await supabase
+      .from("child_profiles")
+      .select("*")
+      .eq("parent_email", cleanEmail.toLowerCase());
+    if (!e2 && d2) {
+      data2 = [...data2, ...d2];
+    }
+  }
 
-  return data || [];
+  const merged = [...data1, ...data2];
+  const unique = [];
+  const seen = new Set();
+  for (const item of merged) {
+    if (item && item.student_id) {
+      const sid = String(item.student_id);
+      if (!seen.has(sid)) {
+        seen.add(sid);
+        unique.push(item);
+      }
+    }
+  }
+  return unique;
 }
 
 // Fallback used when direct child_profiles reads are blocked/recursing under RLS.

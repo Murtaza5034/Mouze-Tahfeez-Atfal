@@ -69,7 +69,7 @@ service cloud.firestore {
     // ---------- child_profiles ----------
     // RLS: admins + teachers read all; parents read their own children only.
     match /child_profiles/{studentId} {
-      allow read: if isSignedIn() && (isAdmin() || isTeacher() || request.auth.uid == resource.data.parent_user_id);
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || request.auth.uid == resource.data.parent_user_id || (resource.data.parent_email != null && request.auth.token.email == resource.data.parent_email));
       allow write: if isAdmin() || isTeacher();
     }
 
