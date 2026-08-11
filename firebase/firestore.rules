@@ -118,6 +118,14 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
     }
 
+    // ---------- leave-chat presence (online/offline status) ----------
+    // Presence docs are written by the app while a leave chat is open and
+    // deleted when it closes. Without this rule Firestore's default-deny
+    // blocks all _presence reads/writes, so online/offline never updates.
+    match /_presence/{id} {
+      allow read, write: if isSignedIn();
+    }
+
     // ---------- notifications ----------
     match /system_notifications/{id} {
       allow read: if isSignedIn() && (isAdmin() || isTeacher() || isParent());

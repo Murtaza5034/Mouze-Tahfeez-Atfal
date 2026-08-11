@@ -73,6 +73,7 @@ function createChannel(channelName, channelOptions = {}) {
   let sessionSuffix = Math.random().toString(36).slice(2, 10);
   let heartbeatTimer = null;
   let trackedDocId = null;
+  let trackedPayload = null;
 
   const leaveIdOf = () => {
     const m = String(channelName).match(/:([^/]+)$/);
@@ -246,8 +247,9 @@ function createChannel(channelName, channelOptions = {}) {
     async track(payload, trackOptions = {}) {
       const id = myPresenceId();
       trackedDocId = id;
+      trackedPayload = { ...(payload || {}) };
       const record = {
-        ...payload,
+        ...trackedPayload,
         _ts: Date.now(),
         _expiresAt: new Date(Date.now() + PRESENCE_TTL_MS).toISOString(),
       };
@@ -266,8 +268,10 @@ function createChannel(channelName, channelOptions = {}) {
           .then(() => {
             presenceMap.delete(trackedDocId);
             trackedDocId = null;
+            trackedPayload = null;
           });
       }
+      trackedPayload = null;
       return Promise.resolve();
     },
     presenceState() {
@@ -291,6 +295,7 @@ function createChannel(channelName, channelOptions = {}) {
         deleteDoc(doc(db, PRESENCE_COLLECTION, trackedDocId)).catch(() => {});
         trackedDocId = null;
       }
+      trackedPayload = null;
     },
   };
 
@@ -300,7 +305,11 @@ function createChannel(channelName, channelOptions = {}) {
 
   function heartbeat() {
     if (trackedDocId) {
+      // setDoc REPLACES the whole doc, so always re-include the tracked
+      // payload (role / userRole / leaveId) — otherwise peers lose our
+      // presence after the first heartbeat and we'd flip offline.
       setDoc(doc(db, PRESENCE_COLLECTION, trackedDocId), {
+        ...(trackedPayload || {}),
         _expiresAt: new Date(Date.now() + PRESENCE_TTL_MS).toISOString(),
       }).catch(() => {});
     }
