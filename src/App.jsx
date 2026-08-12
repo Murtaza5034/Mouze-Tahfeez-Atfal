@@ -80,6 +80,8 @@ import {
   History,
   CalendarClock,
   School,
+  Reply,
+  Pencil,
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -3832,7 +3834,11 @@ function SettingsPage({
     });
 
     if (error) {
-      onShowAction("error", "Failed to update password: " + error.message);
+      let msg = error.message;
+      if (msg.includes("requires-recent-login") || error.code === "auth/requires-recent-login") {
+        msg = "For security reasons, you must log out and log back in to change your password.";
+      }
+      onShowAction("error", "Failed to update password: " + msg);
     } else {
       onShowAction("success", "Password updated successfully!");
       setPassForm({ newPassword: "", confirmPassword: "" });
@@ -3866,7 +3872,8 @@ function SettingsPage({
       user_name: `${userName} (${userRoleStr})`,
       page_issue: page,
       description: desc,
-      status: 'open'
+      status: 'open',
+      created_at: new Date().toISOString()
     }]);
 
     if (error) {
@@ -4046,6 +4053,7 @@ function SettingsPage({
                 {showAppLockSetup ? (
                   <AppLockSetup 
                     onShowAction={onShowAction}
+                    onAppLockToggle={onAppLockToggle}
                     onClose={() => {
                       setShowAppLockSetup(false);
                       // If user cancelled without actually saving PIN, reset toggle
@@ -4907,6 +4915,120 @@ const WHATSAPP_LEAVE_CHAT_CSS = `
     background: #ded7cb; color: #9c9384;
     cursor: not-allowed; opacity: 0.7;
   }
+
+  /* Premium Chat Swipe & Actions */
+  .wac-bubble-container {
+    display: flex; align-items: center; gap: 8px; width: 100%; position: relative;
+    user-select: none;
+  }
+  .wac-bubble-container.outgoing { justify-content: flex-end; }
+  .wac-bubble-container.incoming { justify-content: flex-start; }
+  
+  .wac-reply-preview-container {
+    display: flex; flex-direction: column; background: #fdfaf4;
+    border-left: 4px solid #b8860b; border-radius: 8px 8px 0 0;
+    margin-bottom: 8px; animation: wacSlideUp 0.18s ease both;
+    overflow: hidden;
+  }
+  .wac-reply-preview-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px 2px 12px;
+  }
+  .wac-reply-preview-role {
+    font-size: 0.72rem; font-weight: 700; color: #b8860b; text-transform: capitalize;
+  }
+  .wac-reply-preview-close {
+    border: none; background: transparent; color: #8c734b; cursor: pointer;
+    padding: 4px; display: grid; place-items: center; border-radius: 50%;
+  }
+  .wac-reply-preview-close:hover { background: rgba(0,0,0,0.05); }
+  .wac-reply-preview-text {
+    font-size: 0.82rem; color: #5d4037; padding: 0 12px 8px 12px;
+    margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  
+  .wac-bubble-reply-context {
+    background: rgba(0, 0, 0, 0.05); border-left: 3px solid #b8860b;
+    padding: 6px 10px; border-radius: 6px; margin-bottom: 6px;
+    font-size: 0.8rem; text-align: left;
+  }
+  .wac-reply-context-role {
+    font-size: 0.68rem; font-weight: 700; color: #b8860b; text-transform: capitalize;
+    display: block; margin-bottom: 2px;
+  }
+  .wac-reply-context-text {
+    margin: 0; color: #5d4037; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  
+  .wac-msg-edited-tag {
+    font-size: 0.65rem; color: rgba(0,0,0,0.38); font-style: italic; margin-right: 4px;
+  }
+
+  /* Premium Context Menu Overlay & Star CSS */
+  .wac-context-menu-overlay {
+    position: fixed; inset: 0; z-index: 100000;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    animation: wacFadeIn 0.2s ease both;
+  }
+  
+  .wac-context-menu-card {
+    background: #fffdf6;
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+    width: 290px;
+    overflow: hidden;
+    animation: wacZoomIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  
+  @keyframes wacZoomIn {
+    from { opacity: 0; transform: scale(0.92) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  
+  .wac-context-msg-preview {
+    padding: 16px;
+    background: rgba(212, 175, 55, 0.06);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.12);
+  }
+  
+  .wac-context-msg-text {
+    font-size: 0.88rem; color: #4a3c28; margin: 0;
+    line-height: 1.4; max-height: 80px; overflow-y: auto;
+    font-style: italic;
+  }
+  
+  .wac-context-actions-list {
+    display: flex; flex-direction: column;
+  }
+  
+  .wac-context-action-item {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; padding: 14px 18px;
+    background: none; border: none; cursor: pointer;
+    font-family: inherit; font-size: 0.9rem; text-align: left;
+    color: var(--deep-brown); transition: background 0.15s ease;
+  }
+  
+  .wac-context-action-item:hover {
+    background: rgba(212, 175, 55, 0.08);
+  }
+  
+  .wac-context-action-item:not(:last-child) {
+    border-bottom: 1px solid rgba(61, 43, 31, 0.05);
+  }
+  
+  .wac-context-action-item svg {
+    color: var(--primary-gold);
+  }
+  
+  .wac-bubble-meta-star {
+    display: inline-flex; align-items: center; margin-right: 4px;
+    color: #d4af37;
+  }
 `;
 
 function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], forceOpen = false }) {
@@ -4920,8 +5042,115 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [chatLeave, setChatLeave] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMsg, setEditingMsg] = useState(null); // { msg, idx }
+  const [activeMenuMsg, setActiveMenuMsg] = useState(null); // { msg, idx }
   const chatMessagesRef = useRef(null);
   const { peerOnline: adminOnline, presenceReady } = useChatPresence(chatLeave?.id, "parent");
+  const adminOnlineRef = useRef(adminOnline);
+  useEffect(() => {
+    adminOnlineRef.current = adminOnline;
+  }, [adminOnline]);
+
+  const pressTimeoutRef = useRef(null);
+
+  const handlePressStart = (e, msg, idx) => {
+    if (pressTimeoutRef.current) clearTimeout(pressTimeoutRef.current);
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    e.currentTarget.dataset.pressStartX = clientX;
+    e.currentTarget.dataset.pressStartY = clientY;
+
+    pressTimeoutRef.current = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(15);
+      setActiveMenuMsg({ msg, idx });
+    }, 550);
+  };
+
+  const handlePressMove = (e) => {
+    const startX = parseFloat(e.currentTarget.dataset.pressStartX);
+    const startY = parseFloat(e.currentTarget.dataset.pressStartY);
+    if (isNaN(startX) || isNaN(startY)) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    if (Math.abs(clientX - startX) > 8 || Math.abs(clientY - startY) > 8) {
+      if (pressTimeoutRef.current) {
+        clearTimeout(pressTimeoutRef.current);
+        pressTimeoutRef.current = null;
+      }
+    }
+  };
+
+  const handlePressEnd = (e) => {
+    if (pressTimeoutRef.current) {
+      clearTimeout(pressTimeoutRef.current);
+      pressTimeoutRef.current = null;
+    }
+    e.currentTarget.removeAttribute('data-press-start-x');
+    e.currentTarget.removeAttribute('data-press-start-y');
+  };
+
+  const handleToggleStarParent = async (msgIdx) => {
+    if (!chatLeave) return;
+    const updatedMessages = [...(chatLeave.messages || [])];
+    const targetMsg = updatedMessages[msgIdx];
+    if (!targetMsg) return;
+    
+    targetMsg.starred = !targetMsg.starred;
+    
+    setChatLeave(prev => prev ? { ...prev, messages: updatedMessages } : prev);
+    setHistory(prev => prev.map(l => String(l.id) === String(chatLeave.id) ? { ...l, messages: updatedMessages } : l));
+    
+    try {
+      const { error } = await supabase
+        .from('student_leaves')
+        .update({ messages: updatedMessages })
+        .eq('id', chatLeave.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Failed to star message:", err);
+      showAction("error", "Failed to star message. Please check internet connection.");
+    }
+  };
+
+  const isMessageEditable = (msg) => {
+    if (!msg || !msg.timestamp) return false;
+    const ageMs = new Date() - new Date(msg.timestamp);
+    return ageMs <= 15 * 60 * 1000;
+  };
+
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    e.currentTarget.dataset.startX = touch.clientX;
+    e.currentTarget.style.transition = 'none';
+  };
+
+  const handleTouchMove = (e) => {
+    const startX = parseFloat(e.currentTarget.dataset.startX);
+    if (isNaN(startX)) return;
+    const touch = e.touches[0];
+    const diff = touch.clientX - startX;
+    if (diff > 0) {
+      const moveX = Math.min(diff, 60);
+      e.currentTarget.style.transform = `translateX(${moveX}px)`;
+    }
+  };
+
+  const handleTouchEnd = (e, msg) => {
+    const startX = parseFloat(e.currentTarget.dataset.startX);
+    if (isNaN(startX)) return;
+    const touch = e.changedTouches[0];
+    const diff = touch.clientX - startX;
+    
+    e.currentTarget.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+    e.currentTarget.style.transform = '';
+    e.currentTarget.removeAttribute('data-start-x');
+    
+    if (diff > 45) {
+      setReplyingTo(msg);
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+  };
 
   useEffect(() => {
     if (chatLeave) {
@@ -5376,14 +5605,51 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
     }
   };
 
-  /* ─── Parent Reply to Admin Chat ─── */
   const handleParentReply = async () => {
     if (!chatLeave || !replyText.trim()) return;
     const textToSend = replyText.trim();
-    const newMsg = { role: "parent", text: textToSend, timestamp: new Date().toISOString() };
+
+    if (editingMsg) {
+      // Edit mode!
+      const updatedMessages = [...(chatLeave.messages || [])];
+      updatedMessages[editingMsg.idx] = {
+        ...updatedMessages[editingMsg.idx],
+        text: textToSend,
+        edited: true,
+        editedAt: new Date().toISOString()
+      };
+
+      setReplyText("");
+      setEditingMsg(null);
+      setChatLeave(prev => prev ? { ...prev, messages: updatedMessages } : prev);
+      setHistory(prev => prev.map(l => String(l.id) === String(chatLeave.id) ? { ...l, messages: updatedMessages } : l));
+
+      try {
+        const { error } = await supabase
+          .from('student_leaves')
+          .update({ messages: updatedMessages })
+          .eq('id', chatLeave.id);
+        if (error) throw error;
+      } catch (err) {
+        console.error("Failed to update edited parent message:", err);
+        showAction("error", "Failed to update message. Please check internet connection.");
+      }
+      return;
+    }
+
+    // Normal Send / Reply Mode
+    const newMsg = {
+      role: "parent",
+      text: textToSend,
+      timestamp: new Date().toISOString()
+    };
+    if (replyingTo) {
+      newMsg.replyTo = { text: replyingTo.text, role: replyingTo.role };
+    }
 
     // 1. Optimistic UI update: Instantly show message bubble and clear input with 0ms delay
     setReplyText("");
+    setReplyingTo(null);
     setChatLeave(prev => prev ? { ...prev, messages: [...(prev.messages || []), newMsg] } : prev);
     setHistory(prev => prev.map(l => String(l.id) === String(chatLeave.id) ? { ...l, messages: [...(l.messages || []), newMsg] } : l));
 
@@ -5401,16 +5667,23 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         .eq('id', chatLeave.id);
       if (error) throw error;
 
-      // 2. Smart Notification: ONLY send outside FCM push notification if Admin is OFFLINE / has closed the chat room
-      if (!adminOnline) {
-        await broadcastNotification(
-          "💬 Leave Reply",
-          `${studentProfile?.name || 'Student'}'s parent: ${textToSend}`,
-          "admin",
-          null,
-          "Leave Management"
-        );
-      }
+      // 2. Smart Notification: ONLY send outside FCM push notification if Admin is OFFLINE / has closed the chat room.
+      // We wait 1.5 seconds to allow Firestore snapshots to sync presence, preventing duplicate notifications while actively chatting.
+      setTimeout(async () => {
+        if (!adminOnlineRef.current) {
+          try {
+            await broadcastNotification(
+              "💬 Leave Reply",
+              `${studentProfile?.name || 'Student'}'s parent: ${textToSend}`,
+              "admin",
+              null,
+              "Leave Management"
+            );
+          } catch (notifErr) {
+            console.error("FCM leave reply notification error:", notifErr);
+          }
+        }
+      }, 1500);
     } catch (err) {
       console.error("Failed to send parent reply:", err);
       showAction("error", "Failed to send message. Please check internet connection.");
@@ -5830,7 +6103,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
       {/* ─── Parent WhatsApp Chat Modal (Dedicated Full Screen View) ─── */}
       {chatLeave && createPortal(
-        <div className="wac-modal-overlay" onClick={() => { setChatLeave(null); setReplyText(""); }}>
+        <div className="wac-modal-overlay" onClick={() => { setChatLeave(null); setReplyText(""); setReplyingTo(null); setEditingMsg(null); setActiveMenuMsg(null); }}>
           <style>{WHATSAPP_LEAVE_CHAT_CSS}</style>
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }} onClick={e => e.stopPropagation()}>
             
@@ -5840,7 +6113,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
                 <button
                   type="button"
                   className="wac-back-btn"
-                  onClick={() => { setChatLeave(null); setReplyText(""); }}
+                  onClick={() => { setChatLeave(null); setReplyText(""); setReplyingTo(null); setEditingMsg(null); setActiveMenuMsg(null); }}
                   title="Back to Leave History"
                 >
                   <ArrowLeft size={20} />
@@ -5861,7 +6134,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
                 <button
                   type="button"
                   className="wac-close-btn"
-                  onClick={() => { setChatLeave(null); setReplyText(""); }}
+                  onClick={() => { setChatLeave(null); setReplyText(""); setReplyingTo(null); setEditingMsg(null); setActiveMenuMsg(null); }}
                   title="Close Chat"
                 >
                   <X size={18} />
@@ -5884,11 +6157,35 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
               ) : chatLeave.messages.map((msg, idx) => {
                 const isUser = msg.role === 'parent';
                 return (
-                  <div key={idx} className={`wac-bubble ${isUser ? 'wac-bubble-outgoing' : 'wac-bubble-incoming'}`}>
-                    <p className="wac-msg-text">{msg.text}</p>
-                    <div className="wac-bubble-meta">
-                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      {isUser && <CheckCheck size={13} style={{ color: '#b8860b' }} />}
+                  <div key={idx} className={`wac-bubble-container ${isUser ? 'outgoing' : 'incoming'}`}>
+                    <div 
+                      className={`wac-bubble ${isUser ? 'wac-bubble-outgoing' : 'wac-bubble-incoming'}`}
+                      onMouseDown={(e) => handlePressStart(e, msg, idx)}
+                      onMouseMove={handlePressMove}
+                      onMouseUp={handlePressEnd}
+                      onMouseLeave={handlePressEnd}
+                      onTouchStart={(e) => { handleTouchStart(e); handlePressStart(e, msg, idx); }}
+                      onTouchMove={(e) => { handleTouchMove(e); handlePressMove(e); }}
+                      onTouchEnd={(e) => { handleTouchEnd(e, msg); handlePressEnd(e); }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {msg.replyTo && (
+                        <div className="wac-bubble-reply-context">
+                          <span className="wac-reply-context-role">{msg.replyTo.role === 'parent' ? 'Parent' : 'Admin'}</span>
+                          <p className="wac-reply-context-text">{msg.replyTo.text}</p>
+                        </div>
+                      )}
+                      <p className="wac-msg-text">{msg.text}</p>
+                      <div className="wac-bubble-meta">
+                        {msg.starred && (
+                          <span className="wac-bubble-meta-star" style={{ marginRight: 4, display: 'inline-flex', alignItems: 'center' }}>
+                            <Star size={10} style={{ fill: '#d4af37', color: '#d4af37' }} />
+                          </span>
+                        )}
+                        {msg.edited && <span className="wac-msg-edited-tag">Edited</span>}
+                        <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {isUser && <CheckCheck size={13} style={{ color: '#b8860b' }} />}
+                      </div>
                     </div>
                   </div>
                 );
@@ -5897,6 +6194,28 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
             {/* Floating Input Bar */}
             <div className="wac-input-container">
+              {replyingTo && (
+                <div className="wac-reply-preview-container">
+                  <div className="wac-reply-preview-header">
+                    <span className="wac-reply-preview-role">Replying to {replyingTo.role === 'parent' ? 'Parent' : 'Admin'}</span>
+                    <button type="button" className="wac-reply-preview-close" onClick={() => setReplyingTo(null)}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <p className="wac-reply-preview-text">{replyingTo.text}</p>
+                </div>
+              )}
+              {editingMsg && (
+                <div className="wac-reply-preview-container" style={{ borderLeftColor: '#312b1f' }}>
+                  <div className="wac-reply-preview-header">
+                    <span className="wac-reply-preview-role" style={{ color: '#312b1f' }}>Editing Message</span>
+                    <button type="button" className="wac-reply-preview-close" onClick={() => { setEditingMsg(null); setReplyText(""); }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <p className="wac-reply-preview-text">{editingMsg.msg.text}</p>
+                </div>
+              )}
               <div className="wac-bar-wrapper">
                 <div className="wac-pill-input">
                   <textarea
@@ -5914,7 +6233,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
                         if (replyText.trim()) handleParentReply();
                       }
                     }}
-                    placeholder="Type a message..."
+                    placeholder={editingMsg ? "Edit message..." : "Type a message..."}
                     rows={1}
                   />
                 </div>
@@ -5929,6 +6248,46 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
                 </button>
               </div>
             </div>
+
+            {/* Context Menu Overlay */}
+            {activeMenuMsg && (
+              <div className="wac-context-menu-overlay" onClick={() => setActiveMenuMsg(null)}>
+                <div className="wac-context-menu-card" onClick={e => e.stopPropagation()}>
+                  <div className="wac-context-msg-preview">
+                    <p className="wac-context-msg-text">{activeMenuMsg.msg.text}</p>
+                  </div>
+                  <div className="wac-context-actions-list">
+                    <button type="button" className="wac-context-action-item" onClick={() => {
+                      setReplyingTo(activeMenuMsg.msg);
+                      setActiveMenuMsg(null);
+                    }}>
+                      <Reply size={15} />
+                      <span>Reply</span>
+                    </button>
+                    
+                    <button type="button" className="wac-context-action-item" onClick={() => {
+                      handleToggleStarParent(activeMenuMsg.idx);
+                      setActiveMenuMsg(null);
+                    }}>
+                      <Star size={15} style={{ fill: activeMenuMsg.msg.starred ? '#d4af37' : 'none', color: activeMenuMsg.msg.starred ? '#d4af37' : 'inherit' }} />
+                      <span>{activeMenuMsg.msg.starred ? "Unstar Message" : "Star Message"}</span>
+                    </button>
+                    
+                    {activeMenuMsg.msg.role === 'parent' && isMessageEditable(activeMenuMsg.msg) && (
+                      <button type="button" className="wac-context-action-item" onClick={() => {
+                        setEditingMsg({ msg: activeMenuMsg.msg, idx: activeMenuMsg.idx });
+                        setReplyText(activeMenuMsg.msg.text);
+                        setReplyingTo(null);
+                        setActiveMenuMsg(null);
+                      }}>
+                        <Pencil size={14} />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>,
@@ -7839,10 +8198,117 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
   const [filter, setFilter] = useState("Pending");
   const [chatModal, setChatModal] = useState(null); // leave object or null
   const [chatMessage, setChatMessage] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMsg, setEditingMsg] = useState(null); // { msg, idx }
+  const [activeMenuMsg, setActiveMenuMsg] = useState(null); // { msg, idx }
   const [approveDropdown, setApproveDropdown] = useState(null); // leave.id or null
   const [sendingAction, setSendingAction] = useState(null); // id being processed
   const chatBodyRef = useRef(null);
   const { peerOnline: parentOnline, presenceReady } = useChatPresence(chatModal?.id, "admin");
+  const parentOnlineRef = useRef(parentOnline);
+  useEffect(() => {
+    parentOnlineRef.current = parentOnline;
+  }, [parentOnline]);
+
+  const pressTimeoutRef = useRef(null);
+
+  const handlePressStart = (e, msg, idx) => {
+    if (pressTimeoutRef.current) clearTimeout(pressTimeoutRef.current);
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    e.currentTarget.dataset.pressStartX = clientX;
+    e.currentTarget.dataset.pressStartY = clientY;
+
+    pressTimeoutRef.current = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(15);
+      setActiveMenuMsg({ msg, idx });
+    }, 550);
+  };
+
+  const handlePressMove = (e) => {
+    const startX = parseFloat(e.currentTarget.dataset.pressStartX);
+    const startY = parseFloat(e.currentTarget.dataset.pressStartY);
+    if (isNaN(startX) || isNaN(startY)) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    if (Math.abs(clientX - startX) > 8 || Math.abs(clientY - startY) > 8) {
+      if (pressTimeoutRef.current) {
+        clearTimeout(pressTimeoutRef.current);
+        pressTimeoutRef.current = null;
+      }
+    }
+  };
+
+  const handlePressEnd = (e) => {
+    if (pressTimeoutRef.current) {
+      clearTimeout(pressTimeoutRef.current);
+      pressTimeoutRef.current = null;
+    }
+    e.currentTarget.removeAttribute('data-press-start-x');
+    e.currentTarget.removeAttribute('data-press-start-y');
+  };
+
+  const handleToggleStarAdmin = async (msgIdx) => {
+    if (!chatModal) return;
+    const updatedMessages = [...(chatModal.messages || [])];
+    const targetMsg = updatedMessages[msgIdx];
+    if (!targetMsg) return;
+    
+    targetMsg.starred = !targetMsg.starred;
+    
+    setChatModal(prev => prev ? { ...prev, messages: updatedMessages } : prev);
+    setLeaves(prev => prev.map(l => String(l.id) === String(chatModal.id) ? { ...l, messages: updatedMessages } : l));
+    
+    try {
+      const { error } = await supabase
+        .from('student_leaves')
+        .update({ messages: updatedMessages })
+        .eq('id', chatModal.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Failed to star message:", err);
+      onShowAction("error", "Failed to star message. Please check internet connection.");
+    }
+  };
+
+  const isMessageEditable = (msg) => {
+    if (!msg || !msg.timestamp) return false;
+    const ageMs = new Date() - new Date(msg.timestamp);
+    return ageMs <= 15 * 60 * 1000;
+  };
+
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    e.currentTarget.dataset.startX = touch.clientX;
+    e.currentTarget.style.transition = 'none';
+  };
+
+  const handleTouchMove = (e) => {
+    const startX = parseFloat(e.currentTarget.dataset.startX);
+    if (isNaN(startX)) return;
+    const touch = e.touches[0];
+    const diff = touch.clientX - startX;
+    if (diff > 0) {
+      const moveX = Math.min(diff, 60);
+      e.currentTarget.style.transform = `translateX(${moveX}px)`;
+    }
+  };
+
+  const handleTouchEnd = (e, msg) => {
+    const startX = parseFloat(e.currentTarget.dataset.startX);
+    if (isNaN(startX)) return;
+    const touch = e.changedTouches[0];
+    const diff = touch.clientX - startX;
+    
+    e.currentTarget.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+    e.currentTarget.style.transform = '';
+    e.currentTarget.removeAttribute('data-start-x');
+    
+    if (diff > 45) {
+      setReplyingTo(msg);
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+  };
 
   useEffect(() => {
     fetchLeaves();
@@ -7999,12 +8465,50 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
   const sendChatMessage = async () => {
     if (!chatModal || !chatMessage.trim()) return;
     const textToSend = chatMessage.trim();
+
+    if (editingMsg) {
+      // Edit mode!
+      const updatedMessages = [...(chatModal.messages || [])];
+      updatedMessages[editingMsg.idx] = {
+        ...updatedMessages[editingMsg.idx],
+        text: textToSend,
+        edited: true,
+        editedAt: new Date().toISOString()
+      };
+
+      setChatMessage("");
+      setEditingMsg(null);
+      setChatModal(prev => prev ? { ...prev, messages: updatedMessages } : prev);
+      setLeaves(prev => prev.map(l => String(l.id) === String(chatModal.id) ? { ...l, messages: updatedMessages } : l));
+
+      try {
+        const { error } = await supabase
+          .from('student_leaves')
+          .update({ messages: updatedMessages })
+          .eq('id', chatModal.id);
+        if (error) throw error;
+      } catch (err) {
+        console.error("Failed to update edited admin message:", err);
+        onShowAction("error", "Failed to update message. Please check internet connection.");
+      }
+      return;
+    }
+
+    // Normal Send / Reply Mode
     const student = students.find(s => s.allIds.includes(String(chatModal?.student_id)));
     const studentName = student?.name || "your child";
-    const newMsg = { role: "admin", text: textToSend, timestamp: new Date().toISOString() };
+    const newMsg = {
+      role: "admin",
+      text: textToSend,
+      timestamp: new Date().toISOString()
+    };
+    if (replyingTo) {
+      newMsg.replyTo = { text: replyingTo.text, role: replyingTo.role };
+    }
 
     // 1. Optimistic UI update: Instantly show message bubble and clear input with 0ms delay
     setChatMessage("");
+    setReplyingTo(null);
     setChatModal(prev => prev ? { ...prev, messages: [...(prev.messages || []), newMsg] } : prev);
     setLeaves(prev => prev.map(l => String(l.id) === String(chatModal.id) ? { ...l, messages: [...(l.messages || []), newMsg] } : l));
 
@@ -8023,16 +8527,23 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
         .eq('id', chatModal.id);
       if (error) throw error;
 
-      // 2. Smart Notification: ONLY send outside FCM push notification if Parent is OFFLINE / has closed the chat room
-      if (!parentOnline) {
-        await broadcastNotification(
-          "📝 Leave Clarification",
-          `Regarding ${studentName}'s leave: ${textToSend}`,
-          "user",
-          chatModal.parent_id,
-          "Apply Leave"
-        );
-      }
+      // 2. Smart Notification: ONLY send outside FCM push notification if Parent is OFFLINE / has closed the chat room.
+      // We wait 1.5 seconds to allow Firestore snapshots to sync presence, preventing duplicate notifications while actively chatting.
+      setTimeout(async () => {
+        if (!parentOnlineRef.current) {
+          try {
+            await broadcastNotification(
+              "📝 Leave Clarification",
+              `Regarding ${studentName}'s leave: ${textToSend}`,
+              "user",
+              chatModal.parent_id,
+              "Apply Leave"
+            );
+          } catch (notifErr) {
+            console.error("FCM leave clarification notification error:", notifErr);
+          }
+        }
+      }, 1500);
     } catch (err) {
       console.error("Failed to send admin message:", err);
       onShowAction("error", "Failed to send message. Please check internet connection.");
@@ -8144,7 +8655,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
 
       {/* ─── Admin WhatsApp Chat Modal (Dedicated Full Screen View) ─── */}
       {chatModal && createPortal(
-        <div className="wac-modal-overlay" onClick={() => { setChatModal(null); setChatMessage(""); }}>
+        <div className="wac-modal-overlay" onClick={() => { setChatModal(null); setChatMessage(""); setReplyingTo(null); setEditingMsg(null); setActiveMenuMsg(null); }}>
           <style>{WHATSAPP_LEAVE_CHAT_CSS}</style>
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }} onClick={e => e.stopPropagation()}>
             
@@ -8154,7 +8665,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                 <button
                   type="button"
                   className="wac-back-btn"
-                  onClick={() => { setChatModal(null); setChatMessage(""); }}
+                  onClick={() => { setChatModal(null); setChatMessage(""); setReplyingTo(null); setEditingMsg(null); setActiveMenuMsg(null); }}
                   title="Back to Leave Applications"
                 >
                   <ArrowLeft size={20} />
@@ -8177,7 +8688,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                 <button
                   type="button"
                   className="wac-close-btn"
-                  onClick={() => { setChatModal(null); setChatMessage(""); }}
+                  onClick={() => { setChatModal(null); setChatMessage(""); setReplyingTo(null); setEditingMsg(null); setActiveMenuMsg(null); }}
                   title="Close Chat"
                 >
                   <X size={18} />
@@ -8200,11 +8711,35 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
               ) : chatModal.messages.map((msg, idx) => {
                 const isUser = msg.role === 'admin';
                 return (
-                  <div key={idx} className={`wac-bubble ${isUser ? 'wac-bubble-outgoing' : 'wac-bubble-incoming'}`}>
-                    <p className="wac-msg-text">{msg.text}</p>
-                    <div className="wac-bubble-meta">
-                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      {isUser && <CheckCheck size={13} style={{ color: '#b8860b' }} />}
+                  <div key={idx} className={`wac-bubble-container ${isUser ? 'outgoing' : 'incoming'}`}>
+                    <div 
+                      className={`wac-bubble ${isUser ? 'wac-bubble-outgoing' : 'wac-bubble-incoming'}`}
+                      onMouseDown={(e) => handlePressStart(e, msg, idx)}
+                      onMouseMove={handlePressMove}
+                      onMouseUp={handlePressEnd}
+                      onMouseLeave={handlePressEnd}
+                      onTouchStart={(e) => { handleTouchStart(e); handlePressStart(e, msg, idx); }}
+                      onTouchMove={(e) => { handleTouchMove(e); handlePressMove(e); }}
+                      onTouchEnd={(e) => { handleTouchEnd(e, msg); handlePressEnd(e); }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {msg.replyTo && (
+                        <div className="wac-bubble-reply-context">
+                          <span className="wac-reply-context-role">{msg.replyTo.role === 'parent' ? 'Parent' : 'Admin'}</span>
+                          <p className="wac-reply-context-text">{msg.replyTo.text}</p>
+                        </div>
+                      )}
+                      <p className="wac-msg-text">{msg.text}</p>
+                      <div className="wac-bubble-meta">
+                        {msg.starred && (
+                          <span className="wac-bubble-meta-star" style={{ marginRight: 4, display: 'inline-flex', alignItems: 'center' }}>
+                            <Star size={10} style={{ fill: '#d4af37', color: '#d4af37' }} />
+                          </span>
+                        )}
+                        {msg.edited && <span className="wac-msg-edited-tag">Edited</span>}
+                        <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {isUser && <CheckCheck size={13} style={{ color: '#b8860b' }} />}
+                      </div>
                     </div>
                   </div>
                 );
@@ -8213,6 +8748,29 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
 
             {/* Floating Input Bar + Quick Actions */}
             <div className="wac-input-container">
+              {replyingTo && (
+                <div className="wac-reply-preview-container">
+                  <div className="wac-reply-preview-header">
+                    <span className="wac-reply-preview-role">Replying to {replyingTo.role === 'parent' ? 'Parent' : 'Admin'}</span>
+                    <button type="button" className="wac-reply-preview-close" onClick={() => setReplyingTo(null)}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <p className="wac-reply-preview-text">{replyingTo.text}</p>
+                </div>
+              )}
+              {editingMsg && (
+                <div className="wac-reply-preview-container" style={{ borderLeftColor: '#312b1f' }}>
+                  <div className="wac-reply-preview-header">
+                    <span className="wac-reply-preview-role" style={{ color: '#312b1f' }}>Editing Message</span>
+                    <button type="button" className="wac-reply-preview-close" onClick={() => { setEditingMsg(null); setChatMessage(""); }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <p className="wac-reply-preview-text">{editingMsg.msg.text}</p>
+                </div>
+              )}
+              
               <div className="wac-quick-actions">
                 <button
                   type="button"
@@ -8261,7 +8819,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                         if (chatMessage.trim() && sendingAction !== "chat-" + chatModal.id) sendChatMessage();
                       }
                     }}
-                    placeholder="Ask the parent to clarify the reason..."
+                    placeholder={editingMsg ? "Edit message..." : "Ask the parent to clarify the reason..."}
                     rows={1}
                   />
                 </div>
@@ -8276,6 +8834,46 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                 </button>
               </div>
             </div>
+
+            {/* Context Menu Overlay */}
+            {activeMenuMsg && (
+              <div className="wac-context-menu-overlay" onClick={() => setActiveMenuMsg(null)}>
+                <div className="wac-context-menu-card" onClick={e => e.stopPropagation()}>
+                  <div className="wac-context-msg-preview">
+                    <p className="wac-context-msg-text">{activeMenuMsg.msg.text}</p>
+                  </div>
+                  <div className="wac-context-actions-list">
+                    <button type="button" className="wac-context-action-item" onClick={() => {
+                      setReplyingTo(activeMenuMsg.msg);
+                      setActiveMenuMsg(null);
+                    }}>
+                      <Reply size={15} />
+                      <span>Reply</span>
+                    </button>
+                    
+                    <button type="button" className="wac-context-action-item" onClick={() => {
+                      handleToggleStarAdmin(activeMenuMsg.idx);
+                      setActiveMenuMsg(null);
+                    }}>
+                      <Star size={15} style={{ fill: activeMenuMsg.msg.starred ? '#d4af37' : 'none', color: activeMenuMsg.msg.starred ? '#d4af37' : 'inherit' }} />
+                      <span>{activeMenuMsg.msg.starred ? "Unstar Message" : "Star Message"}</span>
+                    </button>
+                    
+                    {activeMenuMsg.msg.role === 'admin' && isMessageEditable(activeMenuMsg.msg) && (
+                      <button type="button" className="wac-context-action-item" onClick={() => {
+                        setEditingMsg({ msg: activeMenuMsg.msg, idx: activeMenuMsg.idx });
+                        setChatMessage(activeMenuMsg.msg.text);
+                        setReplyingTo(null);
+                        setActiveMenuMsg(null);
+                      }}>
+                        <Pencil size={14} />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>,
@@ -19545,7 +20143,7 @@ function AppLockScreen({ onUnlock, isDarkMode }) {
   );
 }
 
-function AppLockSetup({ onShowAction, onClose }) {
+function AppLockSetup({ onShowAction, onClose, onAppLockToggle }) {
   const [step, setStep] = useState('create');
   const [pin, setPin] = useState(['', '', '', '', '']);
   const [confirmPin, setConfirmPin] = useState(['', '', '', '', '']);
@@ -19608,6 +20206,9 @@ function AppLockSetup({ onShowAction, onClose }) {
     localStorage.setItem(APP_LOCK_KEYS.enabled, 'true');
     localStorage.setItem(APP_LOCK_KEYS.pin, hashPin(entered));
     setAppLockedState(false);
+    if (typeof onAppLockToggle === 'function') {
+      onAppLockToggle(true, entered);
+    }
     onShowAction('success', 'App lock enabled successfully!');
     onClose();
   };
@@ -20466,6 +21067,32 @@ export default function App() {
             storeRole(access.role);
             setPortalAccess(access.accessRow || emptyPortalAccess);
 
+            // Sync App Lock settings from Firebase!
+            try {
+              supabase.from("app_lock_settings")
+                .select("*")
+                .eq("user_id", session.user.id)
+                .limit(1)
+                .then(res => {
+                  if (res?.data && res.data.length > 0) {
+                    const lockSettings = res.data[0];
+                    if (lockSettings.enabled) {
+                      localStorage.setItem(APP_LOCK_KEYS.enabled, 'true');
+                      if (lockSettings.pin_hash) {
+                        localStorage.setItem(APP_LOCK_KEYS.pin, lockSettings.pin_hash);
+                      }
+                      setAppLockEnabled(true);
+                    } else {
+                      localStorage.removeItem(APP_LOCK_KEYS.enabled);
+                      localStorage.removeItem(APP_LOCK_KEYS.pin);
+                      setAppLockEnabled(false);
+                    }
+                  }
+                });
+            } catch (syncErr) {
+              console.error("Failed to sync app lock from Firebase on login:", syncErr);
+            }
+
             
 
             // Initialize FCM service once per user + role to prevent duplicate token requests.
@@ -21271,7 +21898,7 @@ export default function App() {
       storeRole(access.role);
       setPortalAccess(access.accessRow || emptyPortalAccess);
       setUser(loggedInUser);
-      await loadPortalData(access.role, loggedInUser, access.parentProfile);
+      loadPortalData(access.role, loggedInUser, access.parentProfile).catch(() => {});
 
       if (rememberMe) {
         localStorage.setItem(STORAGE_KEYS.rememberMe, "true");
@@ -21346,6 +21973,7 @@ export default function App() {
     const savedRole = localStorage.getItem("mauze-saved-role");
     const rememberMe = localStorage.getItem("mauze-remember-me");
     localStorage.clear();
+    sessionStorage.removeItem(APP_LOCK_KEYS.locked);
     if (rememberMe === "true") {
       if (savedEmail) localStorage.setItem("mauze-saved-email", savedEmail);
       if (savedPassword) localStorage.setItem("mauze-saved-password", savedPassword);
@@ -21360,7 +21988,7 @@ export default function App() {
     setAppLockedState(false);
   };
 
-  const handleAppLockToggle = (enable) => {
+  const handleAppLockToggle = async (enable, pin = null) => {
     if (!enable) {
       localStorage.removeItem(APP_LOCK_KEYS.enabled);
       localStorage.removeItem(APP_LOCK_KEYS.pin);
@@ -21368,8 +21996,40 @@ export default function App() {
       setAppLockEnabled(false);
       setAppLocked(false);
       showAction('success', 'App lock disabled.');
+
+      if (user?.id) {
+        try {
+          await supabase.from("app_lock_settings").upsert({
+            user_id: user.id,
+            enabled: false,
+            pin_hash: "",
+            updated_at: new Date().toISOString()
+          });
+        } catch (dbErr) {
+          console.error("Failed to sync app lock disabled to Firebase:", dbErr);
+        }
+      }
     } else {
+      localStorage.setItem(APP_LOCK_KEYS.enabled, 'true');
+      if (pin) {
+        localStorage.setItem(APP_LOCK_KEYS.pin, hashPin(pin));
+      }
+      setAppLockedState(false);
       setAppLockEnabled(true);
+      setAppLocked(false);
+
+      if (user?.id && pin) {
+        try {
+          await supabase.from("app_lock_settings").upsert({
+            user_id: user.id,
+            enabled: true,
+            pin_hash: hashPin(pin),
+            updated_at: new Date().toISOString()
+          });
+        } catch (dbErr) {
+          console.error("Failed to sync app lock enabled to Firebase:", dbErr);
+        }
+      }
     }
   };
 
@@ -23168,35 +23828,117 @@ const handleSendCustomNotification = async (event) => {
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: '#fffdf8',
-        flexDirection: 'column',
-        gap: '16px',
-        padding: '20px',
-        boxSizing: 'border-box'
-      }}>
-        <div style={{
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          border: '3px solid #f0e6d3',
-          borderTopColor: '#d4af37',
-          animation: 'spin 0.8s linear infinite'
-        }}></div>
-        <p style={{
-          color: '#8a786a',
-          fontFamily: "'Segoe UI',system-ui,sans-serif",
-          fontSize: '14px',
-          letterSpacing: '0.05em',
-          margin: 0
-        }}>Loading...</p>
+      <div className="premium-loader-container">
         <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
+          .premium-loader-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; min-height: 100dvh; width: 100vw;
+            background: radial-gradient(circle at center, #fffdf8 0%, #fbf5e6 100%);
+            position: fixed; inset: 0; z-index: 999999;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          }
+          
+          .premium-loader-card {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px 30px; border-radius: 24px;
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            box-shadow: 0 20px 50px rgba(140, 115, 75, 0.1);
+            max-width: 320px; width: 85%;
+            text-align: center;
+            animation: loaderCardEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+          }
+          
+          @keyframes loaderCardEnter {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          
+          .premium-loader-glowing-ring {
+            position: relative; width: 80px; height: 80px;
+            display: grid; place-items: center; margin-bottom: 24px;
+          }
+          
+          .premium-loader-ring-pulse {
+            position: absolute; inset: 0; border-radius: 50%;
+            border: 2.5px solid #d4af37;
+            animation: loaderRingPulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+          }
+          
+          .premium-loader-ring-pulse-delayed {
+            position: absolute; inset: 0; border-radius: 50%;
+            border: 2.5px solid #b8860b;
+            animation: loaderRingPulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+            animation-delay: 0.6s;
+          }
+          
+          .premium-loader-center-icon {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: linear-gradient(135deg, #d4af37, #b8860b);
+            display: grid; place-items: center; color: #fff;
+            box-shadow: 0 8px 24px rgba(212, 175, 55, 0.45);
+            z-index: 2;
+            animation: floatIcon 3s ease-in-out infinite;
+          }
+          
+          @keyframes loaderRingPulse {
+            0% { transform: scale(0.85); opacity: 0.8; }
+            100% { transform: scale(1.4); opacity: 0; }
+          }
+          
+          @keyframes floatIcon {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+          }
+          
+          .premium-loader-title {
+            font-size: 1.2rem; font-weight: 800; color: #4a3820;
+            margin: 0 0 6px 0; letter-spacing: 0.03em;
+            background: linear-gradient(90deg, #4a3820 0%, #b8860b 50%, #4a3820 100%);
+            background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            animation: shineText 3s linear infinite;
+          }
+          
+          @keyframes shineText {
+            to { background-position: 200% center; }
+          }
+          
+          .premium-loader-sub {
+            font-size: 0.8rem; color: #8a786a; margin: 0 0 24px 0; font-weight: 500;
+          }
+          
+          .premium-loader-progress-track {
+            width: 120px; height: 4px; background: rgba(212, 175, 55, 0.15);
+            border-radius: 2px; overflow: hidden; margin: 0 auto;
+          }
+          
+          .premium-loader-progress-bar {
+            height: 100%; width: 55%;
+            background: linear-gradient(90deg, #d4af37, #b8860b);
+            border-radius: 2px;
+            animation: loaderProgressCycle 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+          }
+          
+          @keyframes loaderProgressCycle {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+          }
         `}</style>
+        <div className="premium-loader-card">
+          <div className="premium-loader-glowing-ring">
+            <div className="premium-loader-ring-pulse" />
+            <div className="premium-loader-ring-pulse-delayed" />
+            <div className="premium-loader-center-icon">
+              <Crown size={22} />
+            </div>
+          </div>
+          <h2 className="premium-loader-title">Mauze Tahfeez</h2>
+          <p className="premium-loader-sub">Preparing your portal...</p>
+          <div className="premium-loader-progress-track">
+            <div className="premium-loader-progress-bar" />
+          </div>
+        </div>
       </div>
     );
   }

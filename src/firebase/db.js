@@ -7,6 +7,10 @@ import {
   doc,
   getDocs,
   getDoc,
+  getDocsFromCache,
+  getDocsFromServer,
+  getDocFromCache,
+  getDocFromServer,
   query,
   where,
   documentId,
@@ -72,6 +76,7 @@ const DOC_ID_BY = {
   email_settings: (d) => String(d.id ?? 1),
   whatsapp_config: (d) => String(d.id ?? 1),
   jadawal: (d) => d.student_id,
+  app_lock_settings: (d) => d.user_id,
 };
 
 function deriveDocId(collectionName, data) {
@@ -407,33 +412,64 @@ async function loadCandidates(state, ref) {
     filters[0].op === "eq" &&
     !filters[0].negated
   ) {
-    const snap = await getDoc(doc(db, state.collection, String(filters[0].val)));
-    return snap.exists() ? [convertRow(snap)] : [];
+    const docRef = doc(db, state.collection, String(filters[0].val));
+    try {
+      const snap = await getDocFromCache(docRef);
+      if (snap.exists()) {
+        getDocFromServer(docRef).catch(() => {});
+        return [convertRow(snap)];
+      }
+    } catch (_) {}
+
+    try {
+      const snap = await getDoc(docRef);
+      return snap.exists() ? [convertRow(snap)] : [];
+    } catch (_) {
+      const snap = await getDocFromServer(docRef);
+      return snap.exists() ? [convertRow(snap)] : [];
+    }
   }
 
+  const constraints = nativeConstraints(filters);
+  const q = constraints.length ? query(ref, ...constraints) : ref;
+
   try {
-    const constraints = nativeConstraints(filters);
-    const q = constraints.length ? query(ref, ...constraints) : ref;
+    const snap = await getDocsFromCache(q);
+    if (snap && snap.docs.length > 0) {
+      getDocsFromServer(q).catch(() => {});
+      return snap.docs.map(convertRow);
+    }
+  } catch (_) {}
+
+  try {
     const snap = await getDocs(q);
     return snap.docs.map(convertRow);
   } catch (e) {
     if (isIndexError(e)) {
       const first = filters.find(isSimpleFilter);
-      let q = ref;
+      let indexQ = ref;
       if (first) {
         if (first.column === "id") {
-          q = query(ref, where(documentId(), "==", String(first.val)));
+          indexQ = query(ref, where(documentId(), "==", String(first.val)));
         } else if (first.op === "eq") {
-          q = query(ref, where(first.column, "==", normValue(first.val)));
+          indexQ = query(ref, where(first.column, "==", normValue(first.val)));
         } else if (
           first.op === "in" &&
           Array.isArray(first.val) &&
           first.val.length <= 10
         ) {
-          q = query(ref, where(first.column, "in", first.val.map(normValue)));
+          indexQ = query(ref, where(first.column, "in", first.val.map(normValue)));
         }
       }
-      const snap = await getDocs(q);
+      try {
+        const snap = await getDocsFromCache(indexQ);
+        if (snap && snap.docs.length > 0) {
+          getDocsFromServer(indexQ).catch(() => {});
+          return snap.docs.map(convertRow);
+        }
+      } catch (_) {}
+
+      const snap = await getDocs(indexQ);
       return snap.docs.map(convertRow);
     }
     throw e;

@@ -183,8 +183,17 @@ service cloud.firestore {
       }
     }
     match /miqaat_calendar/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /portal_issues/{id} { allow read, write: if isSignedIn() && (isAdmin() || request.auth.uid == get(/databases/$(database)/documents/portal_issues/$(id)).data.user_id); }
-    match /support_tickets/{id} { allow read, write: if isSignedIn() && (isAdmin() || request.auth.uid == get(/databases/$(database)/documents/support_tickets/$(id)).data.user_id); }
+    match /portal_issues/{id} {
+      allow read, update, delete: if isSignedIn() && (isAdmin() || resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid);
+    }
+    match /support_tickets/{id} {
+      allow read, update, delete: if isSignedIn() && (isAdmin() || resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid);
+    }
+    match /app_lock_settings/{userId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
 
     match /quran_ikhtebar/{id} {
       allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
