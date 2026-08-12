@@ -487,7 +487,7 @@ export default function Login({ onLoginSuccess }) {
                           />
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               if (!forgotPhone.trim() || forgotPhone.trim().length < 8) {
                                 setForgotError("Please enter a valid mobile phone number.");
                                 return;
@@ -498,16 +498,34 @@ export default function Login({ onLoginSuccess }) {
                               setGeneratedOtp(code);
                               setOtpSent(true);
 
-                              // Optionally call whatsapp function
-                              if (forgotPhone) {
+                              try {
+                                // Dispatch WhatsApp / SMS message to phone number
                                 supabase.functions.invoke("whatsapp-notification", {
-                                  body: { phone: forgotPhone.trim(), message: `Your Mauze Tahfeez Password Reset Verification Code is: ${code}` }
+                                  body: { 
+                                    phone: forgotPhone.trim(), 
+                                    message: `Your Mauze Tahfeez Password Reset OTP Verification Code is: ${code}` 
+                                  }
                                 }).catch(() => {});
-                              }
 
-                              setTimeout(() => {
-                                setOtpSending(false);
-                              }, 600);
+                                // Dispatch Email message as backup dispatch to account email
+                                if (email) {
+                                  supabase.functions.invoke("send-email", {
+                                    body: {
+                                      to: email.trim(),
+                                      subject: "Mauze Tahfeez - Password Reset OTP Code",
+                                      text: `Your 6-digit OTP code to reset your password is: ${code}`,
+                                      html: `<div style="font-family:sans-serif;padding:20px;max-width:500px;margin:0 auto;border:1px solid #eee;border-radius:10px;"><h2 style="color:#b8860b;">Mauze Tahfeez</h2><p>You requested a password reset. Your 6-digit verification code is:</p><h1 style="color:#b8860b;letter-spacing:6px;font-size:32px;">${code}</h1><p>Please enter this code in your mobile application to verify your password change.</p></div>`,
+                                      isOtp: true
+                                    }
+                                  }).catch(() => {});
+                                }
+                              } catch (err) {
+                                console.warn("OTP dispatch error:", err);
+                              } finally {
+                                setTimeout(() => {
+                                  setOtpSending(false);
+                                }, 400);
+                              }
                             }}
                             style={{
                               background: 'linear-gradient(135deg, #d4af37, #b8860b)',
@@ -527,10 +545,14 @@ export default function Login({ onLoginSuccess }) {
                       {otpSent && (
                         <>
                           <div style={{
-                            padding: '10px 12px', background: '#fefce8', border: '1px solid #fef08a',
-                            borderRadius: '8px', marginBottom: '12px', fontSize: '0.8rem', color: '#854d0e'
+                            padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0',
+                            borderRadius: '8px', marginBottom: '12px', fontSize: '0.82rem', color: '#166534',
+                            display: 'flex', alignItems: 'center', gap: '8px'
                           }}>
-                            <strong>Verification Code Sent!</strong> Your 6-digit OTP code is: <span style={{ fontWeight: 800, color: '#b8860b', letterSpacing: '1px' }}>{generatedOtp}</span>
+                            <CheckCircle2 size={18} style={{ flexShrink: 0, color: '#16a34a' }} />
+                            <div>
+                              <strong>OTP Code Sent!</strong> A 6-digit verification code has been sent via text message to <strong>{forgotPhone}</strong> and email. Please check your mobile messages to type the code below.
+                            </div>
                           </div>
 
                           <div className="input-group">
