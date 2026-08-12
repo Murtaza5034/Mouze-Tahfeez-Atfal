@@ -52,6 +52,7 @@ const FUNCTION_NAMES = {
   "process-scheduled-notifications": "processScheduledNotifications",
   "jadwal-reminder": "sendJadwalReminder",
   "deploy-android-app": "deployAndroidApp",
+  "reset-user-password": "resetUserPassword",
 };
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { AlertCircle, Check, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, Users, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, Mail, Send, ShieldCheck, Smartphone, Users, X } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import lottie from "lottie-web";
 // Bundled at build time so the welcome animation never depends on a network
@@ -50,13 +50,17 @@ export default function Login({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
-  const [forgotCurrentPassword, setForgotCurrentPassword] = useState("");
+  const [forgotStep, setForgotStep] = useState(1); // 1: Passwords, 2: Phone & OTP
   const [forgotNewPassword, setForgotNewPassword] = useState("");
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [forgotPhone, setForgotPhone] = useState("");
+  const [forgotOtpInput, setForgotOtpInput] = useState("");
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState("");
   const [forgotError, setForgotError] = useState("");
-  const [showForgotCurrent, setShowForgotCurrent] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirm, setShowForgotConfirm] = useState(false);
   const [buttonFeedback, setButtonFeedback] = useState(null);
@@ -347,26 +351,31 @@ export default function Login({ onLoginSuccess }) {
           </form>
 
           {/* ── Forgot Password Section ── */}
+          {/* ── Forgot Password Section ── */}
           {forgotPasswordMode && (
             <div className="forgot-password-section">
               <div className="forgot-divider" />
 
               {forgotSuccess ? (
                 <div className="forgot-success">
-                  <CheckCircle2 size={24} className="forgot-success-icon" />
-                  <h4>Password Reset Successful</h4>
-                  <p>{forgotSuccess}</p>
+                  <CheckCircle2 size={28} className="forgot-success-icon" style={{ color: '#22c55e' }} />
+                  <h4 style={{ margin: '8px 0 4px 0', color: '#15803d' }}>Password Reset Successful!</h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#4b5563' }}>{forgotSuccess}</p>
                   <button
                     type="button"
                     className="login-button"
                     onClick={() => {
                       setForgotPasswordMode(false);
+                      setForgotStep(1);
                       setForgotSuccess("");
-                      setForgotCurrentPassword("");
                       setForgotNewPassword("");
                       setForgotConfirmPassword("");
+                      setForgotPhone("");
+                      setForgotOtpInput("");
+                      setGeneratedOtp("");
+                      setOtpSent(false);
                     }}
-                    style={{ marginTop: '12px' }}
+                    style={{ marginTop: '16px' }}
                   >
                     <LogIn size={16} />
                     Back to Login
@@ -374,103 +383,176 @@ export default function Login({ onLoginSuccess }) {
                 </div>
               ) : (
                 <>
-                  <h4 className="forgot-title">
-                    <KeyRound size={16} /> Reset Your Password
-                  </h4>
-                  <p className="forgot-desc">
-                    Verify your identity with your current password, then set a new one.
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <h4 className="forgot-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <KeyRound size={16} /> Reset Your Password
+                    </h4>
+                    {forgotStep === 2 && (
+                      <button
+                        type="button"
+                        onClick={() => { setForgotStep(1); setForgotError(""); }}
+                        style={{ border: 'none', background: 'transparent', color: '#b8860b', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                      >
+                        <ArrowLeft size={13} /> Edit details
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="forgot-desc" style={{ marginBottom: '16px' }}>
+                    {forgotStep === 1 
+                      ? "Enter your account email and new password to start."
+                      : "Verify your mobile phone number with OTP to complete password update."}
                   </p>
 
-                  <div className="input-group">
-                    <label htmlFor="forgot-email">Email Address</label>
-                    <div className="input-with-icon">
-                      <Mail size={18} />
-                      <input
-                        id="forgot-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email"
-                        required
-                      />
-                    </div>
-                  </div>
+                  {forgotStep === 1 && (
+                    <>
+                      <div className="input-group">
+                        <label htmlFor="forgot-email">Email Address</label>
+                        <div className="input-with-icon">
+                          <Mail size={18} />
+                          <input
+                            id="forgot-email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Enter account email"
+                            required
+                          />
+                        </div>
+                      </div>
 
-                  <div className="input-group">
-                    <label htmlFor="forgot-current-password">Current Password</label>
-                    <div className="input-with-icon">
-                      <Lock size={18} />
-                      <input
-                        id="forgot-current-password"
-                        type={showForgotCurrent ? "text" : "password"}
-                        value={forgotCurrentPassword}
-                        onChange={(e) => setForgotCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        className="password-toggle-btn"
-                        onClick={() => setShowForgotCurrent((prev) => !prev)}
-                        tabIndex={-1}
-                        aria-label={showForgotCurrent ? "Hide current password" : "Show current password"}
-                      >
-                        {showForgotCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
+                      <div className="input-group">
+                        <label htmlFor="forgot-new-password">New Password</label>
+                        <div className="input-with-icon">
+                          <Lock size={18} />
+                          <input
+                            id="forgot-new-password"
+                            type={showForgotPassword ? "text" : "password"}
+                            value={forgotNewPassword}
+                            onChange={(e) => setForgotNewPassword(e.target.value)}
+                            placeholder="Enter new password (min 6 chars)"
+                            required
+                            minLength={6}
+                          />
+                          <button
+                            type="button"
+                            className="password-toggle-btn"
+                            onClick={() => setShowForgotPassword((prev) => !prev)}
+                            tabIndex={-1}
+                          >
+                            {showForgotPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
 
-                  <div className="forgot-divider-light" />
+                      <div className="input-group">
+                        <label htmlFor="forgot-confirm-password">Confirm New Password</label>
+                        <div className="input-with-icon">
+                          <Lock size={18} />
+                          <input
+                            id="forgot-confirm-password"
+                            type={showForgotConfirm ? "text" : "password"}
+                            value={forgotConfirmPassword}
+                            onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                            placeholder="Confirm new password"
+                            required
+                            minLength={6}
+                          />
+                          <button
+                            type="button"
+                            className="password-toggle-btn"
+                            onClick={() => setShowForgotConfirm((prev) => !prev)}
+                            tabIndex={-1}
+                          >
+                            {showForgotConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-                  <div className="input-group">
-                    <label htmlFor="forgot-new-password">New Password</label>
-                    <div className="input-with-icon">
-                      <Lock size={18} />
-                      <input
-                        id="forgot-new-password"
-                        type={showForgotPassword ? "text" : "password"}
-                        value={forgotNewPassword}
-                        onChange={(e) => setForgotNewPassword(e.target.value)}
-                        placeholder="Enter new password (min 6 chars)"
-                        required
-                        minLength={6}
-                      />
-                      <button
-                        type="button"
-                        className="password-toggle-btn"
-                        onClick={() => setShowForgotPassword((prev) => !prev)}
-                        tabIndex={-1}
-                        aria-label={showForgotPassword ? "Hide password" : "Show password"}
-                      >
-                        {showForgotPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
+                  {forgotStep === 2 && (
+                    <>
+                      <div className="input-group">
+                        <label htmlFor="forgot-phone">Mobile Phone Number</label>
+                        <div className="input-with-icon" style={{ display: 'flex', gap: '6px' }}>
+                          <Smartphone size={18} style={{ flexShrink: 0 }} />
+                          <input
+                            id="forgot-phone"
+                            type="tel"
+                            value={forgotPhone}
+                            onChange={(e) => setForgotPhone(e.target.value)}
+                            placeholder="Enter mobile number (e.g. +91...)"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!forgotPhone.trim() || forgotPhone.trim().length < 8) {
+                                setForgotError("Please enter a valid mobile phone number.");
+                                return;
+                              }
+                              setForgotError("");
+                              setOtpSending(true);
+                              const code = Math.floor(100000 + Math.random() * 900000).toString();
+                              setGeneratedOtp(code);
+                              setOtpSent(true);
 
-                  <div className="input-group">
-                    <label htmlFor="forgot-confirm-password">Confirm New Password</label>
-                    <div className="input-with-icon">
-                      <Lock size={18} />
-                      <input
-                        id="forgot-confirm-password"
-                        type={showForgotConfirm ? "text" : "password"}
-                        value={forgotConfirmPassword}
-                        onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
-                        required
-                        minLength={6}
-                      />
-                      <button
-                        type="button"
-                        className="password-toggle-btn"
-                        onClick={() => setShowForgotConfirm((prev) => !prev)}
-                        tabIndex={-1}
-                        aria-label={showForgotConfirm ? "Hide password" : "Show password"}
-                      >
-                        {showForgotConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
+                              // Optionally call whatsapp function
+                              if (forgotPhone) {
+                                supabase.functions.invoke("whatsapp-notification", {
+                                  body: { phone: forgotPhone.trim(), message: `Your Mauze Tahfeez Password Reset Verification Code is: ${code}` }
+                                }).catch(() => {});
+                              }
+
+                              setTimeout(() => {
+                                setOtpSending(false);
+                              }, 600);
+                            }}
+                            style={{
+                              background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+                              color: '#fff', border: 'none', borderRadius: '6px',
+                              padding: '0 12px', fontSize: '0.78rem', fontWeight: 700,
+                              cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex',
+                              alignItems: 'center', gap: '4px'
+                            }}
+                            disabled={otpSending}
+                          >
+                            {otpSending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                            {otpSent ? "Resend OTP" : "Get OTP"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {otpSent && (
+                        <>
+                          <div style={{
+                            padding: '10px 12px', background: '#fefce8', border: '1px solid #fef08a',
+                            borderRadius: '8px', marginBottom: '12px', fontSize: '0.8rem', color: '#854d0e'
+                          }}>
+                            <strong>Verification Code Sent!</strong> Your 6-digit OTP code is: <span style={{ fontWeight: 800, color: '#b8860b', letterSpacing: '1px' }}>{generatedOtp}</span>
+                          </div>
+
+                          <div className="input-group">
+                            <label htmlFor="forgot-otp">Enter 6-Digit OTP</label>
+                            <div className="input-with-icon">
+                              <ShieldCheck size={18} />
+                              <input
+                                id="forgot-otp"
+                                type="text"
+                                maxLength={6}
+                                value={forgotOtpInput}
+                                onChange={(e) => setForgotOtpInput(e.target.value)}
+                                placeholder="Enter 6-digit code"
+                                style={{ letterSpacing: '3px', fontWeight: 'bold' }}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
 
                   {forgotError && (
                     <div className="error-message">
@@ -485,55 +567,52 @@ export default function Login({ onLoginSuccess }) {
                     onClick={async () => {
                       setForgotError("");
 
-                      if (!email.trim()) {
-                        setForgotError("Please enter your email address.");
+                      if (forgotStep === 1) {
+                        if (!email.trim()) {
+                          setForgotError("Please enter your email address.");
+                          return;
+                        }
+                        if (!forgotNewPassword || forgotNewPassword.length < 6) {
+                          setForgotError("New password must be at least 6 characters.");
+                          return;
+                        }
+                        if (forgotNewPassword !== forgotConfirmPassword) {
+                          setForgotError("New passwords do not match.");
+                          return;
+                        }
+                        // Advance to Step 2 for OTP phone verification!
+                        setForgotStep(2);
                         return;
                       }
-                      if (!forgotCurrentPassword) {
-                        setForgotError("Please enter your current password.");
+
+                      // Step 2 Verification & Update
+                      if (!forgotPhone.trim()) {
+                        setForgotError("Please enter your mobile phone number.");
                         return;
                       }
-                      if (!forgotNewPassword || forgotNewPassword.length < 6) {
-                        setForgotError("New password must be at least 6 characters.");
+                      if (!otpSent) {
+                        setForgotError("Please click 'Get OTP' to generate your verification code.");
                         return;
                       }
-                      if (forgotNewPassword !== forgotConfirmPassword) {
-                        setForgotError("New passwords do not match.");
-                        return;
-                      }
-                      if (forgotNewPassword === forgotCurrentPassword) {
-                        setForgotError("New password must be different from current password.");
+                      if (!forgotOtpInput.trim() || forgotOtpInput.trim() !== generatedOtp) {
+                        setForgotError("Invalid OTP code. Please check the code and try again.");
                         return;
                       }
 
                       setForgotLoading(true);
                       try {
-                        const { error: signInError } = await supabase.auth.signInWithPassword({
-                          email: email.trim(),
-                          password: forgotCurrentPassword,
+                        const { data: res, error: resetErr } = await supabase.rpc("reset_user_password", {
+                          target_email: email.trim(),
+                          new_password: forgotNewPassword,
                         });
 
-                        if (signInError) {
-                          setForgotError("Current password is incorrect. Please try again.");
+                        if (resetErr) {
+                          setForgotError(resetErr.message || "Failed to update password. Please check your email.");
                           setForgotLoading(false);
                           return;
                         }
 
-                        const { error: updateError } = await supabase.auth.updateUser({
-                          password: forgotNewPassword,
-                        });
-
-                        if (updateError) {
-                          setForgotError(updateError.message || "Failed to update password. Please try again.");
-                          setForgotLoading(false);
-                          return;
-                        }
-
-                        await supabase.auth.signOut();
-
-                        setForgotSuccess(
-                          "Your password has been changed successfully! You can now login with your new password."
-                        );
+                        setForgotSuccess("Your password has been updated successfully! You can now log in with your new password.");
                         setPassword(forgotNewPassword);
                       } catch (err) {
                         setForgotError("An unexpected error occurred. Please try again.");
@@ -546,12 +625,17 @@ export default function Login({ onLoginSuccess }) {
                     {forgotLoading ? (
                       <>
                         <Loader2 size={18} className="spinner" />
-                        Changing Password...
+                        Updating Password...
+                      </>
+                    ) : forgotStep === 1 ? (
+                      <>
+                        <ShieldCheck size={18} />
+                        Continue to OTP Verification
                       </>
                     ) : (
                       <>
                         <KeyRound size={18} />
-                        Change Password
+                        Verify OTP & Update Password
                       </>
                     )}
                   </button>
@@ -561,10 +645,14 @@ export default function Login({ onLoginSuccess }) {
                     className="forgot-cancel-btn"
                     onClick={() => {
                       setForgotPasswordMode(false);
+                      setForgotStep(1);
                       setForgotError("");
-                      setForgotCurrentPassword("");
                       setForgotNewPassword("");
                       setForgotConfirmPassword("");
+                      setForgotPhone("");
+                      setForgotOtpInput("");
+                      setGeneratedOtp("");
+                      setOtpSent(false);
                     }}
                   >
                     <X size={14} /> Cancel
