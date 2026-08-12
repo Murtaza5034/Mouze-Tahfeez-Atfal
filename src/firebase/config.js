@@ -76,10 +76,10 @@ function checkFirebaseConfig(config) {
 
   console.error(
     "%c[Firebase Config] MISCONFIGURED BUILD" +
-      " - " + problems.join(", ") + ".\n" +
-      "Firebase Auth / FCM may fail to initialize (e.g. auth/invalid-api-key).\n" +
-      "Fix: set the VITE_FIREBASE_* vars at build time (.env, Vercel/CI env vars)\n" +
-      "or correct the fallbacks in src/firebase/config.js.",
+    " - " + problems.join(", ") + ".\n" +
+    "Firebase Auth / FCM may fail to initialize (e.g. auth/invalid-api-key).\n" +
+    "Fix: set the VITE_FIREBASE_* vars at build time (.env, Vercel/CI env vars)\n" +
+    "or correct the fallbacks in src/firebase/config.js.",
     "background:#d93025;color:#fff;font-weight:bold;padding:2px 6px;border-radius:3px"
   );
 }

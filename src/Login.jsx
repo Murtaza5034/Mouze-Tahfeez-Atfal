@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AlertCircle, ArrowLeft, Check, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, Mail, Send, ShieldCheck, Smartphone, Users, X } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { auth } from "./firebase/auth.js";
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import lottie from "lottie-web";
 // Bundled at build time so the welcome animation never depends on a network
 // fetch (the deployed site's catch-all route used to serve HTML for .json
@@ -57,7 +55,7 @@ export default function Login({ onLoginSuccess }) {
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
   const [forgotPhone, setForgotPhone] = useState("");
   const [forgotOtpInput, setForgotOtpInput] = useState("");
-  const [confirmationResult, setConfirmationResult] = useState(null);
+  const [generatedOtp, setGeneratedOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -65,8 +63,6 @@ export default function Login({ onLoginSuccess }) {
   const [forgotError, setForgotError] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirm, setShowForgotConfirm] = useState(false);
-  const recaptchaContainerRef = useRef(null);
-  const recaptchaVerifierRef = useRef(null);
   const [buttonFeedback, setButtonFeedback] = useState(null);
   const welcomeRef = useRef(null);
   const [rememberMe, setRememberMe] = useState(() => {
@@ -477,91 +473,91 @@ export default function Login({ onLoginSuccess }) {
 
                   {forgotStep === 2 && (
                     <>
-                      <div className="input-group">
-                        <label htmlFor="forgot-phone">Mobile Phone Number</label>
-                        <div className="input-with-icon" style={{ display: 'flex', gap: '6px' }}>
-                          <Smartphone size={18} style={{ flexShrink: 0 }} />
-                          <input
-                            id="forgot-phone"
-                            type="tel"
-                            value={forgotPhone}
-                            onChange={(e) => setForgotPhone(e.target.value)}
-                            placeholder="Enter mobile number (e.g. +91...)"
-                            required
-                          />
+                      {/* Generate OTP Button */}
+                      {!otpSent ? (
+                        <div style={{ textAlign: 'center', padding: '10px 0 16px' }}>
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!forgotPhone.trim() || forgotPhone.trim().length < 8) {
-                                setForgotError("Please enter a valid mobile phone number with country code (e.g. +91...).");
-                                return;
-                              }
-                              setForgotError("");
+                            onClick={() => {
                               setOtpSending(true);
-                              try {
-                                // Destroy any existing verifier before creating a new one
-                                if (recaptchaVerifierRef.current) {
-                                  recaptchaVerifierRef.current.clear();
-                                  recaptchaVerifierRef.current = null;
-                                }
-                                // Create invisible reCAPTCHA verifier (Firebase requirement)
-                                const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                                  size: 'invisible',
-                                  callback: () => {},
-                                });
-                                recaptchaVerifierRef.current = verifier;
-
-                                // Send OTP via Firebase Phone Auth (real SMS)
-                                const result = await signInWithPhoneNumber(auth, forgotPhone.trim(), verifier);
-                                setConfirmationResult(result);
+                              const code = Math.floor(100000 + Math.random() * 900000).toString();
+                              setTimeout(() => {
+                                setGeneratedOtp(code);
                                 setOtpSent(true);
                                 setForgotOtpInput("");
-                              } catch (err) {
-                                console.error("Firebase Phone OTP error:", err);
-                                const msg = err?.code === "auth/invalid-phone-number"
-                                  ? "Invalid phone number format. Use international format e.g. +919930852533"
-                                  : err?.code === "auth/too-many-requests"
-                                  ? "Too many OTP requests. Please try again later."
-                                  : err?.message || "Failed to send OTP. Please try again.";
-                                setForgotError(msg);
-                                setOtpSent(false);
-                              } finally {
                                 setOtpSending(false);
-                              }
+                              }, 600);
                             }}
                             style={{
                               background: 'linear-gradient(135deg, #d4af37, #b8860b)',
-                              color: '#fff', border: 'none', borderRadius: '6px',
-                              padding: '0 12px', fontSize: '0.78rem', fontWeight: 700,
-                              cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex',
-                              alignItems: 'center', gap: '4px'
+                              color: '#fff', border: 'none', borderRadius: '10px',
+                              padding: '12px 28px', fontSize: '0.92rem', fontWeight: 700,
+                              cursor: 'pointer', display: 'inline-flex',
+                              alignItems: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(212,175,55,0.35)'
                             }}
                             disabled={otpSending}
                           >
-                            {otpSending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                            {otpSent ? "Resend OTP" : "Get OTP"}
+                            {otpSending ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                            {otpSending ? "Generating..." : "Generate Verification Code"}
                           </button>
                         </div>
-                      </div>
-
-                      {/* Invisible reCAPTCHA container required by Firebase Phone Auth */}
-                      <div id="recaptcha-container" ref={recaptchaContainerRef} style={{ display: 'none' }} />
-
-                      {otpSent && (
+                      ) : (
                         <>
+                          {/* OTP Display Card */}
                           <div style={{
-                            padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0',
-                            borderRadius: '8px', marginBottom: '12px', fontSize: '0.82rem', color: '#166534',
-                            display: 'flex', alignItems: 'center', gap: '8px'
+                            background: 'linear-gradient(135deg, #1a1200, #2a1e00)',
+                            border: '2px solid #d4af37',
+                            borderRadius: '14px',
+                            padding: '18px 16px',
+                            marginBottom: '16px',
+                            textAlign: 'center',
+                            boxShadow: '0 0 24px rgba(212,175,55,0.25), inset 0 1px 0 rgba(255,255,255,0.05)'
                           }}>
-                            <CheckCircle2 size={18} style={{ flexShrink: 0, color: '#16a34a' }} />
-                            <div>
-                              <strong>OTP Sent via SMS!</strong> A 6-digit code was sent by Firebase to <strong>{forgotPhone}</strong>. Check your SMS messages and enter it below.
+                            <div style={{ fontSize: '0.72rem', color: '#d4af37', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '10px', fontWeight: 600 }}>
+                              🔐 Your Verification Code
                             </div>
+                            <div style={{
+                              fontSize: '2.4rem',
+                              fontWeight: 800,
+                              letterSpacing: '10px',
+                              color: '#f0d060',
+                              fontFamily: 'monospace',
+                              textShadow: '0 0 20px rgba(240,208,96,0.5)',
+                              padding: '4px 0'
+                            }}>
+                              {generatedOtp}
+                            </div>
+                            <div style={{ fontSize: '0.73rem', color: '#a08030', marginTop: '8px' }}>
+                              Enter this code below to verify and update your password
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOtpSending(true);
+                                const code = Math.floor(100000 + Math.random() * 900000).toString();
+                                setTimeout(() => {
+                                  setGeneratedOtp(code);
+                                  setForgotOtpInput("");
+                                  setOtpSending(false);
+                                }, 400);
+                              }}
+                              style={{
+                                marginTop: '12px', background: 'transparent',
+                                border: '1px solid #d4af3760', color: '#d4af37',
+                                borderRadius: '6px', padding: '5px 14px',
+                                fontSize: '0.73rem', cursor: 'pointer', display: 'inline-flex',
+                                alignItems: 'center', gap: '5px'
+                              }}
+                              disabled={otpSending}
+                            >
+                              {otpSending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                              Refresh Code
+                            </button>
                           </div>
 
+                          {/* OTP Input */}
                           <div className="input-group">
-                            <label htmlFor="forgot-otp">Enter 6-Digit OTP</label>
+                            <label htmlFor="forgot-otp">Enter the Code Shown Above</label>
                             <div className="input-with-icon">
                               <ShieldCheck size={18} />
                               <input
@@ -570,9 +566,10 @@ export default function Login({ onLoginSuccess }) {
                                 maxLength={6}
                                 value={forgotOtpInput}
                                 onChange={(e) => setForgotOtpInput(e.target.value.replace(/\D/g, ""))}
-                                placeholder="Enter 6-digit code"
-                                style={{ letterSpacing: '4px', fontWeight: 'bold', fontSize: '1.1rem' }}
+                                placeholder="Type the 6-digit code"
+                                style={{ letterSpacing: '6px', fontWeight: 'bold', fontSize: '1.15rem', textAlign: 'center' }}
                                 required
+                                autoFocus
                               />
                             </div>
                           </div>
@@ -612,26 +609,22 @@ export default function Login({ onLoginSuccess }) {
                         return;
                       }
 
-                      // Step 2 Verification & Update
-                      if (!forgotPhone.trim()) {
-                        setForgotError("Please enter your mobile phone number.");
-                        return;
-                      }
-                      if (!otpSent || !confirmationResult) {
-                        setForgotError("Please click 'Get OTP' to receive your verification code via SMS.");
+                      // Step 2 — OTP Verify & Password Update
+                      if (!otpSent) {
+                        setForgotError("Please click 'Generate Verification Code' first.");
                         return;
                       }
                       if (!forgotOtpInput.trim() || forgotOtpInput.trim().length !== 6) {
-                        setForgotError("Please enter the 6-digit OTP code from your SMS.");
+                        setForgotError("Please enter the 6-digit code shown on screen.");
+                        return;
+                      }
+                      if (forgotOtpInput.trim() !== generatedOtp) {
+                        setForgotError("Incorrect code. Please type the code exactly as shown above.");
                         return;
                       }
 
                       setForgotLoading(true);
                       try {
-                        // Verify OTP with Firebase Phone Auth
-                        await confirmationResult.confirm(forgotOtpInput.trim());
-
-                        // OTP verified! Now update the password via Firebase Admin
                         const { error: resetErr } = await supabase.rpc("reset_user_password", {
                           target_email: email.trim(),
                           new_password: forgotNewPassword,
@@ -643,15 +636,10 @@ export default function Login({ onLoginSuccess }) {
                           return;
                         }
 
-                        setForgotSuccess("Your password has been updated successfully! You can now log in with your new password.");
+                        setForgotSuccess("✅ Password updated successfully! You can now log in with your new password.");
                         setPassword(forgotNewPassword);
                       } catch (err) {
-                        const msg = err?.code === "auth/invalid-verification-code"
-                          ? "Incorrect OTP code. Please check the SMS and try again."
-                          : err?.code === "auth/code-expired"
-                          ? "OTP code has expired. Please request a new one."
-                          : "An unexpected error occurred. Please try again.";
-                        setForgotError(msg);
+                        setForgotError("An unexpected error occurred. Please try again.");
                       } finally {
                         setForgotLoading(false);
                       }
