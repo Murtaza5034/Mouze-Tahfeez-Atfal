@@ -23929,12 +23929,12 @@ const handleSendCustomNotification = async (event) => {
           <div className="premium-loader-glowing-ring">
             <div className="premium-loader-ring-pulse" />
             <div className="premium-loader-ring-pulse-delayed" />
-            <div className="premium-loader-center-icon">
-              <Crown size={22} />
+            <div className="premium-loader-center-icon" style={{ background: '#ffffff', border: '2px solid #d4af37', width: 54, height: 54 }}>
+              <img src="/logo.png" alt="Logo" style={{ width: 38, height: 38, objectFit: 'contain' }} />
             </div>
           </div>
           <h2 className="premium-loader-title">Mauze Tahfeez</h2>
-          <p className="premium-loader-sub">Preparing your portal...</p>
+          <p className="premium-loader-sub">Entering....</p>
           <div className="premium-loader-progress-track">
             <div className="premium-loader-progress-bar" />
           </div>
