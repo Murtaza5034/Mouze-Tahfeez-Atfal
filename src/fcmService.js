@@ -9,6 +9,48 @@ function isNativeAndroid() {
   return isCapacitor() && window.Capacitor.getPlatform() === 'android';
 }
 
+// ---------------------------------------------------------------------------
+// Notification-tap handling (exact-page deep linking)
+//
+// Taps are STASHED (localStorage + a window event) instead of doing a full
+// page reload, so the portal can navigate to the exact page the notification
+// belongs to without losing state. Cold-start taps (app was killed) are
+// recovered from the native MauzeNotifBridge in MainActivity, which reads the
+// notification extras preserved by SplashActivity.
+// ---------------------------------------------------------------------------
+const NOTIF_TAP_KEY = "mauze_notif_tap";
+
+function stashNotificationTap(data) {
+  if (!data || typeof data !== "object") return;
+  const clean = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      clean[k] = v;
+    }
+  }
+  try {
+    localStorage.setItem(NOTIF_TAP_KEY, JSON.stringify(clean));
+  } catch (_) {}
+  try {
+    window.dispatchEvent(new CustomEvent("mauze:notification-tap", { detail: clean }));
+  } catch (_) {}
+}
+
+// Register the native tap listener as early as possible (at module load, before
+// login / FCM init) so taps that arrive while the app is backgrounded are
+// never lost. The portal consumes the stashed payload once it is ready.
+if (isNativeAndroid()) {
+  (async () => {
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        const data = action?.notification?.data || {};
+        if (Object.keys(data).length) stashNotificationTap(data);
+      });
+    } catch (_) {}
+  })();
+}
+
 class FCMService {
   constructor() {
     this.isSupported = false;
@@ -194,17 +236,27 @@ class FCMService {
       // Background/terminated notifications are displayed by the OS automatically
     });
 
-    // Listen for notification action (tap)
-    await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-      console.log('Capacitor notification action:', action);
-      const data = action.notification?.data || {};
-      const redirectPage = data?.redirectPage || '';
-      let url = '/';
-      if (redirectPage) {
-        url = '/?redirectPage=' + encodeURIComponent(redirectPage);
-      }
-      window.location.href = url;
-    });
+    // Ensure the premium notification channel exists (Android 8+). The Firebase
+    // SDK auto-creates it from the payload channel_id, but creating it here
+    // explicitly gives it HIGH importance + sound + vibration for a premium feel.
+    try {
+      await PushNotifications.createChannel({
+        id: "mauze-tahfeez-notifications",
+        name: "Mauze Tahfeez",
+        description: "Leave chat & portal notifications",
+        importance: 5, // IMPORTANCE_HIGH
+        visibility: 1, // VISIBILITY_PUBLIC
+        sound: "",
+        vibration: true,
+        lights: true
+      });
+    } catch (channelErr) {
+      console.warn('Could not create premium notification channel:', channelErr);
+    }
+
+    // Notification taps are handled by the module-level listener (registered at
+    // import time) which stashes the payload for the portal to deep-link to the
+    // exact page. Cold-start taps are recovered from the native MauzeNotifBridge.
 
     this.isNative = true;
     this.isSupported = true;
@@ -484,14 +536,17 @@ class FCMService {
     return notification;
   }
 
-  // Handle notification click
+  // Handle notification click (web foreground notifications)
   handleNotificationClick(data) {
     try {
       const redirectPage = data?.redirectPage || '';
-      let url = '/';
-      if (redirectPage) {
-        url = '/?redirectPage=' + encodeURIComponent(redirectPage);
-      }
+      const leaveId = data?.leaveId || '';
+      const studentId = data?.studentId || data?.student_id || '';
+      const params = [];
+      if (redirectPage) params.push('redirectPage=' + encodeURIComponent(redirectPage));
+      if (leaveId) params.push('leaveId=' + encodeURIComponent(leaveId));
+      if (studentId) params.push('studentId=' + encodeURIComponent(studentId));
+      const url = params.length ? '/?' + params.join('&') : '/';
       console.log('Navigating to:', url);
 
       if (window.focus && !window.document.hidden) {

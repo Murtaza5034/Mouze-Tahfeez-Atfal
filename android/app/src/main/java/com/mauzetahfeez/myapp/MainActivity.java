@@ -26,6 +26,9 @@ import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -43,6 +46,13 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
+        // Expose the notification-tap bridge to the WebView as early as possible
+        // so cold-start taps (app launched from a notification) are never missed.
+        try {
+            WebView wv = getBridge().getWebView();
+            if (wv != null) wv.addJavascriptInterface(new MauzeNotifBridge(), "MauzeNotifBridge");
+        } catch (Exception ignored) {}
+
         getBridge().getWebView().post(() -> {
             webView = getBridge().getWebView();
             if (webView != null) {
@@ -50,7 +60,60 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
+        // Capture a notification tap that arrives while the app is backgrounded
+        // (cold-start taps arrive in SplashActivity instead).
+        saveNotificationTap(getIntent());
+
         setupDownloadListener();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        saveNotificationTap(intent);
+    }
+
+    /**
+     * Preserve the tapped FCM notification's data into SharedPreferences so the
+     * web app can deep-link to the EXACT page the notification belongs to.
+     */
+    private void saveNotificationTap(Intent intent) {
+        if (intent == null || prefs == null) return;
+        Bundle extras = intent.getExtras();
+        if (extras == null || extras.isEmpty()) return;
+        boolean isNotifTap = extras.containsKey("google.message_id")
+                || extras.containsKey("redirectPage")
+                || extras.containsKey("google.c.a.e");
+        if (!isNotifTap) return;
+        JSONObject obj = new JSONObject();
+        for (String key : extras.keySet()) {
+            Object value = extras.get(key);
+            if (value instanceof String) {
+                try { obj.put(key, (String) value); } catch (JSONException ignored) {}
+            } else if (value instanceof Number || value instanceof Boolean) {
+                try { obj.put(key, value); } catch (JSONException ignored) {}
+            }
+        }
+        prefs.edit()
+                .putString("pending_notif_tap", obj.toString())
+                .apply();
+    }
+
+    /**
+     * JavascriptInterface exposed as {@code window.MauzeNotifBridge} so the web
+     * app can read + clear the pending notification tap on startup.
+     */
+    private class MauzeNotifBridge {
+        @JavascriptInterface
+        public String getPendingNotifTap() {
+            return prefs != null ? prefs.getString("pending_notif_tap", null) : null;
+        }
+
+        @JavascriptInterface
+        public void clearPendingNotifTap() {
+            if (prefs != null) prefs.edit().remove("pending_notif_tap").apply();
+        }
     }
 
     public void requestStoragePermission() {
@@ -269,6 +332,8 @@ public class MainActivity extends BridgeActivity {
 
         webView.addJavascriptInterface(
                 new MauzeDownloadInterface(), "MauzeDownloader");
+
+        webView.addJavascriptInterface(new MauzeNotifBridge(), "MauzeNotifBridge");
     }
 
     @Override

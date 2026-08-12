@@ -37,6 +37,20 @@ function makeNotifTag(info) {
   return info.data?.notification_id || info.data?.id || `mauze-${info.title}-${info.body}-${Date.now()}`;
 }
 
+// Build a deep-link URL from notification data so taps open the EXACT page
+// (and, for chat notifications, the exact leave chat).
+function buildDeepLinkUrl(data) {
+  const redirectPage = data?.redirectPage || '';
+  const leaveId = data?.leaveId || '';
+  const studentId = data?.studentId || data?.student_id || '';
+  const params = [];
+  if (redirectPage) params.push('redirectPage=' + encodeURIComponent(redirectPage));
+  if (leaveId) params.push('leaveId=' + encodeURIComponent(leaveId));
+  if (studentId) params.push('studentId=' + encodeURIComponent(studentId));
+  if (params.length) return '/?' + params.join('&');
+  return data?.url || '/';
+}
+
 function buildNotificationOptions(info) {
   const options = {
     body: info.body,
@@ -113,13 +127,7 @@ self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   if (event.action === 'dismiss') return;
 
-  const redirectPage = event.notification.data?.redirectPage || '';
-  let urlToOpen = '/';
-  if (redirectPage) {
-    urlToOpen = '/?redirectPage=' + encodeURIComponent(redirectPage);
-  } else {
-    urlToOpen = event.notification.data?.url || '/';
-  }
+  const urlToOpen = buildDeepLinkUrl(event.notification.data);
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })

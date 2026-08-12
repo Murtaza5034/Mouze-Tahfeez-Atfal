@@ -63,6 +63,8 @@ export default function Login({ onLoginSuccess }) {
   const [forgotError, setForgotError] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirm, setShowForgotConfirm] = useState(false);
+  const [emailFieldError, setEmailFieldError] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [buttonFeedback, setButtonFeedback] = useState(null);
   const welcomeRef = useRef(null);
   const [rememberMe, setRememberMe] = useState(() => {
@@ -408,13 +410,13 @@ export default function Login({ onLoginSuccess }) {
                     <>
                       <div className="input-group">
                         <label htmlFor="forgot-email">Email Address</label>
-                        <div className="input-with-icon">
+                        <div className={`input-with-icon${emailFieldError ? ' field-error' : ''}`}>
                           <Mail size={18} />
                           <input
                             id="forgot-email"
                             type="email"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            onChange={(e) => { setEmail(e.target.value); setEmailFieldError(false); setForgotError(""); }}
                             placeholder="Enter account email"
                             required
                           />
@@ -436,7 +438,7 @@ export default function Login({ onLoginSuccess }) {
                           />
                           <button
                             type="button"
-                            className="password-toggle-btn"
+                            className="password-toggle-btn premium-eye"
                             onClick={() => setShowForgotPassword((prev) => !prev)}
                             tabIndex={-1}
                           >
@@ -460,7 +462,7 @@ export default function Login({ onLoginSuccess }) {
                           />
                           <button
                             type="button"
-                            className="password-toggle-btn"
+                            className="password-toggle-btn premium-eye"
                             onClick={() => setShowForgotConfirm((prev) => !prev)}
                             tabIndex={-1}
                           >
@@ -593,6 +595,7 @@ export default function Login({ onLoginSuccess }) {
 
                       if (forgotStep === 1) {
                         if (!email.trim()) {
+                          setEmailFieldError(true);
                           setForgotError("Please enter your email address.");
                           return;
                         }
@@ -604,6 +607,35 @@ export default function Login({ onLoginSuccess }) {
                           setForgotError("New passwords do not match.");
                           return;
                         }
+                        // Only emails that already have a registered account can
+                        // reset their password — verify the account exists before
+                        // advancing to the OTP step.
+                        setCheckingEmail(true);
+                        setForgotError("");
+                        setEmailFieldError(false);
+                        try {
+                          const { data: emailCheck, error: checkErr } = await supabase.functions.invoke("get-user-by-email", {
+                            body: { target_email: email.trim() },
+                          });
+                          if (checkErr) {
+                            setEmailFieldError(true);
+                            setForgotError("Could not verify your email. Please try again or contact support.");
+                            setCheckingEmail(false);
+                            return;
+                          }
+                          if (!emailCheck || !emailCheck.id) {
+                            setEmailFieldError(true);
+                            setForgotError("No account found for this email. Only registered emails can reset their password.");
+                            setCheckingEmail(false);
+                            return;
+                          }
+                        } catch (err) {
+                          setEmailFieldError(true);
+                          setForgotError("Could not verify your email. Please check your internet connection.");
+                          setCheckingEmail(false);
+                          return;
+                        }
+                        setCheckingEmail(false);
                         // Advance to Step 2 for OTP phone verification!
                         setForgotStep(2);
                         return;
@@ -644,12 +676,17 @@ export default function Login({ onLoginSuccess }) {
                         setForgotLoading(false);
                       }
                     }}
-                    disabled={forgotLoading}
+                    disabled={forgotLoading || checkingEmail}
                   >
                     {forgotLoading ? (
                       <>
                         <Loader2 size={18} className="spinner" />
                         Updating Password...
+                      </>
+                    ) : checkingEmail ? (
+                      <>
+                        <Loader2 size={18} className="spinner" />
+                        Checking Email...
                       </>
                     ) : forgotStep === 1 ? (
                       <>

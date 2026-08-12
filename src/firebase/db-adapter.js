@@ -53,6 +53,7 @@ const FUNCTION_NAMES = {
   "jadwal-reminder": "sendJadwalReminder",
   "deploy-android-app": "deployAndroidApp",
   "reset-user-password": "resetUserPassword",
+  "get-user-by-email": "getUserByEmail",
 };
 
 // ---------------------------------------------------------------------------

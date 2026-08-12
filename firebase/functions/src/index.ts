@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { GoogleAuth } from "google-auth-library";
 
 admin.initializeApp();
@@ -158,9 +159,12 @@ async function sendFcmInner(
           sound: "default",
           channel_id: "mauze-tahfeez-notifications",
           icon: "ic_notification",
-          color: "#26A69A",
+          color: "#C5A059",
           visibility: "public",
-          click_action: "OPEN_MAUZE_TAHFEEZ",
+          // NOTE: no click_action here. Capacitor's PushNotifications plugin
+          // resolves taps from the launcher intent + the FCM data payload, and
+          // an unmatched click_action (no manifest intent-filter) can make the
+          // notification tap silently fail to open the app on some devices.
         },
       },
       apns: { payload: { aps: { sound: "default", "content-available": 1, badge: 1 } } },
@@ -315,6 +319,84 @@ export const sendFcm = onCall(async (request) => {
     summary: { total: res.total, delivered: res.delivered, stale: res.stale, failures: res.failed },
   };
 });
+
+// ---------------------------------------------------------------------------
+// Firestore trigger: Leave chat (WhatsApp-style chatbar) notifications
+//
+// Sends a push notification whenever a NEW message is appended to a
+// student_leaves `messages` array. This runs server-side, so delivery no
+// longer depends on the sender's device being alive right after sending —
+// it works in both directions:
+//   - admin message  -> push to the parent   (opens "Apply Leave")
+//   - parent message -> push to all admins   (opens "Leave Management")
+// Edits keep the original `timestamp`, so editing never re-notifies.
+// ---------------------------------------------------------------------------
+
+export const notifyLeaveChatMessages = onDocumentUpdated(
+  "student_leaves/{leaveId}",
+  async (event) => {
+    const before = (event.data?.before?.data?.() || {}) as Row;
+    const after = (event.data?.after?.data?.() || {}) as Row;
+
+    const newMessages: Row[] = Array.isArray(after.messages) ? after.messages : [];
+    const oldMessages: Row[] = Array.isArray(before.messages) ? before.messages : [];
+    // Only a strictly longer array means a NEW message was appended (edits
+    // replace in place and keep the array length, so they never re-notify).
+    if (newMessages.length <= oldMessages.length || !newMessages.length) return;
+
+    const last = newMessages[newMessages.length - 1];
+    if (!last || typeof last !== "object" || !last.text) return;
+
+    const role = String(last.role || "").toLowerCase();
+    const body = String(last.text).slice(0, 180);
+    const tag = `leave-chat-${event.params.leaveId}-${String(last.timestamp || "")}`;
+
+    if (role === "admin") {
+      const parentId = after.parent_id || before.parent_id;
+      if (!parentId) return;
+      const tokens = await tokensForUser(String(parentId));
+      if (!tokens.length) return;
+      await sendFcmInner(
+        tokens,
+        "📝 Leave Clarification",
+        body,
+        {
+          url: "/",
+          redirectPage: "Apply Leave",
+          leaveId: event.params.leaveId,
+          studentId: String(after.student_id || ""),
+        },
+        tag
+      );
+      // Keep the portal Inbox in sync (previously written client-side).
+      await writeInbox({
+        title: "📝 Leave Clarification",
+        body,
+        target_role: "user",
+        target_user: String(parentId),
+        redirect_page: "Apply Leave",
+      });
+    } else if (role === "parent") {
+      const tokens = await tokensForRole("admin");
+      if (!tokens.length) return;
+      await sendFcmInner(
+        tokens,
+        "💬 Leave Reply",
+        body,
+        { url: "/", redirectPage: "Leave Management", leaveId: event.params.leaveId },
+        tag
+      );
+      // Keep the portal Inbox in sync (previously written client-side).
+      await writeInbox({
+        title: "💬 Leave Reply",
+        body,
+        target_role: "admin",
+        target_user: null,
+        redirect_page: "Leave Management",
+      });
+    }
+  }
+);
 
 // ---------------------------------------------------------------------------
 // sendWhatsapp

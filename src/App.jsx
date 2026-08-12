@@ -1095,6 +1095,11 @@ const STORAGE_KEYS = {
   activePage: "mauze-active-page",
 };
 
+// Stash key for native notification taps (cold-start + background). Written by
+// fcmService.js and the MauzeNotifBridge, consumed once by the portal to
+// deep-link to the exact page a notification belongs to.
+const NOTIF_TAP_KEY = "mauze_notif_tap";
+
 const PAGE_PERSIST_KEY = STORAGE_KEYS.activePage;
 
 const readSavedPages = () => {
@@ -4793,21 +4798,62 @@ const WHATSAPP_LEAVE_CHAT_CSS = `
   .wac-back-btn:hover { background: rgba(255,255,255,0.22); transform: translateX(-2px); }
 
   .wac-avatar-wrap {
-    position: relative; width: 40px; height: 40px; border-radius: 50%;
+    position: relative; width: 42px; height: 42px; border-radius: 50%;
     background: linear-gradient(135deg, #d4af37, #b8860b);
     display: grid; place-items: center; color: #fff; flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.55), 0 0 0 5px rgba(212, 175, 55, 0.14), 0 3px 12px rgba(0,0,0,0.28);
+  }
+  .wac-avatar-img {
+    width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;
+    background: #2b2216;
+  }
+  .wac-avatar-initials {
+    width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center;
+    font-size: 1.1rem; font-weight: 800; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.35); letter-spacing: 0.5px;
   }
   .wac-status-badge {
-    position: absolute; bottom: 0; right: 0; width: 11px; height: 11px;
-    border-radius: 50%; border: 2px solid #1b160e; transition: all 0.25s ease;
+    position: absolute; bottom: 0; right: 0; width: 12px; height: 12px;
+    border-radius: 50%; border: 2.5px solid #1b160e; transition: all 0.25s ease; z-index: 2;
   }
-  .wac-status-online { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
-  .wac-status-offline { background: #9ca3af; }
-  
+  .wac-status-online {
+    background: #22c55e;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16), 0 0 12px rgba(34, 197, 94, 0.9);
+    animation: wacPresencePulse 1.8s ease-in-out infinite;
+  }
+  .wac-status-offline {
+    background: #8a8f98;
+    box-shadow: 0 0 0 4px rgba(138, 143, 152, 0.14), 0 0 4px rgba(0,0,0,0.25);
+  }
+  @keyframes wacPresencePulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16), 0 0 10px rgba(34, 197, 94, 0.7); }
+    50%      { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0.25), 0 0 18px rgba(34, 197, 94, 1); }
+  }
+  .wac-status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 999px; font-weight: 600; line-height: 1.4;
+    background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.3);
+    color: #d9c37a; transition: all 0.25s ease;
+  }
+  .wac-status-pill.online {
+    color: #7bdc9c; background: rgba(34, 197, 94, 0.16); border-color: rgba(34, 197, 94, 0.45);
+  }
+  .wac-status-pill.offline {
+    color: #c9c3b6; background: rgba(138, 143, 152, 0.13); border-color: rgba(138, 143, 152, 0.35);
+  }
+  .wac-status-dot {
+    width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+    background: #d9c37a;
+  }
+  .wac-status-pill.online .wac-status-dot {
+    background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.9);
+    animation: wacPresencePulse 1.8s ease-in-out infinite;
+  }
+  .wac-status-pill.offline .wac-status-dot { background: #9aa0a8; box-shadow: 0 0 4px rgba(0,0,0,0.2); }
+
   .wac-header-info { display: flex; flex-direction: column; min-width: 0; }
   .wac-header-title { font-size: 0.98rem; font-weight: 700; color: #ffffff; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wac-header-sub { font-size: 0.73rem; color: #d4af37; margin-top: 1px; display: flex; align-items: center; gap: 4px; font-weight: 500; }
+  .wac-header-sub { font-size: 0.72rem; color: #d4af37; margin-top: 3px; display: flex; align-items: center; gap: 4px; font-weight: 500; }
   
   .wac-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .wac-close-btn {
@@ -5031,7 +5077,26 @@ const WHATSAPP_LEAVE_CHAT_CSS = `
   }
 `;
 
-function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], forceOpen = false }) {
+// Circular premium profile avatar used in the WhatsApp-style chat headers.
+// Shows the peer's profile photo from their profile; falls back to a gold
+// initial monogram when no photo is set.
+function WacChatAvatar({ photo, name = "Admin Support" }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const safe = cleanPhotoUrl(photo);
+  if (safe && !imgFailed) {
+    return (
+      <img
+        className="wac-avatar-img"
+        src={safe}
+        alt={name}
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+  return <span className="wac-avatar-initials">{(name || "?").trim().charAt(0).toUpperCase()}</span>;
+}
+
+function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], forceOpen = false, adminAvatar = "", autoOpenLeaveId = null, onAutoOpenLeaveConsumed = null }) {
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
   const [attachment, setAttachment] = useState(null);
@@ -5046,11 +5111,30 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
   const [editingMsg, setEditingMsg] = useState(null); // { msg, idx }
   const [activeMenuMsg, setActiveMenuMsg] = useState(null); // { msg, idx }
   const chatMessagesRef = useRef(null);
+  // Which student the loaded `history` belongs to — prevents the auto-open
+  // deep-link from being consumed against another child's stale history.
+  const historyStudentRef = useRef(null);
   const { peerOnline: adminOnline, presenceReady } = useChatPresence(chatLeave?.id, "parent");
   const adminOnlineRef = useRef(adminOnline);
   useEffect(() => {
     adminOnlineRef.current = adminOnline;
   }, [adminOnline]);
+
+  // Auto-open the EXACT leave chat when the app is opened from a chat
+  // notification (deep link). Waits for the current student's history to load.
+  useEffect(() => {
+    if (!autoOpenLeaveId || loadingHistory) return;
+    if (!studentProfile || historyStudentRef.current !== String(studentProfile.student_id)) return;
+    const match = history.find(l => String(l.id) === String(autoOpenLeaveId));
+    if (match) {
+      setChatLeave(match);
+      setReplyText("");
+    }
+    // Consume the deep-link intent once the right student's list has loaded —
+    // whether or not the leave was found — so it never triggers a stale
+    // auto-open later or against another child's history.
+    if (onAutoOpenLeaveConsumed) onAutoOpenLeaveConsumed();
+  }, [autoOpenLeaveId, history, loadingHistory, studentProfile]);
 
   const pressTimeoutRef = useRef(null);
 
@@ -5503,6 +5587,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
     } else {
       setHistory(data || []);
     }
+    historyStudentRef.current = String(studentProfile.student_id);
     setLoadingHistory(false);
   };
 
@@ -5690,23 +5775,10 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         .eq('id', chatLeave.id);
       if (error) throw error;
 
-      // 2. Smart Notification: ONLY send outside FCM push notification if Admin is OFFLINE / has closed the chat room.
-      // We wait 1.5 seconds to allow Firestore snapshots to sync presence, preventing duplicate notifications while actively chatting.
-      setTimeout(async () => {
-        if (!adminOnlineRef.current) {
-          try {
-            await broadcastNotification(
-              "💬 Leave Reply",
-              `${studentProfile?.name || 'Student'}'s parent: ${textToSend}`,
-              "admin",
-              null,
-              "Leave Management"
-            );
-          } catch (notifErr) {
-            console.error("FCM leave reply notification error:", notifErr);
-          }
-        }
-      }, 1500);
+      // Push notifications for chat messages are now sent SERVER-SIDE by the
+      // notifyLeaveChatMessages Firestore trigger, so they arrive reliably even
+      // when the recipient's app is closed or the sender goes offline right
+      // after sending.
     } catch (err) {
       console.error("Failed to send parent reply:", err);
       showAction("error", "Failed to send message. Please check internet connection.");
@@ -6142,14 +6214,16 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
                   <ArrowLeft size={20} />
                 </button>
                 <div className="wac-avatar-wrap">
-                  <MessageCircle size={19} />
+                  <WacChatAvatar photo={adminAvatar} name="Admin Support" />
                   <span className={`wac-status-badge ${presenceReady && adminOnline ? 'wac-status-online' : 'wac-status-offline'}`} />
                 </div>
                 <div className="wac-header-info">
                   <h4 className="wac-header-title">Admin Support</h4>
                   <span className="wac-header-sub">
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: presenceReady && adminOnline ? '#22c55e' : '#9ca3af', display: 'inline-block' }} />
-                    {!presenceReady ? 'Checking status...' : (adminOnline ? 'Online now' : 'Offline')}
+                    <span className={`wac-status-pill ${presenceReady && adminOnline ? 'online' : 'offline'}`}>
+                      <span className="wac-status-dot" />
+                      {!presenceReady ? 'Checking status...' : (adminOnline ? 'Online now' : 'Offline')}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -6410,8 +6484,24 @@ function ParentPortal({
   appLockEnabled,
   onAppUnlock,
   onAppLockToggle,
+  pendingChatLeaveId,
+  onPendingChatLeaveConsumed,
 }) {
   const reportSettingsObject = normalizeReportSettings(propReportSettings);
+  // Profile photo of the Admin Support contact shown in the leave-chat header.
+  // Resolved from the admin's own portal-access profile (falls back to their
+  // teacher profile photo) so parents see the real admin avatar.
+  const adminSupportAvatar = useMemo(() => {
+    const list = schoolData?.portalAccessList || [];
+    const admin = list.find(a => normalizeText(String(a.portal_role)) === "admin")
+      || list.find(a => ["staff", "super_admin"].includes(normalizeText(String(a.portal_role))));
+    if (admin?.photo_url || admin?.avatar_url) return cleanPhotoUrl(admin.photo_url || admin.avatar_url);
+    if (admin?.full_name) {
+      const tp = teacherProfiles.find(t => normalizeText(t.full_name) === normalizeText(admin.full_name));
+      if (tp?.photo_url) return cleanPhotoUrl(tp.photo_url);
+    }
+    return "";
+  }, [schoolData, teacherProfiles]);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const backdropMouseDownRef = useRef(false);
   const notificationOpenedAtRef = useRef(0);
@@ -7339,7 +7429,7 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Apply Leave" && (
-          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} forceOpen={parentLeaveForceOpen} />
+          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} forceOpen={parentLeaveForceOpen} adminAvatar={adminSupportAvatar} autoOpenLeaveId={pendingChatLeaveId} onAutoOpenLeaveConsumed={onPendingChatLeaveConsumed} />
         )}
 
         {activePage === "Leave History" && (
@@ -8221,7 +8311,7 @@ function ParentPortal({
 }
 
 
-function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) {
+function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], autoOpenLeaveId = null, onAutoOpenLeaveConsumed = null }) {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Pending");
@@ -8233,11 +8323,28 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
   const [approveDropdown, setApproveDropdown] = useState(null); // leave.id or null
   const [sendingAction, setSendingAction] = useState(null); // id being processed
   const chatBodyRef = useRef(null);
+  const chatPeerStudent = chatModal ? (students.find(s => s.allIds.includes(String(chatModal.student_id))) || {}) : {};
+  const chatPeerName = chatPeerStudent.name || "Parent Chat";
+  const chatPeerPhoto = cleanPhotoUrl(chatPeerStudent.photoUrl || chatPeerStudent.photo_url || chatPeerStudent.avatar_url || "");
   const { peerOnline: parentOnline, presenceReady } = useChatPresence(chatModal?.id, "admin");
   const parentOnlineRef = useRef(parentOnline);
   useEffect(() => {
     parentOnlineRef.current = parentOnline;
   }, [parentOnline]);
+
+  // Auto-open the EXACT leave chat when the app is opened from a chat
+  // notification (deep link). Waits for the leaves list to load.
+  useEffect(() => {
+    if (!autoOpenLeaveId || loading) return;
+    const match = leaves.find(l => String(l.id) === String(autoOpenLeaveId));
+    if (match) {
+      setChatModal(match);
+      setChatMessage("");
+    }
+    // Consume the deep-link intent once the list has loaded — whether or not the
+    // leave was found — so it can never trigger a stale auto-open later.
+    if (onAutoOpenLeaveConsumed) onAutoOpenLeaveConsumed();
+  }, [autoOpenLeaveId, loading, leaves]);
 
   const pressTimeoutRef = useRef(null);
 
@@ -8539,8 +8646,6 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
     }
 
     // Normal Send / Reply Mode
-    const student = students.find(s => s.allIds.includes(String(chatModal?.student_id)));
-    const studentName = student?.name || "your child";
     const newMsg = {
       role: "admin",
       text: textToSend,
@@ -8571,23 +8676,10 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
         .eq('id', chatModal.id);
       if (error) throw error;
 
-      // 2. Smart Notification: ONLY send outside FCM push notification if Parent is OFFLINE / has closed the chat room.
-      // We wait 1.5 seconds to allow Firestore snapshots to sync presence, preventing duplicate notifications while actively chatting.
-      setTimeout(async () => {
-        if (!parentOnlineRef.current) {
-          try {
-            await broadcastNotification(
-              "📝 Leave Clarification",
-              `Regarding ${studentName}'s leave: ${textToSend}`,
-              "user",
-              chatModal.parent_id,
-              "Apply Leave"
-            );
-          } catch (notifErr) {
-            console.error("FCM leave clarification notification error:", notifErr);
-          }
-        }
-      }, 1500);
+      // Push notifications for chat messages are now sent SERVER-SIDE by the
+      // notifyLeaveChatMessages Firestore trigger, so they arrive reliably even
+      // when the recipient's app is closed or the sender goes offline right
+      // after sending.
     } catch (err) {
       console.error("Failed to send admin message:", err);
       onShowAction("error", "Failed to send message. Please check internet connection.");
@@ -8715,16 +8807,18 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
                   <ArrowLeft size={20} />
                 </button>
                 <div className="wac-avatar-wrap">
-                  <User size={19} />
+                  <WacChatAvatar photo={chatPeerPhoto} name={chatPeerName} />
                   <span className={`wac-status-badge ${presenceReady && parentOnline ? 'wac-status-online' : 'wac-status-offline'}`} />
                 </div>
                 <div className="wac-header-info">
                   <h4 className="wac-header-title">
-                    {students.find(s => s.allIds.includes(String(chatModal.student_id)))?.name || "Parent Chat"}
+                    {chatPeerName}
                   </h4>
                   <span className="wac-header-sub">
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: presenceReady && parentOnline ? '#22c55e' : '#9ca3af', display: 'inline-block' }} />
-                    {!presenceReady ? 'Checking status...' : (parentOnline ? 'Parent is online' : 'Parent is offline')}
+                    <span className={`wac-status-pill ${presenceReady && parentOnline ? 'online' : 'offline'}`}>
+                      <span className="wac-status-dot" />
+                      {!presenceReady ? 'Checking status...' : (parentOnline ? 'Parent is online' : 'Parent is offline')}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -9839,6 +9933,8 @@ function AdminPortal({
   onSetEmailProgress,
   onSetEmailLogs,
   setAdminForms,
+  pendingChatLeaveId,
+  onPendingChatLeaveConsumed,
 
 }) {
   const showAction = onShowAction;
@@ -14073,7 +14169,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           ) : null}
 
           {activePage === "Leave Management" && (
-            <AdminLeaveManagement students={students} teacherProfiles={teacherProfiles} onShowAction={onShowAction} />
+            <AdminLeaveManagement students={students} teacherProfiles={teacherProfiles} onShowAction={onShowAction} autoOpenLeaveId={pendingChatLeaveId} onAutoOpenLeaveConsumed={onPendingChatLeaveConsumed} />
           )}
           {activePage === "Teacher Leaves" ? (
             <div className="overview-container fade-in">
@@ -20493,6 +20589,9 @@ export default function App() {
   useEffect(() => {
     selectedStudentIdRef.current = selectedStudentId;
   }, [selectedStudentId]);
+  // Set when a chat notification is tapped — drives auto-opening the EXACT
+  // leave chat in the parent / admin portal after the page loads.
+  const [pendingChatLeaveId, setPendingChatLeaveId] = useState(null);
   const [activeStudentId, setActiveStudentId] = useState(null);
   const [attachedFileUrl, setAttachedFileUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -20888,10 +20987,66 @@ export default function App() {
         targetPage = "Jadwal";
       }
       setActivePage(resolveRedirectPage(targetPage, portalRole));
+      const notifLeaveId = params.get('leaveId');
+      if (notifLeaveId) setPendingChatLeaveId(notifLeaveId);
+      const notifStudentId = params.get('studentId');
+      if (notifStudentId) setSelectedStudentId(notifStudentId);
       // Clean URL without the redirect parameter
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [portalRole]);
+
+  useEffect(() => {
+    // Native-app deep link: consume a stashed notification tap (cold-start or
+    // background) and navigate to the exact page the notification belongs to —
+    // without a full page reload.
+    const applyNotifTap = () => {
+      if (!user || loading) return; // portal not ready yet — re-run when ready
+      let tap = null;
+      try {
+        const raw = localStorage.getItem(NOTIF_TAP_KEY);
+        if (raw) tap = JSON.parse(raw);
+      } catch (_) {}
+      if (!tap && window.MauzeNotifBridge && typeof window.MauzeNotifBridge.getPendingNotifTap === "function") {
+        try {
+          const raw = window.MauzeNotifBridge.getPendingNotifTap();
+          if (raw) tap = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!tap) return;
+      // Clear immediately — single consumption.
+      try { localStorage.removeItem(NOTIF_TAP_KEY); } catch (_) {}
+      try {
+        if (window.MauzeNotifBridge && typeof window.MauzeNotifBridge.clearPendingNotifTap === "function") {
+          window.MauzeNotifBridge.clearPendingNotifTap();
+        }
+      } catch (_) {}
+
+      let targetPage = tap.redirectPage || tap.redirect_page || "";
+      let targetStudentId = tap.studentId || tap.student_id || "";
+      if (!targetPage && typeof tap.url === "string" && tap.url.includes("redirectPage=")) {
+        try {
+          targetPage = decodeURIComponent(tap.url.split("redirectPage=")[1].split("&")[0]);
+        } catch (_) {}
+      }
+      if (!targetPage || targetPage === "/" || targetPage === "null") return;
+      if (String(targetPage).startsWith("Jadwal:")) {
+        const parts = String(targetPage).split(":");
+        targetPage = parts[0];
+        if (parts[1]) targetStudentId = parts[1];
+      }
+      const resolved = resolveRedirectPage(targetPage, portalRole);
+      if (resolved) {
+        if (targetStudentId) setSelectedStudentId(targetStudentId);
+        setActivePage(resolved);
+        setActionMessage(null);
+        if (tap.leaveId) setPendingChatLeaveId(String(tap.leaveId));
+      }
+    };
+    applyNotifTap();
+    window.addEventListener("mauze:notification-tap", applyNotifTap);
+    return () => window.removeEventListener("mauze:notification-tap", applyNotifTap);
+  }, [portalRole, user, loading]);
 
   useEffect(() => {
     writeSavedPage(portalRole, activePage);
@@ -24047,6 +24202,8 @@ const handleSendCustomNotification = async (event) => {
             appLockEnabled={appLockEnabled}
             onAppUnlock={handleAppUnlock}
             onAppLockToggle={handleAppLockToggle}
+            pendingChatLeaveId={pendingChatLeaveId}
+            onPendingChatLeaveConsumed={() => setPendingChatLeaveId(null)}
           />
         ) : portalRole === "admin" ? (
           <AdminPortal
@@ -24141,6 +24298,8 @@ const handleSendCustomNotification = async (event) => {
             onTeacherUnlock={handleTeacherUnlock}
             showPortalPassword={showPortalPassword}
             setShowPortalPassword={setShowPortalPassword}
+            pendingChatLeaveId={pendingChatLeaveId}
+            onPendingChatLeaveConsumed={() => setPendingChatLeaveId(null)}
           />
         ) : (
           <TeacherPortal
