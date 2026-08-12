@@ -5119,36 +5119,59 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
     return ageMs <= 15 * 60 * 1000;
   };
 
-  const handleTouchStart = (e) => {
-    const touch = e.touches[0];
-    e.currentTarget.dataset.startX = touch.clientX;
-    e.currentTarget.style.transition = 'none';
-  };
+  // ── WhatsApp-style swipe-to-reply ──────────────────────────────────────
+  // Tracks swipe state per row using a ref (avoids stale closures).
+  const swipeState = useRef({ startX: 0, startY: 0, el: null, swiping: false, cancelled: false });
+  const SWIPE_THRESHOLD = 52;   // px needed to trigger reply
+  const SWIPE_MAX      = 72;   // max elastic travel
+  const SWIPE_ANGLE    = 35;   // degrees — steeper than this = vertical scroll, cancel swipe
 
-  const handleTouchMove = (e) => {
-    const startX = parseFloat(e.currentTarget.dataset.startX);
-    if (isNaN(startX)) return;
+  const handleSwipeStart = (e) => {
     const touch = e.touches[0];
-    const diff = touch.clientX - startX;
-    if (diff > 0) {
-      const moveX = Math.min(diff, 60);
-      e.currentTarget.style.transform = `translateX(${moveX}px)`;
+    const inner = e.currentTarget.querySelector('.wac-bubble');
+    swipeState.current = {
+      startX: touch.clientX, startY: touch.clientY,
+      el: inner, swiping: false, cancelled: false,
+    };
+    if (inner) {
+      inner.style.transition = 'none';
     }
   };
 
-  const handleTouchEnd = (e, msg) => {
-    const startX = parseFloat(e.currentTarget.dataset.startX);
-    if (isNaN(startX)) return;
+  const handleSwipeMove = (e) => {
+    const s = swipeState.current;
+    if (!s.el || s.cancelled) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - s.startX;
+    const dy = touch.clientY - s.startY;
+
+    // Cancel if vertical scroll detected
+    if (!s.swiping && Math.abs(dy) > Math.abs(dx) * Math.tan((SWIPE_ANGLE * Math.PI) / 180)) {
+      s.cancelled = true;
+      return;
+    }
+    // Only allow right swipe (positive dx)
+    if (dx <= 0) return;
+    s.swiping = true;
+    // Elastic resistance: travel slows as it approaches SWIPE_MAX
+    const elasticX = SWIPE_MAX * (1 - Math.exp(-dx / SWIPE_MAX));
+    s.el.style.transform = `translateX(${elasticX}px)`;
+    // Cancel the hold-press when user is clearly swiping
+    if (dx > 8) clearTimeout(pressTimeoutRef.current);
+  };
+
+  const handleSwipeEnd = (e, msg) => {
+    const s = swipeState.current;
+    if (!s.el) return;
     const touch = e.changedTouches[0];
-    const diff = touch.clientX - startX;
-    
-    e.currentTarget.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
-    e.currentTarget.style.transform = '';
-    e.currentTarget.removeAttribute('data-start-x');
-    
-    if (diff > 45) {
+    const dx = touch.clientX - s.startX;
+    // Spring back with premium bounce easing
+    s.el.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    s.el.style.transform = '';
+    swipeState.current = { startX: 0, startY: 0, el: null, swiping: false, cancelled: false };
+    if (!s.cancelled && dx > SWIPE_THRESHOLD) {
       setReplyingTo(msg);
-      if (navigator.vibrate) navigator.vibrate(10);
+      if (navigator.vibrate) navigator.vibrate([8]);
     }
   };
 
@@ -6157,16 +6180,22 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
               ) : chatLeave.messages.map((msg, idx) => {
                 const isUser = msg.role === 'parent';
                 return (
-                  <div key={idx} className={`wac-bubble-container ${isUser ? 'outgoing' : 'incoming'}`}>
+                  <div
+                    key={idx}
+                    className={`wac-bubble-container ${isUser ? 'outgoing' : 'incoming'}`}
+                    onTouchStart={handleSwipeStart}
+                    onTouchMove={handleSwipeMove}
+                    onTouchEnd={(e) => handleSwipeEnd(e, msg)}
+                  >
                     <div 
                       className={`wac-bubble ${isUser ? 'wac-bubble-outgoing' : 'wac-bubble-incoming'}`}
                       onMouseDown={(e) => handlePressStart(e, msg, idx)}
                       onMouseMove={handlePressMove}
                       onMouseUp={handlePressEnd}
                       onMouseLeave={handlePressEnd}
-                      onTouchStart={(e) => { handleTouchStart(e); handlePressStart(e, msg, idx); }}
-                      onTouchMove={(e) => { handleTouchMove(e); handlePressMove(e); }}
-                      onTouchEnd={(e) => { handleTouchEnd(e, msg); handlePressEnd(e); }}
+                      onTouchStart={(e) => handlePressStart(e, msg, idx)}
+                      onTouchMove={handlePressMove}
+                      onTouchEnd={handlePressEnd}
                       style={{ cursor: 'pointer' }}
                     >
                       {msg.replyTo && (
@@ -8277,38 +8306,53 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
     return ageMs <= 15 * 60 * 1000;
   };
 
-  const handleTouchStart = (e) => {
+  // ── WhatsApp-style swipe-to-reply ──────────────────────────────────────
+  const swipeState = useRef({ startX: 0, startY: 0, el: null, swiping: false, cancelled: false });
+  const SWIPE_THRESHOLD = 52;
+  const SWIPE_MAX      = 72;
+  const SWIPE_ANGLE    = 35;
+
+  const handleSwipeStart = (e) => {
     const touch = e.touches[0];
-    e.currentTarget.dataset.startX = touch.clientX;
-    e.currentTarget.style.transition = 'none';
+    const inner = e.currentTarget.querySelector('.wac-bubble');
+    swipeState.current = {
+      startX: touch.clientX, startY: touch.clientY,
+      el: inner, swiping: false, cancelled: false,
+    };
+    if (inner) inner.style.transition = 'none';
   };
 
-  const handleTouchMove = (e) => {
-    const startX = parseFloat(e.currentTarget.dataset.startX);
-    if (isNaN(startX)) return;
+  const handleSwipeMove = (e) => {
+    const s = swipeState.current;
+    if (!s.el || s.cancelled) return;
     const touch = e.touches[0];
-    const diff = touch.clientX - startX;
-    if (diff > 0) {
-      const moveX = Math.min(diff, 60);
-      e.currentTarget.style.transform = `translateX(${moveX}px)`;
+    const dx = touch.clientX - s.startX;
+    const dy = touch.clientY - s.startY;
+    if (!s.swiping && Math.abs(dy) > Math.abs(dx) * Math.tan((SWIPE_ANGLE * Math.PI) / 180)) {
+      s.cancelled = true;
+      return;
     }
+    if (dx <= 0) return;
+    s.swiping = true;
+    const elasticX = SWIPE_MAX * (1 - Math.exp(-dx / SWIPE_MAX));
+    s.el.style.transform = `translateX(${elasticX}px)`;
+    if (dx > 8) clearTimeout(pressTimeoutRef.current);
   };
 
-  const handleTouchEnd = (e, msg) => {
-    const startX = parseFloat(e.currentTarget.dataset.startX);
-    if (isNaN(startX)) return;
+  const handleSwipeEnd = (e, msg) => {
+    const s = swipeState.current;
+    if (!s.el) return;
     const touch = e.changedTouches[0];
-    const diff = touch.clientX - startX;
-    
-    e.currentTarget.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
-    e.currentTarget.style.transform = '';
-    e.currentTarget.removeAttribute('data-start-x');
-    
-    if (diff > 45) {
+    const dx = touch.clientX - s.startX;
+    s.el.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    s.el.style.transform = '';
+    swipeState.current = { startX: 0, startY: 0, el: null, swiping: false, cancelled: false };
+    if (!s.cancelled && dx > SWIPE_THRESHOLD) {
       setReplyingTo(msg);
-      if (navigator.vibrate) navigator.vibrate(10);
+      if (navigator.vibrate) navigator.vibrate([8]);
     }
   };
+
 
   useEffect(() => {
     fetchLeaves();
@@ -8711,16 +8755,22 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [] }) 
               ) : chatModal.messages.map((msg, idx) => {
                 const isUser = msg.role === 'admin';
                 return (
-                  <div key={idx} className={`wac-bubble-container ${isUser ? 'outgoing' : 'incoming'}`}>
+                  <div
+                    key={idx}
+                    className={`wac-bubble-container ${isUser ? 'outgoing' : 'incoming'}`}
+                    onTouchStart={handleSwipeStart}
+                    onTouchMove={handleSwipeMove}
+                    onTouchEnd={(e) => handleSwipeEnd(e, msg)}
+                  >
                     <div 
                       className={`wac-bubble ${isUser ? 'wac-bubble-outgoing' : 'wac-bubble-incoming'}`}
                       onMouseDown={(e) => handlePressStart(e, msg, idx)}
                       onMouseMove={handlePressMove}
                       onMouseUp={handlePressEnd}
                       onMouseLeave={handlePressEnd}
-                      onTouchStart={(e) => { handleTouchStart(e); handlePressStart(e, msg, idx); }}
-                      onTouchMove={(e) => { handleTouchMove(e); handlePressMove(e); }}
-                      onTouchEnd={(e) => { handleTouchEnd(e, msg); handlePressEnd(e); }}
+                      onTouchStart={(e) => handlePressStart(e, msg, idx)}
+                      onTouchMove={handlePressMove}
+                      onTouchEnd={handlePressEnd}
                       style={{ cursor: 'pointer' }}
                     >
                       {msg.replyTo && (
