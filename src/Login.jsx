@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { AlertCircle, ArrowLeft, Check, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, Mail, Send, ShieldCheck, Smartphone, Users, X } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import { auth } from "./firebase/auth.js";
+import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import lottie from "lottie-web";
 // Bundled at build time so the welcome animation never depends on a network
 // fetch (the deployed site's catch-all route used to serve HTML for .json
@@ -55,7 +57,7 @@ export default function Login({ onLoginSuccess }) {
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
   const [forgotPhone, setForgotPhone] = useState("");
   const [forgotOtpInput, setForgotOtpInput] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState(null);
   const [otpSent, setOtpSent] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -63,6 +65,8 @@ export default function Login({ onLoginSuccess }) {
   const [forgotError, setForgotError] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showForgotConfirm, setShowForgotConfirm] = useState(false);
+  const recaptchaContainerRef = useRef(null);
+  const recaptchaVerifierRef = useRef(null);
   const [buttonFeedback, setButtonFeedback] = useState(null);
   const welcomeRef = useRef(null);
   const [rememberMe, setRememberMe] = useState(() => {
@@ -489,42 +493,40 @@ export default function Login({ onLoginSuccess }) {
                             type="button"
                             onClick={async () => {
                               if (!forgotPhone.trim() || forgotPhone.trim().length < 8) {
-                                setForgotError("Please enter a valid mobile phone number.");
+                                setForgotError("Please enter a valid mobile phone number with country code (e.g. +91...).");
                                 return;
                               }
                               setForgotError("");
                               setOtpSending(true);
-                              const code = Math.floor(100000 + Math.random() * 900000).toString();
-                              setGeneratedOtp(code);
-                              setOtpSent(true);
-
                               try {
-                                // Dispatch WhatsApp / SMS message to phone number
-                                supabase.functions.invoke("whatsapp-notification", {
-                                  body: { 
-                                    phone: forgotPhone.trim(), 
-                                    message: `Your Mauze Tahfeez Password Reset OTP Verification Code is: ${code}` 
-                                  }
-                                }).catch(() => {});
-
-                                // Dispatch Email message as backup dispatch to account email
-                                if (email) {
-                                  supabase.functions.invoke("send-email", {
-                                    body: {
-                                      to: email.trim(),
-                                      subject: "Mauze Tahfeez - Password Reset OTP Code",
-                                      text: `Your 6-digit OTP code to reset your password is: ${code}`,
-                                      html: `<div style="font-family:sans-serif;padding:20px;max-width:500px;margin:0 auto;border:1px solid #eee;border-radius:10px;"><h2 style="color:#b8860b;">Mauze Tahfeez</h2><p>You requested a password reset. Your 6-digit verification code is:</p><h1 style="color:#b8860b;letter-spacing:6px;font-size:32px;">${code}</h1><p>Please enter this code in your mobile application to verify your password change.</p></div>`,
-                                      isOtp: true
-                                    }
-                                  }).catch(() => {});
+                                // Destroy any existing verifier before creating a new one
+                                if (recaptchaVerifierRef.current) {
+                                  recaptchaVerifierRef.current.clear();
+                                  recaptchaVerifierRef.current = null;
                                 }
+                                // Create invisible reCAPTCHA verifier (Firebase requirement)
+                                const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                                  size: 'invisible',
+                                  callback: () => {},
+                                });
+                                recaptchaVerifierRef.current = verifier;
+
+                                // Send OTP via Firebase Phone Auth (real SMS)
+                                const result = await signInWithPhoneNumber(auth, forgotPhone.trim(), verifier);
+                                setConfirmationResult(result);
+                                setOtpSent(true);
+                                setForgotOtpInput("");
                               } catch (err) {
-                                console.warn("OTP dispatch error:", err);
+                                console.error("Firebase Phone OTP error:", err);
+                                const msg = err?.code === "auth/invalid-phone-number"
+                                  ? "Invalid phone number format. Use international format e.g. +919930852533"
+                                  : err?.code === "auth/too-many-requests"
+                                  ? "Too many OTP requests. Please try again later."
+                                  : err?.message || "Failed to send OTP. Please try again.";
+                                setForgotError(msg);
+                                setOtpSent(false);
                               } finally {
-                                setTimeout(() => {
-                                  setOtpSending(false);
-                                }, 400);
+                                setOtpSending(false);
                               }
                             }}
                             style={{
@@ -542,6 +544,9 @@ export default function Login({ onLoginSuccess }) {
                         </div>
                       </div>
 
+                      {/* Invisible reCAPTCHA container required by Firebase Phone Auth */}
+                      <div id="recaptcha-container" ref={recaptchaContainerRef} style={{ display: 'none' }} />
+
                       {otpSent && (
                         <>
                           <div style={{
@@ -551,7 +556,7 @@ export default function Login({ onLoginSuccess }) {
                           }}>
                             <CheckCircle2 size={18} style={{ flexShrink: 0, color: '#16a34a' }} />
                             <div>
-                              <strong>OTP Code Sent!</strong> A 6-digit verification code has been sent via text message to <strong>{forgotPhone}</strong> and email. Please check your mobile messages to type the code below.
+                              <strong>OTP Sent via SMS!</strong> A 6-digit code was sent by Firebase to <strong>{forgotPhone}</strong>. Check your SMS messages and enter it below.
                             </div>
                           </div>
 
@@ -564,9 +569,9 @@ export default function Login({ onLoginSuccess }) {
                                 type="text"
                                 maxLength={6}
                                 value={forgotOtpInput}
-                                onChange={(e) => setForgotOtpInput(e.target.value)}
+                                onChange={(e) => setForgotOtpInput(e.target.value.replace(/\D/g, ""))}
                                 placeholder="Enter 6-digit code"
-                                style={{ letterSpacing: '3px', fontWeight: 'bold' }}
+                                style={{ letterSpacing: '4px', fontWeight: 'bold', fontSize: '1.1rem' }}
                                 required
                               />
                             </div>
@@ -612,18 +617,22 @@ export default function Login({ onLoginSuccess }) {
                         setForgotError("Please enter your mobile phone number.");
                         return;
                       }
-                      if (!otpSent) {
-                        setForgotError("Please click 'Get OTP' to generate your verification code.");
+                      if (!otpSent || !confirmationResult) {
+                        setForgotError("Please click 'Get OTP' to receive your verification code via SMS.");
                         return;
                       }
-                      if (!forgotOtpInput.trim() || forgotOtpInput.trim() !== generatedOtp) {
-                        setForgotError("Invalid OTP code. Please check the code and try again.");
+                      if (!forgotOtpInput.trim() || forgotOtpInput.trim().length !== 6) {
+                        setForgotError("Please enter the 6-digit OTP code from your SMS.");
                         return;
                       }
 
                       setForgotLoading(true);
                       try {
-                        const { data: res, error: resetErr } = await supabase.rpc("reset_user_password", {
+                        // Verify OTP with Firebase Phone Auth
+                        await confirmationResult.confirm(forgotOtpInput.trim());
+
+                        // OTP verified! Now update the password via Firebase Admin
+                        const { error: resetErr } = await supabase.rpc("reset_user_password", {
                           target_email: email.trim(),
                           new_password: forgotNewPassword,
                         });
@@ -637,7 +646,12 @@ export default function Login({ onLoginSuccess }) {
                         setForgotSuccess("Your password has been updated successfully! You can now log in with your new password.");
                         setPassword(forgotNewPassword);
                       } catch (err) {
-                        setForgotError("An unexpected error occurred. Please try again.");
+                        const msg = err?.code === "auth/invalid-verification-code"
+                          ? "Incorrect OTP code. Please check the SMS and try again."
+                          : err?.code === "auth/code-expired"
+                          ? "OTP code has expired. Please request a new one."
+                          : "An unexpected error occurred. Please try again.";
+                        setForgotError(msg);
                       } finally {
                         setForgotLoading(false);
                       }
