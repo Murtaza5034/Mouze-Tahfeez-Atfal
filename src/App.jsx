@@ -8249,6 +8249,19 @@ function ParentPortal({
           </div>
         )}
 
+        {activePage === "Announcements" && (
+          <div style={{ paddingBottom: '80px' }}>
+            <AnnouncementsPage
+              announcements={(parentData.announcements || []).filter(n => n.target_role === "all" || n.target_role === "parents")}
+              setActivePage={setActivePage}
+              setSelectedAnnouncement={setSelectedAnnouncement}
+              onDismiss={onDismissAnnounce}
+              onClearAll={onClearAllAnnounces}
+              dismissedIds={dismissedAnnounces}
+            />
+          </div>
+        )}
+
         {activePage === "Profile" && (
           <div className="info-grid fade-in" style={{ marginTop: '24px' }}>
             <section style={{ padding: '20px', background: 'linear-gradient(135deg, #fdfbf7, #f8f1e6)', border: '1px solid #e8dcc8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(139,109,49,0.08)' }}>
@@ -15719,6 +15732,17 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 </div>
               </section>
             </div>
+          ) : activePage === "Announcements" ? (
+            <div style={{ paddingBottom: '80px' }}>
+              <AnnouncementsPage
+                announcements={adminData.announcements || []}
+                setActivePage={setActivePage}
+                setSelectedAnnouncement={setSelectedAnnouncement}
+                onDismiss={onDismissAnnounce}
+                onClearAll={onClearAllAnnounces}
+                dismissedIds={dismissedAnnounces}
+              />
+            </div>
           ) : null}
         </section>
 
@@ -19555,6 +19579,17 @@ function TeacherPortal({
                 }}
               />
             </>
+          ) : activePage === "Announcements" ? (
+            <div style={{ paddingBottom: '80px' }}>
+              <AnnouncementsPage
+                announcements={(schoolData.announcements || []).filter(n => n.target_role === "all" || n.target_role === "teacher")}
+                setActivePage={setActivePage}
+                setSelectedAnnouncement={setSelectedAnnouncement}
+                onDismiss={onDismissAnnounce}
+                onClearAll={onClearAllAnnounces}
+                dismissedIds={dismissedAnnounces}
+              />
+            </div>
           ) : null}
 
 {activePage === "Apply Leave" ? (
@@ -22418,7 +22453,7 @@ export default function App() {
           .from("system_notifications")
           .select("*")
           .order("created_at", { ascending: false })
-          .limit(20);
+          .limit(200);
 
         if (data) {
           const myNotifs = data.filter(notif =>

@@ -165,30 +165,32 @@ class FCMService {
     // is never missed. Previously the listener was added after register(),
     // which could miss the event and leave native push unregistered.
     let resolveToken = null;
-    let rejectToken = null;
     let tokenTimer = null;
-    const tokenReady = new Promise((resolve, reject) => {
+    const tokenReady = new Promise((resolve) => {
       resolveToken = resolve;
-      rejectToken = reject;
     });
 
     const settleToken = (value) => {
       if (tokenTimer) { clearTimeout(tokenTimer); tokenTimer = null; }
-      if (resolveToken) { resolveToken(value); resolveToken = null; rejectToken = null; }
+      if (resolveToken) { resolveToken(value); resolveToken = null; }
     };
 
-    await PushNotifications.addListener('registration', (data) => {
+    await PushNotifications.addListener('registration', async (data) => {
       if (data?.value) {
         console.log('Capacitor FCM Token:', data.value.substring(0, 20) + '...');
         this.token = data.value;
         settleToken(this.token);
+        try {
+          await this.storeToken(data.value, userRole);
+        } catch (err) {
+          console.warn('FCM: Failed to store token on registration event:', err);
+        }
       }
     });
 
     PushNotifications.addListener('registrationError', (err) => {
       console.error('Capacitor Push registration error:', err);
-      if (tokenTimer) { clearTimeout(tokenTimer); tokenTimer = null; }
-      if (rejectToken) { rejectToken(new Error('Push registration failed')); rejectToken = null; resolveToken = null; }
+      settleToken(null);
     });
 
     // Request permission (Android 13+)
@@ -208,25 +210,23 @@ class FCMService {
     await PushNotifications.register();
     console.log('Capacitor PushNotifications registered');
 
-    // Wait up to 15s for the first native token
+    // Wait up to 30s for the first native token without failing the whole init flow on timeout
     tokenTimer = setTimeout(() => {
-      if (rejectToken) {
-        const err = new Error('Push registration timed out');
-        rejectToken(err);
-        rejectToken = null;
-        resolveToken = null;
-      }
-    }, 15000);
+      console.warn('Push registration timed out waiting for token event, continuing in background');
+      settleToken(null);
+    }, 30000);
 
     this.token = await tokenReady;
 
     this.isNative = true;
 
     // Store token in database
-    const stored = await this.storeToken(this.token, userRole);
-    if (!stored) {
-      await new Promise(r => setTimeout(r, 1000));
-      await this.storeToken(this.token, userRole);
+    if (this.token) {
+      const stored = await this.storeToken(this.token, userRole);
+      if (!stored) {
+        await new Promise(r => setTimeout(r, 1000));
+        await this.storeToken(this.token, userRole);
+      }
     }
 
     // Listen for incoming notifications (foreground)
@@ -293,7 +293,8 @@ class FCMService {
   // --- Initialize FCM service ---
   async initialize(userRole) {
     if (this.initialized && this.token) {
-      console.log('FCM service already initialized');
+      console.log('FCM service already initialized, ensuring token is stored');
+      await this.storeToken(this.token, userRole);
       return true;
     }
 

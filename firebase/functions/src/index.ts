@@ -331,6 +331,25 @@ export const sendFcm = onCall(async (request) => {
 //   - parent message -> push to all admins   (opens "Leave Management")
 // Edits keep the original `timestamp`, so editing never re-notifies.
 // ---------------------------------------------------------------------------
+async function isPeerOnlineInChat(leaveId: string, peerRole: "parent" | "admin"): Promise<boolean> {
+  try {
+    const now = new Date().toISOString();
+    const snap = await db.collection("_presence")
+      .where("leaveId", "==", leaveId)
+      .get();
+    
+    for (const d of snap.docs) {
+      const data = d.data();
+      const roleMatches = data.role === peerRole || data.userRole === peerRole;
+      if (roleMatches && data._expiresAt && data._expiresAt > now) {
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn("isPeerOnlineInChat check failed", (err as Error).message);
+  }
+  return false;
+}
 
 export const notifyLeaveChatMessages = onDocumentUpdated(
   "student_leaves/{leaveId}",
@@ -354,6 +373,13 @@ export const notifyLeaveChatMessages = onDocumentUpdated(
     if (role === "admin") {
       const parentId = after.parent_id || before.parent_id;
       if (!parentId) return;
+
+      const parentOnline = await isPeerOnlineInChat(event.params.leaveId, "parent");
+      if (parentOnline) {
+        console.log(`Parent is online in chat ${event.params.leaveId}, skipping push/inbox notifications`);
+        return;
+      }
+
       const tokens = await tokensForUser(String(parentId));
       if (!tokens.length) return;
       await sendFcmInner(
@@ -377,6 +403,12 @@ export const notifyLeaveChatMessages = onDocumentUpdated(
         redirect_page: "Apply Leave",
       });
     } else if (role === "parent") {
+      const adminOnline = await isPeerOnlineInChat(event.params.leaveId, "admin");
+      if (adminOnline) {
+        console.log(`Admin is online in chat ${event.params.leaveId}, skipping push/inbox notifications`);
+        return;
+      }
+
       const tokens = await tokensForRole("admin");
       if (!tokens.length) return;
       await sendFcmInner(
