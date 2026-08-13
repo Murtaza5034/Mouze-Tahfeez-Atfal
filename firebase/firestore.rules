@@ -245,5 +245,11 @@ service cloud.firestore {
     match /tahfeez_signals/{id} {
       allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
     }
+    match /online_tahfeez_sessions/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /online_tahfeez_logs/{id} {
+      allow read, write: if isSignedIn();
+    }
   }
 }

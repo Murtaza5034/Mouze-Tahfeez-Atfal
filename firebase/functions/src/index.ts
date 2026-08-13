@@ -51,12 +51,61 @@ function siteUrl(): string {
 }
 
 function notificationUrl(dataMap?: Record<string, string>, fallback = "/"): string {
-  const raw = (dataMap && (dataMap.url || dataMap.link)) || fallback;
-  try {
-    return new URL(raw, `${siteUrl()}/`).toString();
-  } catch {
-    return `${siteUrl()}/`;
+  // Priority: explicit url/link > redirectPage-based deep link > fallback
+  const raw = dataMap?.url || dataMap?.link;
+  if (raw) {
+    try {
+      return new URL(raw, `${siteUrl()}/`).toString();
+    } catch {
+      // fall through
+    }
   }
+  
+  // Generate deep link from redirectPage
+  if (dataMap?.redirectPage) {
+    const page = dataMap.redirectPage;
+    let path = "/";
+    switch (page) {
+      case "Apply Leave": path = "/?redirectPage=Apply%20Leave"; break;
+      case "Leave Management": path = "/?redirectPage=Leave%20Management"; break;
+      case "Leave History": path = "/?redirectPage=Leave%20History"; break;
+      case "Inbox": path = "/?redirectPage=Inbox"; break;
+      case "Home": path = "/?redirectPage=Home"; break;
+      case "Child Summary": path = "/?redirectPage=Child%20Summary"; break;
+      case "Progress": path = "/?redirectPage=Child%20Summary"; break;
+      case "Schedule": path = "/?redirectPage=Schedule"; break;
+      case "Teachers": path = "/?redirectPage=Teachers"; break;
+      case "Profile": path = "/?redirectPage=Profile"; break;
+      case "Hub Raqam": path = "/?redirectPage=Hub%20Raqam"; break;
+      case "Jadwal": path = "/?redirectPage=Jadwal"; break;
+      case "Self Jadwal": path = "/?redirectPage=Self%20Jadwal"; break;
+      case "My Group": path = "/?redirectPage=My%20Group"; break;
+      case "Fill Result": path = "/?redirectPage=Fill%20Result"; break;
+      case "Reports": path = "/?redirectPage=Fill%20Result"; break;
+      case "Announcements": path = "/?redirectPage=Home"; break;
+      case "Settings": path = "/?redirectPage=Settings"; break;
+      case "Quran Ikhtebar": path = "/?redirectPage=Quran%20Ikhtebar"; break;
+      default:
+        // Dynamic redirectPage with parameters (e.g., "Jadwal:studentId")
+        if (page.includes(":")) {
+          const parts = page.split(":");
+          if (parts[1]) {
+            path = `/?redirectPage=${encodeURIComponent(parts[0])}&studentId=${encodeURIComponent(parts[1])}`;
+          } else {
+            path = `/?redirectPage=${encodeURIComponent(parts[0])}`;
+          }
+        } else {
+          path = `/?redirectPage=${encodeURIComponent(page)}`;
+        }
+    }
+    try {
+      return new URL(path, `${siteUrl()}/`).toString();
+    } catch {
+      // fall through
+    }
+  }
+  
+  return `${siteUrl()}/`;
 }
 
 async function tokensForUser(userId?: string): Promise<string[]> {
@@ -300,7 +349,7 @@ export const sendFcm = onCall(async (request) => {
     body,
     target_role: input.targetRole || null,
     target_user: targetUser || null,
-    redirect_page: input.data?.url || "/",
+    redirect_page: input.data?.redirectPage || notificationUrl(input.data) || "/",
   });
 
   const isDupe = await dupeInLast30s(title, body);

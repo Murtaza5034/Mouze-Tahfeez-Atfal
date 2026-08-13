@@ -1,6 +1,13 @@
 package com.mauzetahfeez.myapp;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.DownloadManager;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -46,6 +53,9 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
+        // Create FCM notification channel for Android 8.0+
+        createNotificationChannel();
+
         // Expose the notification-tap bridge to the WebView as early as possible
         // so cold-start taps (app launched from a notification) are never missed.
         try {
@@ -65,6 +75,28 @@ public class MainActivity extends BridgeActivity {
         saveNotificationTap(getIntent());
 
         setupDownloadListener();
+    }
+
+    /**
+     * Create the notification channel used by FCM pushes.
+     */
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            String channelId = "mauze-tahfeez-notifications";
+            String channelName = "Mauze Tahfeez Notifications";
+            String channelDesc = "Notifications for leave requests, announcements, and messages";
+            int importance = NotificationManager.IMPORTANCE_HIGH;
+            NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
+            channel.setDescription(channelDesc);
+            channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{200, 100, 200});
+            channel.setShowBadge(true);
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
     }
 
     @Override

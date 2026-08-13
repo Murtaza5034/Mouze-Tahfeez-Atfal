@@ -12004,3 +12004,143 @@ h4.attendance-rating-text,
     padding: 18px;
   }
 }
+
+/* Online Tahfeez Premium Styles */
+.tahfeez-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+.tahfeez-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--glass-border, rgba(212, 175, 55, 0.15));
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  position: relative;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+.tahfeez-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.12);
+  border-color: var(--primary-gold);
+}
+.tahfeez-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-gold), #f5d475, var(--primary-gold));
+}
+.tahfeez-badge {
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--primary-gold);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+.tahfeez-title {
+  color: var(--deep-brown, #3d2b1f);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+.tahfeez-meta {
+  color: var(--soft-brown, #6e584a);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+}
+.tahfeez-actions {
+  display: flex;
+  gap: 12px;
+}
+.tahfeez-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.tahfeez-btn.primary {
+  background: linear-gradient(135deg, #d4af37, #b8942e);
+  color: white;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+}
+.tahfeez-btn.primary:hover {
+  background: linear-gradient(135deg, #e4c153, #cda53f);
+  box-shadow: 0 6px 18px rgba(212, 175, 55, 0.3);
+}
+.tahfeez-btn.secondary {
+  background: rgba(212, 175, 55, 0.08);
+  color: var(--primary-gold);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+}
+.tahfeez-btn.secondary:hover {
+  background: rgba(212, 175, 55, 0.15);
+}
+.pulse-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #2ecc71;
+  font-weight: 600;
+}
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #2ecc71;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+/* Jitsi Modal Styles */
+.jitsi-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(20, 15, 10, 0.95);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+}
+.jitsi-header {
+  padding: 16px 24px;
+  background: #2b1f15;
+  color: #f3e2b2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1.5px solid var(--primary-gold);
+}
+.jitsi-iframe-container {
+  flex: 1;
+  width: 100%;
+  background: #000;
+}
+.jitsi-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
