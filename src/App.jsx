@@ -106,140 +106,7 @@ const LottieTrophy = ({ size = 120 }) => {
   );
 };
 
-function OnlineTahfeezCallModal({ roomName, displayName, onClose }) {
-  const [seconds, setSeconds] = useState(0);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatDuration = (sec) => {
-    const mins = Math.floor(sec / 60);
-    const secs = sec % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  if (!roomName) return null;
-
-  return (
-    <div className="jitsi-overlay" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 9999, background: "rgba(10, 10, 12, 0.95)" }}>
-      <div className="jitsi-header" style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 20px", background: "var(--card-bg, #1a1a24)", borderBottom: "1px solid rgba(197, 160, 89, 0.15)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div className="pulse-dot" style={{ backgroundColor: "#2ecc71", animationDuration: "1.5s" }} />
-          <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#f3e2b2" }}>
-            Online Tahfeez Live Class
-          </h3>
-        </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: "#ff4d4d",
-            color: "white",
-            border: "none",
-            padding: "8px 16px",
-            borderRadius: "8px",
-            fontWeight: 700,
-            cursor: "pointer",
-            fontSize: "0.9rem",
-            boxShadow: "0 2px 10px rgba(255, 77, 77, 0.3)",
-            transition: "all 0.2s ease"
-          }}
-          onMouseOver={(e) => { e.currentTarget.style.background = "#ff3333"; }}
-          onMouseOut={(e) => { e.currentTarget.style.background = "#ff4d4d"; }}
-        >
-          Leave Class
-        </button>
-      </div>
-
-      <div style={{
-        background: "rgba(30, 30, 36, 0.95)",
-        border: "1px solid var(--primary-gold)",
-        borderRadius: "20px",
-        padding: "40px 30px",
-        textAlign: "center",
-        maxWidth: "450px",
-        width: "90%",
-        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
-        backdropFilter: "blur(10px)",
-        color: "white",
-        boxSizing: "border-box"
-      }}>
-        <div style={{
-          width: "80px",
-          height: "80px",
-          borderRadius: "50%",
-          background: "rgba(197, 160, 89, 0.1)",
-          border: "2px dashed var(--primary-gold)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          margin: "0 auto 20px"
-        }}>
-          <Video size={40} style={{ color: "var(--primary-gold)" }} />
-        </div>
-
-        <h2 className="premium-title" style={{ fontSize: "1.6rem", marginBottom: "10px", color: "var(--primary-gold)", textAlign: "center" }}>
-          Classroom Connected
-        </h2>
-        
-        <p style={{ color: "#d4c8b3", fontSize: "0.95rem", margin: "10px 0 20px" }}>
-          User: <strong>{displayName || "Student"}</strong>
-        </p>
-
-        <div style={{
-          background: "rgba(255, 255, 255, 0.05)",
-          borderRadius: "12px",
-          padding: "15px",
-          margin: "20px 0",
-          border: "1px solid rgba(255, 255, 255, 0.1)"
-        }}>
-          <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "1px", color: "#a59984" }}>
-            Session Duration
-          </div>
-          <div style={{ fontSize: "2.2rem", fontWeight: 700, fontFamily: "monospace", margin: "5px 0", color: "#2ecc71" }}>
-            {formatDuration(seconds)}
-          </div>
-        </div>
-
-        <p style={{ fontSize: "0.85rem", color: "#a59984", lineHeight: "1.5", margin: 0 }}>
-          This classroom session is actively tracked. The attendance record and duration will be logged upon exit.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-const endSessionAndLog = async (sb, sessionId) => {
-  try {
-    const { data: session } = await sb.from('online_tahfeez_sessions').select('*').eq('id', sessionId).single();
-    if (session) {
-      const endedAt = new Date().toISOString();
-      const startedAt = session.started_at || new Date().toISOString();
-      const durationMs = new Date(endedAt) - new Date(startedAt);
-      const durationMins = Math.max(1, Math.round(durationMs / 60000));
-      
-      await sb.from('online_tahfeez_logs').insert([{
-        id: `log_${Date.now()}_${session.student_id}`,
-        student_id: session.student_id,
-        student_name: session.student_name || "Student",
-        teacher_name: session.teacher_name || "Teacher",
-        started_at: startedAt,
-        ended_at: endedAt,
-        duration_minutes: durationMins,
-        date: startedAt.split('T')[0],
-        type: session.type || '1on1',
-        group_name: session.group_name || 'Ungrouped'
-      }]);
-    }
-  } catch (err) {
-    console.error("Failed to log session:", err);
-  } finally {
-    await sb.from('online_tahfeez_sessions').delete().eq('id', sessionId);
-  }
-};
 
 const PremiumStudentsIcon = ({ size = 48 }) => (
   <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-students-svg">
@@ -7226,39 +7093,10 @@ function ParentPortal({
                       Your Muhaffiz is waiting! Join the call now.
                     </div>
                   )}
-
                   <div className="tahfeez-actions">
                     <button
                       className="tahfeez-btn primary"
-                      onClick={async () => {
-                        const sessId = childSessionId;
-                        const cleanChildName = child.name || child.full_name || "Student";
-                        const roomName = `mouze-tahfeez-1on1-${child.student_id}`;
-                        const isExisting = !!activeSession;
-                        
-                        if (!isExisting) {
-                          await supabase.from('online_tahfeez_sessions').upsert({
-                            id: sessId,
-                            student_id: String(child.student_id),
-                            student_name: cleanChildName,
-                            teacher_name: child.teacherName || child.teacher_name || "Unassigned",
-                            teacher_id: String(child.muhaffiz_id || child.original_teacher_id || ""),
-                            room_name: roomName,
-                            started_by: "parent",
-                            started_at: new Date().toISOString(),
-                            status: "active",
-                            group_name: child.groupName || "Ungrouped",
-                            type: "1on1"
-                          });
-                        }
-
-                        setActiveCall({
-                          roomName,
-                          displayName: cleanChildName,
-                          sessionId: sessId,
-                          isHost: !isExisting
-                        });
-                      }}
+                      onClick={() => {}}
                     >
                       <Video size={16} /> 1-on-1 Call
                     </button>
@@ -7266,40 +7104,13 @@ function ParentPortal({
                     {child.groupName && (
                       <button
                         className="tahfeez-btn secondary"
-                        onClick={async () => {
-                          const sessId = groupRoomId;
-                          const cleanChildName = child.name || child.full_name || "Student";
-                          const isExisting = !!activeGroupSession;
-                          
-                          if (!isExisting) {
-                            await supabase.from('online_tahfeez_sessions').upsert({
-                              id: sessId,
-                              student_id: "group",
-                              student_name: "Group Class",
-                              teacher_name: child.teacherName || child.teacher_name || "Unassigned",
-                              teacher_id: String(child.muhaffiz_id || child.original_teacher_id || ""),
-                              room_name: sessId,
-                              started_by: "parent",
-                              started_at: new Date().toISOString(),
-                              status: "active",
-                              group_name: child.groupName || "Ungrouped",
-                              type: "group"
-                            });
-                          }
-
-                          setActiveCall({
-                            roomName: sessId,
-                            displayName: cleanChildName,
-                            sessionId: sessId,
-                            isHost: !isExisting
-                          });
-                        }}
+                        onClick={() => {}}
                       >
                         Group Class
                       </button>
-                )}
+                    )}
+                  </div>
               </div>
-            </div>
           );
         })}
       </div>
@@ -8626,18 +8437,7 @@ function ParentPortal({
         {activePage === "Online Tahfeez" && renderOnlineTahfeezParent()}
       </main>
 
-      {activeCall && (
-        <OnlineTahfeezCallModal
-          roomName={activeCall.roomName}
-          displayName={activeCall.displayName}
-          onClose={async () => {
-            if (activeCall.isHost) {
-              await endSessionAndLog(supabase, activeCall.sessionId);
-            }
-            setActiveCall(null);
-          }}
-        />
-      )}
+
 
       {bottomPages.some(p => p.key === activePage) && (
         <nav className="parent-bottom-nav">
@@ -11322,29 +11122,18 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       <strong>Started:</strong> {new Date(sess.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
-
                   <div className="tahfeez-actions" style={{ gap: '8px' }}>
                     <button
                       className="tahfeez-btn primary"
                       style={{ background: '#2ecc71', flex: 1 }}
-                      onClick={() => {
-                        setActiveCall({
-                          roomName: sess.room_name,
-                          displayName: "Admin Auditor",
-                          sessionId: sess.id
-                        });
-                      }}
+                      onClick={() => {}}
                     >
                       👁️ Spectate
                     </button>
                     <button
                       className="tahfeez-btn secondary"
                       style={{ border: '1px solid #ff4d4d', color: '#ff4d4d', background: 'transparent' }}
-                      onClick={async () => {
-                        if (confirm(`Are you sure you want to force terminate this session?`)) {
-                          await supabase.from('online_tahfeez_sessions').delete().eq('id', sess.id);
-                        }
-                      }}
+                      onClick={() => {}}
                     >
                       🛑 End
                     </button>
@@ -16230,15 +16019,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           ) : null}
         </section>
 
-        {activeCall && (
-          <OnlineTahfeezCallModal
-            roomName={activeCall.roomName}
-            displayName={activeCall.displayName}
-            onClose={() => {
-              setActiveCall(null);
-            }}
-          />
-        )}
+
 
 
         {/* WhatsApp Sending Progress Modal */}
@@ -17830,29 +17611,9 @@ function TeacherPortal({
           <button
             className="tahfeez-btn primary"
             style={{ width: 'auto', minWidth: '180px' }}
-            onClick={async () => {
-              await supabase.from('online_tahfeez_sessions').upsert({
-                id: groupRoomId,
-                student_id: "group",
-                student_name: "Group Class (" + (selectedGroup || "General") + ")",
-                teacher_name: teacherIdentity || user?.email || "Muhaffiz",
-                teacher_id: String(user?.id || ""),
-                room_name: groupRoomId,
-                started_by: "teacher",
-                started_at: new Date().toISOString(),
-                status: "active",
-                group_name: selectedGroup || "Ungrouped",
-                type: "group"
-              });
-
-              setActiveCall({
-                roomName: groupRoomId,
-                displayName: teacherIdentity || "Muhaffiz",
-                sessionId: groupRoomId
-              });
-            }}
+            onClick={() => {}}
           >
-            <Video size={16} /> {isGroupClassLive ? "Re-join Group Class" : "Start Group Class"}
+            <Video size={16} /> Start Group Class
           </button>
         </div>
 
@@ -17911,36 +17672,12 @@ function TeacherPortal({
                       Student has joined and is waiting for you!
                     </div>
                   )}
-
                   <div className="tahfeez-actions">
                     <button
                       className="tahfeez-btn primary"
-                      onClick={async () => {
-                        const sessId = childSessionId;
-                        const roomName = `mouze-tahfeez-1on1-${student.student_id}`;
-                        
-                        await supabase.from('online_tahfeez_sessions').upsert({
-                          id: sessId,
-                          student_id: String(student.student_id),
-                          student_name: student.name || student.full_name || "Student",
-                          teacher_name: teacherIdentity || user?.email || "Muhaffiz",
-                          teacher_id: String(user?.id || ""),
-                          room_name: roomName,
-                          started_by: "teacher",
-                          started_at: new Date().toISOString(),
-                          status: "active",
-                          group_name: selectedGroup || student.groupName || "Ungrouped",
-                          type: "1on1"
-                        });
-
-                        setActiveCall({
-                          roomName,
-                          displayName: teacherIdentity || "Muhaffiz",
-                          sessionId: sessId
-                        });
-                      }}
+                      onClick={() => {}}
                     >
-                      <Video size={16} /> {isClassLive ? "Join Call" : "Call Student"}
+                      <Video size={16} /> Call Student
                     </button>
                   </div>
                 </div>
@@ -20688,16 +20425,7 @@ function TeacherPortal({
         </section>
       </main>
 
-      {activeCall && (
-        <OnlineTahfeezCallModal
-          roomName={activeCall.roomName}
-          displayName={activeCall.displayName}
-          onClose={async () => {
-            await endSessionAndLog(supabase, activeCall.sessionId);
-            setActiveCall(null);
-          }}
-        />
-      )}
+
 
       {teacherDownloadPopup && (
         <div className="celebration-overlay" onClick={() => setTeacherDownloadPopup(null)}>
