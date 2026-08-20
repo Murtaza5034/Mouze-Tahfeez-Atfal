@@ -1,7 +1,7 @@
 import "./style.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { createClient } from "./supabaseClient";
+import { createClient, setSectionScope, getSectionScope } from "./supabaseClient";
 import { getCellEdited, toArabicNum, calcTotalPages, formatJadeed, formatJuzhali, formatMurajah, getAyahPage, getJuzFromPage } from "./SelfJadwal";
 import {
   Bell,
@@ -56,7 +56,7 @@ import {
   AlertCircle,
   ChevronDown, ChevronLeft, ChevronRight,
   Paperclip,
-  Trash2,
+  Trash2, Save,
   Pause,
   Play,
   Mail,
@@ -87,6 +87,9 @@ import {
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
 import TeacherLeaveApprovalPanel from "./TeacherLeaveApprovalPanel";
+import VideoCall from "./components/VideoCall";
+import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
+import { getDeviceInfo } from "./utils/deviceUtils";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -373,7 +376,17 @@ const ROLE_LABELS = {
   parents: "Parents",
   admin: "Admin",
   teacher: "Teacher",
+  "kibar-teacher": "Kibar Teacher",
+  "kibar-admin": "Kibar Admin",
+  "kibar-student": "Kibar Student"
 };
+
+function SECTION_FOR_ROLE(role) {
+  if (role && (role.startsWith("kibar-") || role === "kibar")) {
+    return "kibar";
+  }
+  return "atfal";
+}
 
 const ASSETS = {
   LOGO: "/logo.png",
@@ -882,118 +895,146 @@ const getNotificationPermission = () => {
 const NotificationStatus = ({ role }) => {
   const [permission, setPermission] = useState(getNotificationPermission);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const devInfo = getDeviceInfo();
 
   const requestPermission = async () => {
-    
+    // If iOS user in browser tab (Safari or Chrome), show the visual guide modal
+    if (devInfo.isIOS && !devInfo.isStandalone) {
+      setShowIOSGuide(true);
+      return;
+    }
+
     setIsInitializing(true);
     try {
       const fcmService = await loadFcmService();
       const result = await fcmService.initialize(role);
-      if (result) {
+      if (result && (result === true || result.success)) {
         localStorage.setItem('fcm_notification_enabled', 'true');
         setPermission("granted");
         alert("Notifications enabled successfully!");
       } else {
         setPermission(getNotificationPermission());
-        if ((typeof Notification !== 'undefined' && Notification.permission === 'denied')) {
+        if (result?.reason === 'ios_not_standalone') {
+          setShowIOSGuide(true);
+        } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
           alert("Notifications are blocked in your browser settings. Please click the lock icon in your address bar to allow them.");
+        } else if (result?.reason === 'unsupported_browser' || (devInfo.isIOS && !devInfo.isStandalone)) {
+          setShowIOSGuide(true);
         } else {
-          alert("Failed to initialize notification service. Please try again.");
+          alert("Could not activate notifications. Please ensure notifications are permitted in your browser settings and try again.");
         }
       }
     } catch (error) {
-      console.error(error);
-      alert("An error occurred. Check console for details.");
+      console.error("[NotificationStatus] Initialization error:", error);
+      if (devInfo.isIOS && !devInfo.isStandalone) {
+        setShowIOSGuide(true);
+      } else {
+        alert("An error occurred while enabling notifications. Check browser settings.");
+      }
     } finally {
       setIsInitializing(false);
     }
   };
 
   return (
-    <div className="notification-status-card card-appear">
-      <div className="n-status-head">
-        <Bell size={20} />
-        <h4>Push Notifications</h4>
-      </div>
-      <div className="n-status-body">
-        {permission === "granted" ? (
-          <p className="status-text success"><CheckCircle size={14} /> Notifications are Active</p>
-        ) : permission === "denied" ? (
-          <p className="status-text error"><X size={14} /> Notifications are Blocked</p>
-        ) : (
-          <p className="status-text warning"><Info size={14} /> Not Configured Yet</p>
-        )}
-        
-        {permission === "granted" && (
-          <button 
-            className="action-button mini" 
-            style={{ background: 'var(--soft-brown)', color: 'white' }}
-            onClick={async () => {
-              const authRes = await supabase.auth.getUser();
-              const user = authRes?.data?.user;
-              if (!user) return alert("Please login first to test notifications.");
-              
-              const { data, error } = await supabase.functions.invoke('fcm-notification', {
-                body: {
-                  title: "Test Alert",
-                  body: "Your device is correctly linked to Mauze Tahfeez notifications!",
-                  targetUser: user?.id
-                }
-              });
-              
-              if (error) {
-                console.error("Diagnostic Error:", error);
-                let msg = error.message;
-                try {
-                  const body = await error.context?.json();
-                  if (body?.details) msg += "\n\nDetails: " + body.details;
-                  else if (body?.error) msg += "\n\nError: " + body.error;
-                } catch(e) {}
-                alert("Test failed: " + msg);
-              } else {
-                if (data?.message === 'NO_TOKENS_FOUND') {
-                  alert("Server reached, but NO TOKEN FOUND for your user ID.\nPlease refresh the page and allow notifications to save your token.");
-                } else {
-                  const deliveredCount = data?.summary?.delivered ?? data?.summary?.success ?? 0;
-                  const staleCount = data?.summary?.staleTokensRemoved ?? data?.summary?.stale ?? 0;
-                  const failureCount = data?.summary?.failures ?? 0;
+    <>
+      <div className="notification-status-card card-appear">
+        <div className="n-status-head">
+          <Bell size={20} />
+          <h4>Push Notifications</h4>
+        </div>
+        <div className="n-status-body">
+          {permission === "granted" ? (
+            <p className="status-text success"><CheckCircle size={14} /> Notifications are Active</p>
+          ) : permission === "denied" ? (
+            <p className="status-text error"><X size={14} /> Notifications are Blocked</p>
+          ) : (
+            <p className="status-text warning"><Info size={14} /> Not Configured Yet</p>
+          )}
+          
+          {devInfo.isIOS && !devInfo.isStandalone && permission !== "granted" && (
+            <div style={{ background: '#fdfbf7', border: '1px solid #ebdcc5', borderRadius: '10px', padding: '10px 12px', marginTop: '6px', fontSize: '0.82rem', color: '#735f48', lineHeight: 1.4 }}>
+              📱 <strong>iPhone/iPad Users:</strong> Add this portal to your Home Screen to receive instant push alerts.
+            </div>
+          )}
 
-                  if (failureCount > 0) {
-                    console.error("FCM Delivery Failed:", data);
-                    let extraErr = "";
-                    if (data?.results && data.results[0]?.error) {
-                      extraErr = "\nReason: " + data.results[0].error;
-                    }
-                    alert(`Test alert sent to Firebase, but some deliveries still failed.\nDelivered: ${deliveredCount}\nFailures: ${failureCount}${extraErr}${staleCount > 0 ? `\nStale tokens cleaned: ${staleCount}` : ""}\n\nCheck browser console for details.`);
-                  } else if (deliveredCount > 0) {
-                    const cleanupNote = staleCount > 0 ? `\nStale tokens cleaned: ${staleCount}` : "";
-                    alert(`Test alert successfully delivered to ${deliveredCount} device${deliveredCount === 1 ? "" : "s"}!${cleanupNote}`);
-                  } else if (staleCount > 0) {
-                    alert(`No active devices were reachable, but ${staleCount} stale token${staleCount === 1 ? "" : "s"} were cleaned up.\nPlease reopen the app on a device and enable notifications again.`);
+          {permission === "granted" && (
+            <button 
+              className="action-button mini" 
+              style={{ background: 'var(--soft-brown)', color: 'white' }}
+              onClick={async () => {
+                const authRes = await supabase.auth.getUser();
+                const user = authRes?.data?.user;
+                if (!user) return alert("Please login first to test notifications.");
+                
+                const { data, error } = await supabase.functions.invoke('fcm-notification', {
+                  body: {
+                    title: "Test Alert",
+                    body: "Your device is correctly linked to Mauze Tahfeez notifications!",
+                    targetUser: user?.id
+                  }
+                });
+                
+                if (error) {
+                  console.error("Diagnostic Error:", error);
+                  let msg = error.message;
+                  try {
+                    const body = await error.context?.json();
+                    if (body?.details) msg += "\n\nDetails: " + body.details;
+                    else if (body?.error) msg += "\n\nError: " + body.error;
+                  } catch(e) {}
+                  alert("Test failed: " + msg);
+                } else {
+                  if (data?.message === 'NO_TOKENS_FOUND') {
+                    alert("Server reached, but NO TOKEN FOUND for your user ID.\nPlease refresh the page and allow notifications to save your token.");
                   } else {
-                    alert("Test alert completed, but no delivery details were returned.");
+                    const deliveredCount = data?.summary?.delivered ?? data?.summary?.success ?? 0;
+                    const staleCount = data?.summary?.staleTokensRemoved ?? data?.summary?.stale ?? 0;
+                    const failureCount = data?.summary?.failures ?? 0;
+
+                    if (failureCount > 0) {
+                      console.error("FCM Delivery Failed:", data);
+                      let extraErr = "";
+                      if (data?.results && data.results[0]?.error) {
+                        extraErr = "\nReason: " + data.results[0].error;
+                      }
+                      alert(`Test alert sent to Firebase, but some deliveries still failed.\nDelivered: ${deliveredCount}\nFailures: ${failureCount}${extraErr}${staleCount > 0 ? `\nStale tokens cleaned: ${staleCount}` : ""}\n\nCheck browser console for details.`);
+                    } else if (deliveredCount > 0) {
+                      const cleanupNote = staleCount > 0 ? `\nStale tokens cleaned: ${staleCount}` : "";
+                      alert(`Test alert successfully delivered to ${deliveredCount} device${deliveredCount === 1 ? "" : "s"}!${cleanupNote}`);
+                    } else if (staleCount > 0) {
+                      alert(`No active devices were reachable, but ${staleCount} stale token${staleCount === 1 ? "" : "s"} were cleaned up.\nPlease reopen the app on a device and enable notifications again.`);
+                    } else {
+                      alert("Test alert completed, but no delivery details were returned.");
+                    }
                   }
                 }
-              }
-            }}
-          >
-            Send Test Alert
-          </button>
-        )}
-        
-        {permission !== "granted" && (
-          <button 
-            className="action-button mini" 
-            onClick={requestPermission}
-            disabled={isInitializing}
-          >
-            {isInitializing ? "Configuring..." : "Enable Push Alerts"}
-          </button>
-        )}
+              }}
+            >
+              Send Test Alert
+            </button>
+          )}
+          
+          {permission !== "granted" && (
+            <button 
+              className="action-button mini" 
+              onClick={requestPermission}
+              disabled={isInitializing}
+            >
+              {isInitializing ? "Configuring..." : (devInfo.isIOS && !devInfo.isStandalone ? "Enable for iOS" : "Enable Push Alerts")}
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+
+      <IOSNotificationGuideModal 
+        isOpen={showIOSGuide} 
+        onClose={() => setShowIOSGuide(false)} 
+      />
+    </>
   );
-}
+};
 
 function SidebarHeader({ photoUrl, name, arabicName, tag }) {
   const isArabic = (text) => /[\u0600-\u06FF]/.test(text);
@@ -1036,6 +1077,9 @@ const DEFAULT_PAGE_BY_ROLE = {
   parents: "Home",
   admin: "Overview",
   teacher: "Home",
+  "kibar-student": "Home",
+  "kibar-teacher": "Home",
+  "kibar-admin": "Overview",
 };
 
 const RESULT_NUMERIC_FIELDS = ["murajazah", "juz_hali", "takhteet", "jadeed"];
@@ -2475,19 +2519,35 @@ function getFatemiInfo(dateStr) {
   if (!dateStr) return { week: "...", month: "...", date: "...", monthName: "..." };
 
   try {
-    const date = new Date(dateStr);
-    // Fatemi (Misri) calendar runs 1 day ahead of the standard Islamic tabular calendar
-    const shiftedDate = new Date(date.getTime() + 86400000);
+    // Parse date as local noon to avoid day-boundary issues with islamic-tbla calendar
+    // Islamic day starts at sunset; using noon UTC ensures correct day mapping
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    
     const parts = new Intl.DateTimeFormat('en-u-ca-islamic-tbla-nu-latn', {
       day: 'numeric',
       month: 'numeric',
       year: 'numeric',
       timeZone: 'UTC'
-    }).formatToParts(shiftedDate);
+    }).formatToParts(date);
 
-    const d = parseInt(parts.find(p => p.type === 'day').value);
-    const m = parseInt(parts.find(p => p.type === 'month').value);
+    let d = parseInt(parts.find(p => p.type === 'day').value);
+    let m = parseInt(parts.find(p => p.type === 'month').value);
     const y = parts.find(p => p.type === 'year').value;
+
+    // Add 1 day for Fatemi calendar (1 day ahead of tabular Islamic)
+    d += 1;
+    const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+    const isLeapYear = (parseInt(y) * 11 + 14) % 30 < 11;
+    const lastMonthLen = isLeapYear ? 30 : 29;
+    const currentMonthLen = m === 12 ? lastMonthLen : monthLengths[m - 1];
+    if (d > currentMonthLen) {
+      d = 1;
+      m += 1;
+      if (m > 12) {
+        m = 1;
+      }
+    }
 
     return {
       week: Math.ceil(d / 7),
@@ -2550,12 +2610,22 @@ async function findParentProfiles(userId, email = null) {
   let data2 = [];
 
   if (userId) {
+    // 1. Direct student lookup by user ID (for Kibar students and linked profiles)
+    const { data: dId, error: eId } = await supabase
+      .from("child_profiles")
+      .select("*")
+      .eq("id", userId);
+    if (!eId && dId) {
+      data1 = [...data1, ...dId];
+    }
+
+    // 2. Parent user ID query
     const { data, error } = await supabase
       .from("child_profiles")
       .select("*")
       .eq("parent_user_id", userId);
     if (!error && data) {
-      data1 = data;
+      data1 = [...data1, ...data];
     }
   }
 
@@ -2593,41 +2663,198 @@ async function findParentProfiles(userId, email = null) {
 }
 
 // Fallback used when direct child_profiles reads are blocked/recursing under RLS.
-// Calls the scoped SECURITY DEFINER RPC, which filters server-side to THIS parent
-// only (by user id or email) — never downloads the whole table.
-async function findParentProfilesFallback(userId, email = null) {
-  // Preferred: the scoped SECURITY DEFINER RPC (filters server-side to this
-  // parent only). If the function is not deployed yet (older DB), fall back to
-  // the legacy full-table RPC and filter client-side so parents never see an
-  // empty portal while the migration is pending.
-  try {
-    const { data, error } = await supabase.rpc("get_my_child_profiles", {
-      p_user_id: userId,
-      p_email: email || null,
-    });
-    if (!error && Array.isArray(data)) return data;
-  } catch (_e) {}
+ // Calls the scoped SECURITY DEFINER RPC, which filters server-side to THIS parent
+ // only (by user id or email) — never downloads the whole table.
+ async function findParentProfilesFallback(userId, email = null) {
+   // Preferred: the scoped SECURITY DEFINER RPC (filters server-side to this
+   // parent only). If the function is not deployed yet (older DB), fall back to
+   // the legacy full-table RPC and filter client-side so parents never see an
+   // empty portal while the migration is pending.
+   try {
+     const { data, error } = await supabase.rpc("get_my_child_profiles", {
+       p_user_id: userId,
+       p_email: email || null,
+     });
+     if (!error && Array.isArray(data)) return data;
+   } catch (_e) {}
 
-  console.warn("get_my_child_profiles RPC unavailable; using legacy fallback. Apply the performance migration to remove this fallback.");
+   console.warn("get_my_child_profiles RPC unavailable; using legacy fallback. Apply the performance migration to remove this fallback.");
+   try {
+     const { data, error } = await supabase.rpc("get_all_child_profiles");
+     if (error || !Array.isArray(data)) return [];
+     const uId = String(userId || "").trim().toLowerCase();
+     const em = String(email || "").trim().toLowerCase();
+     return data.filter(p => {
+       const pu = String(p.parent_user_id || "").trim().toLowerCase();
+       const pe = String(p.parent_email || "").trim().toLowerCase();
+       const matchUserId = uId && pu && pu === uId;
+       const matchEmail = em && pe && (pe === em || pe.includes(em) || em.includes(pe));
+       return matchUserId || matchEmail;
+     });
+   } catch (_e) {
+     return [];
+   }
+ }
+
+ // Kibar equivalent of findParentProfiles - queries kibar_child_profiles and related tables
+ async function findKibarParentProfiles(userId, email = null) {
+   let data1 = [];
+   let data2 = [];
+
+   if (userId) {
+     // 1. Direct student lookup by user ID (for Kibar students and linked profiles)
+     const { data: dId, error: eId } = await supabase
+       .from("kibar_child_profiles")
+       .select("*")
+       .eq("id", userId);
+     if (!eId && dId) {
+       data1 = [...data1, ...dId];
+     }
+
+     // 2. Parent user ID query
+     const { data, error } = await supabase
+       .from("kibar_child_profiles")
+       .select("*")
+       .eq("parent_user_id", userId);
+     if (!error && data) {
+       data1 = [...data1, ...data];
+     }
+   }
+
+   if (email && email.trim() !== "") {
+     const cleanEmail = email.trim();
+     const { data: d1, error: e1 } = await supabase
+       .from("kibar_child_profiles")
+       .select("*")
+       .eq("parent_email", cleanEmail);
+     if (!e1 && d1) {
+       data2 = [...data2, ...d1];
+     }
+     const { data: d2, error: e2 } = await supabase
+       .from("kibar_child_profiles")
+       .select("*")
+       .eq("parent_email", cleanEmail.toLowerCase());
+     if (!e2 && d2) {
+       data2 = [...data2, ...d2];
+     }
+   }
+
+   const merged = [...data1, ...data2];
+   const unique = [];
+   const seen = new Set();
+   for (const item of merged) {
+     if (item && item.student_id) {
+       const sid = String(item.student_id);
+       if (!seen.has(sid)) {
+         seen.add(sid);
+         unique.push(item);
+       }
+     }
+   }
+   return unique;
+ }
+
+// Kibar Student Profile - direct lookup by document ID, user_id, email, etc.
+async function findKibarStudentProfile(userId, email = null) {
+  if (!userId && !email) return null;
   try {
-    const { data, error } = await supabase.rpc("get_all_child_profiles");
-    if (error || !Array.isArray(data)) return [];
-    const uId = String(userId || "").trim().toLowerCase();
-    const em = String(email || "").trim().toLowerCase();
-    return data.filter(p => {
-      const pu = String(p.parent_user_id || "").trim().toLowerCase();
-      const pe = String(p.parent_email || "").trim().toLowerCase();
-      const matchUserId = uId && pu && pu === uId;
-      const matchEmail = em && pe && (pe === em || pe.includes(em) || em.includes(pe));
-      return matchUserId || matchEmail;
-    });
-  } catch (_e) {
-    return [];
+    if (userId) {
+      const { data: byId } = await supabase
+        .from("kibar_student_profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+      if (byId) return byId;
+
+      const { data: byUserId } = await supabase
+        .from("kibar_student_profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (byUserId) return byUserId;
+
+      const { data: byStudentId } = await supabase
+        .from("kibar_student_profiles")
+        .select("*")
+        .eq("student_id", userId)
+        .maybeSingle();
+      if (byStudentId) return byStudentId;
+
+      const { data: byChildId } = await supabase
+        .from("kibar_child_profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+      if (byChildId) return byChildId;
+
+      const { data: byChildUserId } = await supabase
+        .from("kibar_child_profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (byChildUserId) return byChildUserId;
+    }
+
+    if (email && email.trim() !== "") {
+      const cleanEmail = email.trim();
+      const { data: byEmail } = await supabase
+        .from("kibar_student_profiles")
+        .select("*")
+        .eq("email", cleanEmail)
+        .maybeSingle();
+      if (byEmail) return byEmail;
+
+      const { data: byParentEmail } = await supabase
+        .from("kibar_student_profiles")
+        .select("*")
+        .eq("parent_email", cleanEmail)
+        .maybeSingle();
+      if (byParentEmail) return byParentEmail;
+
+      const { data: byChildEmail } = await supabase
+        .from("kibar_child_profiles")
+        .select("*")
+        .eq("parent_email", cleanEmail)
+        .maybeSingle();
+      if (byChildEmail) return byChildEmail;
+    }
+  } catch (err) {
+    console.warn("findKibarStudentProfile error:", err);
   }
+  return null;
 }
 
 
-// TTL-cached global ranks so realtime refreshes / 60s polls don't re-invoke
+ // Fallback for Kibar when direct kibar_child_profiles reads are blocked
+ async function findKibarParentProfilesFallback(userId, email = null) {
+   try {
+     const { data, error } = await supabase.rpc("get_my_kibar_child_profiles", {
+       p_user_id: userId,
+       p_email: email || null,
+     });
+     if (!error && Array.isArray(data)) return data;
+   } catch (_e) {}
+
+   console.warn("get_my_kibar_child_profiles RPC unavailable; using legacy fallback.");
+   try {
+     const { data, error } = await supabase.rpc("get_all_kibar_child_profiles");
+     if (error || !Array.isArray(data)) return [];
+     const uId = String(userId || "").trim().toLowerCase();
+     const em = String(email || "").trim().toLowerCase();
+     return data.filter(p => {
+       const pu = String(p.parent_user_id || "").trim().toLowerCase();
+       const pe = String(p.parent_email || "").trim().toLowerCase();
+       const matchUserId = uId && pu && pu === uId;
+       const matchEmail = em && pe && (pe === em || pe.includes(em) || em.includes(pe));
+       return matchUserId || matchEmail;
+     });
+   } catch (_e) {
+     return [];
+   }
+ }
+
+
+ // TTL-cached global ranks so realtime refreshes / 60s polls don't re-invoke
 // the get-global-rank edge function (which scans ALL weekly results) every time.
 let globalRanksCache = { data: null, fetchedAt: 0 };
 const GLOBAL_RANKS_TTL = 2 * 60 * 1000; // 2 minutes
@@ -2657,22 +2884,58 @@ let portalLoadInFlight = false;
 let portalLoadPending = false;
 
 async function authorizePortalAccess(user, requestedRole) {
+  let finalRole = requestedRole;
+
+  // Resolve kibar-teacher and kibar-admin.
+  // Step 1: Check JWT metadata (zero Firestore calls, no scope switching).
+  const assigned = getAssignedRoles(user);
+  if (requestedRole === "teacher" && assigned.includes("kibar-teacher")) {
+    finalRole = "kibar-teacher";
+  } else if (requestedRole === "admin" && assigned.includes("kibar-admin")) {
+    finalRole = "kibar-admin";
+  } else if ((requestedRole === "parents" || requestedRole === "kibar-student") && assigned.includes("kibar-student")) {
+    finalRole = "kibar-student";
+  }
+
+  // Step 2: If metadata didn't reveal kibar role, query kibar_user_portal_access
+  // DIRECTLY by its full hardcoded name — resolveCollectionName() skips adding
+  // the kibar_ prefix when the name already starts with it, so the global section
+  // scope is NEVER changed here, preventing listener permission bleed.
+  if ((requestedRole === "teacher" && finalRole === "teacher") ||
+      (requestedRole === "admin"   && finalRole === "admin")) {
+    try {
+      const { data: kibarRow } = await supabase
+        .from("kibar_user_portal_access")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (kibarRow?.is_active) {
+        if (kibarRow.portal_role === "kibar-teacher" && requestedRole === "teacher") {
+          finalRole = "kibar-teacher";
+        } else if (kibarRow.portal_role === "kibar-admin" && requestedRole === "admin") {
+          finalRole = "kibar-admin";
+        }
+      }
+    } catch (_) {}
+  }
+
+  setSectionScope(SECTION_FOR_ROLE(finalRole));
   const tableAccess = await findPortalAccess(user.id);
   const assignedRoles = getAssignedRoles(user);
-  const requestedLabel = ROLE_LABELS[requestedRole] || requestedRole;
+  const requestedLabel = ROLE_LABELS[finalRole] || finalRole;
 
-  if (tableAccess?.is_active && tableAccess.portal_role === requestedRole) {
+  if (tableAccess?.is_active && tableAccess.portal_role === finalRole) {
     return {
       ok: true,
-      role: requestedRole,
-      assignedRoles: [requestedRole],
+      role: finalRole,
+      assignedRoles: [finalRole],
       parentProfile: null,
       accessRow: tableAccess,
     };
   }
 
   // Allow admin access if teacher's email is in teacher_admin_access list
-  if (requestedRole === "admin" && user?.email) {
+  if (finalRole === "admin" && user?.email) {
     try {
       const { data: settingsData } = await supabase
         .from('jadwal_settings')
@@ -2696,7 +2959,32 @@ async function authorizePortalAccess(user, requestedRole) {
     } catch (_) {}
   }
 
-  if (tableAccess?.is_active && tableAccess.portal_role && tableAccess.portal_role !== requestedRole) {
+  // Allow kibar-admin access if teacher's email is in kibar_jadwal_settings teacher_admin_access list
+  if (finalRole === "kibar-admin" && user?.email) {
+    try {
+      const { data: settingsData } = await supabase
+        .from('jadwal_settings')
+        .select('teacher_admin_access')
+        .eq('id', 1)
+        .single();
+      if (settingsData?.teacher_admin_access) {
+        const accessList = JSON.parse(settingsData.teacher_admin_access);
+        if (Array.isArray(accessList) && accessList.some(e =>
+          normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
+        )) {
+          return {
+            ok: true,
+            role: "kibar-admin",
+            assignedRoles: [...assignedRoles, "kibar-admin"],
+            parentProfile: null,
+            accessRow: tableAccess || null,
+          };
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (tableAccess?.is_active && tableAccess.portal_role && tableAccess.portal_role !== finalRole) {
     return {
       ok: false,
       message: `This account is assigned to the ${ROLE_LABELS[tableAccess.portal_role] || tableAccess.portal_role
@@ -2704,20 +2992,49 @@ async function authorizePortalAccess(user, requestedRole) {
     };
   }
 
-  if (requestedRole === "parents") {
+  if (finalRole === "parents" || finalRole === "kibar-student") {
     let parentProfiles = [];
-    try {
-      parentProfiles = await findParentProfiles(user.id, user.email);
-    } catch (_) {}
-    if (!parentProfiles || parentProfiles.length === 0) {
-      parentProfiles = await findParentProfilesFallback(user.id, user.email);
+    if (finalRole === "kibar-student") {
+      // Kibar Student: fetch own profile directly from kibar_student_profiles / child_profiles
+      const studentProfile = await findKibarStudentProfile(user.id, user.email);
+      if (studentProfile) {
+        parentProfiles = [studentProfile];
+      } else {
+        try {
+          parentProfiles = await findKibarParentProfiles(user.id, user.email);
+        } catch (_) {}
+        if (!parentProfiles || parentProfiles.length === 0) {
+          parentProfiles = await findKibarParentProfilesFallback(user.id, user.email);
+        }
+      }
+
+      // Safe fallback profile: ensures Kibar student is NEVER auto-logged out on refresh
+      if (!parentProfiles || parentProfiles.length === 0) {
+        parentProfiles = [{
+          id: user.id,
+          user_id: user.id,
+          name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
+          full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
+          student_id: user.user_metadata?.student_id || user.user_metadata?.its || user.id,
+          its: user.user_metadata?.its || user.user_metadata?.its_number || "...",
+          section: "kibar",
+          is_kibar: true
+        }];
+      }
+    } else {
+      try {
+        parentProfiles = await findParentProfiles(user.id, user.email);
+      } catch (_) {}
+      if (!parentProfiles || parentProfiles.length === 0) {
+        parentProfiles = await findParentProfilesFallback(user.id, user.email);
+      }
     }
 
     if (parentProfiles.length > 0) {
       return {
         ok: true,
-        role: "parents",
-        assignedRoles: assignedRoles.length > 0 ? assignedRoles : ["parents"],
+        role: finalRole,
+        assignedRoles: assignedRoles.length > 0 ? assignedRoles : [finalRole],
         parentProfile: parentProfiles[0],
         allParentProfiles: parentProfiles,
         accessRow: tableAccess || null,
@@ -2748,28 +3065,96 @@ async function authorizePortalAccess(user, requestedRole) {
 }
 
 async function resolveInitialPortal(user, preferredRole) {
-  if (preferredRole) {
-    const preferredAccess = await authorizePortalAccess(user, preferredRole);
+  if (!user) return { ok: false, message: "No user provided" };
+
+  const assigned = getAssignedRoles(user);
+  let storedRole = null;
+  try {
+    storedRole = localStorage.getItem(STORAGE_KEYS.role) || localStorage.getItem("mauze-portal-role");
+  } catch (_) {}
+
+  let finalPreferred = preferredRole || storedRole;
+
+  if (finalPreferred === "teacher" && assigned.includes("kibar-teacher")) {
+    finalPreferred = "kibar-teacher";
+  } else if (finalPreferred === "admin" && assigned.includes("kibar-admin")) {
+    finalPreferred = "kibar-admin";
+  } else if (
+    finalPreferred === "kibar-student" ||
+    storedRole === "kibar-student" ||
+    assigned.includes("kibar-student") ||
+    user?.user_metadata?.portal_role === "kibar-student" ||
+    user?.user_metadata?.role === "kibar-student" ||
+    user?.user_metadata?.section === "kibar"
+  ) {
+    finalPreferred = "kibar-student";
+  }
+
+  // If finalPreferred is still not determined or is parents, check if user has a kibar profile
+  if (!finalPreferred || finalPreferred === "parents") {
+    try {
+      const kibarProfile = await findKibarStudentProfile(user.id, user.email);
+      if (kibarProfile) {
+        finalPreferred = "kibar-student";
+      }
+    } catch (_) {}
+  }
+
+  setSectionScope(SECTION_FOR_ROLE(finalPreferred || "kibar-student"));
+
+  if (finalPreferred) {
+    const preferredAccess = await authorizePortalAccess(user, finalPreferred);
     if (preferredAccess.ok) {
       return preferredAccess;
     }
   }
 
-  const tableAccess = await findPortalAccess(user.id);
-  const assignedRoles = getAssignedRoles(user);
+  // Fallback: read portal access record under current scope
+  try {
+    const tableAccess = await findPortalAccess(user.id);
+    if (tableAccess?.is_active && tableAccess.portal_role) {
+      const access = await authorizePortalAccess(user, tableAccess.portal_role);
+      if (access.ok) return access;
+    }
+  } catch (_) {}
 
-  if (tableAccess?.is_active && tableAccess.portal_role) {
-    return authorizePortalAccess(user, tableAccess.portal_role);
-  }
-
-  for (const role of assignedRoles) {
+  // Fallback: try all assigned roles
+  for (const role of assigned) {
     const access = await authorizePortalAccess(user, role);
     if (access.ok) {
       return access;
     }
   }
 
-  return authorizePortalAccess(user, "parents");
+  // Fallback: try kibar-student
+  const kibarAccess = await authorizePortalAccess(user, "kibar-student");
+  if (kibarAccess.ok) {
+    return kibarAccess;
+  }
+
+  // Fallback: try parents
+  const parentAccess = await authorizePortalAccess(user, "parents");
+  if (parentAccess.ok) {
+    return parentAccess;
+  }
+
+  // Safe fallback profile - ALWAYS return ok: true so a logged in user is NEVER auto-logged out
+  return {
+    ok: true,
+    role: finalPreferred || "kibar-student",
+    assignedRoles: [finalPreferred || "kibar-student"],
+    parentProfile: {
+      id: user.id,
+      user_id: user.id,
+      name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
+      full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
+      student_id: user.user_metadata?.student_id || user.user_metadata?.its || user.id,
+      its: user.user_metadata?.its || user.user_metadata?.its_number || "...",
+      section: (finalPreferred === "parents") ? "atfal" : "kibar",
+      is_kibar: finalPreferred !== "parents",
+    },
+    accessRow: null,
+  };
 }
 
 function guessTeacherIdentity(user, portalAccess = null) {
@@ -2809,15 +3194,18 @@ const READ_DAY_LABELS = { SATURDAY:'Saturday', SUNDAY:'Sunday', MONDAY:'Monday',
 
 const getWeekDateStr = (dayIndex) => {
   const now = new Date();
+  const today = now.getDay(); // 0=Sunday, 6=Saturday
+  const daysSinceSat = (today + 1) % 7; // Saturday=6, (6+1)%7=0
   const saturday = new Date(now);
-  const daysBack = (6 - now.getDay() + 7) % 7;
-  saturday.setDate(now.getDate() - daysBack);
+  saturday.setDate(now.getDate() - daysSinceSat);
   const d = new Date(saturday);
   d.setDate(saturday.getDate() + dayIndex);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  // Return ISO date string for reliable parsing
+  return d.toISOString().split('T')[0];
 };
 
 function ReadJadwalView({ scheduleData, mode, editHistory }) {
+  // Map JS getDay (0=Sun..6=Sat) to our Saturday=0..Friday=6 order
   const todayIndex = [1,2,3,4,5,6,0][new Date().getDay()];
   return (
     <div className="jadwal-table-wrapper">
@@ -2854,12 +3242,15 @@ function ReadJadwalView({ scheduleData, mode, editHistory }) {
           {READ_DAY_ORDER.map((day, idx) => {
             const row = scheduleData[day] || {};
             const isToday = idx === todayIndex;
+            const weekDate = getWeekDateStr(idx);
+            const fatemiInfo = weekDate ? getFatemiInfo(weekDate) : null;
+            const fatemiDateStr = fatemiInfo && fatemiInfo.monthName ? `${fatemiInfo.date} ${fatemiInfo.monthName} ${fatemiInfo.year}` : '';
             return (
               <tr key={day} className={isToday ? 'read-jadwal-today-row' : ''}>
                 <td className={`day-cell ${isToday ? 'read-jadwal-today-day' : ''}`}>
                   <div className="day-cell-content">
                     <span className="day-cell-name">{READ_DAY_LABELS[day]}</span>
-                    <span className="day-cell-date">{getWeekDateStr(idx)}</span>
+                    {fatemiDateStr && <div className="day-fatemi-date">{fatemiDateStr}</div>}
                   </div>
                 </td>
                 {mode === 'juz-wise' ? (
@@ -2987,8 +3378,10 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
         profile.full_name && r.full_name && normalizeText(r.full_name) === normalizeText(profile.full_name)
       )) || null;
 
+    // Support multiple possible teacher ID field names (kibar vs atfal)
+    const teacherId = profile.teacher_id || profile.muhaffiz_id || profile.teacher_user_id || profile.teacherId;
     const teacherInProfiles = teacherProfiles.find(t =>
-      (profile.teacher_id && (t.id === profile.teacher_id || t.user_id === profile.teacher_id))
+      (teacherId && (t.id === teacherId || t.user_id === teacherId))
     );
 
     const prevWeekRank = latestResult ? (() => {
@@ -3000,15 +3393,15 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
       ...profile,
       id: profile.id,
       student_id: numericId,
-      allIds: [profile.student_id, profile.its, profile.id].filter(Boolean).map(String),
+      allIds: [profile.student_id, profile.its, profile.id, profile.user_id, profile.parent_user_id].filter(Boolean).map(String),
       name: profile.full_name,
       arabic_name: fixArabicScript(profile.arabic_name),
       its: profile.its || "...",
       latestResult,
       previousWeekRank: prevWeekRank,
-      teacherName: profile.teacher_name || teacherInProfiles?.full_name || "Unassigned teacher",
+      teacherName: profile.teacher_name || profile.muhaffiz_name || teacherInProfiles?.full_name || "Unassigned teacher",
       groupName: profile.group_name || "Ungrouped",
-      muhaffiz_id: profile.teacher_id || null,
+      muhaffiz_id: profile.teacher_id || profile.muhaffiz_id || profile.teacher_user_id || profile.teacherId || null,
       /* Badal fields: original_teacher_id = permanent teacher, badal_teacher_id = substitute (nullable) */
       original_teacher_id: profile.original_teacher_id || null,
       badal_teacher_id: profile.badal_teacher_id || null,
@@ -4431,6 +4824,19 @@ const computeLeaveDays = (fromDate, toDate) => {
 const formatMonthKeyLabel = (key) => {
   if (!key) return "Unknown";
   try {
+    // Handle potential Hijri dates (year < 2000) by returning the key as-is
+    const year = parseInt(key.split("-")[0], 10);
+    if (year < 2000) {
+      // Likely a Hijri year parsed as Gregorian - return formatted key
+      const monthNum = parseInt(key.split("-")[1], 10);
+      const hijriMonths = [
+        "Muharram", "Safar", "Rabi Al Awwal", "Rabi Al Thani",
+        "Jumada Al Awwal", "Jumada Al Thani", "Rajab", "Sha'ban",
+        "Ramadan", "Shawwal", "Dhu Al Qadah", "Dhu Al Hijjah"
+      ];
+      const monthName = hijriMonths[monthNum - 1] || `Month ${monthNum}`;
+      return `${monthName} ${year} AH`;
+    }
     return new Date(key + "-01T00:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
   } catch {
     return key;
@@ -4463,25 +4869,57 @@ const groupLeavesByMonth = (leaves) => {
     }));
 };
 
-function useParentLeaveData(studentId) {
+function useParentLeaveData(studentProfileOrId, isKibar = false) {
   const [data, setData] = useState({ leaves: [], loading: true });
 
   const fetchData = useCallback(async () => {
-    if (!studentId) {
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+    const isProfileObj = typeof studentProfileOrId === 'object' && studentProfileOrId !== null;
+    const candidateIds = (isProfileObj
+      ? [
+          studentProfileOrId.student_id,
+          studentProfileOrId.id,
+          studentProfileOrId.user_id,
+          studentProfileOrId.ITS,
+          studentProfileOrId.its,
+          studentProfileOrId.its_number,
+          ...(studentProfileOrId.allIds || []),
+          user?.id
+        ]
+      : [studentProfileOrId, user?.id]
+    ).filter(Boolean).map(String);
+
+    const uniqueIds = [...new Set(candidateIds)];
+    if (uniqueIds.length === 0) {
       setData({ leaves: [], loading: false });
       return;
     }
     setData((prev) => ({ ...prev, loading: true }));
-    const [studentRes, eventRes] = await Promise.all([
-      supabase.from("student_leaves").select("*").eq("student_id", String(studentId)).order("created_at", { ascending: false }),
-      supabase.from("event_leaves").select("*").order("created_at", { ascending: false })
+    const studentLeavesTable = isKibar ? "kibar_student_leaves" : "student_leaves";
+    const eventLeavesTable = isKibar ? "kibar_event_leaves" : "event_leaves";
+    
+    const [studentRes, parentRes, eventRes] = await Promise.all([
+      supabase.from(studentLeavesTable).select("*").in("student_id", uniqueIds).order("created_at", { ascending: false }),
+      user?.id ? supabase.from(studentLeavesTable).select("*").eq("parent_id", user.id).order("created_at", { ascending: false }) : { data: [] },
+      supabase.from(eventLeavesTable).select("*").in("student_id", uniqueIds).order("created_at", { ascending: false })
     ]);
-    const studentLeaves = studentRes.data || [];
+
+    const combinedStudentLeaves = [...(studentRes.data || []), ...(parentRes.data || [])];
+    const seen = new Set();
+    const uniqueStudentLeaves = combinedStudentLeaves.filter(l => {
+      const lid = String(l.id);
+      if (seen.has(lid)) return false;
+      seen.add(lid);
+      return true;
+    });
+
     const eventLeaves = eventRes.data || [];
     const leaves = [
-      ...studentLeaves.map((l) => ({
+      ...uniqueStudentLeaves.map((l) => ({
         kind: "student",
         id: "s-" + l.id,
+        rawId: l.id,
         title: l.leave_type || "Leave",
         dateFrom: l.from_date || l.leave_date,
         dateTo: l.to_date || l.leave_date,
@@ -4494,6 +4932,7 @@ function useParentLeaveData(studentId) {
       ...eventLeaves.map((l) => ({
         kind: "event",
         id: "e-" + l.id,
+        rawId: l.id,
         title: l.event_name || "School Event",
         dateFrom: l.from_date,
         dateTo: l.to_date,
@@ -4505,15 +4944,15 @@ function useParentLeaveData(studentId) {
       }))
     ];
     setData({ leaves, loading: false });
-  }, [studentId]);
+  }, [studentProfileOrId, isKibar]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   return { ...data, refresh: fetchData };
 }
 
-function ParentLeaveHistory({ studentProfile, showAction }) {
-  const { leaves, loading } = useParentLeaveData(studentProfile?.student_id);
+function ParentLeaveHistory({ studentProfile, showAction, isKibar = false }) {
+  const { leaves, loading } = useParentLeaveData(studentProfile, isKibar);
   const [expanded, setExpanded] = useState(null);
   const months = useMemo(() => groupLeavesByMonth(leaves), [leaves]);
   const totalLeaves = leaves.length;
@@ -5100,6 +5539,9 @@ function WacChatAvatar({ photo, name = "Admin Support" }) {
 }
 
 function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], forceOpen = false, adminAvatar = "", autoOpenLeaveId = null, onAutoOpenLeaveConsumed = null }) {
+  const sectionKibar = getSectionScope() === 'kibar';
+  const LEAVES_TABLE = sectionKibar ? 'kibar_student_leaves' : 'student_leaves';
+  const EVENT_LEAVES_TABLE = sectionKibar ? 'kibar_event_leaves' : 'event_leaves';
   const [leaveType, setLeaveType] = useState("");
   const [reason, setReason] = useState("");
   const [attachment, setAttachment] = useState(null);
@@ -5190,7 +5632,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
     
     try {
       const { error } = await supabase
-        .from('student_leaves')
+        .from(LEAVES_TABLE)
         .update({ messages: updatedMessages })
         .eq('id', chatLeave.id);
       if (error) throw error;
@@ -5477,13 +5919,13 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
   // Real-time subscription so admin replies appear instantly without refresh
   useEffect(() => {
-    const studentId = studentProfile?.student_id;
+    const studentId = studentProfile?.student_id || studentProfile?.id || studentProfile?.ITS || studentProfile?.its || studentProfile?.user_id;
     if (!studentId) return;
     const channel = supabase
       .channel('parent-leaves-realtime')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'student_leaves', filter: `student_id=eq.${studentId}` },
+        { event: '*', schema: 'public', table: LEAVES_TABLE },
         (payload) => {
           const updatedRow = payload.new;
           if (!updatedRow) return;
@@ -5502,32 +5944,64 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
       // subscribe() returns a Channel (not a Promise), so it has no .catch()
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [studentProfile?.student_id]);
+  }, [studentProfile?.student_id, studentProfile?.id, LEAVES_TABLE]);
 
   // Reliable fallback: poll while this page is visible so new messages
   // and status changes always appear without a manual refresh.
   useEffect(() => {
     if (!studentProfile) return;
     const poll = async () => {
-      const { data } = await supabase
-        .from('student_leaves')
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      const candidateIds = [
+        studentProfile?.student_id,
+        studentProfile?.id,
+        studentProfile?.user_id,
+        studentProfile?.ITS,
+        studentProfile?.its,
+        studentProfile?.its_number,
+        ...(studentProfile?.allIds || []),
+        user?.id
+      ].filter(Boolean).map(String);
+      const uniqueIds = [...new Set(candidateIds)];
+      if (uniqueIds.length === 0) return;
+
+      const { data: byStudent } = await supabase
+        .from(LEAVES_TABLE)
         .select('*')
-        .eq('student_id', String(studentProfile.student_id))
+        .in('student_id', uniqueIds)
         .order('created_at', { ascending: false });
-      if (!data) return;
-      setHistory(data);
-      setChatLeave(prev => {
-        if (!prev) return prev;
-        const fresh = data.find(l => String(l.id) === String(prev.id));
-        return fresh ? { ...prev, ...fresh } : prev;
+
+      let combined = byStudent || [];
+      if (user?.id) {
+        const { data: byParent } = await supabase
+          .from(LEAVES_TABLE)
+          .select('*')
+          .eq('parent_id', user.id)
+          .order('created_at', { ascending: false });
+        if (byParent) combined = [...combined, ...byParent];
+      }
+
+      const seen = new Set();
+      const deduped = combined.filter(l => {
+        const lid = String(l.id);
+        if (seen.has(lid)) return false;
+        seen.add(lid);
+        return true;
       });
+
+      if (deduped.length > 0) {
+        setHistory(deduped);
+        setChatLeave(prev => {
+          if (!prev) return prev;
+          const fresh = deduped.find(l => String(l.id) === String(prev.id));
+          return fresh ? { ...prev, ...fresh } : prev;
+        });
+      }
     };
-    // Realtime (parent-leaves-realtime) pushes instant updates; this poll is
-    // only a safety net (8s — cheap single-doc read) in case realtime is
-    // unavailable, so the chat still stays responsive without hammering Firestore.
     const interval = setInterval(poll, 8000);
     return () => clearInterval(interval);
-  }, [studentProfile?.student_id]);
+  }, [studentProfile?.student_id, studentProfile?.id, LEAVES_TABLE]);
 
   // Lock background scrolling while the chat is open so only the chat
   // messages area scrolls (WhatsApp-style fullscreen chat on all devices).
@@ -5566,31 +6040,51 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
   const fetchHistory = async () => {
     if (!studentProfile) return;
     setLoadingHistory(true);
-    console.log("Parent: Fetching history for student:", studentProfile.student_id);
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // Fetch by student_id (string conversion for safety)
-    const { data, error } = await supabase
-      .from('student_leaves')
-      .select('*')
-      .eq('student_id', String(studentProfile.student_id))
-      .order('created_at', { ascending: false });
+    const candidateIds = [
+      studentProfile?.student_id,
+      studentProfile?.id,
+      studentProfile?.user_id,
+      studentProfile?.ITS,
+      studentProfile?.its,
+      studentProfile?.its_number,
+      ...(studentProfile?.allIds || []),
+      user?.id
+    ].filter(Boolean).map(String);
 
-    if (error) {
-      console.error("Parent History Error:", error);
-      // Fallback: try by parent_id if student_id check fails
-      const { data: fallbackData } = await supabase
-        .from('student_leaves')
+    const uniqueIds = [...new Set(candidateIds)];
+    let allLeaves = [];
+
+    if (uniqueIds.length > 0) {
+      const { data: byStudent } = await supabase
+        .from(LEAVES_TABLE)
         .select('*')
-        .eq('parent_id', user?.id)
+        .in('student_id', uniqueIds)
         .order('created_at', { ascending: false });
-      
-      if (fallbackData) setHistory(fallbackData);
-    } else {
-      setHistory(data || []);
+      if (byStudent) allLeaves.push(...byStudent);
     }
-    historyStudentRef.current = String(studentProfile.student_id);
+
+    if (user?.id) {
+      const { data: byParent } = await supabase
+        .from(LEAVES_TABLE)
+        .select('*')
+        .eq('parent_id', user.id)
+        .order('created_at', { ascending: false });
+      if (byParent) allLeaves.push(...byParent);
+    }
+
+    const seen = new Set();
+    const deduped = allLeaves.filter(l => {
+      const lid = String(l.id);
+      if (seen.has(lid)) return false;
+      seen.add(lid);
+      return true;
+    });
+
+    setHistory(deduped);
+    historyStudentRef.current = String(studentProfile?.student_id || studentProfile?.id || user?.id);
     setLoadingHistory(false);
   };
 
@@ -5621,10 +6115,18 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
     setIsSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error: dbErr } = await supabase.from('student_leaves').insert({
-        student_id: studentProfile?.student_id,
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      const sId = studentProfile?.student_id || studentProfile?.ITS || studentProfile?.its || studentProfile?.id || studentProfile?.user_id || user?.id;
+      const sName = studentProfile?.name || studentProfile?.full_name || "Student";
+      const targetSection = sectionKibar ? "kibar" : "atfal";
+      const targetAdminRole = sectionKibar ? "kibar-admin" : "admin";
+
+      const { error: dbErr } = await supabase.from(LEAVES_TABLE).insert({
+        student_id: String(sId),
         parent_id: user?.id,
+        user_id: user?.id,
+        student_name: sName,
         leave_type: leaveType,
         reason: reason,
         attachment_url: attachment,
@@ -5632,7 +6134,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         from_date: fromGreg,
         to_date: tillGreg,
         status: 'Pending',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        section: targetSection
       });
       if (dbErr) throw dbErr;
 
@@ -5643,19 +6146,27 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
       await broadcastNotification(
         `Leave Application 📋`,
-        `${studentProfile?.name} has applied for leave (${leaveType})${miqaatName ? `: ${miqaatName}` : ""}. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
-        "admin",
+        `${sName} has applied for leave (${leaveType})${miqaatName ? `: ${miqaatName}` : ""}. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
+        targetAdminRole,
         null,
-        "Leave Management"
+        "Leave Management",
+        {
+          redirectPage: "Leave Management",
+          section: targetSection,
+          studentId: String(sId),
+        },
+        targetSection
       );
 
       // Also notify the student's teacher (resolve reliably from the DB so the
       // teacher always gets the leave notification for their group child).
       try {
-        const sidRef = studentProfile?.student_id || studentProfile?.allIds?.[0];
+        const sidRef = studentProfile?.student_id || studentProfile?.allIds?.[0] || sId;
+        const childTable = sectionKibar ? "kibar_child_profiles" : "child_profiles";
+        const teacherTable = sectionKibar ? "kibar_teacher_profiles" : "teacher_profiles";
         if (sidRef) {
           const { data: childRow } = await supabase
-            .from("child_profiles")
+            .from(childTable)
             .select("teacher_id, original_teacher_id, badal_teacher_id")
             .eq("student_id", String(sidRef))
             .maybeSingle();
@@ -5670,9 +6181,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
           if (teacherIdField) {
             let teacherTarget = null;
-            // teacher_id may hold either the teacher profile id or the auth user_id
             const { data: teacherRow } = await supabase
-              .from("teacher_profiles")
+              .from(teacherTable)
               .select("id, user_id")
               .or(`id.eq.${teacherIdField},user_id.eq.${teacherIdField}`)
               .maybeSingle();
@@ -5681,7 +6191,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
             if (!teacherTarget && normalizeText) {
               const nameMatch = (studentProfile?.teacherName || "").trim();
               const { data: byName } = await supabase
-                .from("teacher_profiles")
+                .from(teacherTable)
                 .select("id, user_id, full_name")
                 .limit(1000);
               const found = (byName || []).find(t => normalizeText(t.full_name) === normalizeText(nameMatch));
@@ -5691,10 +6201,16 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
             if (teacherTarget) {
               await broadcastNotification(
                 `Leave Application 📋`,
-                `${studentProfile?.name} (${leaveType})${miqaatName ? `: ${miqaatName}` : ""} has applied for leave. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
-                "user",
+                `${sName} (${leaveType})${miqaatName ? `: ${miqaatName}` : ""} has applied for leave. Dates: ${leaveWindowLabel}. Reason: ${reason || 'Not provided'}`,
+                sectionKibar ? "kibar-teacher" : "teacher",
                 teacherTarget,
-                "Leave Management"
+                "Leave Management",
+                {
+                  redirectPage: "Leave Management",
+                  section: targetSection,
+                  studentId: String(sId)
+                },
+                targetSection
               );
             }
           }
@@ -5703,7 +6219,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         console.warn("Could not notify teacher about leave:", tErr);
       }
 
-      showAction("success", "Leave applied successfully!");setLeaveType("");
+      showAction("success", "Leave applied successfully!");
+      setLeaveType("");
       setReason("");
       setAttachment(null);
       setMiqaatEvent("");
@@ -5737,7 +6254,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
 
       try {
         const { error } = await supabase
-          .from('student_leaves')
+          .from(LEAVES_TABLE)
           .update({ messages: updatedMessages })
           .eq('id', chatLeave.id);
         if (error) throw error;
@@ -5773,7 +6290,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
     try {
       const existing = chatLeave.messages || [];
       const { error } = await supabase
-        .from('student_leaves')
+        .from(LEAVES_TABLE)
         .update({ messages: [...existing, newMsg] })
         .eq('id', chatLeave.id);
       if (error) throw error;
@@ -6522,6 +7039,110 @@ function ParentPortal({
   const [activeCall, setActiveCall] = useState(null);
   const [activeSessions, setActiveSessions] = useState({});
 
+  const handleParentStartCall = async (child) => {
+    const childSessionId = `session_${child.student_id}`;
+    const studentName = child.name || child.full_name || "Student";
+    const teacherName = child.teacherName || child.teacher_name || "Muhaffiz";
+    const roomId = childSessionId;
+
+    const activeSession = activeSessions[childSessionId];
+    if (activeSession) {
+      setActiveCall({
+        roomId,
+        role: "callee",
+        myName: studentName,
+        peerName: teacherName,
+        myRole: "parent",
+        startedAt: activeSession.started_at || new Date().toISOString()
+      });
+      return;
+    }
+
+    const startedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from('online_tahfeez_sessions')
+      .insert({
+        id: roomId,
+        started_by: "parent",
+        started_at: startedAt,
+        type: "1-on-1",
+        student_id: String(child.student_id),
+        student_name: studentName,
+        teacher_name: teacherName,
+      });
+
+    if (error) {
+      if (showAction) showAction("error", "Failed to start call session: " + error.message);
+      return;
+    }
+
+    setActiveCall({
+      roomId,
+      role: "caller",
+      myName: studentName,
+      peerName: teacherName,
+      myRole: "parent",
+      startedAt
+    });
+  };
+
+  const handleParentJoinGroupClass = async (child) => {
+    if (!child.groupName) return;
+    const groupRoomId = `mouze-tahfeez-group-${child.groupName.replace(/\s+/g, '-').toLowerCase()}`;
+    const activeGroupSession = activeSessions[groupRoomId];
+    if (!activeGroupSession) {
+      if (showAction) showAction("error", "Group class is not currently live.");
+      return;
+    }
+
+    const studentName = child.name || child.full_name || "Student";
+    const teacherName = activeGroupSession.teacher_name || "Muhaffiz";
+
+    setActiveCall({
+      roomId: groupRoomId,
+      role: "callee",
+      myName: studentName,
+      peerName: teacherName,
+      myRole: "parent",
+      startedAt: activeGroupSession.started_at || new Date().toISOString()
+    });
+  };
+
+  const handleCallClose = async () => {
+    if (activeCall) {
+      const { roomId, role, startedAt } = activeCall;
+      if (role === "caller") {
+        const endedAt = new Date().toISOString();
+        const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000);
+        const activeSession = activeSessions[roomId];
+        if (activeSession) {
+          try {
+            await supabase
+              .from('online_tahfeez_logs')
+              .insert({
+                student_id: activeSession.student_id || null,
+                student_name: activeSession.student_name || null,
+                teacher_id: activeSession.teacher_id || null,
+                teacher_name: activeSession.teacher_name || null,
+                started_at: activeSession.started_at || startedAt,
+                ended_at: endedAt,
+                duration_seconds: durationSeconds,
+                type: activeSession.type || "1-on-1",
+                group_name: activeSession.group_name || null
+              });
+          } catch (e) {
+            console.error("Failed to write online tahfeez log:", e);
+          }
+        }
+        await supabase
+          .from('online_tahfeez_sessions')
+          .delete()
+          .eq('id', roomId);
+      }
+      setActiveCall(null);
+    }
+  };
+
   useEffect(() => {
     if (activePage !== "Online Tahfeez") return;
 
@@ -6647,21 +7268,33 @@ function ParentPortal({
     };
   }, [fetchPageVisibility]);
 
-  // Fetch self_jadwal data for read-only view (parent sees child's jadwal)
+  // Fetch self_jadwal data for read-only view (parent/student sees child/self jadwal)
   const fetchReadJadwal = useCallback(async () => {
-    const childUserId = parentData?.studentProfile?.parent_user_id || parentData?.studentProfile?.user_id;
-    if (!childUserId) return;
+    const candidateIds = [
+      parentData?.studentProfile?.user_id,
+      parentData?.studentProfile?.id,
+      parentData?.studentProfile?.student_id,
+      parentData?.studentProfile?.parent_user_id,
+      user?.id
+    ].filter(Boolean).map(String);
+    const uniqueIds = [...new Set(candidateIds)];
+    if (uniqueIds.length === 0) {
+      setReadJadwalLoading(false);
+      return;
+    }
     setReadJadwalLoading(true);
-    const { data, error } = await supabase
+    const { data: records, error } = await supabase
       .from('self_jadwal')
-      .select('schedule_data, has_unseen_changes')
-      .eq('user_id', childUserId)
-      .single();
+      .select('schedule_data, has_unseen_changes, updated_at')
+      .in('user_id', uniqueIds)
+      .order('updated_at', { ascending: false });
+
+    const data = records && records.length > 0 ? records[0] : null;
     if (error && error.code !== 'PGRST116') {
       console.error('Failed to fetch Self Jadwal:', error);
     } else if (data && data.schedule_data) {
       const defaultSchedule = {};
-      ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'].forEach(day => {
+      ['SATURDAY','SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY'].forEach(day => {
         defaultSchedule[day] = { juz1: '', juz2: '', juz3: '', juz4: '', murajah: '', juzhali: '', jadeed: '', star: '' };
       });
       setReadJadwalData({ ...defaultSchedule, ...data.schedule_data, _mode: undefined, _editHistory: undefined });
@@ -6675,7 +7308,7 @@ function ParentPortal({
       setReadJadwalUnseen(false);
     }
     setReadJadwalLoading(false);
-  }, [parentData?.studentProfile?.parent_user_id, parentData?.studentProfile?.user_id, selfJadwalRefreshKey]);
+  }, [parentData?.studentProfile, user?.id, selfJadwalRefreshKey]);
 
   useEffect(() => {
     fetchReadJadwal();
@@ -6683,24 +7316,43 @@ function ParentPortal({
 
   // Mark as viewed when opening
   useEffect(() => {
-    const childUserId = parentData?.studentProfile?.parent_user_id || parentData?.studentProfile?.user_id;
-    if (activePage === "Jadwal" && childUserId && readJadwalUnseen) {
-      supabase.from('self_jadwal').update({ has_unseen_changes: false }).eq('user_id', childUserId).then(() => setReadJadwalUnseen(false));
+    const candidateIds = [
+      parentData?.studentProfile?.user_id,
+      parentData?.studentProfile?.id,
+      parentData?.studentProfile?.student_id,
+      parentData?.studentProfile?.parent_user_id,
+      user?.id
+    ].filter(Boolean).map(String);
+    const uniqueIds = [...new Set(candidateIds)];
+    if (activePage === "Jadwal" && uniqueIds.length > 0 && readJadwalUnseen) {
+      supabase.from('self_jadwal').update({ has_unseen_changes: false }).in('user_id', uniqueIds).then(() => setReadJadwalUnseen(false));
     }
-  }, [activePage, parentData?.studentProfile?.parent_user_id, parentData?.studentProfile?.user_id, readJadwalUnseen]);
+  }, [activePage, parentData?.studentProfile, user?.id, readJadwalUnseen]);
 
   // Real-time subscription for instant updates
   useEffect(() => {
-    const childUserId = parentData?.studentProfile?.parent_user_id || parentData?.studentProfile?.user_id;
-    if (!childUserId) return;
+    const candidateIds = [
+      parentData?.studentProfile?.user_id,
+      parentData?.studentProfile?.id,
+      parentData?.studentProfile?.student_id,
+      parentData?.studentProfile?.parent_user_id,
+      user?.id
+    ].filter(Boolean).map(String);
+    if (candidateIds.length === 0) return;
     const channel = supabase.channel('self-jadwal-realtime')
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'self_jadwal', filter: `user_id=eq.${childUserId}` },
-        () => { setSelfJadwalRefreshKey(k => k + 1); setReadJadwalUnseen(true); }
+        { event: '*', schema: 'public', table: 'self_jadwal' },
+        (payload) => {
+          const row = payload.new || payload.old;
+          if (!row || candidateIds.includes(String(row.user_id)) || candidateIds.includes(String(row.student_id))) {
+            setSelfJadwalRefreshKey(k => k + 1);
+            setReadJadwalUnseen(true);
+          }
+        }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [parentData?.studentProfile?.parent_user_id, parentData?.studentProfile?.user_id]);
+  }, [parentData?.studentProfile, user?.id]);
 
   const openNotificationDetail = (event, notification) => {
     event?.preventDefault?.();
@@ -6729,6 +7381,27 @@ function ParentPortal({
   };
 
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData || {};
+
+  const isKibarStudent = portalRole === "kibar-student" ||
+    getSectionScope() === "kibar" ||
+    studentProfile?.section === "kibar" ||
+    String(studentProfile?.id || "").startsWith("kibar") ||
+    studentProfile?.is_kibar === true ||
+    studentProfile?.is_kibar_student === true ||
+    user?.user_metadata?.portal_role === "kibar-student" ||
+    user?.user_metadata?.role === "kibar-student" ||
+    getAssignedRoles(user).includes("kibar-student") ||
+    (() => {
+      try {
+        const cachedRole = localStorage.getItem(STORAGE_KEYS.cachedAuth);
+        if (cachedRole && (cachedRole.includes("kibar-student") || cachedRole.includes("kibar"))) return true;
+        const storedRole = localStorage.getItem("mauze-portal-role");
+        if (storedRole && storedRole.includes("kibar")) return true;
+        const portalCache = localStorage.getItem("mauze_portal_cache");
+        if (portalCache && portalCache.includes("kibar-student")) return true;
+      } catch (_) {}
+      return typeof window !== "undefined" && window.location?.href?.includes("kibar");
+    })();
 
   // Fetch archive results when viewing Results Archive
   useEffect(() => {
@@ -7096,15 +7769,15 @@ function ParentPortal({
                   <div className="tahfeez-actions">
                     <button
                       className="tahfeez-btn primary"
-                      onClick={() => {}}
+                      onClick={() => handleParentStartCall(child)}
                     >
-                      <Video size={16} /> 1-on-1 Call
+                      <Video size={16} /> {activeSessions[`session_${child.student_id}`] ? "Join 1-on-1 Call" : "1-on-1 Call"}
                     </button>
 
                     {child.groupName && (
                       <button
-                        className="tahfeez-btn secondary"
-                        onClick={() => {}}
+                        className={`tahfeez-btn ${activeSessions[`mouze-tahfeez-group-${child.groupName.replace(/\s+/g, '-').toLowerCase()}`] ? "primary pulse" : "secondary"}`}
+                        onClick={() => handleParentJoinGroupClass(child)}
                       >
                         Group Class
                       </button>
@@ -7126,10 +7799,10 @@ function ParentPortal({
 
       <aside className={`parent-drawer ${menuOpen ? 'open' : ''}`}>
         <SidebarHeader
-          photoUrl={studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"}
+          photoUrl={studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || (isKibarStudent ? "/kibar-logo.png" : "/logo.png")}
           name={studentProfile?.name || "Student"}
           arabicName={studentProfile?.arabic_name}
-          tag={`ITS: ${studentProfile?.its || "..."}`}
+          tag={isKibarStudent ? `Tahfeez al Kibar · ITS: ${studentProfile?.its || "..."}` : `ITS: ${studentProfile?.its || "..."}`}
         />
         <button className="drawer-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
 
@@ -7215,9 +7888,9 @@ function ParentPortal({
           )}
         </nav>
         <div className="drawer-footer">
-          {assignedRoles.filter(r => r !== 'parents').map((role) => (
+          {assignedRoles.filter(r => r !== 'parents' && r !== 'kibar-student').map((role) => (
             <button key={role} className="drawer-link" onClick={() => { onRoleChange(role); setMenuOpen(false); }}>
-              <LogOut size={18} /> Switch to {role}
+              <LogOut size={18} /> Switch to {ROLE_LABELS[role] || role}
             </button>
           ))}
           <button className="drawer-link logout" onClick={onLogout}>
@@ -7226,27 +7899,71 @@ function ParentPortal({
         </div>
       </aside>
 
-<header className="parent-topbar">
-        <div className="parent-topbar-left">
-          <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
-            <Menu size={22} />
-          </button>
-          <img
-            src={studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || "/logo.png"}
-            alt={studentProfile?.name || "Child"}
-            className="topbar-logo parent-topbar-dp"
-            onError={(e) => { e.target.src = "/logo.png"; }}
-          />
-          <div className="parent-topbar-brand-wrap">
-            <span className="topbar-brand">Rawdat Tahfeez al Atfal-Galiakot</span>
-            <span className="topbar-sub">Parents Portal</span>
+        <header className="parent-topbar">
+          <div className="parent-topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
+              <Menu size={22} />
+            </button>
+            {(() => {
+              const photo = cleanPhotoUrl(studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || studentProfile?.photo || "");
+              if (photo) {
+                return (
+                  <img
+                    src={photo}
+                    alt={studentProfile?.name || studentProfile?.full_name || "Student"}
+                    className="topbar-logo parent-topbar-dp"
+                    style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = isKibarStudent ? "/kibar-logo.png" : "/logo.png";
+                    }}
+                  />
+                );
+              }
+              if (isKibarStudent) {
+                return (
+                  <img
+                    src="/kibar-logo.png"
+                    alt="Tahfeez al Kibar"
+                    className="topbar-logo parent-topbar-dp"
+                    style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "/logo.png";
+                    }}
+                  />
+                );
+              }
+              return (
+                <img
+                  src="/logo.png"
+                  alt="Rawdat Tahfeez"
+                  className="topbar-logo parent-topbar-dp"
+                  style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
+                />
+              );
+            })()}
+            <div className="parent-topbar-brand-wrap" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>
+              {isKibarStudent ? (
+                <>
+                  <span className="topbar-brand topbar-brand-kibar">Tahfeez al Kibar</span>
+                  <span className="topbar-sub topbar-sub-kibar" style={{ fontSize: '0.70rem', letterSpacing: '0.08em', fontWeight: 700 }}>
+                    {(activePage || "Home").toUpperCase()}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="topbar-brand">Rawdat Tahfeez al Atfal-Galiakot</span>
+                  <span className="topbar-sub">Parents Portal</span>
+                </>
+              )}
+            </div>
           </div>
-        </div>
 
-        <button className="topbar-logout-btn" onClick={onLogout} title="Logout">
-          <Power size={22} />
-        </button>
-      </header>
+          <button className="topbar-logout-btn" onClick={onLogout} title="Logout">
+            <Power size={22} />
+          </button>
+        </header>
 
       <main className="parent-main">
         {actionMessage && (
@@ -7348,45 +8065,162 @@ function ParentPortal({
               />
             )}
 
-            <div className="dashboard-section" style={{ marginBottom: '20px' }}>
-              <div className="section-header">
-                <Bell size={18} />
-                <h3>Active Notifications</h3>
-              </div>
-              <div className="announcement-list">
-                {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
-                  const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
-                  return (
-                    <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', position: 'relative' }} onClick={(e) => openNotificationDetail(e, news)}>
-                      <button 
-                        className="card-dismiss-btn" 
-                        title="Clear from home" 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          onDismissHomeNotif(news.id); 
-                        }}
-                      >
-                        <X size={14} />
-                      </button>
-                      <div style={{ paddingRight: '48px' }}>
-                        <div className="news-meta">
-                          <span className="tag update">
-                            Alert
-                          </span>
-                          <span className="date">{new Date(news.created_at).toLocaleDateString()}</span>
-                        </div>
-                        <h4>{news.title}</h4>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                          {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
+              <div style={{ width: '100%', marginBottom: '24px' }}>
+                {/* Notification Section Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                    <div style={{
+                      width: '34px', height: '34px', borderRadius: '10px',
+                      background: 'linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.07))',
+                      border: '1px solid rgba(212,175,55,0.28)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                    }}>
+                      <Bell size={17} style={{ color: 'var(--primary-gold)' }} />
+                    </div>
+                    <div>
+<h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--deep-brown)', lineHeight: 1.2 }}>Active Notifications</h3>
+                        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--soft-brown)', opacity: 0.8 }}>
+                          {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id) && new Date(n.created_at).toDateString() === new Date().toDateString()).length} unread
                         </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setActivePage('Inbox'); setMenuOpen && setMenuOpen(false); }}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(212,175,55,0.15), rgba(212,175,55,0.07))',
+                      border: '1px solid rgba(212,175,55,0.3)', borderRadius: '10px',
+                      padding: '6px 13px', color: 'var(--primary-gold)', fontWeight: 700, fontSize: '0.75rem',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'transform 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    <Bell size={13} /> Open Page
+                  </button>
+                </div>
+                {/* Notification Cards */}
+                {(() => {
+                  const activeNotifs = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id) && new Date(n.created_at).toDateString() === new Date().toDateString()).slice(0, 1);
+                  if (activeNotifs.length === 0) {
+                    return (
+                      <div style={{
+                        padding: '22px 16px', borderRadius: '14px', textAlign: 'center',
+                        background: 'rgba(255,255,255,0.5)', border: '1px dashed rgba(212,175,55,0.25)'
+                      }}>
+                        <Bell size={28} style={{ color: 'var(--primary-gold)', opacity: 0.3, marginBottom: '8px' }} />
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--soft-brown)', fontWeight: 600 }}>No active notifications</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>You're all caught up!</p>
                       </div>
+                    );
+                  }
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {activeNotifs.map((notif, idx) => {
+                        const timeAgo = (() => {
+                          const diff = Date.now() - new Date(notif.created_at).getTime();
+                          const mins = Math.floor(diff / 60000);
+                          const hrs = Math.floor(mins / 60);
+                          const days = Math.floor(hrs / 24);
+                          if (days > 0) return days + 'd ago';
+                          if (hrs > 0) return hrs + 'h ago';
+                          if (mins > 0) return mins + 'm ago';
+                          return 'Just now';
+                        })();
+                        const isUrgent = notif.type === 'urgent';
+                        const isSuccess = notif.type === 'success';
+                        const typeColor = isUrgent ? '#e74c3c' : isSuccess ? '#27ae60' : 'var(--primary-gold)';
+                        const typeBg = isUrgent ? 'rgba(231,76,60,0.08)' : isSuccess ? 'rgba(39,174,96,0.08)' : 'rgba(212,175,55,0.08)';
+                        const typeBorder = isUrgent ? 'rgba(231,76,60,0.22)' : isSuccess ? 'rgba(39,174,96,0.22)' : 'rgba(212,175,55,0.22)';
+                        return (
+                          <div key={notif.id || idx} style={{
+                            borderRadius: '14px', overflow: 'hidden', position: 'relative',
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.97), rgba(255,252,245,0.92))',
+                            border: `1px solid ${typeBorder}`,
+                            boxShadow: '0 2px 12px rgba(0,0,0,0.05)'
+                          }}>
+                            {/* Colored accent bar */}
+                            <div style={{ height: '3px', background: `linear-gradient(90deg, ${typeColor}, ${typeColor}88)` }} />
+                            <div style={{ padding: '12px 14px' }}>
+                              {/* Top: icon + title + time */}
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                <div style={{
+                                  width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+                                  background: typeBg, border: `1px solid ${typeBorder}`,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px'
+                                }}>
+                                  <Bell size={15} style={{ color: typeColor }} />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                                    <span style={{
+                                      fontSize: '0.88rem', fontWeight: 800, color: 'var(--primary-dark)',
+                                      flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                    }}>{notif.title}</span>
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>{timeAgo}</span>
+                                  </div>
+                                  <p style={{
+                                    margin: '0 0 10px', fontSize: '0.8rem', color: 'var(--soft-brown)',
+                                    lineHeight: '1.45', display: '-webkit-box', WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                                  }}>{notif.body}</p>
+                                  {/* Action row */}
+<div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+                                        <button
+                                          onClick={(e) => openNotificationDetail(e, notif)}
+                                          style={{
+                                            background: `linear-gradient(135deg, ${typeColor}22, ${typeColor}11)`,
+                                            border: `1px solid ${typeBorder}`,
+                                            borderRadius: '8px', padding: '5px 12px',
+                                            color: typeColor, fontWeight: 700, fontSize: '0.72rem',
+                                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'transform 0.15s'
+                                          }}
+                                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                        >
+                                          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+                                          Open
+                                        </button>
+                                        {notif.redirect_page && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              let targetPage = notif.redirect_page;
+                                              if (targetPage.startsWith("Jadwal")) {
+                                                const parts = targetPage.split(":");
+                                                if (parts[1]) {
+                                                  onSelectChild(parts[1]);
+                                                }
+                                                targetPage = "Jadwal";
+                                              }
+                                              setActivePage(resolveRedirectPage(targetPage, "parents"));
+                                            }}
+                                            style={{
+                                              background: 'rgba(0,0,0,0.04)', border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)',
+                                              borderRadius: '8px', padding: '5px 10px',
+                                              fontWeight: 700, fontSize: '0.72rem',
+                                              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'background 0.15s'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,175,55,0.12)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                                            title="Go to page"
+                                          >
+                                            <ChevronRight size={11} /> GO TO PAGE
+                                          </button>
+                                        )}
+                                        <span style={{ marginLeft: 'auto', background: typeBg, color: typeColor, border: `1px solid ${typeBorder}`, borderRadius: '5px', padding: '1px 7px', fontSize: '0.63rem', fontWeight: 700, textTransform: 'capitalize' }}>
+                                          {notif.type || 'alert'}
+                                        </span>
+                                      </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
-                })() : (
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
-                )}
+                })()}
               </div>
-            </div>
 
             <PremiumTodaySchedule
               schedule={pages.Schedule.schedule}
@@ -7563,7 +8397,7 @@ function ParentPortal({
         )}
 
         {activePage === "Leave History" && (
-          <ParentLeaveHistory studentProfile={studentProfile} showAction={showAction} />
+          <ParentLeaveHistory studentProfile={studentProfile} showAction={showAction} isKibar={getSectionScope() === 'kibar'} />
         )}
 
         {activePage === "Child Summary" ? (
@@ -7753,7 +8587,7 @@ function ParentPortal({
                 <Calendar size={24} style={{ color: 'var(--primary-gold)' }} />
                 <div>
                   <h2>Read Jadwal</h2>
-                  <p className="pj-subtitle">Self Jadwal Schedule — {user?.email || "read-only view"}</p>
+                  <p className="pj-subtitle">Self Jadwal Schedule — {studentProfile?.name || studentProfile?.full_name || "Student"}</p>
                 </div>
               </div>
               <div className="pj-days-track">
@@ -7794,6 +8628,7 @@ function ParentPortal({
               userEmail={user?.email}
               showAction={showAction}
               onBroadcastNotification={broadcastNotification}
+              studentProfile={studentProfile}
             />
           </Suspense>
         ) : null}
@@ -8453,12 +9288,22 @@ function ParentPortal({
           ))}
         </nav>
       )}
+      {activeCall && (
+        <VideoCall
+          call={activeCall}
+          onClose={handleCallClose}
+        />
+      )}
     </div>
   );
 }
 
 
 function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], autoOpenLeaveId = null, onAutoOpenLeaveConsumed = null }) {
+  const sectionKibar = getSectionScope() === 'kibar';
+  const LEAVES_TABLE = sectionKibar ? 'kibar_student_leaves' : 'student_leaves';
+  const EVENT_LEAVES_TABLE = sectionKibar ? 'kibar_event_leaves' : 'event_leaves';
+
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Pending");
@@ -8469,9 +9314,15 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
   const [activeMenuMsg, setActiveMenuMsg] = useState(null); // { msg, idx }
   const [approveDropdown, setApproveDropdown] = useState(null); // leave.id or null
   const [sendingAction, setSendingAction] = useState(null); // id being processed
-  const chatBodyRef = useRef(null);
-  const chatPeerStudent = chatModal ? (students.find(s => s.allIds.includes(String(chatModal.student_id))) || {}) : {};
-  const chatPeerName = chatPeerStudent.name || "Parent Chat";
+  const chatPeerStudent = chatModal ? (students.find(s =>
+    (s.allIds && s.allIds.includes(String(chatModal.student_id))) ||
+    String(s.student_id) === String(chatModal.student_id) ||
+    String(s.id) === String(chatModal.student_id) ||
+    String(s.user_id) === String(chatModal.student_id) ||
+    String(s.its) === String(chatModal.student_id) ||
+    String(s.its_number) === String(chatModal.student_id)
+  ) || {}) : {};
+  const chatPeerName = chatPeerStudent.name || chatPeerStudent.full_name || chatModal.student_name || "Student Chat";
   const chatPeerPhoto = cleanPhotoUrl(chatPeerStudent.photoUrl || chatPeerStudent.photo_url || chatPeerStudent.avatar_url || "");
   const { peerOnline: parentOnline, presenceReady } = useChatPresence(chatModal?.id, "admin");
   const parentOnlineRef = useRef(parentOnline);
@@ -8544,7 +9395,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
     
     try {
       const { error } = await supabase
-        .from('student_leaves')
+        .from(LEAVES_TABLE)
         .update({ messages: updatedMessages })
         .eq('id', chatModal.id);
       if (error) throw error;
@@ -8610,7 +9461,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
 
   useEffect(() => {
     fetchLeaves();
-  }, []);
+  }, [sectionKibar]);
 
   // Auto-scroll chat to the latest message (WhatsApp-style)
   useEffect(() => {
@@ -8625,7 +9476,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
       .channel('admin-leaves-realtime')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'student_leaves' },
+        { event: '*', schema: 'public', table: LEAVES_TABLE },
         (payload) => {
           const updatedRow = payload.new;
           if (!updatedRow) return;
@@ -8643,7 +9494,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [LEAVES_TABLE]);
 
   // Reliable fallback: poll the open chat while it is visible so new
   // messages always appear without a manual refresh.
@@ -8651,7 +9502,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
     if (!chatModal?.id) return;
     const poll = async () => {
       const { data } = await supabase
-        .from('student_leaves')
+        .from(LEAVES_TABLE)
         .select('*')
         .eq('id', chatModal.id)
         .maybeSingle();
@@ -8664,7 +9515,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
     // unavailable, so the chat still stays responsive without hammering Firestore.
     const interval = setInterval(poll, 8000);
     return () => clearInterval(interval);
-  }, [chatModal?.id]);
+  }, [chatModal?.id, LEAVES_TABLE]);
 
   // Lock background scrolling while the chat is open so only the chat
   // messages area scrolls (WhatsApp-style fullscreen chat on all devices).
@@ -8679,7 +9530,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
   const fetchLeaves = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('student_leaves')
+      .from(LEAVES_TABLE)
       .select('*')
       .order('created_at', { ascending: false });
     if (error) {
@@ -8693,12 +9544,19 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
 
   const updateStatus = async (id, newStatus, adminMessage = "") => {
     const leaveToUpdate = leaves.find(l => l.id === id);
-    const student = students.find(s => s.allIds.includes(String(leaveToUpdate?.student_id)));
-    const studentName = student?.name || "your child";
+    const student = students.find(s =>
+      (s.allIds && s.allIds.includes(String(leaveToUpdate?.student_id))) ||
+      String(s.student_id) === String(leaveToUpdate?.student_id) ||
+      String(s.id) === String(leaveToUpdate?.student_id) ||
+      String(s.user_id) === String(leaveToUpdate?.student_id) ||
+      String(s.its) === String(leaveToUpdate?.student_id) ||
+      String(s.its_number) === String(leaveToUpdate?.student_id)
+    ) || {};
+    const studentName = student?.name || student?.full_name || leaveToUpdate?.student_name || "your child";
     setSendingAction(id);
 
     const { error } = await supabase
-      .from('student_leaves')
+      .from(LEAVES_TABLE)
       .update({ status: newStatus, admin_comment: adminMessage || null })
       .eq('id', id);
 
@@ -8715,14 +9573,22 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
 
     onShowAction("success", `Leave ${statusLabel}! Notification sent.`);
 
-    if (leaveToUpdate?.parent_id) {
+    const targetUser = leaveToUpdate?.parent_id || leaveToUpdate?.user_id;
+    if (targetUser) {
       try {
+        const targetSection = sectionKibar ? "kibar" : "atfal";
         await broadcastNotification(
           `Leave ${statusLabel}`,
           notifyBody,
           "user",
-          leaveToUpdate.parent_id,
-          "Apply Leave"
+          targetUser,
+          "Apply Leave",
+          {
+            redirectPage: "Apply Leave",
+            section: targetSection,
+            studentId: String(leaveToUpdate?.student_id || "")
+          },
+          targetSection
         );
       } catch (err) {
         console.error("Leave notification failed:", err);
@@ -8781,7 +9647,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
 
       try {
         const { error } = await supabase
-          .from('student_leaves')
+          .from(LEAVES_TABLE)
           .update({ messages: updatedMessages })
           .eq('id', chatModal.id);
         if (error) throw error;
@@ -8818,7 +9684,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
     try {
       const existing = chatModal.messages || [];
       const { error } = await supabase
-        .from('student_leaves')
+        .from(LEAVES_TABLE)
         .update({ messages: [...existing, newMsg] })
         .eq('id', chatModal.id);
       if (error) throw error;
@@ -9215,11 +10081,19 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
               <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading requests...</p>
             </div>
           ) : filteredLeaves.map(leave => {
-            const student = students.find(s => s.allIds.includes(String(leave.student_id)));
+            const student = students.find(s =>
+              (s.allIds && s.allIds.includes(String(leave.student_id))) ||
+              String(s.student_id) === String(leave.student_id) ||
+              String(s.id) === String(leave.student_id) ||
+              String(s.user_id) === String(leave.student_id) ||
+              String(s.its) === String(leave.student_id) ||
+              String(s.its_number) === String(leave.student_id)
+            ) || {};
             const isIllness = leave.leave_type === "ILLNESS";
             const approveMsgs = getApproveMessages(leave.leave_type);
             const showApproveDropdown = approveDropdown === leave.id;
             const hasMessages = leave.messages && leave.messages.length > 0;
+            const studentDisplayName = student?.name || student?.full_name || leave.student_name || "Student";
 
             return (
               <div
@@ -9246,7 +10120,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {student?.name || "Unknown Student"}
+                        {studentDisplayName}
                       </h4>
                       <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         Applied {new Date(leave.created_at).toLocaleDateString()} &middot; {new Date(leave.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
@@ -10280,6 +11154,50 @@ function AdminPortal({
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [activeCall, setActiveCall] = useState(null);
   const [activeSessions, setActiveSessions] = useState({});
+
+  const handleAdminSpectate = (sess) => {
+    const adminName = portalAccess?.full_name || user?.user_metadata?.full_name || "Admin";
+    const isGroup = sess.type === "group";
+    const peerName = isGroup ? sess.group_name : sess.student_name;
+
+    setActiveCall({
+      roomId: sess.id,
+      role: "callee",
+      myName: adminName,
+      peerName: peerName,
+      myRole: "admin",
+      isSpectator: true,
+      startedAt: sess.started_at || new Date().toISOString()
+    });
+  };
+
+  const handleAdminEndSession = async (sess) => {
+    // Delete session from database
+    await supabase
+      .from('online_tahfeez_sessions')
+      .delete()
+      .eq('id', sess.id);
+
+    // Delete Realtime Database signaling node
+    try {
+      const { getDatabase, ref, update, remove } = await import("firebase/database");
+      const { firebaseApp } = await import("./firebase/config.js");
+      const rtdb = getDatabase(firebaseApp);
+      const signalRef = ref(rtdb, `tahfeez_signals/${sess.id}`);
+      await update(signalRef, { status: "ended" });
+      setTimeout(async () => {
+        try {
+          await remove(signalRef);
+        } catch (_) {}
+      }, 2000);
+    } catch (_) {}
+    
+    if (showAction) showAction("success", "Session ended successfully.");
+  };
+
+  const handleCallClose = () => {
+    setActiveCall(null);
+  };
   const [tahfeezLogs, setTahfeezLogs] = useState([]);
 
   useEffect(() => {
@@ -10662,10 +11580,12 @@ const handleDownloadAllReports = async () => {
   useEffect(() => {
     const fetchOverviewStats = async () => {
       try {
+        const sectionKibar = getSectionScope() === 'kibar';
+        const LEAVES_TABLE = sectionKibar ? 'kibar_student_leaves' : 'student_leaves';
         // Fetch pending leave count for today
         const todayStr = new Date().toISOString().split('T')[0];
         const { count: leaveCount } = await supabase
-          .from('student_leaves')
+          .from(LEAVES_TABLE)
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending')
           .gte('created_at', todayStr);
@@ -11126,14 +12046,14 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                     <button
                       className="tahfeez-btn primary"
                       style={{ background: '#2ecc71', flex: 1 }}
-                      onClick={() => {}}
+                      onClick={() => handleAdminSpectate(sess)}
                     >
                       👁️ Spectate
                     </button>
                     <button
                       className="tahfeez-btn secondary"
                       style={{ border: '1px solid #ff4d4d', color: '#ff4d4d', background: 'transparent' }}
-                      onClick={() => {}}
+                      onClick={() => handleAdminEndSession(sess)}
                     >
                       🛑 End
                     </button>
@@ -11146,6 +12066,13 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
       </div>
     );
   };
+
+  const isKibarAdmin = portalRole === "kibar-admin" ||
+    getSectionScope() === "kibar" ||
+    user?.user_metadata?.portal_role === "kibar-admin" ||
+    user?.user_metadata?.role === "kibar-admin" ||
+    getAssignedRoles(user).includes("kibar-admin") ||
+    (typeof window !== "undefined" && window.location?.href?.includes("kibar"));
 
   return (
     <div className="admin-shell">
@@ -11162,7 +12089,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 photoUrl={photo}
                 name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Admin"}
                 arabicName={portalAccess?.arabic_name || user?.user_metadata?.arabic_name}
-                tag="Management Portal"
+                tag={isKibarAdmin ? "Tahfeez al Kibar — Admin Portal" : "Management Portal"}
               />
             );
           })()}
@@ -11170,6 +12097,62 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
 
         </div>
+        {/* Atfal / Kibar Section Switcher Tab */}
+        <div style={{ padding: "10px 16px 15px", borderBottom: "1px solid var(--glass-border)" }}>
+          <div style={{
+            display: "flex",
+            background: "rgba(0, 0, 0, 0.04)",
+            borderRadius: "8px",
+            padding: "3px",
+            border: "1px solid rgba(0, 0, 0, 0.05)"
+          }}>
+            <button
+              onClick={() => {
+                if (portalRole !== "admin") {
+                  onRoleChange("admin");
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: "8px 12px",
+                borderRadius: "6px",
+                border: "none",
+                background: portalRole === "admin" ? "var(--primary-gold)" : "transparent",
+                color: portalRole === "admin" ? "white" : "var(--soft-brown)",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                boxShadow: portalRole === "admin" ? "0 2px 6px rgba(184, 148, 31, 0.3)" : "none"
+              }}
+            >
+              Atfal Admin
+            </button>
+            <button
+              onClick={() => {
+                if (portalRole !== "kibar-admin") {
+                  onRoleChange("kibar-admin");
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: "8px 12px",
+                borderRadius: "6px",
+                border: "none",
+                background: portalRole === "kibar-admin" ? "var(--primary-gold)" : "transparent",
+                color: portalRole === "kibar-admin" ? "white" : "var(--soft-brown)",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                boxShadow: portalRole === "kibar-admin" ? "0 2px 6px rgba(184, 148, 31, 0.3)" : "none"
+              }}
+            >
+              Kibar Admin
+            </button>
+          </div>
+        </div>
+
         <nav className="sidebar-nav">
           <p className="sidebar-category">Main Dashboard</p>
           {navPages.map(page => {
@@ -11209,7 +12192,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             const metaRoles = getAssignedRoles(user);
             const hasTeacherPortalAccess = (portalAccessList || []).some(a =>
               a.is_active &&
-              a.portal_role === 'teacher' &&
+              (a.portal_role === 'teacher' || a.portal_role === 'kibar-teacher') &&
               (a.email || '').toLowerCase() === (user?.email || '').toLowerCase()
             );
             const hasTeacherProfile = (teacherProfiles || []).some(p =>
@@ -11217,13 +12200,17 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
               (p.email || '').toLowerCase() === (user?.email || '').toLowerCase()
             );
             const available = [...metaRoles];
-            if ((hasTeacherPortalAccess || hasTeacherProfile) && !available.includes('teacher')) {
-              available.push('teacher');
+            if (hasTeacherPortalAccess || hasTeacherProfile) {
+              if (portalRole === 'kibar-admin') {
+                if (!available.includes('kibar-teacher')) available.push('kibar-teacher');
+              } else {
+                if (!available.includes('teacher')) available.push('teacher');
+              }
             }
-            return available.filter(r => r !== 'admin' && r !== 'parents');
+            return available.filter(r => r !== 'admin' && r !== 'kibar-admin' && r !== 'parents' && r !== 'kibar-student');
           })().map((role) => (
             <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
-              <LogOut size={18} /> Switch to {role}
+              <LogOut size={18} /> Switch to {ROLE_LABELS[role] || role}
             </button>
           ))}
           <button className="sidebar-link logout-btn" onClick={onLogout}>
@@ -11234,11 +12221,24 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
       <main className="admin-main">
         <header className="topbar admin-topbar-dynamic">
-          <div className="admin-header-left">
+          <div className="admin-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
-            <h2 className="page-title">{activePage}</h2>
+            <div className="parent-topbar-brand-wrap" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>
+              {isKibarAdmin ? (
+                <>
+                  <span className="topbar-brand topbar-brand-kibar">
+                    Tahfeez al Kibar
+                  </span>
+                  <span className="topbar-sub topbar-sub-kibar">
+                    {activePage && activePage !== "Overview" ? activePage : "Admin Portal"}
+                  </span>
+                </>
+              ) : (
+                <h2 className="page-title" style={{ margin: 0 }}>{activePage}</h2>
+              )}
+            </div>
           </div>
           <button className="topbar-logout-btn" onClick={onLogout}><Power size={22} /></button>
         </header>
@@ -12421,15 +13421,17 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
               {(() => {
                 const total = students.length;
-                const viewedMap = new Set(
-                  (parentViews || []).filter(v => v.viewed).map(v => String(v.student_id).trim().toLowerCase())
+                const viewsMap = new Map(
+                  (parentViews || []).map(v => [String(v.student_id).trim().toLowerCase(), v])
                 );
-                const viewed = students.filter(s =>
-                  viewedMap.has(String(s.student_id).trim().toLowerCase())
-                ).length;
+                const viewed = students.filter(s => {
+                  const r = viewsMap.get(String(s.student_id).trim().toLowerCase());
+                  return r?.viewed;
+                }).length;
                 const notViewed = Math.max(total - viewed, 0);
                 const pct = total > 0 ? Math.round((viewed / total) * 100) : 0;
                 return (
+                  <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px', marginBottom: '20px' }}>
                     <div className="data-card card-appear" style={{ padding: '18px', textAlign: 'center', background: 'linear-gradient(135deg, rgba(46,196,182,0.12), rgba(46,196,182,0.04))', border: '1px solid rgba(46,196,182,0.3)', borderRadius: '14px' }}>
                       <p style={{ margin: '0 0 6px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--soft-brown)' }}>Viewed</p>
@@ -12451,41 +13453,125 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary-gold)' }}>{pct}%</p>
                     </div>
                   </div>
+
+                  <div className="assigned-list card-appear">
+                    <div className="assigned-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))', gap: '12px' }}>
+                      {students.map(s => {
+                        const viewRecord = viewsMap.get(String(s.student_id).trim().toLowerCase());
+                        const isViewed = viewRecord?.viewed ?? false;
+                        const duration = viewRecord?.view_duration_seconds ?? 0;
+                        const viewTime = viewRecord?.updated_at ? new Date(viewRecord.updated_at) : null;
+                        
+                        const timeStr = viewTime 
+                          ? viewTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                          : '';
+                        const dayStr = viewTime 
+                          ? viewTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) 
+                          : '';
+                        const dateTimeDisplay = viewTime 
+                          ? `${dayStr} ${timeStr}`
+                          : '';
+                        return (
+                          <div key={s.student_id} className="assigned-child-card" style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            padding: '12px', 
+                            margin: 0,
+                            borderRadius: '12px',
+                            background: 'rgba(255, 255, 255, 0.45)',
+                            border: '1px solid rgba(212, 175, 55, 0.15)',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            position: 'relative',
+                            aspectRatio: '1',
+                            boxSizing: 'border-box'
+                          }}>
+                            {/* Top Corner Glowing Status Dot */}
+                            <div 
+                              title={isViewed ? `Parent viewed report for ${duration}s at ${dateTimeDisplay}` : "Parent has not viewed report"}
+                              style={{
+                                position: 'absolute',
+                                top: '12px',
+                                right: '12px',
+                                width: '10px',
+                                height: '10px',
+                                borderRadius: '50%',
+                                backgroundColor: isViewed ? '#2ec4b6' : '#e71d36',
+                                boxShadow: isViewed 
+                                  ? '0 0 10px rgba(46, 196, 182, 0.8)' 
+                                  : '0 0 10px rgba(231, 29, 54, 0.8)',
+                                border: '1.5px solid #ffffff',
+                                flexShrink: 0
+                              }}
+                            />
+
+                            {/* Center Info Content */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%', minWidth: 0, flex: 1, justifyContent: 'center' }}>
+                              <StudentAvatar student={s} size="small" />
+                              <h4 style={{ 
+                                margin: '6px 0 2px 0', 
+                                fontSize: '0.82rem', 
+                                color: 'var(--primary-dark)', 
+                                fontWeight: '700',
+                                width: '100%',
+                                whiteSpace: 'nowrap', 
+                                overflow: 'hidden', 
+                                textOverflow: 'ellipsis' 
+                              }} title={s.name}>
+                                {s.name}
+                              </h4>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', width: '100%' }}>
+                                <span style={{ 
+                                  fontSize: '0.68rem', 
+                                  color: 'var(--soft-brown)', 
+                                  whiteSpace: 'nowrap', 
+                                  overflow: 'hidden', 
+                                  textOverflow: 'ellipsis',
+                                  width: '100%'
+                                }} title={s.groupName || 'No Group'}>
+                                  {s.groupName || 'No Group'}
+                                </span>
+                                {s.teacherName && (
+                                  <span style={{ 
+                                    background: '#fff9e6', 
+                                    color: '#8a6d1d', 
+                                    border: '1px solid #e8d08d', 
+                                    borderRadius: '4px', 
+                                    padding: '1px 6px', 
+                                    fontSize: '0.62rem', 
+                                    fontWeight: 700,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: '100%'
+                                  }} title={s.teacherName}>
+                                    {s.teacherName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Bottom Opened / View details */}
+                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '6px' }}>
+                              {isViewed ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+                                  <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: '700' }}>Opened: {timeStr}</span>
+                                  <span style={{ fontSize: '0.58rem', color: 'var(--soft-brown)' }}>{dayStr} ({duration}s)</span>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.68rem', color: '#ef4444', fontWeight: '700' }}>Not Opened</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  </>
                 );
               })()}
-
-              <div className="assigned-list card-appear">
-                <div className="assigned-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
-                  {students.map(s => {
-                    const isViewed = (parentViews || []).find(v => String(v.student_id) === String(s.student_id))?.viewed ?? false;
-                    return (
-                      <div key={s.student_id} className="assigned-child-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', margin: 0 }}>
-                        <div className="child-info-header" style={{ margin: 0, gap: '12px' }}>
-                          <StudentAvatar student={s} size="small" />
-                          <div>
-                            <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: 'var(--primary-dark)' }}>{s.name}</h4>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--soft-brown)' }}>{s.groupName || 'No Group'}</p>
-                          </div>
-                        </div>
-                        <div 
-                          title={isViewed ? "Parent viewed report" : "Parent has not viewed report"}
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            borderRadius: '50%',
-                            backgroundColor: isViewed ? '#2ec4b6' : '#e71d36',
-                            boxShadow: isViewed 
-                              ? '0 0 12px rgba(46, 196, 182, 0.7)' 
-                              : '0 0 12px rgba(231, 29, 54, 0.7)',
-                            border: '2px solid #ffffff',
-                            flexShrink: 0
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
           ) : null}
 
@@ -13084,7 +14170,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                   </h3>
                 </div>
                 <p className="subtitle" style={{ margin: '-10px 0 18px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>
-                  Assign a new schedule task for a student. They will see it in their parent portal instantly.
+                  {isKibarAdmin ? "Assign a new schedule task for a student. They will see it in their student portal instantly." : "Assign a new schedule task for a student. They will see it in their parent portal instantly."}
                 </p>
 
                 <form className="stack-form" onSubmit={onCreateSchedule}>
@@ -13098,7 +14184,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       <SearchableSelect
                         name="student_id"
                         options={students.map((s, i) => ({
-                          value: s?.student_id || "",
+                          value: String(s?.student_id || s?.id || s?.user_id || ""),
                           label: s?.name || s?.full_name || `Student ${i + 1}`,
                           sub: s?.marhala ? `(${s.marhala})` : "",
                         }))}
@@ -13274,13 +14360,13 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                   <label style={{ marginTop: '16px', display: 'block' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
                       <Send size={14} style={{ color: 'var(--primary-gold)' }} />
-                      Message for Parent
+                      {isKibarAdmin ? "Message for Student" : "Message for Parent"}
                     </span>
                     <textarea
                       name="task_body"
                       value={adminForms.schedule.task_body}
                       onChange={onAdminFormChange("schedule")}
-                      placeholder="Write a message explaining today's task, instructions, or any notes for the parent..."
+                      placeholder={isKibarAdmin ? "Write a message explaining today's task, instructions, or any notes for the student..." : "Write a message explaining today's task, instructions, or any notes for the parent..."}
                       className="premium-input"
                       rows={3}
                       style={{ width: '100%', resize: 'vertical', lineHeight: '1.5' }}
@@ -13325,7 +14411,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       </div>
                       <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--deep-brown)' }}>
                         <Bell size={14} style={{ marginRight: '4px', verticalAlign: 'middle', color: adminForms.schedule.send_notification ? 'var(--primary-gold)' : 'var(--text-muted)' }} />
-                        Send Notification to Parent
+                        {isKibarAdmin ? "Send Notification to Student" : "Send Notification to Parent"}
                       </span>
                     </label>
 
@@ -13359,7 +14445,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 </form>
               </section>
 
-              {/* ── Parent Leave Portal Toggle ── */}
+              {/* ── Parent / Student Leave Portal Toggle ── */}
               {(() => {
                 const jsRow = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
                 const leaveEnabled = jsRow.parent_leave_enabled === true;
@@ -13369,10 +14455,12 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       <div>
                         <div className="card-headline" style={{ marginBottom: '8px' }}>
                           <CalendarX size={20} style={{ color: leaveEnabled ? '#16a34a' : '#dc2626' }} />
-                          <h3 style={{ color: 'var(--deep-brown)' }}>Parent Leave Portal</h3>
+                          <h3 style={{ color: 'var(--deep-brown)' }}>{isKibarAdmin ? 'Student Leave Portal' : 'Parent Leave Portal'}</h3>
                         </div>
                         <p className="subtitle" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--soft-brown)', maxWidth: '460px' }}>
-                          When ON, parents can submit leave applications at any time — including outside the normal 12:00 AM–4:00 PM window. When OFF, the regular window schedule applies.
+                          {isKibarAdmin
+                            ? 'When ON, Kibar students can submit leave applications at any time. When OFF, standard schedule rules apply.'
+                            : 'When ON, parents can submit leave applications at any time — including outside the normal 12:00 AM–4:00 PM window. When OFF, the regular window schedule applies.'}
                         </p>
                         <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{
@@ -13383,7 +14471,9 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                             boxShadow: '0 0 8px ' + (leaveEnabled ? 'rgba(22,163,74,0.4)' : 'rgba(220,38,38,0.4)'),
                           }} />
                           <span style={{ fontWeight: 700, fontSize: '0.9rem', color: leaveEnabled ? '#16a34a' : '#dc2626', fontFamily: 'Inter, sans-serif', letterSpacing: '0.5px' }}>
-                            {leaveEnabled ? '● OPEN — Parents can apply leave anytime' : '● SCHEDULE — 12:00 AM–4:00 PM window'}
+                            {leaveEnabled
+                              ? (isKibarAdmin ? '● OPEN — Kibar students can apply leave anytime' : '● OPEN — Parents can apply leave anytime')
+                              : (isKibarAdmin ? '● SCHEDULE — Standard schedule rules apply' : '● SCHEDULE — 12:00 AM–4:00 PM window')}
                           </span>
                         </div>
                       </div>
@@ -13420,75 +14510,76 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 );
               })()}
 
-              <div className="management-grid two-columns" style={{ marginTop: '24px' }}>
-
-              <section className="form-card card-appear">
-                <div className="card-headline">
-                  <Clock size={18} />
-                  <h3>Auto Lock Settings</h3>
+              {!isKibarAdmin && (
+                <div className="management-grid two-columns" style={{ marginTop: '24px' }}>
+                  <section className="form-card card-appear">
+                    <div className="card-headline">
+                      <Clock size={18} />
+                      <h3>Auto Lock Settings</h3>
+                    </div>
+                    <form className="stack-form" onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.target);
+                      const updates = {
+                        auto_lock_enabled: formData.get("auto_lock_enabled") === "true",
+                        auto_lock_day: formData.get("auto_lock_day"),
+                        auto_lock_time: formData.get("auto_lock_time"),
+                        auto_unlock_day: formData.get("auto_unlock_day"),
+                        auto_unlock_time: formData.get("auto_unlock_time"),
+                      };
+                      saveReportSettings(updates);
+                    }}>
+                      <div className="form-grid">
+                        <label>
+                          <span>Enable Auto Lock</span>
+                          <select name="auto_lock_enabled" defaultValue={String(reportSettingsDraft.auto_lock_enabled ?? true)} className="premium-select">
+                            <option value="true">Enabled</option>
+                            <option value="false">Disabled</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>Lock Day</span>
+                          <select name="auto_lock_day" defaultValue={reportSettingsDraft.auto_lock_day || "Saturday"} className="premium-select">
+                            <option value="Sunday">Sunday</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>Lock Time</span>
+                          <input name="auto_lock_time" type="time" defaultValue={reportSettingsDraft.auto_lock_time || "00:00"} className="premium-input" />
+                        </label>
+                        <label>
+                          <span>Unlock Day</span>
+                          <select name="auto_unlock_day" defaultValue={reportSettingsDraft.auto_unlock_day || "Friday"} className="premium-select">
+                            <option value="Sunday">Sunday</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>Unlock Time</span>
+                          <input name="auto_unlock_time" type="time" defaultValue={reportSettingsDraft.auto_unlock_time || "16:30"} className="premium-input" />
+                        </label>
+                      </div>
+                      <p className="hint-text" style={{ marginBottom: '20px' }}>
+                        Teachers can fill progress reports during the unlock window (e.g., {reportSettingsDraft.auto_unlock_day || "Friday"} {reportSettingsDraft.auto_unlock_time || "4:30 PM"} to {reportSettingsDraft.auto_lock_day || "Saturday"} {reportSettingsDraft.auto_lock_time || "12:00 AM"}). Outside this window, progress entry is locked.
+                      </p>
+                      <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
+                        Save Auto Lock Settings
+                      </button>
+                    </form>
+                  </section>
                 </div>
-                <form className="stack-form" onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.target);
-                  const updates = {
-                    auto_lock_enabled: formData.get("auto_lock_enabled") === "true",
-                    auto_lock_day: formData.get("auto_lock_day"),
-                    auto_lock_time: formData.get("auto_lock_time"),
-                    auto_unlock_day: formData.get("auto_unlock_day"),
-                    auto_unlock_time: formData.get("auto_unlock_time"),
-                  };
-                  saveReportSettings(updates);
-                }}>
-                  <div className="form-grid">
-                    <label>
-                      <span>Enable Auto Lock</span>
-                      <select name="auto_lock_enabled" defaultValue={String(reportSettingsDraft.auto_lock_enabled ?? true)} className="premium-select">
-                        <option value="true">Enabled</option>
-                        <option value="false">Disabled</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Lock Day</span>
-                      <select name="auto_lock_day" defaultValue={reportSettingsDraft.auto_lock_day || "Saturday"} className="premium-select">
-                        <option value="Sunday">Sunday</option>
-                        <option value="Monday">Monday</option>
-                        <option value="Tuesday">Tuesday</option>
-                        <option value="Wednesday">Wednesday</option>
-                        <option value="Thursday">Thursday</option>
-                        <option value="Friday">Friday</option>
-                        <option value="Saturday">Saturday</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Lock Time</span>
-                      <input name="auto_lock_time" type="time" defaultValue={reportSettingsDraft.auto_lock_time || "00:00"} className="premium-input" />
-                    </label>
-                    <label>
-                      <span>Unlock Day</span>
-                      <select name="auto_unlock_day" defaultValue={reportSettingsDraft.auto_unlock_day || "Friday"} className="premium-select">
-                        <option value="Sunday">Sunday</option>
-                        <option value="Monday">Monday</option>
-                        <option value="Tuesday">Tuesday</option>
-                        <option value="Wednesday">Wednesday</option>
-                        <option value="Thursday">Thursday</option>
-                        <option value="Friday">Friday</option>
-                        <option value="Saturday">Saturday</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Unlock Time</span>
-                      <input name="auto_unlock_time" type="time" defaultValue={reportSettingsDraft.auto_unlock_time || "16:30"} className="premium-input" />
-                    </label>
-                  </div>
-                  <p className="hint-text" style={{ marginBottom: '20px' }}>
-                    Teachers can fill progress reports during the unlock window (e.g., {reportSettingsDraft.auto_unlock_day || "Friday"} {reportSettingsDraft.auto_unlock_time || "4:30 PM"} to {reportSettingsDraft.auto_lock_day || "Saturday"} {reportSettingsDraft.auto_lock_time || "12:00 AM"}). Outside this window, progress entry is locked.
-                  </p>
-                  <button type="submit" className="action-button premium" style={{ marginTop: '20px' }}>
-                    Save Auto Lock Settings
-                  </button>
-                </form>
-              </section>
-            </div>
+              )}
             </>
           ) : null}
 
@@ -16272,6 +17363,12 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
         </div>
       )}
 
+      {activeCall && (
+        <VideoCall
+          call={activeCall}
+          onClose={handleCallClose}
+        />
+      )}
     </div>
   );
 }
@@ -16339,6 +17436,125 @@ function TeacherPortal({
   const backdropMouseDownRef = useRef(false);
   const [activeCall, setActiveCall] = useState(null);
   const [activeSessions, setActiveSessions] = useState({});
+
+  const handleStartCall = async (student) => {
+    const childSessionId = `session_${student.student_id}`;
+    const teacherName = portalAccess?.full_name || user?.user_metadata?.full_name || teacherIdentity || "Muhaffiz";
+    const studentName = student.name || student.full_name || "Student";
+    const teacherId = user?.id || teacherIdentity;
+    const roomId = childSessionId;
+    
+    // Check if session already exists
+    const { data: existing } = await supabase
+      .from('online_tahfeez_sessions')
+      .select('*')
+      .eq('id', roomId)
+      .maybeSingle();
+
+    if (!existing) {
+      const { error } = await supabase
+        .from('online_tahfeez_sessions')
+        .insert({
+          id: roomId,
+          started_by: "teacher",
+          started_at: new Date().toISOString(),
+          type: "1-on-1",
+          student_id: String(student.student_id),
+          student_name: studentName,
+          teacher_id: String(teacherId),
+          teacher_name: teacherName,
+        });
+      if (error) {
+        if (onShowAction) onShowAction("error", "Failed to start call session: " + error.message);
+        return;
+      }
+    }
+
+    setActiveCall({
+      roomId,
+      role: "caller",
+      myName: teacherName,
+      peerName: studentName,
+      myRole: "teacher",
+      startedAt: new Date().toISOString()
+    });
+  };
+
+  const handleStartGroupClass = async () => {
+    const groupName = selectedGroup || "General";
+    const groupRoomId = `mouze-tahfeez-group-${groupName.replace(/\s+/g, '-').toLowerCase()}`;
+    const teacherName = portalAccess?.full_name || user?.user_metadata?.full_name || teacherIdentity || "Muhaffiz";
+    const teacherId = user?.id || teacherIdentity;
+    const roomId = groupRoomId;
+
+    const { data: existing } = await supabase
+      .from('online_tahfeez_sessions')
+      .select('*')
+      .eq('id', roomId)
+      .maybeSingle();
+
+    if (!existing) {
+      const { error } = await supabase
+        .from('online_tahfeez_sessions')
+        .insert({
+          id: roomId,
+          started_by: "teacher",
+          started_at: new Date().toISOString(),
+          type: "group",
+          group_name: groupName,
+          teacher_id: String(teacherId),
+          teacher_name: teacherName,
+        });
+      if (error) {
+        if (onShowAction) onShowAction("error", "Failed to start group class session: " + error.message);
+        return;
+      }
+    }
+
+    setActiveCall({
+      roomId,
+      role: "caller",
+      myName: teacherName,
+      peerName: `${groupName} Group`,
+      myRole: "teacher",
+      startedAt: new Date().toISOString()
+    });
+  };
+
+  const handleCallClose = async () => {
+    if (activeCall) {
+      const { roomId, role, startedAt } = activeCall;
+      if (role === "caller") {
+        const endedAt = new Date().toISOString();
+        const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000);
+        const activeSession = activeSessions[roomId];
+        if (activeSession) {
+          try {
+            await supabase
+              .from('online_tahfeez_logs')
+              .insert({
+                student_id: activeSession.student_id || null,
+                student_name: activeSession.student_name || null,
+                teacher_id: activeSession.teacher_id || null,
+                teacher_name: activeSession.teacher_name || null,
+                started_at: activeSession.started_at || startedAt,
+                ended_at: endedAt,
+                duration_seconds: durationSeconds,
+                type: activeSession.type || "1-on-1",
+                group_name: activeSession.group_name || null
+              });
+          } catch (e) {
+            console.error("Failed to write online tahfeez log:", e);
+          }
+        }
+        await supabase
+          .from('online_tahfeez_sessions')
+          .delete()
+          .eq('id', roomId);
+      }
+      setActiveCall(null);
+    }
+  };
 
   useEffect(() => {
     if (activePage !== "Online Tahfeez") return;
@@ -16657,6 +17873,19 @@ function TeacherPortal({
     return [...visibleStudents, ...badalOverviewStudents];
   }, [visibleStudents, badalOverviewStudents]);
 
+  const shiftedBadalStudents = useMemo(() => {
+    const allSchoolStudents = schoolData?.students || [];
+    return allSchoolStudents.filter(s => {
+      const isMyOriginal = currentTeacherIds.some(uid =>
+        String(s.original_teacher_id || s.muhaffiz_id).trim() === uid.trim()
+      );
+      const isShiftedToOther = s.badal_teacher_id && !currentTeacherIds.some(uid =>
+        String(s.badal_teacher_id).trim() === uid.trim()
+      );
+      return isMyOriginal && isShiftedToOther;
+    });
+  }, [schoolData?.students, currentTeacherIds]);
+
   useEffect(() => {
     const teacherId = user?.id || teacherIdentity;
     if (!teacherId || overviewStudents.length === 0) return;
@@ -16713,17 +17942,20 @@ function TeacherPortal({
   }, [overviewStudents.length]);
 
   const teacherIdForLeave = user?.id || teacherIdentity;
+  const sectionKibar = getSectionScope() === 'kibar';
+  const TEACHER_LEAVES_TABLE = sectionKibar ? 'kibar_teacher_leaves' : 'teacher_leaves';
+  const TEACHER_LEAVE_BADALS_TABLE = sectionKibar ? 'kibar_teacher_leave_badals' : 'teacher_leave_badals';
 
   const loadMyLeaves = useCallback(() => {
     if (!teacherIdForLeave) return;
     setLeavesLoading(true);
-    supabase.from("teacher_leaves").select("*").eq("teacher_id", String(teacherIdForLeave)).order("created_at", { ascending: false }).then(({ data }) => {
+    supabase.from(TEACHER_LEAVES_TABLE).select("*").eq("teacher_id", String(teacherIdForLeave)).order("created_at", { ascending: false }).then(({ data }) => {
       setMyLeaves(data || []);
       setLeavesLoading(false);
     });
-  }, [teacherIdForLeave]);
+  }, [teacherIdForLeave, sectionKibar]);
 
-  useEffect(() => { loadMyLeaves(); }, [teacherIdForLeave]);
+  useEffect(() => { loadMyLeaves(); }, [teacherIdForLeave, sectionKibar]);
 
   useEffect(() => {
     if (activePage !== "Apply Leave") return;
@@ -16740,19 +17972,20 @@ function TeacherPortal({
   useEffect(() => {
     if (!teacherIdForLeave) return;
     const today = new Date().toISOString().slice(0, 10);
-    supabase.from("teacher_leave_badals").select("*").eq("original_teacher_id", String(teacherIdForLeave)).eq("active", true).lte("to_date", today).then(({ data: endedBadals }) => {
+    supabase.from(TEACHER_LEAVE_BADALS_TABLE).select("*").eq("original_teacher_id", String(teacherIdForLeave)).eq("active", true).lte("to_date", today).then(({ data: endedBadals }) => {
       if (endedBadals && endedBadals.length > 0) {
         endedBadals.forEach(b => {
           const sid = String(b.student_id);
           const sidNum = Number(b.student_id);
           const sidVal = isNaN(sidNum) ? sid : sidNum;
-          supabase.from("child_profiles").update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
-            supabase.from("teacher_leave_badals").update({ active: false }).eq("id", b.id);
+          const CHILD_PROFILES_TABLE = sectionKibar ? 'kibar_child_profiles' : 'child_profiles';
+          supabase.from(CHILD_PROFILES_TABLE).update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
+            supabase.from(TEACHER_LEAVE_BADALS_TABLE).update({ active: false }).eq("id", b.id);
           });
         });
       }
     });
-  }, [teacherIdForLeave]);
+  }, [teacherIdForLeave, sectionKibar]);
 
   /*
    * BADAL FLOW - fetchBadalData
@@ -16971,6 +18204,43 @@ function TeacherPortal({
     }
     setSavingBadal(prev => ({ ...prev, [studentId]: false }));
     fetchBadalData();
+  };
+
+  const handleResumeClass = async (child) => {
+    if (!child?.student_id) return;
+    const sid = String(child.student_id);
+    const originalTeacherId = user?.id || teacherIdentity;
+    if (onShowAction) onShowAction("info", `Resuming class for ${child.name}...`);
+    try {
+      await supabase
+        .from("child_profiles")
+        .update({ badal_teacher_id: null })
+        .eq("student_id", sid);
+      await supabase
+        .from("teacher_leave_badals")
+        .update({ active: false })
+        .eq("student_id", sid)
+        .eq("active", true);
+      await supabase
+        .from("badal_assignments")
+        .update({ status: "inactive" })
+        .eq("student_id", sid);
+      if (child.badal_teacher_id) {
+        const originalTeacherName = teacherProfiles.find(p => p.user_id === originalTeacherId)?.full_name || "Original Teacher";
+        await supabase.functions.invoke('fcm-notification', {
+          body: {
+            title: "Class Resumed",
+            body: `${originalTeacherName} has resumed class for ${child.name}.`,
+            targetUser: child.badal_teacher_id,
+            data: { type: "badal_class_resumed", studentId: sid }
+          }
+        });
+      }
+      if (onShowAction) onShowAction("success", `Class resumed for ${child.name}!`);
+      loadPortalData(portalRole, user, null, { silent: true });
+    } catch (e) {
+      if (onShowAction) onShowAction("error", "Failed to resume class: " + e.message);
+    }
   };
 
   const handleMarkAttendance = async (studentId, date, status) => {
@@ -17609,11 +18879,11 @@ function TeacherPortal({
             Start a combined session. All students in this group will see a button in their portal to join you.
           </p>
           <button
-            className="tahfeez-btn primary"
+            className={`tahfeez-btn ${isGroupClassLive ? "primary pulse" : "primary"}`}
             style={{ width: 'auto', minWidth: '180px' }}
-            onClick={() => {}}
+            onClick={handleStartGroupClass}
           >
-            <Video size={16} /> Start Group Class
+            <Video size={16} /> {isGroupClassLive ? "Join Group Class" : "Start Group Class"}
           </button>
         </div>
 
@@ -17675,9 +18945,9 @@ function TeacherPortal({
                   <div className="tahfeez-actions">
                     <button
                       className="tahfeez-btn primary"
-                      onClick={() => {}}
+                      onClick={() => handleStartCall(student)}
                     >
-                      <Video size={16} /> Call Student
+                      <Video size={16} /> {isClassLive ? "Join Call" : "Call Student"}
                     </button>
                   </div>
                 </div>
@@ -17689,6 +18959,13 @@ function TeacherPortal({
     );
   };
 
+  const isKibarTeacher = portalRole === "kibar-teacher" ||
+    getSectionScope() === "kibar" ||
+    user?.user_metadata?.portal_role === "kibar-teacher" ||
+    user?.user_metadata?.role === "kibar-teacher" ||
+    getAssignedRoles(user).includes("kibar-teacher") ||
+    (typeof window !== "undefined" && window.location?.href?.includes("kibar"));
+
   return (
     <div className="admin-shell">
       <style>{PREMIUM_NOTIFICATION_CSS}</style>
@@ -17699,7 +18976,7 @@ function TeacherPortal({
             photoUrl={teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(teacherIdentity))?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url}
             name={portalAccess?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Teacher"}
             arabicName={portalAccess?.arabic_name}
-            tag="Teacher Portal"
+            tag={isKibarTeacher ? "Tahfeez al Kibar — Teacher Portal" : "Teacher Portal"}
           />
           <button className="sidebar-close-btn" onClick={() => setMenuOpen(false)}><X size={20} /></button>
 
@@ -17729,16 +19006,21 @@ function TeacherPortal({
         </nav>
         <div className="sidebar-footer">
           {(() => {
-            const fromMetadata = getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'parents');
+            const fromMetadata = getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'kibar-teacher' && r !== 'parents');
             const hasAdminAccess = user?.email && teacherAdminAccessList.some(e =>
               normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
             );
-            const roles = hasAdminAccess && !fromMetadata.includes('admin')
-              ? [...fromMetadata, 'admin']
-              : fromMetadata;
+            const roles = [...fromMetadata];
+            if (hasAdminAccess) {
+              if (portalRole === 'kibar-teacher') {
+                if (!roles.includes('kibar-admin')) roles.push('kibar-admin');
+              } else {
+                if (!roles.includes('admin')) roles.push('admin');
+              }
+            }
             return roles.map((role) => (
               <button key={role} className="sidebar-link" onClick={() => onRoleChange(role)}>
-                <LogOut size={18} /> Switch to {role}
+                <LogOut size={18} /> Switch to {ROLE_LABELS[role] || role}
               </button>
             ));
           })()}
@@ -17750,11 +19032,24 @@ function TeacherPortal({
 
       <main className="admin-main">
         <header className="topbar admin-topbar-dynamic">
-          <div className="admin-header-left">
+          <div className="admin-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
-            <h2 className="page-title">{activePage}</h2>
+            <div className="parent-topbar-brand-wrap" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>
+              {isKibarTeacher ? (
+                <>
+                  <span className="topbar-brand topbar-brand-kibar">
+                    Tahfeez al Kibar
+                  </span>
+                  <span className="topbar-sub topbar-sub-kibar">
+                    {activePage && activePage !== "Home" ? activePage : "Teacher Portal"}
+                  </span>
+                </>
+              ) : (
+                <h2 className="page-title" style={{ margin: 0 }}>{activePage}</h2>
+              )}
+            </div>
           </div>
 
           <button className="topbar-logout-btn" onClick={onLogout}><Power size={22} /></button>
@@ -17869,44 +19164,161 @@ function TeacherPortal({
                  })}
                </div>
 
-               <div className="dashboard-section" style={{ width: '100%', marginBottom: '24px' }}>
-                 <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                   <Bell size={18} style={{ color: 'var(--primary-gold)' }} />
-                   <h3 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--deep-brown)' }}>Active Notifications</h3>
+               <div style={{ width: '100%', marginBottom: '24px' }}>
+                 {/* Notification Section Header */}
+                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                     <div style={{
+                       width: '34px', height: '34px', borderRadius: '10px',
+                       background: 'linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.07))',
+                       border: '1px solid rgba(212,175,55,0.28)',
+                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                     }}>
+                       <Bell size={17} style={{ color: 'var(--primary-gold)' }} />
+                     </div>
+                     <div>
+                       <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--deep-brown)', lineHeight: 1.2 }}>Active Notifications</h3>
+                       <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--soft-brown)', opacity: 0.8 }}>
+                         {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id) && new Date(n.created_at).toDateString() === new Date().toDateString()).length} unread
+                       </p>
+                     </div>
+                   </div>
+                   <button
+                     onClick={() => { setActivePage('Inbox'); setMenuOpen && setMenuOpen(false); }}
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(212,175,55,0.15), rgba(212,175,55,0.07))',
+                       border: '1px solid rgba(212,175,55,0.3)', borderRadius: '10px',
+                       padding: '6px 13px', color: 'var(--primary-gold)', fontWeight: 700, fontSize: '0.75rem',
+                       cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'transform 0.15s'
+                     }}
+                     onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                     onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                   >
+                     <Bell size={13} /> Open Page
+                   </button>
                  </div>
-                 <div className="announcement-list">
-                   {notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id)).length > 0 ? (() => {
-                     const news = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id))[0];
+                 {/* Notification Cards */}
+                 {(() => {
+                   const activeNotifs = notifications.filter(n => !dismissedNotifs.includes(n.id) && !dismissedHomeNotifs.includes(n.id) && new Date(n.created_at).toDateString() === new Date().toDateString()).slice(0, 1);
+                   if (activeNotifs.length === 0) {
                      return (
-                       <div key={news.id || news.title} className="news-card" style={{ cursor: 'pointer', background: 'var(--card-bg)', border: '1px solid var(--glass-border)', marginBottom: '12px', position: 'relative' }} onClick={(e) => openNotificationDetail(e, news)}>
-                         <button 
-                           className="card-dismiss-btn" 
-                           title="Clear from home" 
-                           onClick={(e) => { 
-                             e.stopPropagation(); 
-                             onDismissHomeNotif(news.id); 
-                           }}
-                         >
-                           <X size={14} />
-                         </button>
-                         <div style={{ paddingRight: '48px' }}>
-                           <div className="news-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
-                             <span className="tag update" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--primary-gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
-                               Alert
-                             </span>
-                             <span className="date" style={{ color: 'var(--text-muted)' }}>{new Date(news.created_at).toLocaleDateString()}</span>
-                           </div>
-                           <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: 'var(--deep-brown)' }}>{news.title}</h4>
-                           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                             {news.body.length > 80 ? news.body.substring(0, 80) + "..." : news.body}
-                           </p>
-                         </div>
+                       <div style={{
+                         padding: '22px 16px', borderRadius: '14px', textAlign: 'center',
+                         background: 'rgba(255,255,255,0.5)', border: '1px dashed rgba(212,175,55,0.25)'
+                       }}>
+                         <Bell size={28} style={{ color: 'var(--primary-gold)', opacity: 0.3, marginBottom: '8px' }} />
+                         <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--soft-brown)', fontWeight: 600 }}>No active notifications</p>
+                         <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>You're all caught up!</p>
                        </div>
                      );
-                   })() : (
-                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', padding: '12px 0' }}>No active notifications</p>
-                   )}
-                 </div>
+                   }
+                   return (
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                       {activeNotifs.map((notif, idx) => {
+                         const timeAgo = (() => {
+                           const diff = Date.now() - new Date(notif.created_at).getTime();
+                           const mins = Math.floor(diff / 60000);
+                           const hrs = Math.floor(mins / 60);
+                           const days = Math.floor(hrs / 24);
+                           if (days > 0) return days + 'd ago';
+                           if (hrs > 0) return hrs + 'h ago';
+                           if (mins > 0) return mins + 'm ago';
+                           return 'Just now';
+                         })();
+                         const isUrgent = notif.type === 'urgent';
+                         const isSuccess = notif.type === 'success';
+                         const typeColor = isUrgent ? '#e74c3c' : isSuccess ? '#27ae60' : 'var(--primary-gold)';
+                         const typeBg = isUrgent ? 'rgba(231,76,60,0.08)' : isSuccess ? 'rgba(39,174,96,0.08)' : 'rgba(212,175,55,0.08)';
+                         const typeBorder = isUrgent ? 'rgba(231,76,60,0.22)' : isSuccess ? 'rgba(39,174,96,0.22)' : 'rgba(212,175,55,0.22)';
+                         return (
+                           <div key={notif.id || idx} style={{
+                             borderRadius: '14px', overflow: 'hidden', position: 'relative',
+                             background: 'linear-gradient(135deg, rgba(255,255,255,0.97), rgba(255,252,245,0.92))',
+                             border: `1px solid ${typeBorder}`,
+                             boxShadow: '0 2px 12px rgba(0,0,0,0.05)'
+                           }}>
+                             {/* Colored accent bar */}
+                             <div style={{ height: '3px', background: `linear-gradient(90deg, ${typeColor}, ${typeColor}88)` }} />
+                             <div style={{ padding: '12px 14px' }}>
+                               {/* Top: icon + title + time */}
+                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                 <div style={{
+                                   width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+                                   background: typeBg, border: `1px solid ${typeBorder}`,
+                                   display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px'
+                                 }}>
+                                   <Bell size={15} style={{ color: typeColor }} />
+                                 </div>
+                                 <div style={{ flex: 1, minWidth: 0 }}>
+                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                                     <span style={{
+                                       fontSize: '0.88rem', fontWeight: 800, color: 'var(--primary-dark)',
+                                       flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                     }}>{notif.title}</span>
+                                     <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>{timeAgo}</span>
+                                   </div>
+                                   <p style={{
+                                     margin: '0 0 10px', fontSize: '0.8rem', color: 'var(--soft-brown)',
+                                     lineHeight: '1.45', display: '-webkit-box', WebkitLineClamp: 2,
+                                     WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                                   }}>{notif.body}</p>
+                                   {/* Action row */}
+<div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+                                       <button
+                                         onClick={(e) => openNotificationDetail(e, notif)}
+                                         style={{
+                                           background: `linear-gradient(135deg, ${typeColor}22, ${typeColor}11)`,
+                                           border: `1px solid ${typeBorder}`,
+                                           borderRadius: '8px', padding: '5px 12px',
+                                           color: typeColor, fontWeight: 700, fontSize: '0.72rem',
+                                           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'transform 0.15s'
+                                         }}
+                                         onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                                         onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                       >
+                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+                                         Open
+                                       </button>
+                                       {notif.redirect_page && (
+                                         <button
+                                           onClick={(e) => {
+                                             e.stopPropagation();
+                                             let targetPage = notif.redirect_page;
+                                             if (targetPage.startsWith("Jadwal")) {
+                                               const parts = notif.redirect_page.split(":");
+                                               if (parts[1]) {
+                                                 setActiveStudentId(parts[1]);
+                                               }
+                                               targetPage = "Jadwal";
+                                             }
+                                             setActivePage(resolveRedirectPage(targetPage, "teacher"));
+                                           }}
+                                           style={{
+                                             background: 'rgba(0,0,0,0.04)', border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)',
+                                             borderRadius: '8px', padding: '5px 10px',
+                                             fontWeight: 700, fontSize: '0.72rem',
+                                             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'background 0.15s'
+                                           }}
+                                           onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,175,55,0.12)'}
+                                           onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                                           title="Go to page"
+                                         >
+                                           <ChevronRight size={11} /> GO TO PAGE
+                                         </button>
+                                       )}
+                                       <span style={{ marginLeft: 'auto', background: typeBg, color: typeColor, border: `1px solid ${typeBorder}`, borderRadius: '5px', padding: '1px 7px', fontSize: '0.63rem', fontWeight: 700, textTransform: 'capitalize' }}>
+                                         {notif.type || 'alert'}
+                                       </span>
+                                     </div>
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                         );
+                       })}
+                     </div>
+                   );
+                 })()}
                </div>
 
                <div className="premium-quick-panel card-appear">
@@ -18006,7 +19418,7 @@ function TeacherPortal({
                        </div>
                      </div>
 
-                     <div className="quick-panel-row">
+                   <div className="quick-panel-row">
                        <div className="quick-panel-btn-col">
                          <button className="quick-action-btn" onClick={() => handleNavigateTo("Fill Result", 'markProgress', 'Mark Progress')}>
                            <Sparkles size={20} />
@@ -18029,7 +19441,103 @@ function TeacherPortal({
                          )}
                        </div>
                      </div>
-                   </div>
+                   
+
+                       {shiftedBadalStudents.map(child => {
+                         // Check both t.id and t.user_id to reliably match the badal teacher profile
+                         const badalTeacher = (teacherProfiles || []).find(p =>
+                           String(p.id) === String(child.badal_teacher_id) ||
+                           String(p.user_id) === String(child.badal_teacher_id)
+                         );
+                         const badalName = badalTeacher?.full_name || "Badal Teacher";
+                         const avatarLetter = (child.name || "?").charAt(0).toUpperCase();
+                         const groupLabel = child.groupName || "";
+                         return (
+                           <div key={child.student_id} style={{
+                             margin: "10px 14px",
+                             borderRadius: "16px",
+                             background: "linear-gradient(135deg, rgba(255,255,255,0.97), rgba(255,248,240,0.92))",
+                             border: "1.5px solid rgba(231, 76, 60, 0.22)",
+                             boxShadow: "0 4px 20px rgba(231, 76, 60, 0.10), 0 1px 4px rgba(0,0,0,0.04)",
+                             overflow: "hidden",
+                             position: "relative"
+                           }}>
+                             {/* Accent gradient bar at top */}
+                             <div style={{
+                               position: "absolute", top: 0, left: 0, right: 0, height: "3px",
+                               background: "linear-gradient(90deg, #e74c3c, #f39c12, #e74c3c)"
+                             }} />
+                             <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: "13px" }}>
+                               {/* Student Avatar */}
+                               <div style={{
+                                 width: "46px", height: "46px", borderRadius: "14px",
+                                 background: "linear-gradient(135deg, #e74c3c, #c0392b)",
+                                 display: "flex", alignItems: "center", justifyContent: "center",
+                                 color: "white", fontWeight: 800, fontSize: "1.1rem",
+                                 flexShrink: 0, boxShadow: "0 4px 12px rgba(231, 76, 60, 0.30)",
+                                 overflow: "hidden"
+                               }}>
+                                 {child.photoUrl
+                                   ? <img src={child.photoUrl} alt={child.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                   : avatarLetter}
+                               </div>
+                               {/* Info */}
+                               <div style={{ flex: 1, minWidth: 0 }}>
+                                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "4px" }}>
+                                   <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--primary-dark)" }}>
+                                     {child.name}
+                                   </span>
+                                   {groupLabel ? (
+                                     <span style={{
+                                       background: "rgba(212,175,55,0.12)", color: "#8a6d1d",
+                                       border: "1px solid rgba(212,175,55,0.35)", borderRadius: "5px",
+                                       padding: "1px 7px", fontSize: "0.65rem", fontWeight: 700
+                                     }}>{groupLabel}</span>
+                                   ) : null}
+                                 </div>
+                                 {/* Badal teacher pill */}
+                                 <div style={{
+                                   display: "inline-flex", alignItems: "center", gap: "4px",
+                                   background: "rgba(231, 76, 60, 0.08)",
+                                   border: "1px solid rgba(231, 76, 60, 0.20)",
+                                   borderRadius: "20px", padding: "2px 9px 2px 5px",
+                                   fontSize: "0.7rem", color: "#c0392b", fontWeight: 700, maxWidth: "100%"
+                                 }}>
+                                   <span style={{
+                                     width: "16px", height: "16px", borderRadius: "50%",
+                                     background: "linear-gradient(135deg, #e74c3c, #c0392b)",
+                                     color: "white", display: "flex", alignItems: "center",
+                                     justifyContent: "center", fontSize: "0.55rem", fontWeight: 800, flexShrink: 0
+                                   }}>
+                                     {badalName.charAt(0).toUpperCase()}
+                                   </span>
+                                   <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                     With: {badalName}
+                                   </span>
+                                 </div>
+                               </div>
+                               {/* Resume Button */}
+                               <button
+                                 onClick={() => handleResumeClass(child)}
+                                 style={{
+                                   flexShrink: 0,
+                                   background: "linear-gradient(135deg, #27ae60, #1e8449)",
+                                   color: "white", border: "none", padding: "9px 14px",
+                                   borderRadius: "12px", fontSize: "0.75rem", fontWeight: 800,
+                                   cursor: "pointer", boxShadow: "0 4px 14px rgba(39,174,96,0.35)",
+                                   display: "flex", alignItems: "center", gap: "5px",
+                                   whiteSpace: "nowrap", transition: "transform 0.15s, box-shadow 0.15s"
+                                 }}
+                                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(39,174,96,0.50)"; }}
+                                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(39,174,96,0.35)"; }}
+                               >
+                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M8 5v14l11-7z"/></svg>
+                                 Resume
+                               </button>
+                             </div>
+                           </div>
+                         );
+                       })}</div>
                  </div>
                </div>
 
@@ -18324,26 +19832,27 @@ function TeacherPortal({
                     <span className="mp-student-select-icon"><User size={16} /></span>
                     <label>
                       <span>Child</span>
-                      <SearchableSelect
+                      <select
                         name="student_id"
-                        options={filteredStudents.map((student) => {
+                        className="premium-select"
+                        value={teacherForms.result.student_id || ""}
+                        onChange={(e) => onTeacherFormChange({ target: { name: "student_id", value: e.target.value } })}
+                        disabled={selectedResultLocked || !canTeacherFillProgress}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(212, 175, 55, 0.2)', fontSize: '0.9rem', color: 'var(--primary-dark)', background: '#ffffff' }}
+                      >
+                        <option value="">Select child</option>
+                        {filteredStudents.map((student) => {
                           const existingResult = (schoolData.weeklyResults || []).find(r =>
                             String(r.student_id) === String(student.student_id) &&
                             String(r.week_date) === String(teacherForms.result.week_date)
                           );
-                          return {
-                            value: student.student_id,
-                            label: `${student.name}${existingResult ? " - ✓ Saved" : ""}`,
-                            sub: student.groupName,
-                          };
+                          return (
+                            <option key={student.student_id} value={student.student_id}>
+                              {student.name}{existingResult ? " - ✓ Saved" : ""} {student.groupName ? `(${student.groupName})` : ""}
+                            </option>
+                          );
                         })}
-                        value={teacherForms.result.student_id || ""}
-                        onChange={(v) => onTeacherFormChange({ target: { name: "student_id", value: v } })}
-                        disabled={selectedResultLocked || !canTeacherFillProgress}
-                        placeholder="Select child"
-                        emptyValue="Select child"
-                        searchPlaceholder="Search child by name…"
-                      />
+                      </select>
                     </label>
                   </div>
 
@@ -18716,7 +20225,29 @@ function TeacherPortal({
                     />
                   </label>
 
-                  <div className="mp-form-actions">
+                  <div className="mp-form-actions" style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      type="button"
+                      className="mp-save-btn"
+                      onClick={onTeacherResultSubmit}
+                      disabled={!canEditCurrentResult || !teacherForms.result.student_id}
+                      style={{
+                        background: 'linear-gradient(135deg, #c5a059, #8b6d31)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: '12px',
+                        fontWeight: '700',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 4px 15px rgba(139, 109, 49, 0.2)'
+                      }}
+                    >
+                      <Save size={15} /> Save Progress
+                    </button>
                     <button
                       type="button"
                       className="mp-clear-btn"
@@ -20019,6 +21550,8 @@ function TeacherPortal({
               {(function() {
                 const teacherId = user?.id || teacherIdentity;
                 const teacherName = teacherIdentity || user?.email || "";
+                const sectionKibar = getSectionScope() === 'kibar';
+                const TEACHER_LEAVES_TABLE = sectionKibar ? 'kibar_teacher_leaves' : 'teacher_leaves';
                 const leaveCal = getFatemiCalendarMap();
                 const leaveWeekdayStart = (m) => {
                   const g = leaveCal.hijriToGreg[`${m}-1`];
@@ -20149,7 +21682,7 @@ function TeacherPortal({
                 const handleLeaveSubmit = async () => {
                   if (!leaveValid || !teacherId) return;
                   setLeaveSubmitting(true);
-                  const { error } = await supabase.from("teacher_leaves").insert({
+                  const { error } = await supabase.from(TEACHER_LEAVES_TABLE).insert({
                     teacher_id: String(teacherId),
                     teacher_name: teacherName,
                     category: leaveCategory,
@@ -20472,6 +22005,12 @@ function TeacherPortal({
             </div>
           </div>
         </div>
+      )}
+      {activeCall && (
+        <VideoCall
+          call={activeCall}
+          onClose={handleCallClose}
+        />
       )}
     </div>
   );
@@ -21428,7 +22967,7 @@ export default function App() {
     // When switching to admin role, reload data via get_all_child_profiles RPC
     // to bypass RLS (teachers toggled for admin access would otherwise see only their students).
     // On initial login, user is null here so this won't double-load.
-    if (!isFirstRender.current && user && portalRole === "admin") {
+    if (!isFirstRender.current && user && (portalRole === "admin" || portalRole === "kibar-admin")) {
       setLoading(true);
       loadPortalData(portalRole, user).catch(() => {
         if (typeof setLoading === 'function') setLoading(false);
@@ -21553,8 +23092,8 @@ export default function App() {
           const cacheRaw = localStorage.getItem('mauze_portal_cache');
           if (cacheRaw) {
             const cacheData = JSON.parse(cacheRaw);
-            if (cacheData.role === cached.role) {
-              if (cached.role === 'parents' && cacheData.parentData) {
+            if (cacheData.role === cached.role || ((cached.role === 'kibar-student' || cached.role === 'parents') && (cacheData.role === 'parents' || cacheData.role === 'kibar-student'))) {
+              if ((cached.role === 'parents' || cached.role === 'kibar-student') && cacheData.parentData) {
                 setParentData(cacheData.parentData);
               } else if (cacheData.schoolData) {
                 setSchoolData(cacheData.schoolData);
@@ -21602,8 +23141,8 @@ export default function App() {
           const cachedRaw = localStorage.getItem('mauze_portal_cache');
           if (cachedRaw) {
             const cacheData = JSON.parse(cachedRaw);
-            if (cacheData.role === cached.role && Date.now() - cacheData._t < 86400000) {
-              if (cached.role === 'parents' && cacheData.parentData) {
+            if ((cacheData.role === cached.role || ((cached.role === 'kibar-student' || cached.role === 'parents') && (cacheData.role === 'parents' || cacheData.role === 'kibar-student'))) && Date.now() - cacheData._t < 86400000) {
+              if ((cached.role === 'parents' || cached.role === 'kibar-student') && cacheData.parentData) {
                 setParentData(cacheData.parentData);
               } else if (cacheData.schoolData) {
                 setSchoolData(cacheData.schoolData);
@@ -21644,7 +23183,6 @@ export default function App() {
         session = res?.data?.session ?? null;
       } catch (e) {
         console.warn("Session check failed", e);
-        try { await supabase.auth.signOut(); } catch (_) {}
       }
 
       if (!mounted) return;
@@ -21671,10 +23209,7 @@ export default function App() {
           return;
         }
       } catch (e) {
-        console.warn("Token refresh failed, clearing stale session:", e);
-        // Clear stale session data so subsequent API calls don't fail with 401/400
-        try { await supabase.auth.signOut(); } catch (_) {}
-        localStorage.removeItem(STORAGE_KEYS.cachedAuth);
+        console.warn("Token refresh failed, falling back to cached auth:", e);
       }
 
       if (!mounted) return;
@@ -21719,14 +23254,17 @@ export default function App() {
         try {
           const access = await resolveInitialPortal(
             session.user,
-            window.localStorage.getItem(STORAGE_KEYS.role) || "parents"
+            window.localStorage.getItem(STORAGE_KEYS.role) || "kibar-student"
           );
 
           if (mounted) {
-            if (!access.ok) {
-              await supabase.auth.signOut();
-              setActionMessage({ type: "error", text: access.message });
-              setLoading(false);
+            if (!access || !access.ok) {
+              console.warn("Portal resolution returned non-ok, using fallback safely:", access?.message);
+              const fallbackRole = access?.role || window.localStorage.getItem(STORAGE_KEYS.role) || "kibar-student";
+              storeRole(fallbackRole);
+              setPortalAccess(emptyPortalAccess);
+              loadPortalData(fallbackRole, session.user, null, { silent }).catch(() => {});
+              if (!silent) setLoading(false);
               return;
             }
 
@@ -21780,8 +23318,9 @@ export default function App() {
               const cachedRaw = localStorage.getItem('mauze_portal_cache');
               if (cachedRaw) {
                 const cached = JSON.parse(cachedRaw);
-                if (cached.role === access.role) {
-                  if (access.role === 'parents' && cached.parentData) {
+                const isRoleMatch = cached.role === access.role || ((access.role === 'kibar-student' || access.role === 'parents') && (cached.role === 'parents' || cached.role === 'kibar-student'));
+                if (isRoleMatch) {
+                  if ((access.role === 'parents' || access.role === 'kibar-student') && cached.parentData) {
                     setParentData(cached.parentData);
                   } else if (cached.schoolData) {
                     setSchoolData(cached.schoolData);
@@ -21866,6 +23405,18 @@ export default function App() {
 
     initialize();
 
+    // Keep session alive by refreshing token periodically (every 30 minutes)
+    // This prevents auto logout due to token expiry during long sessions
+    const sessionKeepAlive = setInterval(() => {
+      if (user && mounted) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            supabase.auth.refreshSession().catch(() => {});
+          }
+        });
+      }
+    }, 30 * 60 * 1000);
+
     function handleOnline() {
       const cachedRaw = localStorage.getItem(STORAGE_KEYS.cachedAuth);
       if (!user && cachedRaw) {
@@ -21906,6 +23457,7 @@ export default function App() {
     return () => {
       mounted = false;
       clearTimeout(failsafe);
+      clearInterval(sessionKeepAlive);
       subscription.unsubscribe();
       window.removeEventListener('online', handleOnline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -21945,12 +23497,14 @@ export default function App() {
       }, 1200);
     };
 
-    const tables =
-      portalRole === "parents"
-        ? ["weekly_results", "student_daily_attendance", "schedule", "events", "child_profiles", "report_settings", "jadwal_settings"]
+    const isKibar = portalRole === "kibar-student";
+    const tables = isKibar
+      ? ["kibar_weekly_results", "kibar_student_daily_attendance", "kibar_schedule", "kibar_events", "kibar_report_settings", "kibar_jadwal_settings"]
+      : portalRole === "parents"
+        ? ["weekly_results", "student_daily_attendance", "schedule", "events", "report_settings", "jadwal_settings"]
         : portalRole === "teacher"
-          ? ["weekly_results", "student_daily_attendance", "teacher_profiles", "schedule", "events", "report_settings", "jadwal_settings", "child_profiles"]
-          : ["weekly_results", "student_daily_attendance", "teacher_profiles", "schedule", "events", "report_settings", "jadwal_settings", "child_profiles", "portal_access"];
+          ? ["weekly_results", "student_daily_attendance", "teacher_profiles", "schedule", "events", "report_settings", "jadwal_settings"]
+          : ["weekly_results", "student_daily_attendance", "teacher_profiles", "schedule", "events", "report_settings", "jadwal_settings", "portal_access"];
 
     const channel = supabase.channel(`portal-realtime-${portalRole}`);
     tables.forEach((table) => {
@@ -21984,6 +23538,7 @@ export default function App() {
       setLoading(false);
       return;
     }
+    setSectionScope(SECTION_FOR_ROLE(role));
 
     // NOTE: Do NOT sync selectedStudentIdRef here. The ref is kept current by
     // the effect on [selectedStudentId] and by selectParentChild, and this
@@ -22006,17 +23561,63 @@ export default function App() {
     if (!silent) setLoading(true);
 
     try {
-      if (role === "parents") {
+      const isKibar = role === "kibar-student";
+      if (role === "parents" || isKibar) {
         let rawProfiles = parentProfileOverride ? [parentProfileOverride] : null;
-        if (!rawProfiles || rawProfiles.length === 0) {
+        
+        if (isKibar) {
+          // Kibar Student: fetch own profile directly from kibar_student_profiles / child_profiles
+          const studentProfile = await findKibarStudentProfile(currentUser.id, currentUser.email);
+          if (studentProfile) {
+            rawProfiles = [studentProfile];
+          }
+          // Fallback for kibar student if profile not found
+          if (!studentProfile) {
+            try {
+              rawProfiles = await findKibarParentProfiles(currentUser.id, currentUser.email);
+            } catch (_e) {}
+            if (!rawProfiles || rawProfiles.length === 0) {
+              try {
+                const { data, error } = await supabase.rpc("get_my_kibar_child_profiles", {
+                  p_user_id: currentUser.id,
+                  p_email: currentUser.email || null,
+                });
+                if (!error && data && data.length > 0) {
+                  rawProfiles = data;
+                }
+              } catch (_e) {}
+            }
+            if (!rawProfiles || rawProfiles.length === 0) {
+              rawProfiles = [{
+                id: currentUser.id,
+                user_id: currentUser.id,
+                name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || "Student",
+                full_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || "Student",
+                student_id: currentUser.user_metadata?.student_id || currentUser.user_metadata?.its || currentUser.id,
+                its: currentUser.user_metadata?.its || currentUser.user_metadata?.its_number || "...",
+                section: "kibar",
+                is_kibar: true
+              }];
+            }
+          }
+        } else if (!rawProfiles || rawProfiles.length === 0) {
           try {
             rawProfiles = await findParentProfiles(currentUser.id, currentUser.email);
           } catch (err) {
             console.warn("child_profiles read blocked; using fallback RPC", err);
           }
         }
-        if (!rawProfiles || rawProfiles.length === 0) {
+        
+        if (!isKibar && (!rawProfiles || rawProfiles.length === 0)) {
           rawProfiles = await findParentProfilesFallback(currentUser.id, currentUser.email);
+        }
+
+        // Only proceed if we have valid profiles. If the profile query fails (e.g., transient
+        // permission error during realtime refresh), keep the existing parentData instead of
+        // clearing it with empty state.
+        if (!rawProfiles || rawProfiles.length === 0) {
+          if (!silent) setLoading(false);
+          return;
         }
 
         let nextParentState = {
@@ -22031,21 +23632,28 @@ export default function App() {
           reportSettings: null,
         };
 
-        if (rawProfiles.length > 0) {
-          // AUTO-LINK: If any profile only has email but no ID, link it now
-          const profilesToLink = rawProfiles.filter(p => !p.parent_user_id && p.parent_email && normalizeText(p.parent_email) === normalizeText(currentUser.email));
-          if (profilesToLink.length > 0) {
-            console.log("Auto-linking parent user_id to student profiles:", profilesToLink.length);
-            await Promise.all(profilesToLink.map(p =>
-              supabase.from("child_profiles").update({ parent_user_id: currentUser.id }).eq("student_id", p.student_id)
-            ));
-            // Update local objects to reflect the link immediately
-            profilesToLink.forEach(p => p.parent_user_id = currentUser.id);
+        if (rawProfiles && rawProfiles.length > 0) {
+          // AUTO-LINK: If any profile only has email but no ID, link it now (only for parents)
+          if (!isKibar) {
+            const profilesToLink = rawProfiles.filter(p => !p.parent_user_id && p.parent_email && normalizeText(p.parent_email) === normalizeText(currentUser.email));
+            if (profilesToLink.length > 0) {
+              console.log("Auto-linking parent user_id to student profiles:", profilesToLink.length);
+              await Promise.all(profilesToLink.map(p =>
+                supabase.from("child_profiles").update({ parent_user_id: currentUser.id }).eq("student_id", p.student_id)
+              ));
+              profilesToLink.forEach(p => p.parent_user_id = currentUser.id);
+            }
           }
 
           // Fetch necessary data for all potential students
-          // Fetch necessary data for all potential students using their UUIDs to avoid SQL type errors (uuid = text)
-          const studentQueryIds = rawProfiles.map(p => p.student_id).filter(Boolean);
+          const studentQueryIds = Array.from(new Set(rawProfiles.flatMap(p => [
+            p.student_id,
+            p.id,
+            p.user_id,
+            p.its,
+            p.its_number,
+            ...(p.allIds || [])
+          ]).filter(Boolean).map(String)));
 
           const [
             attendanceResponse,
@@ -22057,21 +23665,21 @@ export default function App() {
             jadwalSettingsResponse,
           ] = await Promise.all([
             supabase
-              .from("student_daily_attendance")
+              .from(isKibar ? "kibar_student_daily_attendance" : "student_daily_attendance")
               .select("*")
               .in("student_id", studentQueryIds)
               .order("attendance_date", { ascending: false }),
-            supabase.from("schedule").select("*").in("student_id", studentQueryIds).order("task_time", { ascending: true }),
+            supabase.from(isKibar ? "kibar_schedule" : "schedule").select("*").in("student_id", studentQueryIds).order("task_time", { ascending: true }),
             supabase
-              .from("weekly_results")
+              .from(isKibar ? "kibar_weekly_results" : "weekly_results")
               .select("*")
               .in("student_id", studentQueryIds)
               .order("week_date", { ascending: false })
               .limit(5000),
-            supabase.from("events").select("*").order("event_date", { ascending: false }).limit(200),
-            supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
-            supabase.from("report_settings").select("*"),
-            supabase.from("jadwal_settings").select("*"),
+            supabase.from(isKibar ? "kibar_events" : "events").select("*").order("event_date", { ascending: false }).limit(200),
+            supabase.from(isKibar ? "kibar_teacher_profiles" : "teacher_profiles").select("*").order("full_name", { ascending: true }),
+            supabase.from(isKibar ? "kibar_report_settings" : "report_settings").select("*"),
+            supabase.from(isKibar ? "kibar_jadwal_settings" : "jadwal_settings").select("*"),
           ]);
 
           // Handle potential missing tables (404) or other fetch errors gracefully
@@ -22127,7 +23735,10 @@ export default function App() {
             activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(a.student_id || "").trim().toLowerCase())
           );
           const activeSchedule = (scheduleResponse.data || []).filter(s => 
-            activeStudent.allIds.some(aid => String(aid).trim().toLowerCase() === String(s.student_id || "").trim().toLowerCase())
+            activeStudent.allIds.some(aid =>
+              String(aid).trim().toLowerCase() === String(s.student_id || "").trim().toLowerCase() ||
+              String(aid).trim().toLowerCase() === String(s.user_id || "").trim().toLowerCase()
+            )
           );
 
           // Compute monthly attendance and jadeed totals for the active student
@@ -22174,22 +23785,23 @@ export default function App() {
 
         setParentData(nextParentState);
         setTeacherProfiles(nextParentState.teacherProfiles || []);
-        try { localStorage.setItem('mauze_portal_cache', JSON.stringify({ role: 'parents', parentData: nextParentState, schoolData: null, _t: Date.now() })); } catch (_) {}
+        try { localStorage.setItem('mauze_portal_cache', JSON.stringify({ role: role, parentData: nextParentState, schoolData: null, _t: Date.now() })); } catch (_) {}
       } else {
         // For admin and teacher roles, use get_all_child_profiles RPC (SECURITY DEFINER, bypasses RLS)
         // so teachers and admins can view all assigned students and Badal substitutes without RLS truncation.
-        const profilesPromise = (role === "admin" || role === "teacher")
-          ? supabase.rpc("get_all_child_profiles")
+        const isKibarAdmin = role === "kibar-admin" || role === "kibar-teacher";
+        const profilesPromise = (role === "admin" || role === "teacher" || role === "kibar-admin" || role === "kibar-teacher")
+          ? supabase.rpc(isKibarAdmin ? "get_all_kibar_child_profiles" : "get_all_child_profiles")
               .then(({ data, error }) => {
                 if (error || !data || data.length === 0) {
-                  return supabase.from("child_profiles").select("*").order("full_name", { ascending: true });
+                  return supabase.from(isKibarAdmin ? "kibar_child_profiles" : "child_profiles").select("*").order("full_name", { ascending: true });
                 }
                 return { data, error: null };
               })
               .catch(() =>
-                supabase.from("child_profiles").select("*").order("full_name", { ascending: true })
+                supabase.from(isKibarAdmin ? "kibar_child_profiles" : "child_profiles").select("*").order("full_name", { ascending: true })
               )
-          : supabase.from("child_profiles").select("*").order("full_name", { ascending: true });
+          : supabase.from(isKibarAdmin ? "kibar_child_profiles" : "child_profiles").select("*").order("full_name", { ascending: true });
 
         const [
           profilesResponse,
@@ -22206,23 +23818,23 @@ export default function App() {
           parentViewsResponse,
         ] = await Promise.all([
           profilesPromise,
-          supabase.from("weekly_results").select("*").order("week_date", { ascending: false }).limit(10000),
-          supabase.from("events").select("*").order("event_date", { ascending: false }).limit(200),
-          supabase.from("schedule").select("*").order("task_time", { ascending: true }).limit(5000),
-          supabase.from("user_portal_access").select("*").order("created_at", { ascending: false }).then(r => r, () => ({ data: [], error: null })),
-          supabase.from("custom_groups").select("*").order("group_name", { ascending: true }).then(r => r, () => ({ data: [], error: null })),
-          supabase.from("teacher_attendance").select("*").order("attendance_date", { ascending: false }).limit(2000).then(r => r, () => ({ data: [], error: null })),
-          supabase.from("teacher_profiles").select("*").order("full_name", { ascending: true }),
-          supabase.from("report_settings").select("*"),
-          supabase.from("jadwal_settings").select("*"),
-          supabase.from("portal_issues").select("*").order("created_at", { ascending: false }).limit(500).then(r => r, () => ({ data: [], error: null })),
-          supabase.from("parent_report_views").select("*").limit(2000).then(r => r, () => ({ data: [], error: null })),
+          supabase.from(isKibarAdmin ? "kibar_weekly_results" : "weekly_results").select("*").order("week_date", { ascending: false }).limit(10000),
+          supabase.from(isKibarAdmin ? "kibar_events" : "events").select("*").order("event_date", { ascending: false }).limit(200),
+          supabase.from(isKibarAdmin ? "kibar_schedule" : "schedule").select("*").order("task_time", { ascending: true }).limit(5000),
+          supabase.from(isKibarAdmin ? "kibar_user_portal_access" : "user_portal_access").select("*").order("created_at", { ascending: false }).then(r => r, () => ({ data: [], error: null })),
+          supabase.from(isKibarAdmin ? "kibar_custom_groups" : "custom_groups").select("*").order("group_name", { ascending: true }).then(r => r, () => ({ data: [], error: null })),
+          supabase.from(isKibarAdmin ? "kibar_teacher_attendance" : "teacher_attendance").select("*").order("attendance_date", { ascending: false }).limit(2000).then(r => r, () => ({ data: [], error: null })),
+          supabase.from(isKibarAdmin ? "kibar_teacher_profiles" : "teacher_profiles").select("*").order("full_name", { ascending: true }),
+          supabase.from(isKibarAdmin ? "kibar_report_settings" : "report_settings").select("*"),
+          supabase.from(isKibarAdmin ? "kibar_jadwal_settings" : "jadwal_settings").select("*"),
+          supabase.from(isKibarAdmin ? "kibar_portal_issues" : "portal_issues").select("*").order("created_at", { ascending: false }).limit(500).then(r => r, () => ({ data: [], error: null })),
+          supabase.from(isKibarAdmin ? "kibar_parent_report_views" : "parent_report_views").select("*").limit(2000).then(r => r, () => ({ data: [], error: null })),
         ]);
 
         let archiveData = [];
         try {
           const { data: archiveResponseData, error: archiveError } = await supabase
-            .from("weekly_results_archive")
+            .from(isKibarAdmin ? "kibar_weekly_results_archive" : "weekly_results_archive")
             .select("*")
             .order("week_date", { ascending: false })
             .limit(5000);
@@ -22445,7 +24057,7 @@ export default function App() {
         if (p.id && !allTeacherIds.includes(String(p.id))) allTeacherIds.push(String(p.id));
       });
 
-    const matchedStudents = portalRole === "admin"
+    const matchedStudents = (portalRole === "admin" || portalRole === "kibar-admin")
       ? [...schoolData.students]
       : schoolData.students.filter((student) => {
           const idMatch = allTeacherIds.some(uid =>
@@ -22514,6 +24126,7 @@ export default function App() {
 
   function storeRole(role) {
     setPortalRole(role);
+    setSectionScope(SECTION_FOR_ROLE(role));
     if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEYS.role, role);
       try {
@@ -22551,7 +24164,14 @@ export default function App() {
 
   const handleLoginSuccess = async (loggedInUser, selectedRole, rememberMe = true) => {
     try {
-      const access = await authorizePortalAccess(loggedInUser, selectedRole);
+      let access = await authorizePortalAccess(loggedInUser, selectedRole);
+
+      if (!access.ok) {
+        const resolved = await resolveInitialPortal(loggedInUser, selectedRole);
+        if (resolved.ok) {
+          access = resolved;
+        }
+      }
 
       if (!access.ok) {
         await supabase.auth.signOut();
@@ -22883,7 +24503,7 @@ export default function App() {
 
         if (data) {
           const myNotifs = data.filter(notif =>
-            portalRole === "admin" ||
+            (portalRole === "admin" || portalRole === "kibar-admin") ||
             notif.target_user === user.id ||
             notif.target_user === user.email ||
             (!notif.target_user && (
@@ -22912,7 +24532,7 @@ export default function App() {
             (payload) => {
               const newNotif = payload.new;
               const isTargeted =
-                portalRole === "admin" ||
+                (portalRole === "admin" || portalRole === "kibar-admin") ||
                 newNotif.target_user === user.id ||
                 newNotif.target_user === user.email ||
                 (!newNotif.target_user && (
@@ -23055,7 +24675,7 @@ export default function App() {
   // Client-side scheduler: process due scheduled notifications every 30s
   // (falls back if pg_cron is not enabled on the Supabase project)
   useEffect(() => {
-    if (!user || portalRole !== "admin") return;
+    if (!user || (portalRole !== "admin" && portalRole !== "kibar-admin")) return;
     let isActive = true;
 
     const processDueNotifications = async () => {
@@ -23298,13 +24918,6 @@ export default function App() {
         autoSaveTimerRef.current = null;
       }
       setSaveStatus("");
-    } else if (name !== "student_id" && teacherForms.result.student_id) {
-      if (typeof performAutoSaveRef?.current === "function") {
-        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-        autoSaveTimerRef.current = setTimeout(() => {
-          performAutoSaveRef.current();
-        }, 1500);
-      }
     }
   };
 
@@ -23684,10 +25297,19 @@ const handleSendCustomNotification = async (event) => {
   const handleCreateSchedule = async (event) => {
     event.preventDefault();
 
+    const isKibar = portalRole === "kibar-admin" || getSectionScope() === "kibar";
     const studentId = String(adminForms.schedule.student_id || "").trim();
     const ikhtebarType = adminForms.schedule.ikhtebar_type;
     const ikhtebarCustom = adminForms.schedule.ikhtebar_custom;
     const sendNotif = adminForms.schedule.send_notification !== false;
+
+    // Find the student to get parent / user info
+    const targetStudent = (students || []).find(s =>
+      String(s.student_id).trim() === studentId ||
+      String(s.id).trim() === studentId ||
+      String(s.user_id).trim() === studentId ||
+      (s.allIds && s.allIds.some(aid => String(aid).trim() === studentId))
+    );
 
     // Determine the effective task type name for display
     const IKHTEBAR_LABEL_MAP = {
@@ -23712,16 +25334,21 @@ const handleSendCustomNotification = async (event) => {
 
     const payload = {
       student_id: studentId,
+      student_name: targetStudent?.name || targetStudent?.full_name || "",
+      user_id: targetStudent?.user_id || targetStudent?.id || studentId,
       schedule_date: adminForms.schedule.schedule_date || getToday(),
       task_time: adminForms.schedule.task_time,
       task_name: displayTaskName || "Today's Task",
       task_body: adminForms.schedule.task_body || "",
-      ikhtebar_type: taskTypeForDb,
+      ikhtebar_type: taskTypeForDb || "",
       marhala: adminForms.schedule.marhala || "",
       is_done: false,
+      section: isKibar ? "kibar" : "atfal",
+      created_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase.from("schedule").insert([payload]).select().single();
+    const targetTable = isKibar ? "kibar_schedule" : "schedule";
+    const { data, error } = await supabase.from(targetTable).insert([payload]).select().single();
 
     if (error) {
       showAction("error", error.message);
@@ -23730,12 +25357,13 @@ const handleSendCustomNotification = async (event) => {
 
     setSchoolData((current) => ({
       ...current,
-      schedule: [...current.schedule, data],
+      schedule: [...(current.schedule || []), data],
     }));
     setAdminForms((current) => ({
       ...current,
       schedule: {
         ...current.schedule,
+        student_id: "",
         schedule_date: getToday(),
         task_name: "",
         task_body: "",
@@ -23746,30 +25374,28 @@ const handleSendCustomNotification = async (event) => {
       },
     }));
 
-    // Find the student to get parent info
-    const targetStudent = students.find(s => String(s.student_id).trim() === studentId);
     const studentLabel = targetStudent?.name || targetStudent?.full_name || studentId;
-    const parentUserId = targetStudent?.parent_user_id;
+    const targetUserId = targetStudent?.parent_user_id || targetStudent?.user_id || targetStudent?.id;
 
     showAction("success", `Schedule created for ${studentLabel}! 🎉`);
 
-    // Send targeted notification to the specific student's parent if toggled on
+    // Send targeted notification to the specific student/parent account if toggled on
     if (sendNotif) {
       try {
-        if (parentUserId) {
+        if (targetUserId) {
           await broadcastNotification(
             "📋 New Schedule",
             `New task scheduled for ${studentLabel}: ${payload.task_name}${payload.task_body ? ` — ${payload.task_body}` : ""}`,
             "user",
-            parentUserId,
+            targetUserId,
             "Schedule"
           );
         } else {
-          // Fallback: broadcast to all parents
+          // Fallback: broadcast to role
           await broadcastNotification(
             "📋 Schedule Updated",
             `New task added for ${studentLabel}: ${payload.task_name}`,
-            "parents",
+            isKibar ? "kibar-student" : "parents",
             null,
             "Schedule"
           );
@@ -24345,10 +25971,18 @@ const handleSendCustomNotification = async (event) => {
   };
 
   const handleTeacherResultSubmit = async (event) => {
-    event.preventDefault();
+    if (event && event.preventDefault) event.preventDefault();
+
+    const reportSettingsObject = getReportSettingsObject(reportSettings);
+    const canTeacherFillProgress = reportSettingsObject?.allow_teacher_progress_entry !== false;
 
     if (!canTeacherFillProgress) {
       showAction("error", "Teacher progress-card filling is disabled in Global Settings.");
+      return;
+    }
+
+    if (isTeacherResultLocked(reportSettingsObject)) {
+      showAction("error", "Progress entry is currently locked. Please wait until the next open window.");
       return;
     }
 
@@ -24386,69 +26020,22 @@ const handleSendCustomNotification = async (event) => {
       total_score: totalScore,
     };
 
-    if (isTeacherResultLocked(reportSettingsObject)) {
-      showAction("error", "Progress entry is currently locked. Please wait until the next open window.");
-      return;
-    }
-
-    let data, error;
-    try {
-      ({ data, error } = await supabase
-        .from("weekly_results")
-        .upsert([payload], { onConflict: "student_id,week_date" })
-        .select()
-        .single());
-    } catch (err) {
-      showAction("error", err?.message || "Failed to save result. Please try again.");
-      return;
-    }
-
-    if (error) {
-      showAction("error", error.message);
-      return;
-    }
-
+    // Optimistic UI updates
     setSchoolData((current) => {
       const nextWeeklyResults = [
-        data,
+        payload,
         ...current.weeklyResults.filter((result) =>
           !(
-            String(result.student_id) === String(data.student_id) &&
-            String(result.week_date) === String(data.week_date)
+            String(result.student_id) === String(payload.student_id) &&
+            String(result.week_date) === String(payload.week_date)
           )
         ),
       ];
       const updatedStudents = current.students.map((student) =>
-        String(student.student_id) === String(data.student_id)
-          ? { ...student, latestResult: data }
+        String(student.student_id) === String(payload.student_id)
+          ? { ...student, latestResult: payload }
           : student
       );
-
-      // Final rank notification check inline
-      try {
-        const allHaveResults = updatedStudents.every(
-          s => s.latestResult && String(s.latestResult.week_date) === String(data?.week_date)
-        );
-        if (allHaveResults) {
-          const weekDate = data?.week_date;
-          if (weekDate) {
-            const key = `final_rank_${weekDate}`;
-            if (!window.__finalRankNotified) window.__finalRankNotified = {};
-            if (!window.__finalRankNotified[key]) {
-              window.__finalRankNotified[key] = true;
-              setTimeout(() => {
-                broadcastNotification(
-                  "Final Ranks Calculated",
-                  "All students have been graded this week. Final ranks are live in the Rank Preview page.",
-                  "teacher",
-                  null,
-                  "Overview"
-                );
-              }, 100);
-            }
-          }
-        }
-      } catch (_e) {}
 
       return {
         ...current,
@@ -24461,21 +26048,61 @@ const handleSendCustomNotification = async (event) => {
       ...current,
       result: {
         ...current.result,
-        ...data,
+        ...payload,
       },
     }));
-    showAction("success", "Progress report saved successfully.");
-    const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
 
-    if (targetStudent) {
-      broadcastNotification(
-        "Tahfeez Report Submitted",
-        `A new progress report has been saved for ${targetStudent?.name || "the student"}.`,
-        "parents",
-        targetStudent?.parent_user_id || targetStudent?.parent_email,
-        "Progress"
-      );
-    }
+    showAction("success", "Progress report saved successfully.");
+
+    // Perform database write in background
+    supabase
+      .from("weekly_results")
+      .upsert([payload], { onConflict: "student_id,week_date" })
+      .select()
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Optimistic save background write error:", error);
+          showAction("error", "Sync failed: " + error.message);
+          return;
+        }
+        // In background, refresh local copy with database actual data
+        if (data) {
+          setSchoolData((current) => {
+            const nextWeeklyResults = [
+              data,
+              ...current.weeklyResults.filter((result) =>
+                !(
+                  String(result.student_id) === String(data.student_id) &&
+                  String(result.week_date) === String(data.week_date)
+                )
+              ),
+            ];
+            const updatedStudents = current.students.map((student) =>
+              String(student.student_id) === String(data.student_id)
+                ? { ...student, latestResult: data }
+                : student
+            );
+            return {
+              ...current,
+              weeklyResults: nextWeeklyResults,
+              students: recalculateComputedRanks(updatedStudents),
+            };
+          });
+        }
+      });
+
+    // Notify parents in background - DISABLED per user request
+    // const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
+    // if (targetStudent) {
+    //   broadcastNotification(
+    //     "Tahfeez Report Submitted",
+    //     `A new progress report has been saved for ${targetStudent?.name || "the student"}.`,
+    //     "parents",
+    //     targetStudent?.parent_user_id || targetStudent?.parent_email,
+    //     "Progress"
+    //   ).catch(err => console.error("Notification broadcast error:", err));
+    // }
   };
 
 
@@ -24619,7 +26246,7 @@ const handleSendCustomNotification = async (event) => {
       />
       <div className="app-portal-wrapper">
         <PortalErrorBoundary>
-        {portalRole === "parents" ? (
+        {(portalRole === "parents" || portalRole === "kibar-student") ? (
           <ParentPortal
             activePage={activePage}
             appTheme={appTheme}
@@ -24666,7 +26293,7 @@ const handleSendCustomNotification = async (event) => {
             pendingChatLeaveId={pendingChatLeaveId}
             onPendingChatLeaveConsumed={() => setPendingChatLeaveId(null)}
           />
-        ) : portalRole === "admin" ? (
+        ) : (portalRole === "admin" || portalRole === "kibar-admin") ? (
           <AdminPortal
             activePage={activePage}
             adminData={{
@@ -24715,16 +26342,28 @@ const handleSendCustomNotification = async (event) => {
             reportSettings={reportSettings}
             jadwalSettings={jadwalSettings}
             onSaveJadwalSettings={async function(updates) {
+              const isKibar = portalRole === "kibar-admin" || getSectionScope() === "kibar";
+              const targetTable = isKibar ? "kibar_jadwal_settings" : "jadwal_settings";
               const { error } = await supabase
-                .from("jadwal_settings")
+                .from(targetTable)
                 .upsert({ id: 1, ...updates }, { onConflict: "id" })
                 .select()
                 .maybeSingle();
               if (error) {
-                onShowAction("error", "Failed to update Jadwal settings: " + error.message);
+                showAction("error", "Failed to update Leave settings: " + error.message);
                 return;
               }
-              onShowAction("success", "Jadwal settings saved successfully!");
+              showAction("success", "Leave settings saved successfully! 🎉");
+              setJadwalSettings(prev => {
+                const list = Array.isArray(prev) ? prev : [];
+                const existingIdx = list.findIndex(s => s.id === 1);
+                if (existingIdx >= 0) {
+                  const updated = [...list];
+                  updated[existingIdx] = { ...updated[existingIdx], ...updates };
+                  return updated;
+                }
+                return [{ id: 1, ...updates }];
+              });
               loadPortalData(portalRole, user, null, { silent: true });
             }}
             whatsappConfig={whatsappConfig}

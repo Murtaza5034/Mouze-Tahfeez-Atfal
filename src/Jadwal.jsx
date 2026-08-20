@@ -10,7 +10,7 @@ import { getAyahPage } from './quranPageMap';
 import SearchableSelect from './SearchableSelect';
 import './jadwal.css';
 
-const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+const DAYS = ['FRIDAY', 'SATURDAY', 'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY'];
 const DEFAULT_SCHEDULE = {};
 DAYS.forEach(day => {
   DEFAULT_SCHEDULE[day] = { juz1: '', juz2: '', juz3: '', juz4: '', murajah: '', juzhali: '', jadeed: '', star: '' };
@@ -1620,10 +1620,19 @@ const getFatemiDateStr = (dateStr) => {
       "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
       "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
     ];
-    if (m === 12 && d === 30) {
-      return `1 ${arabicMonths[0]} ${y + 1}`;
+    d += 1;
+    const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+    const isLeapYear = (y * 11 + 14) % 30 < 11;
+    const lastMonthLen = isLeapYear ? 30 : 29;
+    const currentMonthLen = m === 12 ? lastMonthLen : monthLengths[m - 1];
+    if (d > currentMonthLen) {
+      d = 1;
+      m += 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
     }
-    if (m === 1) d++;
     return `${d} ${arabicMonths[m - 1] || ''} ${y}`;
   } catch { return ''; }
 };
@@ -1637,19 +1646,19 @@ const getDayDate = (weekStart, dayIndex) => {
 
 const getCurrentWeekRange = () => {
   const now = new Date();
+  // Friday is day 5 in getDay() (0=Sunday, 5=Friday)
+  // Find the most recent Friday (including today if it's Friday)
   const today = now.getDay();
-  let sat;
-  if (today === 5) {
-    sat = new Date(now);
-    sat.setDate(now.getDate() + 1);
-  } else {
-    const daysBack = (today - 6 + 7) % 7;
-    sat = new Date(now);
-    sat.setDate(now.getDate() - daysBack);
-  }
-  const fri = new Date(sat);
-  fri.setDate(sat.getDate() + 6);
-  return { weekStart: sat.toISOString().split('T')[0], weekEnd: fri.toISOString().split('T')[0] };
+  const daysSinceFri = (today + 2) % 7; // Friday=5, (5+2)%7=0
+  const friday = new Date(now);
+  friday.setDate(now.getDate() - daysSinceFri);
+  // Week starts on Saturday after that Friday
+  const weekStart = new Date(friday);
+  weekStart.setDate(friday.getDate() + 1);
+  // Week ends on Thursday (6 days after Saturday start)
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  return { weekStart: weekStart.toISOString().split('T')[0], weekEnd: weekEnd.toISOString().split('T')[0] };
 };
 
 const getDaysFromRange = (startStr, endStr) => {
@@ -1921,14 +1930,18 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
       <div className="jadwal-header">
         <h2>Teacher Jadwal Editor</h2>
         <div className="student-selector">
-          <SearchableSelect
-            options={(students || []).map(s => ({ value: s.student_id, label: s.full_name || s.name }))}
+          <select
+            className="premium-select"
             value={selectedStudentId || ""}
-            onChange={(v) => setSelectedStudentId(v)}
-            placeholder="-- Select Student --"
-            emptyValue="-- Select Student --"
-            searchPlaceholder="Search student by name…"
-          />
+            onChange={(e) => setSelectedStudentId(e.target.value)}
+          >
+            <option value="">-- Select Student --</option>
+            {(students || []).map(s => (
+              <option key={s.student_id} value={s.student_id}>
+                {s.full_name || s.name}
+              </option>
+            ))}
+          </select>
           {selectedStudentId && (
             <div className="jadwal-actions-row">
               <button className="jadwal-save-btn" onClick={handleNotifyParents} disabled={saving}>

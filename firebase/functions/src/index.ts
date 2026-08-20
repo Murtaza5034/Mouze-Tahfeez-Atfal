@@ -108,10 +108,11 @@ function notificationUrl(dataMap?: Record<string, string>, fallback = "/"): stri
   return `${siteUrl()}/`;
 }
 
-async function tokensForUser(userId?: string): Promise<string[]> {
+async function tokensForUser(userId?: string, section: "atfal" | "kibar" = "atfal"): Promise<string[]> {
   if (!userId) return [];
   const out: string[] = [];
-  const snap = await db.collection("user_fcm_tokens").where("user_id", "==", String(userId)).limit(200).get();
+  const col = "user_fcm_tokens";
+  const snap = await db.collection(col).where("user_id", "==", String(userId)).limit(200).get();
   snap.docs.forEach((d) => {
     const t = d.data().fcm_token;
     if (t) out.push(String(t));
@@ -119,28 +120,51 @@ async function tokensForUser(userId?: string): Promise<string[]> {
   return [...new Set(out)];
 }
 
-async function tokensForRole(role?: string): Promise<string[]> {
+// Map a plain atfal target role onto the kibar section roles. "all" expands to
+// every kibar role so a kibar broadcast never leaks into the atfal institute.
+function kibarRolesFor(role?: string): string[] {
+  if (!role || role === "all" || role === "user") return ["kibar-admin", "kibar-teacher", "kibar-student"];
+  if (role === "parents") return ["kibar-student"];
+  if (role === "teacher") return ["kibar-teacher"];
+  if (role === "admin") return ["kibar-admin"];
+  if (role.startsWith("kibar-")) return [role];
+  return [];
+}
+
+async function tokensForRole(role?: string, section: "atfal" | "kibar" = "atfal"): Promise<string[]> {
   const out: string[] = [];
-  const all = await allDocs("user_fcm_tokens");
+  const col = "user_fcm_tokens";
+  const all = await allDocs(col);
   for (const { data } of all) {
     const r = String(data.user_role || "");
     const t = data.fcm_token;
     if (!t) continue;
-    if (!role || role === "all" || r === role) out.push(String(t));
+    const isKibarToken = r.startsWith("kibar-");
+    if (section === "kibar" ? !isKibarToken : isKibarToken) continue;
+    if (!role || role === "all" || role === "user") {
+      out.push(String(t));
+      continue;
+    }
+    if (section === "kibar") {
+      if (kibarRolesFor(role).includes(r)) out.push(String(t));
+    } else if (r === role) {
+      out.push(String(t));
+    }
   }
   return [...new Set(out)];
 }
 
-async function tokensForTarget(targetUser?: string, targetRole?: string): Promise<string[]> {
-  if (targetUser) return tokensForUser(targetUser);
-  return tokensForRole(targetRole);
+async function tokensForTarget(targetUser?: string, targetRole?: string, section: "atfal" | "kibar" = "atfal"): Promise<string[]> {
+  if (targetUser) return tokensForUser(targetUser, section);
+  return tokensForRole(targetRole, section);
 }
 
-async function dupeInLast30s(title: string, body: string): Promise<boolean> {
+async function dupeInLast30s(title: string, body: string, section: "atfal" | "kibar" = "atfal"): Promise<boolean> {
   const since = new Date(Date.now() - 30_000).toISOString();
+  const col = section === "kibar" ? "kibar_system_notifications" : "system_notifications";
   try {
     const snap = await db
-      .collection("system_notifications")
+      .collection(col)
       .where("title", "==", title)
       .where("body", "==", body)
       .where("created_at", ">=", since)
@@ -152,9 +176,10 @@ async function dupeInLast30s(title: string, body: string): Promise<boolean> {
   }
 }
 
-async function writeInbox(doc: Row) {
+async function writeInbox(doc: Row, section: "atfal" | "kibar" = "atfal") {
+  const col = section === "kibar" ? "kibar_system_notifications" : "system_notifications";
   try {
-    await db.collection("system_notifications").add({
+    await db.collection(col).add({
       title: doc.title,
       body: doc.body,
       target_role: doc.target_role || null,
@@ -173,7 +198,8 @@ async function sendFcmInner(
   title: string,
   body: string,
   dataMap: Record<string, string> = {},
-  tag = "mauze-tahfeez-notification"
+  tag = "mauze-tahfeez-notification",
+  section: "atfal" | "kibar" = "atfal"
 ): Promise<{ total: number; delivered: number; stale: number; failed: number }> {
   const uniq = [...new Set(tokens.filter(Boolean))];
   if (!uniq.length) return { total: 0, delivered: 0, stale: 0, failed: 0 };
@@ -181,6 +207,8 @@ async function sendFcmInner(
   let delivered = 0;
   let stale = 0;
   let failed = 0;
+
+  const col = "user_fcm_tokens";
 
   for (let i = 0; i < uniq.length; i += 100) {
     const chunk = uniq.slice(i, i + 100);
@@ -226,7 +254,7 @@ async function sendFcmInner(
         const code = r.error?.code || "";
         if (/not-registered|unregistered|registration-token-not-registered/i.test(code)) {
           stale++;
-          db.collection("user_fcm_tokens")
+          db.collection(col)
             .where("fcm_token", "==", chunk[idx])
             .get()
             .then((snap) => snap.docs.forEach((d) => d.ref.delete()))
@@ -249,9 +277,15 @@ export const getGlobalRank = onCall(async (request) => {
     student_id?: string;
     return_all?: boolean;
     preview?: Row;
+    section?: string;
   };
 
-  const rows = await allDocs("weekly_results");
+  // Kibar portal ranks are computed from the kibar_* collections so the two
+  // institutes never mix leaderboards.
+  const section = input.section === "kibar" ? "kibar" : "atfal";
+  const resultsCol = section === "kibar" ? "kibar_weekly_results" : "weekly_results";
+
+  const rows = await allDocs(resultsCol);
   const latest = new Map<string, Row>();
   for (const { data } of rows) {
     const sid = String(data.student_id || "").trim().toLowerCase();
@@ -331,32 +365,36 @@ export const sendFcm = onCall(async (request) => {
     targetRole?: string;
     targetUser?: string;
     data?: Record<string, string>;
+    section?: string;
   };
   const title = String(input.title || "");
   const body = String(input.body || "");
   if (!title || !body) throw new HttpsError("invalid-argument", "Missing title or body in request");
 
+  const section: "atfal" | "kibar" = input.section === "kibar" ? "kibar" : "atfal";
+
   let targetUser = input.targetUser;
   if (targetUser && targetUser.includes("@")) {
     const email = normalizeEmail(targetUser);
-    const snap = await db.collection("user_portal_access").where("email", "==", email).limit(1).get();
+    const col = section === "kibar" ? "kibar_user_portal_access" : "user_portal_access";
+    const snap = await db.collection(col).where("email", "==", email).limit(1).get();
     if (!snap.empty) targetUser = String(snap.docs[0].data().user_id || "");
   }
 
-  const tokens = await tokensForTarget(targetUser, input.targetRole || "all");
+  const tokens = await tokensForTarget(targetUser, input.targetRole || "all", section);
   await writeInbox({
     title,
     body,
     target_role: input.targetRole || null,
     target_user: targetUser || null,
     redirect_page: input.data?.redirectPage || notificationUrl(input.data) || "/",
-  });
+  }, section);
 
-  const isDupe = await dupeInLast30s(title, body);
+  const isDupe = await dupeInLast30s(title, body, section);
   if (isDupe) return { success: true, message: "DUPLICATE_SKIPPED" };
   if (!tokens.length) return { success: true, message: "NO_TOKENS_FOUND" };
 
-  const res = await sendFcmInner(tokens, title, body, input.data || {});
+  const res = await sendFcmInner(tokens, title, body, input.data || {}, "mauze-tahfeez-notification", section);
   return {
     success: res.failed === 0,
     message:
@@ -479,18 +517,88 @@ export const notifyLeaveChatMessages = onDocumentUpdated(
   }
 );
 
+export const notifyKibarLeaveChatMessages = onDocumentUpdated(
+  "kibar_student_leaves/{leaveId}",
+  async (event) => {
+    const before = (event.data?.before?.data?.() || {}) as Row;
+    const after = (event.data?.after?.data?.() || {}) as Row;
+
+    const newMessages: Row[] = Array.isArray(after.messages) ? after.messages : [];
+    const oldMessages: Row[] = Array.isArray(before.messages) ? before.messages : [];
+    if (newMessages.length <= oldMessages.length || !newMessages.length) return;
+
+    const last = newMessages[newMessages.length - 1];
+    if (!last || typeof last !== "object" || !last.text) return;
+
+    const role = String(last.role || "").toLowerCase();
+    const body = String(last.text).slice(0, 180);
+    const tag = `kibar-leave-chat-${event.params.leaveId}-${String(last.timestamp || "")}`;
+
+    if (role === "admin" || role === "kibar-admin" || role === "teacher" || role === "kibar-teacher") {
+      const studentId = after.student_id || after.parent_id || before.student_id || before.parent_id;
+      if (!studentId) return;
+
+      const tokens = await tokensForUser(String(studentId), "kibar");
+      if (!tokens.length) return;
+      await sendFcmInner(
+        tokens,
+        "📝 Leave Clarification",
+        body,
+        {
+          url: "/",
+          redirectPage: "Apply Leave",
+          leaveId: event.params.leaveId,
+          studentId: String(after.student_id || ""),
+        },
+        tag,
+        "kibar"
+      );
+      await writeInbox({
+        title: "📝 Leave Clarification",
+        body,
+        target_role: "kibar-student",
+        target_user: String(studentId),
+        redirect_page: "Apply Leave",
+      }, "kibar");
+    } else if (role === "parent" || role === "student" || role === "kibar-student") {
+      const tokens = await tokensForRole("kibar-admin", "kibar");
+      if (!tokens.length) return;
+      await sendFcmInner(
+        tokens,
+        "💬 Leave Reply",
+        body,
+        { url: "/", redirectPage: "Leave Management", leaveId: event.params.leaveId },
+        tag,
+        "kibar"
+      );
+      await writeInbox({
+        title: "💬 Leave Reply",
+        body,
+        target_role: "kibar-admin",
+        target_user: null,
+        redirect_page: "Leave Management",
+      }, "kibar");
+    }
+  }
+);
+
 // ---------------------------------------------------------------------------
 // sendWhatsapp
 // ---------------------------------------------------------------------------
 
 export const sendWhatsapp = onCall(async (request) => {
-  const input = (request.data || {}) as { phone?: string; message?: string; studentName?: string };
+  const input = (request.data || {}) as { phone?: string; message?: string; studentName?: string; section?: string };
   const phone = String(input.phone || "").replace(/\D/g, "");
   const message = String(input.message || "").trim();
   if (!phone) throw new HttpsError("invalid-argument", "Missing or invalid phone number");
   if (!message) throw new HttpsError("invalid-argument", "Missing WhatsApp message body");
 
-  const snap = await db.collection("whatsapp_config").doc("1").get();
+  const section = input.section === "kibar" ? "kibar" : "atfal";
+  const col = section === "kibar" ? "kibar_whatsapp_config" : "whatsapp_config";
+  let snap = await db.collection(col).doc("1").get();
+  if (!snap.exists && section === "kibar") {
+    snap = await db.collection("whatsapp_config").doc("1").get();
+  }
   const config = (snap.exists ? snap.data() : {}) || {};
   if (!config.enabled || config.provider === "none") {
     throw new HttpsError("failed-precondition", "WhatsApp notifications are disabled in the admin portal");
@@ -592,6 +700,7 @@ export const sendEmail = onCall(async (request) => {
     pdfFilename?: string;
     studentName?: string;
     isOtp?: boolean;
+    section?: string;
   };
   const to = String(input.to || "").trim();
   const subject = String(input.subject || "").trim();
@@ -604,7 +713,12 @@ export const sendEmail = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "to, subject and html/text are required");
   }
 
-  const settingsSnap = await db.collection("email_settings").doc("1").get();
+  const section = input.section === "kibar" ? "kibar" : "atfal";
+  const col = section === "kibar" ? "kibar_email_settings" : "email_settings";
+  let settingsSnap = await db.collection(col).doc("1").get();
+  if (!settingsSnap.exists && section === "kibar") {
+    settingsSnap = await db.collection("email_settings").doc("1").get();
+  }
   const settings = (settingsSnap.exists ? settingsSnap.data() : {}) as Row;
   if (settings?.enabled === false && !isOtp) {
     throw new HttpsError("failed-precondition", "Email notifications are disabled in the admin portal");
@@ -661,6 +775,7 @@ export const provisionUser = onCall(async (request) => {
   if (!email || password.length < 6) throw new HttpsError("invalid-argument", "email and password (min 6 chars) are required");
   const fullName = String(input.data?.full_name || "").trim() || null;
   const portalRole = String(input.data?.portal_role || "parents").trim().toLowerCase();
+  const section = String(input.data?.section || (portalRole.startsWith("kibar-") ? "kibar" : "atfal")).trim().toLowerCase();
   try {
     const rec = await auth.createUser({
       email,
@@ -671,6 +786,7 @@ export const provisionUser = onCall(async (request) => {
     // Keep `users/{uid}` in sync so Firestore rules (role()) can resolve this
     // account's portal_role for admin/teacher/parent data reads.
     const now = new Date().toISOString();
+    const isTeacherRole = portalRole === "teacher" || portalRole === "kibar-teacher";
     const userDoc = {
       email,
       full_name: fullName || email.split("@")[0],
@@ -678,11 +794,39 @@ export const provisionUser = onCall(async (request) => {
       is_active: true,
       created_at: now,
       updated_at: now,
-      salary_per_minute: portalRole === "teacher" ? 2.3 : 0,
-      show_salary_card: portalRole === "teacher",
+      salary_per_minute: isTeacherRole ? 2.3 : 0,
+      show_salary_card: isTeacherRole,
       id: rec.uid,
+      section,
     };
     await db.collection("users").doc(rec.uid).set(userDoc, { merge: true });
+
+    if (section === "kibar" || portalRole.startsWith("kibar-")) {
+      const kibarAccessDoc = {
+        id: rec.uid,
+        user_id: rec.uid,
+        email,
+        full_name: fullName || email.split("@")[0],
+        portal_role: portalRole,
+        is_active: true,
+        created_at: now,
+        section: "kibar",
+      };
+      await db.collection("kibar_user_portal_access").doc(rec.uid).set(kibarAccessDoc, { merge: true });
+    } else {
+      const atfalAccessDoc = {
+        id: rec.uid,
+        user_id: rec.uid,
+        email,
+        full_name: fullName || email.split("@")[0],
+        portal_role: portalRole,
+        is_active: true,
+        created_at: now,
+        section: "atfal",
+      };
+      await db.collection("user_portal_access").doc(rec.uid).set(atfalAccessDoc, { merge: true });
+    }
+
     return { user: { id: rec.uid, email: rec.email } };
   } catch (err: any) {
     if (err && (err.code === "auth/email-already-exists" || /email.*already/i.test(err.message || ""))) {
@@ -767,8 +911,11 @@ const CLEAR_FIELDS = [
   "total_score",
 ];
 
-export const clearAllMarks = onCall(async () => {
-  const rows = await allDocs("weekly_results");
+export const clearAllMarks = onCall(async (request) => {
+  const input = (request?.data || {}) as { section?: string };
+  const section = input.section === "kibar" ? "kibar" : "atfal";
+  const resultsCol = section === "kibar" ? "kibar_weekly_results" : "weekly_results";
+  const rows = await allDocs(resultsCol);
   const touched = rows.filter(({ data }) => CLEAR_FIELDS.some((f) => data[f] !== null && data[f] !== undefined));
   let updated = 0;
   for (const { id } of touched) {
@@ -778,7 +925,7 @@ export const clearAllMarks = onCall(async () => {
     patch.teacher_locked = false;
     patch.teacher_locked_at = null;
     try {
-      await db.collection("weekly_results").doc(id).update(patch);
+      await db.collection(resultsCol).doc(id).update(patch);
       updated++;
     } catch (_e) {
       console.warn("clearAllMarks update failed", (_e as Error).message);
@@ -800,74 +947,149 @@ export const clearAllMarks = onCall(async () => {
 
 export const sendScheduleNotifications = onSchedule("every 5 minutes", async () => {
   const nowIso = new Date().toISOString();
-  const rows = await allDocs("scheduled_notifications");
-  const due = rows.filter(
-    ({ data }) => data.is_active === true && data.fire_at && String(data.fire_at) <= nowIso && !data.processed_at
-  );
-  for (const item of due) {
-    const data = item.data;
-    const tokens = await tokensForTarget(data.target_user, data.target_role || "all");
-    if (tokens.length) {
-      await sendFcmInner(tokens, String(data.title || "Notification"), String(data.body || ""), {
-        url: data.redirect_page || "/",
-      }, "scheduled");
+  const sections: Array<"atfal" | "kibar"> = ["atfal", "kibar"];
+  for (const section of sections) {
+    const col = section === "kibar" ? "kibar_scheduled_notifications" : "scheduled_notifications";
+    const rows = await allDocs(col);
+    const due = rows.filter(
+      ({ data }) => data.is_active === true && data.fire_at && String(data.fire_at) <= nowIso && !data.processed_at
+    );
+    for (const item of due) {
+      const data = item.data;
+      const tokens = await tokensForTarget(data.target_user, data.target_role || "all", section);
+      if (tokens.length) {
+        await sendFcmInner(tokens, String(data.title || "Notification"), String(data.body || ""), {
+          url: data.redirect_page || "/",
+        }, "scheduled");
+      }
+      await db.collection(col).doc(item.id).update({ processed_at: nowIso, last_sent_at: nowIso });
     }
-    await db.collection("scheduled_notifications").doc(item.id).update({ processed_at: nowIso, last_sent_at: nowIso });
   }
 });
 
-// ---------------------------------------------------------------------------
-// Scheduled: result live notifier
-// ---------------------------------------------------------------------------
+async function runResultLiveNotifierInner(section: "atfal" | "kibar" = "atfal", manual = false) {
+  const settingsCol = section === "kibar" ? "kibar_report_settings" : "report_settings";
+  const resultsCol = section === "kibar" ? "kibar_weekly_results" : "weekly_results";
+  const childCol = section === "kibar" ? "kibar_child_profiles" : "child_profiles";
+  const teacherCol = section === "kibar" ? "kibar_teacher_profiles" : "teacher_profiles";
 
-export const sendResultLiveNotifier = onSchedule("every 2 minutes", async () => {
-  const rows = await allDocs("weekly_results");
-  const pending = rows.filter(
-    ({ data }) => !data._result_notified && (data.total_score !== undefined || data.murajazah !== undefined || data.jadeed !== undefined)
-  );
-  if (!pending.length) return;
+  // 1. Fetch settings and check rules
+  const settingsRows = await allDocs(settingsCol);
+  const settings = settingsRows[0]?.data || {};
 
-  const children = await allDocs("child_profiles");
+  if (!settings.result_live_notify_enabled) {
+    return { skipped: "NOTIFY_DISABLED" };
+  }
+  if (!settings.reports_live) {
+    return { skipped: "NOT_LIVE" };
+  }
+
+  // 2. Determine pending results
+  const rows = await allDocs(resultsCol);
+  let pending: Array<{ id: string; data: Row }> = [];
+
+  if (manual) {
+    // For manual notifications, target the most recent week's results
+    const weekDates = rows.map(r => r.data.week_date).filter(Boolean);
+    if (!weekDates.length) return { skipped: "NO_RESULTS" };
+    const latestWeekDate = weekDates.reduce((max, d) => (d > max ? d : max), weekDates[0]);
+    pending = rows.filter(
+      ({ data }) =>
+        (data.week_date === latestWeekDate || !data._result_notified) &&
+        (data.total_score !== undefined || data.murajazah !== undefined || data.jadeed !== undefined)
+    );
+  } else {
+    // For scheduled notifications, target pending/unnotified results
+    pending = rows.filter(
+      ({ data }) => !data._result_notified && (data.total_score !== undefined || data.murajazah !== undefined || data.jadeed !== undefined)
+    );
+  }
+
+  if (!pending.length) return { skipped: "NO_PENDING" };
+
+  // 3. Load students and teachers mapping
+  const children = await allDocs(childCol);
   const childMap = new Map<string, Row>();
   children.forEach((c) => childMap.set(String(c.data.student_id || "").trim().toLowerCase(), c.data));
-  const teachers = await allDocs("teacher_profiles");
+  const teachers = await allDocs(teacherCol);
   const teacherUserMap = new Map<string, string>();
   teachers.forEach((t) => {
     const key = String(t.data.student_id || t.data.id || "").trim().toLowerCase();
     if (key && t.data.user_id) teacherUserMap.set(key, String(t.data.user_id));
   });
 
+  let childrenCount = 0;
+  const parentsCount = new Set<string>();
+  let deliveredCount = 0;
+
+  // 4. Send notifications
   for (const { id, data } of pending) {
     const sid = String(data.student_id || "").trim().toLowerCase();
     const child = childMap.get(sid);
     const name = String(child?.full_name || "Your child");
+    
+    let notifiedChild = false;
     if (child?.parent_user_id) {
-      const tokens = await tokensForUser(String(child.parent_user_id));
+      const tokens = await tokensForUser(String(child.parent_user_id), section);
       if (tokens.length) {
         await sendFcmInner(
           tokens,
           `${name}'s Result is Live!`,
           "The latest tahfz result is now available in the Progress page.",
           { url: "/", redirectPage: "Progress" },
-          `result-live-${sid}`
+          section === "kibar" ? `kibar-result-live-${sid}` : `result-live-${sid}`,
+          section
         );
+        parentsCount.add(String(child.parent_user_id));
+        deliveredCount += tokens.length;
+        notifiedChild = true;
       }
     }
+    
     const teacherUid = teacherUserMap.get(sid);
     if (teacherUid) {
-      const tokens = await tokensForUser(teacherUid);
+      const tokens = await tokensForUser(teacherUid, section);
       if (tokens.length) {
         await sendFcmInner(
           tokens,
           "Result Saved",
           `Result saved for ${name}`,
           { url: "/", redirectPage: "Progress" },
-          `result-saved-${sid}`
+          section === "kibar" ? `kibar-result-saved-${sid}` : `result-saved-${sid}`,
+          section
         );
+        deliveredCount += tokens.length;
       }
     }
-    await db.collection("weekly_results").doc(id).update({ _result_notified: true }).catch((err) => console.warn("_result_notified write failed", (err as Error).message));
+    if (notifiedChild) {
+      childrenCount++;
+    }
+    await db.collection(resultsCol).doc(id).update({ _result_notified: true }).catch((err) => console.warn(`${section} _result_notified write failed`, (err as Error).message));
   }
+
+  return {
+    success: true,
+    summary: {
+      delivered: deliveredCount,
+      children: childrenCount,
+      parents: parentsCount.size,
+    }
+  };
+}
+
+export const sendResultLiveNotifier = onCall(async (request) => {
+  const input = request.data || {};
+  const section: "atfal" | "kibar" = input.section === "kibar" ? "kibar" : "atfal";
+  const manual = Boolean(input.manual);
+  return await runResultLiveNotifierInner(section, manual);
+});
+
+export const scheduledSendResultLiveNotifier = onSchedule("every 2 minutes", async () => {
+  await runResultLiveNotifierInner("atfal");
+});
+
+export const sendKibarResultLiveNotifier = onSchedule("every 2 minutes", async () => {
+  await runResultLiveNotifierInner("kibar");
 });
 
 // ---------------------------------------------------------------------------
@@ -1089,31 +1311,36 @@ export const sendJadwalReminder = onSchedule("every 1 minutes", async () => {
 // ---------------------------------------------------------------------------
 
 export const autoClearProgress = onSchedule("every 30 minutes", async () => {
-  const snap = await db.collection("report_settings").doc("1").get();
-  const settings = snap.exists ? snap.data() : {};
-  if (settings?.auto_clear_enabled !== true) return;
-  const day = String(settings.auto_clear_day || "Friday");
-  const time = String(settings.auto_clear_time || "11:30");
-  const now = new Date();
-  const dayMap: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
-  if (now.getDay() !== (dayMap[day] ?? 5)) return;
-  const [h, m] = time.split(":").map((x) => parseInt(x, 10));
-  const nowMins = now.getHours() * 60 + now.getMinutes();
-  const targetMins = (h || 0) * 60 + (m || 0);
-  if (nowMins < targetMins || nowMins > targetMins + 45) return;
+  const sections: Array<"atfal" | "kibar"> = ["atfal", "kibar"];
+  for (const section of sections) {
+    const settingsCol = section === "kibar" ? "kibar_report_settings" : "report_settings";
+    const resultsCol = section === "kibar" ? "kibar_weekly_results" : "weekly_results";
+    const snap = await db.collection(settingsCol).doc("1").get();
+    const settings = snap.exists ? snap.data() : {};
+    if (settings?.auto_clear_enabled !== true) continue;
+    const day = String(settings.auto_clear_day || "Friday");
+    const time = String(settings.auto_clear_time || "11:30");
+    const now = new Date();
+    const dayMap: Record<string, number> = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+    if (now.getDay() !== (dayMap[day] ?? 5)) continue;
+    const [h, m] = time.split(":").map((x) => parseInt(x, 10));
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const targetMins = (h || 0) * 60 + (m || 0);
+    if (nowMins < targetMins || nowMins > targetMins + 45) continue;
 
-  const rows = await allDocs("weekly_results");
-  for (const { id, data } of rows) {
-    if (!CLEAR_FIELDS.some((f) => data[f] !== null && data[f] !== undefined)) continue;
-    const patch: Row = {};
-    CLEAR_FIELDS.forEach((f) => (patch[f] = null));
-    patch.teacher_edit_count = 0;
-    patch.teacher_locked = false;
-    patch.teacher_locked_at = null;
-    try {
-      await db.collection("weekly_results").doc(id).update(patch);
-    } catch (_e) {
-      console.warn("autoClearProgress update failed", (_e as Error).message);
+    const rows = await allDocs(resultsCol);
+    for (const { id, data } of rows) {
+      if (!CLEAR_FIELDS.some((f) => data[f] !== null && data[f] !== undefined)) continue;
+      const patch: Row = {};
+      CLEAR_FIELDS.forEach((f) => (patch[f] = null));
+      patch.teacher_edit_count = 0;
+      patch.teacher_locked = false;
+      patch.teacher_locked_at = null;
+      try {
+        await db.collection(resultsCol).doc(id).update(patch);
+      } catch (_e) {
+        console.warn(`autoClearProgress update failed for ${resultsCol}`, (_e as Error).message);
+      }
     }
   }
 });

@@ -37,7 +37,7 @@ const firebaseConfig = {
     import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "353078822685",
   appId:
     import.meta.env.VITE_FIREBASE_APP_ID ||
-    "1:353078822685:android:8f83b293733213472bc3f4",
+    "1:353078822685:web:9b89c7c156bcb0992bc3f4",
   measurementId:
     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "B5W2bPUAQQmqbmDf5lF-6g",
 };

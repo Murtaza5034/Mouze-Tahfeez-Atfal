@@ -1,13 +1,9 @@
 import { supabase } from './supabaseClient.js';
+import { isCapacitor, isNativeAndroid, getDeviceInfo, isIOS, isStandalone } from './utils/deviceUtils.js';
 
-// Detect if running inside a Capacitor native app
-function isCapacitor() {
-  return !!(window.Capacitor && window.Capacitor.isNativePlatform);
-}
+export { isCapacitor, isNativeAndroid, getDeviceInfo, isIOS, isStandalone };
 
-function isNativeAndroid() {
-  return isCapacitor() && window.Capacitor.getPlatform() === 'android';
-}
+
 
 // ---------------------------------------------------------------------------
 // Notification-tap handling (exact-page deep linking)
@@ -291,82 +287,101 @@ class FCMService {
   }
 
   // --- Initialize FCM service ---
-  async initialize(userRole) {
+  async initialize(userRole, options = {}) {
+    const devInfo = getDeviceInfo();
+
     if (this.initialized && this.token) {
-      console.log('FCM service already initialized, ensuring token is stored');
+      console.log('[FCM] Service already initialized, ensuring token is stored');
       await this.storeToken(this.token, userRole);
-      return true;
+      return { success: true, token: this.token };
     }
 
     if (this.initializingPromise) {
-      console.log('FCM service initialization already in progress, waiting...');
+      console.log('[FCM] Initialization already in progress, waiting...');
       return this.initializingPromise;
     }
 
     this.initializingPromise = (async () => {
       try {
-        console.log('Initializing FCM service for role:', userRole);
+        console.log('[FCM] Initializing FCM service for role:', userRole);
 
         // --- Native Capacitor path ---
         if (isNativeAndroid()) {
-          console.log('Running in native Android Capacitor — using native PushNotifications');
-          return await this._initNative(userRole);
+          console.log('[FCM] Running in native Android Capacitor — using native PushNotifications');
+          const res = await this._initNative(userRole);
+          return typeof res === 'object' ? res : { success: !!res, token: this.token };
+        }
+
+        // --- iOS in standard browser tab (non-PWA) ---
+        // On iOS, Apple requires Web Push to be installed to Home Screen (PWA mode)
+        if (devInfo.isIOS && !devInfo.isStandalone) {
+          console.warn('[FCM] iOS browser tab detected. Apple Web Push requires adding app to Home Screen.');
+          return {
+            success: false,
+            reason: 'ios_not_standalone',
+            isIOS: true,
+            isChrome: devInfo.isChromeIOS,
+            isSafari: devInfo.isSafariIOS
+          };
         }
 
         // --- Web / PWA path ---
         if (!('Notification' in window)) {
-          console.error('This browser does not support notifications');
-          return false;
+          console.warn('[FCM] This browser does not support notifications');
+          return { success: false, reason: 'unsupported_browser' };
         }
 
         if (!('serviceWorker' in navigator)) {
-          console.error('Service workers are not supported in this browser');
-          return false;
+          console.warn('[FCM] Service workers are not supported in this browser');
+          return { success: false, reason: 'no_service_worker' };
         }
 
         // Check current permission status
         const currentPermission = Notification.permission;
-        console.log('Current notification permission:', currentPermission);
+        console.log('[FCM] Current notification permission:', currentPermission);
 
-        // Request notification permission if not granted
         let permission = currentPermission;
         if (permission === 'default') {
-          console.log('Requesting notification permission...');
-          permission = await Notification.requestPermission();
-          console.log('Notification permission status:', permission);
+          console.log('[FCM] Requesting notification permission...');
+          try {
+            permission = await Notification.requestPermission();
+          } catch (permErr) {
+            console.warn('[FCM] Notification.requestPermission error:', permErr);
+          }
+          console.log('[FCM] Notification permission status:', permission);
         }
 
         if (permission !== 'granted') {
-          console.error('Notification permission denied. Please enable notifications in your browser settings.');
-          return false;
+          console.warn('[FCM] Notification permission denied or not granted.');
+          return { success: false, reason: 'permission_denied' };
         }
 
         // Dynamically import web FCM only when needed
         const { getFCMToken } = await import('./firebaseConfig.js');
 
         // Get FCM token
-        console.log('Retrieving FCM token...');
+        console.log('[FCM] Retrieving FCM token...');
         const token = await getFCMToken();
         if (!token) {
-          console.error('Failed to get FCM token. Please refresh the page and try again.');
-          return false;
+          console.warn('[FCM] Failed to get FCM token.');
+          return { success: false, reason: 'token_fetch_failed' };
         }
 
-        console.log('FCM token retrieved successfully:', token.substring(0, 20) + '...');
+        console.log('[FCM] Token retrieved successfully:', token.substring(0, 20) + '...');
         this.token = token;
         this.isSupported = true;
 
         // Store token in database (with retries)
-        console.log('Storing FCM token in database...');
+        console.log('[FCM] Storing FCM token in database...');
         const stored = await this.storeToken(token, userRole);
         if (!stored) {
-          console.warn('FCM token stored failed on first attempt, retrying...');
+          console.warn('[FCM] Token store failed on first attempt, retrying...');
           await new Promise(r => setTimeout(r, 1000));
           const storedRetry = await this.storeToken(token, userRole);
           if (!storedRetry) {
-            console.warn('FCM token storage failed after retry. Token is cached in memory but may not be reachable from server.');
+            console.warn('[FCM] Token storage failed after retry.');
           } else {
-            console.log('FCM token stored on retry');
+            console.log('[FCM] Token stored on retry');
           }
         }
 
@@ -374,23 +389,16 @@ class FCMService {
         this.setupMessageListener();
 
         this.initialized = true;
-        console.log('FCM service initialized successfully for role:', userRole);
+        console.log('[FCM] Service initialized successfully for role:', userRole);
 
         // Start periodic token refresh
         this.startTokenRefresh(userRole);
 
-        return true;
+        return { success: true, token };
 
       } catch (error) {
-        console.error('Error initializing FCM service:', error);
-        if (error.name === 'AbortError') {
-          console.error('FCM registration was aborted. This might be due to a service worker conflict or insecure context.');
-        } else if (error.code === 'messaging/permission-blocked') {
-          console.error('Notification permission was blocked by the user.');
-        } else if (error.code === 'messaging/unsupported-browser') {
-          console.error('This browser is not supported for FCM.');
-        }
-        return false;
+        console.error('[FCM] Error initializing FCM service:', error);
+        return { success: false, reason: error?.name || error?.code || 'error', error };
       } finally {
         this.initializingPromise = null;
       }
@@ -404,23 +412,24 @@ class FCMService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        // Expected when FCM initializes before login (e.g. the "Enable Device
-        // Alerts" button) - not an error, just nothing to attach the token to.
-        console.warn('FCM: no authenticated user yet - skipping token storage');
+        console.warn('[FCM] No authenticated user yet - skipping token storage');
         return false;
       }
 
-      console.log('Storing token for user:', user.id, 'with role:', userRole);
+      console.log('[FCM] Storing token for user:', user.id, 'with role:', userRole);
 
+      const devInfo = getDeviceInfo();
       const deviceInfo = {
         userAgent: navigator.userAgent,
-        platform: navigator.platform || (isCapacitor() ? window.Capacitor.getPlatform() : 'unknown'),
+        platform: devInfo.isIOS ? (devInfo.isStandalone ? 'iOS PWA' : 'iOS Web') : (navigator.platform || (isCapacitor() ? window.Capacitor.getPlatform() : 'unknown')),
         language: navigator.language,
-        deviceType: this.isNative ? 'native' : 'web',
+        deviceType: this.isNative ? 'native' : (devInfo.isStandalone ? 'pwa' : 'web'),
+        isIOS: devInfo.isIOS,
+        isStandalone: devInfo.isStandalone,
         timestamp: new Date().toISOString()
       };
 
-      // Upsert token (update if exists, insert if new)
+      // Upsert token
       const { error } = await supabase
         .from('user_fcm_tokens')
         .upsert({
@@ -433,17 +442,19 @@ class FCMService {
         });
 
       if (error) {
-        console.error('Error storing FCM token:', error);
+        console.error('[FCM] Error storing token:', error);
         return false;
       } else {
-        console.log('FCM token stored successfully for user:', user.id);
+        console.log('[FCM] Token stored successfully for user:', user.id);
         return true;
       }
     } catch (error) {
-      console.error('Error in storeToken:', error);
+      console.error('[FCM] Error in storeToken:', error);
       return false;
     }
   }
+
+
 
   // Set up message listener for foreground messages (web only)
   setupMessageListener() {

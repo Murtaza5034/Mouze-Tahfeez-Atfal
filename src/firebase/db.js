@@ -60,12 +60,62 @@ try {
 
 export { db };
 
+// ---------------------------------------------------------------------------
+// Portal section scoping.
+//
+// The app now hosts two independent institutes:
+//   - "atfal"  -> the original Rawdat Tahfeez al Atfal (default; no prefix)
+//   - "kibar"  -> the new adult/Kibar portal (reads/writes kibar_* collections)
+//
+// Every collection queried through `from()` is resolved through
+// resolveCollectionName(). When the active section is "kibar", data tables are
+// redirected to their kibar_* counterpart so the two institutes never share a
+// single record. A small set of collections (auth users, device lock, FCM
+// tokens, presence, releases, email logs) stays shared across both sections.
+// ---------------------------------------------------------------------------
+
+let activeSection = "atfal";
+
+export function setSectionScope(section) {
+  const next = section === "kibar" ? "kibar" : "atfal";
+  activeSection = next;
+  console.log(`[Database] Switched active section scope to: ${next}`);
+  return next;
+}
+
+export function getSectionScope() {
+  return activeSection;
+}
+
+const SHARED_COLLECTIONS = new Set([
+  "users",
+  "app_lock_settings",
+  "user_fcm_tokens",
+  "_presence",
+  "app_releases",
+  "email_logs",
+]);
+
+export function resolveCollectionName(name) {
+  if (
+    activeSection === "kibar" &&
+    name &&
+    !SHARED_COLLECTIONS.has(name) &&
+    !String(name).startsWith("kibar_")
+  ) {
+    return `kibar_${name}`;
+  }
+  return name;
+}
+
 const DOC_ID_BY = {
-  child_profiles: (d) => d.student_id,
-  self_jadwal: (d) => d.user_id,
-  self_jadawal: (d) => d.user_id,
-  user_portal_access: (d) => d.user_id,
-  parent_report_views: (d) => d.student_id,
+  child_profiles: (d) => d.student_id || d.id,
+  student_profiles: (d) => d.student_id || d.id || d.user_id,
+  teacher_profiles: (d) => d.id || d.teacher_id || d.email,
+  self_jadwal: (d) => d.user_id || d.id,
+  self_jadawal: (d) => d.user_id || d.id,
+  user_portal_access: (d) => d.user_id || d.id,
+  parent_report_views: (d) => d.student_id || d.id,
   page_visibility: (d) => [d.page_key, d.role].join("__"),
   user_fcm_tokens: (d) => d.fcm_token || d.token,
   weekly_results: (d) => [d.student_id, d.week_date].join("_"),
@@ -73,15 +123,17 @@ const DOC_ID_BY = {
   student_daily_attendance: (d) => [d.student_id, d.attendance_date].join("_"),
   jadwal_settings: (d) => String(d.id ?? 1),
   report_settings: (d) => String(d.id ?? 1),
+  marhala_settings: (d) => String(d.id ?? 1),
   email_settings: (d) => String(d.id ?? 1),
   whatsapp_config: (d) => String(d.id ?? 1),
-  jadawal: (d) => d.student_id,
-  app_lock_settings: (d) => d.user_id,
+  jadawal: (d) => d.student_id || d.id,
+  app_lock_settings: (d) => d.user_id || d.id,
 };
 
 function deriveDocId(collectionName, data) {
   if (!data || typeof data !== "object") return null;
-  const derive = DOC_ID_BY[collectionName];
+  const baseName = String(collectionName).replace(/^kibar_/, "");
+  const derive = DOC_ID_BY[baseName];
   if (derive) {
     const id = derive(data);
     if (id !== undefined && id !== null && String(id) !== "") return String(id);
@@ -404,6 +456,12 @@ function nativeConstraints(filters) {
 
 async function loadCandidates(state, ref) {
   const filters = state.filters || [];
+
+  // Intercept empty 'in' filters to avoid Firestore crashes and return [] immediately
+  const hasEmptyInFilter = filters.some(f => f.op === "in" && Array.isArray(f.val) && f.val.length === 0);
+  if (hasEmptyInFilter) {
+    return [];
+  }
 
   // Fast path: single eq(id) -> getDoc
   if (
@@ -757,7 +815,7 @@ function createBuilder(collectionName) {
 }
 
 export function from(collectionName) {
-  return createBuilder(collectionName);
+  return createBuilder(resolveCollectionName(collectionName));
 }
 
 export default { from };

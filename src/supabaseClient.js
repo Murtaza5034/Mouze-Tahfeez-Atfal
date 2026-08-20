@@ -11,6 +11,10 @@ import firebaseCompat, { createClient as createFirebaseClient } from "./firebase
 
 export const supabase = firebaseCompat;
 
+// Portal section scoping (atfal | kibar). kibar sections read/write the
+// kibar_* Firestore collections so the two institutes stay fully isolated.
+export { setSectionScope, getSectionScope } from "./firebase/db.js";
+
 export const supabaseUrl =
   import.meta.env.VITE_SUPABASE_URL || "https://medypnbcsjytbxiwenob.supabase.co";
 

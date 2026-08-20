@@ -210,10 +210,19 @@ const getFatemiDateStr = (dateStr) => {
       "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
       "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
     ];
-    if (m === 12 && d === 30) {
-      return `1 ${arabicMonths[0]} ${y + 1}`;
+    d += 1;
+    const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+    const isLeapYear = (y * 11 + 14) % 30 < 11;
+    const lastMonthLen = isLeapYear ? 30 : 29;
+    const currentMonthLen = m === 12 ? lastMonthLen : monthLengths[m - 1];
+    if (d > currentMonthLen) {
+      d = 1;
+      m += 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
     }
-    if (m === 1) d++;
     return `${d} ${arabicMonths[m - 1] || ''} ${y}`;
   } catch { return ''; }
 };

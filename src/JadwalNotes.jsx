@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient';
+import { supabase, getSectionScope } from './supabaseClient';
 import { Send, FileText, Clock, Trash, Reply, CheckCircle } from 'lucide-react';
 
 const normalizeText = (text) => text ? text.trim().toLowerCase() : "";
@@ -103,6 +103,7 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
                 body: notifBody,
                 targetRole: "teacher",
                 targetUser: String(teacherTarget),
+                section: getSectionScope() === "kibar" ? "kibar" : "atfal",
                 data: {
                   redirectPage: `Jadwal:${studentId}`,
                   timestamp: new Date().toISOString()

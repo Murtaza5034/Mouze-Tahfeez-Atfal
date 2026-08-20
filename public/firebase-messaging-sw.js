@@ -7,7 +7,7 @@ firebase.initializeApp({
   projectId: "mawaid-b929a",
   storageBucket: "mawaid-b929a.firebasestorage.app",
   messagingSenderId: "353078822685",
-  appId: "1:353078822685:android:8f83b293733213472bc3f4",
+  appId: "1:353078822685:web:9b89c7c156bcb0992bc3f4",
   measurementId: "B5W2bPUAQQmqbmDf5lF-6g"
 });
 

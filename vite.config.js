@@ -108,6 +108,7 @@ export function getRefreshReg() {
   ],
   base: '/',
   build: {
+    emptyOutDir: false,
     sourcemap: false,
     minify: 'esbuild',
     cssCodeSplit: true,
@@ -160,6 +161,9 @@ export function getRefreshReg() {
     assetsInlineLimit: 4096,
   },
   server: {
+    watch: {
+      ignored: ['**/dist/**', '**/dist_*/**', '**/dist_trash*/**', '**/.git/**', '**/.agents/**', '**/build/**'],
+    },
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
     },

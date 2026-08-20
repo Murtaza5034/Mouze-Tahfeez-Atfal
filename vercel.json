@@ -31,6 +31,14 @@
       }
     },
     {
+      "src": "/firebase-messaging-sw.js",
+      "dest": "/firebase-messaging-sw.js",
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate",
+        "service-worker-allowed": "/"
+      }
+    },
+    {
       "src": "/manifest.webmanifest",
       "dest": "/manifest.webmanifest",
       "headers": { "content-type": "application/manifest+json" }

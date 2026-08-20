@@ -140,11 +140,21 @@ export function getFallbackFatemiDate(dateStr) {
     let d = parseInt(parts.find(p => p.type === 'day').value);
     let m = parseInt(parts.find(p => p.type === 'month').value);
     let y = parseInt(parts.find(p => p.type === 'year').value);
-    if (m === 12 && d === 30) {
-      return `1 ${ARABIC_MONTHS[0]} ${y + 1}`;
+    const arabicMonths = ARABIC_MONTHS;
+    d += 1;
+    const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+    const isLeapYear = (y * 11 + 14) % 30 < 11;
+    const lastMonthLen = isLeapYear ? 30 : 29;
+    const currentMonthLen = m === 12 ? lastMonthLen : monthLengths[m - 1];
+    if (d > currentMonthLen) {
+      d = 1;
+      m += 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
     }
-    if (m === 1) d++;
-    return `${d} ${ARABIC_MONTHS[m - 1] || ''} ${y}`;
+    return `${d} ${arabicMonths[m - 1] || ''} ${y}`;
   } catch { return ''; }
 }
 
@@ -206,15 +216,30 @@ export async function convertToHijri(gregorianDate) {
     // Fall through to Intl fallback
   }
 
-  // Fallback: use browser Intl
+  // Fallback: use browser Intl (add 1 day for Fatemi calendar)
   const hp = getHijriParts(gregorianDate);
   if (!hp) {
     return { date: null, date_arabic: '', date_english: '', _fallback: true, _monthDay: '' };
   }
-  const mm = String(hp.month).padStart(2, '0');
-  const dd = String(hp.day).padStart(2, '0');
-  const dateStr = `${hp.year}-${mm}-${dd}`;
-  const dateArabic = formatHijriArabic(dateStr) || `${hp.day} ${ARABIC_MONTHS[hp.month - 1] || ''} ${hp.year}`;
+  let d = hp.day + 1;
+  let m = hp.month;
+  let y = hp.year;
+  const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+  const isLeapYear = (y * 11 + 14) % 30 < 11;
+  const lastMonthLen = isLeapYear ? 30 : 29;
+  const currentMonthLen = m === 12 ? lastMonthLen : monthLengths[m - 1];
+  if (d > currentMonthLen) {
+    d = 1;
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  const mm = String(m).padStart(2, '0');
+  const dd = String(d).padStart(2, '0');
+  const dateStr = `${y}-${mm}-${dd}`;
+  const dateArabic = formatHijriArabic(dateStr) || `${d} ${ARABIC_MONTHS[m - 1] || ''} ${y}`;
   const dateEnglish = formatHijriEnglish(dateStr) || '';
   const fallback = {
     date: dateStr,

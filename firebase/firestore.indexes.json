@@ -63,6 +63,70 @@
         { "fieldPath": "student_id", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "kibar_student_daily_attendance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "student_id", "order": "ASCENDING" },
+        { "fieldPath": "attendance_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kibar_student_daily_attendance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "student_id", "order": "ASCENDING" },
+        { "fieldPath": "attendance_date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kibar_weekly_results",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "student_id", "order": "ASCENDING" },
+        { "fieldPath": "week_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kibar_weekly_results_archive",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "student_id", "order": "ASCENDING" },
+        { "fieldPath": "week_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kibar_child_profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "parent_user_id", "order": "ASCENDING" },
+        { "fieldPath": "student_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kibar_schedule",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "student_id", "order": "ASCENDING" },
+        { "fieldPath": "task_time", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kibar_badal_progress",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "student_id", "order": "ASCENDING" },
+        { "fieldPath": "week_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kibar_student_leaves",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "student_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

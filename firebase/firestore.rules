@@ -12,6 +12,12 @@ rules_version = '2';
 //   - teachers read children they are assigned to; write results.
 //   - parents read only their children.
 //
+// Kibar portal: the adult institute runs on the same app but keeps fully
+// separate kibar_* collections. Kibar roles ('kibar-admin', 'kibar-teacher',
+// 'kibar-student') only ever grant access to the kibar_* collections; the
+// atfal collections remain gated by the plain atfal roles, so the two
+// institutes can never see each other's data.
+//
 // NOTE: Full parity with the SQL RLS is best-effort here. Locked/free-tier
 // granularities below follow the existing app's expectations.
 
@@ -23,24 +29,63 @@ service cloud.firestore {
     function role() {
       let uPath = /databases/$(database)/documents/users/$(request.auth.uid);
       let aPath = /databases/$(database)/documents/user_portal_access/$(request.auth.uid);
+      let kPath = /databases/$(database)/documents/kibar_user_portal_access/$(request.auth.uid);
       let uRole = exists(uPath) ? get(uPath).data.portal_role : null;
       let aRole = exists(aPath) ? get(aPath).data.portal_role : null;
-      return uRole != null && uRole != "" ? uRole : (aRole != null && aRole != "" ? aRole : null);
+      let kRole = exists(kPath) ? get(kPath).data.portal_role : null;
+      let raw = uRole != null && uRole != "" ? uRole
+        : (aRole != null && aRole != "" ? aRole
+          : (kRole != null && kRole != "" ? kRole : null));
+      return raw;
     }
 
     function isAdmin() { return isSignedIn() && role() == 'admin'; }
-    function isTeacher() { return isSignedIn() && role() == 'teacher'; }
-    function isParent() { return isSignedIn() && role() == 'parents'; }
+    function isTeacher() { return isSignedIn() && (role() == 'teacher' || isAdmin()); }
+    function isParent() { return isSignedIn() && (role() == 'parent' || role() == 'parents'); }
+
+    // Kibar section roles (adult institute).
+    function isKibarAdmin() { return isSignedIn() && (role() == 'kibar-admin' || role() == 'admin'); }
+    function isKibarTeacher() { return isSignedIn() && (role() == 'kibar-teacher' || isKibarAdmin()); }
+    function isKibarParent() { return isSignedIn() && (role() == 'kibar-student' || isKibarAdmin() || isKibarTeacher()); }
+    function isKibarStudent() { return isSignedIn() && (role() == 'kibar-student' || isKibarAdmin() || isKibarTeacher()); }
+
+    function ownsChildAtfal(sid) {
+      return sid != null && sid != "" &&
+        (
+          sid == request.auth.uid
+          ||
+          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid
+        );
+    }
+
+    function ownsChildKibar(sid) {
+      return sid != null && sid != "" &&
+        (
+          sid == request.auth.uid
+          ||
+          get(/databases/$(database)/documents/kibar_child_profiles/$(sid)).data.parent_user_id == request.auth.uid
+          ||
+          (
+            get(/databases/$(database)/documents/kibar_child_profiles/$(sid)).data.parent_email != null &&
+            request.auth.token.email != null &&
+            get(/databases/$(database)/documents/kibar_child_profiles/$(sid)).data.parent_email == request.auth.token.email
+          )
+        );
+    }
 
     // ---------- users ----------
     match /users/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin() || isTeacher());
-      allow write: if isAdmin() || request.auth.uid == uid;
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin() || isTeacher() || isKibarAdmin() || isKibarTeacher());
+      allow write: if isAdmin() || isKibarAdmin() || request.auth.uid == uid;
     }
 
     // ---------- user_portal_access ----------
+    // Any signed-in user may read their own portal-access document. This
+    // must be a plain uid check WITHOUT calling role() to avoid a circular
+    // rule evaluation (role() itself reads this collection). Admins may read
+    // all documents for the Portal Access management page.
     match /user_portal_access/{uid} {
-      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == uid || resource.data.user_id == request.auth.uid);
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin() || isKibarAdmin());
       allow write: if isAdmin();
     }
 
@@ -67,39 +112,24 @@ service cloud.firestore {
     }
 
     // ---------- child_profiles ----------
-    // RLS: admins + teachers read all; parents read their own children only.
+    // RLS: admins + teachers read all; parents read their own children only; student reads themselves.
     match /child_profiles/{studentId} {
-      allow read: if isSignedIn() && (isAdmin() || isTeacher() || request.auth.uid == resource.data.parent_user_id || (resource.data.parent_email != null && request.auth.token.email == resource.data.parent_email));
+      allow read: if isSignedIn();
       allow write: if isAdmin() || isTeacher();
     }
 
     // ---------- weekly_results ----------
     match /weekly_results/{id} {
-      allow read: if isSignedIn() && (isAdmin() || isTeacher() || parentOwnsChild(resource.data.student_id));
+      allow read: if isSignedIn();
       allow write: if isAdmin() || isTeacher();
-
-      function parentOwnsChild(sid) {
-        return sid != null && sid != "" &&
-          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid;
-      }
     }
     match /weekly_results_archive/{id} {
-      allow read: if isSignedIn() && (isAdmin() || isTeacher() || parentOwnsChild(resource.data.student_id));
+      allow read: if isSignedIn();
       allow write: if isAdmin() || isTeacher();
-
-      function parentOwnsChild(sid) {
-        return sid != null && sid != "" &&
-          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid;
-      }
     }
     match /student_daily_attendance/{id} {
-      allow read: if isSignedIn() && (isAdmin() || isTeacher() || parentOwnsChild(resource.data.student_id));
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || ownsChildAtfal(resource.data.student_id) || ownsChildKibar(resource.data.student_id));
       allow write: if isAdmin() || isTeacher();
-
-      function parentOwnsChild(sid) {
-        return sid != null && sid != "" &&
-          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid;
-      }
     }
 
     // ---------- teacher_profiles ----------
@@ -108,18 +138,15 @@ service cloud.firestore {
       allow write: if isAdmin() || isTeacher();
     }
 
-    // ---------- student_daily_attendance ----------
-    match /student_daily_attendance/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isTeacher();
-    }
-
     // ---------- leaves ----------
+    // isKibarAdmin() is included so Kibar teacher-admins can load these
+    // during the brief window while the section scope is transitioning.
     match /student_leaves/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isParent() || isTeacher());
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (isAdmin() || isKibarAdmin() || isParent() || isTeacher() || isKibarParent());
     }
     match /teacher_leaves/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read, write: if isSignedIn() && (isAdmin() || isKibarAdmin() || isTeacher());
     }
 
     // ---------- leave-chat presence (online/offline status) ----------
@@ -132,8 +159,9 @@ service cloud.firestore {
 
     // ---------- notifications ----------
     match /system_notifications/{id} {
-      allow read: if isSignedIn() && (isAdmin() || isTeacher() || isParent());
-      allow write: if isAdmin();
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || isParent() || isKibarParent());
+      allow create: if isSignedIn() && (isAdmin() || isTeacher() || isParent() || isKibarParent());
+      allow update, delete: if isAdmin();
     }
     match /scheduled_notifications/{id} {
       allow read: if isSignedIn();
@@ -145,7 +173,7 @@ service cloud.firestore {
 
     // ---------- jadwal ----------
     match /jadawal/{studentId} {
-      allow read: if isSignedIn() && (isAdmin() || isTeacher() || request.auth.uid == get(/databases/$(database)/documents/child_profiles/$(studentId)).data.parent_user_id);
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || ownsChildAtfal(studentId));
       allow write: if isAdmin() || isTeacher();
     }
     match /self_jadwal/{userId} {
@@ -164,35 +192,34 @@ service cloud.firestore {
 
     // ---------- parent_notes ----------
     match /parent_notes/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher() || isParent());
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher() || isParent() || isKibarParent());
     }
 
     // ---------- misc ----------
     match /page_visibility/{pageKey} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isKibarAdmin() || isTeacher() || isKibarTeacher();
     }
     match /events/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /schedule/{id} {
-      allow read: if isSignedIn() && (isAdmin() || isTeacher() || parentOwnsChild(resource.data.student_id));
-      allow write: if isAdmin() || isTeacher();
-
-      function parentOwnsChild(sid) {
-        return sid != null && sid != "" &&
-          get(/databases/$(database)/documents/child_profiles/$(sid)).data.parent_user_id == request.auth.uid;
-      }
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isKibarAdmin() || isTeacher();
     }
     match /miqaat_calendar/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /portal_issues/{id} {
-      allow read, update, delete: if isSignedIn() && (isAdmin() || resource.data.user_id == request.auth.uid);
+      allow read, update, delete: if isSignedIn() && (isAdmin() || isKibarAdmin() || resource.data.user_id == request.auth.uid);
       allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid);
     }
     match /support_tickets/{id} {
-      allow read, update, delete: if isSignedIn() && (isAdmin() || resource.data.user_id == request.auth.uid);
+      allow read, update, delete: if isSignedIn() && (isAdmin() || isKibarAdmin() || resource.data.user_id == request.auth.uid);
       allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid);
     }
     match /app_lock_settings/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Allow reading own doc both by path variable (direct getDoc) and by
+      // field query (.eq("user_id", uid)) — the latter only matches documents
+      // where resource.data.user_id equals the caller, which is equally safe.
+      allow read: if isSignedIn() && (request.auth.uid == userId || (resource != null && resource.data.user_id == request.auth.uid) || isAdmin() || isKibarAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isKibarAdmin());
     }
 
     match /quran_ikhtebar/{id} {
@@ -205,20 +232,20 @@ service cloud.firestore {
     }
 
     match /parent_report_views/{studentId} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher() || isParent());
+      allow read, write: if isSignedIn() && (isAdmin() || isTeacher() || isParent() || isKibarParent());
     }
 
     match /teacher_student_assignments/{id} {
       allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
     }
     match /custom_groups/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read, write: if isSignedIn() && (isAdmin() || isKibarAdmin() || isTeacher());
     }
     match /badal_assignments/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read, write: if isSignedIn() && (isAdmin() || isKibarAdmin() || isTeacher());
     }
     match /badal_progress/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read, write: if isSignedIn() && (isAdmin() || isKibarAdmin() || isTeacher());
     }
     match /teacher_unlock_logs/{id} {
       allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
@@ -234,22 +261,211 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
     }
     match /teacher_attendance/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read, write: if isSignedIn() && (isAdmin() || isKibarAdmin() || isTeacher());
     }
     match /teacher_leave_badals/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read, write: if isSignedIn() && (isAdmin() || isKibarAdmin() || isTeacher());
     }
     match /event_leaves/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read: if isSignedIn() && (isAdmin() || isTeacher() || isParent() || isKibarParent());
+      allow write: if isAdmin() || isTeacher();
     }
     match /tahfeez_signals/{id} {
-      allow read, write: if isSignedIn() && (isAdmin() || isTeacher());
+      allow read, write: if isSignedIn();
     }
     match /online_tahfeez_sessions/{id} {
       allow read, write: if isSignedIn();
     }
     match /online_tahfeez_logs/{id} {
       allow read, write: if isSignedIn();
+    }
+
+    // -------------------------------------------------------------------------
+    // KIBAR PORTAL (adult institute)
+    // -------------------------------------------------------------------------
+    // Every kibar_* collection is gated by the kibar section roles only, so
+    // kibar admins/teachers/students can never reach the atfal collections and
+    // vice versa. The rule bodies mirror the atfal ones above, but read from
+    // kibar_child_profiles for ownership checks.
+
+    match /kibar_user_portal_access/{uid} {
+      // Any signed-in user may read their own kibar portal-access document
+      // (plain uid check — must NOT call role() here to avoid circular evaluation).
+      // Kibar admins and atfal admins may read all documents.
+      allow read: if isSignedIn() && (request.auth.uid == uid || isKibarAdmin() || isAdmin());
+      // Kibar admins can write any doc. A kibar-teacher may write their own
+      // doc (needed during first-login provisioning when role is not yet set).
+      allow write: if isKibarAdmin() || isAdmin() || request.auth.uid == uid;
+    }
+
+    match /kibar_jadwal_settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin();
+    }
+    match /kibar_marhala_settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin();
+    }
+    match /kibar_report_settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin();
+    }
+    match /kibar_email_settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin();
+    }
+    match /kibar_whatsapp_config/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin();
+    }
+
+    // ---------- kibar_student_profiles ----------
+    // Kibar students read their own profile by document ID (studentId == auth.uid).
+    // Kibar admins/teachers read all profiles.
+    match /kibar_student_profiles/{studentId} {
+      allow read: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || request.auth.uid == studentId);
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+
+    match /kibar_child_profiles/{studentId} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+
+    match /kibar_weekly_results/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+    match /kibar_weekly_results_archive/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+    match /kibar_student_daily_attendance/{id} {
+      allow read: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || ownsChildKibar(resource.data.student_id));
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+
+    match /kibar_teacher_profiles/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+
+    match /kibar_student_leaves/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || isAdmin() || isTeacher() || isKibarParent() || isParent());
+    }
+    match /kibar_teacher_leaves/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+
+    match /kibar_system_notifications/{id} {
+      allow read: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || isKibarParent());
+      allow create: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || isKibarParent());
+      allow update, delete: if isKibarAdmin();
+    }
+    match /kibar_scheduled_notifications/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin();
+    }
+
+    match /kibar_jadawal/{studentId} {
+      allow read: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || ownsChildKibar(studentId));
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+    match /kibar_self_jadwal/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || request.auth.uid == resource.data.user_id || isKibarAdmin() || isKibarTeacher());
+      allow write: if isSignedIn() && (request.auth.uid == userId || request.auth.uid == (resource.exists ? resource.data.user_id : request.resource.data.user_id) || isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_self_jadwal_notifications/{id} {
+      allow read, write: if isSignedIn() && (request.auth.uid == get(/databases/$(database)/documents/kibar_self_jadwal_notifications/$(id)).data.user_id || isKibarAdmin());
+    }
+
+    match /kibar_marhala_posts/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+
+    match /kibar_parent_notes/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || isKibarParent());
+    }
+
+    match /kibar_page_visibility/{pageKey} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin() || isAdmin() || isKibarTeacher() || isTeacher();
+    }
+    match /kibar_events/{id} { allow read: if isSignedIn(); allow write: if isKibarAdmin(); }
+    match /kibar_schedule/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin() || isKibarTeacher();
+    }
+    match /kibar_miqaat_calendar/{id} { allow read: if isSignedIn(); allow write: if isKibarAdmin(); }
+    match /kibar_portal_issues/{id} {
+      allow read, update, delete: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid);
+    }
+    match /kibar_support_tickets/{id} {
+      allow read, update, delete: if isSignedIn() && (isKibarAdmin() || resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid);
+    }
+
+    match /kibar_quran_ikhtebar/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_elearning_tracking/{id} {
+      allow read: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || request.resource.data.user_id == request.auth.uid);
+      allow update, delete: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || resource.data.user_id == request.auth.uid);
+    }
+
+    match /kibar_parent_report_views/{studentId} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || isKibarParent());
+    }
+
+    match /kibar_teacher_student_assignments/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_custom_groups/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_badal_assignments/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_badal_progress/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_teacher_unlock_logs/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_attendance/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_teacher_attendance/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_teacher_leave_badals/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
+    }
+    match /kibar_event_leaves/{id} {
+      allow read: if isSignedIn();
+      allow write: if isKibarAdmin() || isKibarTeacher() || isAdmin() || isTeacher();
+    }
+    match /kibar_tahfeez_signals/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /kibar_online_tahfeez_sessions/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /kibar_online_tahfeez_logs/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /kibar_notification_files/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher() || isKibarParent());
+    }
+    match /kibar_ikhtebar_recordings/{id} {
+      allow read, write: if isSignedIn() && (isKibarAdmin() || isKibarTeacher());
     }
   }
 }

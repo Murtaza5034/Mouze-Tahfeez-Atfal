@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "./supabaseClient";
+import { supabase, getSectionScope } from "./supabaseClient";
 
 const normalizePhoneNumber = (phone) => {
   if (!phone) return '';
@@ -48,6 +48,7 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
         body,
         targetRole: targetRole === "user" ? null : targetRole,
         targetUser: targetUser,
+        section: getSectionScope() === "kibar" ? "kibar" : "atfal",
         data: {
           redirectPage,
           fileUrl: fileUrl || "",
@@ -151,6 +152,12 @@ export default function TeacherLeaveApprovalPanel({
   portalRole,
   user,
 }) {
+  const sectionKibar = getSectionScope() === 'kibar';
+  const TEACHER_LEAVES_TABLE = sectionKibar ? 'kibar_teacher_leaves' : 'teacher_leaves';
+  const TEACHER_LEAVE_BADALS_TABLE = sectionKibar ? 'kibar_teacher_leave_badals' : 'teacher_leave_badals';
+  const CHILD_PROFILES_TABLE = sectionKibar ? 'kibar_child_profiles' : 'child_profiles';
+  const BADAL_ASSIGNMENTS_TABLE = sectionKibar ? 'kibar_badal_assignments' : 'badal_assignments';
+
   const [tlLeaves, setTlLeaves] = useState([]);
   const [tlLoading, setTlLoading] = useState(true);
   const [tlFilter, setTlFilter] = useState("pending");
@@ -161,30 +168,30 @@ export default function TeacherLeaveApprovalPanel({
 
   const fetchTlLeaves = () => {
     setTlLoading(true);
-    supabase.from("teacher_leaves").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+    supabase.from(TEACHER_LEAVES_TABLE).select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
       if (!error) setTlLeaves(data || []);
       setTlLoading(false);
     });
   };
 
-  useEffect(() => { fetchTlLeaves(); }, []);
+  useEffect(() => { fetchTlLeaves(); }, [sectionKibar]);
 
   /* Auto-restore expired leaves on load */
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
-    supabase.from("teacher_leave_badals").select("*").eq("active", true).lte("to_date", today).then(({ data: expired }) => {
+    supabase.from(TEACHER_LEAVE_BADALS_TABLE).select("*").eq("active", true).lte("to_date", today).then(({ data: expired }) => {
       if (expired && expired.length > 0) {
         expired.forEach(b => {
           const sid = String(b.student_id);
           const sidNum = Number(b.student_id);
           const sidVal = isNaN(sidNum) ? sid : sidNum;
-          supabase.from("child_profiles").update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
-            supabase.from("teacher_leave_badals").update({ active: false }).eq("id", b.id);
+          supabase.from(CHILD_PROFILES_TABLE).update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
+            supabase.from(TEACHER_LEAVE_BADALS_TABLE).update({ active: false }).eq("id", b.id);
           });
         });
       }
     });
-  }, []);
+  }, [sectionKibar]);
 
   const handleTlApprove = async (lv) => {
     if (!tlComment.trim()) {
@@ -217,7 +224,7 @@ export default function TeacherLeaveApprovalPanel({
       setTlSubmitting(false);
       return;
     }
-    await supabase.from("teacher_leaves").update({ status: "approved", admin_comment: tlComment }).eq("id", lv.id);
+    await supabase.from(TEACHER_LEAVES_TABLE).update({ status: "approved", admin_comment: tlComment }).eq("id", lv.id);
     for (const s of assigned) {
       const badalId = tlAssignments[String(s.student_id)];
       const sid = String(s.student_id);
@@ -225,14 +232,14 @@ export default function TeacherLeaveApprovalPanel({
       const sidVal = isNaN(sidNum) ? sid : sidNum;
       const badalTeacher = teacherProfiles.find(p => p.user_id === badalId);
       const studentName = s.name || s.full_name || "";
-      await supabase.from("child_profiles").update({ badal_teacher_id: badalId }).eq("student_id", sidVal);
-      await supabase.from("teacher_leave_badals").insert({
+      await supabase.from(CHILD_PROFILES_TABLE).update({ badal_teacher_id: badalId }).eq("student_id", sidVal);
+      await supabase.from(TEACHER_LEAVE_BADALS_TABLE).insert({
         leave_id: lv.id, student_id: sidVal, student_name: studentName,
         original_teacher_id: String(lv.teacher_id), badal_teacher_id: badalId,
         badal_teacher_name: badalTeacher?.full_name || badalId,
         from_date: lv.from_date, to_date: lv.to_date, active: true
       });
-      await supabase.from("badal_assignments").upsert(
+      await supabase.from(BADAL_ASSIGNMENTS_TABLE).upsert(
         { student_id: sidVal, teacher_id: badalId, original_teacher_id: String(lv.teacher_id), status: "active" },
         { onConflict: "student_id" }
       );
@@ -264,7 +271,7 @@ export default function TeacherLeaveApprovalPanel({
       if (onShowAction) onShowAction("error", "Please enter an admin comment before rejecting.");
       return;
     }
-    await supabase.from("teacher_leaves").update({ status: "rejected", admin_comment: tlComment }).eq("id", lv.id);
+    await supabase.from(TEACHER_LEAVES_TABLE).update({ status: "rejected", admin_comment: tlComment }).eq("id", lv.id);
     broadcastNotification(
       "Leave Rejected",
       `Your leave (${lv.from_date} → ${lv.to_date}) has been rejected. Comment: ${tlComment}`,
@@ -282,7 +289,7 @@ export default function TeacherLeaveApprovalPanel({
       if (onShowAction) onShowAction("error", "Please enter an admin comment before marking subject to approve.");
       return;
     }
-    await supabase.from("teacher_leaves").update({ status: "subject_to_approve", admin_comment: tlComment }).eq("id", lv.id);
+    await supabase.from(TEACHER_LEAVES_TABLE).update({ status: "subject_to_approve", admin_comment: tlComment }).eq("id", lv.id);
     broadcastNotification(
       "Leave Subject To Approve",
       `Your leave (${lv.from_date} → ${lv.to_date}) has been marked subject to approve. Comment: ${tlComment}`,

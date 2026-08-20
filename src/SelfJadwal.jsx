@@ -9,7 +9,7 @@ import './jadwal.css';
 
 export { getAyahPage };
 
-const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+const DAYS = ['SATURDAY', 'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
 
 export const getFatemiDateStr = (dateStr) => {
   if (!dateStr) return '';
@@ -26,29 +26,35 @@ export const getFatemiDateStr = (dateStr) => {
       "جمادى الأولى", "جمادى الآخرة", "رجب الأصب", "شعبان الكريم",
       "رمضان المعظم", "شوال المكرم", "ذي القعدة الحرام", "ذي الحجة الحرام"
     ];
-    if (m === 12 && d === 30) {
-      return `1 ${arabicMonths[0]} ${y + 1}`;
+    d += 1;
+    const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+    const isLeapYear = (y * 11 + 14) % 30 < 11;
+    const lastMonthLen = isLeapYear ? 30 : 29;
+    const currentMonthLen = m === 12 ? lastMonthLen : monthLengths[m - 1];
+    if (d > currentMonthLen) {
+      d = 1;
+      m += 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
     }
-    if (m === 1) d++;
     return `${d} ${arabicMonths[m - 1] || ''} ${y}`;
   } catch { return ''; }
 };
 
 const getCurrentWeekRange = () => {
   const now = new Date();
+  // Saturday is day 6 in getDay() (0=Sunday, 6=Saturday)
+  // Find current week's Saturday
   const today = now.getDay();
-  let sat;
-  if (today === 5) {
-    sat = new Date(now);
-    sat.setDate(now.getDate() + 1);
-  } else {
-    const daysBack = (today - 6 + 7) % 7;
-    sat = new Date(now);
-    sat.setDate(now.getDate() - daysBack);
-  }
-  const fri = new Date(sat);
-  fri.setDate(sat.getDate() + 6);
-  return { weekStart: sat.toISOString().split('T')[0], weekEnd: fri.toISOString().split('T')[0] };
+  const daysSinceSat = (today + 1) % 7; // Sat: (6+1)%7=0, Sun: (0+1)%7=1, ..., Fri: (5+1)%7=6
+  const saturday = new Date(now);
+  saturday.setDate(now.getDate() - daysSinceSat);
+  const weekStart = new Date(saturday);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  return { weekStart: weekStart.toISOString().split('T')[0], weekEnd: weekEnd.toISOString().split('T')[0] };
 };
 
 const getDayDate = (weekStart, dayIndex) => {
@@ -954,7 +960,7 @@ const premiumCardStyle = {
   overflow: 'hidden',
 };
 
-export const SelfJadwalParentView = ({ userId, userEmail, showAction, onBroadcastNotification }) => {
+export const SelfJadwalParentView = ({ userId, userEmail, showAction, onBroadcastNotification, studentProfile }) => {
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(true);
@@ -983,10 +989,8 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction, onBroadcas
   // Compute enriched days directly from fatemiData (no useEffect needed)
   const enrichedDays = useMemo(() => {
     if (!customDays || !fatemiData || Object.keys(fatemiData).length === 0) {
-      console.log('🔍 SelfJadwalParentView: useMemo skipping (no data)');
       return null;
     }
-    console.log('🔍 SelfJadwalParentView: useMemo enriching', { daysCount: customDays.length, dataKeys: Object.keys(fatemiData) });
     const enriched = customDays.map(day => {
       const apiData = fatemiData[day.date];
       if (apiData && apiData.hijri) {
@@ -999,22 +1003,20 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction, onBroadcas
       }
       return { ...day, miqaats: [], miqaatSummary: null };
     });
-    const miqaatDays = enriched.filter(d => d.miqaats && d.miqaats.length > 0);
-    console.log('🔍 SelfJadwalParentView: useMemo done', enriched.length, 'days,', miqaatDays.length, 'with miqaats', miqaatDays.map(d => ({ day: d.dayName, date: d.date, count: d.miqaats.length })));
     return enriched;
   }, [customDays, fatemiData]);
 
   useEffect(() => {
-    if (userId) {
+    if (userId || studentProfile) {
       fetchSelfJadwal().then(() => markAsViewed());
       fetchUserName();
       checkWelcomePopup();
     }
-  }, [userId]);
+  }, [userId, studentProfile]);
 
   // Auto-save whenever schedule or mode changes
   useEffect(() => {
-    if (!userId || loading) return;
+    if ((!userId && !studentProfile) || loading) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     const currentSnapshot = JSON.stringify({ data: scheduleData, mode });
@@ -1030,10 +1032,13 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction, onBroadcas
       for (const [key, ts] of Object.entries(mergedHistory)) {
         if (now - new Date(ts).getTime() < 60000) cleanHistory[key] = ts;
       }
+      const targetUserId = userId || studentProfile?.user_id || studentProfile?.id || studentProfile?.student_id;
+      const sid = studentProfile?.student_id || studentProfile?.id || targetUserId;
       const { error } = await supabase
         .from('self_jadwal')
         .upsert({
-          user_id: userId,
+          user_id: String(targetUserId),
+          student_id: String(sid),
           schedule_data: { ...scheduleData, _mode: mode, _editHistory: cleanHistory },
           updated_at: new Date().toISOString(),
           parent_viewed_at: new Date().toISOString()
@@ -1053,30 +1058,46 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction, onBroadcas
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [scheduleData, mode, userId, loading]);
+  }, [scheduleData, mode, userId, studentProfile, loading]);
 
   const fetchUserName = async () => {
     try {
+      const lookupId = userId || studentProfile?.user_id || studentProfile?.id;
       const { data: userData } = await supabase
         .from('user_portal_access')
         .select('full_name')
-        .eq('user_id', userId)
+        .eq('user_id', lookupId)
         .single();
       if (userData?.full_name) {
         setUserName(userData.full_name);
+      } else if (studentProfile?.name || studentProfile?.full_name) {
+        setUserName(studentProfile.name || studentProfile.full_name);
       }
     } catch (e) {
-      // silent
+      if (studentProfile?.name || studentProfile?.full_name) {
+        setUserName(studentProfile.name || studentProfile.full_name);
+      }
     }
   };
 
   const fetchSelfJadwal = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const candidateUserIds = [
+      userId,
+      studentProfile?.user_id,
+      studentProfile?.id,
+      studentProfile?.student_id,
+      studentProfile?.parent_user_id
+    ].filter(Boolean).map(String);
+    const uniqueIds = [...new Set(candidateUserIds)];
+
+    const { data: records, error } = await supabase
       .from('self_jadwal')
-      .select('schedule_data, has_unseen_changes')
-      .eq('user_id', userId)
-      .single();
+      .select('schedule_data, has_unseen_changes, updated_at')
+      .in('user_id', uniqueIds)
+      .order('updated_at', { ascending: false });
+
+    const data = records && records.length > 0 ? records[0] : null;
 
     if (error && error.code !== 'PGRST116') {
       console.error('Failed to fetch self Jadwal:', error);
@@ -1099,55 +1120,62 @@ export const SelfJadwalParentView = ({ userId, userEmail, showAction, onBroadcas
   };
 
   const handleNotifyUser = async () => {
-    if (!userId) return;
+    if (!userId && !studentProfile) return;
     setIsNotifying(true);
     if (showAction) showAction('info', 'Sending notification...');
 
     if (onBroadcastNotification) {
       try {
-        // Look up this parent's child to find the teacher
+        const isKibar = typeof window !== "undefined" && (window.location?.href?.includes("kibar") || (studentProfile && String(studentProfile?.id || "").startsWith("kibar")));
+        const childTable = isKibar ? 'kibar_child_profiles' : 'child_profiles';
+        const teacherTable = isKibar ? 'kibar_teacher_profiles' : 'teacher_profiles';
         let teacherUserId = null;
         try {
+          const sidRef = studentProfile?.student_id || studentProfile?.id || userId;
           const { data: childData } = await supabase
-            .from('child_profiles')
+            .from(childTable)
             .select('teacher_id')
-            .eq('parent_user_id', userId)
+            .or(`parent_user_id.eq.${userId},student_id.eq.${sidRef},user_id.eq.${userId}`)
             .limit(1)
             .maybeSingle();
 
-          if (childData?.teacher_id) {
-            // teacher_id may be stored as numeric id or UUID user_id
+          const teacherIdField = childData?.teacher_id || studentProfile?.muhaffiz_id || studentProfile?.teacher_id;
+          if (teacherIdField) {
             const { data: teacherData } = await supabase
-              .from('teacher_profiles')
-              .select('user_id')
-              .or(`id.eq.${childData.teacher_id},user_id.eq.${childData.teacher_id}`)
+              .from(teacherTable)
+              .select('user_id, id')
+              .or(`id.eq.${teacherIdField},user_id.eq.${teacherIdField}`)
               .limit(1)
               .maybeSingle();
-            teacherUserId = teacherData?.user_id || 
-              (typeof childData.teacher_id === 'string' && childData.teacher_id.length > 20 ? childData.teacher_id : null);
+            teacherUserId = teacherData?.user_id || teacherData?.id;
           }
         } catch (lookupErr) {
           console.warn('Teacher lookup failed, falling back to teacher role:', lookupErr);
         }
 
+        const targetTeacherRole = isKibar ? "kibar-teacher" : "teacher";
+        const targetSection = isKibar ? "kibar" : "atfal";
+        const studentDisplayName = userName || studentProfile?.name || studentProfile?.full_name || 'A student';
         if (teacherUserId) {
-          // Send to the specific teacher
           await onBroadcastNotification(
             "Self Jadwal Timetable Updated",
-            `${userName || 'A parent'} has updated the Self Jadwal schedule. Please review the changes.`,
+            `${studentDisplayName} has updated the Self Jadwal schedule. Please review the changes.`,
             "user",
             teacherUserId,
-            "Schedule"
+            "Self Jadwal",
+            { redirectPage: "Self Jadwal", section: targetSection },
+            targetSection
           );
           if (showAction) showAction('success', 'Teacher notified successfully');
         } else {
-          // Fallback: send to all teachers
           await onBroadcastNotification(
             "Self Jadwal Timetable Updated",
-            `${userName || 'A parent'} has updated the Self Jadwal schedule. Please review the changes.`,
-            "teacher",
+            `${studentDisplayName} has updated the Self Jadwal schedule. Please review the changes.`,
+            targetTeacherRole,
             null,
-            "Schedule"
+            "Self Jadwal",
+            { redirectPage: "Self Jadwal", section: targetSection },
+            targetSection
           );
           if (showAction) showAction('success', 'Teacher notified successfully');
         }
@@ -1491,18 +1519,30 @@ export const SelfJadwalTeacherView
 
   useEffect(() => {
     if (selectedUserId) {
-      const child = students.find(s => String(s.student_id) === String(selectedUserId) || String(s.id) === String(selectedUserId));
+      const child = students.find(s =>
+        String(s.student_id) === String(selectedUserId) ||
+        String(s.id) === String(selectedUserId) ||
+        String(s.user_id) === String(selectedUserId) ||
+        (s.allIds && s.allIds.includes(String(selectedUserId)))
+      );
       if (child) {
         setSelectedUserName(child.name || child.full_name || 'Child');
-        const parentUserId = child.user_id || selectedUserId;
-        setResolvedUserId(parentUserId);
-        fetchSelfJadwalByChildId(parentUserId);
+        const candidateIds = [
+          child.user_id,
+          child.id,
+          child.student_id,
+          ...(child.allIds || []),
+          selectedUserId
+        ].filter(Boolean).map(String);
+        const primaryUserId = child.user_id || child.id || child.student_id || selectedUserId;
+        setResolvedUserId(String(primaryUserId));
+        fetchSelfJadwalByChildIds(candidateIds, primaryUserId);
       }
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
       setResolvedUserId('');
     }
-  }, [selectedUserId]);
+  }, [selectedUserId, students]);
 
   useEffect(() => {
     if (!resolvedUserId) return;
@@ -1522,10 +1562,18 @@ export const SelfJadwalTeacherView
       for (const [key, ts] of Object.entries(mergedHistory)) {
         if (now - new Date(ts).getTime() < 60000) cleanHistory[key] = ts;
       }
+      const child = students.find(s =>
+        String(s.student_id) === String(selectedUserId) ||
+        String(s.id) === String(selectedUserId) ||
+        String(s.user_id) === String(selectedUserId) ||
+        (s.allIds && s.allIds.includes(String(selectedUserId)))
+      );
+      const sid = child?.student_id || child?.id || resolvedUserId;
       const { error } = await supabase
         .from('self_jadwal')
         .upsert({
           user_id: resolvedUserId,
+          student_id: String(sid),
           schedule_data: { ...scheduleData, _mode: mode, _editHistory: cleanHistory },
           updated_at: new Date().toISOString(),
           has_unseen_changes: true,
@@ -1548,15 +1596,18 @@ export const SelfJadwalTeacherView
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [scheduleData, mode, resolvedUserId, currentUserId]);
+  }, [scheduleData, mode, resolvedUserId, currentUserId, selectedUserId, students]);
 
-  const fetchSelfJadwalByChildId = async (childId) => {
+  const fetchSelfJadwalByChildIds = async (candidateIds, primaryUserId) => {
     setLoading(true);
-    const { data, error } = await supabase
+    const uniqueIds = [...new Set((candidateIds || [primaryUserId]).filter(Boolean).map(String))];
+    const { data: records, error } = await supabase
       .from('self_jadwal')
-      .select('schedule_data')
-      .eq('user_id', childId)
-      .single();
+      .select('schedule_data, updated_at, user_id')
+      .in('user_id', uniqueIds)
+      .order('updated_at', { ascending: false });
+
+    const data = records && records.length > 0 ? records[0] : null;
 
     if (error && error.code !== 'PGRST116') {
       console.error('Failed to fetch self Jadwal:', error);
@@ -1565,8 +1616,9 @@ export const SelfJadwalTeacherView
       setMode(savedMode);
       const history = data.schedule_data._editHistory || {};
       setEditHistory(history);
-      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
-      lastSavedSnapshotRef.current = JSON.stringify({ data: { ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode }, mode: savedMode });
+      const loaded = { ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode };
+      setScheduleData(loaded);
+      lastSavedSnapshotRef.current = JSON.stringify({ data: loaded, mode: savedMode });
     } else {
       setScheduleData(DEFAULT_SCHEDULE);
       setEditHistory({});
@@ -1596,18 +1648,23 @@ export const SelfJadwalTeacherView
   };
 
   const handleNotifyUser = async () => {
-    if (!selectedUserId) return;
+    if (!selectedUserId && !resolvedUserId) return;
     setSaving(true);
     if (showAction) showAction('info', 'Sending notification...');
 
     if (onBroadcastNotification) {
       try {
+        const isKibar = typeof window !== "undefined" && window.location?.href?.includes("kibar");
+        const targetSection = isKibar ? "kibar" : "atfal";
+        const targetUserId = resolvedUserId || selectedUserId;
         await onBroadcastNotification(
           "Self Jadwal Timetable Updated",
           `Your personal Self Jadwal schedule has been updated by the teacher. Tap to view.`,
           "user",
-          selectedUserId,
-          "Self Jadwal"
+          targetUserId,
+          "Self Jadwal",
+          { redirectPage: "Self Jadwal", section: targetSection },
+          targetSection
         );
         if (showAction) showAction('success', 'User notified successfully');
       } catch (e) {
@@ -1650,14 +1707,18 @@ export const SelfJadwalTeacherView
         <div className="sj-card" style={premiumCardStyle}>
           <div className="sj-toolbar" style={{ padding: '20px 24px', borderBottom: '1px solid rgba(212, 175, 55, 0.15)' }}>
             <div className="student-selector" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <SearchableSelect
-                options={students.map(s => ({ value: s.student_id || s.id, label: s.name || s.full_name }))}
+              <select
+                className="premium-select"
                 value={selectedUserId || ""}
-                onChange={(v) => setSelectedUserId(v)}
-                placeholder="-- Select Child --"
-                emptyValue="-- Select Child --"
-                searchPlaceholder="Search child by name…"
-              />
+                onChange={(e) => setSelectedUserId(e.target.value)}
+              >
+                <option value="">-- Select Child --</option>
+                {students.map(s => (
+                  <option key={s.student_id || s.id} value={s.student_id || s.id}>
+                    {s.name || s.full_name}
+                  </option>
+                ))}
+              </select>
               {selectedUserId && (
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button

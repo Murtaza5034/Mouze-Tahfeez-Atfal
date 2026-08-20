@@ -1,6 +1,6 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "./config.js";
-import { from } from "./db.js";
+import { from, getSectionScope } from "./db.js";
 import authApi from "./auth.js";
 import storageApi from "./storage.js";
 import {
@@ -77,6 +77,13 @@ async function rpcGetMyChildProfiles({ p_user_id, p_email } = {}) {
   let lastError = null;
 
   if (uId) {
+    // 1. Direct student lookup by user ID
+    const { data: dId, error: eId } = await from("child_profiles")
+      .select("*")
+      .eq("id", uId);
+    if (!eId && dId) results.push(...dId);
+
+    // 2. Parent user ID query
     const { data, error } = await from("child_profiles")
       .select("*")
       .eq("parent_user_id", uId)
@@ -132,9 +139,91 @@ async function rpcGetUserIdByEmail({ target_email } = {}) {
   return { data: null, error: null };
 }
 
+// Kibar equivalent: get all kibar child profiles
+async function rpcGetAllKibarChildProfiles() {
+  const { data, error } = await from("kibar_child_profiles").select("*").limit(100000);
+  if (error) return { data: [], error };
+  return { data: data || [], error: null };
+}
+
+// Kibar equivalent: get my kibar child profiles
+async function rpcGetMyKibarChildProfiles({ p_user_id, p_email } = {}) {
+  const uId = String(p_user_id || "").trim().toLowerCase();
+  const em = String(p_email || "").trim().toLowerCase();
+
+  // Native filtered queries so Firestore rules only hand this parent their own
+  // children. The kibar_child_profiles rules gate reads on parent_user_id, so that
+  // is the provable query path.
+  const results = [];
+  let lastError = null;
+
+  if (uId) {
+    // 1. Direct student lookup by user ID
+    const { data: dId, error: eId } = await from("kibar_child_profiles")
+      .select("*")
+      .eq("id", uId);
+    if (!eId && dId) results.push(...dId);
+
+    // 2. Parent user ID query
+    const { data, error } = await from("kibar_child_profiles")
+      .select("*")
+      .eq("parent_user_id", uId)
+      .limit(100000);
+    if (error) lastError = error;
+    else results.push(...(data || []));
+  } else if (em) {
+    // Email-only match (no user id linked): the parent_user_id rule blocks a
+    // plain email query, so emulate the Supabase server-side filter by
+    // fetching the parent's own kibar_user_portal_access first, then matching by id.
+    const { data: pa, error: paErr } = await from("kibar_user_portal_access")
+      .select("*")
+      .eq("email", em)
+      .limit(10);
+    if (paErr) lastError = paErr;
+    else {
+      const uidFromEmail = (pa && pa[0] && pa[0].user_id) || null;
+      if (uidFromEmail) {
+        const { data, error } = await from("kibar_child_profiles")
+          .select("*")
+          .eq("parent_user_id", uidFromEmail)
+          .limit(100000);
+        if (error) lastError = error;
+        else results.push(...(data || []));
+      }
+    }
+  }
+
+  const seen = new Set();
+  const rows = results.filter((p) => {
+    const sid = String(p.student_id || "");
+    if (seen.has(sid)) return false;
+    seen.add(sid);
+    return true;
+  });
+  return { data: rows, error: lastError };
+}
+
+// Kibar Student Profiles - for admin/teacher access to all student profiles
+async function rpcGetAllKibarStudentProfiles() {
+  const { data, error } = await from("kibar_student_profiles").select("*").limit(100000);
+  if (error) return { data: [], error };
+  return { data: data || [], error: null };
+}
+
+// Kibar Teacher Profiles - for admin access to all kibar teacher profiles
+async function rpcGetAllKibarTeacherProfiles() {
+  const { data, error } = await from("kibar_teacher_profiles").select("*").limit(100000);
+  if (error) return { data: [], error };
+  return { data: data || [], error: null };
+}
+
 const RPC_LOCAL = {
   get_all_child_profiles: () => rpcGetAllChildProfiles(),
   get_my_child_profiles: (args) => rpcGetMyChildProfiles(args || {}),
+  get_all_kibar_child_profiles: () => rpcGetAllKibarChildProfiles(),
+  get_my_kibar_child_profiles: (args) => rpcGetMyKibarChildProfiles(args || {}),
+  get_all_kibar_student_profiles: () => rpcGetAllKibarStudentProfiles(),
+  get_all_kibar_teacher_profiles: () => rpcGetAllKibarTeacherProfiles(),
   get_user_id_by_email: (args) => rpcGetUserIdByEmail(args || {}),
   trigger_clear_all_marks: (args) =>
     callFunction("clearAllMarks", args || {}),
@@ -160,7 +249,11 @@ async function rpc(name, args = {}) {
 
 async function invokeFunction(name, options = {}) {
   const callableName = FUNCTION_NAMES[name] || name;
-  return callFunction(callableName, options.body || {});
+  const body = options.body || {};
+  if (body.section === undefined) {
+    body.section = getSectionScope();
+  }
+  return callFunction(callableName, body);
 }
 
 // ---------------------------------------------------------------------------

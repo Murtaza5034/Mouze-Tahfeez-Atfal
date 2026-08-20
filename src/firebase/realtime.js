@@ -8,7 +8,7 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
-import { db } from "./db.js";
+import { db, resolveCollectionName } from "./db.js";
 import { firebaseApp } from "./config.js";
 
 // ---------------------------------------------------------------------------
@@ -116,8 +116,9 @@ function createChannel(channelName, channelOptions = {}) {
   function startPg(listener) {
     const table = (listener.opts && listener.opts.table) || "";
     if (!table) return;
+    const realTable = resolveCollectionName(table);
     const filters = parsePgFilter(listener.opts && listener.opts.filter);
-    let q = collection(db, table);
+    let q = collection(db, realTable);
     let valid = true;
     try {
       const constraints = [];
@@ -127,7 +128,7 @@ function createChannel(channelName, channelOptions = {}) {
       if (constraints.length) q = query(q, ...constraints);
     } catch (_) {
       valid = false;
-      q = collection(db, table);
+      q = collection(db, realTable);
     }
 
     let firstSnapshot = true;
@@ -166,6 +167,9 @@ function createChannel(channelName, channelOptions = {}) {
         // Permission-denied listeners (role-scoped tables) are non-fatal: the
         // app keeps polling via its fallback refresh loop. Swallow silently.
         if (!err || err.code === "permission-denied") return;
+        // Also swallow "Missing or insufficient permissions" which is the same error
+        // with a different message format in some Firebase versions
+        if (err.message && err.message.includes("Missing or insufficient permissions")) return;
         console.warn(`[realtime:${table}]`, err && err.message ? err.message : err);
       }
     );
@@ -208,6 +212,10 @@ function createChannel(channelName, channelOptions = {}) {
       if (joined.length) emit("join", null);
       if (left.length) emit("leave", null);
       emit("sync", null);
+    }, (err) => {
+      if (!err || err.code === "permission-denied") return;
+      if (err.message && err.message.includes("Missing or insufficient permissions")) return;
+      console.warn(`[realtime:presence]`, err && err.message ? err.message : err);
     });
     cleanupFns.push(unsub);
   }
