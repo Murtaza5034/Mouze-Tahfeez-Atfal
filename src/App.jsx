@@ -3008,18 +3008,20 @@ async function authorizePortalAccess(user, requestedRole) {
         }
       }
 
-      // Safe fallback profile: ensures Kibar student is NEVER auto-logged out on refresh
+      // Safe fallback profile: ONLY for users genuinely assigned to kibar-student
       if (!parentProfiles || parentProfiles.length === 0) {
-        parentProfiles = [{
-          id: user.id,
-          user_id: user.id,
-          name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
-          full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
-          student_id: user.user_metadata?.student_id || user.user_metadata?.its || user.id,
-          its: user.user_metadata?.its || user.user_metadata?.its_number || "...",
-          section: "kibar",
-          is_kibar: true
-        }];
+        if (assignedRoles.includes("kibar-student") || user?.user_metadata?.portal_role === "kibar-student" || user?.user_metadata?.role === "kibar-student") {
+          parentProfiles = [{
+            id: user.id,
+            user_id: user.id,
+            name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
+            full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
+            student_id: user.user_metadata?.student_id || user.user_metadata?.its || user.id,
+            its: user.user_metadata?.its || user.user_metadata?.its_number || "...",
+            section: "kibar",
+            is_kibar: true
+          }];
+        }
       }
     } else {
       try {
@@ -3073,87 +3075,73 @@ async function resolveInitialPortal(user, preferredRole) {
     storedRole = localStorage.getItem(STORAGE_KEYS.role) || localStorage.getItem("mauze-portal-role");
   } catch (_) {}
 
-  let finalPreferred = preferredRole || storedRole;
+  // 1. If preferredRole or storedRole is specified, try that first:
+  let candidateRole = preferredRole || storedRole;
 
-  if (finalPreferred === "teacher" && assigned.includes("kibar-teacher")) {
-    finalPreferred = "kibar-teacher";
-  } else if (finalPreferred === "admin" && assigned.includes("kibar-admin")) {
-    finalPreferred = "kibar-admin";
-  } else if (
-    finalPreferred === "kibar-student" ||
-    storedRole === "kibar-student" ||
-    assigned.includes("kibar-student") ||
-    user?.user_metadata?.portal_role === "kibar-student" ||
-    user?.user_metadata?.role === "kibar-student" ||
-    user?.user_metadata?.section === "kibar"
-  ) {
-    finalPreferred = "kibar-student";
+  if (candidateRole === "teacher" && assigned.includes("kibar-teacher")) {
+    candidateRole = "kibar-teacher";
+  } else if (candidateRole === "admin" && assigned.includes("kibar-admin")) {
+    candidateRole = "kibar-admin";
+  } else if (candidateRole === "parents" && (assigned.includes("kibar-student") || user?.user_metadata?.portal_role === "kibar-student")) {
+    candidateRole = "kibar-student";
   }
 
-  // If finalPreferred is still not determined or is parents, check if user has a kibar profile
-  if (!finalPreferred || finalPreferred === "parents") {
-    try {
-      const kibarProfile = await findKibarStudentProfile(user.id, user.email);
-      if (kibarProfile) {
-        finalPreferred = "kibar-student";
-      }
-    } catch (_) {}
-  }
-
-  setSectionScope(SECTION_FOR_ROLE(finalPreferred || "kibar-student"));
-
-  if (finalPreferred) {
-    const preferredAccess = await authorizePortalAccess(user, finalPreferred);
-    if (preferredAccess.ok) {
-      return preferredAccess;
-    }
-  }
-
-  // Fallback: read portal access record under current scope
-  try {
-    const tableAccess = await findPortalAccess(user.id);
-    if (tableAccess?.is_active && tableAccess.portal_role) {
-      const access = await authorizePortalAccess(user, tableAccess.portal_role);
-      if (access.ok) return access;
-    }
-  } catch (_) {}
-
-  // Fallback: try all assigned roles
-  for (const role of assigned) {
-    const access = await authorizePortalAccess(user, role);
+  if (candidateRole) {
+    const access = await authorizePortalAccess(user, candidateRole);
     if (access.ok) {
       return access;
     }
   }
 
-  // Fallback: try kibar-student
-  const kibarAccess = await authorizePortalAccess(user, "kibar-student");
-  if (kibarAccess.ok) {
-    return kibarAccess;
+  // 2. Check user_portal_access / kibar_user_portal_access table
+  try {
+    const atfalAccess = await findPortalAccess(user.id);
+    if (atfalAccess?.is_active && atfalAccess.portal_role) {
+      const access = await authorizePortalAccess(user, atfalAccess.portal_role);
+      if (access.ok) return access;
+    }
+    const { data: kibarAccess } = await supabase
+      .from("kibar_user_portal_access")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (kibarAccess?.is_active && kibarAccess.portal_role) {
+      const access = await authorizePortalAccess(user, kibarAccess.portal_role);
+      if (access.ok) return access;
+    }
+  } catch (_) {}
+
+  // 3. Try explicitly assigned roles in metadata
+  for (const role of assigned) {
+    const access = await authorizePortalAccess(user, role);
+    if (access.ok) return access;
   }
 
-  // Fallback: try parents
+  // 4. Try parents (Atfal)
   const parentAccess = await authorizePortalAccess(user, "parents");
-  if (parentAccess.ok) {
-    return parentAccess;
-  }
+  if (parentAccess.ok) return parentAccess;
 
-  // Safe fallback profile - ALWAYS return ok: true so a logged in user is NEVER auto-logged out
+  // 5. Try kibar-student ONLY if user has a kibar student profile
+  try {
+    const kibarProfile = await findKibarStudentProfile(user.id, user.email);
+    if (kibarProfile) {
+      const kibarAccess = await authorizePortalAccess(user, "kibar-student");
+      if (kibarAccess.ok) return kibarAccess;
+    }
+  } catch (_) {}
+
+  // 6. Try teacher (Atfal)
+  const teacherAccess = await authorizePortalAccess(user, "teacher");
+  if (teacherAccess.ok) return teacherAccess;
+
+  // 7. Try admin (Atfal)
+  const adminAccess = await authorizePortalAccess(user, "admin");
+  if (adminAccess.ok) return adminAccess;
+
+  // 8. If none matched, return failure
   return {
-    ok: true,
-    role: finalPreferred || "kibar-student",
-    assignedRoles: [finalPreferred || "kibar-student"],
-    parentProfile: {
-      id: user.id,
-      user_id: user.id,
-      name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
-      full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "Student",
-      student_id: user.user_metadata?.student_id || user.user_metadata?.its || user.id,
-      its: user.user_metadata?.its || user.user_metadata?.its_number || "...",
-      section: (finalPreferred === "parents") ? "atfal" : "kibar",
-      is_kibar: finalPreferred !== "parents",
-    },
-    accessRow: null,
+    ok: false,
+    message: "No authorized portal found for this account.",
   };
 }
 
@@ -23252,15 +23240,16 @@ export default function App() {
       if (session) {
         setUser(session.user);
         try {
+          const currentStoredRole = window.localStorage.getItem(STORAGE_KEYS.role) || "parents";
           const access = await resolveInitialPortal(
             session.user,
-            window.localStorage.getItem(STORAGE_KEYS.role) || "kibar-student"
+            currentStoredRole
           );
 
           if (mounted) {
             if (!access || !access.ok) {
-              console.warn("Portal resolution returned non-ok, using fallback safely:", access?.message);
-              const fallbackRole = access?.role || window.localStorage.getItem(STORAGE_KEYS.role) || "kibar-student";
+              console.warn("Portal resolution returned non-ok, using currentStoredRole safely:", access?.message);
+              const fallbackRole = currentStoredRole || "parents";
               storeRole(fallbackRole);
               setPortalAccess(emptyPortalAccess);
               loadPortalData(fallbackRole, session.user, null, { silent }).catch(() => {});
