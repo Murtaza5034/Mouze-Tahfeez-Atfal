@@ -24247,15 +24247,22 @@ export default function App() {
     const savedPassword = localStorage.getItem("mauze-saved-password");
     const savedRole = localStorage.getItem("mauze-saved-role");
     const rememberMe = localStorage.getItem("mauze-remember-me");
-    localStorage.clear();
-    sessionStorage.removeItem(APP_LOCK_KEYS.locked);
+    
+    // Clear user auth and portal caches
+    localStorage.removeItem(STORAGE_KEYS.role);
+    localStorage.removeItem(STORAGE_KEYS.cachedAuth);
+    localStorage.removeItem("mauze_portal_cache");
+    localStorage.removeItem("parent-jadwal-tracked-days");
+    localStorage.removeItem("parent-quick-action-statuses");
+    sessionStorage.clear();
+
     if (rememberMe === "true") {
       if (savedEmail) localStorage.setItem("mauze-saved-email", savedEmail);
       if (savedPassword) localStorage.setItem("mauze-saved-password", savedPassword);
       if (savedRole) localStorage.setItem("mauze-saved-role", savedRole);
       localStorage.setItem("mauze-remember-me", "true");
     }
-    window.location.reload();
+    setLoading(false);
   };
 
   const handleAppUnlock = () => {
