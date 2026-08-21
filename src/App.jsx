@@ -12055,12 +12055,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
     );
   };
 
-  const isKibarAdmin = portalRole === "kibar-admin" ||
-    getSectionScope() === "kibar" ||
-    user?.user_metadata?.portal_role === "kibar-admin" ||
-    user?.user_metadata?.role === "kibar-admin" ||
-    getAssignedRoles(user).includes("kibar-admin") ||
-    (typeof window !== "undefined" && window.location?.href?.includes("kibar"));
+  const isKibarAdmin = portalRole === "kibar-admin";
 
   return (
     <div className="admin-shell">
@@ -12208,7 +12203,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
       </aside>
 
       <main className="admin-main">
-        <header className="topbar admin-topbar-dynamic">
+        <header className="topbar admin-topbar-dynamic" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
           <div className="admin-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -12228,6 +12223,57 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
               )}
             </div>
           </div>
+
+          {/* Persistent Instant Header Switcher */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            background: "rgba(0, 0, 0, 0.05)",
+            padding: "3px",
+            borderRadius: "20px",
+            gap: "2px",
+            border: "1px solid rgba(212, 175, 55, 0.25)"
+          }}>
+            <button
+              onClick={() => {
+                if (portalRole !== "admin") onRoleChange("admin");
+              }}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "16px",
+                border: "none",
+                background: !isKibarAdmin ? "linear-gradient(135deg, #d4af37, #b8860b)" : "transparent",
+                color: !isKibarAdmin ? "#fff" : "var(--soft-brown)",
+                fontWeight: 700,
+                fontSize: "0.78rem",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                boxShadow: !isKibarAdmin ? "0 2px 6px rgba(184, 148, 31, 0.35)" : "none"
+              }}
+            >
+              Atfal Admin
+            </button>
+            <button
+              onClick={() => {
+                if (portalRole !== "kibar-admin") onRoleChange("kibar-admin");
+              }}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "16px",
+                border: "none",
+                background: isKibarAdmin ? "linear-gradient(135deg, #2c6e63, #1a4540)" : "transparent",
+                color: isKibarAdmin ? "#fff" : "var(--soft-brown)",
+                fontWeight: 700,
+                fontSize: "0.78rem",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                boxShadow: isKibarAdmin ? "0 2px 6px rgba(44, 110, 99, 0.35)" : "none"
+              }}
+            >
+              Kibar Admin
+            </button>
+          </div>
+
           <button className="topbar-logout-btn" onClick={onLogout}><Power size={22} /></button>
         </header>
 
@@ -23205,13 +23251,9 @@ export default function App() {
       // Fall back to cached auth
       const restored = await tryRestoreCachedAuth();
       if (!restored && mounted) {
-        // Clean up stale tokens only when no recovery method worked
-        // (don't delete sb- tokens if cached auth was restored — they're still needed for API calls)
-        for (const key of Object.keys(localStorage)) {
-          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        if (!cacheRestored) {
+          setUser(null);
         }
-        localStorage.removeItem(STORAGE_KEYS.cachedAuth);
-        setUser(null);
         setLoading(false);
       }
     }
