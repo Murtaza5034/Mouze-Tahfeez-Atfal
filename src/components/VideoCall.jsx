@@ -18,6 +18,12 @@ function buildIceServers() {
   const servers = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun:stun.services.mozilla.com" },
+    { urls: "stun:global.stun.twilio.com:3478" },
+    { urls: "stun:stun.cloudflare.com:3478" },
   ];
   const turnUrl = import.meta.env.VITE_TURN_URL;
   const turnUser = import.meta.env.VITE_TURN_USERNAME;
@@ -29,7 +35,10 @@ function buildIceServers() {
       credential: turnCred,
     });
   }
-  return { iceServers: servers };
+  return {
+    iceServers: servers,
+    iceCandidatePoolSize: 10,
+  };
 }
 
 export default function VideoCall({ call, onClose }) {
@@ -80,6 +89,7 @@ export default function VideoCall({ call, onClose }) {
           pcRef.current.onicecandidate = null;
           pcRef.current.ontrack = null;
           pcRef.current.onconnectionstatechange = null;
+          pcRef.current.oniceconnectionstatechange = null;
           pcRef.current.close();
           pcRef.current = null;
         }
@@ -102,12 +112,12 @@ export default function VideoCall({ call, onClose }) {
       if (deleteSignaling && roomId) {
         try {
           const roomRef = doc(db, SIGNAL_PATH, roomId);
-          await updateDoc(roomRef, { status: "ended" });
+          await setDoc(roomRef, { status: "ended" }, { merge: true });
           setTimeout(async () => {
             try {
               await deleteDoc(roomRef);
             } catch (_) {}
-          }, 2000);
+          }, 3000);
         } catch (_) {}
       }
     },
@@ -155,12 +165,43 @@ export default function VideoCall({ call, onClose }) {
   }, [micOn]);
 
   // ----- toggle cam -----
-  const toggleCam = useCallback(() => {
+  const toggleCam = useCallback(async () => {
+    const pc = pcRef.current;
     const stream = localStreamRef.current;
-    if (!stream) return;
-    const next = !camOn;
-    stream.getVideoTracks().forEach((t) => { t.enabled = next; });
-    setCamOn(next);
+    
+    if (stream && stream.getVideoTracks().length > 0) {
+      const next = !camOn;
+      stream.getVideoTracks().forEach((t) => { t.enabled = next; });
+      setCamOn(next);
+      return;
+    }
+
+    // Camera not yet acquired (e.g. teacher started audio-only)
+    try {
+      const videoStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        }
+      });
+      const videoTrack = videoStream.getVideoTracks()[0];
+      if (videoTrack) {
+        if (stream) {
+          stream.addTrack(videoTrack);
+        }
+        if (pc) {
+          pc.addTrack(videoTrack, stream || videoStream);
+        }
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream || videoStream;
+          try { await localVideoRef.current.play(); } catch (_) {}
+        }
+        setCamOn(true);
+      }
+    } catch (e) {
+      console.warn("Unable to enable camera:", e);
+    }
   }, [camOn]);
 
   // ----- main effect: start the call -----
@@ -176,37 +217,23 @@ export default function VideoCall({ call, onClose }) {
       // 1. acquire local media (skip if spectator)
       let stream = null;
       if (!isSpectator) {
-        const isTeacher = myRole === "teacher";
         try {
-          if (!isTeacher) {
-            try {
-              stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                  width: { min: 640, ideal: 1280, max: 1920 },
-                  height: { min: 480, ideal: 720, max: 1080 },
-                  frameRate: { ideal: 30, max: 60 }
-                },
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true
-                },
-              });
-              setCamOn(true);
-            } catch (videoErr) {
-              console.warn("Camera failed or denied, falling back to audio only:", videoErr);
-              stream = await navigator.mediaDevices.getUserMedia({
-                video: false,
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true
-                },
-              });
-              setCamOn(false);
-            }
-          } else {
-            // Teacher starts with camera off/blocked by default
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30 }
+              },
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              },
+            });
+            setCamOn(true);
+          } catch (videoErr) {
+            console.warn("Camera failed or denied, falling back to audio only:", videoErr);
             stream = await navigator.mediaDevices.getUserMedia({
               video: false,
               audio: {
@@ -251,39 +278,91 @@ export default function VideoCall({ call, onClose }) {
       }
 
       pc.ontrack = (ev) => {
-        const [remoteStream] = ev.streams;
+        console.log("[WebRTC] Remote track received:", ev.track.kind);
         if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream;
-          remoteVideoRef.current.play().catch(() => {});
+          if (ev.streams && ev.streams[0]) {
+            remoteVideoRef.current.srcObject = ev.streams[0];
+          } else {
+            if (!remoteVideoRef.current.srcObject) {
+              remoteVideoRef.current.srcObject = new MediaStream();
+            }
+            remoteVideoRef.current.srcObject.addTrack(ev.track);
+          }
+          remoteVideoRef.current.play().catch((err) => {
+            console.warn("[WebRTC] Remote play error:", err);
+          });
         }
       };
 
-      pc.onconnectionstatechange = () => {
-        const s = pc.connectionState;
-        if (s === "connected") {
+      const checkConnectionState = () => {
+        const cs = pc.connectionState;
+        const ics = pc.iceConnectionState;
+        console.log(`[WebRTC] state change: connectionState=${cs}, iceState=${ics}`);
+        if (cs === "connected" || ics === "connected" || ics === "completed") {
           setStatus("connected");
-        } else if (s === "failed") {
+        } else if (cs === "failed" || ics === "failed") {
           setStatus("failed");
-          setError("Connection failed. Please retry — your network may be blocking peer-to-peer media.");
-        } else if (s === "disconnected") {
+          setError("Connection failed. Please check network and retry.");
+        } else if (cs === "disconnected" || ics === "disconnected") {
           setStatus("disconnected");
         }
       };
 
+      pc.onconnectionstatechange = checkConnectionState;
+      pc.oniceconnectionstatechange = checkConnectionState;
+
+      // 3. signaling setup with robust candidate buffering
+      const roomRef = doc(db, SIGNAL_PATH, roomId);
+      const processedCandidates = new Set();
+      const pendingRemoteCandidates = [];
+      let docReady = false;
+      const initialLocalCandidates = [];
+
       pc.onicecandidate = async (ev) => {
-        if (ev.candidate && roomId) {
-          try {
-            const roomRef = doc(db, SIGNAL_PATH, roomId);
-            const fieldName = role === "caller" ? "caller_candidates" : "callee_candidates";
-            await updateDoc(roomRef, {
-              [fieldName]: arrayUnion(ev.candidate.toJSON())
-            });
-          } catch (_) {}
+        if (ev.candidate) {
+          const candJson = ev.candidate.toJSON();
+          const targetField = role === "caller" ? "caller_candidates" : "callee_candidates";
+          if (!docReady) {
+            initialLocalCandidates.push(candJson);
+          } else {
+            try {
+              await setDoc(roomRef, {
+                [targetField]: arrayUnion(candJson)
+              }, { merge: true });
+            } catch (err) {
+              console.warn("[WebRTC] Error pushing candidate:", err);
+            }
+          }
         }
       };
 
-      // 3. signaling flow
-      const roomRef = doc(db, SIGNAL_PATH, roomId);
+      const applyCandidate = async (cand) => {
+        if (!cand) return;
+        const key = JSON.stringify(cand);
+        if (processedCandidates.has(key)) return;
+        processedCandidates.add(key);
+
+        if (!pc.remoteDescription) {
+          pendingRemoteCandidates.push(cand);
+          return;
+        }
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (err) {
+          console.warn("[WebRTC] addIceCandidate error:", err);
+        }
+      };
+
+      const flushRemoteCandidates = async () => {
+        while (pendingRemoteCandidates.length > 0) {
+          const cand = pendingRemoteCandidates.shift();
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(cand));
+          } catch (err) {
+            console.warn("[WebRTC] addIceCandidate flush error:", err);
+          }
+        }
+      };
 
       if (role === "caller") {
         try {
@@ -298,39 +377,29 @@ export default function VideoCall({ call, onClose }) {
             caller: { name: myName, role: myRole },
             started_at: Date.now(),
             status: "calling",
-            caller_candidates: [],
+            caller_candidates: initialLocalCandidates,
             callee_candidates: [],
-          });
+          }, { merge: true });
+          docReady = true;
 
-          const processedCandidates = new Set();
-          const unsub = onSnapshot(roomRef, (snapshot) => {
+          const unsub = onSnapshot(roomRef, async (snapshot) => {
             if (endedRef.current) return;
             if (!snapshot.exists()) return;
             const data = snapshot.data();
             if (!data) return;
 
-            const processCandidates = () => {
-              const peerCandidatesField = "callee_candidates";
-              const candidatesList = data[peerCandidatesField] || [];
-              candidatesList.forEach((cand) => {
-                const candStr = JSON.stringify(cand);
-                if (!processedCandidates.has(candStr)) {
-                  processedCandidates.add(candStr);
-                  try {
-                    pc.addIceCandidate(new RTCIceCandidate(cand));
-                  } catch (_) {}
-                }
-              });
-            };
-
             if (data.answer && !pc.remoteDescription) {
-              pc.setRemoteDescription(new RTCSessionDescription(data.answer))
-                .then(() => {
-                  processCandidates();
-                })
-                .catch((err) => console.error("setRemoteDescription failed:", err));
-            } else if (pc.remoteDescription) {
-              processCandidates();
+              try {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                await flushRemoteCandidates();
+              } catch (err) {
+                console.error("[WebRTC] setRemoteDescription failed on caller:", err);
+              }
+            }
+
+            const calleeCandidates = data.callee_candidates || [];
+            for (const c of calleeCandidates) {
+              await applyCandidate(c);
             }
 
             if (data.status === "ended") {
@@ -348,55 +417,55 @@ export default function VideoCall({ call, onClose }) {
         }
       } else {
         // Callee / Spectator: read offer, create answer
-        const roomSnap = await getDoc(roomRef);
-        if (!roomSnap.exists()) {
-          setError("This call is no longer available.");
-          setStatus("error");
-          return;
-        }
-        const data = roomSnap.data();
-        if (!data || !data.offer) {
-          setError("Invalid call offer.");
-          setStatus("error");
-          return;
-        }
-        if (data.status === "ended") {
-          setError("This call has ended.");
-          setStatus("error");
-          return;
-        }
-
         try {
+          const roomSnap = await getDoc(roomRef);
+          if (!roomSnap.exists()) {
+            setError("This call is no longer available.");
+            setStatus("error");
+            return;
+          }
+          const data = roomSnap.data();
+          if (!data || !data.offer) {
+            setError("Invalid call offer.");
+            setStatus("error");
+            return;
+          }
+          if (data.status === "ended") {
+            setError("This call has ended.");
+            setStatus("error");
+            return;
+          }
+
           await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
-          await updateDoc(roomRef, {
+          await setDoc(roomRef, {
             answer: { type: answer.type, sdp: answer.sdp },
             callee: { name: myName, role: myRole },
             status: "connected",
-          });
+            callee_candidates: initialLocalCandidates,
+          }, { merge: true });
+          docReady = true;
 
-          // Setup snapshot listener
-          const processedCandidates = new Set();
-          const unsub = onSnapshot(roomRef, (snapshot) => {
+          // Process initial caller candidates
+          const callerCandidates = data.caller_candidates || [];
+          for (const c of callerCandidates) {
+            await applyCandidate(c);
+          }
+          await flushRemoteCandidates();
+
+          // Listen for subsequent caller candidates & session state
+          const unsub = onSnapshot(roomRef, async (snapshot) => {
             if (endedRef.current) return;
             if (!snapshot.exists()) return;
             const d = snapshot.data();
             if (!d) return;
 
-            // Handle ICE candidates
-            const peerCandidatesField = "caller_candidates";
-            const candidatesList = d[peerCandidatesField] || [];
-            candidatesList.forEach((cand) => {
-              const candStr = JSON.stringify(cand);
-              if (!processedCandidates.has(candStr)) {
-                processedCandidates.add(candStr);
-                try {
-                  pc.addIceCandidate(new RTCIceCandidate(cand));
-                } catch (_) {}
-              }
-            });
+            const cands = d.caller_candidates || [];
+            for (const c of cands) {
+              await applyCandidate(c);
+            }
 
             if (d.status === "ended") {
               stopAll(false).finally(() => {

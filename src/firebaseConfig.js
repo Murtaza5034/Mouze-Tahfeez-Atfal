@@ -108,7 +108,6 @@ export const getFCMToken = async (retries = 3) => {
         return null;
       }
     } catch (error) {
-      console.error(`[FCM] An error occurred while retrieving token (attempt ${attempt}/${retries}): `, error);
       if (error.code === 'messaging/permission-blocked' || error.name === 'NotAllowedError') {
         console.warn('[FCM] Notification permission was blocked.');
         return null;
@@ -117,26 +116,27 @@ export const getFCMToken = async (retries = 3) => {
         return null;
       }
       // Handle 403 Forbidden errors (token deletion failed, stale registration)
-      if (error.message && (error.message.includes('403') || error.message.includes('Forbidden') || error.message.includes('token-unsubscribe-failed'))) {
-        console.warn('[FCM] 403 error detected, clearing IndexedDB cache and retrying...');
+      if (error.message && (error.message.includes('403') || error.message.includes('Forbidden') || error.message.includes('token-unsubscribe-failed') || error.message.includes('caller does not have permission'))) {
+        console.warn('[FCM] Stale FCM token detected, clearing IndexedDB databases...');
         try {
           if (typeof window !== 'undefined' && window.indexedDB) {
-            window.indexedDB.deleteDatabase("fcm_token_details_db");
+            ['fcm_token_details_db', 'firebase-messaging-database', 'firebase-installations-database'].forEach(name => {
+              try { window.indexedDB.deleteDatabase(name); } catch (_) {}
+            });
             localStorage.setItem("mauze-fcm-v3", "3");
-            console.log("[FCM] Cleared FCM token database from IndexedDB due to 403 error.");
           }
         } catch (e) {
           console.warn("[FCM] Failed to clear IndexedDB database:", e);
         }
+        return null;
       }
+      console.warn(`[FCM] Token retrieval note (attempt ${attempt}/${retries}):`, error?.message || error);
       if (attempt < retries) {
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
-        console.log(`[FCM] Retrying in ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
       }
     }
   }
-  console.error('[FCM] Failed to get FCM token after', retries, 'attempts');
   return null;
 };
 
