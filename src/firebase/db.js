@@ -94,6 +94,9 @@ const SHARED_COLLECTIONS = new Set([
   "_presence",
   "app_releases",
   "email_logs",
+  "tahfeez_signals",
+  "online_tahfeez_sessions",
+  "online_tahfeez_logs",
 ]);
 
 export function resolveCollectionName(name) {

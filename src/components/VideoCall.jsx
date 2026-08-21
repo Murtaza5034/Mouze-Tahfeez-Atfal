@@ -51,7 +51,8 @@ export default function VideoCall({ call, onClose }) {
     isSpectator = false,
   } = call || {};
 
-  const SIGNAL_PATH = resolveCollectionName("tahfeez_signals");
+  // Standard uniform signaling path so both caller and callee always meet in the same room
+  const SIGNAL_PATH = "tahfeez_signals";
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -176,23 +177,27 @@ export default function VideoCall({ call, onClose }) {
       return;
     }
 
-    // Camera not yet acquired (e.g. teacher started audio-only)
+    // Camera not yet acquired
     try {
-      const videoStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 }
-        }
-      });
+      const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
       const videoTrack = videoStream.getVideoTracks()[0];
       if (videoTrack) {
         if (stream) {
           stream.addTrack(videoTrack);
+        } else {
+          localStreamRef.current = videoStream;
         }
+        
         if (pc) {
-          pc.addTrack(videoTrack, stream || videoStream);
+          const senders = pc.getSenders();
+          const videoSender = senders.find(s => s.track && s.track.kind === 'video') || senders.find(s => !s.track);
+          if (videoSender) {
+            await videoSender.replaceTrack(videoTrack);
+          } else {
+            pc.addTrack(videoTrack, stream || videoStream);
+          }
         }
+
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream || videoStream;
           try { await localVideoRef.current.play(); } catch (_) {}
@@ -220,11 +225,7 @@ export default function VideoCall({ call, onClose }) {
         try {
           try {
             stream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                frameRate: { ideal: 30 }
-              },
+              video: true,
               audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
@@ -233,7 +234,7 @@ export default function VideoCall({ call, onClose }) {
             });
             setCamOn(true);
           } catch (videoErr) {
-            console.warn("Camera failed or denied, falling back to audio only:", videoErr);
+            console.warn("Camera not available, falling back to audio only:", videoErr);
             stream = await navigator.mediaDevices.getUserMedia({
               video: false,
               audio: {
@@ -245,13 +246,19 @@ export default function VideoCall({ call, onClose }) {
             setCamOn(false);
           }
         } catch (e) {
-          setError(
-            "Cannot access microphone. Please allow microphone permission and try again. (" +
-              (e?.message || e) +
-              ")"
-          );
-          setStatus("error");
-          return;
+          try {
+            // Ultimate audio fallback
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            setCamOn(false);
+          } catch (audioErr) {
+            setError(
+              "Cannot access microphone. Please allow microphone permissions and try again. (" +
+                (audioErr?.message || audioErr) +
+                ")"
+            );
+            setStatus("error");
+            return;
+          }
         }
 
         if (cancelled) {
@@ -273,12 +280,26 @@ export default function VideoCall({ call, onClose }) {
       const pc = new RTCPeerConnection(buildIceServers());
       pcRef.current = pc;
 
+      // Add local tracks
       if (stream) {
         stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       }
 
+      // Ensure transceivers are configured so video/audio can be received even if local camera is off
+      if (pc.addTransceiver) {
+        const hasAudio = stream && stream.getAudioTracks().length > 0;
+        const hasVideo = stream && stream.getVideoTracks().length > 0;
+        if (!hasAudio) {
+          try { pc.addTransceiver('audio', { direction: 'sendrecv' }); } catch (_) {}
+        }
+        if (!hasVideo) {
+          try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch (_) {}
+        }
+      }
+
       pc.ontrack = (ev) => {
         console.log("[WebRTC] Remote track received:", ev.track.kind);
+        setStatus("connected");
         if (remoteVideoRef.current) {
           if (ev.streams && ev.streams[0]) {
             remoteVideoRef.current.srcObject = ev.streams[0];
