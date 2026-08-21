@@ -540,8 +540,14 @@ async function executeSelect(state) {
   try {
     rows = await loadCandidates(state, ref);
   } catch (err) {
-    console.error(`Firestore select error on collection "${state.collection}":`, err);
-    return { data: null, error: { message: err.message || String(err) } };
+    console.warn(`Firestore select warning on collection "${state.collection}":`, err?.message || err);
+    if (state.single === "single") {
+      return { data: null, error: { message: err.message || String(err) } };
+    }
+    if (state.single === "maybeSingle") {
+      return { data: null, error: null };
+    }
+    return { data: [], error: { message: err.message || String(err) } };
   }
 
   rows = matchesAll(rows, state);

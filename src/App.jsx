@@ -9310,8 +9310,8 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
     String(s.its) === String(chatModal.student_id) ||
     String(s.its_number) === String(chatModal.student_id)
   ) || {}) : {};
-  const chatPeerName = chatPeerStudent.name || chatPeerStudent.full_name || chatModal.student_name || "Student Chat";
-  const chatPeerPhoto = cleanPhotoUrl(chatPeerStudent.photoUrl || chatPeerStudent.photo_url || chatPeerStudent.avatar_url || "");
+  const chatPeerName = chatPeerStudent?.name || chatPeerStudent?.full_name || chatModal?.student_name || "Student Chat";
+  const chatPeerPhoto = cleanPhotoUrl(chatPeerStudent?.photoUrl || chatPeerStudent?.photo_url || chatPeerStudent?.avatar_url || "");
   const { peerOnline: parentOnline, presenceReady } = useChatPresence(chatModal?.id, "admin");
   const parentOnlineRef = useRef(parentOnline);
   useEffect(() => {
