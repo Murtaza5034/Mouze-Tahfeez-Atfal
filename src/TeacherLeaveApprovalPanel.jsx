@@ -168,8 +168,12 @@ export default function TeacherLeaveApprovalPanel({
 
   const fetchTlLeaves = () => {
     setTlLoading(true);
-    supabase.from(TEACHER_LEAVES_TABLE).select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-      if (!error) setTlLeaves(data || []);
+    supabase.from(TEACHER_LEAVES_TABLE).select("*").then(({ data, error }) => {
+      if (!error) {
+        const rows = data || [];
+        rows.sort((a, b) => new Date(b.created_at || b.createdAt || b.from_date || 0) - new Date(a.created_at || a.createdAt || a.from_date || 0));
+        setTlLeaves(rows);
+      }
       setTlLoading(false);
     });
   };

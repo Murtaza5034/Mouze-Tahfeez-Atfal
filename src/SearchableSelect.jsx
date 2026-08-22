@@ -25,6 +25,7 @@ export default function SearchableSelect({
   searchable = true,
   exclude = null,
   groupHeaderFor = (g) => g,
+  renderItemAction,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -186,6 +187,7 @@ export default function SearchableSelect({
               >
                 <span className="searchable-select-item-label">{o.label}</span>
                 {o.sub && <span className="searchable-select-item-sub">{o.sub}</span>}
+                {renderItemAction && <span className="searchable-select-item-action" onClick={(e) => e.stopPropagation()}>{renderItemAction(o)}</span>}
               </button>
             ))}
           </div>
@@ -204,6 +206,7 @@ export default function SearchableSelect({
               >
                 <span className="searchable-select-item-label">{o.label}</span>
                 {o.sub && <span className="searchable-select-item-sub">{o.sub}</span>}
+                {renderItemAction && <span className="searchable-select-item-action" onClick={(e) => e.stopPropagation()}>{renderItemAction(o)}</span>}
               </button>
             ))}
           </div>

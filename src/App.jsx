@@ -54,6 +54,7 @@ import {
   CalendarCheck,
   CalendarX,
   AlertCircle,
+  AlertTriangle,
   ChevronDown, ChevronLeft, ChevronRight,
   Paperclip,
   Trash2, Save,
@@ -1097,9 +1098,7 @@ const clampResultField = (field, val) => {
   if (!Number.isFinite(num)) return "";
   if (num < 0) return "0";
   if (num > max) return String(max);
-  // Keep in-progress decimals like "8." so teachers can type 8.5 naturally
-  if (raw.endsWith(".")) return raw;
-  return String(Math.round(num * 100) / 100);
+  return raw;
 };
 
 // Count how many days the student was marked 'present' in the Sat->Fri school week
@@ -2898,9 +2897,7 @@ async function authorizePortalAccess(user, requestedRole) {
   }
 
   // Step 2: If metadata didn't reveal kibar role, query kibar_user_portal_access
-  // DIRECTLY by its full hardcoded name — resolveCollectionName() skips adding
-  // the kibar_ prefix when the name already starts with it, so the global section
-  // scope is NEVER changed here, preventing listener permission bleed.
+  // DIRECTLY by its full hardcoded name
   if ((requestedRole === "teacher" && finalRole === "teacher") ||
       (requestedRole === "admin"   && finalRole === "admin")) {
     try {
@@ -2920,9 +2917,36 @@ async function authorizePortalAccess(user, requestedRole) {
   }
 
   setSectionScope(SECTION_FOR_ROLE(finalRole));
-  const tableAccess = await findPortalAccess(user.id);
+  let tableAccess = await findPortalAccess(user.id);
+  // Also check kibar_user_portal_access if tableAccess is empty
+  if (!tableAccess && finalRole.startsWith("kibar-")) {
+    try {
+      const { data: kibarDirect } = await supabase
+        .from("kibar_user_portal_access")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (kibarDirect) tableAccess = kibarDirect;
+    } catch (_) {}
+  }
+
   const assignedRoles = getAssignedRoles(user);
   const requestedLabel = ROLE_LABELS[finalRole] || finalRole;
+
+  // Unified Admin access: Any admin (Atfal Admin or Kibar Admin) has access to both admin views!
+  const isAdminRole = finalRole === "admin" || finalRole === "kibar-admin";
+  const userHasAdminAccess = (tableAccess?.is_active && (tableAccess.portal_role === "admin" || tableAccess.portal_role === "kibar-admin")) ||
+    assignedRoles.includes("admin") || assignedRoles.includes("kibar-admin");
+
+  if (isAdminRole && userHasAdminAccess) {
+    return {
+      ok: true,
+      role: finalRole,
+      assignedRoles: [...new Set([...assignedRoles, finalRole])],
+      parentProfile: null,
+      accessRow: tableAccess || null,
+    };
+  }
 
   if (tableAccess?.is_active && tableAccess.portal_role === finalRole) {
     return {
@@ -2935,51 +2959,46 @@ async function authorizePortalAccess(user, requestedRole) {
   }
 
   // Allow admin access if teacher's email is in teacher_admin_access list
-  if (finalRole === "admin" && user?.email) {
+  if (isAdminRole && user?.email) {
     try {
+      const targetTable = finalRole === "kibar-admin" ? "kibar_jadwal_settings" : "jadwal_settings";
       const { data: settingsData } = await supabase
-        .from('jadwal_settings')
+        .from(targetTable)
         .select('teacher_admin_access')
         .eq('id', 1)
-        .single();
+        .maybeSingle();
+      let accessList = [];
       if (settingsData?.teacher_admin_access) {
-        const accessList = JSON.parse(settingsData.teacher_admin_access);
-        if (Array.isArray(accessList) && accessList.some(e =>
-          normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
-        )) {
-          return {
-            ok: true,
-            role: "admin",
-            assignedRoles: [...assignedRoles, "admin"],
-            parentProfile: null,
-            accessRow: tableAccess || null,
-          };
-        }
+        try {
+          accessList = typeof settingsData.teacher_admin_access === 'string'
+            ? JSON.parse(settingsData.teacher_admin_access)
+            : settingsData.teacher_admin_access;
+        } catch (_) {}
       }
-    } catch (_) {}
-  }
-
-  // Allow kibar-admin access if teacher's email is in kibar_jadwal_settings teacher_admin_access list
-  if (finalRole === "kibar-admin" && user?.email) {
-    try {
-      const { data: settingsData } = await supabase
-        .from('jadwal_settings')
-        .select('teacher_admin_access')
-        .eq('id', 1)
-        .single();
-      if (settingsData?.teacher_admin_access) {
-        const accessList = JSON.parse(settingsData.teacher_admin_access);
-        if (Array.isArray(accessList) && accessList.some(e =>
-          normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
-        )) {
-          return {
-            ok: true,
-            role: "kibar-admin",
-            assignedRoles: [...assignedRoles, "kibar-admin"],
-            parentProfile: null,
-            accessRow: tableAccess || null,
-          };
-        }
+      if ((!accessList || accessList.length === 0) && finalRole === "kibar-admin") {
+        try {
+          const { data: atfalSettings } = await supabase
+            .from('jadwal_settings')
+            .select('teacher_admin_access')
+            .eq('id', 1)
+            .maybeSingle();
+          if (atfalSettings?.teacher_admin_access) {
+            accessList = typeof atfalSettings.teacher_admin_access === 'string'
+              ? JSON.parse(atfalSettings.teacher_admin_access)
+              : atfalSettings.teacher_admin_access;
+          }
+        } catch (_) {}
+      }
+      if (Array.isArray(accessList) && accessList.some(e =>
+        normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
+      )) {
+        return {
+          ok: true,
+          role: finalRole,
+          assignedRoles: [...new Set([...assignedRoles, finalRole])],
+          parentProfile: null,
+          accessRow: tableAccess || null,
+        };
       }
     } catch (_) {}
   }
@@ -3029,6 +3048,27 @@ async function authorizePortalAccess(user, requestedRole) {
       } catch (_) {}
       if (!parentProfiles || parentProfiles.length === 0) {
         parentProfiles = await findParentProfilesFallback(user.id, user.email);
+      }
+      // If not found in Atfal profiles, check Kibar student profiles!
+      if (!parentProfiles || parentProfiles.length === 0) {
+        try {
+          const kibarProf = await findKibarStudentProfile(user.id, user.email);
+          if (kibarProf) {
+            parentProfiles = [kibarProf];
+            finalRole = "kibar-student";
+            setSectionScope("kibar");
+          } else {
+            const kibarParent = await findKibarParentProfiles(user.id, user.email);
+            if (kibarParent && kibarParent.length > 0) {
+              parentProfiles = kibarParent;
+              finalRole = "kibar-student";
+              setSectionScope("kibar");
+            }
+          }
+        } catch (_) {}
+      } else if (parentProfiles.some(p => p.is_kibar || p.section === "kibar")) {
+        finalRole = "kibar-student";
+        setSectionScope("kibar");
       }
     }
 
@@ -3087,6 +3127,7 @@ async function resolveInitialPortal(user, preferredRole) {
   }
 
   if (candidateRole) {
+    setSectionScope(SECTION_FOR_ROLE(candidateRole));
     const access = await authorizePortalAccess(user, candidateRole);
     if (access.ok) {
       return access;
@@ -3095,6 +3136,18 @@ async function resolveInitialPortal(user, preferredRole) {
 
   // 2. Check user_portal_access / kibar_user_portal_access table
   try {
+    if (candidateRole && candidateRole.startsWith("kibar-")) {
+      const { data: kibarAccess } = await supabase
+        .from("kibar_user_portal_access")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (kibarAccess?.is_active && kibarAccess.portal_role) {
+        const access = await authorizePortalAccess(user, kibarAccess.portal_role);
+        if (access.ok) return access;
+      }
+    }
+
     const atfalAccess = await findPortalAccess(user.id);
     if (atfalAccess?.is_active && atfalAccess.portal_role) {
       const access = await authorizePortalAccess(user, atfalAccess.portal_role);
@@ -3138,10 +3191,9 @@ async function resolveInitialPortal(user, preferredRole) {
   const adminAccess = await authorizePortalAccess(user, "admin");
   if (adminAccess.ok) return adminAccess;
 
-  // 8. If none matched, return failure
   return {
     ok: false,
-    message: "No authorized portal found for this account.",
+    message: "No active portal assignment found for this account.",
   };
 }
 
@@ -3325,13 +3377,17 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
   });
 
   const latestResultMap = new Map();
-  const sortedByDate = [...weeklyResults].sort((a, b) => new Date(b.week_date) - new Date(a.week_date));
+  const sortedByDate = [...weeklyResults].sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
 
   sortedByDate.forEach((result) => {
     const resId = String(result.student_id || "").trim().toLowerCase();
     if (resId && !latestResultMap.has(resId)) {
       const weeklyRank = rankMap.get(`${resId}-${result.week_date}`);
       latestResultMap.set(resId, { ...result, weeklyRank, effectiveScore: calculateEffectiveScore(result) });
+    }
+    const resName = normalizeText(result.student_name || result.name || result.full_name || "");
+    if (resName && !latestResultMap.has(`name:${resName}`)) {
+      latestResultMap.set(`name:${resName}`, { ...result, effectiveScore: calculateEffectiveScore(result) });
     }
   });
 
@@ -3357,13 +3413,18 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     const pId = normalizeId(profile.id);
     const psId = normalizeId(profile.student_id);
     const pIts = normalizeId(profile.its);
+    const pName = normalizeText(profile.full_name || profile.name || "");
+
+    const allCandidateIds = [pId, psId, pIts, ...(profile.allIds || []).map(normalizeId)].filter(Boolean);
 
     const latestResult = 
-      (pId && latestResultMap.get(pId)) || 
-      (psId && latestResultMap.get(psId)) || 
-      (pIts && latestResultMap.get(pIts)) ||
+      allCandidateIds.map(id => latestResultMap.get(id)).find(Boolean) ||
+      (pName && latestResultMap.get(`name:${pName}`)) ||
       (Array.from(latestResultMap.values()).find(r => 
-        profile.full_name && r.full_name && normalizeText(r.full_name) === normalizeText(profile.full_name)
+        (profile.full_name && r.full_name && normalizeText(r.full_name) === normalizeText(profile.full_name)) ||
+        (profile.name && r.name && normalizeText(r.name) === normalizeText(profile.name)) ||
+        (profile.name && r.student_name && normalizeText(r.student_name) === normalizeText(profile.name)) ||
+        (profile.full_name && r.student_name && normalizeText(r.student_name) === normalizeText(profile.full_name))
       )) || null;
 
     // Support multiple possible teacher ID field names (kibar vs atfal)
@@ -4857,13 +4918,16 @@ const groupLeavesByMonth = (leaves) => {
     }));
 };
 
-function useParentLeaveData(studentProfileOrId, isKibar = false) {
+function useParentLeaveData(studentProfileOrId, isKibarProp = null) {
   const [data, setData] = useState({ leaves: [], loading: true });
+  const isProfileObj = typeof studentProfileOrId === 'object' && studentProfileOrId !== null;
+  const isKibar = isKibarProp !== null
+    ? Boolean(isKibarProp)
+    : ((isProfileObj && (studentProfileOrId.is_kibar || studentProfileOrId.section === 'kibar')) || getSectionScope() === 'kibar');
 
   const fetchData = useCallback(async () => {
     const { data: authData } = await supabase.auth.getUser();
     const user = authData?.user;
-    const isProfileObj = typeof studentProfileOrId === 'object' && studentProfileOrId !== null;
     const candidateIds = (isProfileObj
       ? [
           studentProfileOrId.student_id,
@@ -4888,9 +4952,9 @@ function useParentLeaveData(studentProfileOrId, isKibar = false) {
     const eventLeavesTable = isKibar ? "kibar_event_leaves" : "event_leaves";
     
     const [studentRes, parentRes, eventRes] = await Promise.all([
-      supabase.from(studentLeavesTable).select("*").in("student_id", uniqueIds).order("created_at", { ascending: false }),
-      user?.id ? supabase.from(studentLeavesTable).select("*").eq("parent_id", user.id).order("created_at", { ascending: false }) : { data: [] },
-      supabase.from(eventLeavesTable).select("*").in("student_id", uniqueIds).order("created_at", { ascending: false })
+      supabase.from(studentLeavesTable).select("*").in("student_id", uniqueIds),
+      user?.id ? supabase.from(studentLeavesTable).select("*").eq("parent_id", user.id) : { data: [] },
+      supabase.from(eventLeavesTable).select("*").in("student_id", uniqueIds)
     ]);
 
     const combinedStudentLeaves = [...(studentRes.data || []), ...(parentRes.data || [])];
@@ -4914,7 +4978,7 @@ function useParentLeaveData(studentProfileOrId, isKibar = false) {
         days: computeLeaveDays(l.from_date || l.leave_date, l.to_date || l.leave_date),
         reason: l.reason || "",
         status: l.status || "Pending",
-        createdAt: l.created_at,
+        createdAt: l.created_at || l.createdAt || l.from_date || l.leave_date,
         hasMessages: (l.messages || []).length > 0
       })),
       ...eventLeaves.map((l) => ({
@@ -4927,14 +4991,27 @@ function useParentLeaveData(studentProfileOrId, isKibar = false) {
         days: computeLeaveDays(l.from_date, l.to_date),
         reason: l.reason || "",
         status: "Event",
-        createdAt: l.created_at,
+        createdAt: l.created_at || l.createdAt || l.from_date,
         hasMessages: false
       }))
     ];
-    setData({ leaves, loading: false });
-  }, [studentProfileOrId, isKibar]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+    leaves.sort((a, b) => new Date(b.createdAt || b.dateFrom || 0) - new Date(a.createdAt || a.dateFrom || 0));
+
+    setData({ leaves, loading: false });
+  }, [studentProfileOrId, isKibar, isProfileObj]);
+
+  useEffect(() => {
+    fetchData();
+    const studentLeavesTable = isKibar ? "kibar_student_leaves" : "student_leaves";
+    const channel = supabase
+      .channel(`parent-leave-history-${isKibar ? 'kibar' : 'atfal'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: studentLeavesTable }, () => {
+        fetchData();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchData, isKibar]);
 
   return { ...data, refresh: fetchData };
 }
@@ -5079,7 +5156,7 @@ function ParentLeaveHistory({ studentProfile, showAction, isKibar = false }) {
 }
 
 function MonthlyLeaveCountCard({ studentProfile, onGoApplyLeave }) {
-  const { leaves, loading } = useParentLeaveData(studentProfile?.student_id);
+  const { leaves, loading } = useParentLeaveData(studentProfile);
   const currentKey = getLocalDateKey(new Date()).slice(0, 7);
   const currentLeaves = (leaves || []).filter((l) => (l.dateFrom || "").slice(0, 7) === currentKey);
   const count = currentLeaves.length;
@@ -5526,8 +5603,20 @@ function WacChatAvatar({ photo, name = "Admin Support" }) {
   return <span className="wac-avatar-initials">{(name || "?").trim().charAt(0).toUpperCase()}</span>;
 }
 
-function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], forceOpen = false, adminAvatar = "", autoOpenLeaveId = null, onAutoOpenLeaveConsumed = null }) {
-  const sectionKibar = getSectionScope() === 'kibar';
+function ChildLeaveApply({
+  studentProfile,
+  showAction,
+  teacherProfiles = [],
+  forceOpen = false,
+  adminAvatar = "",
+  autoOpenLeaveId = null,
+  onAutoOpenLeaveConsumed = null,
+  portalRole = "parents",
+  isKibar = null,
+}) {
+  const sectionKibar = isKibar !== null
+    ? Boolean(isKibar)
+    : (portalRole === "kibar-student" || studentProfile?.is_kibar || studentProfile?.section === "kibar" || getSectionScope() === "kibar");
   const LEAVES_TABLE = sectionKibar ? 'kibar_student_leaves' : 'student_leaves';
   const EVENT_LEAVES_TABLE = sectionKibar ? 'kibar_event_leaves' : 'event_leaves';
   const [leaveType, setLeaveType] = useState("");
@@ -5708,7 +5797,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
     };
   }, [chatLeave]);
 
-  const { leaves: allLeaveRecords, loading: countsLoading, refresh: refreshLeaveCounts } = useParentLeaveData(studentProfile?.student_id);
+  const isKibarProfile = sectionKibar || studentProfile?.is_kibar || studentProfile?.section === "kibar";
+  const { leaves: allLeaveRecords, loading: countsLoading, refresh: refreshLeaveCounts } = useParentLeaveData(studentProfile, isKibarProfile);
   const [miqaats, setMiqaats] = useState([]);
   const [miqaatEvent, setMiqaatEvent] = useState("");
   const [fromM, setFromM] = useState(2);
@@ -5957,16 +6047,14 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
       const { data: byStudent } = await supabase
         .from(LEAVES_TABLE)
         .select('*')
-        .in('student_id', uniqueIds)
-        .order('created_at', { ascending: false });
+        .in('student_id', uniqueIds);
 
       let combined = byStudent || [];
       if (user?.id) {
         const { data: byParent } = await supabase
           .from(LEAVES_TABLE)
           .select('*')
-          .eq('parent_id', user.id)
-          .order('created_at', { ascending: false });
+          .eq('parent_id', user.id);
         if (byParent) combined = [...combined, ...byParent];
       }
 
@@ -5976,6 +6064,12 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         if (seen.has(lid)) return false;
         seen.add(lid);
         return true;
+      });
+
+      deduped.sort((a, b) => {
+        const timeA = new Date(a.created_at || a.createdAt || a.from_date || a.leave_date || 0).getTime();
+        const timeB = new Date(b.created_at || b.createdAt || b.from_date || b.leave_date || 0).getTime();
+        return timeB - timeA;
       });
 
       if (deduped.length > 0) {
@@ -6049,8 +6143,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
       const { data: byStudent } = await supabase
         .from(LEAVES_TABLE)
         .select('*')
-        .in('student_id', uniqueIds)
-        .order('created_at', { ascending: false });
+        .in('student_id', uniqueIds);
       if (byStudent) allLeaves.push(...byStudent);
     }
 
@@ -6058,8 +6151,7 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
       const { data: byParent } = await supabase
         .from(LEAVES_TABLE)
         .select('*')
-        .eq('parent_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('parent_id', user.id);
       if (byParent) allLeaves.push(...byParent);
     }
 
@@ -6069,6 +6161,12 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
       if (seen.has(lid)) return false;
       seen.add(lid);
       return true;
+    });
+
+    deduped.sort((a, b) => {
+      const timeA = new Date(a.created_at || a.createdAt || a.from_date || a.leave_date || 0).getTime();
+      const timeB = new Date(b.created_at || b.createdAt || b.from_date || b.leave_date || 0).getTime();
+      return timeB - timeA;
     });
 
     setHistory(deduped);
@@ -6123,7 +6221,8 @@ function ChildLeaveApply({ studentProfile, showAction, teacherProfiles = [], for
         to_date: tillGreg,
         status: 'Pending',
         created_at: new Date().toISOString(),
-        section: targetSection
+        section: targetSection,
+        is_kibar: sectionKibar
       });
       if (dbErr) throw dbErr;
 
@@ -7503,41 +7602,10 @@ function ParentPortal({
                     } else {
                       setParentViewedStatus(true);
                       if (showAction) showAction("success", "Excellent! Your view duration has been verified.");
-                      // Check if child ranked in top 3 and trigger celebration + notifications
+                      // Check if child ranked in top 3 and trigger celebration popup
                       const rankForCelebration = studentProfile?.latestResult?.computedRank || studentProfile?.latestResult?.weeklyRank;
                       if (rankForCelebration && rankForCelebration >= 1 && rankForCelebration <= 3) {
                         setCelebrationRank(rankForCelebration);
-                        const ordinalMap = { 1: "1st", 2: "2nd", 3: "3rd" };
-                        const ordinal = ordinalMap[rankForCelebration];
-                        const childName = studentProfile?.name || studentProfile?.full_name || "Your child";
-                        // Notify parent
-                        broadcastNotification(
-                          "ًںژ‰ " + ordinal + " Place! Mubarak Mohanna!",
-                          "ًںژ‰ " + ordinal + " Place! Mubarak Mohanna!\n" + childName + " topped this week\'s Hifz result. Keep it up! ًں¤©",
-                          "user",
-                          user?.id,
-                          "Child Summary",
-                          true
-                        );
-                        // Notify teacher
-                        const teacherIdField = studentProfile?.muhaffiz_id;
-                        if (teacherIdField && typeof teacherProfiles !== 'undefined' && teacherProfiles?.length > 0) {
-                          const teacherMatch = teacherProfiles.find(t =>
-                            t.id === teacherIdField || t.user_id === teacherIdField ||
-                            normalizeText(t.full_name) === normalizeText(studentProfile?.teacherName)
-                          );
-                          const teacherTarget = teacherMatch?.user_id || teacherMatch?.id;
-                          if (teacherTarget) {
-                            broadcastNotification(
-                              "ًںژ‰ Student Achievement!",
-                              "Your student " + childName + " got " + ordinal + " place in this week\'s Hifz result! Mubarak Mohanna! ًں¤©",
-                              "user",
-                              teacherTarget,
-                              "My Group",
-                              true
-                            );
-                          }
-                        }
                       }
                     }
                   });
@@ -8012,7 +8080,7 @@ function ParentPortal({
                 const attStatus = (attendance?.status || '').toLowerCase();
                 const attColor = attStatus === 'present' ? '#22c55e' : attStatus === 'absent' ? '#ef4444' : attStatus === 'holiday' ? '#f59e0b' : '#5d4037';
                 const attLabel = attStatus === 'present' ? 'Present' : attStatus === 'absent' ? 'Absent' : attStatus === 'holiday' ? 'Holiday' : '-';
-                const weekDate = weeklyResult?.week_date;
+                const weekDate = weeklyResult?.week_date || studentProfile?.latestResult?.week_date;
                 let weekLabel = "out of 100";
                 {
                   const wd = new Date();
@@ -8025,8 +8093,9 @@ function ParentPortal({
                   const weekEnd = prevFri;
                   weekLabel = `${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — ${weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
                 }
+                const activeScore = weeklyResult?.total_score ?? studentProfile?.latestResult?.total_score ?? weeklyResult?.effectiveScore ?? studentProfile?.latestResult?.effectiveScore ?? weeklyResult?.score ?? studentProfile?.latestResult?.score;
                 const stats = [
-                  { label: "Weekly Score", val: weeklyResult?.total_score ?? "--", sub: weekLabel, icon: Trophy, color: "#c5a059" },
+                  { label: "Weekly Score", val: activeScore != null ? activeScore : "--", sub: weekLabel, icon: Trophy, color: "#c5a059" },
                   { label: "Daily Attendance", val: attLabel, sub: attDate, icon: Clock, color: attColor },
                   { label: "Current HIFZ STATUS", val: studentProfile?.latestResult?.wusool_juz || hifzDetails?.juz || "--", sub: studentProfile?.latestResult?.wusool_surah || hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
                   { label: muhaffizLabel, val: muhaffizVal, sub: muhaffizSub, icon: GraduationCap, color: "#d4af37" },
@@ -8381,11 +8450,25 @@ function ParentPortal({
         ) : null}
 
         {activePage === "Apply Leave" && (
-          <ChildLeaveApply studentProfile={studentProfile} showAction={showAction} teacherProfiles={teacherProfiles} forceOpen={parentLeaveForceOpen} adminAvatar={adminSupportAvatar} autoOpenLeaveId={pendingChatLeaveId} onAutoOpenLeaveConsumed={onPendingChatLeaveConsumed} />
+          <ChildLeaveApply
+            studentProfile={studentProfile}
+            showAction={showAction}
+            teacherProfiles={teacherProfiles}
+            forceOpen={parentLeaveForceOpen}
+            adminAvatar={adminSupportAvatar}
+            autoOpenLeaveId={pendingChatLeaveId}
+            onAutoOpenLeaveConsumed={onPendingChatLeaveConsumed}
+            portalRole={portalRole}
+            isKibar={portalRole === "kibar-student" || studentProfile?.is_kibar || studentProfile?.section === "kibar" || getSectionScope() === "kibar"}
+          />
         )}
 
         {activePage === "Leave History" && (
-          <ParentLeaveHistory studentProfile={studentProfile} showAction={showAction} isKibar={getSectionScope() === 'kibar'} />
+          <ParentLeaveHistory
+            studentProfile={studentProfile}
+            showAction={showAction}
+            isKibar={portalRole === "kibar-student" || studentProfile?.is_kibar || studentProfile?.section === "kibar" || getSectionScope() === "kibar"}
+          />
         )}
 
         {activePage === "Child Summary" ? (
@@ -9287,8 +9370,18 @@ function ParentPortal({
 }
 
 
-function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], autoOpenLeaveId = null, onAutoOpenLeaveConsumed = null }) {
-  const sectionKibar = getSectionScope() === 'kibar';
+function AdminLeaveManagement({
+  onShowAction,
+  students = [],
+  teacherProfiles = [],
+  autoOpenLeaveId = null,
+  onAutoOpenLeaveConsumed = null,
+  portalRole = "admin",
+  isKibar = null,
+}) {
+  const sectionKibar = isKibar !== null
+    ? Boolean(isKibar)
+    : (portalRole === "kibar-admin" || getSectionScope() === 'kibar');
   const LEAVES_TABLE = sectionKibar ? 'kibar_student_leaves' : 'student_leaves';
   const EVENT_LEAVES_TABLE = sectionKibar ? 'kibar_event_leaves' : 'event_leaves';
 
@@ -9302,6 +9395,14 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
   const [activeMenuMsg, setActiveMenuMsg] = useState(null); // { msg, idx }
   const [approveDropdown, setApproveDropdown] = useState(null); // leave.id or null
   const [sendingAction, setSendingAction] = useState(null); // id being processed
+  const chatBodyRef = useRef(null);
+
+  const normalizeLeaveStatus = (st) => {
+    const s = String(st || "Pending").trim().toLowerCase();
+    if (s === "approved") return "Approved";
+    if (s === "rejected") return "Rejected";
+    return "Pending";
+  };
   const chatPeerStudent = chatModal ? (students.find(s =>
     (s.allIds && s.allIds.includes(String(chatModal.student_id))) ||
     String(s.student_id) === String(chatModal.student_id) ||
@@ -9387,6 +9488,11 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
         .update({ messages: updatedMessages })
         .eq('id', chatModal.id);
       if (error) throw error;
+      if (sectionKibar) {
+        try {
+          await supabase.from('student_leaves').update({ messages: updatedMessages }).eq('id', chatModal.id);
+        } catch (_) {}
+      }
     } catch (err) {
       console.error("Failed to star message:", err);
       onShowAction("error", "Failed to star message. Please check internet connection.");
@@ -9446,10 +9552,137 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
     }
   };
 
+  const fetchLeaves = useCallback(async () => {
+    setLoading(true);
+    let allLeaves = [];
+    try {
+      // 1. Fetch all known Kibar student profiles to build complete Kibar ID and name sets
+      let kibarProfiles = [];
+      try {
+        const { data: kp } = await supabase.from('kibar_child_profiles').select('*');
+        if (kp && kp.length > 0) kibarProfiles = kp;
+      } catch (_) {}
+
+      const kibarIdSet = new Set(
+        kibarProfiles.flatMap(s => [
+          String(s.student_id || '').trim().toLowerCase(),
+          String(s.id || '').trim().toLowerCase(),
+          String(s.user_id || '').trim().toLowerCase(),
+          String(s.parent_user_id || '').trim().toLowerCase(),
+          String(s.its || '').trim().toLowerCase(),
+          String(s.its_number || '').trim().toLowerCase(),
+          ...(s.allIds || []).map(id => String(id).trim().toLowerCase())
+        ]).filter(Boolean)
+      );
+
+      const kibarNameSet = new Set(
+        kibarProfiles.flatMap(s => [
+          normalizeText(s.name || ''),
+          normalizeText(s.full_name || '')
+        ]).filter(Boolean)
+      );
+
+      // Also include any students passed in if we are in Kibar mode
+      if (sectionKibar && students) {
+        students.forEach(s => {
+          if (s.student_id) kibarIdSet.add(String(s.student_id).trim().toLowerCase());
+          if (s.id) kibarIdSet.add(String(s.id).trim().toLowerCase());
+          if (s.user_id) kibarIdSet.add(String(s.user_id).trim().toLowerCase());
+          if (s.its) kibarIdSet.add(String(s.its).trim().toLowerCase());
+          if (s.name) kibarNameSet.add(normalizeText(s.name));
+          if (s.full_name) kibarNameSet.add(normalizeText(s.full_name));
+        });
+      }
+
+      const isKibarLeave = (l) => {
+        if (!l) return false;
+        if (l.section === 'kibar' || l.is_kibar === true) return true;
+        const sid = String(l.student_id || '').trim().toLowerCase();
+        const pid = String(l.parent_id || '').trim().toLowerCase();
+        const uid = String(l.user_id || '').trim().toLowerCase();
+        if (sid && kibarIdSet.has(sid)) return true;
+        if (pid && kibarIdSet.has(pid)) return true;
+        if (uid && kibarIdSet.has(uid)) return true;
+        const sname = normalizeText(l.student_name || '');
+        if (sname && kibarNameSet.has(sname)) return true;
+        if (sname && kibarProfiles.some(p => {
+          const pName = normalizeText(p.name || p.full_name || '');
+          return pName && (pName.includes(sname) || sname.includes(pName));
+        })) {
+          return true;
+        }
+        return false;
+      };
+
+      if (sectionKibar) {
+        // Kibar Admin: Load from kibar_student_leaves
+        const { data: kibarData, error: kibarError } = await supabase
+          .from('kibar_student_leaves')
+          .select('*');
+        if (kibarError) {
+          console.error("Kibar Admin Leave Fetch Error:", kibarError);
+        } else if (kibarData) {
+          allLeaves.push(...kibarData);
+        }
+
+        // Also check student_leaves (via atfal_student_leaves) for any leaves belonging to Kibar students
+        try {
+          const { data: fallbackData } = await supabase
+            .from('atfal_student_leaves')
+            .select('*');
+          if (fallbackData) {
+            const kibarOnly = fallbackData.filter(isKibarLeave);
+            const seenIds = new Set(allLeaves.map(l => String(l.id)));
+            for (const l of kibarOnly) {
+              if (!seenIds.has(String(l.id))) {
+                allLeaves.push(l);
+                // Automatically migrate this leave to kibar_student_leaves so it is officially saved there!
+                supabase.from('kibar_student_leaves').upsert({
+                  ...l,
+                  section: 'kibar',
+                  is_kibar: true
+                }).catch(() => {});
+                // Also update the original record in student_leaves to section: 'kibar', is_kibar: true
+                supabase.from('atfal_student_leaves').update({
+                  section: 'kibar',
+                  is_kibar: true
+                }).eq('id', l.id).catch(() => {});
+              }
+            }
+          }
+        } catch (_) {}
+      } else {
+        // Atfal Admin: Load strictly Atfal student leaves
+        const { data: atfalData, error: atfalError } = await supabase
+          .from('student_leaves')
+          .select('*');
+        if (atfalError) {
+          console.error("Atfal Admin Leave Fetch Error:", atfalError);
+          if (onShowAction) onShowAction("error", "Database Error: " + atfalError.message);
+        } else if (atfalData) {
+          // EXCLUDE any Kibar student leaves so they NEVER leak into Atfal admin
+          allLeaves = atfalData.filter(l => !isKibarLeave(l));
+        }
+      }
+    } catch (err) {
+      console.error("Admin Leave Fetch Catch:", err);
+    }
+
+    allLeaves.sort((a, b) => {
+      const timeA = new Date(a.created_at || a.createdAt || a.from_date || a.leave_date || 0).getTime();
+      const timeB = new Date(b.created_at || b.createdAt || b.from_date || b.leave_date || 0).getTime();
+      return timeB - timeA;
+    });
+
+    setLeaves(allLeaves);
+    setLoading(false);
+  }, [sectionKibar, students, onShowAction]);
 
   useEffect(() => {
     fetchLeaves();
-  }, [sectionKibar]);
+    const interval = setInterval(fetchLeaves, 8000);
+    return () => clearInterval(interval);
+  }, [fetchLeaves]);
 
   // Auto-scroll chat to the latest message (WhatsApp-style)
   useEffect(() => {
@@ -9461,11 +9694,19 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
   // Real-time subscription so new messages appear instantly without refresh
   useEffect(() => {
     const channel = supabase
-      .channel('admin-leaves-realtime')
+      .channel(`admin-leaves-realtime-${LEAVES_TABLE}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: LEAVES_TABLE },
         (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const oldId = payload.old?.id;
+            if (oldId) {
+              setLeaves(prev => prev.filter(l => String(l.id) !== String(oldId)));
+              setChatModal(prev => (prev && String(prev.id) === String(oldId) ? null : prev));
+            }
+            return;
+          }
           const updatedRow = payload.new;
           if (!updatedRow) return;
           setLeaves(prev => {
@@ -9515,21 +9756,6 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
     return () => { if (mainEl) mainEl.style.overflow = prevOverflow; };
   }, [chatModal]);
 
-  const fetchLeaves = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from(LEAVES_TABLE)
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) {
-      console.error("Admin Leave Fetch Error:", error);
-      onShowAction("error", "Database Error: " + error.message);
-    } else {
-      setLeaves(data || []);
-    }
-    setLoading(false);
-  };
-
   const updateStatus = async (id, newStatus, adminMessage = "") => {
     const leaveToUpdate = leaves.find(l => l.id === id);
     const student = students.find(s =>
@@ -9552,6 +9778,15 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
       onShowAction("error", "Failed to update status");
       setSendingAction(null);
       return;
+    }
+
+    if (sectionKibar) {
+      try {
+        await supabase
+          .from('student_leaves')
+          .update({ status: newStatus, admin_comment: adminMessage || null })
+          .eq('id', id);
+      } catch (_) {}
     }
 
     const statusLabel = newStatus === "Approved" ? "Approved" : "Rejected";
@@ -9639,6 +9874,11 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
           .update({ messages: updatedMessages })
           .eq('id', chatModal.id);
         if (error) throw error;
+        if (sectionKibar) {
+          try {
+            await supabase.from('student_leaves').update({ messages: updatedMessages }).eq('id', chatModal.id);
+          } catch (_) {}
+        }
       } catch (err) {
         console.error("Failed to update edited admin message:", err);
         onShowAction("error", "Failed to update message. Please check internet connection.");
@@ -9676,6 +9916,11 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
         .update({ messages: [...existing, newMsg] })
         .eq('id', chatModal.id);
       if (error) throw error;
+      if (sectionKibar) {
+        try {
+          await supabase.from('student_leaves').update({ messages: [...existing, newMsg] }).eq('id', chatModal.id);
+        } catch (_) {}
+      }
 
       // Push notifications for chat messages are now sent SERVER-SIDE by the
       // notifyLeaveChatMessages Firestore trigger, so they arrive reliably even
@@ -9784,7 +10029,7 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
     .alm-dropdown-item:not(:last-child) { border-bottom: 1px solid rgba(61,43,31,0.06); }
   `;
 
-  const filteredLeaves = leaves.filter(l => l.status === filter);
+  const filteredLeaves = leaves.filter(l => normalizeLeaveStatus(l.status) === filter);
 
   return (
     <>
@@ -10041,24 +10286,27 @@ function AdminLeaveManagement({ onShowAction, students, teacherProfiles = [], au
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {["Pending", "Approved", "Rejected"].map(s => (
-              <button
-                key={s}
-                onClick={() => setFilter(s)}
-                style={{
-                  padding: '8px 18px', borderRadius: '999px', border: 'none',
-                  background: filter === s
-                    ? 'linear-gradient(135deg, #d4af37, #b8962e)'
-                    : 'rgba(61,43,31,0.06)',
-                  color: filter === s ? '#fff' : 'var(--text-muted)',
-                  fontWeight: 700, fontSize: '0.8rem',
-                  cursor: 'pointer', transition: 'all 0.2s ease',
-                  fontFamily: 'inherit', letterSpacing: '0.03em',
-                }}
-              >
-                {s} ({leaves.filter(l => l.status === s).length})
-              </button>
-            ))}
+            {["Pending", "Approved", "Rejected"].map(s => {
+              const count = leaves.filter(l => normalizeLeaveStatus(l.status) === s).length;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setFilter(s)}
+                  style={{
+                    padding: '8px 18px', borderRadius: '999px', border: 'none',
+                    background: filter === s
+                      ? 'linear-gradient(135deg, #d4af37, #b8962e)'
+                      : 'rgba(61,43,31,0.06)',
+                    color: filter === s ? '#fff' : 'var(--text-muted)',
+                    fontWeight: 700, fontSize: '0.8rem',
+                    cursor: 'pointer', transition: 'all 0.2s ease',
+                    fontFamily: 'inherit', letterSpacing: '0.03em',
+                  }}
+                >
+                  {s} ({count})
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -11087,6 +11335,7 @@ function AdminPortal({
   const [isGeneratingReports, setIsGeneratingReports] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [studentToRender, setStudentToRender] = useState(null);
+  const [captureOffsetLeft, setCaptureOffsetLeft] = useState('-9999px');
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [whatsAppProgress, setWhatsAppProgress] = useState({ current: 0, total: 0 });
   const [whatsAppLogs, setWhatsAppLogs] = useState([]);
@@ -11469,6 +11718,7 @@ const handleDownloadAllReports = async () => {
 
     setIsGeneratingReports(true);
     setGenerationProgress(0);
+    setCaptureOffsetLeft('0px');
     const [JSZip, saveAs] = await Promise.all([
       loadJSZip(),
       loadSaveAs(),
@@ -11483,7 +11733,15 @@ const handleDownloadAllReports = async () => {
       const student = students[i];
       setStudentToRender(student);
       setGenerationProgress(i + 1);
-      
+      await new Promise(r => setTimeout(r, 300));
+      const el = document.getElementById("actual-report-content");
+      if (el) {
+        for (let j = 0; j < 20; j++) {
+          await new Promise(r => setTimeout(r, 250));
+          const rect = el.getBoundingClientRect();
+          if (rect.height > 50 && rect.width > 100) break;
+        }
+      }
       try {
         const pdfBlob = await captureElementToPdf("actual-report-content", "", { scale: 2.5 });
         const safeName = (student.name || `Student_${i+1}`).replace(/[^a-z0-9]/gi, '_');
@@ -11509,9 +11767,52 @@ const handleDownloadAllReports = async () => {
       console.error("Error generating ZIP:", err);
       if (onShowAction) onShowAction("error", err.message || "Failed to generate ZIP file.");
     } finally {
+      setCaptureOffsetLeft('-9999px');
       setIsGeneratingReports(false);
       setStudentToRender(null);
       setGenerationProgress(0);
+    }
+  };
+
+  const [downloadingStudentId, setDownloadingStudentId] = useState(null);
+
+  const handleDownloadSingleReport = async (student) => {
+    if (!student) return;
+    if (downloadingStudentId) return;
+    setDownloadingStudentId(student.student_id);
+    if (onShowAction) onShowAction("success", `Generating PDF for ${student.name}...`);
+    try {
+      await loadCustomFontsForCanvas();
+      setStudentToRender(student);
+      setIsGeneratingReports(true);
+      setCaptureOffsetLeft('0px');
+      await new Promise(r => setTimeout(r, 500));
+      const el = document.getElementById("actual-report-content");
+      if (el) {
+        let ready = false;
+        for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, 250));
+          const rect = el.getBoundingClientRect();
+          if (rect.height > 50 && rect.width > 100) { ready = true; break; }
+        }
+        if (!ready) await new Promise(r => setTimeout(r, 1000));
+      }
+      const pdfBlob = await captureElementToPdf("actual-report-content", "", { scale: 2.5 });
+      const safeName = (student.name || "Student").replace(/[^a-z0-9]/gi, "_");
+      const dlResult = await downloadFile(pdfBlob, `${safeName}_Report.pdf`);
+      if (dlResult?.type === "native") {
+        setDownloadPopup({ filePath: dlResult.filePath, fileName: `${safeName}_Report.pdf` });
+      } else {
+        if (onShowAction) onShowAction("success", `${student.name}'s report downloaded!`);
+      }
+    } catch (err) {
+      console.error(`Error generating PDF for ${student.name}:`, err);
+      if (onShowAction) onShowAction("error", `Failed: ${err.message}`);
+    } finally {
+      setCaptureOffsetLeft('-9999px');
+      setIsGeneratingReports(false);
+      setStudentToRender(null);
+      setDownloadingStudentId(null);
     }
   };
 
@@ -11568,23 +11869,106 @@ const handleDownloadAllReports = async () => {
   useEffect(() => {
     const fetchOverviewStats = async () => {
       try {
-        const sectionKibar = getSectionScope() === 'kibar';
-        const LEAVES_TABLE = sectionKibar ? 'kibar_student_leaves' : 'student_leaves';
-        // Fetch pending leave count for today
-        const todayStr = new Date().toISOString().split('T')[0];
-        const { count: leaveCount } = await supabase
-          .from(LEAVES_TABLE)
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .gte('created_at', todayStr);
-        setPendingLeaveCount(leaveCount || 0);
+        const isKibar = portalRole === "kibar-admin" || getSectionScope() === 'kibar';
+
+        // 1. Fetch kibar student profiles to build ID and name sets for accurate section separation
+        let kibarProfiles = [];
+        try {
+          const { data: kp } = await supabase.from('kibar_child_profiles').select('*');
+          if (kp && kp.length > 0) kibarProfiles = kp;
+        } catch (_) {}
+
+        const kibarIdSet = new Set(
+          kibarProfiles.flatMap(s => [
+            String(s.student_id || '').trim().toLowerCase(),
+            String(s.id || '').trim().toLowerCase(),
+            String(s.user_id || '').trim().toLowerCase(),
+            String(s.parent_user_id || '').trim().toLowerCase(),
+            String(s.its || '').trim().toLowerCase(),
+            String(s.its_number || '').trim().toLowerCase(),
+            ...(s.allIds || []).map(id => String(id).trim().toLowerCase())
+          ]).filter(Boolean)
+        );
+
+        const kibarNameSet = new Set(
+          kibarProfiles.flatMap(s => [
+            normalizeText(s.name || ''),
+            normalizeText(s.full_name || '')
+          ]).filter(Boolean)
+        );
+
+        if (isKibar && students) {
+          students.forEach(s => {
+            if (s.student_id) kibarIdSet.add(String(s.student_id).trim().toLowerCase());
+            if (s.id) kibarIdSet.add(String(s.id).trim().toLowerCase());
+            if (s.user_id) kibarIdSet.add(String(s.user_id).trim().toLowerCase());
+            if (s.its) kibarIdSet.add(String(s.its).trim().toLowerCase());
+            if (s.name) kibarNameSet.add(normalizeText(s.name));
+            if (s.full_name) kibarNameSet.add(normalizeText(s.full_name));
+          });
+        }
+
+        const isKibarLeave = (l) => {
+          if (!l) return false;
+          if (l.section === 'kibar' || l.is_kibar === true) return true;
+          const sid = String(l.student_id || '').trim().toLowerCase();
+          const pid = String(l.parent_id || '').trim().toLowerCase();
+          const uid = String(l.user_id || '').trim().toLowerCase();
+          if (sid && kibarIdSet.has(sid)) return true;
+          if (pid && kibarIdSet.has(pid)) return true;
+          if (uid && kibarIdSet.has(uid)) return true;
+          const sname = normalizeText(l.student_name || '');
+          if (sname && kibarNameSet.has(sname)) return true;
+          if (sname && kibarProfiles.some(p => {
+            const pName = normalizeText(p.name || p.full_name || '');
+            return pName && (pName.includes(sname) || sname.includes(pName));
+          })) {
+            return true;
+          }
+          return false;
+        };
+
+        const isPending = (st) => {
+          const s = String(st || "Pending").trim().toLowerCase();
+          return s !== "approved" && s !== "rejected";
+        };
+
+        let count = 0;
+        if (isKibar) {
+          // Kibar Admin: Load from kibar_student_leaves + kibar leaves in atfal_student_leaves
+          let allKibarLeaves = [];
+          const { data: kibarLeaves } = await supabase.from('kibar_student_leaves').select('*');
+          if (kibarLeaves) allKibarLeaves.push(...kibarLeaves);
+
+          try {
+            const { data: rawLeaves } = await supabase.from('atfal_student_leaves').select('*');
+            if (rawLeaves) {
+              const kibarOnly = rawLeaves.filter(isKibarLeave);
+              const seenIds = new Set(allKibarLeaves.map(l => String(l.id)));
+              for (const l of kibarOnly) {
+                if (!seenIds.has(String(l.id))) allKibarLeaves.push(l);
+              }
+            }
+          } catch (_) {}
+
+          count = allKibarLeaves.filter(l => isPending(l.status)).length;
+        } else {
+          // Atfal Admin: strictly non-Kibar student leaves
+          const { data: atfalLeaves } = await supabase.from('student_leaves').select('*');
+          if (atfalLeaves) {
+            const atfalOnly = atfalLeaves.filter(l => !isKibarLeave(l));
+            count = atfalOnly.filter(l => isPending(l.status)).length;
+          }
+        }
+        setPendingLeaveCount(count);
 
         // Fetch today's attendance for teacher tracking
-        const today = todayStr;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const ATT_TABLE = isKibar ? 'kibar_student_daily_attendance' : 'student_daily_attendance';
         const { data: attData } = await supabase
-          .from('student_daily_attendance')
+          .from(ATT_TABLE)
           .select('*')
-          .eq('attendance_date', today);
+          .eq('attendance_date', todayStr);
 
         const attMap = {};
         if (attData) {
@@ -11621,7 +12005,9 @@ const handleDownloadAllReports = async () => {
       setOverviewAttLoading(false);
     };
     fetchOverviewStats();
-  }, [students, teacherProfiles]);
+    const interval = setInterval(fetchOverviewStats, 15000);
+    return () => clearInterval(interval);
+  }, [students, teacherProfiles, portalRole]);
 
   const stats = [
     { label: "Students", value: students.length, icon: Users, navigateTo: "Student Registry" },
@@ -12203,9 +12589,9 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
       </aside>
 
       <main className="admin-main">
-        <header className="topbar admin-topbar-dynamic" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-          <div className="admin-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
+        <header className="topbar admin-topbar-dynamic" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'nowrap' }}>
+          <div className="admin-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+            <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation menu">
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
             <div className="parent-topbar-brand-wrap" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>
@@ -12219,62 +12605,14 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                   </span>
                 </>
               ) : (
-                <h2 className="page-title" style={{ margin: 0 }}>{activePage}</h2>
+                <h2 className="page-title" style={{ margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activePage}</h2>
               )}
             </div>
           </div>
 
-          {/* Persistent Instant Header Switcher */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            background: "rgba(0, 0, 0, 0.05)",
-            padding: "3px",
-            borderRadius: "20px",
-            gap: "2px",
-            border: "1px solid rgba(212, 175, 55, 0.25)"
-          }}>
-            <button
-              onClick={() => {
-                if (portalRole !== "admin") onRoleChange("admin");
-              }}
-              style={{
-                padding: "6px 14px",
-                borderRadius: "16px",
-                border: "none",
-                background: !isKibarAdmin ? "linear-gradient(135deg, #d4af37, #b8860b)" : "transparent",
-                color: !isKibarAdmin ? "#fff" : "var(--soft-brown)",
-                fontWeight: 700,
-                fontSize: "0.78rem",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                boxShadow: !isKibarAdmin ? "0 2px 6px rgba(184, 148, 31, 0.35)" : "none"
-              }}
-            >
-              Atfal Admin
-            </button>
-            <button
-              onClick={() => {
-                if (portalRole !== "kibar-admin") onRoleChange("kibar-admin");
-              }}
-              style={{
-                padding: "6px 14px",
-                borderRadius: "16px",
-                border: "none",
-                background: isKibarAdmin ? "linear-gradient(135deg, #2c6e63, #1a4540)" : "transparent",
-                color: isKibarAdmin ? "#fff" : "var(--soft-brown)",
-                fontWeight: 700,
-                fontSize: "0.78rem",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                boxShadow: isKibarAdmin ? "0 2px 6px rgba(44, 110, 99, 0.35)" : "none"
-              }}
-            >
-              Kibar Admin
-            </button>
-          </div>
-
-          <button className="topbar-logout-btn" onClick={onLogout}><Power size={22} /></button>
+          <button className="topbar-logout-btn" onClick={onLogout} title="Logout" aria-label="Logout">
+            <Power size={22} />
+          </button>
         </header>
 
         <section className="admin-content-pad">
@@ -12823,6 +13161,31 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         emptyValue="-- Select Student --"
                         searchPlaceholder="Search student by name…"
                         groupHeaderFor={(g) => `Muhaffiz: ${g}`}
+                        renderItemAction={(opt) => (
+                          <button
+                            type="button"
+                            title={downloadingStudentId === opt.value ? "Generating..." : `Download ${opt.label}'s Report PDF`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const stu = students.find(s => String(s.student_id) === String(opt.value));
+                              if (stu) handleDownloadSingleReport(stu);
+                            }}
+                            disabled={isGeneratingReports || downloadingStudentId === opt.value}
+                            style={{
+                              background: 'none', border: 'none', cursor: (isGeneratingReports || downloadingStudentId === opt.value) ? 'not-allowed' : 'pointer',
+                              padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: downloadingStudentId === opt.value ? '#999' : 'var(--primary-gold)',
+                              opacity: (isGeneratingReports && downloadingStudentId !== opt.value) ? 0.4 : 1,
+                            }}
+                          >
+                            {downloadingStudentId === opt.value ? (
+                              <Loader2 size={16} className="spin" />
+                            ) : (
+                              <Download size={16} />
+                            )}
+                          </button>
+                        )}
                       />
                     </div>
                     <button 
@@ -15546,7 +15909,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             id="bulk-capture-hidden-zone"
               style={{ 
                 position: 'fixed', 
-                left: '-9999px', 
+                left: captureOffsetLeft, 
                 top: '0', 
                 width: '794px', 
                 zIndex: 9999, 
@@ -15578,7 +15941,15 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           ) : null}
 
           {activePage === "Leave Management" && (
-            <AdminLeaveManagement students={students} teacherProfiles={teacherProfiles} onShowAction={onShowAction} autoOpenLeaveId={pendingChatLeaveId} onAutoOpenLeaveConsumed={onPendingChatLeaveConsumed} />
+            <AdminLeaveManagement
+              students={students}
+              teacherProfiles={teacherProfiles}
+              onShowAction={onShowAction}
+              autoOpenLeaveId={pendingChatLeaveId}
+              onAutoOpenLeaveConsumed={onPendingChatLeaveConsumed}
+              portalRole={portalRole}
+              isKibar={portalRole === "kibar-admin" || getSectionScope() === "kibar"}
+            />
           )}
           {activePage === "Teacher Leaves" ? (
             <div className="overview-container fade-in">
@@ -17407,6 +17778,232 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
   );
 }
 
+function MarkProgressConfirmModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  student,
+  formData,
+  isSaving = false,
+}) {
+  if (!isOpen || !student) return null;
+
+  // Calculate scores
+  const murajahScore = toNumber(formData?.murajazah);
+  const juzHaliScore = toNumber(formData?.juz_hali);
+  const takhteetScore = toNumber(formData?.takhteet);
+  const jadeedScore = toNumber(formData?.jadeed);
+  const totalScore = Math.round((murajahScore + juzHaliScore + takhteetScore + jadeedScore) * 10) / 10;
+
+  // Grade/Performance badge label
+  let scoreBadge = "Mumtaz";
+  if (totalScore < 60) scoreBadge = "Makbool";
+  else if (totalScore < 75) scoreBadge = "Jayyid";
+  else if (totalScore < 90) scoreBadge = "Jayyid Jiddan";
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !isSaving) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, isSaving]);
+
+  const initialLetter = student?.name?.charAt(0)?.toUpperCase() || "?";
+
+  return createPortal(
+    <div
+      className="mp-confirm-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSaving) onClose();
+      }}
+    >
+      <div className="mp-confirm-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mp-confirm-top-bar" />
+
+        {/* Modal Header */}
+        <div className="mp-confirm-header">
+          <div className="mp-confirm-header-left">
+            <div className="mp-confirm-icon-wrap">
+              <Sparkles size={24} />
+            </div>
+            <div>
+              <h3 className="mp-confirm-title">Save Progress Report?</h3>
+              <p className="mp-confirm-subtitle">
+                Are you sure you want to save this child's weekly result?
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mp-confirm-close-btn"
+            onClick={onClose}
+            disabled={isSaving}
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="mp-confirm-body">
+          {/* Child Identity Card */}
+          <div className="mp-confirm-student-card">
+            <div className="mp-confirm-student-info">
+              <div className="mp-confirm-avatar">{initialLetter}</div>
+              <div style={{ overflow: "hidden" }}>
+                <div className="mp-confirm-name">{student.name}</div>
+                {student.arabic_name && (
+                  <div className="mp-confirm-subname arabic-kanz" style={{ fontSize: "1rem" }}>
+                    {student.arabic_name}
+                  </div>
+                )}
+                <div style={{ fontSize: "0.75rem", color: "#8a6d1d", fontWeight: 600, marginTop: "1px" }}>
+                  {student.groupName || student.class || "Student"}
+                </div>
+              </div>
+            </div>
+            <div className="mp-confirm-badge-pill">
+              {formData?.week_date || getToday()}
+            </div>
+          </div>
+
+          {/* Score Hero Banner */}
+          <div className="mp-confirm-score-hero">
+            <div className="mp-confirm-score-hero-left">
+              <span className="mp-confirm-score-hero-label">Total Weekly Score</span>
+              <div className="mp-confirm-score-hero-total">
+                <span>{totalScore}</span>
+                <span className="mp-confirm-score-hero-max">/ 100</span>
+              </div>
+            </div>
+            <div className="mp-confirm-score-pill">
+              {scoreBadge}
+            </div>
+          </div>
+
+          {/* 4-Item Scores Grid */}
+          <div className="mp-confirm-scores-grid">
+            <div className="mp-confirm-score-tile">
+              <span className="mp-confirm-score-tile-label">Murajah</span>
+              <span className="mp-confirm-score-tile-val">{murajahScore}</span>
+              <span className="mp-confirm-score-tile-sub">out of 30</span>
+            </div>
+            <div className="mp-confirm-score-tile">
+              <span className="mp-confirm-score-tile-label">Juz Hali</span>
+              <span className="mp-confirm-score-tile-val">{juzHaliScore}</span>
+              <span className="mp-confirm-score-tile-sub">out of 30</span>
+            </div>
+            <div className="mp-confirm-score-tile">
+              <span className="mp-confirm-score-tile-label">Takhteet</span>
+              <span className="mp-confirm-score-tile-val">{takhteetScore}</span>
+              <span className="mp-confirm-score-tile-sub">out of 20</span>
+            </div>
+            <div className="mp-confirm-score-tile">
+              <span className="mp-confirm-score-tile-label">Jadeed</span>
+              <span className="mp-confirm-score-tile-val">{jadeedScore}</span>
+              <span className="mp-confirm-score-tile-sub">
+                {formData?.total_jadeed_pages ? `${formData.total_jadeed_pages} ${formData.total_jadeed_unit || "صفه"}` : "out of 20"}
+              </span>
+            </div>
+          </div>
+
+          {/* Progression Milestones */}
+          <div className="mp-confirm-milestones">
+            <div className="mp-confirm-milestone-row">
+              <span className="mp-confirm-milestone-key">
+                <BookMarked size={15} /> Wusool (Reached)
+              </span>
+              <span className="mp-confirm-milestone-val kanz">
+                Juz {formData?.wusool_juz || "-"} · {formData?.wusool_surah || "-"} {formData?.wusool_page ? `(p. ${formData.wusool_page})` : ""}
+              </span>
+            </div>
+
+            <div className="mp-confirm-milestone-row">
+              <span className="mp-confirm-milestone-key">
+                <CalendarClock size={15} /> Next Week Target
+              </span>
+              <span className="mp-confirm-milestone-val kanz">
+                Juz {formData?.next_week_juz || "-"} · {formData?.next_week_surah || "-"} {formData?.next_week_page ? `(p. ${formData.next_week_page})` : ""}
+              </span>
+            </div>
+
+            <div className="mp-confirm-milestone-row">
+              <span className="mp-confirm-milestone-key">
+                <Edit3 size={15} /> Takhteet (Istifadah)
+              </span>
+              <span className="mp-confirm-milestone-val kanz">
+                Juz {formData?.istifadah_juz || "-"} · {formData?.istifadah_surah || "-"} {formData?.istifadah_page ? `(p. ${formData.istifadah_page})` : ""}
+              </span>
+            </div>
+
+            <div className="mp-confirm-milestone-row">
+              <span className="mp-confirm-milestone-key">
+                <CalendarCheck size={15} /> Attendance
+              </span>
+              <span className="mp-confirm-milestone-val" style={{ color: '#10b981', fontWeight: 800 }}>
+                {formData?.attendance_count ?? 0} / 6 Days Present
+              </span>
+            </div>
+
+            {(formData?.matrookah || formData?.daeefah) && (
+              <div className="mp-confirm-milestone-row">
+                <span className="mp-confirm-milestone-key">
+                  <AlertCircle size={15} /> Matrookah / Daeefah
+                </span>
+                <span className="mp-confirm-milestone-val" style={{ fontSize: '0.8rem', color: '#b45309' }}>
+                  {formData?.matrookah ? `Matrookah: ${formData.matrookah}` : ""}
+                  {formData?.matrookah && formData?.daeefah ? " · " : ""}
+                  {formData?.daeefah ? `Daeefah: ${formData.daeefah}` : ""}
+                </span>
+              </div>
+            )}
+
+            {formData?.attendance_note && (
+              <div className="mp-confirm-note-box">
+                <span style={{ fontWeight: 800, color: '#8b6d31', fontStyle: 'normal' }}>Note: </span>
+                "{formData.attendance_note}"
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Modal Footer Actions */}
+        <div className="mp-confirm-footer">
+          <button
+            type="button"
+            className="mp-confirm-btn-cancel"
+            onClick={onClose}
+            disabled={isSaving}
+          >
+            <X size={15} /> Cancel
+          </button>
+          <button
+            type="button"
+            className="mp-confirm-btn-save"
+            onClick={onConfirm}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 size={16} className="spin" /> Saving...
+              </>
+            ) : (
+              <>
+                <Save size={16} /> Save Child Result
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function TeacherPortal({
   actionMessage,
   activePage,
@@ -17470,6 +18067,7 @@ function TeacherPortal({
   const backdropMouseDownRef = useRef(false);
   const [activeCall, setActiveCall] = useState(null);
   const [activeSessions, setActiveSessions] = useState({});
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
 
   const handleStartCall = async (student) => {
     const childSessionId = `session_${student.student_id}`;
@@ -17620,6 +18218,113 @@ function TeacherPortal({
   const notificationOpenedAtRef = useRef(0);
   const finalRankNotifiedRef = useRef({});
 
+  const [validationAttempted, setValidationAttempted] = useState(false);
+
+  const isFieldFilled = (field) => {
+    const val = teacherForms?.result?.[field];
+    return val !== "" && val !== null && val !== undefined;
+  };
+
+  const isFieldRequired = (field) => {
+    const required = [
+      "student_id",
+      "murajazah",
+      "juz_hali",
+      "takhteet",
+      "total_jadeed_pages",
+      "wusool_juz",
+      "wusool_surah",
+      "wusool_page",
+      "next_week_juz",
+      "next_week_surah",
+      "next_week_page",
+      "istifadah_juz",
+      "istifadah_surah",
+      "istifadah_page",
+      "attendance_count",
+    ];
+    return required.includes(field);
+  };
+
+  const getFieldStatus = (field) => {
+    const filled = isFieldFilled(field);
+    if (validationAttempted && !filled && isFieldRequired(field)) return "error";
+    if (filled) return "saved";
+    return "default";
+  };
+
+  const getFieldClass = (field, baseClass = "") => {
+    const status = getFieldStatus(field);
+    if (status === "error") return `${baseClass} mp-field-error`.trim();
+    if (status === "saved") return `${baseClass} mp-field-saved`.trim();
+    return baseClass;
+  };
+
+  const getFieldStyle = (field, customStyle = {}) => {
+    const status = getFieldStatus(field);
+    if (status === "error") {
+      return {
+        ...customStyle,
+        borderColor: "#ef4444",
+        boxShadow: "0 0 14px rgba(239, 68, 68, 0.55), inset 0 0 4px rgba(239, 68, 68, 0.2)",
+        backgroundColor: "rgba(254, 242, 242, 0.7)",
+      };
+    }
+    if (status === "saved") {
+      return {
+        ...customStyle,
+        borderColor: "#10b981",
+        boxShadow: "0 0 12px rgba(16, 185, 129, 0.42), inset 0 0 3px rgba(16, 185, 129, 0.15)",
+        backgroundColor: "rgba(240, 253, 244, 0.6)",
+      };
+    }
+    return customStyle;
+  };
+
+  const handleSubmitWithValidation = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const requiredCheck = [
+      { key: "student_id", label: "Child" },
+      { key: "murajazah", label: "Murajah" },
+      { key: "juz_hali", label: "Juz Hali" },
+      { key: "takhteet", label: "Takhteet" },
+      { key: "total_jadeed_pages", label: "Total Jadeed Pages" },
+      { key: "wusool_juz", label: "Wusool Juz" },
+      { key: "wusool_surah", label: "Wusool Surah" },
+      { key: "wusool_page", label: "Wusool Page" },
+      { key: "next_week_juz", label: "Next Week Juz" },
+      { key: "next_week_surah", label: "Next Week Surah" },
+      { key: "next_week_page", label: "Next Week Page" },
+      { key: "istifadah_juz", label: "Takhteet Juz" },
+      { key: "istifadah_surah", label: "Takhteet Surah" },
+      { key: "istifadah_page", label: "Takhteet Page" },
+      { key: "attendance_count", label: "Attendance Count" },
+    ];
+
+    const missing = requiredCheck.filter(item => {
+      const val = teacherForms?.result?.[item.key];
+      return val === "" || val === null || val === undefined;
+    });
+
+    if (missing.length > 0) {
+      setValidationAttempted(true);
+      setSaveStatus("validation");
+      const missingLabels = missing.map(m => m.label).slice(0, 4).join(", ") + (missing.length > 4 ? ` +${missing.length - 4} more` : "");
+      setSaveErrorDetails(`Please fill all required fields: ${missingLabels}`);
+      if (onShowAction) onShowAction("error", `Please fill all required fields: ${missingLabels}`);
+      return;
+    }
+
+    setValidationAttempted(false);
+    setShowSaveConfirmModal(true);
+  };
+
+  const handleConfirmSaveResult = (e) => {
+    setShowSaveConfirmModal(false);
+    onTeacherResultSubmit(e);
+  };
+
   const handleClearResultFields = () => {
     if (!teacherForms?.result?.student_id) {
       if (onShowAction) onShowAction("error", "Select a child before clearing the form.");
@@ -17631,6 +18336,7 @@ function TeacherPortal({
     });
     setTeacherForms(curr => ({ ...curr, result: draft }));
     setStudentCleared(teacherForms.result.student_id, true);
+    setValidationAttempted(false);
     if (autoSaveTimerRef?.current) {
       clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
@@ -17983,8 +18689,10 @@ function TeacherPortal({
   const loadMyLeaves = useCallback(() => {
     if (!teacherIdForLeave) return;
     setLeavesLoading(true);
-    supabase.from(TEACHER_LEAVES_TABLE).select("*").eq("teacher_id", String(teacherIdForLeave)).order("created_at", { ascending: false }).then(({ data }) => {
-      setMyLeaves(data || []);
+    supabase.from(TEACHER_LEAVES_TABLE).select("*").eq("teacher_id", String(teacherIdForLeave)).then(({ data }) => {
+      const rows = data || [];
+      rows.sort((a, b) => new Date(b.created_at || b.createdAt || b.from_date || 0) - new Date(a.created_at || a.createdAt || a.from_date || 0));
+      setMyLeaves(rows);
       setLeavesLoading(false);
     });
   }, [teacherIdForLeave, sectionKibar]);
@@ -19868,11 +20576,11 @@ function TeacherPortal({
                       <span>Child</span>
                       <select
                         name="student_id"
-                        className="premium-select"
+                        className={getFieldClass("student_id", "premium-select")}
                         value={teacherForms.result.student_id || ""}
                         onChange={(e) => onTeacherFormChange({ target: { name: "student_id", value: e.target.value } })}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
-                        style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(212, 175, 55, 0.2)', fontSize: '0.9rem', color: 'var(--primary-dark)', background: '#ffffff' }}
+                        style={getFieldStyle("student_id", { width: '100%', padding: '10px 14px', borderRadius: '12px', fontSize: '0.9rem', color: 'var(--primary-dark)', background: '#ffffff' })}
                       >
                         <option value="">Select child</option>
                         {filteredStudents.map((student) => {
@@ -19905,6 +20613,8 @@ function TeacherPortal({
                         max="30"
                         name="murajazah"
                         step="0.1"
+                        className={getFieldClass("murajazah")}
+                        style={getFieldStyle("murajazah")}
                         value={teacherForms.result.murajazah}
                         onChange={onTeacherFormChange}
                         required
@@ -19919,6 +20629,8 @@ function TeacherPortal({
                         max="30"
                         step="0.1"
                         name="juz_hali"
+                        className={getFieldClass("juz_hali")}
+                        style={getFieldStyle("juz_hali")}
                         value={teacherForms.result.juz_hali}
                         onChange={onTeacherFormChange}
                         required
@@ -19933,6 +20645,8 @@ function TeacherPortal({
                         max="20"
                         name="takhteet"
                         step="0.1"
+                        className={getFieldClass("takhteet")}
+                        style={getFieldStyle("takhteet")}
                         value={teacherForms.result.takhteet}
                         onChange={onTeacherFormChange}
                         required
@@ -19947,6 +20661,8 @@ function TeacherPortal({
                         max="20"
                         name="jadeed"
                         step="0.1"
+                        className={getFieldClass("jadeed")}
+                        style={getFieldStyle("jadeed")}
                         value={teacherForms.result.jadeed}
                         onChange={onTeacherFormChange}
                         readOnly
@@ -19963,21 +20679,23 @@ function TeacherPortal({
                       <h4>Jadeed — New Memorization</h4>
                     </div>
                     <div className="form-grid mp-grid-two">
-
-
                     <label>
                       <span>Total Jadeed Pages</span>
                       <input
                         type="text"
                         name="total_jadeed_pages"
+                        className={getFieldClass("total_jadeed_pages")}
+                        style={getFieldStyle("total_jadeed_pages")}
                         value={teacherForms.result.total_jadeed_pages ?? ""}
                         onChange={onTeacherFormChange}
+                        placeholder="e.g. 5 or 2.5"
                       />
                     </label>
                     <label>
                       <span>Unit</span>
                       <select
-                        className="premium-select"
+                        className={getFieldClass("total_jadeed_unit", "premium-select")}
+                        style={getFieldStyle("total_jadeed_unit")}
                         name="total_jadeed_unit"
                         value={teacherForms.result.total_jadeed_unit}
                         onChange={onTeacherFormChange}
@@ -20000,7 +20718,8 @@ function TeacherPortal({
                     <label>
                       <span>Wusool Juz</span>
                       <select
-                        className="premium-select kanz-font"
+                        className={getFieldClass("wusool_juz", "premium-select kanz-font")}
+                        style={getFieldStyle("wusool_juz")}
                         name="wusool_juz"
                         value={teacherForms.result.wusool_juz}
                         onChange={onTeacherFormChange}
@@ -20015,16 +20734,16 @@ function TeacherPortal({
                     <label>
                       <span>Wusool Surah</span>
                       <select
-                        className="premium-select kanz-font"
+                        className={getFieldClass("wusool_surah", "premium-select kanz-font")}
+                        style={getFieldStyle("wusool_surah", { fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" })}
                         name="wusool_surah"
                         value={teacherForms.result.wusool_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
-                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
-                        {SURAH_NAMES_AR.map((name, i) => (
-                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
+                        {getSurahsForJuz(teacherForms.result.wusool_juz).map(({ number, name }) => (
+                          <option key={number} value={name} className="arabic-text">{number}. {name}</option>
                         ))}
                       </select>
                     </label>
@@ -20037,6 +20756,8 @@ function TeacherPortal({
                         name="wusool_page"
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
+                        className={getFieldClass("wusool_page")}
+                        style={getFieldStyle("wusool_page")}
                       />
                     </label>
                   </div>
@@ -20053,6 +20774,8 @@ function TeacherPortal({
                       <input
                         type="text"
                         name="matrookah"
+                        className={getFieldClass("matrookah")}
+                        style={getFieldStyle("matrookah")}
                         value={teacherForms.result.matrookah ?? ""}
                         onChange={onTeacherFormChange}
                         placeholder="e.g. 1, 2, 5"
@@ -20063,6 +20786,8 @@ function TeacherPortal({
                       <input
                         type="text"
                         name="daeefah"
+                        className={getFieldClass("daeefah")}
+                        style={getFieldStyle("daeefah")}
                         value={teacherForms.result.daeefah ?? ""}
                         onChange={onTeacherFormChange}
                         placeholder="e.g. 3, 7"
@@ -20080,7 +20805,8 @@ function TeacherPortal({
                     <label>
                       <span>Next Week Juz</span>
                       <select
-                        className="premium-select kanz-font"
+                        className={getFieldClass("next_week_juz", "premium-select kanz-font")}
+                        style={getFieldStyle("next_week_juz")}
                         name="next_week_juz"
                         value={teacherForms.result.next_week_juz}
                         onChange={onTeacherFormChange}
@@ -20095,16 +20821,16 @@ function TeacherPortal({
                     <label>
                       <span>Next Week Surah</span>
                       <select
-                        className="premium-select kanz-font"
+                        className={getFieldClass("next_week_surah", "premium-select kanz-font")}
+                        style={getFieldStyle("next_week_surah", { fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" })}
                         name="next_week_surah"
                         value={teacherForms.result.next_week_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
-                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
-                        {SURAH_NAMES_AR.map((name, i) => (
-                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
+                        {getSurahsForJuz(teacherForms.result.next_week_juz).map(({ number, name }) => (
+                          <option key={number} value={name} className="arabic-text">{number}. {name}</option>
                         ))}
                       </select>
                     </label>
@@ -20117,6 +20843,8 @@ function TeacherPortal({
                         name="next_week_page"
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
+                        className={getFieldClass("next_week_page")}
+                        style={getFieldStyle("next_week_page")}
                       />
                     </label>
                   </div>
@@ -20131,7 +20859,8 @@ function TeacherPortal({
                     <label>
                       <span>Takhteet Juz</span>
                       <select
-                        className="premium-select kanz-font"
+                        className={getFieldClass("istifadah_juz", "premium-select kanz-font")}
+                        style={getFieldStyle("istifadah_juz")}
                         name="istifadah_juz"
                         value={teacherForms.result.istifadah_juz}
                         onChange={onTeacherFormChange}
@@ -20146,16 +20875,16 @@ function TeacherPortal({
                     <label>
                       <span>Takhteet Surah</span>
                       <select
-                        className="premium-select kanz-font"
+                        className={getFieldClass("istifadah_surah", "premium-select kanz-font")}
+                        style={getFieldStyle("istifadah_surah", { fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" })}
                         name="istifadah_surah"
                         value={teacherForms.result.istifadah_surah}
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
-                        style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
                       >
                         <option value="">-- Select Surah --</option>
-                        {SURAH_NAMES_AR.map((name, i) => (
-                          <option key={i + 1} value={name} className="arabic-text">{i + 1}. {name}</option>
+                        {getSurahsForJuz(teacherForms.result.istifadah_juz).map(({ number, name }) => (
+                          <option key={number} value={name} className="arabic-text">{number}. {name}</option>
                         ))}
                       </select>
                     </label>
@@ -20168,6 +20897,8 @@ function TeacherPortal({
                         name="istifadah_page"
                         onChange={onTeacherFormChange}
                         disabled={selectedResultLocked || !canTeacherFillProgress}
+                        className={getFieldClass("istifadah_page")}
+                        style={getFieldStyle("istifadah_page")}
                       />
                     </label>
                   </div>
@@ -20186,6 +20917,8 @@ function TeacherPortal({
                         min="0"
                         max="6"
                         name="attendance_count"
+                        className={getFieldClass("attendance_count")}
+                        style={getFieldStyle("attendance_count")}
                         value={teacherForms.result.attendance_count}
                         onChange={onTeacherFormChange}
                       />
@@ -20253,6 +20986,8 @@ function TeacherPortal({
                     <textarea
                       name="attendance_note"
                       rows="3"
+                      className={getFieldClass("attendance_note")}
+                      style={getFieldStyle("attendance_note")}
                       value={teacherForms.result.attendance_note ?? ""}
                       onChange={onTeacherFormChange}
                       placeholder="Behaviour, attendance, or memorization note"
@@ -20263,7 +20998,7 @@ function TeacherPortal({
                     <button
                       type="button"
                       className="mp-save-btn"
-                      onClick={onTeacherResultSubmit}
+                      onClick={handleSubmitWithValidation}
                       disabled={!canEditCurrentResult || !teacherForms.result.student_id}
                       style={{
                         background: 'linear-gradient(135deg, #c5a059, #8b6d31)',
@@ -20295,14 +21030,142 @@ function TeacherPortal({
                   </div>
 
                   </fieldset>
-                  <div className="auto-save-status">
-                    {saveStatus === "validation" && <span className="save-status-validation">Fill all 4 score fields first</span>}
-                    {saveStatus === "saving" && <span className="save-status-saving">Saving...</span>}
-                    {saveStatus === "saved" && <span className="save-status-saved">Saved</span>}
+
+                  <div className="mp-save-status-container" style={{ marginTop: '16px' }}>
+                    {saveStatus === "saved" && (
+                      <div className="mp-status-card saved" style={{
+                        padding: '16px 20px',
+                        borderRadius: '16px',
+                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.06))',
+                        border: '1.5px solid rgba(16, 185, 129, 0.45)',
+                        boxShadow: '0 8px 24px rgba(16, 185, 129, 0.18), 0 0 16px rgba(16, 185, 129, 0.25)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        animation: 'fadeInUp 0.35s ease'
+                      }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #10b981, #059669)',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 14px rgba(16, 185, 129, 0.45)',
+                          flexShrink: 0
+                        }}>
+                          <CheckCircle size={22} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#065f46', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>Progress Saved &amp; Synced Successfully!</span>
+                            <span style={{ fontSize: '0.72rem', background: '#10b981', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontWeight: 700, letterSpacing: '0.04em' }}>LIVE SYNC</span>
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#047857', marginTop: '2px', lineHeight: 1.4 }}>
+                            All scores, memorization progress, and attendance for <strong>{selectedStudent?.name || "Student"}</strong> are locked and recorded in the database.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {saveStatus === "saving" && (
+                      <div className="mp-status-card saving" style={{
+                        padding: '16px 20px',
+                        borderRadius: '16px',
+                        background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.12), rgba(180, 83, 9, 0.06))',
+                        border: '1.5px solid rgba(217, 119, 6, 0.45)',
+                        boxShadow: '0 8px 24px rgba(217, 119, 6, 0.18), 0 0 16px rgba(217, 119, 6, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        animation: 'fadeInUp 0.3s ease'
+                      }}>
+                        <div className="spinner" style={{ width: '28px', height: '28px', borderWidth: '3.5px', borderColor: '#d97706', borderTopColor: 'transparent', flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#92400e' }}>
+                            Saving &amp; Syncing Progress Report...
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#b45309', marginTop: '2px', lineHeight: 1.4 }}>
+                            Writing marks to database and updating student rankings.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {saveStatus === "validation" && (
+                      <div className="mp-status-card validation" style={{
+                        padding: '16px 20px',
+                        borderRadius: '16px',
+                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(220, 38, 38, 0.06))',
+                        border: '1.5px solid rgba(239, 68, 68, 0.45)',
+                        boxShadow: '0 8px 24px rgba(239, 68, 68, 0.18), 0 0 16px rgba(239, 68, 68, 0.25)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        animation: 'fadeInUp 0.35s ease'
+                      }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.45)',
+                          flexShrink: 0
+                        }}>
+                          <AlertTriangle size={22} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#991b1b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>Required Fields Incomplete!</span>
+                            <span style={{ fontSize: '0.72rem', background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>ACTION REQUIRED</span>
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#b91c1c', marginTop: '2px', lineHeight: 1.4 }}>
+                            {saveErrorDetails || "Please fill all required fields highlighted in red before saving."}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {saveStatus === "error" && (
-                      <div className="save-status-error">
-                        <span>Save failed</span>
-                        {saveErrorDetails && <small style={{ display: "block", fontSize: "10px", marginTop: "4px", opacity: 0.8 }}>{saveErrorDetails}</small>}
+                      <div className="mp-status-card error" style={{
+                        padding: '16px 20px',
+                        borderRadius: '16px',
+                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(220, 38, 38, 0.06))',
+                        border: '1.5px solid rgba(239, 68, 68, 0.45)',
+                        boxShadow: '0 8px 24px rgba(239, 68, 68, 0.18), 0 0 16px rgba(239, 68, 68, 0.25)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        animation: 'fadeInUp 0.35s ease'
+                      }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.45)',
+                          flexShrink: 0
+                        }}>
+                          <AlertCircle size={22} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#991b1b' }}>
+                            Save Failed
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#b91c1c', marginTop: '2px', lineHeight: 1.4 }}>
+                            {saveErrorDetails || "A database sync error occurred. Please check network connection and try again."}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -20372,6 +21235,25 @@ function TeacherPortal({
               </div>
             </div>
           ) : null}
+
+          {showSaveConfirmModal && (
+            <MarkProgressConfirmModal
+              isOpen={showSaveConfirmModal}
+              onClose={() => setShowSaveConfirmModal(false)}
+              onConfirm={handleConfirmSaveResult}
+              student={
+                filteredStudents.find(
+                  (s) => String(s.student_id) === String(teacherForms.result.student_id)
+                ) ||
+                filteredStudents.find((s) =>
+                  s.allIds?.includes(String(teacherForms.result.student_id))
+                ) ||
+                selectedStudent
+              }
+              formData={teacherForms.result}
+              isSaving={saveStatus === "saving"}
+            />
+          )}
 
           {activePage === "BadalEntry" ? (
             <div className="badal-page-container">
@@ -22077,6 +22959,51 @@ const SURAH_NAMES_AR = [
   "المسد","الإخلاص","الفلق","الناس"
 ];
 
+// Exact mapping of Surahs contained in each of the 30 Quranic Juzs
+const JUZ_TO_SURAHS = {
+  1: [1, 2],
+  2: [2],
+  3: [2, 3],
+  4: [3, 4],
+  5: [4],
+  6: [4, 5],
+  7: [5, 6],
+  8: [6, 7],
+  9: [7, 8],
+  10: [8, 9],
+  11: [9, 10, 11],
+  12: [11, 12],
+  13: [12, 13, 14],
+  14: [15, 16],
+  15: [17, 18],
+  16: [18, 19, 20],
+  17: [21, 22],
+  18: [23, 24, 25],
+  19: [25, 26, 27],
+  20: [27, 28, 29],
+  21: [29, 30, 31, 32, 33],
+  22: [33, 34, 35, 36],
+  23: [36, 37, 38, 39],
+  24: [39, 40, 41],
+  25: [41, 42, 43, 44, 45],
+  26: [46, 47, 48, 49, 50, 51],
+  27: [51, 52, 53, 54, 55, 56, 57],
+  28: [58, 59, 60, 61, 62, 63, 64, 65, 66],
+  29: [67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77],
+  30: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114]
+};
+
+const getSurahsForJuz = (juz) => {
+  const j = Number(juz);
+  if (!j || !JUZ_TO_SURAHS[j]) {
+    return SURAH_NAMES_AR.map((name, i) => ({ number: i + 1, name }));
+  }
+  return JUZ_TO_SURAHS[j].map((num) => ({
+    number: num,
+    name: SURAH_NAMES_AR[num - 1]
+  }));
+};
+
 // Exact surah page resolution for the teacher progress form (Misri/Madani 604-page mushaf):
 // - juz 26-30 (or no juz yet) → the exact page where the selected surah starts
 // - juz 1-25 → any page within the selected surah's range (start page .. last page of the surah)
@@ -22090,7 +23017,7 @@ const resolveSurahPage = (juz, surahNum, currentPage) => {
 
 // Page field for Wusool / Next Week / Target Till:
 // exact auto-filled page for juz 26-30, or a dropdown of the surah's page range for juz 1-25.
-const SurahPagePicker = ({ juz, surah, value, name, onChange, disabled }) => {
+const SurahPagePicker = ({ juz, surah, value, name, onChange, disabled, style, className = "" }) => {
   const surahIdx = SURAH_NAMES_AR.indexOf(surah);
   const surahNum = surahIdx + 1;
   const juzNum = Number(juz);
@@ -22111,7 +23038,7 @@ const SurahPagePicker = ({ juz, surah, value, name, onChange, disabled }) => {
   }, [hasSurah, disabled, raw, isPure, juzNum, surahNum, value, name, onChange]);
 
   if (!hasSurah) {
-    return <input type="text" value="" readOnly disabled={disabled} placeholder="Select Surah first" />;
+    return <input type="text" value="" readOnly disabled={disabled} placeholder="Select Surah first" style={style} className={className} />;
   }
 
   if (!isRangeMode) {
@@ -22124,6 +23051,8 @@ const SurahPagePicker = ({ juz, surah, value, name, onChange, disabled }) => {
         title="Auto-filled exact surah page (Misri 604-page mushaf)"
         placeholder="Auto from surah"
         disabled={disabled}
+        style={style}
+        className={className}
       />
     );
   }
@@ -22137,8 +23066,9 @@ const SurahPagePicker = ({ juz, surah, value, name, onChange, disabled }) => {
       value={selectValue}
       onChange={onChange}
       disabled={disabled}
-      className="premium-select kanz-font"
+      className={`premium-select kanz-font ${className}`.trim()}
       title={`Surah pages ${startPage}–${endPage} (Misri 604-page mushaf)`}
+      style={style}
     >
       {options.map((p) => (
         <option key={p} value={String(p)}>{p}</option>
@@ -22530,6 +23460,14 @@ export default function App() {
       return DEFAULT_PAGE_BY_ROLE.parents;
     }
   });
+
+  // Persist active page per role so refreshing ANY page keeps the user on the EXACT same page
+  useEffect(() => {
+    if (portalRole && activePage) {
+      writeSavedPage(portalRole, activePage);
+    }
+  }, [portalRole, activePage]);
+
   const [searchPageLoading, setSearchPageLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -22976,7 +23914,7 @@ export default function App() {
         result: createTeacherResultDraft({ student_id: numericId })
       }));
     }
-  }, [portalRole, schoolData.students, schoolData.weeklyResults]);
+  }, [portalRole, schoolData.students]);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -22991,10 +23929,15 @@ export default function App() {
     };
   }, []);
 
+  const lastPortalRoleRef = useRef(portalRole);
   useEffect(() => {
-    const savedPages = readSavedPages();
-    const restoredPage = savedPages[portalRole];
-    setActivePage(restoredPage || DEFAULT_PAGE_BY_ROLE[portalRole] || DEFAULT_PAGE_BY_ROLE.parents);
+    // Only switch activePage if portalRole actually changed
+    if (lastPortalRoleRef.current !== portalRole) {
+      lastPortalRoleRef.current = portalRole;
+      const savedPages = readSavedPages();
+      const restoredPage = savedPages[portalRole];
+      setActivePage(restoredPage || DEFAULT_PAGE_BY_ROLE[portalRole] || DEFAULT_PAGE_BY_ROLE.parents);
+    }
     setMenuOpen(false);
     setActionMessage(null);
 
@@ -23690,6 +24633,7 @@ export default function App() {
             attendanceResponse,
             scheduleResponse,
             resultsResponse,
+            archiveResultsResponse,
             announcementResponse,
             teacherProfilesResponse,
             reportSettingsResponse,
@@ -23704,8 +24648,10 @@ export default function App() {
             supabase
               .from(isKibar ? "kibar_weekly_results" : "weekly_results")
               .select("*")
-              .in("student_id", studentQueryIds)
-              .order("week_date", { ascending: false })
+              .limit(5000),
+            supabase
+              .from(isKibar ? "kibar_weekly_results_archive" : "weekly_results_archive")
+              .select("*")
               .limit(5000),
             supabase.from(isKibar ? "kibar_events" : "events").select("*").order("event_date", { ascending: false }).limit(200),
             supabase.from(isKibar ? "kibar_teacher_profiles" : "teacher_profiles").select("*").order("full_name", { ascending: true }),
@@ -23720,15 +24666,18 @@ export default function App() {
           if (reportSettingsResponse.data) setReportSettings(reportSettingsResponse.data);
           if (jadwalSettingsResponse.data) setJadwalSettings(jadwalSettingsResponse.data);
           if (scheduleResponse.error) throw scheduleResponse.error;
-          if (resultsResponse.error) throw resultsResponse.error;
           if (announcementResponse.error) throw announcementResponse.error;
           if (teacherProfilesResponse.error) throw teacherProfilesResponse.error;
 
           const attendanceData = attendanceResponse.data || [];
+          const allWeeklyResults = [
+            ...(resultsResponse?.data || []),
+            ...(archiveResultsResponse?.data || [])
+          ];
 
           const processedStudents = buildStudents(
             rawProfiles,
-            resultsResponse.data || [],
+            allWeeklyResults,
             teacherProfilesResponse.data || []
           );
 
@@ -23986,7 +24935,11 @@ export default function App() {
             },
           }));
           setTeacherForms((current) => {
-            const currentSid = current.result.student_id || students[0].student_id;
+            if (current?.result?.student_id) {
+              return current;
+            }
+            const currentSid = students[0]?.student_id;
+            if (!currentSid) return current;
             const freshResults = resultsResponse.data || [];
             const matchingResults = freshResults
               .filter(r => String(r.student_id) === String(currentSid))
@@ -23998,7 +24951,7 @@ export default function App() {
             return {
               ...current,
               result: {
-                ...current.result,
+                ...createTeacherResultDraft({ student_id: currentSid }),
                 ...latestResult,
                 wusool_surah: latestResult?.wusool_surah || "",
                 next_week_surah: latestResult?.next_week_surah || "",
@@ -24155,9 +25108,20 @@ export default function App() {
     };
   }, [teacherData.attendances, portalAccess.salary_per_minute, portalAccess.show_salary_card, portalRole, teacherProfiles, teacherIdentity]);
 
-  function storeRole(role) {
+  function storeRole(role, newActivePage = null) {
+    const targetSection = SECTION_FOR_ROLE(role);
     setPortalRole(role);
-    setSectionScope(SECTION_FOR_ROLE(role));
+    setSectionScope(targetSection);
+
+    // Choose appropriate landing page for the new role to avoid stale subpages from previous role
+    const savedPages = readSavedPages();
+    const defaultPage = (role === "admin" || role === "kibar-admin")
+      ? "Overview"
+      : "Home";
+    const targetPage = newActivePage || savedPages[role] || defaultPage;
+    setActivePage(targetPage);
+    writeSavedPage(role, targetPage);
+
     if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEYS.role, role);
       try {
@@ -24168,6 +25132,12 @@ export default function App() {
           localStorage.setItem(STORAGE_KEYS.cachedAuth, JSON.stringify(cached));
         }
       } catch (_) {}
+    }
+
+    if (user) {
+      loadPortalData(role, user, null, { silent: true }).catch(err => {
+        console.warn("Failed to load portal data on role switch:", err);
+      });
     }
   }
 
@@ -24267,6 +25237,9 @@ export default function App() {
     } catch (e) { /* ignore */ }
 
     setUser(null);
+    setPortalRole("parents");
+    setSectionScope("atfal");
+    setActivePage("Home");
     setPortalAccess(emptyPortalAccess);
     setParentData(emptyParentData);
     setSchoolData({
@@ -24296,6 +25269,7 @@ export default function App() {
     localStorage.removeItem("mauze_portal_cache");
     localStorage.removeItem("parent-jadwal-tracked-days");
     localStorage.removeItem("parent-quick-action-statuses");
+    localStorage.removeItem("mauze-selected-child");
     sessionStorage.clear();
 
     if (rememberMe === "true") {
@@ -24818,90 +25792,6 @@ export default function App() {
 
   const handleTeacherFormChange = (event) => {
     const { name, value } = event.target;
-    const cleanValue = clampResultField(name, value);
-
-    setTeacherForms((current) => ({
-      ...current,
-      result: {
-        ...current.result,
-        [name]: cleanValue,
-      },
-    }));
-
-    // Auto-fill the Quran page from the selected surah (Misri/Madani 604-page mushaf):
-    // juz 26-30 → exact surah start page; juz 1-25 → first page of the surah's range (teacher picks the exact page in the dropdown)
-    const surahToPageField = {
-      wusool_surah: "wusool_page",
-      next_week_surah: "next_week_page",
-      istifadah_surah: "istifadah_page",
-    };
-    const surahToJuzField = {
-      wusool_surah: "wusool_juz",
-      next_week_surah: "next_week_juz",
-      istifadah_surah: "istifadah_juz",
-    };
-    if (surahToPageField[name]) {
-      const surahIdx = SURAH_NAMES_AR.indexOf(value);
-      if (surahIdx >= 0) {
-        setTeacherForms((cur) => {
-          const page = resolveSurahPage(
-            Number(cur.result[surahToJuzField[name]]),
-            surahIdx + 1,
-            cur.result[surahToPageField[name]]
-          );
-          return {
-            ...cur,
-            result: { ...cur.result, [surahToPageField[name]]: String(page) },
-          };
-        });
-      }
-    }
-
-    // When the juz changes, re-resolve the page (26-30 → exact surah page, 1-25 → within the surah's range)
-    const juzToSurahField = {
-      wusool_juz: "wusool_surah",
-      next_week_juz: "next_week_surah",
-      istifadah_juz: "istifadah_surah",
-    };
-    const juzToPageField = {
-      wusool_juz: "wusool_page",
-      next_week_juz: "next_week_page",
-      istifadah_juz: "istifadah_page",
-    };
-    if (juzToSurahField[name]) {
-      setTeacherForms((cur) => {
-        const surahIdx = SURAH_NAMES_AR.indexOf(cur.result[juzToSurahField[name]]);
-        if (surahIdx < 0) return cur;
-        const page = resolveSurahPage(Number(value), surahIdx + 1, cur.result[juzToPageField[name]]);
-        return {
-          ...cur,
-          result: { ...cur.result, [juzToPageField[name]]: String(page) },
-        };
-      });
-    }
-
-    // Auto-fill Jadeed marks from Total Jadeed Pages + Unit (all out of 20):
-    // Satar(30) = 2 marks per satar, Satar(26-30) = 1 mark per satar,
-    // Safah(1-5) = 7 marks per page, Safah(6-25) = 4 marks per page — capped at 20.
-    if (name === "total_jadeed_pages" || name === "total_jadeed_unit") {
-      setTeacherForms((current) => {
-        const pagesRaw = String(current.result.total_jadeed_pages ?? "").trim();
-        const unit = current.result.total_jadeed_unit;
-        const n = Number(pagesRaw);
-        let autoMarks = "";
-        if (pagesRaw !== "" && Number.isFinite(n) && n >= 0) {
-          const per = unit === "سطر 26-30" ? 1 : unit === "صفه 6-25" ? 4 : unit === "سطر" ? 2 : 7;
-          autoMarks = String(Math.min(Math.round(n * per * 100) / 100, 20));
-        }
-        return {
-          ...current,
-          result: {
-            ...current.result,
-            jadeed: autoMarks,
-          },
-        };
-      });
-    }
 
     if (name === "student_id") {
       const numericId = value && !isNaN(value) ? Number(value) : value;
@@ -24921,13 +25811,20 @@ export default function App() {
         } else if (todayResult) {
           setTeacherForms(curr => ({
             ...curr,
-            result: { ...curr.result, ...todayResult, wusool_surah: todayResult?.wusool_surah || "", next_week_surah: todayResult?.next_week_surah || "", istifadah_surah: todayResult?.istifadah_surah || "", student_id: numericId }
+            result: {
+              ...createTeacherResultDraft({ student_id: numericId }),
+              ...todayResult,
+              wusool_surah: todayResult?.wusool_surah || "",
+              next_week_surah: todayResult?.next_week_surah || "",
+              istifadah_surah: todayResult?.istifadah_surah || "",
+              student_id: numericId
+            }
           }));
         } else if (studentResults.length > 0) {
           setTeacherForms(curr => ({
             ...curr,
             result: {
-              ...curr.result,
+              ...createTeacherResultDraft({ student_id: numericId }),
               ...studentResults[0],
               wusool_surah: studentResults[0]?.wusool_surah || "",
               next_week_surah: studentResults[0]?.next_week_surah || "",
@@ -24956,7 +25853,78 @@ export default function App() {
         autoSaveTimerRef.current = null;
       }
       setSaveStatus("");
+      return;
     }
+
+    const cleanValue = clampResultField(name, value);
+
+    setTeacherForms((current) => {
+      const nextResult = {
+        ...current.result,
+        [name]: cleanValue,
+      };
+
+      // Auto-fill the Quran page from the selected surah (Misri/Madani 604-page mushaf)
+      const surahToPageField = {
+        wusool_surah: "wusool_page",
+        next_week_surah: "next_week_page",
+        istifadah_surah: "istifadah_page",
+      };
+      const surahToJuzField = {
+        wusool_surah: "wusool_juz",
+        next_week_surah: "next_week_juz",
+        istifadah_surah: "istifadah_juz",
+      };
+      if (surahToPageField[name]) {
+        const surahIdx = SURAH_NAMES_AR.indexOf(cleanValue);
+        if (surahIdx >= 0) {
+          const page = resolveSurahPage(
+            Number(nextResult[surahToJuzField[name]]),
+            surahIdx + 1,
+            nextResult[surahToPageField[name]]
+          );
+          nextResult[surahToPageField[name]] = String(page);
+        }
+      }
+
+      // When the juz changes, re-resolve the page
+      const juzToSurahField = {
+        wusool_juz: "wusool_surah",
+        next_week_juz: "next_week_surah",
+        istifadah_juz: "istifadah_surah",
+      };
+      const juzToPageField = {
+        wusool_juz: "wusool_page",
+        next_week_juz: "next_week_page",
+        istifadah_juz: "istifadah_page",
+      };
+      if (juzToSurahField[name]) {
+        const currentSurah = nextResult[juzToSurahField[name]];
+        const surahIdx = SURAH_NAMES_AR.indexOf(currentSurah);
+        if (surahIdx >= 0) {
+          const page = resolveSurahPage(Number(cleanValue), surahIdx + 1, nextResult[juzToPageField[name]]);
+          nextResult[juzToPageField[name]] = String(page);
+        }
+      }
+
+      // Auto-fill Jadeed marks from Total Jadeed Pages + Unit (all out of 20)
+      if (name === "total_jadeed_pages" || name === "total_jadeed_unit") {
+        const pagesRaw = String(nextResult.total_jadeed_pages ?? "").trim();
+        const unit = nextResult.total_jadeed_unit;
+        const n = Number(pagesRaw);
+        let autoMarks = "";
+        if (pagesRaw !== "" && Number.isFinite(n) && n >= 0) {
+          const per = unit === "سطر 26-30" ? 1 : unit === "صفه 6-25" ? 4 : unit === "سطر" ? 2 : 7;
+          autoMarks = String(Math.min(Math.round(n * per * 100) / 100, 20));
+        }
+        nextResult.jadeed = autoMarks;
+      }
+
+      return {
+        ...current,
+        result: nextResult,
+      };
+    });
   };
 
   const handleNotificationFileChange = async (e) => {
@@ -26058,6 +27026,18 @@ const handleSendCustomNotification = async (event) => {
       total_score: totalScore,
     };
 
+    // Clear the cleared flag so this student is recognized as saved
+    if (numericId) {
+      setStudentCleared(numericId, false);
+    }
+
+    // Set saveStatus to "saved" so the teacher UI displays the live saved card
+    setSaveStatus("saved");
+    setSaveErrorDetails("");
+    setTimeout(() => {
+      setSaveStatus("");
+    }, 4000);
+
     // Optimistic UI updates
     setSchoolData((current) => {
       const nextWeeklyResults = [
@@ -26092,6 +27072,19 @@ const handleSendCustomNotification = async (event) => {
 
     showAction("success", "Progress report saved successfully.");
 
+    // Auto-update child's current Juz in child_profiles when wusool_juz is set
+    const newWusoolJuz = payload.wusool_juz;
+    if (newWusoolJuz && String(newWusoolJuz).trim() !== "" && numericId) {
+      const juzNum = parseInt(newWusoolJuz, 10);
+      if (!isNaN(juzNum) && juzNum >= 1 && juzNum <= 30) {
+        supabase
+          .from("child_profiles")
+          .update({ juz: String(juzNum) })
+          .eq("student_id", numericId)
+          .then(() => {});
+      }
+    }
+
     // Perform database write in background
     supabase
       .from("weekly_results")
@@ -26101,6 +27094,8 @@ const handleSendCustomNotification = async (event) => {
       .then(({ data, error }) => {
         if (error) {
           console.error("Optimistic save background write error:", error);
+          setSaveStatus("error");
+          setSaveErrorDetails(error.message);
           showAction("error", "Sync failed: " + error.message);
           return;
         }

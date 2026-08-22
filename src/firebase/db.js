@@ -78,9 +78,11 @@ let activeSection = "atfal";
 
 export function setSectionScope(section) {
   const next = section === "kibar" ? "kibar" : "atfal";
-  activeSection = next;
-  console.log(`[Database] Switched active section scope to: ${next}`);
-  return next;
+  if (activeSection !== next) {
+    activeSection = next;
+    console.log(`[Database] Switched active section scope to: ${next}`);
+  }
+  return activeSection;
 }
 
 export function getSectionScope() {
@@ -100,15 +102,22 @@ const SHARED_COLLECTIONS = new Set([
 ]);
 
 export function resolveCollectionName(name) {
+  if (!name) return name;
+  const str = String(name);
+  if (str.startsWith("atfal_")) {
+    return str.slice(6);
+  }
+  if (str.startsWith("raw:")) {
+    return str.slice(4);
+  }
   if (
     activeSection === "kibar" &&
-    name &&
-    !SHARED_COLLECTIONS.has(name) &&
-    !String(name).startsWith("kibar_")
+    !SHARED_COLLECTIONS.has(str) &&
+    !str.startsWith("kibar_")
   ) {
-    return `kibar_${name}`;
+    return `kibar_${str}`;
   }
-  return name;
+  return str;
 }
 
 const DOC_ID_BY = {

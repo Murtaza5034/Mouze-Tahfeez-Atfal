@@ -81,30 +81,24 @@ service cloud.firestore {
 
     // ---------- user_portal_access ----------
     match /user_portal_access/{uid} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     // ---------- singleton settings ----------
     match /jadwal_settings/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
     match /marhala_settings/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
     match /report_settings/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
     match /email_settings/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
     match /whatsapp_config/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     // ---------- child_profiles ----------
@@ -225,8 +219,7 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
     match /app_releases/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
     match /email_logs/{id} {
       allow read, write: if isSignedIn();
@@ -265,31 +258,23 @@ service cloud.firestore {
       // Any signed-in user may read their own kibar portal-access document
       // (plain uid check — must NOT call role() here to avoid circular evaluation).
       // Kibar admins and atfal admins may read all documents.
-      allow read: if isSignedIn() && (request.auth.uid == uid || isKibarAdmin() || isAdmin());
-      // Kibar admins can write any doc. A kibar-teacher may write their own
-      // doc (needed during first-login provisioning when role is not yet set).
-      allow write: if isKibarAdmin() || isAdmin() || request.auth.uid == uid;
+      allow read, write: if isSignedIn();
     }
 
     match /kibar_jadwal_settings/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin();
+      allow read, write: if isSignedIn();
     }
     match /kibar_marhala_settings/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin();
+      allow read, write: if isSignedIn();
     }
     match /kibar_report_settings/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin();
+      allow read, write: if isSignedIn();
     }
     match /kibar_email_settings/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin();
+      allow read, write: if isSignedIn();
     }
     match /kibar_whatsapp_config/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin();
+      allow read, write: if isSignedIn();
     }
 
     // ---------- kibar_student_profiles ----------

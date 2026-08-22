@@ -11716,6 +11716,36 @@ h4.attendance-rating-text,
   box-shadow: 0 0 0 4px rgba(197, 160, 89, 0.15);
 }
 
+/* ---- Mark Progress Field Glow Lighting Effects ---- */
+.mark-progress-page .stack-form input.mp-field-saved,
+.mark-progress-page .stack-form select.mp-field-saved,
+.mark-progress-page .stack-form textarea.mp-field-saved,
+.mark-progress-page select.mp-field-saved,
+.mark-progress-page input.mp-field-saved {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.42), inset 0 0 3px rgba(16, 185, 129, 0.15) !important;
+  background-color: rgba(240, 253, 244, 0.6) !important;
+  transition: all 0.3s ease !important;
+}
+
+.mark-progress-page .stack-form input.mp-field-error,
+.mark-progress-page .stack-form select.mp-field-error,
+.mark-progress-page .stack-form textarea.mp-field-error,
+.mark-progress-page select.mp-field-error,
+.mark-progress-page input.mp-field-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.55), inset 0 0 4px rgba(239, 68, 68, 0.2) !important;
+  background-color: rgba(254, 242, 242, 0.7) !important;
+  animation: mpShakeError 0.35s ease-in-out !important;
+  transition: all 0.3s ease !important;
+}
+
+@keyframes mpShakeError {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
 /* ---- Attendance mini (premium gold) ---- */
 .mark-progress-page .att-week-mini {
   margin: 4px 0 8px;
@@ -11841,6 +11871,520 @@ h4.attendance-rating-text,
 }
 
 /* ============================================================
+   PREMIUM MARK PROGRESS CONFIRMATION POPUP MODAL
+   ============================================================ */
+
+.mp-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999999;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  animation: mpConfirmFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mp-confirm-modal {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  background: linear-gradient(155deg, #ffffff 0%, #fffdfa 50%, #faf4e7 100%);
+  border-radius: 26px;
+  border: 1.5px solid rgba(212, 175, 55, 0.45);
+  box-shadow:
+    0 36px 90px -15px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset,
+    0 14px 40px rgba(197, 160, 89, 0.24);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: mpConfirmPopIn 0.32s cubic-bezier(0.34, 1.35, 0.64, 1);
+}
+
+.mp-confirm-top-bar {
+  height: 5px;
+  width: 100%;
+  background: linear-gradient(90deg, #b8860b 0%, #d4af37 35%, #fff1b8 50%, #d4af37 65%, #b8860b 100%);
+  background-size: 200% 100%;
+  animation: mpShimmerGold 3s linear infinite;
+}
+
+@keyframes mpShimmerGold {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.mp-confirm-header {
+  padding: 20px 24px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mp-confirm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mp-confirm-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #d4af37 0%, #9e720e 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 22px rgba(212, 175, 55, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+}
+
+.mp-confirm-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #2d1e12;
+  margin: 0;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.mp-confirm-subtitle {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #7c6858;
+  margin: 3px 0 0;
+  line-height: 1.4;
+}
+
+.mp-confirm-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(197, 160, 89, 0.3);
+  background: rgba(255, 255, 255, 0.9);
+  color: #7c6858;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.mp-confirm-close-btn:hover {
+  background: #fdf2d8;
+  color: #2d1e12;
+  transform: scale(1.06);
+}
+
+.mp-confirm-body {
+  padding: 0 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: calc(92vh - 170px);
+}
+
+/* Student Hero */
+.mp-confirm-student-card {
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fff9ec 0%, #f6ecd2 100%);
+  border: 1.2px solid rgba(197, 160, 89, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(197, 160, 89, 0.12);
+}
+
+.mp-confirm-student-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mp-confirm-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #c5a059 0%, #8b6d31 100%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(139, 109, 49, 0.3);
+  flex-shrink: 0;
+}
+
+.mp-confirm-name {
+  font-weight: 800;
+  font-size: 0.96rem;
+  color: #2d1e12;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-confirm-subname {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8b6d31;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.mp-confirm-badge-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(197, 160, 89, 0.18);
+  border: 1px solid rgba(197, 160, 89, 0.38);
+  color: #785a1a;
+  white-space: nowrap;
+}
+
+/* Score Hero Banner */
+.mp-confirm-score-hero {
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #2d1e12 0%, #1a110a 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 8px 24px rgba(45, 30, 18, 0.28);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.mp-confirm-score-hero-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.mp-confirm-score-hero-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(212, 175, 55, 0.9);
+}
+
+.mp-confirm-score-hero-total {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #fffdf5;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.mp-confirm-score-hero-max {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.mp-confirm-score-pill {
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.4);
+}
+
+/* Scores Grid */
+.mp-confirm-scores-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.mp-confirm-score-tile {
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1.2px solid rgba(197, 160, 89, 0.25);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 3px 10px rgba(61, 43, 31, 0.04);
+}
+
+.mp-confirm-score-tile-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b6d31;
+}
+
+.mp-confirm-score-tile-val {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #2d1e12;
+}
+
+.mp-confirm-score-tile-sub {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: #9c8473;
+}
+
+/* Milestones List */
+.mp-confirm-milestones {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.mp-confirm-milestone-row {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #fffdf7;
+  border: 1px solid rgba(197, 160, 89, 0.24);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mp-confirm-milestone-key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #5c4333;
+}
+
+.mp-confirm-milestone-key svg {
+  color: #b8860b;
+}
+
+.mp-confirm-milestone-val {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #2d1e12;
+  text-align: right;
+}
+
+.mp-confirm-milestone-val.kanz {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 0.98rem;
+  color: #8b6d31;
+}
+
+.mp-confirm-note-box {
+  padding: 10px 14px;
+  border-radius: 13px;
+  background: rgba(197, 160, 89, 0.08);
+  border: 1px dashed rgba(197, 160, 89, 0.35);
+  font-size: 0.8rem;
+  color: #634d3d;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+/* Footer Actions */
+.mp-confirm-footer {
+  padding: 16px 24px 20px;
+  border-top: 1px dashed rgba(197, 160, 89, 0.35);
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.mp-confirm-btn-cancel {
+  flex: 1;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1.2px solid rgba(197, 160, 89, 0.45);
+  background: #ffffff;
+  color: #6e5847;
+  font-weight: 800;
+  font-size: 0.86rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(61, 43, 31, 0.05);
+}
+
+.mp-confirm-btn-cancel:hover {
+  background: #fbf5e6;
+  color: #2d1e12;
+  border-color: rgba(197, 160, 89, 0.7);
+  transform: translateY(-1px);
+}
+
+.mp-confirm-btn-save {
+  flex: 1.5;
+  padding: 12px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, #d4af37 0%, #b8860b 55%, #8f6504 100%);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow:
+    0 8px 24px rgba(184, 134, 11, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.mp-confirm-btn-save:hover {
+  background: linear-gradient(135deg, #e4bf47 0%, #c9960d 55%, #a67605 100%);
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 30px rgba(184, 134, 11, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.mp-confirm-btn-save:active {
+  transform: translateY(0);
+}
+
+@keyframes mpConfirmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mpConfirmPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Dark Mode Overrides for Confirmation Modal */
+.dark-mode .mp-confirm-modal {
+  background: linear-gradient(155deg, #1e2430 0%, #171c26 60%, #11151c 100%);
+  border-color: rgba(212, 175, 55, 0.4);
+  box-shadow:
+    0 36px 90px -15px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 14px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode .mp-confirm-title {
+  color: #f1f5f9;
+}
+
+.dark-mode .mp-confirm-subtitle {
+  color: #94a3b8;
+}
+
+.dark-mode .mp-confirm-close-btn {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(212, 175, 55, 0.3);
+  color: #cbd5e1;
+}
+
+.dark-mode .mp-confirm-close-btn:hover {
+  background: rgba(51, 65, 85, 0.9);
+  color: #f8fafc;
+}
+
+.dark-mode .mp-confirm-student-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.dark-mode .mp-confirm-name {
+  color: #f8fafc;
+}
+
+.dark-mode .mp-confirm-subname {
+  color: #d4af37;
+}
+
+.dark-mode .mp-confirm-score-tile {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(212, 175, 55, 0.2);
+}
+
+.dark-mode .mp-confirm-score-tile-val {
+  color: #f8fafc;
+}
+
+.dark-mode .mp-confirm-score-tile-sub {
+  color: #94a3b8;
+}
+
+.dark-mode .mp-confirm-milestone-row {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(212, 175, 55, 0.2);
+}
+
+.dark-mode .mp-confirm-milestone-key {
+  color: #cbd5e1;
+}
+
+.dark-mode .mp-confirm-milestone-val {
+  color: #f8fafc;
+}
+
+.dark-mode .mp-confirm-milestone-val.kanz {
+  color: #d4af37;
+}
+
+.dark-mode .mp-confirm-note-box {
+  background: rgba(212, 175, 55, 0.08);
+  border-color: rgba(212, 175, 55, 0.3);
+  color: #e2e8f0;
+}
+
+.dark-mode .mp-confirm-footer {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: rgba(212, 175, 55, 0.25);
+}
+
+.dark-mode .mp-confirm-btn-cancel {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(212, 175, 55, 0.3);
+  color: #cbd5e1;
+}
+
+.dark-mode .mp-confirm-btn-cancel:hover {
+  background: rgba(51, 65, 85, 0.9);
+  color: #f8fafc;
+}
+
+/* ============================================================
    RESPONSIVE — premium Mark Progress (mobile & tablet)
    ============================================================ */
 
@@ -11856,6 +12400,27 @@ h4.attendance-rating-text,
   .mark-progress-page .data-card {
     border-radius: 22px;
     padding: 18px 14px;
+  }
+
+  .mp-confirm-modal {
+    max-height: 94vh;
+    border-radius: 20px;
+  }
+
+  .mp-confirm-header {
+    padding: 16px 18px 12px;
+  }
+
+  .mp-confirm-body {
+    padding: 0 18px 16px;
+  }
+
+  .mp-confirm-footer {
+    padding: 14px 18px 18px;
+  }
+
+  .mp-confirm-scores-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .mark-progress-page .mp-card-headline {

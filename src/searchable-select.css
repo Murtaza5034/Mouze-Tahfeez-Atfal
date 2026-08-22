@@ -192,6 +192,36 @@
   white-space: nowrap;
 }
 
+.searchable-select-item-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--primary-gold, #d4af37);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, transform 0.12s;
+  margin-left: 4px;
+}
+
+.searchable-select-item-action:hover {
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #fff;
+  transform: scale(1.1);
+}
+
+.searchable-select-item.is-selected .searchable-select-item-action {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.searchable-select-item.is-selected .searchable-select-item-action:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
 .searchable-select-empty {
   padding: 18px;
   text-align: center;
