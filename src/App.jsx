@@ -11685,16 +11685,15 @@ function AdminPortal({
       .delete()
       .eq('id', sess.id);
 
-    // Delete Realtime Database signaling node
+    // Delete signaling node in Firestore
     try {
-      const { getDatabase, ref, update, remove } = await import("firebase/database");
-      const { firebaseApp } = await import("./firebase/config.js");
-      const rtdb = getDatabase(firebaseApp);
-      const signalRef = ref(rtdb, `tahfeez_signals/${sess.id}`);
-      await update(signalRef, { status: "ended" });
+      const { doc, setDoc, deleteDoc } = await import("firebase/firestore");
+      const { db } = await import("./firebase/db.js");
+      const signalRef = doc(db, "tahfeez_signals", sess.id);
+      await setDoc(signalRef, { status: "ended" }, { merge: true });
       setTimeout(async () => {
         try {
-          await remove(signalRef);
+          await deleteDoc(signalRef);
         } catch (_) {}
       }, 2000);
     } catch (_) {}
