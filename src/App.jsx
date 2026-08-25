@@ -85,6 +85,7 @@ import {
   Reply,
   Pencil,
   Video,
+  HelpCircle,
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
