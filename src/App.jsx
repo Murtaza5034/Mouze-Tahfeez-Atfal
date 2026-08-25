@@ -7223,39 +7223,8 @@ function ParentPortal({
     });
   };
 
-  const handleCallClose = async () => {
-    if (activeCall) {
-      const { roomId, role, startedAt } = activeCall;
-      if (role === "caller") {
-        const endedAt = new Date().toISOString();
-        const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000);
-        const activeSession = activeSessions[roomId];
-        if (activeSession) {
-          try {
-            await supabase
-              .from('online_tahfeez_logs')
-              .insert({
-                student_id: activeSession.student_id || null,
-                student_name: activeSession.student_name || null,
-                teacher_id: activeSession.teacher_id || null,
-                teacher_name: activeSession.teacher_name || null,
-                started_at: activeSession.started_at || startedAt,
-                ended_at: endedAt,
-                duration_seconds: durationSeconds,
-                type: activeSession.type || "1-on-1",
-                group_name: activeSession.group_name || null
-              });
-          } catch (e) {
-            console.error("Failed to write online tahfeez log:", e);
-          }
-        }
-        await supabase
-          .from('online_tahfeez_sessions')
-          .delete()
-          .eq('id', roomId);
-      }
-      setActiveCall(null);
-    }
+  const handleCallClose = () => {
+    setActiveCall(null);
   };
 
   useEffect(() => {
@@ -18449,39 +18418,46 @@ function TeacherPortal({
     });
   };
 
-  const handleCallClose = async () => {
-    if (activeCall) {
-      const { roomId, role, startedAt } = activeCall;
-      if (role === "caller") {
-        const endedAt = new Date().toISOString();
-        const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000);
-        const activeSession = activeSessions[roomId];
-        if (activeSession) {
-          try {
-            await supabase
-              .from('online_tahfeez_logs')
-              .insert({
-                student_id: activeSession.student_id || null,
-                student_name: activeSession.student_name || null,
-                teacher_id: activeSession.teacher_id || null,
-                teacher_name: activeSession.teacher_name || null,
-                started_at: activeSession.started_at || startedAt,
-                ended_at: endedAt,
-                duration_seconds: durationSeconds,
-                type: activeSession.type || "1-on-1",
-                group_name: activeSession.group_name || null
-              });
-          } catch (e) {
-            console.error("Failed to write online tahfeez log:", e);
-          }
-        }
+  const handleTeacherEndSession = async (roomId) => {
+    const activeSession = activeSessions[roomId];
+    if (activeSession) {
+      const endedAt = new Date().toISOString();
+      const startedAt = activeSession.started_at || endedAt;
+      const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000);
+      try {
         await supabase
-          .from('online_tahfeez_sessions')
-          .delete()
-          .eq('id', roomId);
+          .from('online_tahfeez_logs')
+          .insert({
+            student_id: activeSession.student_id || null,
+            student_name: activeSession.student_name || null,
+            teacher_id: activeSession.teacher_id || null,
+            teacher_name: activeSession.teacher_name || null,
+            started_at: startedAt,
+            ended_at: endedAt,
+            duration_seconds: durationSeconds,
+            type: activeSession.type || "1-on-1",
+            group_name: activeSession.group_name || null
+          });
+      } catch (e) {
+        console.error("Failed to write online tahfeez log:", e);
       }
-      setActiveCall(null);
     }
+    await supabase
+      .from('online_tahfeez_sessions')
+      .delete()
+      .eq('id', roomId);
+    try {
+      const { doc, setDoc, deleteDoc } = await import("firebase/firestore");
+      const { db } = await import("./firebase/db.js");
+      const signalRef = doc(db, "tahfeez_signals", roomId);
+      await setDoc(signalRef, { status: "ended" }, { merge: true });
+      setTimeout(() => { deleteDoc(signalRef).catch(() => {}); }, 2000);
+    } catch (_) {}
+    if (onShowAction) onShowAction("success", "Class session ended successfully.");
+  };
+
+  const handleCallClose = () => {
+    setActiveCall(null);
   };
 
   useEffect(() => {
@@ -19916,13 +19892,24 @@ function TeacherPortal({
           <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", margin: "8px 0 20px" }}>
             Start a combined session. All students in this group will see a button in their portal to join you.
           </p>
-          <button
-            className={`tahfeez-btn ${isGroupClassLive ? "primary pulse" : "primary"}`}
-            style={{ width: 'auto', minWidth: '180px' }}
-            onClick={handleStartGroupClass}
-          >
-            <Video size={16} /> {isGroupClassLive ? "Join Group Class" : "Start Group Class"}
-          </button>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              className={`tahfeez-btn ${isGroupClassLive ? "primary pulse" : "primary"}`}
+              style={{ width: 'auto', minWidth: '180px' }}
+              onClick={handleStartGroupClass}
+            >
+              <Video size={16} /> {isGroupClassLive ? "Join Group Class" : "Start Group Class"}
+            </button>
+            {isGroupClassLive && (
+              <button
+                className="tahfeez-btn"
+                style={{ width: 'auto', background: "#e74c3c", color: "#fff", borderColor: "#c0392b" }}
+                onClick={() => handleTeacherEndSession(groupRoomId)}
+              >
+                End Group Session
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Individual Students List */}
@@ -19980,13 +19967,22 @@ function TeacherPortal({
                       Student has joined and is waiting for you!
                     </div>
                   )}
-                  <div className="tahfeez-actions">
+                  <div className="tahfeez-actions" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       className="tahfeez-btn primary"
                       onClick={() => handleStartCall(student)}
                     >
                       <Video size={16} /> {isClassLive ? "Join Call" : "Call Student"}
                     </button>
+                    {isClassLive && (
+                      <button
+                        className="tahfeez-btn"
+                        style={{ background: "#e74c3c", color: "#fff", borderColor: "#c0392b" }}
+                        onClick={() => handleTeacherEndSession(childSessionId)}
+                      >
+                        End Class
+                      </button>
+                    )}
                   </div>
                 </div>
               );

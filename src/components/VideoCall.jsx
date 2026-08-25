@@ -6,9 +6,7 @@ import {
   setDoc,
   updateDoc,
   onSnapshot,
-  arrayUnion,
   deleteDoc,
-  getDoc,
   getDocs,
   addDoc,
 } from "firebase/firestore";
@@ -30,7 +28,7 @@ function buildIceServers() {
 
   const servers = [
     { urls: stunUrls },
-    // Public OpenRelay free STUN/TURN relay servers for NAT/Firewall traversal on mobile cellular networks
+    // Metered OpenRelay public WebRTC STUN/TURN relays for reliable NAT/CGNAT traversal on 4G/5G and WiFi
     {
       urls: [
         "turn:openrelay.metered.ca:80",
@@ -70,7 +68,6 @@ export default function VideoCall({ call, onClose }) {
     isSpectator = false,
   } = call || {};
 
-  // Uniform signaling collection in Firestore
   const SIGNAL_PATH = "tahfeez_signals";
 
   const localVideoRef = useRef(null);
@@ -79,10 +76,11 @@ export default function VideoCall({ call, onClose }) {
   const localStreamRef = useRef(null);
   const signalUnsubsRef = useRef([]);
   const endedRef = useRef(false);
+  const sessionIdRef = useRef(Date.now().toString());
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
-  const [status, setStatus] = useState("initializing");
+  const [status, setStatus] = useState("initializing"); // "initializing" | "calling" | "connected" | "reconnecting" | "error"
   const [error, setError] = useState("");
   const [seconds, setSeconds] = useState(0);
 
@@ -90,74 +88,59 @@ export default function VideoCall({ call, onClose }) {
     if (typeof unsub === "function") signalUnsubsRef.current.push(unsub);
   }, []);
 
-  // ----- cleanup helper -----
-  const stopAll = useCallback(
-    async (deleteSignaling) => {
-      if (endedRef.current) return;
-      endedRef.current = true;
+  // ----- cleanup helper for local device only -----
+  const stopLocal = useCallback(() => {
+    if (endedRef.current) return;
+    endedRef.current = true;
 
-      try {
-        const unsubs = signalUnsubsRef.current;
-        signalUnsubsRef.current = [];
-        for (const fn of unsubs) {
-          try { fn(); } catch (_) {}
-        }
-      } catch (_) {}
-
-      try {
-        if (pcRef.current) {
-          pcRef.current.onicecandidate = null;
-          pcRef.current.ontrack = null;
-          pcRef.current.onconnectionstatechange = null;
-          pcRef.current.oniceconnectionstatechange = null;
-          pcRef.current.close();
-          pcRef.current = null;
-        }
-      } catch (_) {}
-
-      try {
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach((t) => {
-            try { t.stop(); } catch (_) {}
-          });
-          localStreamRef.current = null;
-        }
-      } catch (_) {}
-
-      try {
-        if (localVideoRef.current) localVideoRef.current.srcObject = null;
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-      } catch (_) {}
-
-      if (deleteSignaling && roomId) {
-        try {
-          const roomRef = doc(db, SIGNAL_PATH, roomId);
-          await setDoc(roomRef, { status: "ended" }, { merge: true });
-          setTimeout(async () => {
-            try {
-              await deleteDoc(roomRef);
-              const [callerCands, calleeCands] = await Promise.all([
-                getDocs(collection(db, SIGNAL_PATH, roomId, "callerCandidates")).catch(() => ({ docs: [] })),
-                getDocs(collection(db, SIGNAL_PATH, roomId, "calleeCandidates")).catch(() => ({ docs: [] }))
-              ]);
-              const delPromises = [];
-              callerCands.docs?.forEach(d => delPromises.push(deleteDoc(d.ref).catch(() => {})));
-              calleeCands.docs?.forEach(d => delPromises.push(deleteDoc(d.ref).catch(() => {})));
-              await Promise.all(delPromises);
-            } catch (_) {}
-          }, 3000);
-        } catch (_) {}
+    try {
+      const unsubs = signalUnsubsRef.current;
+      signalUnsubsRef.current = [];
+      for (const fn of unsubs) {
+        try { fn(); } catch (_) {}
       }
-    },
-    [roomId, SIGNAL_PATH]
-  );
+    } catch (_) {}
 
-  // ----- end call -----
+    try {
+      if (pcRef.current) {
+        pcRef.current.onicecandidate = null;
+        pcRef.current.ontrack = null;
+        pcRef.current.onconnectionstatechange = null;
+        pcRef.current.oniceconnectionstatechange = null;
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+    } catch (_) {}
+
+    try {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => {
+          try { t.stop(); } catch (_) {}
+        });
+        localStreamRef.current = null;
+      }
+    } catch (_) {}
+
+    try {
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    } catch (_) {}
+
+    // Mark self inactive in signaling so the other user sees reconnection status but stays in room
+    if (roomId) {
+      try {
+        const roomRef = doc(db, SIGNAL_PATH, roomId);
+        const fieldName = role === "caller" ? "caller_in_room" : "callee_in_room";
+        updateDoc(roomRef, { [fieldName]: false }).catch(() => {});
+      } catch (_) {}
+    }
+  }, [roomId, role, SIGNAL_PATH]);
+
+  // ----- user clicks End button -----
   const handleEnd = useCallback(() => {
-    stopAll(true).finally(() => {
-      if (onClose) onClose();
-    });
-  }, [stopAll, onClose]);
+    stopLocal();
+    if (onClose) onClose();
+  }, [stopLocal, onClose]);
 
   // ----- esc to end -----
   useEffect(() => {
@@ -171,15 +154,17 @@ export default function VideoCall({ call, onClose }) {
   // ----- unmount safety -----
   useEffect(() => {
     return () => {
-      stopAll(true);
+      stopLocal();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ----- timer -----
+  // ----- timer: ONLY runs when both are actively connected -----
   useEffect(() => {
     if (status !== "connected") return;
-    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    const t = setInterval(() => {
+      setSeconds((s) => s + 1);
+    }, 1000);
     return () => clearInterval(t);
   }, [status]);
 
@@ -204,10 +189,10 @@ export default function VideoCall({ call, onClose }) {
       return;
     }
 
-    // Camera not yet acquired - acquire front camera
+    // Camera not yet acquired
     try {
       const videoStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
+        video: { width: { ideal: 640 }, height: { ideal: 480 } }
       });
       const videoTrack = videoStream.getVideoTracks()[0];
       if (videoTrack) {
@@ -238,61 +223,51 @@ export default function VideoCall({ call, onClose }) {
     }
   }, [camOn]);
 
-  // ----- main effect: start the call -----
+  // ----- main effect: start and maintain the WebRTC call -----
   useEffect(() => {
     if (!roomId || !role) return;
 
     let cancelled = false;
+    const currentSessionId = sessionIdRef.current;
 
     const start = async () => {
       setStatus("initializing");
       setError("");
 
-      // 1. acquire local media (skip if spectator)
+      // 1. Acquire local media (cross-platform with robust fallback)
       let stream = null;
       if (!isSpectator) {
         try {
           try {
+            // First attempt: video and audio with ideal dimensions (safe for desktop webcams & mobile cameras)
             stream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                facingMode: "user",
-                width: { ideal: 640, max: 1280 },
-                height: { ideal: 480, max: 720 },
-                frameRate: { ideal: 24, max: 30 }
-              },
+              video: { width: { ideal: 640 }, height: { ideal: 480 } },
               audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true
-              },
+              }
             });
             setCamOn(true);
-          } catch (videoErr) {
-            console.warn("Camera not available or permission denied, falling back to audio only:", videoErr);
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: false,
-              audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-              },
-            });
-            setCamOn(false);
+            setMicOn(true);
+          } catch (vidErr) {
+            console.warn("Attempt 1 failed, trying generic video/audio:", vidErr);
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+              setCamOn(true);
+              setMicOn(true);
+            } catch (vidErr2) {
+              console.warn("Camera not available, falling back to audio only:", vidErr2);
+              stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              setCamOn(false);
+              setMicOn(true);
+            }
           }
-        } catch (e) {
-          try {
-            // Ultimate audio fallback
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            setCamOn(false);
-          } catch (audioErr) {
-            setError(
-              "Cannot access microphone. Please allow microphone permissions and try again. (" +
-                (audioErr?.message || audioErr) +
-                ")"
-            );
-            setStatus("error");
-            return;
-          }
+        } catch (mediaErr) {
+          console.error("Microphone/Camera permission error:", mediaErr);
+          setError("Microphone / Camera access required. Please grant permissions and retry.");
+          setStatus("error");
+          return;
         }
 
         if (cancelled) {
@@ -310,16 +285,18 @@ export default function VideoCall({ call, onClose }) {
         setMicOn(false);
       }
 
-      // 2. create peer connection
+      // 2. Create RTCPeerConnection
       const pc = new RTCPeerConnection(buildIceServers());
       pcRef.current = pc;
 
-      // Add local tracks
+      // Add local tracks to peer connection
       if (stream) {
-        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+        stream.getTracks().forEach((t) => {
+          try { pc.addTrack(t, stream); } catch (_) {}
+        });
       }
 
-      // Ensure transceivers are configured so video/audio can be received even if local camera is off
+      // Add transceivers so audio and video streams can be negotiated in both directions
       if (pc.addTransceiver) {
         const hasAudio = stream && stream.getAudioTracks().length > 0;
         const hasVideo = stream && stream.getVideoTracks().length > 0;
@@ -331,9 +308,9 @@ export default function VideoCall({ call, onClose }) {
         }
       }
 
+      // Remote track handler
       pc.ontrack = (ev) => {
         console.log("[WebRTC] Remote track received:", ev.track.kind);
-        setStatus("connected");
         if (remoteVideoRef.current) {
           if (ev.streams && ev.streams[0]) {
             remoteVideoRef.current.srcObject = ev.streams[0];
@@ -343,64 +320,63 @@ export default function VideoCall({ call, onClose }) {
             }
             remoteVideoRef.current.srcObject.addTrack(ev.track);
           }
-          const playPromise = remoteVideoRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((err) => {
-              console.warn("[WebRTC] Remote autoplay play error:", err);
+          const p = remoteVideoRef.current.play();
+          if (p !== undefined) {
+            p.catch((err) => {
+              console.warn("[WebRTC] Remote video autoplay error:", err);
             });
           }
         }
+        setStatus("connected");
       };
 
       const checkConnectionState = () => {
         if (!pcRef.current) return;
         const cs = pcRef.current.connectionState;
         const ics = pcRef.current.iceConnectionState;
-        console.log(`[WebRTC] state change: connectionState=${cs}, iceState=${ics}`);
+        console.log(`[WebRTC] Connection state: ${cs}, ICE state: ${ics}`);
         if (cs === "connected" || ics === "connected" || ics === "completed") {
           setStatus("connected");
           setError("");
-        } else if (cs === "failed" || ics === "failed") {
-          if (cs === "failed" && ics === "failed") {
-            setStatus("failed");
-            setError("Connection failed. Please check network and retry.");
-          }
         } else if (cs === "disconnected" || ics === "disconnected") {
-          console.warn("[WebRTC] Connection temporarily disconnected...");
+          console.warn("[WebRTC] Temporary disconnect, waiting to reconnect...");
+          setStatus("reconnecting");
+        } else if (cs === "failed" || ics === "failed") {
+          console.warn("[WebRTC] ICE failed, attempting restart...");
+          try {
+            if (pcRef.current && pcRef.current.restartIce) {
+              pcRef.current.restartIce();
+            }
+          } catch (_) {}
+          setStatus("reconnecting");
         }
       };
 
       pc.onconnectionstatechange = checkConnectionState;
       pc.oniceconnectionstatechange = checkConnectionState;
 
-      // 3. Signaling setup with subcollections & queued ICE candidates
+      // 3. Signaling setup
       const roomRef = doc(db, SIGNAL_PATH, roomId);
+      const candidatesCol = collection(db, SIGNAL_PATH, roomId, "candidates");
       const processedCandidateKeys = new Set();
       const pendingRemoteCandidates = [];
 
-      const mySubColName = role === "caller" ? "callerCandidates" : "calleeCandidates";
-      const remoteSubColName = role === "caller" ? "calleeCandidates" : "callerCandidates";
-      const myDocArrayField = role === "caller" ? "caller_candidates" : "callee_candidates";
-
-      // On Local ICE Candidate discovered
+      // When local ICE candidate is found
       pc.onicecandidate = async (ev) => {
         if (ev.candidate) {
           const candJson = ev.candidate.toJSON();
           if (!candJson || !candJson.candidate) return;
 
-          // 1. Write to subcollection (atomic and realtime)
           try {
-            await addDoc(collection(db, SIGNAL_PATH, roomId, mySubColName), candJson);
+            await addDoc(candidatesCol, {
+              senderRole: role,
+              sessionId: currentSessionId,
+              candidate: candJson,
+              createdAt: Date.now()
+            });
           } catch (err) {
-            console.warn("[WebRTC] Error writing subcollection candidate:", err);
+            console.warn("[WebRTC] Error writing ICE candidate:", err);
           }
-
-          // 2. Also write to room document array as fallback
-          try {
-            await setDoc(roomRef, {
-              [myDocArrayField]: arrayUnion(candJson)
-            }, { merge: true });
-          } catch (_) {}
         }
       };
 
@@ -418,7 +394,6 @@ export default function VideoCall({ call, onClose }) {
 
         try {
           await currentPc.addIceCandidate(new RTCIceCandidate(cand));
-          console.log("[WebRTC] Applied ICE candidate successfully");
         } catch (err) {
           console.warn("[WebRTC] addIceCandidate error:", err);
         }
@@ -432,25 +407,24 @@ export default function VideoCall({ call, onClose }) {
           const cand = pendingRemoteCandidates.shift();
           try {
             await currentPc.addIceCandidate(new RTCIceCandidate(cand));
-            console.log("[WebRTC] Flushed pending candidate successfully");
           } catch (err) {
-            console.warn("[WebRTC] flush candidate error:", err);
+            console.warn("[WebRTC] flush ICE candidate error:", err);
           }
         }
       };
 
-      // Listen for remote candidates via subcollection (realtime & instant)
-      const unsubSubCol = onSnapshot(
-        collection(db, SIGNAL_PATH, roomId, remoteSubColName),
-        (snap) => {
-          snap.docChanges().forEach((change) => {
-            if (change.type === "added") {
-              applyCandidate(change.doc.data());
+      // Listen for remote candidates from subcollection
+      const unsubCandidates = onSnapshot(candidatesCol, (snap) => {
+        snap.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const data = change.doc.data();
+            if (data && data.senderRole !== role && data.candidate) {
+              applyCandidate(data.candidate);
             }
-          });
-        }
-      );
-      trackUnsub(unsubSubCol);
+          }
+        });
+      });
+      trackUnsub(unsubCandidates);
 
       if (role === "caller") {
         try {
@@ -460,21 +434,25 @@ export default function VideoCall({ call, onClose }) {
           });
           await pc.setLocalDescription(offer);
 
+          // Overwrite signaling document with fresh session state (erases any stale old answers)
           await setDoc(roomRef, {
+            sessionId: currentSessionId,
             offer: { type: offer.type, sdp: offer.sdp },
+            answer: null,
             caller: { name: myName, role: myRole },
+            caller_in_room: true,
+            callee_in_room: false,
             started_at: Date.now(),
             status: "calling",
-            caller_candidates: [],
-            callee_candidates: [],
-          }, { merge: true });
+          });
 
           const unsubRoom = onSnapshot(roomRef, async (snapshot) => {
             if (endedRef.current || !snapshot.exists()) return;
             const data = snapshot.data();
             if (!data) return;
 
-            if (data.answer && !pc.remoteDescription) {
+            // When callee sends answer for this session
+            if (data.answer && data.sessionId === currentSessionId && !pc.remoteDescription) {
               try {
                 console.log("[WebRTC] Caller received answer from Callee");
                 await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
@@ -485,16 +463,9 @@ export default function VideoCall({ call, onClose }) {
               }
             }
 
-            // Fallback: process doc array candidates
-            const calleeCandidates = data.callee_candidates || [];
-            for (const c of calleeCandidates) {
-              await applyCandidate(c);
-            }
-
-            if (data.status === "ended") {
-              stopAll(false).finally(() => {
-                if (onClose) onClose();
-              });
+            // Update peer in-room status
+            if (data.callee_in_room === false && status === "connected") {
+              setStatus("reconnecting");
             }
           });
           trackUnsub(unsubRoom);
@@ -505,56 +476,48 @@ export default function VideoCall({ call, onClose }) {
           setStatus("error");
         }
       } else {
-        // Callee / Spectator
+        // Callee
         let answerCreated = false;
 
-        const handleOffer = async (offerData) => {
+        const handleOffer = async (offerData, offerSessionId) => {
           if (answerCreated || !offerData || !offerData.sdp) return;
           answerCreated = true;
           try {
-            console.log("[WebRTC] Callee applying offer and creating answer");
+            console.log("[WebRTC] Callee processing offer");
             await pc.setRemoteDescription(new RTCSessionDescription(offerData));
             await flushRemoteCandidates();
 
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
-            await setDoc(roomRef, {
+            await updateDoc(roomRef, {
               answer: { type: answer.type, sdp: answer.sdp },
               callee: { name: myName, role: myRole },
+              callee_in_room: true,
               status: "connected",
-            }, { merge: true });
+            });
 
             setStatus("connected");
-            console.log("[WebRTC] Callee answer sent successfully");
+            console.log("[WebRTC] Callee answer sent");
           } catch (err) {
-            console.error("[WebRTC] Error handling offer on callee:", err);
-            setError("Failed to establish video call: " + (err.message || err));
+            console.error("[WebRTC] Error creating answer on callee:", err);
+            setError("Failed to join video call: " + (err.message || err));
             setStatus("error");
           }
         };
 
-        // Listen for offer on room doc via onSnapshot (handles any initial propagation delay)
         const unsubRoom = onSnapshot(roomRef, async (snapshot) => {
           if (endedRef.current || !snapshot.exists()) return;
           const data = snapshot.data();
           if (!data) return;
 
-          if (data.status === "ended") {
-            stopAll(false).finally(() => {
-              if (onClose) onClose();
-            });
-            return;
-          }
-
           if (data.offer && !answerCreated) {
-            await handleOffer(data.offer);
+            await handleOffer(data.offer, data.sessionId);
           }
 
-          // Fallback: process doc array candidates
-          const callerCandidates = data.caller_candidates || [];
-          for (const c of callerCandidates) {
-            await applyCandidate(c);
+          // If caller leaves, show reconnecting
+          if (data.caller_in_room === false && status === "connected") {
+            setStatus("reconnecting");
           }
         });
         trackUnsub(unsubRoom);
@@ -579,8 +542,9 @@ export default function VideoCall({ call, onClose }) {
     initializing: "Setting up…",
     calling: "Connecting…",
     connected: `${mm}:${ss}`,
+    reconnecting: `Waiting for ${peerName}…`,
     disconnected: "Reconnecting…",
-    failed: "Connection failed",
+    failed: "Reconnecting…",
     error: "Error",
   }[status] || status;
 
@@ -608,7 +572,7 @@ export default function VideoCall({ call, onClose }) {
 
         <div className="vc-topbar">
           <div className="vc-topbar-left">
-            <span className="vc-dot" />
+            <span className={`vc-dot ${status === "connected" ? "vc-dot-active" : ""}`} />
             <span className="vc-room-label">
               {isSpectator ? "Auditing Class (Spectator)" : "Online Tahfeez Class"}
             </span>
