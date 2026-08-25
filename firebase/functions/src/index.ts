@@ -46,66 +46,54 @@ function siteUrl(): string {
   return (
     process.env.SITE_URL ||
     process.env.VERCEL_PROJECT_PRODUCTION_URL ||
-    "https://mouze-tahfeez-atfal-mu.vercel.app"
+    "https://mouze-tahfeez-atfal.vercel.app"
   ).replace(/\/+$/, "");
 }
 
 function notificationUrl(dataMap?: Record<string, string>, fallback = "/"): string {
-  // Priority: explicit url/link > redirectPage-based deep link > fallback
+  const base = siteUrl();
   const raw = dataMap?.url || dataMap?.link;
   if (raw) {
     try {
-      return new URL(raw, `${siteUrl()}/`).toString();
+      if (raw.startsWith("/")) {
+        return new URL(raw, `${base}/`).toString();
+      }
+      const parsed = new URL(raw);
+      // Rebase onto base site url
+      return new URL(parsed.pathname + parsed.search + parsed.hash, `${base}/`).toString();
     } catch {
       // fall through
     }
   }
   
   // Generate deep link from redirectPage
-  if (dataMap?.redirectPage) {
-    const page = dataMap.redirectPage;
-    let path = "/";
-    switch (page) {
-      case "Apply Leave": path = "/?redirectPage=Apply%20Leave"; break;
-      case "Leave Management": path = "/?redirectPage=Leave%20Management"; break;
-      case "Leave History": path = "/?redirectPage=Leave%20History"; break;
-      case "Inbox": path = "/?redirectPage=Inbox"; break;
-      case "Home": path = "/?redirectPage=Home"; break;
-      case "Child Summary": path = "/?redirectPage=Child%20Summary"; break;
-      case "Progress": path = "/?redirectPage=Child%20Summary"; break;
-      case "Schedule": path = "/?redirectPage=Schedule"; break;
-      case "Teachers": path = "/?redirectPage=Teachers"; break;
-      case "Profile": path = "/?redirectPage=Profile"; break;
-      case "Hub Raqam": path = "/?redirectPage=Hub%20Raqam"; break;
-      case "Jadwal": path = "/?redirectPage=Jadwal"; break;
-      case "Self Jadwal": path = "/?redirectPage=Self%20Jadwal"; break;
-      case "My Group": path = "/?redirectPage=My%20Group"; break;
-      case "Fill Result": path = "/?redirectPage=Fill%20Result"; break;
-      case "Reports": path = "/?redirectPage=Fill%20Result"; break;
-      case "Announcements": path = "/?redirectPage=Home"; break;
-      case "Settings": path = "/?redirectPage=Settings"; break;
-      case "Quran Ikhtebar": path = "/?redirectPage=Quran%20Ikhtebar"; break;
-      default:
-        // Dynamic redirectPage with parameters (e.g., "Jadwal:studentId")
-        if (page.includes(":")) {
-          const parts = page.split(":");
-          if (parts[1]) {
-            path = `/?redirectPage=${encodeURIComponent(parts[0])}&studentId=${encodeURIComponent(parts[1])}`;
-          } else {
-            path = `/?redirectPage=${encodeURIComponent(parts[0])}`;
-          }
-        } else {
-          path = `/?redirectPage=${encodeURIComponent(page)}`;
-        }
+  const page = dataMap?.redirectPage || dataMap?.redirect_page;
+  const leaveId = dataMap?.leaveId || dataMap?.leave_id;
+  const studentId = dataMap?.studentId || dataMap?.student_id;
+
+  if (page) {
+    let path = `/?redirectPage=${encodeURIComponent(page)}`;
+    if (page.includes(":")) {
+      const parts = page.split(":");
+      path = `/?redirectPage=${encodeURIComponent(parts[0])}`;
+      if (parts[1] && !studentId) {
+        path += `&studentId=${encodeURIComponent(parts[1])}`;
+      }
+    }
+    if (leaveId) {
+      path += `&leaveId=${encodeURIComponent(leaveId)}`;
+    }
+    if (studentId) {
+      path += `&studentId=${encodeURIComponent(studentId)}`;
     }
     try {
-      return new URL(path, `${siteUrl()}/`).toString();
+      return new URL(path, `${base}/`).toString();
     } catch {
       // fall through
     }
   }
   
-  return `${siteUrl()}/`;
+  return `${base}/`;
 }
 
 async function tokensForUser(userId?: string, section: "atfal" | "kibar" = "atfal"): Promise<string[]> {

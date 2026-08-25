@@ -6078,10 +6078,10 @@
     "semantic_hash": "ae370a9d9ec75c557dccd4b902e37fdb"
   },
   "firebase/functions/src/index.ts": {
-    "mtime": 1787221905.336055,
-    "seen": 1787510537.2114582,
-    "ast_hash": "e85590aa3fe33415ce8a3522d0e03778",
-    "semantic_hash": "e85590aa3fe33415ce8a3522d0e03778"
+    "mtime": 1787668522.658083,
+    "seen": 1787676112.8729606,
+    "ast_hash": "f9841a88bd475d2d1643e4f8f2e3e22b",
+    "semantic_hash": ""
   },
   "firebase/functions/tsconfig.json": {
     "mtime": 1786170625.118152,
@@ -6174,10 +6174,10 @@
     "semantic_hash": "d895104c82766075e6865e6c965d9ebc"
   },
   "public/firebase-messaging-sw.js": {
-    "mtime": 1787033467.1242578,
-    "seen": 1787510537.211472,
-    "ast_hash": "4a59efe52d95a3ffeaba3a8928a2b2d9",
-    "semantic_hash": "4a59efe52d95a3ffeaba3a8928a2b2d9"
+    "mtime": 1787668471.4557974,
+    "seen": 1787676112.873865,
+    "ast_hash": "fb3ca76c9cb25979383ca0b0a5f60002",
+    "semantic_hash": ""
   },
   "qvac-examples/package.json": {
     "mtime": 1781174838.6835709,
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1787664446.3444102,
-    "seen": 1787666572.2936773,
-    "ast_hash": "7e3022add8539cdac6544939162b1430",
+    "mtime": 1787668533.9359863,
+    "seen": 1787676112.8759427,
+    "ast_hash": "5d35d244986788332a4aef76ca4d4b0f",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6498,16 +6498,16 @@
     "semantic_hash": "b5213675a7c338bb418624635036fc77"
   },
   "src/fcmService.js": {
-    "mtime": 1787221130.93029,
-    "seen": 1787510537.2115164,
-    "ast_hash": "3dec8d705a8aa139548e0c46aa946c18",
-    "semantic_hash": "3dec8d705a8aa139548e0c46aa946c18"
+    "mtime": 1787668512.325973,
+    "seen": 1787676112.8774028,
+    "ast_hash": "b68d1cceae186be2a6313c20f1ee0a58",
+    "semantic_hash": ""
   },
   "src/firebaseConfig.js": {
-    "mtime": 1787289706.3661878,
-    "seen": 1787510537.211517,
-    "ast_hash": "1d2663b52519d4db316918c8ed4afe5c",
-    "semantic_hash": "1d2663b52519d4db316918c8ed4afe5c"
+    "mtime": 1787668502.593017,
+    "seen": 1787676112.8774045,
+    "ast_hash": "a9c1279a499a09c697cf66e08efe1a61",
+    "semantic_hash": ""
   },
   "src/firebase/auth.js": {
     "mtime": 1786456937.2226024,
@@ -6630,10 +6630,10 @@
     "semantic_hash": "957bbea90bb141a8c66d5fe0b0321a96"
   },
   "vite.config.js": {
-    "mtime": 1787221348.47788,
-    "seen": 1787510537.2115364,
-    "ast_hash": "7ff9a225910265b3ac046d1d34beca98",
-    "semantic_hash": "7ff9a225910265b3ac046d1d34beca98"
+    "mtime": 1787668461.3222764,
+    "seen": 1787676112.8786328,
+    "ast_hash": "a9e16e775d1d244d7f7acb8a89c71bc7",
+    "semantic_hash": ""
   },
   ".agents/rules/graphify.md": {
     "mtime": 1787510480.3937619,

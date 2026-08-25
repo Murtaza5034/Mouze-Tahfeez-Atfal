@@ -46,6 +46,7 @@ export function getRefreshReg() {
         'Qilka-Bold.otf',
       ],
       workbox: {
+        importScripts: ['/firebase-messaging-sw.js'],
         maximumFileSizeToCacheInBytes: 10485760,
         globPatterns: ['**/*.{js,css,html,json,png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,otf}'],
         globIgnores: ['**/login background.jpg', '**/kanz-al-marjaan-webfont.svg'],

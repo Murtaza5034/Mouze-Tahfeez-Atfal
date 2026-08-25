@@ -7041,14 +7041,15 @@ function ChildLeaveApply({
 const resolveRedirectPage = (page, role) => {
   if (!page) return "Home";
   
-  if (role === "parents") {
+  if (role === "parents" || role === "kibar-student") {
     const parentMap = {
-      "Announcements": "Home",
+      "Notifications": "Inbox",
+      "Announcements": "Inbox",
+      "Inbox": "Inbox",
       "Progress": "Child Summary",
       "Child Summary": "Child Summary",
       "Schedule": "Schedule",
       "Teachers": "Teachers",
-      "Inbox": "Inbox",
       "Profile": "Profile",
       "Hub Raqam": "Hub Raqam",
       "Apply Leave": "Apply Leave",
@@ -7056,26 +7057,42 @@ const resolveRedirectPage = (page, role) => {
       "Settings": "Settings",
       "Jadwal": "Jadwal",
       "Self Jadwal": "Self Jadwal",
+      "Help Videos": "Help Videos",
+      "Online Tahfeez": "Online Tahfeez",
       "Home": "Home"
     };
-    return parentMap[page] || "Home";
+    return parentMap[page] || page;
   }
   
-  if (role === "teacher") {
+  if (role === "teacher" || role === "kibar-teacher") {
     const teacherMap = {
-      "Announcements": "My Group",
+      "Notifications": "Inbox",
+      "Announcements": "Inbox",
+      "Inbox": "Inbox",
       "Reports": "Fill Result",
-      "Home": "My Group",
+      "Fill Result": "Fill Result",
+      "Home": "Home",
       "My Group": "My Group",
+      "Students": "My Group",
       "Jadwal": "Jadwal",
       "Self Jadwal": "Self Jadwal",
       "Quran Ikhtebar": "Quran Ikhtebar",
-      "Inbox": "Inbox",
-      "Settings": "Settings"
+      "Settings": "Settings",
+      "Attendance History": "Attendance History",
+      "Apply Leave": "Apply Leave",
+      "BadalEntry": "BadalEntry",
+      "Badal": "Badal",
+      "Online Tahfeez": "Online Tahfeez",
+      "Help Videos": "Help Videos",
     };
-    return teacherMap[page] || "My Group";
+    return teacherMap[page] || page;
   }
   
+  if (role === "admin" || role === "kibar-admin") {
+    if (page === "Inbox") return "Notifications";
+    return page;
+  }
+
   return page;
 };
 

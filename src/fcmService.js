@@ -551,23 +551,34 @@ class FCMService {
   // Handle notification click (web foreground notifications)
   handleNotificationClick(data) {
     try {
-      const redirectPage = data?.redirectPage || '';
-      const leaveId = data?.leaveId || '';
+      const redirectPage = data?.redirectPage || data?.redirect_page || '';
+      const leaveId = data?.leaveId || data?.leave_id || '';
       const studentId = data?.studentId || data?.student_id || '';
       const params = [];
       if (redirectPage) params.push('redirectPage=' + encodeURIComponent(redirectPage));
       if (leaveId) params.push('leaveId=' + encodeURIComponent(leaveId));
       if (studentId) params.push('studentId=' + encodeURIComponent(studentId));
       const url = params.length ? '/?' + params.join('&') : '/';
-      console.log('Navigating to:', url);
+      console.log('[FCM] Navigating to:', url);
+
+      // Stash tap data for in-app state transition
+      stashNotificationTap({
+        ...data,
+        redirectPage: redirectPage || 'Inbox',
+        leaveId,
+        studentId,
+        url
+      });
 
       if (window.focus && !window.document.hidden) {
-        window.location.href = url;
+        // Push state without jarring full reload if on same domain
+        window.history.pushState({}, '', url);
       } else {
-        window.open(url, '_blank');
+        const fullUrl = new URL(url, window.location.origin).href;
+        window.location.href = fullUrl;
       }
     } catch (error) {
-      console.error('Error handling notification click:', error);
+      console.error('[FCM] Error handling notification click:', error);
       window.location.href = '/';
     }
   }

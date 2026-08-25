@@ -67,28 +67,16 @@ export const getFCMToken = async (retries = 3) => {
     try {
       console.log(`[FCM] Requesting FCM Token (attempt ${attempt}/${retries})...`);
       
-      // Explicitly register service worker for official PWA support
+      // Explicitly obtain active service worker registration for official PWA / background push support
       if ('serviceWorker' in navigator) {
-        let registration;
-        const existingRegistrations = await navigator.serviceWorker.getRegistrations();
-        const existingFcmSw = existingRegistrations.find(r => 
-          r.active?.scriptURL?.includes('firebase-messaging-sw') ||
-          r.installing?.scriptURL?.includes('firebase-messaging-sw') ||
-          r.waiting?.scriptURL?.includes('firebase-messaging-sw')
-        );
-        
-        if (existingFcmSw) {
-          registration = existingFcmSw;
-          console.log('[FCM] Using existing Firebase SW registration');
-        } else {
+        let registration = await navigator.serviceWorker.ready.catch(() => null);
+        if (!registration) {
           registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
             scope: '/'
           });
-          console.log('[FCM] Service Worker registered with scope:', registration.scope);
+          await navigator.serviceWorker.ready;
         }
-        
-        // Wait for service worker to be ready
-        await navigator.serviceWorker.ready;
+        console.log('[FCM] Service Worker active registration:', registration?.scope);
         
         const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || "BNWhCt5Y0FaHfo6H4O5c3I8vtkZVbSduNgy65bZ7Il5BogYCif7s4RGmSMJzC73Y6bdCrJRwmUsXKALXJXlm2Sk";
         const currentToken = await getToken(msgInstance, { 
