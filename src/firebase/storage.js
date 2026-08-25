@@ -2,6 +2,7 @@ import {
   getStorage,
   ref,
   uploadBytes,
+  uploadBytesResumable,
   getDownloadURL,
   listAll,
   deleteObject,
@@ -60,13 +61,32 @@ function buildStorageFrom(bucketName) {
         if (options.contentType) {
           metadata.contentType = options.contentType;
         }
-        if (options.upsert !== false) metadata.upsertFlag = true; // updateBytes overwrites anyway
+        if (options.upsert !== false) metadata.upsertFlag = true;
+
+        if (typeof options.onProgress === "function") {
+          const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+          const snap = await new Promise((resolve, reject) => {
+            uploadTask.on(
+              "state_changed",
+              (snapshot) => {
+                const progress = (snapshot.bytesTransferred / (snapshot.totalBytes || 1)) * 100;
+                options.onProgress(Math.min(100, Math.max(0, Math.round(progress))));
+              },
+              (err) => reject(err),
+              () => resolve(uploadTask.snapshot)
+            );
+          });
+          const publicUrl = await getDownloadURL(snap.ref).catch(() => firebaseStoragePublicUrl(full));
+          return { data: { path: snap.metadata.fullPath, publicUrl }, error: null };
+        }
+
         const snap = await withTimeout(
           uploadBytes(storageRef, file, metadata),
-          60000,
-          "Upload timed out after 60s. Please check your internet connection and try again."
+          120000,
+          "Upload timed out after 120s. Please check your internet connection and try again."
         );
-        return { data: { path: snap.metadata.fullPath }, error: null };
+        const publicUrl = await getDownloadURL(snap.ref).catch(() => firebaseStoragePublicUrl(full));
+        return { data: { path: snap.metadata.fullPath, publicUrl }, error: null };
       } catch (error) {
         return { data: null, error: supabaseError(error) };
       }
@@ -180,6 +200,7 @@ const storageApi = {
         { name: "report_backgrounds", id: "report_backgrounds" },
         { name: "teacher_photos", id: "teacher_photos" },
         { name: "ikhtebar_recordings", id: "ikhtebar_recordings" },
+        { name: "help_videos", id: "help_videos" },
       ],
       error: null,
     };

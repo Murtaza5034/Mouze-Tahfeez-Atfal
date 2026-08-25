@@ -39,10 +39,14 @@ export default function PortalHelpGuidePage({ portalType = "parent" }) {
           .order("created_at", { ascending: false });
 
         if (!error && data) {
-          // Filter for this portal or all
-          const filtered = data.filter(
-            (t) => t.target_audience === portalType || t.target_audience === "all"
-          );
+          // Filter for this portal role or all
+          const filtered = data.filter((t) => {
+            const aud = t.target_audience;
+            if (aud === "all") return true;
+            if (isTeacher && (aud === "teacher" || aud === "teachers")) return true;
+            if (!isTeacher && (aud === "parent" || aud === "parents")) return true;
+            return false;
+          });
           setTutorials(filtered);
           if (filtered.length > 0) {
             setSelectedTutorial(filtered[0]);

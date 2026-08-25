@@ -146,30 +146,32 @@ export default function AdminHelpManagement({ showAction }) {
     // If uploading a new file
     if (formSourceType === "upload" && uploadFile) {
       setUploading(true);
-      setUploadProgress(20);
+      setUploadProgress(0);
       try {
         const fileExt = uploadFile.name.split(".").pop();
         const fileName = `help_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
         const filePath = `videos/${fileName}`;
 
-        setUploadProgress(50);
         const { data: uploadRes, error: uploadErr } = await supabase.storage
           .from("help_videos")
           .upload(filePath, uploadFile, {
             contentType: uploadFile.type,
             upsert: true,
+            onProgress: (pct) => setUploadProgress(pct),
           });
 
         if (uploadErr) {
           throw new Error("Failed to upload video: " + uploadErr.message);
         }
 
-        setUploadProgress(85);
-        const { data: urlRes } = await supabase.storage
-          .from("help_videos")
-          .getPublicUrl(filePath);
-
-        finalVideoUrl = urlRes?.publicUrl || "";
+        if (uploadRes?.publicUrl) {
+          finalVideoUrl = uploadRes.publicUrl;
+        } else {
+          const { data: urlRes } = await supabase.storage
+            .from("help_videos")
+            .getPublicUrl(filePath);
+          finalVideoUrl = urlRes?.publicUrl || "";
+        }
         setUploadProgress(100);
       } catch (err) {
         console.error("Upload error:", err);
@@ -182,7 +184,7 @@ export default function AdminHelpManagement({ showAction }) {
     }
 
     if (!finalVideoUrl) {
-      if (showAction) showAction("error", "Please upload a video or provide a valid video URL.");
+      if (showAction) showAction("error", "Please upload a video file or provide a valid video link.");
       return;
     }
 
@@ -221,7 +223,9 @@ export default function AdminHelpManagement({ showAction }) {
       }
 
       setIsModalOpen(false);
-      fetchTutorials();
+      setUploadFile(null);
+      setUploadProgress(0);
+      await fetchTutorials();
     } catch (err) {
       console.error("Save error:", err);
       if (showAction) showAction("error", "Failed to save tutorial: " + err.message);
@@ -248,8 +252,16 @@ export default function AdminHelpManagement({ showAction }) {
     }
   };
 
+  const isTeacherAudience = (aud) => aud === "teachers" || aud === "teacher" || aud === "all";
+  const isParentAudience = (aud) => aud === "parents" || aud === "parent" || aud === "all";
+
   const filteredTutorials = tutorials.filter((t) => {
-    const matchAudience = filterAudience === "all" || t.target_audience === filterAudience || t.target_audience === "all";
+    const matchAudience =
+      filterAudience === "all"
+        ? true
+        : filterAudience === "teachers"
+        ? isTeacherAudience(t.target_audience)
+        : isParentAudience(t.target_audience);
     const matchCategory = filterCategory === "All" || t.category === filterCategory;
     return matchAudience && matchCategory;
   });

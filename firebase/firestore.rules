@@ -245,6 +245,12 @@ service cloud.firestore {
     match /online_tahfeez_logs/{id} {
       allow read, write: if isSignedIn();
     }
+    match /help_tutorials/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /kibar_help_tutorials/{id} {
+      allow read, write: if isSignedIn();
+    }
 
     // -------------------------------------------------------------------------
     // KIBAR PORTAL (adult institute)
