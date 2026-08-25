@@ -18,6 +18,7 @@ import {
   Menu,
   ShieldCheck,
   Eye,
+  EyeOff,
   Sparkles,
   Trophy,
   Trash,
@@ -91,6 +92,7 @@ import TeacherLeaveApprovalPanel from "./TeacherLeaveApprovalPanel";
 import VideoCall from "./components/VideoCall";
 import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
 import { getDeviceInfo } from "./utils/deviceUtils";
+import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -4267,6 +4269,8 @@ function SettingsPage({
   const [selectedSetting, setSelectedSetting] = useState(null);
   const tabs = ["Dark mode", "App themes", "Notifications", "Animations", "Security", "Support", "About"];
   const [passForm, setPassForm] = useState({ newPassword: "", confirmPassword: "" });
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
@@ -4471,25 +4475,49 @@ function SettingsPage({
                 <form className="stack-form" onSubmit={handleUpdatePassword}>
                   <label>
                     <span>New Password</span>
-                    <input 
-                      type="password" 
-                      className="premium-input" 
-                      value={passForm.newPassword}
-                      onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
-                      placeholder="Min 6 characters"
-                      required
-                    />
+                    <div className="password-input-wrapper has-left-icon">
+                      <Lock size={16} className="password-left-icon" />
+                      <input 
+                        type={showNewPass ? "text" : "password"} 
+                        className="premium-input" 
+                        value={passForm.newPassword}
+                        onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
+                        placeholder="Min 6 characters"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="portal-password-toggle-btn"
+                        onClick={() => setShowNewPass(prev => !prev)}
+                        tabIndex={-1}
+                        aria-label={showNewPass ? "Hide password" : "Show password"}
+                      >
+                        {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </label>
                   <label>
                     <span>Confirm New Password</span>
-                    <input 
-                      type="password" 
-                      className="premium-input" 
-                      value={passForm.confirmPassword}
-                      onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
-                      placeholder="Re-type password"
-                      required
-                    />
+                    <div className="password-input-wrapper has-left-icon">
+                      <Lock size={16} className="password-left-icon" />
+                      <input 
+                        type={showConfirmPass ? "text" : "password"} 
+                        className="premium-input" 
+                        value={passForm.confirmPassword}
+                        onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
+                        placeholder="Re-type password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="portal-password-toggle-btn"
+                        onClick={() => setShowConfirmPass(prev => !prev)}
+                        tabIndex={-1}
+                        aria-label={showConfirmPass ? "Hide password" : "Show password"}
+                      >
+                        {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </label>
                   <button type="submit" className="action-button">
                     Update Password
@@ -4954,7 +4982,7 @@ function useParentLeaveData(studentProfileOrId, isKibarProp = null) {
     const [studentRes, parentRes, eventRes] = await Promise.all([
       supabase.from(studentLeavesTable).select("*").in("student_id", uniqueIds),
       user?.id ? supabase.from(studentLeavesTable).select("*").eq("parent_id", user.id) : { data: [] },
-      supabase.from(eventLeavesTable).select("*").in("student_id", uniqueIds)
+      supabase.from(eventLeavesTable).select("*")
     ]);
 
     const combinedStudentLeaves = [...(studentRes.data || []), ...(parentRes.data || [])];
@@ -10027,6 +10055,19 @@ function AdminLeaveManagement({
     }
     .alm-dropdown-item:hover { background: rgba(212,175,55,0.10); }
     .alm-dropdown-item:not(:last-child) { border-bottom: 1px solid rgba(61,43,31,0.06); }
+    .alm-leave-card {
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease;
+    }
+    .alm-leave-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 40px rgba(61,43,31,0.12);
+      border-color: rgba(212,175,55,0.48);
+    }
+    .dark-mode .alm-leave-card {
+      background: linear-gradient(145deg, rgba(35, 28, 24, 0.98), rgba(28, 22, 18, 0.94)) !important;
+      border-color: rgba(212,175,55,0.22) !important;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
+    }
   `;
 
   const filteredLeaves = leaves.filter(l => normalizeLeaveStatus(l.status) === filter);
@@ -10310,7 +10351,7 @@ function AdminLeaveManagement({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: '22px' }}>
           {loading ? (
             <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px' }}>
               <Loader2 className="animate-spin" size={32} style={{ color: 'var(--primary-gold)' }} />
@@ -10325,22 +10366,52 @@ function AdminLeaveManagement({
               String(s.its) === String(leave.student_id) ||
               String(s.its_number) === String(leave.student_id)
             ) || {};
+
             const isIllness = leave.leave_type === "ILLNESS";
             const approveMsgs = getApproveMessages(leave.leave_type);
             const showApproveDropdown = approveDropdown === leave.id;
             const hasMessages = leave.messages && leave.messages.length > 0;
             const studentDisplayName = student?.name || student?.full_name || leave.student_name || "Student";
+            const studentPhoto = cleanPhotoUrl(student?.photoUrl || student?.photo_url || student?.avatar_url || "");
+            const studentIts = student.ITS || student.its || student.its_number || student.student_id || leave.student_id || "";
+            const studentGroup = student.groupName || student.group_name || student.class_level || "";
+
+            // Resolve assigned teacher accurately from student profile or teacherProfiles
+            const teacherIdField = student?.teacher_id || student?.teacher_user_id || student?.muhaffiz_id || student?.original_teacher_id;
+            const assignedTeacherObj = (teacherProfiles || []).find(t =>
+              (teacherIdField && (String(t.id) === String(teacherIdField) || String(t.user_id) === String(teacherIdField))) ||
+              (student.teacherName && (normalizeText(t.name) === normalizeText(student.teacherName) || normalizeText(t.full_name) === normalizeText(student.teacherName))) ||
+              (student.teacher_name && (normalizeText(t.name) === normalizeText(student.teacher_name) || normalizeText(t.full_name) === normalizeText(student.teacher_name)))
+            );
+            const teacherDisplayName =
+              student.teacherName ||
+              student.teacher_name ||
+              assignedTeacherObj?.full_name ||
+              assignedTeacherObj?.name ||
+              student.muhaffiz_name ||
+              leave.teacher_name ||
+              (studentGroup ? `${studentGroup} Teacher` : "") ||
+              "Unassigned";
+
+            const fromDateStr = leave.leave_date || leave.from_date;
+            const toDateStr = leave.to_date || fromDateStr;
+            const totalDays = computeLeaveDays(fromDateStr, toDateStr);
+            const appliedDate = leave.created_at ? new Date(leave.created_at) : null;
 
             return (
               <div
                 key={leave.id}
+                className="alm-leave-card"
                 style={{
-                  borderRadius: 20, overflow: 'hidden',
-                  background: 'linear-gradient(145deg, rgba(255,252,246,0.98), rgba(252,248,239,0.94))',
-                  border: '1px solid ' + (leave.status === 'Approved' ? 'rgba(34,197,94,0.30)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.25)' : 'rgba(212,175,55,0.25)'),
-                  boxShadow: '0 8px 30px rgba(61,43,31,0.06)',
+                  borderRadius: 22,
+                  overflow: 'hidden',
+                  background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(252, 249, 242, 0.94))',
+                  border: '1px solid ' + (leave.status === 'Approved' ? 'rgba(34,197,94,0.35)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.30)' : 'rgba(212,175,55,0.32)'),
+                  boxShadow: '0 10px 32px rgba(61,43,31,0.07)',
                   position: 'relative',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
                 }}
               >
                 {/* Top accent status bar */}
@@ -10348,66 +10419,176 @@ function AdminLeaveManagement({
                   height: 4, width: '100%',
                   background: leave.status === 'Approved' ? 'linear-gradient(90deg, #22c55e, #16a34a)'
                     : leave.status === 'Rejected' ? 'linear-gradient(90deg, #ef4444, #dc2626)'
-                    : 'linear-gradient(90deg, #d4af37, #b8962e)',
+                    : 'linear-gradient(90deg, #d4af37, #f39c12, #b8962e)',
                 }} />
 
-                <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  {/* Header: Student Name & Status Badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                <div style={{ padding: '20px 22px', flex: 1, display: 'flex', flexDirection: 'column', gap: '13px' }}>
+                  {/* Header: Student Profile & Status Badge */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
+                      {/* Avatar / Photo */}
+                      {studentPhoto ? (
+                        <img
+                          src={studentPhoto}
+                          alt={studentDisplayName}
+                          style={{
+                            width: 48, height: 48, borderRadius: '50%', objectFit: 'cover',
+                            border: '2px solid rgba(212,175,55,0.4)', flexShrink: 0,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                          background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+                          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '1.15rem', fontWeight: 800, textTransform: 'uppercase',
+                          border: '2px solid rgba(255,255,255,0.8)',
+                          boxShadow: '0 4px 12px rgba(212,175,55,0.3)'
+                        }}>
+                          {studentDisplayName.charAt(0)}
+                        </div>
+                      )}
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {/* Student Name: Fully visible, zero cut-off */}
+                        <h4 style={{
+                          margin: 0, fontSize: '1.12rem', color: 'var(--deep-brown, #2a1f14)',
+                          fontWeight: 800, lineHeight: '1.35', wordBreak: 'break-word', whiteSpace: 'normal',
+                          letterSpacing: '-0.01em'
+                        }}>
+                          {studentDisplayName}
+                        </h4>
+
+                        {/* Badges: ITS & Group */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', marginTop: '5px' }}>
+                          {studentIts && (
+                            <span style={{
+                              fontSize: '0.72rem', fontWeight: 700, color: '#8a786a',
+                              background: 'rgba(61,43,31,0.05)', padding: '2px 8px', borderRadius: '6px',
+                              border: '1px solid rgba(61,43,31,0.08)', letterSpacing: '0.02em'
+                            }}>
+                              ITS: {studentIts}
+                            </span>
+                          )}
+                          {studentGroup && (
+                            <span style={{
+                              fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary-gold, #b8860b)',
+                              background: 'rgba(212,175,55,0.10)', padding: '2px 8px', borderRadius: '6px',
+                              border: '1px solid rgba(212,175,55,0.20)'
+                            }}>
+                              {studentGroup}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <span style={{
+                      padding: '5px 12px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800,
+                      textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', flexShrink: 0,
+                      display: 'inline-flex', alignItems: 'center', gap: '5px',
+                      background: leave.status === 'Approved' ? 'rgba(34,197,94,0.12)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.10)' : 'rgba(212,175,55,0.15)',
+                      color: leave.status === 'Approved' ? '#16a34a' : leave.status === 'Rejected' ? '#dc2626' : '#b8860b',
+                      border: '1px solid ' + (leave.status === 'Approved' ? 'rgba(34,197,94,0.35)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.35)' : 'rgba(212,175,55,0.35)'),
+                      boxShadow: leave.status === 'Approved' ? '0 2px 8px rgba(34,197,94,0.12)' : 'none'
+                    }}>
+                      <span style={{
+                        width: 6, height: 6, borderRadius: '50%',
+                        background: leave.status === 'Approved' ? '#16a34a' : leave.status === 'Rejected' ? '#dc2626' : '#d4af37'
+                      }} />
+                      {leave.status}
+                    </span>
+                  </div>
+
+                  {/* Assigned Teacher Premium Box */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '9px 12px', borderRadius: '12px',
+                    background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(255,255,255,0.92))',
+                    border: '1px solid rgba(212,175,55,0.24)',
+                    boxShadow: '0 2px 8px rgba(212,175,55,0.06)'
+                  }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #d4af37, #b8860b)',
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, boxShadow: '0 2px 6px rgba(212,175,55,0.3)'
+                    }}>
+                      <GraduationCap size={17} />
+                    </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--deep-brown)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {studentDisplayName}
-                      </h4>
-                      <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Applied {new Date(leave.created_at).toLocaleDateString()} &middot; {new Date(leave.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                      </p>
+                      <div style={{ fontSize: '0.64rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9a7b2c' }}>
+                        Assigned Teacher
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--deep-brown, #2a1f14)', wordBreak: 'break-word', whiteSpace: 'normal', lineHeight: '1.25' }}>
+                        {teacherDisplayName}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dates & Duration Banner */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px',
+                    padding: '10px 14px', borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.85)',
+                    border: '1px solid rgba(61,43,31,0.08)',
+                    fontSize: '0.84rem', color: 'var(--deep-brown, #2f2118)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '160px' }}>
+                      <Calendar size={16} style={{ color: 'var(--primary-gold)', flexShrink: 0 }} />
+                      <span>
+                        <strong>Dates:</strong> {fromDateStr}
+                        {toDateStr && toDateStr !== fromDateStr ? ` → ${toDateStr}` : ""}
+                      </span>
                     </div>
                     <span style={{
-                      padding: '5px 12px', borderRadius: '999px', fontSize: '0.7rem', fontWeight: 800,
-                      textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', flexShrink: 0,
-                      background: leave.status === 'Approved' ? 'rgba(34,197,94,0.12)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.10)' : 'rgba(212,175,55,0.14)',
-                      color: leave.status === 'Approved' ? '#16a34a' : leave.status === 'Rejected' ? '#dc2626' : '#b8962e',
-                      border: '1px solid ' + (leave.status === 'Approved' ? 'rgba(34,197,94,0.3)' : leave.status === 'Rejected' ? 'rgba(239,68,68,0.3)' : 'rgba(212,175,55,0.3)'),
+                      padding: '3px 9px', borderRadius: '8px',
+                      background: 'rgba(212,175,55,0.18)', color: '#9a7b2c',
+                      fontSize: '0.74rem', fontWeight: 800, whiteSpace: 'nowrap',
+                      border: '1px solid rgba(212,175,55,0.30)'
                     }}>
-                      {leave.status}
+                      {totalDays} {totalDays === 1 ? 'Day' : 'Days'}
                     </span>
                   </div>
 
                   {/* Category + Reason Details Box */}
                   <div style={{
-                    marginTop: '14px', padding: '12px 14px',
-                    background: 'rgba(212,175,55,0.06)',
+                    padding: '12px 14px',
+                    background: 'rgba(212,175,55,0.05)',
                     borderRadius: 14, border: '1px solid rgba(212,175,55,0.14)',
                     flex: 1,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: 6 }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--primary-gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        {leave.leave_type || "General"}
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary-gold, #b8860b)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        {leave.leave_type || "General Leave"}
                       </span>
                       {isIllness && (
-                        <span style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: 4, background: 'rgba(239,68,68,0.12)', color: '#dc2626', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.62rem', padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,0.12)', color: '#dc2626', fontWeight: 800, letterSpacing: '0.05em' }}>
                           MEDICAL
                         </span>
                       )}
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--deep-brown)', lineHeight: '1.5', fontStyle: leave.reason ? 'normal' : 'italic' }}>
+                    <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--deep-brown, #2a1f14)', lineHeight: '1.5', fontStyle: leave.reason ? 'normal' : 'italic' }}>
                       {leave.reason ? `"${leave.reason}"` : "No details provided."}
                     </p>
                   </div>
 
-                  {/* Leave Date Range */}
-                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: 'var(--deep-brown)', background: 'rgba(255,255,255,0.7)', padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(212,175,55,0.12)' }}>
-                    <Calendar size={15} style={{ color: 'var(--primary-gold)', flexShrink: 0 }} />
-                    <span>
-                      <strong>Dates:</strong> {leave.leave_date || leave.from_date}
-                      {leave.to_date && leave.to_date !== (leave.leave_date || leave.from_date) ? ` → ${leave.to_date}` : ""}
-                    </span>
-                  </div>
+                  {/* Applied Timestamp */}
+                  {appliedDate && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8a786a)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Clock size={12} style={{ color: 'var(--primary-gold)' }} />
+                      <span>
+                        Applied on {appliedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {appliedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Admin Comment if present */}
                   {leave.admin_comment && (
-                    <div style={{ marginTop: '8px', fontSize: '0.78rem', color: 'var(--soft-brown)', background: 'rgba(212,175,55,0.08)', padding: '6px 10px', borderRadius: 8 }}>
-                      <strong>Admin note:</strong> {leave.admin_comment}
+                    <div style={{ fontSize: '0.78rem', color: 'var(--soft-brown)', background: 'rgba(212,175,55,0.08)', padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(212,175,55,0.15)' }}>
+                      <strong style={{ color: '#9a7b2c' }}>Admin note:</strong> {leave.admin_comment}
                     </div>
                   )}
 
@@ -10417,25 +10598,25 @@ function AdminLeaveManagement({
                       type="button"
                       onClick={() => window.open(leave.attachment_url, '_blank')}
                       style={{
-                        marginTop: '10px', width: '100%', padding: '9px 14px', borderRadius: 10,
+                        width: '100%', padding: '9px 14px', borderRadius: 10,
                         border: '1px solid rgba(212,175,55,0.25)', color: 'var(--primary-gold)',
-                        background: 'rgba(212,175,55,0.05)', cursor: 'pointer',
+                        background: 'rgba(212,175,55,0.06)', cursor: 'pointer',
                         fontSize: '0.8rem', display: 'flex', alignItems: 'center',
                         justifyContent: 'center', gap: '6px', fontWeight: 700, fontFamily: 'inherit',
                         transition: 'all 0.2s ease',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(212,175,55,0.12)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(212,175,55,0.05)'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(212,175,55,0.14)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(212,175,55,0.06)'; }}
                     >
                       <FileArchive size={14} /> View Medical Document
                     </button>
                   )}
 
                   {/* Action Buttons */}
-                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ marginTop: 'auto', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {leave.status === "Pending" ? (
                       <>
-                        {/* Row 1: Approve & Reject (Side-by-Side 50/50, zero text overflow!) */}
+                        {/* Row 1: Approve & Reject */}
                         <div style={{ display: 'flex', gap: '8px' }}>
                           {/* Approve with dropdown */}
                           <div style={{ flex: 1, position: 'relative' }}>
@@ -10444,7 +10625,7 @@ function AdminLeaveManagement({
                               onClick={() => setApproveDropdown(showApproveDropdown ? null : leave.id)}
                               disabled={sendingAction === leave.id}
                               className="alm-premium-btn alm-btn-green"
-                              style={{ width: '100%', padding: '11px 12px', fontSize: '0.8rem' }}
+                              style={{ width: '100%', padding: '11px 12px', fontSize: '0.82rem' }}
                             >
                               <CheckCircle size={15} />
                               {sendingAction === leave.id ? "..." : "Approve"}
@@ -10479,19 +10660,19 @@ function AdminLeaveManagement({
                             }}
                             disabled={sendingAction === leave.id}
                             className="alm-premium-btn alm-btn-red"
-                            style={{ flex: 1, padding: '11px 12px', fontSize: '0.8rem' }}
+                            style={{ flex: 1, padding: '11px 12px', fontSize: '0.82rem' }}
                           >
                             <X size={15} />
                             Reject
                           </button>
                         </div>
 
-                        {/* Row 2: Subject to Approve / Chat Button (Full Width) */}
+                        {/* Row 2: Subject to Approve / Chat Button */}
                         <button
                           type="button"
                           onClick={() => { setChatModal(leave); setChatMessage(""); }}
                           className="alm-premium-btn alm-btn-outline"
-                          style={{ width: '100%', padding: '10px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
+                          style={{ width: '100%', padding: '10px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
                         >
                           <MessageCircle size={15} style={{ color: 'var(--primary-gold)' }} />
                           <span>Clarify / Subject to Approve</span>
@@ -10508,7 +10689,7 @@ function AdminLeaveManagement({
                         type="button"
                         onClick={() => { setChatModal(leave); setChatMessage(""); }}
                         className="alm-premium-btn alm-btn-outline"
-                        style={{ width: '100%', padding: '10px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
+                        style={{ width: '100%', padding: '10px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
                       >
                         <MessageCircle size={15} style={{ color: 'var(--primary-gold)' }} />
                         <span>{hasMessages ? `Chat History (${leave.messages.length})` : "Open Chat"}</span>
@@ -10693,6 +10874,8 @@ const [expandedTeacherId, setExpandedTeacherId] = useState(null);
         }
         .att-student-status.present { background: #dcfce7; color: #16a34a; }
         .att-student-status.absent { background: #fef2f2; color: #dc2626; }
+        .att-student-status.holiday { background: #fef3c7; color: #d97706; }
+        .att-student-status.uzur { background: #fef9c3; color: #854d0e; }
         .att-student-status.unmarked { background: #f5f5f5; color: #9ca3af; }
         @keyframes fadeSlideUp {
           from { opacity: 0; transform: translateY(10px); }
@@ -10782,14 +10965,16 @@ const [expandedTeacherId, setExpandedTeacherId] = useState(null);
                   {item.students.map((s, si) => {
                     const isPresent = s.attStatus === 'present';
                     const isAbsent = s.attStatus === 'absent';
+                    const isHoliday = s.attStatus === 'holiday';
+                    const isUzur = s.attStatus === 'uzur';
                     return (
                       <div key={s.student_id || si} className="att-student-row" style={{ animationDelay: `${si * 0.03}s` }}>
-                        <div className={"att-student-status " + (isPresent ? 'present' : isAbsent ? 'absent' : 'unmarked')}>
-                          {isPresent ? 'P' : isAbsent ? 'A' : '—'}
+                        <div className={"att-student-status " + (isPresent ? 'present' : isAbsent ? 'absent' : isHoliday ? 'holiday' : isUzur ? 'uzur' : 'unmarked')}>
+                          {isPresent ? 'P' : isAbsent ? 'A' : isHoliday ? '☾' : isUzur ? 'U' : '—'}
                         </div>
                         <span className="att-student-name">{s.name || s.full_name || `Student #${s.student_id}`}</span>
-                        <span style={{ fontSize: '0.72rem', color: isPresent ? '#16a34a' : isAbsent ? '#dc2626' : '#9ca3af' }}>
-                          {isPresent ? 'Present' : isAbsent ? 'Absent' : 'Not Marked'}
+                        <span style={{ fontSize: '0.72rem', color: isPresent ? '#16a34a' : isAbsent ? '#dc2626' : isHoliday ? '#d97706' : isUzur ? '#854d0e' : '#9ca3af' }}>
+                          {isPresent ? 'Present' : isAbsent ? 'Absent' : isHoliday ? 'Holiday' : isUzur ? 'Uzur' : 'Not Marked'}
                         </span>
                       </div>
                     );
@@ -10874,23 +11059,108 @@ function PremiumEventLeavePage({ onShowAction, user }) {
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.from("event_leaves").insert({
+
+    const eventPayload = {
       event_id: isOther ? null : Number(selectedEvent),
       event_name: eventName,
       from_date: fromDate,
       to_date: toDate,
       reason: reason || null,
       applied_by: user?.id || user?.email || "admin"
-    });
+    };
+
+    const { error } = await supabase.from("event_leaves").insert(eventPayload);
     if (error) {
       if (onShowAction) onShowAction("error", "Failed to apply leave: " + error.message);
       setSubmitting(false);
       return;
     }
+
+    // Mirror to kibar_event_leaves so Kibar portal also tracks the event leave
+    try {
+      await supabase.from("kibar_event_leaves").insert(eventPayload);
+    } catch (_) {}
+
+    // --- AUTO-MARK HOLIDAY FOR ALL STUDENTS ACROSS BOTH PORTALS (ATFAL & KIBAR) ---
+    try {
+      const getDatesInRange = (startStr, endStr) => {
+        const dates = [];
+        const [sy, sm, sd] = startStr.split('-').map(Number);
+        const [ey, em, ed] = endStr.split('-').map(Number);
+        const cur = new Date(sy, sm - 1, sd);
+        const end = new Date(ey, em - 1, ed);
+        while (cur <= end) {
+          const y = cur.getFullYear();
+          const m = String(cur.getMonth() + 1).padStart(2, '0');
+          const d = String(cur.getDate()).padStart(2, '0');
+          dates.push(`${y}-${m}-${d}`);
+          cur.setDate(cur.getDate() + 1);
+        }
+        return dates;
+      };
+      const datesInRange = getDatesInRange(fromDate, toDate);
+
+      // Fetch all students from both portals
+      const [atfalRes, kibarRes] = await Promise.all([
+        supabase.from("child_profiles").select("student_id, id, muhaffiz_id, original_teacher_id"),
+        supabase.from("kibar_child_profiles").select("student_id, id, muhaffiz_id, original_teacher_id")
+      ]);
+
+      const atfalStudents = atfalRes.data || [];
+      const kibarStudents = kibarRes.data || [];
+
+      // Build Atfal attendance records (status: 'holiday')
+      const atfalAttRecords = [];
+      for (const d of datesInRange) {
+        for (const s of atfalStudents) {
+          const sid = String(s.student_id || s.id || '').trim();
+          if (!sid) continue;
+          const tid = String(s.muhaffiz_id || s.original_teacher_id || user?.id || "admin");
+          atfalAttRecords.push({
+            student_id: sid,
+            teacher_id: tid,
+            attendance_date: d,
+            status: 'holiday'
+          });
+        }
+      }
+
+      // Build Kibar attendance records (status: 'holiday')
+      const kibarAttRecords = [];
+      for (const d of datesInRange) {
+        for (const s of kibarStudents) {
+          const sid = String(s.student_id || s.id || '').trim();
+          if (!sid) continue;
+          const tid = String(s.muhaffiz_id || s.original_teacher_id || user?.id || "admin");
+          kibarAttRecords.push({
+            student_id: sid,
+            teacher_id: tid,
+            attendance_date: d,
+            status: 'holiday'
+          });
+        }
+      }
+
+      const attPromises = [];
+      if (atfalAttRecords.length > 0) {
+        attPromises.push(
+          supabase.from("student_daily_attendance").upsert(atfalAttRecords, { onConflict: "student_id,attendance_date" })
+        );
+      }
+      if (kibarAttRecords.length > 0) {
+        attPromises.push(
+          supabase.from("kibar_student_daily_attendance").upsert(kibarAttRecords, { onConflict: "student_id,attendance_date" })
+        );
+      }
+      await Promise.all(attPromises);
+    } catch (attErr) {
+      console.error("Auto holiday attendance marking error:", attErr);
+    }
+
     const title = "Event Leave: " + eventName;
     const body = `Leave has been applied for ${eventName} from ${fromDate} to ${toDate}.${reason ? "\nReason: " + reason : ""}`;
     await sendNotificationToAll(title, body);
-    if (onShowAction) onShowAction("success", `Leave applied for ${eventName} from ${fromDate} to ${toDate}. Notifications sent to teachers & parents.`);
+    if (onShowAction) onShowAction("success", `Leave applied for ${eventName} from ${fromDate} to ${toDate}. Auto-marked holiday for all students across both portals.`);
     setSelectedEvent("");
     setCustomEventName("");
     setFromDate("");
@@ -11488,6 +11758,8 @@ function AdminPortal({
   const [resetPasswordTarget, setResetPasswordTarget] = useState(null);
   const [resetPasswordNewPass, setResetPasswordNewPass] = useState("");
   const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
+  const [showResetNewPass, setShowResetNewPass] = useState(false);
+  const [showResetConfirmPass, setShowResetConfirmPass] = useState(false);
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordMessage, setResetPasswordMessage] = useState("");
   const [resetPasswordError, setResetPasswordError] = useState("");
@@ -15806,7 +16078,8 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                     </label>
                     <label>
                       <span>Account Password</span>
-                      <div className="password-input-wrapper">
+                      <div className="password-input-wrapper has-left-icon">
+                        <Lock size={16} className="password-left-icon" />
                         <input
                           type={showPortalPassword ? "text" : "password"}
                           name="password"
@@ -15822,7 +16095,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                           tabIndex={-1}
                           aria-label={showPortalPassword ? "Hide password" : "Show password"}
                         >
-                          {showPortalPassword ? <PremiumLockOpen size={18} /> : <PremiumLockClosed size={18} />}
+                          {showPortalPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
                     </label>
@@ -16495,31 +16768,55 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       <p style={{ fontSize: '13px', color: 'var(--soft-brown)', marginBottom: '16px' }}>
                         Resetting password for: <strong>{resetPasswordTarget.full_name}</strong>
                       </p>
-                      <div className="input-group" style={{ marginBottom: '12px' }}>
+                      <div className="input-group" style={{ marginBottom: '14px' }}>
                         <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-gold)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                          <Lock size={12} /> New Password
+                          New Password
                         </label>
-                        <input
-                          type="password"
-                          className="premium-input"
-                          placeholder="Enter new password (min 6 chars)"
-                          value={resetPasswordNewPass}
-                          onChange={e => setResetPasswordNewPass(e.target.value)}
-                          style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--glass-border)', fontSize: '14px' }}
-                        />
+                        <div className="password-input-wrapper has-left-icon">
+                          <Lock size={16} className="password-left-icon" />
+                          <input
+                            type={showResetNewPass ? "text" : "password"}
+                            className="premium-input"
+                            placeholder="Enter new password (min 6 chars)"
+                            value={resetPasswordNewPass}
+                            onChange={e => setResetPasswordNewPass(e.target.value)}
+                            required
+                          />
+                          <button
+                            type="button"
+                            className="portal-password-toggle-btn"
+                            onClick={() => setShowResetNewPass(prev => !prev)}
+                            tabIndex={-1}
+                            aria-label={showResetNewPass ? "Hide password" : "Show password"}
+                          >
+                            {showResetNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                       <div className="input-group" style={{ marginBottom: '16px' }}>
                         <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-gold)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                          <Lock size={12} /> Confirm Password
+                          Confirm Password
                         </label>
-                        <input
-                          type="password"
-                          className="premium-input"
-                          placeholder="Confirm new password"
-                          value={resetPasswordConfirm}
-                          onChange={e => setResetPasswordConfirm(e.target.value)}
-                          style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--glass-border)', fontSize: '14px' }}
-                        />
+                        <div className="password-input-wrapper has-left-icon">
+                          <Lock size={16} className="password-left-icon" />
+                          <input
+                            type={showResetConfirmPass ? "text" : "password"}
+                            className="premium-input"
+                            placeholder="Confirm new password"
+                            value={resetPasswordConfirm}
+                            onChange={e => setResetPasswordConfirm(e.target.value)}
+                            required
+                          />
+                          <button
+                            type="button"
+                            className="portal-password-toggle-btn"
+                            onClick={() => setShowResetConfirmPass(prev => !prev)}
+                            tabIndex={-1}
+                            aria-label={showResetConfirmPass ? "Hide password" : "Show password"}
+                          >
+                            {showResetConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                       {resetPasswordError && (
                         <div className="error-message" style={{ marginBottom: '12px' }}>
@@ -27139,6 +27436,35 @@ const handleSendCustomNotification = async (event) => {
   };
 
 
+  // Mobile Back Navigation & Edge Gesture Controller
+  const backNavModals = useMemo(() => [
+    { isOpen: !!selfJadwalPopup, close: () => setSelfJadwalPopup(null) },
+    { isOpen: !!selectedAnnouncement, close: () => setSelectedAnnouncement(null) },
+    { isOpen: !!selectedNotification, close: () => setSelectedNotification(null) },
+    { isOpen: !!portalAccessSuccess, close: () => setPortalAccessSuccess(null) },
+    { isOpen: !!pendingChatLeaveId, close: () => setPendingChatLeaveId(null) },
+    { isOpen: !!menuOpen, close: () => setMenuOpen(false) },
+  ], [
+    selfJadwalPopup,
+    selectedAnnouncement,
+    selectedNotification,
+    portalAccessSuccess,
+    pendingChatLeaveId,
+    menuOpen,
+  ]);
+
+  const {
+    transitionDirection,
+    SwipeBackIndicator,
+  } = useMobileBackNavigation({
+    activePage,
+    setActivePage,
+    portalRole,
+    modals: backNavModals,
+    isAppLocked: Boolean(user && appLocked),
+    reduceAnimations,
+  });
+
   // Public route: Show Privacy Policy without authentication
   // Supports both /privacy path and ?page=privacy query param
   if (typeof window !== "undefined" && (
@@ -27272,12 +27598,13 @@ const handleSendCustomNotification = async (event) => {
 
   return (
     <React.Fragment>
+      <SwipeBackIndicator />
       <AppUpdatePopup />
       <AnnouncementDetailsModal
         announcement={selectedAnnouncement}
         onClose={() => setSelectedAnnouncement(null)}
       />
-      <div className="app-portal-wrapper">
+      <div className={`app-portal-wrapper ${transitionDirection ? `mauze-page-anim-${transitionDirection}` : ""}`}>
         <PortalErrorBoundary>
         {(portalRole === "parents" || portalRole === "kibar-student") ? (
           <ParentPortal

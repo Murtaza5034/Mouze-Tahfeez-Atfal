@@ -326,7 +326,7 @@ export default function Login({ onLoginSuccess }) {
                 />
                 <button
                   type="button"
-                  className="password-toggle-btn"
+                  className="password-toggle-btn premium-eye"
                   onClick={() => setShowPassword((prev) => !prev)}
                   tabIndex={-1}
                   aria-label={showPassword ? "Hide password" : "Show password"}
