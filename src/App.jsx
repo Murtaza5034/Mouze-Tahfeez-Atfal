@@ -90,6 +90,8 @@ import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
 import TeacherLeaveApprovalPanel from "./TeacherLeaveApprovalPanel";
 import VideoCall from "./components/VideoCall";
+import AdminHelpManagement from "./components/AdminHelpManagement";
+import PortalHelpGuidePage from "./components/PortalHelpGuidePage";
 import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
@@ -1191,7 +1193,7 @@ const NAV_ICONS = {
   "Global Settings": Settings,
   "Messages": MessageCircle,
   "Email Settings": Mail,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,"Online Tahfeez Tracking": Video,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,"Online Tahfeez Tracking": Video,"Help Management": HelpCircle,
 };
 
 const emptyParentData = {
@@ -7934,6 +7936,11 @@ function ParentPortal({
               <Video size={18} /> Online Tahfeez
             </button>
           )}
+          {pageVisibility["Help Videos"] !== false && (
+            <button className={`drawer-link ${activePage === "Help Videos" ? "active" : ""}`} onClick={() => { setActivePage("Help Videos"); setMenuOpen(false); }}>
+              <HelpCircle size={18} /> Help & Video Guides
+            </button>
+          )}
           {pageVisibility["Settings"] !== false && (
             <button className={`drawer-link ${activePage === "Settings" ? "active" : ""}`} onClick={() => { setActivePage("Settings"); setMenuOpen(false); }}>
               <Settings size={18} /> Settings
@@ -9338,6 +9345,7 @@ function ParentPortal({
         )}
 
         {activePage === "Online Tahfeez" && renderOnlineTahfeezParent()}
+        {activePage === "Help Videos" && <PortalHelpGuidePage portalType="parent" />}
       </main>
 
 
@@ -12056,7 +12064,7 @@ const handleDownloadAllReports = async () => {
     }
   };
 
-  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Online Tahfeez Tracking", "Global Settings", "Email Settings", "App Update"];
+  const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Online Tahfeez Tracking", "Help Management", "Global Settings", "Email Settings", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
@@ -17777,6 +17785,8 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             </div>
           ) : activePage === "Online Tahfeez Tracking" ? (
             renderOnlineTahfeezTracking()
+          ) : activePage === "Help Management" ? (
+            <AdminHelpManagement showAction={onShowAction || showAction} />
           ) : null}
         </section>
 
@@ -20031,6 +20041,7 @@ function TeacherPortal({
             { id: "Attendance History", label: "Attendance History", icon: CalendarCheck },
             { id: "Apply Leave", label: "Apply Leave", icon: CalendarX },
             { id: "Online Tahfeez", label: "Online Tahfeez", icon: Video },
+            { id: "Help Videos", label: "Help & Video Guides", icon: HelpCircle },
             { id: "Settings", label: "Settings", icon: Settings },
           ].filter(p => pageVisibility[p.id] !== false).map(page => (
             <button key={page.id} className={`sidebar-link ${activePage === page.id ? 'active' : ''}`} onClick={() => { setActivePage(page.id); setMenuOpen(false); }}>
@@ -23161,6 +23172,8 @@ function TeacherPortal({
             </div>
           ) : activePage === "Online Tahfeez" ? (
             renderOnlineTahfeezTeacher()
+          ) : activePage === "Help Videos" ? (
+            <PortalHelpGuidePage portalType="teacher" />
           ) : null}
 
         </section>

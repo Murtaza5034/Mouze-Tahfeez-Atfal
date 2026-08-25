@@ -99,6 +99,7 @@ const SHARED_COLLECTIONS = new Set([
   "tahfeez_signals",
   "online_tahfeez_sessions",
   "online_tahfeez_logs",
+  "help_tutorials",
 ]);
 
 export function resolveCollectionName(name) {

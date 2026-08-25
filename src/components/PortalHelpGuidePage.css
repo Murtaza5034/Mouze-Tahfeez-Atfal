@@ -1,0 +1,265 @@
+/* Portal Help & Video Guide Styles (Teachers & Parents) */
+
+.portal-help-container {
+  padding: 24px 28px 80px;
+  max-width: 1350px;
+  margin: 0 auto;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text-main, #2c2523);
+}
+
+.portal-help-header {
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.portal-help-header h2 {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--deep-brown, #3d2b1f);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+
+.portal-help-header p {
+  color: var(--text-muted, #7c7267);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* Two-Column Theatre Layout */
+.portal-help-theatre-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 30px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .portal-help-theatre-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Main Theatre Left Column */
+.portal-help-main-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.portal-help-details-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--glass-border, rgba(212, 175, 55, 0.25));
+  border-radius: 20px;
+  padding: 24px 28px;
+  box-shadow: var(--premium-shadow, 0 12px 32px rgba(0, 0, 0, 0.06));
+}
+
+.portal-help-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.portal-help-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: #b8860b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.dark-mode .portal-help-category-badge {
+  color: #d4af37;
+}
+
+.portal-help-active-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--deep-brown, #3d2b1f);
+  margin: 0 0 16px;
+  line-height: 1.35;
+}
+
+.portal-help-instructions-box {
+  background: var(--input-bg, #faf8f5);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.portal-help-instructions-box h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--deep-brown, #3d2b1f);
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-help-desc-content {
+  font-size: 0.94rem;
+  line-height: 1.75;
+  color: var(--text-main, #2c2523);
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+/* Playlist Right Column */
+.portal-help-playlist-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--glass-border, rgba(212, 175, 55, 0.25));
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--premium-shadow, 0 12px 32px rgba(0, 0, 0, 0.06));
+  display: flex;
+  flex-direction: column;
+  max-height: 800px;
+}
+
+.portal-help-playlist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.portal-help-playlist-header h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--deep-brown, #3d2b1f);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-help-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  background: var(--input-bg, #faf8f5);
+  color: var(--text-main, #2c2523);
+  font-size: 0.88rem;
+  outline: none;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
+
+.portal-help-search-input:focus {
+  border-color: #d4af37;
+}
+
+.portal-help-playlist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.portal-help-item-row {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.dark-mode .portal-help-item-row {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.portal-help-item-row:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.3);
+  transform: translateX(3px);
+}
+
+.portal-help-item-row.active {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: #d4af37;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.15);
+}
+
+.portal-help-item-thumb {
+  width: 90px;
+  height: 56px;
+  border-radius: 8px;
+  background: #141210;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.portal-help-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portal-help-item-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d4af37;
+}
+
+.portal-help-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.portal-help-item-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--deep-brown, #3d2b1f);
+  margin: 0 0 4px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portal-help-item-cat {
+  font-size: 0.72rem;
+  color: #d4af37;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Mobile responsive padding */
+@media (max-width: 768px) {
+  .portal-help-container {
+    padding: 16px 16px 80px;
+  }
+  .portal-help-active-title {
+    font-size: 1.25rem;
+  }
+  .portal-help-details-card {
+    padding: 18px 18px;
+  }
+}
