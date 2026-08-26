@@ -95,6 +95,7 @@ import AdminHelpManagement from "./components/AdminHelpManagement";
 import PortalHelpGuidePage from "./components/PortalHelpGuidePage";
 import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
 import FirstTimeStudentRegistryModal from "./components/FirstTimeStudentRegistryModal";
+import ParentViewsModal from "./components/ParentViewsModal";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
 import "./style.css";
@@ -11485,6 +11486,7 @@ function AdminPortal({
   const [assignModal, setAssignModal] = useState(null);
   const [assigning, setAssigning] = useState(false);
   const [reportSettingsSaved, setReportSettingsSaved] = useState(false);
+  const [showAdminParentViewsModal, setShowAdminParentViewsModal] = useState(false);
 
   const handleAssignClick = async (data) => {
     if (!data?.student_id) {
@@ -13189,11 +13191,20 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                   <div
                     key={stat.label}
                     className="infographic-card"
-                    onClick={() => stat.navigateTo && setActivePage(stat.navigateTo)}
-                    role={stat.navigateTo ? 'button' : undefined}
-                    tabIndex={stat.navigateTo ? 0 : undefined}
-                    onKeyDown={stat.navigateTo ? (e) => { if (e.key === 'Enter') setActivePage(stat.navigateTo); } : undefined}
-                    style={{ cursor: stat.navigateTo ? 'pointer' : 'default' }}
+                    onClick={() => {
+                      if (isParentViews) setShowAdminParentViewsModal(true);
+                      else if (stat.navigateTo) setActivePage(stat.navigateTo);
+                    }}
+                    role={stat.navigateTo || isParentViews ? 'button' : undefined}
+                    tabIndex={stat.navigateTo || isParentViews ? 0 : undefined}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (isParentViews) setShowAdminParentViewsModal(true);
+                        else if (stat.navigateTo) setActivePage(stat.navigateTo);
+                      }
+                    }}
+                    style={{ cursor: stat.navigateTo || isParentViews ? 'pointer' : 'default' }}
+                    title={isParentViews ? 'Click to see student report views details' : undefined}
                   >
                     <div className="ig-bg-pattern">
                       {['✦', '◈', '◆', '◇', '⬟'][idx % 5]}
@@ -18068,6 +18079,15 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           onClose={handleCallClose}
         />
       )}
+      {showAdminParentViewsModal && (
+        <ParentViewsModal
+          isOpen={showAdminParentViewsModal}
+          onClose={() => setShowAdminParentViewsModal(false)}
+          students={students}
+          parentViews={parentViews}
+          isKibar={portalRole === "kibar-admin" || (portalRole === "admin" && getSectionScope() === "kibar")}
+        />
+      )}
     </div>
   );
 }
@@ -18362,6 +18382,7 @@ function TeacherPortal({
   const [activeCall, setActiveCall] = useState(null);
   const [activeSessions, setActiveSessions] = useState({});
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+  const [showParentViewsModal, setShowParentViewsModal] = useState(false);
 
   const handleStartCall = async (student) => {
     const childSessionId = `session_${student.student_id}`;
@@ -20186,7 +20207,20 @@ function TeacherPortal({
                    const isFrac = stat.label === "Parent Views";
                    const [numStr, denStr] = isFrac ? String(stat.value).split('/') : [];
                    return (
-                     <div key={stat.label} className="infographic-card">
+                     <div
+                        key={stat.label}
+                        className="infographic-card"
+                        onClick={() => {
+                          if (isFrac) setShowParentViewsModal(true);
+                        }}
+                        role={isFrac ? 'button' : undefined}
+                        tabIndex={isFrac ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && isFrac) setShowParentViewsModal(true);
+                        }}
+                        style={{ cursor: isFrac ? 'pointer' : 'default' }}
+                        title={isFrac ? 'Click to see student report views details' : undefined}
+                      >
                        <div className="ig-bg-pattern">
                          {['✦', '◈', '◆', '⬢', '◇'][i % 5]}
                        </div>
@@ -23250,6 +23284,15 @@ function TeacherPortal({
         <VideoCall
           call={activeCall}
           onClose={handleCallClose}
+        />
+      )}
+      {showParentViewsModal && (
+        <ParentViewsModal
+          isOpen={showParentViewsModal}
+          onClose={() => setShowParentViewsModal(false)}
+          students={overviewStudents}
+          parentViews={parentViews}
+          isKibar={isKibarTeacher}
         />
       )}
     </div>
