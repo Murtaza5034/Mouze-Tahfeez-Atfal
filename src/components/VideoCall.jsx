@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/db.js";
 import "./VideoCall.css";
-import { Mic, MicOff, Video, VideoOff, Phone } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Phone, Volume2, VolumeX } from "lucide-react";
 
 function buildIceServers() {
   const stunUrls = [
@@ -75,13 +75,15 @@ export default function VideoCall({ call, onClose }) {
   const remoteAudioRef = useRef(null);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
-  const remoteStreamRef = useRef(null);
   const signalUnsubsRef = useRef([]);
   const endedRef = useRef(false);
   const sessionIdRef = useRef(Date.now().toString());
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
+  const [hasRemoteAudio, setHasRemoteAudio] = useState(false);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const [status, setStatus] = useState("initializing"); // "initializing" | "calling" | "connected" | "reconnecting" | "error"
   const [error, setError] = useState("");
   const [seconds, setSeconds] = useState(0);
@@ -124,15 +126,6 @@ export default function VideoCall({ call, onClose }) {
     } catch (_) {}
 
     try {
-      if (remoteStreamRef.current) {
-        remoteStreamRef.current.getTracks().forEach((t) => {
-          try { t.stop(); } catch (_) {}
-        });
-        remoteStreamRef.current = null;
-      }
-    } catch (_) {}
-
-    try {
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
       if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
@@ -171,7 +164,7 @@ export default function VideoCall({ call, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ----- timer: ONLY runs when both are actively connected -----
+  // ----- timer: ONLY runs when actively connected -----
   useEffect(() => {
     if (status !== "connected") return;
     const t = setInterval(() => {
@@ -241,6 +234,15 @@ export default function VideoCall({ call, onClose }) {
     }
   }, [camOn]);
 
+  // ----- unlock audio if browser autoplay blocked it -----
+  const handleUnlockAudio = () => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.play().then(() => {
+        setAudioBlocked(false);
+      }).catch(() => {});
+    }
+  };
+
   // ----- main effect: start and maintain the WebRTC call -----
   useEffect(() => {
     if (!roomId || !role) return;
@@ -269,7 +271,7 @@ export default function VideoCall({ call, onClose }) {
             setCamOn(true);
             setMicOn(true);
           } catch (vidErr) {
-            console.warn("Attempt 1 failed, trying generic video/audio:", vidErr);
+            console.warn("Attempt 1 failed, trying simple video/audio:", vidErr);
             try {
               stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
               setCamOn(true);
@@ -379,43 +381,51 @@ export default function VideoCall({ call, onClose }) {
         }
       }
 
-      // 3. Remote track handler using unified MediaStream
-      if (!remoteStreamRef.current) {
-        remoteStreamRef.current = new MediaStream();
-      }
-
+      // 3. Remote track handler using direct MediaStream binding
       pc.ontrack = (ev) => {
         console.log("[WebRTC] Remote track received:", ev.track.kind, ev.track.id);
 
-        if (!remoteStreamRef.current) {
-          remoteStreamRef.current = new MediaStream();
+        const incomingStream = (ev.streams && ev.streams[0]) ? ev.streams[0] : new MediaStream([ev.track]);
+
+        if (ev.track.kind === "video") {
+          setHasRemoteVideo(true);
+          ev.track.onmute = () => setHasRemoteVideo(false);
+          ev.track.onunmute = () => setHasRemoteVideo(true);
+          ev.track.onended = () => setHasRemoteVideo(false);
+
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = incomingStream;
+            remoteVideoRef.current.play().catch((err) => {
+              console.warn("[WebRTC] Remote video play note:", err);
+            });
+          }
         }
 
-        // Add track if not already in remote stream
-        const currentTracks = remoteStreamRef.current.getTracks();
-        if (!currentTracks.some((t) => t.id === ev.track.id)) {
-          remoteStreamRef.current.addTrack(ev.track);
+        if (ev.track.kind === "audio") {
+          setHasRemoteAudio(true);
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = incomingStream;
+            remoteAudioRef.current.muted = isSpectator ? true : false;
+            remoteAudioRef.current.volume = 1.0;
+            remoteAudioRef.current.play().then(() => {
+              setAudioBlocked(false);
+            }).catch((err) => {
+              console.warn("[WebRTC] Remote audio autoplay blocked by browser:", err);
+              setAudioBlocked(true);
+            });
+          }
         }
 
-        // Attach remoteStream to video element (plays video)
-        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        // Also ensure fallback stream assignment
+        if (remoteVideoRef.current && !remoteVideoRef.current.srcObject) {
+          remoteVideoRef.current.srcObject = incomingStream;
+          remoteVideoRef.current.play().catch(() => {});
         }
-
-        // Attach remoteStream to audio element (plays crystal-clear unmuted audio)
-        if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
-          remoteAudioRef.current.srcObject = remoteStreamRef.current;
-        }
-
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.play().catch((err) => {
-            console.warn("[WebRTC] Remote video play note:", err);
-          });
-        }
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.play().catch((err) => {
-            console.warn("[WebRTC] Remote audio play note:", err);
-          });
+        if (remoteAudioRef.current && !remoteAudioRef.current.srcObject) {
+          remoteAudioRef.current.srcObject = incomingStream;
+          remoteAudioRef.current.muted = isSpectator ? true : false;
+          remoteAudioRef.current.volume = 1.0;
+          remoteAudioRef.current.play().catch(() => setAudioBlocked(true));
         }
 
         setStatus("connected");
@@ -652,17 +662,17 @@ export default function VideoCall({ call, onClose }) {
   return createPortal(
     <div id="g" className="vc-overlay" role="dialog" aria-label="Video call">
       <div className="vc-stage">
-        {/* Remote video element - muted to guarantee 100% instant autoplay on all browsers */}
+        {/* Remote video element - shown full screen when remote video track is streaming */}
         <video
           ref={remoteVideoRef}
-          className="vc-remote"
+          className={`vc-remote ${hasRemoteVideo && status === "connected" ? "vc-video-active" : "vc-video-hidden"}`}
           autoPlay
           playsInline
           muted={true}
           disablePictureInPicture={myRole !== "teacher"}
         />
 
-        {/* Dedicated remote audio element for crystal-clear two-way voice */}
+        {/* Dedicated HTML5 audio element for high-fidelity unmuted remote voice */}
         <audio
           ref={remoteAudioRef}
           autoPlay
@@ -670,17 +680,38 @@ export default function VideoCall({ call, onClose }) {
           muted={isSpectator}
         />
 
-        {status !== "connected" && (
+        {/* Premium Tahfeez Classroom Stage Overlay when video is off or connecting */}
+        {(!hasRemoteVideo || status !== "connected") && (
           <div className="vc-remote-placeholder">
             <div className="vc-avatar-pulse">
               <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
             </div>
             <div className="vc-peer-name">{peerName}</div>
-            <div className="vc-status-line">{statusLabel}</div>
+            
+            {status === "connected" ? (
+              <div className="vc-audio-live-pill">
+                <span className="vc-audio-wave">
+                  <span></span><span></span><span></span><span></span>
+                </span>
+                <span>Audio Connected · Camera Off</span>
+              </div>
+            ) : (
+              <div className="vc-status-line">{statusLabel}</div>
+            )}
+
             {error && <div className="vc-error">{error}</div>}
           </div>
         )}
 
+        {/* Click to unmute banner if browser autoplay policy blocked sound */}
+        {audioBlocked && (
+          <div className="vc-audio-blocked-banner" onClick={handleUnlockAudio}>
+            <VolumeX size={18} />
+            <span>Tap here to enable sound</span>
+          </div>
+        )}
+
+        {/* Top bar */}
         <div className="vc-topbar">
           <div className="vc-topbar-left">
             <span className={`vc-dot ${status === "connected" ? "vc-dot-active" : ""}`} />
@@ -693,6 +724,7 @@ export default function VideoCall({ call, onClose }) {
           </div>
         </div>
 
+        {/* Picture-in-Picture Local Video */}
         {!isSpectator && (
           <div className="vc-local">
             <video
@@ -711,6 +743,7 @@ export default function VideoCall({ call, onClose }) {
           </div>
         )}
 
+        {/* Bottom Control Bar */}
         <div className="vc-controls">
           {!isSpectator && (
             <>

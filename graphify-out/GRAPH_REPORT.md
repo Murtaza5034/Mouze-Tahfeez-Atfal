@@ -1,16 +1,16 @@
 # Graph Report - Mauze Tahfeez  (2026-08-26)
 
 ## Corpus Check
-- 1605 files · ~1,973,675 words
+- 1605 files · ~1,973,804 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 14593 nodes · 24941 edges · 1016 communities (741 shown, 275 thin omitted)
+- 14593 nodes · 24941 edges · 1021 communities (747 shown, 274 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 730 edges (avg confidence: 0.82)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `3f06991f`
+- Built from commit: `34a055cd`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -28,7 +28,7 @@
 - whatsapp-web-js.adapter.ts
 - IWhatsAppEngine
 - LocalConnection
-- ApiResponse
+- RequireRole
 - bootstrap
 - app.module.ts
 - PluginWorkerHost
@@ -58,7 +58,7 @@
 - HttpExecutor
 - App.tsx
 - client.ts
-- ApiKey
+- AuthService
 - BaileysSessionStore
 - LoggerService
 - message.controller.ts
@@ -81,7 +81,7 @@
 - UpdateWebhookDto
 - scripts
 - infra.controller.ts
-- CreateApiKeyDto
+- ApiKey
 - ContactService
 - run
 - ChatResponse
@@ -92,11 +92,11 @@
 - ChatsResourceTest.java
 - ConversationMapping
 - GroupChat
-- tool-registry.spec.ts
+- getting_started/hooks.py
 - compilerOptions
 - catalog.controller.ts
 - Common Errors
-- .logInfo
+- ApiResponse
 - filter-types.ts
 - Jadwal.jsx
 - OpenWAApiError
@@ -201,7 +201,7 @@
 - CacheService
 - Hook Types
 - wa-web-version.ts
-- ConcurrencyLimiter
+- webhook.processor.ts
 - db-adapter.js
 - Badal Teacher Test Checklist
 - PriorityEvaluationTest
@@ -319,7 +319,7 @@
 - dto-strict-coercion.spec.ts
 - add-integration-uuid-defaults.spec.ts
 - AddMessageStatus1770108659848
-- DockerService
+- .logInfo
 - Configuration Reference
 - Infrastructure.tsx
 - storage.js
@@ -605,7 +605,7 @@
 - 18 - SDK Design
 - Session Phone-Number Pairing
 - rmyndharis-openwa
-- TestWebSocket
+- StatusController
 - message.service.ts
 - Common ARIA patterns
 - Understandable
@@ -617,7 +617,7 @@
 - Alternative: Manual MCP Configuration (Project Scope)
 - Manual Initialization
 - [0.1.0] - 2026-02-05
-- 6.4.5 Message Templates
+- SettingsController
 - ingress-signature.ts
 - 6.4.9 API Keys
 - 07.10 Webhooks (management)
@@ -626,7 +626,7 @@
 - handle
 - 1. Eliminating Waterfalls
 - 2. Bundle Size Optimization
-- [0.10.1] - 2026-07-20
+- RequestPairingCodeDto
 - bug_report.md
 - Multimodal Examples
 - Core Concepts
@@ -788,11 +788,14 @@
 - [0.1.1] - 2026-02-17
 - [0.1.3] - 2026-02-18
 - [0.1.4] - 2026-02-26
-- [0.4.1] - 2026-06-18
+- StatsController
 - [0.4.5] - 2026-06-20
 - [0.2.1] - 2026-06-15
+- 6.4.3 Contacts
+- storage.service.s3.spec.ts
 - [0.2.5] - 2026-06-16
 - data-source.ts
+- DeleteChatDto
 - [0.1.5] - 2026-04-27
 - [0.7.13] - 2026-06-29
 - [0.7.16] - 2026-06-30
@@ -891,6 +894,7 @@
 - .agents/skills/react-best-practices/rules/_template.md
 - .agents/skills/vite/GENERATION.md
 - workflows/graphify.md
+- [0.2.3] - 2026-06-15
 - antigravity-sdk-python-main/CODE_OF_CONDUCT.md
 - InstanceThrottlerGuard
 - @ai-sdk/anthropic
@@ -980,7 +984,7 @@
 - lottie-web
 - useMobileBackNavigation.jsx
 - react
-- eslint-plugin-react-hooks
+- [0.8.14] - 2026-07-10
 - react-router-dom
 - @tanstack/react-query
 - Spinner
@@ -988,6 +992,7 @@
 - react
 - react-dom
 - react-refresh
+- @ai-sdk/mcp
 - rollup
 - OpenWA/README.md
 - @rolldown/plugin-babel
@@ -996,10 +1001,10 @@
 - [0.1.6] - 2026-05-17
 - [0.4.6] - 2026-06-20
 - api-key.entity.ts
+- globals
 - [0.7.5] - 2026-06-26
 - [0.8.0] - 2026-07-02
 - 07.2 Endpoints
-- @capacitor/app-launcher
 
 ## God Nodes (most connected - your core abstractions)
 1. `ApiResponse` - 150 edges
@@ -1028,11 +1033,11 @@
 ## Import Cycles
 - 4-file cycle: `OpenWA/src/core/plugins/index.ts -> OpenWA/src/core/plugins/plugin-loader.service.ts -> OpenWA/src/modules/session/session.service.ts -> OpenWA/src/engine/engine.factory.ts -> OpenWA/src/core/plugins/index.ts`
 - 5-file cycle: `OpenWA/src/core/plugins/index.ts -> OpenWA/src/core/plugins/plugin-loader.service.ts -> OpenWA/src/modules/message/message.service.ts -> OpenWA/src/modules/session/session.service.ts -> OpenWA/src/engine/engine.factory.ts -> OpenWA/src/core/plugins/index.ts`
+- 5-file cycle: `OpenWA/src/core/plugins/index.ts -> OpenWA/src/core/plugins/plugins.module.ts -> OpenWA/src/core/plugins/plugin-loader.service.ts -> OpenWA/src/modules/session/session.service.ts -> OpenWA/src/engine/engine.factory.ts -> OpenWA/src/core/plugins/index.ts`
 - 5-file cycle: `OpenWA/src/core/plugins/index.ts -> OpenWA/src/core/plugins/plugin-loader.service.ts -> OpenWA/src/modules/session/session.service.ts -> OpenWA/src/engine/engine.factory.ts -> OpenWA/src/plugins/engines/baileys/index.ts -> OpenWA/src/core/plugins/index.ts`
 - 5-file cycle: `OpenWA/src/core/plugins/index.ts -> OpenWA/src/core/plugins/plugin-loader.service.ts -> OpenWA/src/modules/session/session.service.ts -> OpenWA/src/engine/engine.factory.ts -> OpenWA/src/plugins/engines/whatsapp-web-js/index.ts -> OpenWA/src/core/plugins/index.ts`
-- 5-file cycle: `OpenWA/src/core/plugins/index.ts -> OpenWA/src/core/plugins/plugins.module.ts -> OpenWA/src/core/plugins/plugin-loader.service.ts -> OpenWA/src/modules/session/session.service.ts -> OpenWA/src/engine/engine.factory.ts -> OpenWA/src/core/plugins/index.ts`
 
-## Communities (1016 total, 275 thin omitted)
+## Communities (1021 total, 274 thin omitted)
 
 ### Community 0 - "App.jsx"
 Cohesion: 0.03
@@ -1072,7 +1077,7 @@ Nodes (5): extractLinkedParentJID(), WhatsAppWebJsAdapter, isChannelJid(), Label
 
 ### Community 9 - "LocalAgentConfig"
 Cohesion: 0.03
-Nodes (104): main(), PrintToolCallHook, Hook to print tool calls before they run., main(), PrintToolCallHook, Hook to print tool calls before they run., _add(), main() (+96 more)
+Nodes (108): main(), PrintToolCallHook, Hook to print tool calls before they run., main(), PrintToolCallHook, Hook to print tool calls before they run., _add(), main() (+100 more)
 
 ### Community 10 - "whatsapp-web-js.adapter.ts"
 Cohesion: 0.03
@@ -1082,9 +1087,9 @@ Nodes (56): RFC-6350, ChannelMediaNotSupportedError, ChannelNotFoundError, ChatL
 Cohesion: 0.04
 Nodes (48): _extract_tool_result(), LocalConnection, _make_step_id(), normalize_wire_path(), _PendingCallKey, _PendingCallValue, Any, Content (+40 more)
 
-### Community 13 - "ApiResponse"
-Cohesion: 0.05
-Nodes (63): ApiConsumes, ApiResponse, RequireRole(), CatalogController, ApiOperation, ApiTags, Body, Controller (+55 more)
+### Community 13 - "RequireRole"
+Cohesion: 0.13
+Nodes (24): ApiConsumes, RequireRole(), InstallFromUrlDto, PluginConfigDto, PluginSessionsDto, ApiProperty, IsArray, IsObject (+16 more)
 
 ### Community 14 - "bootstrap"
 Cohesion: 0.24
@@ -1124,7 +1129,7 @@ Nodes (22): MessagesResource, NOTE: the real paths use the `/send-` prefix, e.g.
 
 ### Community 23 - "mcp.server.ts"
 Cohesion: 0.07
-Nodes (34): BullBoardAuthMiddleware, res, Injectable, ProxyAwareThrottlerGuard, Injectable, ipMatches(), ipv4ToInt(), normalizeIp() (+26 more)
+Nodes (35): BullBoardAuthMiddleware, res, Injectable, ProxyAwareThrottlerGuard, Injectable, ipMatches(), ipv4ToInt(), normalizeIp() (+27 more)
 
 ### Community 24 - "Chats.tsx"
 Cohesion: 0.06
@@ -1148,7 +1153,7 @@ Nodes (68): HookContext, HookResult, HookContext, HookResult, allow(), allow_all
 
 ### Community 29 - "antigravity/types.py"
 Cohesion: 0.03
-Nodes (62): log_interaction(), on_interaction, Logs interaction requests. Skips all questions., on_interact(), on_interaction, Handles user interaction requests., callable_to_tool_proto(), _get_sdk_version() (+54 more)
+Nodes (61): log_interaction(), on_interaction, Logs interaction requests. Skips all questions., callable_to_tool_proto(), _get_sdk_version(), LocalConnectionStep, LocalConnectionStrategy, Returns the version of the Google Antigravity SDK. (+53 more)
 
 ### Community 30 - "GroupsResource"
 Cohesion: 0.04
@@ -1159,8 +1164,8 @@ Cohesion: 0.03
 Nodes (73): adm-zip, archiver, @aws-sdk/client-s3, better-sqlite3, @bull-board/api, @bull-board/express, @bull-board/nestjs, bullmq (+65 more)
 
 ### Community 32 - "AuditService"
-Cohesion: 0.07
-Nodes (32): resolveSessionScope(), getRequestActor(), AuditController, ApiOperation, ApiQuery, ApiTags, Controller, Get (+24 more)
+Cohesion: 0.06
+Nodes (31): resolveSessionScope(), getRequestActor(), AuditController, ApiOperation, ApiQuery, ApiTags, Controller, Get (+23 more)
 
 ### Community 33 - "WebhookEvent"
 Cohesion: 0.05
@@ -1202,9 +1207,9 @@ Nodes (35): ApiKeys, App(), AppContent(), Chats, Login, queryClient, Templates, 
 Cohesion: 0.09
 Nodes (19): OpenWAClient, OpenWAClientOptions, classifyApiError(), buildUrl(), ClientConfig, FetchLike, HttpMethod, LOCALHOST_HOSTS (+11 more)
 
-### Community 43 - "ApiKey"
-Cohesion: 0.05
-Nodes (31): ApiHeader, writeSecretFile(), invokeTool(), readTool, AuditContext, hashApiKey(), API_KEY_FILE, AuthService (+23 more)
+### Community 43 - "AuthService"
+Cohesion: 0.06
+Nodes (27): IsDateString, writeSecretFile(), invokeTool(), readTool, hashApiKey(), API_KEY_FILE, AuthService, bannerKeyLine() (+19 more)
 
 ### Community 44 - "BaileysSessionStore"
 Cohesion: 0.10
@@ -1224,7 +1229,7 @@ Nodes (13): Builder, SendImageStatusRequest, Builder, SendTextStatusRequest, Bui
 
 ### Community 48 - "dependencies"
 Cohesion: 0.11
-Nodes (19): ai, @ai-sdk/mcp, @capacitor/android, @capacitor/cli, @capacitor/filesystem, dependencies, ai, @ai-sdk/mcp (+11 more)
+Nodes (19): ai, @capacitor/android, @capacitor/app-launcher, @capacitor/cli, @capacitor/filesystem, dependencies, ai, @capacitor/android (+11 more)
 
 ### Community 49 - "MessageService"
 Cohesion: 0.21
@@ -1283,8 +1288,8 @@ Cohesion: 0.08
 Nodes (22): MessagesService, BatchStatusResponse, BulkMessageResponse, ChatHistoryMessage, DeleteMessageRequest, EditMessageRequest, ForwardMessageRequest, ListMessagesQuery (+14 more)
 
 ### Community 63 - "UpdateWebhookDto"
-Cohesion: 0.14
-Nodes (19): IsHeaderMap(), CreateWebhookDto, FILTERS_API_EXAMPLE, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt (+11 more)
+Cohesion: 0.13
+Nodes (21): IsHeaderMap(), CreateWebhookDto, FILTERS_API_EXAMPLE, ApiProperty, ApiPropertyOptional, ArrayMinSize, IsArray, IsBoolean (+13 more)
 
 ### Community 64 - "scripts"
 Cohesion: 0.05
@@ -1294,17 +1299,17 @@ Nodes (44): scripts, build, build:all, check:versions, dashboard:build, dashboar
 Cohesion: 0.08
 Nodes (39): isMissingTableError(), driverErr(), qfe(), ImportStorageDto, ApiProperty, IsNotEmpty, IsString, BaileysStoredMessageRow (+31 more)
 
-### Community 66 - "CreateApiKeyDto"
-Cohesion: 0.09
-Nodes (29): IsDateString, AuthController, ApiOperation, ApiTags, Body, Controller, Delete, Get (+21 more)
+### Community 66 - "ApiKey"
+Cohesion: 0.06
+Nodes (43): ApiHeader, AuditContext, AuthController, ApiOperation, ApiTags, Body, Controller, Delete (+35 more)
 
 ### Community 67 - "ContactService"
-Cohesion: 0.16
-Nodes (13): contactTools(), ContactController, ApiOperation, ApiParam, ApiQuery, ApiTags, Controller, Get (+5 more)
+Cohesion: 0.15
+Nodes (14): contactTools(), ContactController, ApiOperation, ApiParam, ApiQuery, ApiTags, Controller, Delete (+6 more)
 
 ### Community 68 - "run"
-Cohesion: 0.05
-Nodes (66): broken_tool(), greet(), log_compaction(), log_post_subagent_call(), log_post_tool_call(), log_post_turn(), log_pre_subagent_call(), log_pre_tool_call_decide() (+58 more)
+Cohesion: 0.08
+Nodes (38): broken_tool(), greet(), log_compaction(), log_post_subagent_call(), log_post_tool_call(), log_post_turn(), log_pre_subagent_call(), log_pre_tool_call_decide() (+30 more)
 
 ### Community 69 - "ChatResponse"
 Cohesion: 0.06
@@ -1316,7 +1321,7 @@ Nodes (22): ChatResponseStreamTest, Cache replay: thoughts → tool_calls → te
 
 ### Community 71 - "Changelog"
 Cohesion: 0.04
-Nodes (49): [0.10.4] - 2026-07-21, [0.10.5] - 2026-07-22, [0.10.7] - 2026-07-23, [0.1.8] - 2026-06-13, [0.2.10] - 2026-06-17, [0.2.3] - 2026-06-15, [0.2.6] - 2026-06-16, [0.6.1] - 2026-06-22 (+41 more)
+Nodes (49): [0.10.1] - 2026-07-20, [0.10.4] - 2026-07-21, [0.10.5] - 2026-07-22, [0.10.7] - 2026-07-23, [0.1.8] - 2026-06-13, [0.2.10] - 2026-06-17, [0.2.6] - 2026-06-16, [0.4.1] - 2026-06-18 (+41 more)
 
 ### Community 72 - "MainActivity"
 Cohesion: 0.10
@@ -1334,25 +1339,25 @@ Nodes (14): ChatState, PAUSED, RECORDING, TYPING, ChatSummary, Builder, DeleteCh
 Cohesion: 0.07
 Nodes (21): isUniqueViolation(), PluginMappingsCapability, PluginsModule, Global, Module, CapabilityContext, dispatchCapabilityVerb(), SandboxCapabilityContext (+13 more)
 
-### Community 77 - "tool-registry.spec.ts"
-Cohesion: 0.17
-Nodes (12): ToolDescriptor, ToolRegistryService, Injectable, r, w, sessionId, sessionId, sessionId (+4 more)
+### Community 77 - "getting_started/hooks.py"
+Cohesion: 0.12
+Nodes (25): broken_tool(), greet(), main(), on_compact(), on_end(), on_error(), on_interact(), on_start() (+17 more)
 
 ### Community 78 - "compilerOptions"
 Cohesion: 0.07
 Nodes (28): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, jsx, lib, module, moduleDetection, moduleResolution (+20 more)
 
 ### Community 79 - "catalog.controller.ts"
-Cohesion: 0.30
-Nodes (10): ProductQueryDto, SendCatalogDto, SendProductDto, ApiProperty, ApiPropertyOptional, IsInt, IsOptional, IsString (+2 more)
+Cohesion: 0.16
+Nodes (18): CatalogController, ApiOperation, ApiTags, Body, Controller, Get, Param, Post (+10 more)
 
 ### Community 80 - "Common Errors"
 Cohesion: 0.04
 Nodes (44): Authentication, Find Available Models, Usage, Vercel AI Gateway, `addToolResult` → `addToolOutput`, Common Errors, `generateObject` → `generateText` with `output`, Manual JSON parsing → `generateText` with `output` (+36 more)
 
-### Community 81 - ".logInfo"
-Cohesion: 0.09
-Nodes (31): SessionScoped(), DeleteChatDto, ApiProperty, IsNotEmpty, IsString, Matches, MarkChatReadDto, ApiProperty (+23 more)
+### Community 81 - "ApiResponse"
+Cohesion: 0.14
+Nodes (22): ApiResponse, Param, Post, MarkChatReadDto, ApiProperty, IsNotEmpty, IsString, Matches (+14 more)
 
 ### Community 82 - "filter-types.ts"
 Cohesion: 0.09
@@ -1463,8 +1468,8 @@ Cohesion: 0.04
 Nodes (45): dateColumnType(), isPostgres(), jsonColumnType(), WidenIngressDedupKey1782100000000, writtenEnv(), IngressEvent, Column, CreateDateColumn (+37 more)
 
 ### Community 109 - "webhook.service.ts"
-Cohesion: 0.09
-Nodes (29): incrementWebhookDeliveryFailures(), isSsrfProtectionEnabled(), redactSsrfError(), Processor, WebhookJobResult, WebhookProcessor, QueueModule, Module (+21 more)
+Cohesion: 0.11
+Nodes (17): ConcurrencyLimiter, Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, WebhookDeliveryFailure, queueModules (+9 more)
 
 ### Community 110 - "15 - Project Roadmap"
 Cohesion: 0.04
@@ -1511,8 +1516,8 @@ Cohesion: 0.14
 Nodes (22): LazyJadwalTrackingView, downloadFile(), getFileSubfolder(), isStorageAccessGranted(), nativeDownload(), requestStorageAccess(), formatJadeed(), formatJuzhali() (+14 more)
 
 ### Community 121 - "WebhookResponseDto"
-Cohesion: 0.16
-Nodes (16): Expose, ApiProperty, ApiPropertyOptional, WebhookResponseDto, ApiOperation, ApiParam, ApiTags, Body (+8 more)
+Cohesion: 0.19
+Nodes (14): Expose, WebhookResponseDto, ApiOperation, ApiParam, ApiTags, Body, Controller, Delete (+6 more)
 
 ### Community 122 - "MediaInput"
 Cohesion: 0.14
@@ -1616,7 +1621,7 @@ Nodes (39): 10. Decision Checklist, 1. Framework Selection (2025), 2. Runtime Co
 
 ### Community 149 - "session.service.ts"
 Cohesion: 0.02
-Nodes (90): createLogger(), StorageModule, Global, Module, positiveIntFromEnv(), ENV_KEYS, mockedS3Client, S3ClientConfig (+82 more)
+Nodes (87): createLogger(), StorageModule, Global, Module, positiveIntFromEnv(), S3Config, StorageService, Injectable (+79 more)
 
 ### Community 150 - "coverageThreshold"
 Cohesion: 0.06
@@ -1675,7 +1680,7 @@ Cohesion: 0.21
 Nodes (14): SendAudioMessageDto, SendMediaMessageDto, SendTextMessageDto, ApiProperty, ApiPropertyOptional, ArrayMaxSize, IsArray, IsBoolean (+6 more)
 
 ### Community 164 - "Webhook"
-Cohesion: 0.12
+Cohesion: 0.11
 Nodes (13): InjectRepository, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn (+5 more)
 
 ### Community 165 - "fetchAllPages.ts"
@@ -1695,8 +1700,8 @@ Cohesion: 0.16
 Nodes (16): resolveCollectionName(), SHARED_COLLECTIONS, channel(), channels, createChannel(), emit(), emitAllJoined(), heartbeat() (+8 more)
 
 ### Community 169 - "TestLocalHarness"
-Cohesion: 0.12
-Nodes (11): Awaits a test event to be fired with a given timeout., Simulates the harness transmitting an OutputEvent to the SDK., Simulates the harness transmitting a ToolCall event to the SDK., Simulates the harness transmitting a ToolConfirmationRequest event., Helper to test LocalConnection by simulating the Go harness side of the…, Simulates the SDK initiating a disconnect., Simulates the Go harness closing the WebSocket connection., Awaits the next response from the SDK and returns the parsed JSON. (+3 more)
+Cohesion: 0.08
+Nodes (14): TestCase, Awaits a test event to be fired with a given timeout., Simulates the harness transmitting an OutputEvent to the SDK., Simulates the harness transmitting a ToolCall event to the SDK., Simulates the harness transmitting a ToolConfirmationRequest event., Mock WebSocket allowing async injection and inspection of messages., Helper to test LocalConnection by simulating the Go harness side of the…, Simulates the SDK initiating a disconnect. (+6 more)
 
 ### Community 170 - "TestMcpBridgeFiltering"
 Cohesion: 0.19
@@ -1736,7 +1741,7 @@ Nodes (9): Validates the ToolResult Pydantic model., Verifies construction of a 
 
 ### Community 180 - "devDependencies"
 Cohesion: 0.09
-Nodes (23): eslint-plugin-react-refresh, devDependencies, eslint, @eslint/js, eslint-plugin-react-refresh, globals, @types/node, @types/react (+15 more)
+Nodes (23): eslint-plugin-react-hooks, eslint-plugin-react-refresh, devDependencies, eslint, @eslint/js, eslint-plugin-react-hooks, eslint-plugin-react-refresh, @types/node (+15 more)
 
 ### Community 181 - "MockBackend"
 Cohesion: 0.15
@@ -1753,6 +1758,10 @@ Nodes (31): Basic Chat, Hello World Example, Interactive Chat Loop, Mechanics of
 ### Community 185 - "wa-web-version.ts"
 Cohesion: 0.22
 Nodes (11): buildRemotePin(), getEffectiveWebVersionInfo(), pickSettledWebVersion(), __resetWebVersionCache(), resolveCurrentWebVersion(), resolveWebVersionPin(), FIXED_NOW, WA_VERSION_REGISTRY_URL (+3 more)
+
+### Community 186 - "webhook.processor.ts"
+Cohesion: 0.16
+Nodes (13): incrementWebhookDeliveryFailures(), isSsrfProtectionEnabled(), redactSsrfError(), Processor, WebhookJobResult, WebhookProcessor, QueueModule, Module (+5 more)
 
 ### Community 187 - "db-adapter.js"
 Cohesion: 0.19
@@ -2198,9 +2207,9 @@ Nodes (5): PIPE_TRANSFORM_OPTS, PIPE_VALIDATOR_OPTS, PROBES, SRC, ValidatedClass
 Cohesion: 0.25
 Nodes (3): NOTE: kept OUT of src/database/migrations/ on purpose — the TypeORM migrations…, TABLES, AddIntegrationUuidDefaults1782300000000
 
-### Community 304 - "DockerService"
-Cohesion: 0.09
-Nodes (13): DockerModule, Module, ContainerInfo, DockerService, MANAGED_DOCKER_PROFILES, OrchestrationResult, Injectable, InjectDataSource (+5 more)
+### Community 304 - ".logInfo"
+Cohesion: 0.06
+Nodes (23): DockerModule, Module, ContainerInfo, DockerService, MANAGED_DOCKER_PROFILES, OrchestrationResult, Injectable, InfraController (+15 more)
 
 ### Community 305 - "Configuration Reference"
 Cohesion: 0.08
@@ -2627,8 +2636,8 @@ Cohesion: 0.13
 Nodes (14): 1. The Anti-Ruby Mandate, 2. Modern Xcode Folder Synchronization, 3. Allowed Scripting Languages, 4. Toolchain Verification, 5. Mandatory Linker Flags for Static Frameworks (Firebase), **CRITICAL: Always Use Latest SDK Version**, ⛔️ CRITICAL RULES & ENVIRONMENT CHECKS, Empty Directory Workflow (+6 more)
 
 ### Community 510 - "6.4 REST API Reference"
-Cohesion: 0.12
-Nodes (17): 6.4.12 Search, 6.4.13 Profile (own account), 6.4.14 Calls, 6.4.3 Contacts, 6.4 REST API Reference, DELETE /api/sessions/:sessionId/contacts/:contactId/block, GET /api/search, GET /api/sessions/:sessionId/contacts (+9 more)
+Cohesion: 0.13
+Nodes (15): 6.4.12 Search, 6.4.13 Profile (own account), 6.4.14 Calls, 6.4.5 Message Templates, 6.4 REST API Reference, DELETE /api/sessions/:sessionId/templates/:id, GET /api/search, GET /api/sessions/:sessionId/templates (+7 more)
 
 ### Community 511 - "JavaScript API"
 Cohesion: 0.14
@@ -3054,9 +3063,9 @@ Nodes (8): 1. Create a Session, 2. Start the Session, 3. Request a Pairing Code,
 Cohesion: 0.22
 Nodes (8): Errors, Install, License, Messaging, Notes, rmyndharis-openwa, Search, Usage
 
-### Community 618 - "TestWebSocket"
-Cohesion: 0.22
-Nodes (3): TestCase, Mock WebSocket allowing async injection and inspection of messages., TestWebSocket
+### Community 618 - "StatusController"
+Cohesion: 0.23
+Nodes (10): StatusController, ApiOperation, ApiTags, Body, Controller, Delete, Get, Param (+2 more)
 
 ### Community 619 - "message.service.ts"
 Cohesion: 0.07
@@ -3102,9 +3111,9 @@ Nodes (8): 1. Create a Firestore Enterprise Database, 2. Create `firebase.json`,
 Cohesion: 0.25
 Nodes (8): [0.1.0] - 2026-02-05, Advanced Features, Core Features, Dashboard, Infrastructure, 🎉 Initial Release, Messaging, Security
 
-### Community 630 - "6.4.5 Message Templates"
-Cohesion: 0.33
-Nodes (6): 6.4.5 Message Templates, DELETE /api/sessions/:sessionId/templates/:id, GET /api/sessions/:sessionId/templates, GET /api/sessions/:sessionId/templates/:id, POST /api/sessions/:sessionId/templates, PUT /api/sessions/:sessionId/templates/:id
+### Community 630 - "SettingsController"
+Cohesion: 0.20
+Nodes (8): SettingsController, ApiOperation, ApiTags, Controller, Get, Put, SettingsModule, Module
 
 ### Community 631 - "ingress-signature.ts"
 Cohesion: 0.36
@@ -3138,9 +3147,9 @@ Nodes (7): 1.1 Check Cheap Conditions Before Async Flags, 1.2 Defer Await Until 
 Cohesion: 0.29
 Nodes (7): 2.1 Avoid Barrel File Imports, 2.2 Conditional Module Loading, 2.3 Defer Non-Critical Third-Party Libraries, 2.4 Dynamic Imports for Heavy Components, 2.5 Prefer Statically Analyzable Paths, 2.6 Preload Based on User Intent, 2. Bundle Size Optimization
 
-### Community 639 - "[0.10.1] - 2026-07-20"
-Cohesion: 0.67
-Nodes (3): [0.10.1] - 2026-07-20, Added, Fixed
+### Community 639 - "RequestPairingCodeDto"
+Cohesion: 0.28
+Nodes (6): PairingCodeResponseDto, RequestPairingCodeDto, ApiProperty, IsNotEmpty, IsString, Matches
 
 ### Community 640 - "bug_report.md"
 Cohesion: 0.29
@@ -3730,9 +3739,9 @@ Nodes (3): [0.1.3] - 2026-02-18, Changed, Fixed
 Cohesion: 0.67
 Nodes (3): [0.1.4] - 2026-02-26, Changed, Fixed
 
-### Community 802 - "[0.4.1] - 2026-06-18"
-Cohesion: 0.67
-Nodes (3): [0.4.1] - 2026-06-18, Changed, Fixed
+### Community 802 - "StatsController"
+Cohesion: 0.33
+Nodes (6): StatsController, ApiOperation, ApiTags, Controller, Get, Param
 
 ### Community 803 - "[0.4.5] - 2026-06-20"
 Cohesion: 0.67
@@ -3742,6 +3751,14 @@ Nodes (3): [0.4.5] - 2026-06-20, Added, Fixed
 Cohesion: 0.67
 Nodes (3): [0.2.1] - 2026-06-15, Dependencies, Fixed
 
+### Community 805 - "6.4.3 Contacts"
+Cohesion: 0.25
+Nodes (8): 6.4.3 Contacts, DELETE /api/sessions/:sessionId/contacts/:contactId/block, GET /api/sessions/:sessionId/contacts, GET /api/sessions/:sessionId/contacts/check/:number, GET /api/sessions/:sessionId/contacts/:contactId, GET /api/sessions/:sessionId/contacts/:contactId/phone, GET /api/sessions/:sessionId/contacts/:contactId/profile-picture, POST /api/sessions/:sessionId/contacts/:contactId/block
+
+### Community 806 - "storage.service.s3.spec.ts"
+Cohesion: 0.29
+Nodes (3): ENV_KEYS, mockedS3Client, S3ClientConfig
+
 ### Community 807 - "[0.2.5] - 2026-06-16"
 Cohesion: 0.67
 Nodes (3): [0.2.5] - 2026-06-16, Added, Fixed
@@ -3749,6 +3766,10 @@ Nodes (3): [0.2.5] - 2026-06-16, Added, Fixed
 ### Community 808 - "data-source.ts"
 Cohesion: 0.28
 Nodes (6): buildPostgresDataSourceOptions(), dataEntities, dataMigrations, postgresDataSourceOptions, PgOpts, sqliteDataSourceOptions
+
+### Community 809 - "DeleteChatDto"
+Cohesion: 0.33
+Nodes (5): DeleteChatDto, ApiProperty, IsNotEmpty, IsString, Matches
 
 ### Community 810 - "[0.1.5] - 2026-04-27"
 Cohesion: 0.67
@@ -3830,6 +3851,10 @@ Nodes (3): N, NestJS, Node.js
 Cohesion: 0.67
 Nodes (3): V, Vite, Volume (Docker)
 
+### Community 909 - "[0.2.3] - 2026-06-15"
+Cohesion: 0.67
+Nodes (3): [0.2.3] - 2026-06-15, Changed, Fixed
+
 ### Community 914 - "ThinkingLevelTest"
 Cohesion: 0.33
 Nodes (4): Tests for the ThinkingLevel enum., Verifies each enum member has the expected string value., Verifies ThinkingLevel members compare equal to their string values., ThinkingLevelTest
@@ -3837,6 +3862,10 @@ Nodes (4): Tests for the ThinkingLevel enum., Verifies each enum member has the 
 ### Community 998 - "useMobileBackNavigation.jsx"
 Cohesion: 0.47
 Nodes (3): getRootPageForRole(), isRootPageForRole(), useMobileBackNavigation()
+
+### Community 1000 - "[0.8.14] - 2026-07-10"
+Cohesion: 0.67
+Nodes (3): [0.8.14] - 2026-07-10, Added, Fixed
 
 ### Community 1003 - "Spinner"
 Cohesion: 0.29
@@ -3859,8 +3888,8 @@ Cohesion: 0.67
 Nodes (3): [0.4.6] - 2026-06-20, Added, Fixed
 
 ### Community 1016 - "api-key.entity.ts"
-Cohesion: 0.06
-Nodes (37): AuthModule, Global, Module, AuthValidateController, ApiTags, Controller, PUBLIC_KEY, REQUIRED_ROLE_KEY (+29 more)
+Cohesion: 0.07
+Nodes (33): ToolDescriptor, ToolRegistryService, Injectable, r, w, sessionId, sessionId, sessionId (+25 more)
 
 ### Community 1018 - "[0.7.5] - 2026-06-26"
 Cohesion: 0.67
@@ -3877,12 +3906,12 @@ Nodes (9): 07.14 Real-time (WebSocket), 07.2 Endpoints, 07.7 Message Templates, 
 ## Knowledge Gaps
 - **4412 isolated node(s):** `deploy-codex.sh script`, `deploy.sh script`, `PackageDescription`, `Foundation`, `PathKit` (+4407 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **275 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **274 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ApiResponse` connect `ApiResponse` to `IntegrationInstanceController`, `CallService`, `AuditService`, `logger.service.ts`, `template.controller.ts`, `api.ts`, `ChannelService`, `ApiKey`, `.receive`, `GroupService`, `CreateApiKeyDto`, `ContactService`, `.logInfo`, `MessageController`, `SetProfilePictureDto`, `Public`, `LabelService`, `api-key.entity.ts`, `WebhookResponseDto`?**
+- **Why does `ApiResponse` connect `ApiResponse` to `RequireRole`, `IntegrationInstanceController`, `CallService`, `AuditService`, `logger.service.ts`, `StatsController`, `api.ts`, `template.controller.ts`, `ChannelService`, `.logInfo`, `.receive`, `GroupService`, `ApiKey`, `ContactService`, `catalog.controller.ts`, `MessageController`, `SetProfilePictureDto`, `StatusController`, `Public`, `LabelService`, `SettingsController`, `WebhookResponseDto`?**
   _High betweenness centrality (0.094) - this node is a cross-community bridge._
 - **Why does `str` connect `_make_step` to `antigravity/__init__.py`, `BuiltinTools`, `Plugins.tsx`?**
   _High betweenness centrality (0.083) - this node is a cross-community bridge._

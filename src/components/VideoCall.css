@@ -52,10 +52,21 @@
   height: 100%;
   object-fit: cover;
   background: #0f0e0d;
-  transition: opacity 0.5s ease;
+  transition: opacity 0.4s ease;
 }
 
-/* Remote video loading placeholder */
+.vc-video-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.vc-video-hidden {
+  opacity: 0;
+  visibility: hidden;
+  position: absolute;
+}
+
+/* Remote video loading / audio-only placeholder */
 .vc-remote-placeholder {
   position: absolute;
   top: 0;
@@ -66,10 +77,76 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, #1f1b16 0%, #0d0c0b 100%);
+  background: radial-gradient(circle at center, #241f17 0%, #0d0c0b 100%);
   color: #f7f5f0;
   z-index: 2;
   text-align: center;
+  padding: 20px;
+}
+
+.vc-audio-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(46, 204, 113, 0.12);
+  border: 1px solid rgba(46, 204, 113, 0.35);
+  padding: 8px 18px;
+  border-radius: 30px;
+  color: #2ecc71;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 8px;
+  letter-spacing: 0.3px;
+}
+
+.vc-audio-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 14px;
+}
+
+.vc-audio-wave span {
+  display: inline-block;
+  width: 3px;
+  background: #2ecc71;
+  border-radius: 3px;
+  animation: vcAudioWave 1.2s ease-in-out infinite alternate;
+}
+
+.vc-audio-wave span:nth-child(1) { height: 6px; animation-delay: 0.1s; }
+.vc-audio-wave span:nth-child(2) { height: 14px; animation-delay: 0.3s; }
+.vc-audio-wave span:nth-child(3) { height: 9px; animation-delay: 0.2s; }
+.vc-audio-wave span:nth-child(4) { height: 12px; animation-delay: 0.4s; }
+
+@keyframes vcAudioWave {
+  0% { transform: scaleY(0.4); opacity: 0.6; }
+  100% { transform: scaleY(1.3); opacity: 1; }
+}
+
+.vc-audio-blocked-banner {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+  color: #12100e;
+  padding: 10px 22px;
+  border-radius: 30px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.45);
+  animation: vcPulseBanner 1.8s infinite alternate ease-in-out;
+}
+
+@keyframes vcPulseBanner {
+  0% { transform: translateX(-50%) scale(0.98); }
+  100% { transform: translateX(-50%) scale(1.03); }
 }
 
 .vc-avatar-pulse {
