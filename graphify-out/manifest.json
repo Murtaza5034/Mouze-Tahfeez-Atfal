@@ -6504,9 +6504,9 @@
     "semantic_hash": ""
   },
   "src/firebaseConfig.js": {
-    "mtime": 1787668502.593017,
-    "seen": 1787676112.8774045,
-    "ast_hash": "a9c1279a499a09c697cf66e08efe1a61",
+    "mtime": 1787748146.1037197,
+    "seen": 1787748549.0240538,
+    "ast_hash": "7d94d5981e51cb2e2fe006141bc91631",
     "semantic_hash": ""
   },
   "src/firebase/auth.js": {

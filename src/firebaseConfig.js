@@ -4,11 +4,12 @@ import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messagi
 try {
   // Clear legacy/cached FCM token databases from IndexedDB to prevent 403 token-unsubscribe-failed errors
   if (typeof window !== 'undefined' && window.indexedDB) {
-    const cachedVer = localStorage.getItem("mauze-fcm-v3");
-    if (cachedVer !== "3") {
-      window.indexedDB.deleteDatabase("fcm_token_details_db");
-      localStorage.setItem("mauze-fcm-v3", "3");
-      console.log("Cleared legacy FCM token database from IndexedDB.");
+    const cachedVer = localStorage.getItem("mauze-fcm-v4");
+    if (cachedVer !== "4") {
+      ['fcm_token_details_db', 'firebase-messaging-database', 'firebase-installations-database'].forEach((name) => {
+        try { window.indexedDB.deleteDatabase(name); } catch (_) {}
+      });
+      localStorage.setItem("mauze-fcm-v4", "4");
     }
   }
 } catch (e) {

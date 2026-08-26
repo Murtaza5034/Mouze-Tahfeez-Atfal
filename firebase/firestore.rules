@@ -107,22 +107,18 @@ service cloud.firestore {
 
     // ---------- weekly_results ----------
     match /weekly_results/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isTeacher();
+      allow read, write: if isSignedIn();
     }
     match /weekly_results_archive/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isTeacher();
+      allow read, write: if isSignedIn();
     }
     match /student_daily_attendance/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isTeacher();
+      allow read, write: if isSignedIn();
     }
 
     // ---------- teacher_profiles ----------
     match /teacher_profiles/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isTeacher();
+      allow read, write: if isSignedIn();
     }
 
     // ---------- leaves ----------
@@ -300,21 +296,17 @@ service cloud.firestore {
     }
 
     match /kibar_weekly_results/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin() || isKibarTeacher();
+      allow read, write: if isSignedIn();
     }
     match /kibar_weekly_results_archive/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin() || isKibarTeacher();
+      allow read, write: if isSignedIn();
     }
     match /kibar_student_daily_attendance/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin() || isKibarTeacher();
+      allow read, write: if isSignedIn();
     }
 
     match /kibar_teacher_profiles/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin() || isKibarTeacher();
+      allow read, write: if isSignedIn();
     }
 
     match /kibar_student_leaves/{id} {
@@ -342,8 +334,7 @@ service cloud.firestore {
     }
 
     match /kibar_marhala_posts/{id} {
-      allow read: if isSignedIn();
-      allow write: if isKibarAdmin() || isKibarTeacher();
+      allow read, write: if isSignedIn();
     }
 
     match /kibar_parent_notes/{id} {
