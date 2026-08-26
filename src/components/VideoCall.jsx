@@ -369,15 +369,15 @@ export default function VideoCall({ call, onClose }) {
         });
       }
 
-      // Ensure transceivers exist in both directions so audio & video can be received
+      // Ensure transceivers exist in both directions so audio & video can be received and sent
       if (pc.addTransceiver) {
         const hasAudio = stream && stream.getAudioTracks().length > 0;
         const hasVideo = stream && stream.getVideoTracks().length > 0;
         if (!hasAudio) {
-          try { pc.addTransceiver("audio", { direction: "recvonly" }); } catch (_) {}
+          try { pc.addTransceiver("audio", { direction: "sendrecv" }); } catch (_) {}
         }
         if (!hasVideo) {
-          try { pc.addTransceiver("video", { direction: "recvonly" }); } catch (_) {}
+          try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (_) {}
         }
       }
 
@@ -536,10 +536,7 @@ export default function VideoCall({ call, onClose }) {
             });
           }).catch(() => {});
 
-          const offer = await pc.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: true,
-          });
+          const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
 
           // Overwrite signaling document with fresh session state (erases any stale old answers)
@@ -595,10 +592,7 @@ export default function VideoCall({ call, onClose }) {
             await pc.setRemoteDescription(new RTCSessionDescription(offerData));
             await flushRemoteCandidates();
 
-            const answer = await pc.createAnswer({
-              offerToReceiveAudio: true,
-              offerToReceiveVideo: true,
-            });
+            const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
             await updateDoc(roomRef, {
