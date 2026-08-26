@@ -94,6 +94,7 @@ import VideoCall from "./components/VideoCall";
 import AdminHelpManagement from "./components/AdminHelpManagement";
 import PortalHelpGuidePage from "./components/PortalHelpGuidePage";
 import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
+import FirstTimeStudentRegistryModal from "./components/FirstTimeStudentRegistryModal";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
 import "./style.css";
@@ -24115,6 +24116,7 @@ export default function App() {
     return localStorage.getItem("mauze-reduce-animations") === "true";
   });
   const [registryStudentId, setRegistryStudentId] = useState("");
+  const [needsFirstTimeRegistration, setNeedsFirstTimeRegistration] = useState(false);
 
   useEffect(() => {
     document.body.classList.toggle("dark-mode", isDarkMode);
@@ -24909,12 +24911,14 @@ export default function App() {
           rawProfiles = await findParentProfilesFallback(currentUser.id, currentUser.email);
         }
 
-        // Only proceed if we have valid profiles. If the profile query fails (e.g., transient
-        // permission error during realtime refresh), keep the existing parentData instead of
-        // clearing it with empty state.
+        // If no profiles found for this parent/kibar account, trigger the first-time student registry form
         if (!rawProfiles || rawProfiles.length === 0) {
+          console.log("[Portal] No student profile linked to parent account — prompting first-time student registration.");
+          setNeedsFirstTimeRegistration(true);
           if (!silent) setLoading(false);
           return;
+        } else {
+          setNeedsFirstTimeRegistration(false);
         }
 
         let nextParentState = {
@@ -25560,6 +25564,7 @@ export default function App() {
     } catch (e) { /* ignore */ }
 
     setUser(null);
+    setNeedsFirstTimeRegistration(false);
     setPortalRole("parents");
     setSectionScope("atfal");
     setActivePage("Home");
@@ -27633,7 +27638,21 @@ const handleSendCustomNotification = async (event) => {
       <div className={`app-portal-wrapper ${transitionDirection ? `mauze-page-anim-${transitionDirection}` : ""}`}>
         <PortalErrorBoundary>
         {(portalRole === "parents" || portalRole === "kibar-student") ? (
-          <ParentPortal
+          <>
+            {needsFirstTimeRegistration && (
+              <FirstTimeStudentRegistryModal
+                user={user}
+                portalRole={portalRole}
+                onCompleted={async (newStudentProfile) => {
+                  setNeedsFirstTimeRegistration(false);
+                  setLoading(true);
+                  await loadPortalData(portalRole, user, newStudentProfile);
+                }}
+                onLogout={handleLogout}
+                showAction={showAction}
+              />
+            )}
+            <ParentPortal
             activePage={activePage}
             appTheme={appTheme}
             isDarkMode={isDarkMode}
@@ -27679,6 +27698,7 @@ const handleSendCustomNotification = async (event) => {
             pendingChatLeaveId={pendingChatLeaveId}
             onPendingChatLeaveConsumed={() => setPendingChatLeaveId(null)}
           />
+          </>
         ) : (portalRole === "admin" || portalRole === "kibar-admin") ? (
           <AdminPortal
             activePage={activePage}
