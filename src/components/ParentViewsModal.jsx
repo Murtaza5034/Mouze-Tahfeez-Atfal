@@ -136,11 +136,29 @@ export default function ParentViewsModal({
   const handleSendReminder = (student) => {
     const cleanNumber = String(student.whatsapp_number || "").replace(/[^0-9]/g, "");
     const studentName = student.name || student.full_name || "your child";
+    const studentId = student.student_id || student.id || "";
     const portalLink = "https://mouze-tahfeez-atfal.vercel.app/";
-    const text = encodeURIComponent(
-      `Salam! This is a gentle reminder to please review the weekly Tahfeez progress report for ${studentName} on the portal:\n${portalLink}`
-    );
-    window.open(`https://wa.me/${cleanNumber}?text=${text}`, "_blank");
+    const appProgressLink = `https://mouze-tahfeez-atfal.vercel.app/?redirectPage=Home&studentId=${studentId}&openApp=true`;
+    const playStoreLink = "https://play.google.com/store/apps/details?id=com.mauzetahfeez.myapp";
+
+    const message = 
+`Salam! 🌟
+
+This is a gentle reminder to please review the latest weekly Tahfeez progress report card for *${studentName}*.
+
+📱 *Direct App & Progress Report:*
+${appProgressLink}
+
+📥 *Download App from Google Play Store:*
+${playStoreLink}
+
+🌐 *Web Portal:*
+${portalLink}
+
+Shukran!`;
+
+    const encodedText = encodeURIComponent(message);
+    window.open(`https://wa.me/${cleanNumber}?text=${encodedText}`, "_blank");
   };
 
   return (

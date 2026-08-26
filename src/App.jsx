@@ -24335,7 +24335,20 @@ export default function App() {
       const notifLeaveId = params.get('leaveId');
       if (notifLeaveId) setPendingChatLeaveId(notifLeaveId);
       const notifStudentId = params.get('studentId');
-      if (notifStudentId) setSelectedStudentId(notifStudentId);
+      if (notifStudentId) {
+        setSelectedStudentId(notifStudentId);
+        try {
+          localStorage.setItem("mauze-selected-child", notifStudentId);
+        } catch (_) {}
+      }
+      const openAppIntent = params.get('openApp');
+      if (openAppIntent === 'true' && typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)) {
+        // If opened from external browser, try to launch app intent with Play Store fallback
+        const intentUrl = `intent://mouze-tahfeez-atfal.vercel.app/?redirectPage=${encodeURIComponent(targetPage)}&studentId=${notifStudentId || ''}#Intent;scheme=https;package=com.mauzetahfeez.myapp;S.browser_fallback_url=${encodeURIComponent("https://play.google.com/store/apps/details?id=com.mauzetahfeez.myapp")};end`;
+        try {
+          window.location.href = intentUrl;
+        } catch (_) {}
+      }
       // Clean URL without the redirect parameter
       window.history.replaceState({}, '', window.location.pathname);
     }
