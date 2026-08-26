@@ -75,8 +75,7 @@ service cloud.firestore {
 
     // ---------- users ----------
     match /users/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin() || isTeacher() || isKibarAdmin() || isKibarTeacher());
-      allow write: if isAdmin() || isKibarAdmin() || request.auth.uid == uid;
+      allow read, write: if isSignedIn();
     }
 
     // ---------- user_portal_access ----------
@@ -237,12 +236,21 @@ service cloud.firestore {
     }
     match /tahfeez_signals/{id} {
       allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
     }
     match /online_tahfeez_sessions/{id} {
       allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
     }
     match /online_tahfeez_logs/{id} {
       allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
     }
     match /help_tutorials/{id} {
       allow read, write: if isSignedIn();
@@ -397,12 +405,21 @@ service cloud.firestore {
     }
     match /kibar_tahfeez_signals/{id} {
       allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
     }
     match /kibar_online_tahfeez_sessions/{id} {
       allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
     }
     match /kibar_online_tahfeez_logs/{id} {
       allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
     }
     match /kibar_notification_files/{id} {
       allow read, write: if isSignedIn();

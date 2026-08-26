@@ -258,16 +258,35 @@ export default function VideoCall({ call, onClose }) {
               setMicOn(true);
             } catch (vidErr2) {
               console.warn("Camera not available, falling back to audio only:", vidErr2);
-              stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-              setCamOn(false);
-              setMicOn(true);
+              try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                setCamOn(false);
+                setMicOn(true);
+              } catch (audErr) {
+                console.warn("Microphone not available either, continuing as listen/view only:", audErr);
+                try {
+                  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                  const osc = audioCtx.createOscillator();
+                  const dest = audioCtx.createMediaStreamDestination();
+                  const gain = audioCtx.createGain();
+                  gain.gain.value = 0;
+                  osc.connect(gain);
+                  gain.connect(dest);
+                  osc.start();
+                  stream = dest.stream;
+                } catch (_) {
+                  stream = new MediaStream();
+                }
+                setCamOn(false);
+                setMicOn(false);
+              }
             }
           }
         } catch (mediaErr) {
-          console.error("Microphone/Camera permission error:", mediaErr);
-          setError("Microphone / Camera access required. Please grant permissions and retry.");
-          setStatus("error");
-          return;
+          console.warn("Media permissions/devices fallback active:", mediaErr);
+          stream = new MediaStream();
+          setCamOn(false);
+          setMicOn(false);
         }
 
         if (cancelled) {
@@ -418,7 +437,7 @@ export default function VideoCall({ call, onClose }) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const data = change.doc.data();
-            if (data && data.senderRole !== role && data.candidate) {
+            if (data && data.senderRole !== role && data.candidate && (!data.sessionId || data.sessionId === currentSessionId)) {
               applyCandidate(data.candidate);
             }
           }
@@ -428,6 +447,13 @@ export default function VideoCall({ call, onClose }) {
 
       if (role === "caller") {
         try {
+          // Clean up old stale candidates from prior calls
+          getDocs(candidatesCol).then((oldCands) => {
+            oldCands.forEach((docSnap) => {
+              deleteDoc(docSnap.ref).catch(() => {});
+            });
+          }).catch(() => {});
+
           const offer = await pc.createOffer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: true,
