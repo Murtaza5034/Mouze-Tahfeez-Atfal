@@ -72,8 +72,10 @@ export default function VideoCall({ call, onClose }) {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
   const signalUnsubsRef = useRef([]);
   const endedRef = useRef(false);
   const sessionIdRef = useRef(Date.now().toString());
@@ -122,8 +124,18 @@ export default function VideoCall({ call, onClose }) {
     } catch (_) {}
 
     try {
+      if (remoteStreamRef.current) {
+        remoteStreamRef.current.getTracks().forEach((t) => {
+          try { t.stop(); } catch (_) {}
+        });
+        remoteStreamRef.current = null;
+      }
+    } catch (_) {}
+
+    try {
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     } catch (_) {}
 
     // Mark self inactive in signaling so the other user sees reconnection status but stays in room
@@ -189,11 +201,17 @@ export default function VideoCall({ call, onClose }) {
       return;
     }
 
-    // Camera not yet acquired
+    // Camera not yet acquired - request camera
     try {
-      const videoStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 } }
-      });
+      let videoStream = null;
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 } }
+        });
+      } catch (_) {
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+
       const videoTrack = videoStream.getVideoTracks()[0];
       if (videoTrack) {
         if (stream) {
@@ -204,7 +222,7 @@ export default function VideoCall({ call, onClose }) {
 
         if (pc) {
           const senders = pc.getSenders();
-          const videoSender = senders.find(s => s.track && s.track.kind === 'video') || senders.find(s => !s.track);
+          const videoSender = senders.find((s) => s.track && s.track.kind === "video") || senders.find((s) => !s.track);
           if (videoSender) {
             await videoSender.replaceTrack(videoTrack);
           } else {
@@ -239,14 +257,14 @@ export default function VideoCall({ call, onClose }) {
       if (!isSpectator) {
         try {
           try {
-            // First attempt: video and audio with ideal dimensions (safe for desktop webcams & mobile cameras)
+            // First attempt: Standard video + echo-cancelled audio
             stream = await navigator.mediaDevices.getUserMedia({
               video: { width: { ideal: 640 }, height: { ideal: 480 } },
               audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true
-              }
+                autoGainControl: true,
+              },
             });
             setCamOn(true);
             setMicOn(true);
@@ -257,22 +275,50 @@ export default function VideoCall({ call, onClose }) {
               setCamOn(true);
               setMicOn(true);
             } catch (vidErr2) {
-              console.warn("Camera not available, falling back to audio only:", vidErr2);
+              console.warn("Camera not available, trying audio-only and separate video:", vidErr2);
+              let audioStream = null;
+              let videoStream = null;
               try {
-                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                setCamOn(false);
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                  audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                  },
+                });
                 setMicOn(true);
-              } catch (audErr) {
-                console.warn("Microphone not available either, continuing as listen/view only:", audErr);
+              } catch (_) {
+                try {
+                  audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                  setMicOn(true);
+                } catch (aErr) {
+                  console.warn("Microphone not available:", aErr);
+                  setMicOn(false);
+                }
+              }
+
+              try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                setCamOn(true);
+              } catch (vErr) {
+                console.warn("Camera not available:", vErr);
+                setCamOn(false);
+              }
+
+              if (audioStream && videoStream) {
+                stream = new MediaStream([
+                  ...videoStream.getVideoTracks(),
+                  ...audioStream.getAudioTracks(),
+                ]);
+              } else if (audioStream) {
+                stream = audioStream;
+              } else if (videoStream) {
+                stream = videoStream;
+              } else {
+                // If neither is detected, create silent stream for viewing
                 try {
                   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                  const osc = audioCtx.createOscillator();
                   const dest = audioCtx.createMediaStreamDestination();
-                  const gain = audioCtx.createGain();
-                  gain.gain.value = 0;
-                  osc.connect(gain);
-                  gain.connect(dest);
-                  osc.start();
                   stream = dest.stream;
                 } catch (_) {
                   stream = new MediaStream();
@@ -292,6 +338,12 @@ export default function VideoCall({ call, onClose }) {
         if (cancelled) {
           if (stream) stream.getTracks().forEach((t) => t.stop());
           return;
+        }
+
+        // Enable all acquired tracks
+        if (stream) {
+          stream.getAudioTracks().forEach((t) => { t.enabled = true; });
+          stream.getVideoTracks().forEach((t) => { t.enabled = true; });
         }
 
         localStreamRef.current = stream;
@@ -315,37 +367,57 @@ export default function VideoCall({ call, onClose }) {
         });
       }
 
-      // Add transceivers so audio and video streams can be negotiated in both directions
+      // Ensure transceivers exist in both directions so audio & video can be received
       if (pc.addTransceiver) {
         const hasAudio = stream && stream.getAudioTracks().length > 0;
         const hasVideo = stream && stream.getVideoTracks().length > 0;
         if (!hasAudio) {
-          try { pc.addTransceiver('audio', { direction: 'sendrecv' }); } catch (_) {}
+          try { pc.addTransceiver("audio", { direction: "recvonly" }); } catch (_) {}
         }
         if (!hasVideo) {
-          try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch (_) {}
+          try { pc.addTransceiver("video", { direction: "recvonly" }); } catch (_) {}
         }
       }
 
-      // Remote track handler
+      // 3. Remote track handler using unified MediaStream
+      if (!remoteStreamRef.current) {
+        remoteStreamRef.current = new MediaStream();
+      }
+
       pc.ontrack = (ev) => {
-        console.log("[WebRTC] Remote track received:", ev.track.kind);
-        if (remoteVideoRef.current) {
-          if (ev.streams && ev.streams[0]) {
-            remoteVideoRef.current.srcObject = ev.streams[0];
-          } else {
-            if (!remoteVideoRef.current.srcObject) {
-              remoteVideoRef.current.srcObject = new MediaStream();
-            }
-            remoteVideoRef.current.srcObject.addTrack(ev.track);
-          }
-          const p = remoteVideoRef.current.play();
-          if (p !== undefined) {
-            p.catch((err) => {
-              console.warn("[WebRTC] Remote video autoplay error:", err);
-            });
-          }
+        console.log("[WebRTC] Remote track received:", ev.track.kind, ev.track.id);
+
+        if (!remoteStreamRef.current) {
+          remoteStreamRef.current = new MediaStream();
         }
+
+        // Add track if not already in remote stream
+        const currentTracks = remoteStreamRef.current.getTracks();
+        if (!currentTracks.some((t) => t.id === ev.track.id)) {
+          remoteStreamRef.current.addTrack(ev.track);
+        }
+
+        // Attach remoteStream to video element (plays video)
+        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        }
+
+        // Attach remoteStream to audio element (plays crystal-clear unmuted audio)
+        if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
+          remoteAudioRef.current.srcObject = remoteStreamRef.current;
+        }
+
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.play().catch((err) => {
+            console.warn("[WebRTC] Remote video play note:", err);
+          });
+        }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.play().catch((err) => {
+            console.warn("[WebRTC] Remote audio play note:", err);
+          });
+        }
+
         setStatus("connected");
       };
 
@@ -374,7 +446,7 @@ export default function VideoCall({ call, onClose }) {
       pc.onconnectionstatechange = checkConnectionState;
       pc.oniceconnectionstatechange = checkConnectionState;
 
-      // 3. Signaling setup
+      // 4. Signaling setup
       const roomRef = doc(db, SIGNAL_PATH, roomId);
       const candidatesCol = collection(db, SIGNAL_PATH, roomId, "candidates");
       const processedCandidateKeys = new Set();
@@ -391,7 +463,7 @@ export default function VideoCall({ call, onClose }) {
               senderRole: role,
               sessionId: currentSessionId,
               candidate: candJson,
-              createdAt: Date.now()
+              createdAt: Date.now(),
             });
           } catch (err) {
             console.warn("[WebRTC] Error writing ICE candidate:", err);
@@ -513,7 +585,10 @@ export default function VideoCall({ call, onClose }) {
             await pc.setRemoteDescription(new RTCSessionDescription(offerData));
             await flushRemoteCandidates();
 
-            const answer = await pc.createAnswer();
+            const answer = await pc.createAnswer({
+              offerToReceiveAudio: true,
+              offerToReceiveVideo: true,
+            });
             await pc.setLocalDescription(answer);
 
             await updateDoc(roomRef, {
@@ -577,14 +652,24 @@ export default function VideoCall({ call, onClose }) {
   return createPortal(
     <div id="g" className="vc-overlay" role="dialog" aria-label="Video call">
       <div className="vc-stage">
+        {/* Remote video element - muted to guarantee 100% instant autoplay on all browsers */}
         <video
           ref={remoteVideoRef}
           className="vc-remote"
           autoPlay
           playsInline
-          muted={isSpectator}
+          muted={true}
           disablePictureInPicture={myRole !== "teacher"}
         />
+
+        {/* Dedicated remote audio element for crystal-clear two-way voice */}
+        <audio
+          ref={remoteAudioRef}
+          autoPlay
+          playsInline
+          muted={isSpectator}
+        />
+
         {status !== "connected" && (
           <div className="vc-remote-placeholder">
             <div className="vc-avatar-pulse">
