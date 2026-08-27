@@ -199,7 +199,11 @@ export default function VideoCall({ call, onClose }) {
       let videoStream = null;
       try {
         videoStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 } }
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
         });
       } catch (_) {
         videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -207,6 +211,7 @@ export default function VideoCall({ call, onClose }) {
 
       const videoTrack = videoStream.getVideoTracks()[0];
       if (videoTrack) {
+        videoTrack.enabled = true;
         if (stream) {
           stream.addTrack(videoTrack);
         } else {
@@ -224,7 +229,7 @@ export default function VideoCall({ call, onClose }) {
         }
 
         if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream || videoStream;
+          localVideoRef.current.srcObject = new MediaStream([videoTrack]);
           try { await localVideoRef.current.play(); } catch (_) {}
         }
         setCamOn(true);
@@ -261,7 +266,11 @@ export default function VideoCall({ call, onClose }) {
           try {
             // First attempt: Standard video + echo-cancelled audio
             stream = await navigator.mediaDevices.getUserMedia({
-              video: { width: { ideal: 640 }, height: { ideal: 480 } },
+              video: {
+                facingMode: "user",
+                width: { ideal: 640, max: 1280 },
+                height: { ideal: 480, max: 720 },
+              },
               audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
@@ -277,7 +286,7 @@ export default function VideoCall({ call, onClose }) {
               setCamOn(true);
               setMicOn(true);
             } catch (vidErr2) {
-              console.warn("Camera not available, trying audio-only and separate video:", vidErr2);
+              console.warn("Combined devices not available, trying audio-only and separate video:", vidErr2);
               let audioStream = null;
               let videoStream = null;
               try {
@@ -300,7 +309,9 @@ export default function VideoCall({ call, onClose }) {
               }
 
               try {
-                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                  video: { facingMode: "user" }
+                }).catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
                 setCamOn(true);
               } catch (vErr) {
                 console.warn("Camera not available:", vErr);
@@ -349,8 +360,8 @@ export default function VideoCall({ call, onClose }) {
         }
 
         localStreamRef.current = stream;
-        if (localVideoRef.current && stream) {
-          localVideoRef.current.srcObject = stream;
+        if (localVideoRef.current && stream && stream.getVideoTracks().length > 0) {
+          localVideoRef.current.srcObject = new MediaStream(stream.getVideoTracks());
           try { await localVideoRef.current.play(); } catch (_) {}
         }
       } else {
@@ -365,67 +376,70 @@ export default function VideoCall({ call, onClose }) {
       // Add local tracks to peer connection
       if (stream) {
         stream.getTracks().forEach((t) => {
-          try { pc.addTrack(t, stream); } catch (_) {}
+          try {
+            pc.addTrack(t, stream);
+            console.log(`[WebRTC] Added local track: ${t.kind}`);
+          } catch (_) {}
         });
       }
 
-      // Ensure transceivers exist in both directions so audio & video can be received and sent
-      if (pc.addTransceiver) {
-        const hasAudio = stream && stream.getAudioTracks().length > 0;
-        const hasVideo = stream && stream.getVideoTracks().length > 0;
-        if (!hasAudio) {
-          try { pc.addTransceiver("audio", { direction: "sendrecv" }); } catch (_) {}
-        }
-        if (!hasVideo) {
-          try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (_) {}
-        }
+      // Ensure transceivers exist in both directions with sendrecv so audio & video can flow symmetrically
+      const hasAudio = stream && stream.getAudioTracks().length > 0;
+      const hasVideo = stream && stream.getVideoTracks().length > 0;
+      if (!hasAudio && pc.addTransceiver) {
+        try { pc.addTransceiver("audio", { direction: "sendrecv" }); } catch (_) {}
+      }
+      if (!hasVideo && pc.addTransceiver) {
+        try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (_) {}
       }
 
-      // 3. Remote track handler using direct MediaStream binding
+      // 3. Remote track handler with independent video-only and audio-only streams
       pc.ontrack = (ev) => {
-        console.log("[WebRTC] Remote track received:", ev.track.kind, ev.track.id);
+        console.log(`[WebRTC] Remote track received: ${ev.track.kind}, id: ${ev.track.id}`);
 
-        const incomingStream = (ev.streams && ev.streams[0]) ? ev.streams[0] : new MediaStream([ev.track]);
+        const track = ev.track;
 
-        if (ev.track.kind === "video") {
+        if (track.kind === "video") {
           setHasRemoteVideo(true);
-          ev.track.onmute = () => setHasRemoteVideo(false);
-          ev.track.onunmute = () => setHasRemoteVideo(true);
-          ev.track.onended = () => setHasRemoteVideo(false);
+          track.onmute = () => {
+            console.log("[WebRTC] Remote video muted");
+            setHasRemoteVideo(false);
+          };
+          track.onunmute = () => {
+            console.log("[WebRTC] Remote video unmuted");
+            setHasRemoteVideo(true);
+          };
+          track.onended = () => {
+            console.log("[WebRTC] Remote video ended");
+            setHasRemoteVideo(false);
+          };
 
           if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = incomingStream;
+            // Provide video-only stream to avoid WebKit/Chrome media pipeline audio muting
+            remoteVideoRef.current.srcObject = new MediaStream([track]);
             remoteVideoRef.current.play().catch((err) => {
               console.warn("[WebRTC] Remote video play note:", err);
             });
           }
         }
 
-        if (ev.track.kind === "audio") {
+        if (track.kind === "audio") {
           setHasRemoteAudio(true);
+          track.onmute = () => setHasRemoteAudio(false);
+          track.onunmute = () => setHasRemoteAudio(true);
+
           if (remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = incomingStream;
+            // Provide audio-only stream for pristine, loud, unmuted voice
+            remoteAudioRef.current.srcObject = new MediaStream([track]);
             remoteAudioRef.current.muted = isSpectator ? true : false;
             remoteAudioRef.current.volume = 1.0;
             remoteAudioRef.current.play().then(() => {
               setAudioBlocked(false);
             }).catch((err) => {
-              console.warn("[WebRTC] Remote audio autoplay blocked by browser:", err);
+              console.warn("[WebRTC] Remote audio autoplay blocked by browser policy:", err);
               setAudioBlocked(true);
             });
           }
-        }
-
-        // Also ensure fallback stream assignment
-        if (remoteVideoRef.current && !remoteVideoRef.current.srcObject) {
-          remoteVideoRef.current.srcObject = incomingStream;
-          remoteVideoRef.current.play().catch(() => {});
-        }
-        if (remoteAudioRef.current && !remoteAudioRef.current.srcObject) {
-          remoteAudioRef.current.srcObject = incomingStream;
-          remoteAudioRef.current.muted = isSpectator ? true : false;
-          remoteAudioRef.current.volume = 1.0;
-          remoteAudioRef.current.play().catch(() => setAudioBlocked(true));
         }
 
         setStatus("connected");
@@ -656,10 +670,10 @@ export default function VideoCall({ call, onClose }) {
   return createPortal(
     <div id="g" className="vc-overlay" role="dialog" aria-label="Video call">
       <div className="vc-stage">
-        {/* Remote video element - shown full screen when remote video track is streaming */}
+        {/* Remote video element - always rendered in background for immediate GPU frame decoding */}
         <video
           ref={remoteVideoRef}
-          className={`vc-remote ${hasRemoteVideo && status === "connected" ? "vc-video-active" : "vc-video-hidden"}`}
+          className="vc-remote"
           autoPlay
           playsInline
           muted={true}
