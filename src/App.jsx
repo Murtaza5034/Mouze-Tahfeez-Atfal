@@ -8086,19 +8086,45 @@ function ParentPortal({
           <div className="home-dashboard fade-in">
             <div className="hifz-stats-premium-strip">
               {(() => {
-                const mTeacher = teacherProfiles.find(t => {
-                  const mName = normalizeText(studentProfile?.teacherName || "");
+                const isFemaleTeacher = (t) => {
+                  if (t?.gender === 'female') return true;
+                  if (t?.gender === 'male') return false;
+                  const name = normalizeText(t?.full_name || t?.name || "");
+                  const femaleKeywords = [
+                    'ben', 'fatema', 'sakina', 'zainab', 'rashida', 'mariyum', 'maryam', 
+                    'batul', 'batool', 'amatullah', 'khadija', 'arwa', 'durriya', 'jumana', 
+                    'umme', 'tasneem', 'insiyah', 'munira', 'zahra', 'ruqaiya', 'shirin', 
+                    'alifiya', 'rabab', 'hawra', 'sherebanu', 'sakena', 'kulsum', 'mubarakah', 'bhen'
+                  ];
+                  return femaleKeywords.some(kw => name.includes(kw));
+                };
+
+                const allAvailableTeachers = [
+                  ...(Array.isArray(teacherProfiles) ? teacherProfiles : []),
+                  ...(Array.isArray(schoolData?.teacherProfiles) ? schoolData.teacherProfiles : []),
+                  ...(Array.isArray(schoolData?.portalAccessList) ? schoolData.portalAccessList : [])
+                ];
+
+                const mTeacher = allAvailableTeachers.find(t => {
+                  const mName = normalizeText(studentProfile?.teacherName || studentProfile?.teacher_name || "");
                   return (mName && normalizeText(t.full_name) === mName) ||
                     String(t.id) === String(studentProfile?.muhaffiz_id) ||
                     String(t.user_id) === String(studentProfile?.muhaffiz_id) ||
+                    String(t.id) === String(studentProfile?.teacher_id) ||
+                    String(t.user_id) === String(studentProfile?.teacher_id) ||
                     String(t.id) === String(studentProfile?.original_teacher_id) ||
                     String(t.user_id) === String(studentProfile?.original_teacher_id);
                 });
-                const muhaffizLabel = mTeacher?.gender === 'female' ? 'My Muhaffezah' : 'My Muhaffiz';
-                const muhaffizSub = mTeacher?.gender === 'female' ? 'Direct Muhaffezah' : 'Direct Teacher';
+
                 const bTeacherId = studentProfile?.badal_teacher_id;
-                const bTeacher = bTeacherId ? teacherProfiles.find(t => String(t.id) === String(bTeacherId) || String(t.user_id) === String(bTeacherId)) : null;
-                const muhaffizVal = bTeacher?.full_name || hifzDetails?.muhaffiz_name || "Pending";
+                const bTeacher = bTeacherId ? allAvailableTeachers.find(t => String(t.id) === String(bTeacherId) || String(t.user_id) === String(bTeacherId)) : null;
+
+                const effectiveTeacher = bTeacher || mTeacher || { full_name: studentProfile?.teacherName || studentProfile?.teacher_name || hifzDetails?.muhaffiz_name };
+                const isFem = isFemaleTeacher(effectiveTeacher);
+
+                const muhaffizLabel = isFem ? 'My Muhaffezah' : 'My Muhaffiz';
+                const muhaffizSub = isFem ? 'Direct Muhaffezah' : 'Direct Teacher';
+                const muhaffizVal = bTeacher?.full_name || studentProfile?.teacherName || studentProfile?.teacher_name || hifzDetails?.muhaffiz_name || "Pending";
                 const todayStr = getToday();
                 const attDate = new Date(todayStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
                 const attStatus = (attendance?.status || '').toLowerCase();
@@ -8736,113 +8762,246 @@ function ParentPortal({
             </div>
             <div className="teacher-info-stack">
               {(() => {
-                const muhaffizTag = (t) => t?.gender === 'female' ? 'Muhaffezah' : 'Muhaffiz';
-                const roleFiltered = teacherProfiles.filter(t => t.is_active !== false && t.user_id);
-                const assignedTeacher = roleFiltered.find(t => {
-                  const assignedName = normalizeText(studentProfile?.teacherName || "");
-                  return assignedName && (normalizeText(t.full_name) === assignedName ||
-                    String(t.id) === String(studentProfile?.muhaffiz_id) ||
-                    String(t.user_id) === String(studentProfile?.muhaffiz_id) ||
-                    String(t.id) === String(studentProfile?.original_teacher_id) ||
-                    String(t.user_id) === String(studentProfile?.original_teacher_id));
+                const isKibar = portalRole === "kibar-admin" || portalRole === "kibar-teacher" || portalRole === "kibar-student" || getSectionScope() === "kibar";
+
+                const isFemaleTeacher = (t) => {
+                  if (t?.gender === 'female') return true;
+                  if (t?.gender === 'male') return false;
+                  const name = normalizeText(t?.full_name || t?.name || "");
+                  const femaleKeywords = [
+                    'ben', 'fatema', 'sakina', 'zainab', 'rashida', 'mariyum', 'maryam', 
+                    'batul', 'batool', 'amatullah', 'khadija', 'arwa', 'durriya', 'jumana', 
+                    'umme', 'tasneem', 'insiyah', 'munira', 'zahra', 'ruqaiya', 'shirin', 
+                    'alifiya', 'rabab', 'hawra', 'sherebanu', 'sakena', 'kulsum', 'mubarakah', 'bhen'
+                  ];
+                  return femaleKeywords.some(kw => name.includes(kw));
+                };
+
+                const getTeacherTag = (t) => {
+                  const female = isFemaleTeacher(t);
+                  if (isKibar) {
+                    return female ? 'My Muhaffezah' : 'My Muhaffiz';
+                  }
+                  return female ? "My Child's Muhaffezah" : "My Child's Muhaffiz";
+                };
+
+                const allAvailableTeachers = [
+                  ...(Array.isArray(teacherProfiles) ? teacherProfiles : []),
+                  ...(Array.isArray(schoolData?.teacherProfiles) ? schoolData.teacherProfiles : []),
+                  ...(Array.isArray(schoolData?.portalAccessList) ? schoolData.portalAccessList : [])
+                ];
+
+                const uniqueTeachersMap = new Map();
+                allAvailableTeachers.forEach(t => {
+                  if (!t) return;
+                  const key = normalizeText(t.full_name || t.name || t.email || t.user_id || t.id || "");
+                  if (!key) return;
+                  if (!uniqueTeachersMap.has(key)) {
+                    uniqueTeachersMap.set(key, t);
+                  } else {
+                    const existing = uniqueTeachersMap.get(key);
+                    uniqueTeachersMap.set(key, {
+                      ...existing,
+                      ...t,
+                      phone_number: t.phone_number || existing.phone_number,
+                      whatsapp_number: t.whatsapp_number || existing.whatsapp_number,
+                      photo_url: t.photo_url || existing.photo_url,
+                      teacher_role: t.teacher_role || existing.teacher_role || t.portal_role
+                    });
+                  }
                 });
+                const combinedTeachers = Array.from(uniqueTeachersMap.values()).filter(t => t.is_active !== false);
+
+                const assignedName = normalizeText(studentProfile?.teacherName || studentProfile?.teacher_name || hifzDetails?.muhaffiz_name || "");
+                const studentMuhaffizId = String(studentProfile?.muhaffiz_id || studentProfile?.teacher_id || "").trim();
+                const studentOrigId = String(studentProfile?.original_teacher_id || "").trim();
+                const studentBadalId = String(studentProfile?.badal_teacher_id || "").trim();
+
+                let assignedTeacher = combinedTeachers.find(t => {
+                  const tId = String(t.id || "").trim();
+                  const tUid = String(t.user_id || "").trim();
+                  const tEmail = String(t.email || "").trim().toLowerCase();
+                  const tName = normalizeText(t.full_name || t.name || "");
+
+                  const idMatch = (studentMuhaffizId && (studentMuhaffizId === tId || studentMuhaffizId === tUid || (tEmail && studentMuhaffizId.toLowerCase() === tEmail))) ||
+                    (studentOrigId && (studentOrigId === tId || studentOrigId === tUid || (tEmail && studentOrigId.toLowerCase() === tEmail))) ||
+                    (studentBadalId && (studentBadalId === tId || studentBadalId === tUid || (tEmail && studentBadalId.toLowerCase() === tEmail)));
+
+                  const nameMatch = assignedName && assignedName !== 'unassigned teacher' && tName && (
+                    tName === assignedName ||
+                    tName.includes(assignedName) ||
+                    assignedName.includes(tName)
+                  );
+
+                  return idMatch || nameMatch;
+                });
+
+                if (!assignedTeacher && assignedName && assignedName !== 'unassigned teacher') {
+                  assignedTeacher = {
+                    id: studentMuhaffizId || 'assigned-teacher-id',
+                    full_name: studentProfile?.teacherName || studentProfile?.teacher_name || "Assigned Teacher",
+                    gender: studentProfile?.teacher_gender || null,
+                    phone_number: studentProfile?.teacher_phone || null,
+                    whatsapp_number: studentProfile?.teacher_whatsapp || null,
+                    photo_url: studentProfile?.teacher_photo_url || ASSETS.LOGO
+                  };
+                }
+
+                const roleTeachers = combinedTeachers.filter(t => {
+                  if (assignedTeacher && (
+                    (t.id && t.id === assignedTeacher.id) ||
+                    (t.user_id && t.user_id === assignedTeacher.user_id) ||
+                    (normalizeText(t.full_name) === normalizeText(assignedTeacher.full_name))
+                  )) {
+                    return false;
+                  }
+                  const r = (t.teacher_role || t.portal_role || t.role || "").toLowerCase();
+                  const n = (t.full_name || "").toLowerCase();
+                  return r.includes('masool') || r.includes('musaid') || n.includes('masool') || n.includes('musaid');
+                }).sort((a, b) => {
+                  const rA = (a.teacher_role || a.portal_role || a.role || "").toLowerCase();
+                  const rB = (b.teacher_role || b.portal_role || b.role || "").toLowerCase();
+                  if (rA.includes('masool') && rB.includes('musaid')) return -1;
+                  if (rA.includes('musaid') && rB.includes('masool')) return 1;
+                  return 0;
+                });
+
+                const roleLabel = (t) => {
+                  const r = (t.teacher_role || t.portal_role || t.role || "").toLowerCase();
+                  if (r.includes('masool')) return 'Masool';
+                  if (r.includes('musaid')) return 'Musaid';
+                  return 'Staff';
+                };
+
+                const hasAnyCard = !!assignedTeacher || roleTeachers.length > 0;
+
                 return <>
                   {assignedTeacher && (() => {
                     const t = assignedTeacher;
-                    const wa = (t.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
-                    const photo = t.photo_url || ASSETS.LOGO;
+                    const matchedProfile = combinedTeachers.find(p =>
+                      (t.user_id && p.user_id === t.user_id) ||
+                      (t.id && p.id === t.id) ||
+                      (t.full_name && normalizeText(p.full_name) === normalizeText(t.full_name))
+                    );
+                    const rawWa = t.whatsapp_number || matchedProfile?.whatsapp_number || studentProfile?.teacher_whatsapp || studentProfile?.whatsapp_number || "";
+                    const wa = rawWa.split("").filter(c => "0123456789".includes(c)).join("");
+                    const phone = t.phone_number || matchedProfile?.phone_number || studentProfile?.teacher_phone || rawWa || "";
+                    const photo = t.photo_url || matchedProfile?.photo_url || ASSETS.LOGO;
+                    const tagText = getTeacherTag(t);
+                    const female = isFemaleTeacher(t);
                     return (
-                      <article key={t.id} className="premium-card teacher-profile-card pinned">
+                      <article key={t.id || 'assigned'} className="premium-card teacher-profile-card pinned">
                         <div className="pin-badge">
-                          <Sparkles size={12} /> My Child's {muhaffizTag(t)}
+                          <Sparkles size={12} /> {tagText}
                         </div>
                         <div className="teacher-card-inner">
                           <img src={photo} alt={t.full_name} className="teacher-photo-square" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.LOGO; }} />
                           <div className="teacher-details">
                             <h3>{t.full_name}</h3>
-                            <p className="teacher-specialty">Assigned {muhaffizTag(t)}</p>
+                            <p className="teacher-specialty">Assigned {female ? 'Muhaffezah' : 'Muhaffiz'}</p>
                             <div className="contact-actions">
-                              {t.phone_number && (
-                                <a href={`tel:${t.phone_number}`} className="contact-btn call">
+                              {phone ? (
+                                <a href={`tel:${phone}`} className="contact-btn call">
                                   <Phone size={16} /> Call
                                 </a>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="contact-btn call"
+                                  onClick={() => alert("Phone number not listed yet. Please contact the administrative office.")}
+                                >
+                                  <Phone size={16} /> Call
+                                </button>
                               )}
-                              {wa && (
+                              {wa ? (
                                 <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
                                   <MessageCircle size={16} /> WhatsApp
                                 </a>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="contact-btn whatsapp"
+                                  onClick={() => alert("WhatsApp number not listed yet. Please contact the administrative office.")}
+                                >
+                                  <MessageCircle size={16} /> WhatsApp
+                                </button>
                               )}
                             </div>
                           </div>
                         </div>
                       </article>
                     );
-                    })()}
-                  {(() => {
-                    const roleTeachers = roleFiltered.filter(t => {
-                      if (assignedTeacher && t.id === assignedTeacher.id) return false;
-                      return t.teacher_role === 'masool' || t.teacher_role === 'musaid';
-                    }).sort((a, b) => {
-                      if (a.teacher_role === 'masool' && b.teacher_role === 'musaid') return -1;
-                      if (a.teacher_role === 'musaid' && b.teacher_role === 'masool') return 1;
-                      return 0;
-                    });
-                    const roleLabel = (role) => {
-                      if (role === 'masool') return 'Masool';
-                      if (role === 'musaid') return 'Musaid';
-                      return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Staff';
-                    };
-                    return roleTeachers.length > 0 ? (
-                      <>
-                        <div className="muhaffiz-divider">
-                          <div className="muhaffiz-divider-line">
-                            <span className="muhaffiz-divider-diamond">&#9670;</span>
-                            Masool &amp; Musaid
-                            <span className="muhaffiz-divider-diamond">&#9670;</span>
-                          </div>
-                          <p className="muhaffiz-divider-message">
-                            You may also contact our Masool and Musaid for additional support.
-                          </p>
+                  })()}
+
+                  {roleTeachers.length > 0 && (
+                    <>
+                      <div className="muhaffiz-divider">
+                        <div className="muhaffiz-divider-line">
+                          <span className="muhaffiz-divider-diamond">&#9670;</span>
+                          Masool &amp; Musaid
+                          <span className="muhaffiz-divider-diamond">&#9670;</span>
                         </div>
-                        {roleTeachers.map(t => {
-                          const wa = (t.whatsapp_number || "").split("").filter(c => "0123456789".includes(c)).join("");
-                          const photo = t.photo_url || ASSETS.LOGO;
-                          return (
-                            <article key={t.id} className="premium-card teacher-profile-card">
-                              <div className="teacher-card-inner">
-                                <img src={photo} alt={t.full_name} className="teacher-photo-square" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.LOGO; }} />
-                                <div className="teacher-details">
-                                  <h3>{t.full_name}</h3>
-                                  <p className="teacher-specialty">{roleLabel(t.teacher_role)}</p>
-                                  <div className="contact-actions">
-                                    {t.phone_number && (
-                                      <a href={`tel:${t.phone_number}`} className="contact-btn call">
-                                        <Phone size={16} /> Call
-                                      </a>
-                                    )}
-                                    {wa && (
-                                      <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
-                                        <MessageCircle size={16} /> WhatsApp
-                                      </a>
-                                    )}
-                                  </div>
+                        <p className="muhaffiz-divider-message">
+                          You may also contact our Masool and Musaid for additional support.
+                        </p>
+                      </div>
+                      {roleTeachers.map(t => {
+                        const rawWa = t.whatsapp_number || "";
+                        const wa = rawWa.split("").filter(c => "0123456789".includes(c)).join("");
+                        const phone = t.phone_number || rawWa || "";
+                        const photo = t.photo_url || ASSETS.LOGO;
+                        return (
+                          <article key={t.id || t.full_name} className="premium-card teacher-profile-card">
+                            <div className="teacher-card-inner">
+                              <img src={photo} alt={t.full_name} className="teacher-photo-square" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.LOGO; }} />
+                              <div className="teacher-details">
+                                <h3>{t.full_name}</h3>
+                                <p className="teacher-specialty">{roleLabel(t)}</p>
+                                <div className="contact-actions">
+                                  {phone ? (
+                                    <a href={`tel:${phone}`} className="contact-btn call">
+                                      <Phone size={16} /> Call
+                                    </a>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="contact-btn call"
+                                      onClick={() => alert("Phone number not listed yet. Please contact the administrative office.")}
+                                    >
+                                      <Phone size={16} /> Call
+                                    </button>
+                                  )}
+                                  {wa ? (
+                                    <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="contact-btn whatsapp">
+                                      <MessageCircle size={16} /> WhatsApp
+                                    </a>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="contact-btn whatsapp"
+                                      onClick={() => alert("WhatsApp number not listed yet. Please contact the administrative office.")}
+                                    >
+                                      <MessageCircle size={16} /> WhatsApp
+                                    </button>
+                                  )}
                                 </div>
                               </div>
-                            </article>
-                          );
-                        })}
-                      </>
-                    ) : null;
-                  })()}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {!hasAnyCard && (
+                    <div className="empty-state premium-card">
+                      <Users size={48} opacity={0.2} />
+                      <p>No teacher information available at this moment.</p>
+                    </div>
+                  )}
                 </>;
               })()}
             </div>
-            {teacherProfiles.length === 0 && (
-              <div className="empty-state premium-card">
-                <Users size={48} opacity={0.2} />
-                <p>No teacher information available at this moment.</p>
-              </div>
-            )}
           </div>
         ) : null}
 
@@ -15301,18 +15460,35 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                           onChange={(val, form) => {
                             setRegistryStudentId(val || "");
                             if (!val) return;
-                            const s = students.find(x => x.allIds.includes(String(val)));
+                            const s = students.find(x => (x.allIds && x.allIds.includes(String(val))) || String(x.student_id) === String(val) || String(x.id) === String(val));
                             if (s && form) {
                               if (form.full_name) form.full_name.value = s.name || '';
                               if (form.arabic_name) form.arabic_name.value = s.arabic_name || '';
                               if (form.group_name) form.group_name.value = s.groupName === 'Ungrouped' ? '' : (s.groupName || '');
-                              if (form.juz) form.juz.value = s.juz || '';
-                              if (form.surat) form.surat.value = s.surat || '';
+                              if (form.juz) form.juz.value = s.juz || (s.hifz && s.hifz.juz !== 'N-A' ? s.hifz.juz : '');
+                              if (form.surat) form.surat.value = s.surat || (s.hifz && s.hifz.surat !== 'Pending' ? s.hifz.surat : '');
                               if (form.photo_url) form.photo_url.value = s.photoUrl || '';
                               if (form.its) form.its.value = s.its === '...' ? '' : (s.its || '');
                               if (form.whatsapp_number) form.whatsapp_number.value = s.whatsapp_number || '';
-                              if (form.teacher_id) form.teacher_id.value = s.muhaffiz_id || '';
-                              if (form.parent_id) form.parent_id.value = s.user_id || '';
+                              if (form.teacher_id) {
+                                form.teacher_id.value = s.muhaffiz_id || s.teacher_id || '';
+                                if (!form.teacher_id.value && s.teacherName && s.teacherName !== 'Unassigned teacher') {
+                                  const opt = Array.from(form.teacher_id.options || []).find(o =>
+                                    normalizeText(o.text).includes(normalizeText(s.teacherName)) ||
+                                    normalizeText(o.value) === normalizeText(s.teacherName)
+                                  );
+                                  if (opt) form.teacher_id.value = opt.value;
+                                }
+                              }
+                              if (form.parent_id) {
+                                form.parent_id.value = s.user_id || s.parent_user_id || '';
+                                if (!form.parent_id.value && s.parent_email) {
+                                  const opt = Array.from(form.parent_id.options || []).find(o =>
+                                    o.value === s.parent_email || normalizeText(o.text).includes(normalizeText(s.parent_email))
+                                  );
+                                  if (opt) form.parent_id.value = opt.value;
+                                }
+                              }
                               if (form.gender) form.gender.value = s.gender || 'male';
                             }
                           }}
@@ -15380,33 +15556,47 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         <span>Muhaffiz (Teacher)</span>
                         <select name="teacher_id" className="premium-select">
                           <option value="">-- No Teacher (Unlinked) --</option>
-                          {portalAccessList.length > 0 || teacherProfiles.length > 0 ? (
-                            <React.Fragment>
-                              {/* Show users from portal access who are teachers/muhaffiz */}
-                              {portalAccessList
-                                .filter(a =>
-                                  normalizeText(a.portal_role).includes('teacher') ||
-                                  normalizeText(a.portal_role).includes('muhaffiz')
-                                )
-                                .map(p => (
-                                  <option key={`portal-${p.id}`} value={p.user_id || p.email}>
-                                    {p.full_name || p.email}
+                          {(() => {
+                            const renderedKeys = new Set();
+                            const options = [];
+
+                            (portalAccessList || [])
+                              .filter(a =>
+                                normalizeText(a.portal_role || "").includes('teacher') ||
+                                normalizeText(a.portal_role || "").includes('muhaffiz') ||
+                                normalizeText(a.portal_role || "").includes('kibar')
+                              )
+                              .forEach(p => {
+                                const val = p.user_id || p.id || p.email || p.full_name;
+                                const key = normalizeText(p.full_name || p.email || val);
+                                if (!renderedKeys.has(key)) {
+                                  renderedKeys.add(key);
+                                  options.push(
+                                    <option key={`portal-${p.id || val}`} value={val}>
+                                      {p.full_name || p.email}
+                                    </option>
+                                  );
+                                }
+                              });
+
+                            (teacherProfiles || []).forEach(tp => {
+                              const key = normalizeText(tp.full_name || tp.email || tp.user_id || tp.id);
+                              if (!renderedKeys.has(key)) {
+                                renderedKeys.add(key);
+                                const val = tp.user_id || tp.id || tp.email || tp.full_name;
+                                options.push(
+                                  <option key={`profile-${tp.id || val}`} value={val}>
+                                    {tp.full_name}
                                   </option>
-                                ))
+                                );
                               }
-                              {/* Also show from teacher_profiles table if not in portalAccessList */}
-                              {teacherProfiles
-                                .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
-                                .map(tp => (
-                                  <option key={`profile-${tp.id}`} value={tp.user_id}>
-                                    {tp.full_name} (Profile)
-                                  </option>
-                                ))
-                              }
-                            </React.Fragment>
-                          ) : (
-                            <option value="" disabled>No staff found</option>
-                          )}
+                            });
+
+                            if (options.length === 0) {
+                              return <option value="" disabled>No staff found</option>;
+                            }
+                            return options;
+                          })()}
                         </select>
                       </label>
 
@@ -15510,7 +15700,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                               <span className="detail-label">Original Teacher:</span>
                               <select
                                 className="premium-select badal-inline-select"
-                                value={student.muhaffiz_id || ""}
+                                value={student.muhaffiz_id || student.teacher_id || student.teacherName || ""}
                                 onChange={e => {
                                   const tid = e.target.value;
                                   if (tid) {
@@ -15526,23 +15716,44 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                                 }}
                               >
                                 <option value="">-- Select Teacher --</option>
-                                {portalAccessList
-                                  .filter(a =>
-                                    normalizeText(a.portal_role).includes('teacher') ||
-                                    normalizeText(a.portal_role).includes('muhaffiz')
-                                  )
-                                  .map(p => (
-                                    <option key={`portal-${p.id}`} value={p.user_id || p.email}>
-                                      {p.full_name || p.email}
-                                    </option>
-                                  ))}
-                                {teacherProfiles
-                                  .filter(tp => !portalAccessList.some(pa => pa.user_id === tp.user_id || normalizeText(pa.full_name) === normalizeText(tp.full_name)))
-                                  .map(tp => (
-                                    <option key={`tp-${tp.id}`} value={tp.user_id || tp.full_name}>
-                                      {tp.full_name}
-                                    </option>
-                                  ))}
+                                {(() => {
+                                  const renderedKeys = new Set();
+                                  const options = [];
+
+                                  (portalAccessList || [])
+                                    .filter(a =>
+                                      normalizeText(a.portal_role || "").includes('teacher') ||
+                                      normalizeText(a.portal_role || "").includes('muhaffiz') ||
+                                      normalizeText(a.portal_role || "").includes('kibar')
+                                    )
+                                    .forEach(p => {
+                                      const val = p.user_id || p.id || p.email || p.full_name;
+                                      const key = normalizeText(p.full_name || p.email || val);
+                                      if (!renderedKeys.has(key)) {
+                                        renderedKeys.add(key);
+                                        options.push(
+                                          <option key={`portal-inline-${p.id || val}`} value={val}>
+                                            {p.full_name || p.email}
+                                          </option>
+                                        );
+                                      }
+                                    });
+
+                                  (teacherProfiles || []).forEach(tp => {
+                                    const key = normalizeText(tp.full_name || tp.email || tp.user_id || tp.id);
+                                    if (!renderedKeys.has(key)) {
+                                      renderedKeys.add(key);
+                                      const val = tp.user_id || tp.id || tp.email || tp.full_name;
+                                      options.push(
+                                        <option key={`profile-inline-${tp.id || val}`} value={val}>
+                                          {tp.full_name}
+                                        </option>
+                                      );
+                                    }
+                                  });
+
+                                  return options;
+                                })()}
                               </select>
                             </div>
 
@@ -15656,25 +15867,34 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         required
                         className="premium-select"
                       >
-                        <option value="">-- Select Teacher --</option>
-                        {(portalAccessList.length > 0 || teacherProfiles.length > 0) &&
-                          portalAccessList
-                            .filter(a =>
-                              normalizeText(a.portal_role).includes('teacher') ||
-                              normalizeText(a.portal_role).includes('muhaffiz')
-                            )
-                            .map(a => (
-                            <option key={a.id || a.full_name} value={a.full_name}>{a.full_name}</option>
-                          ))
-                        }
-                        {teacherProfiles.length > 0 && teacherProfiles
-                          .filter(tp => !portalAccessList.some(pa =>
-                            normalizeText(pa.full_name) === normalizeText(tp.full_name)
-                          ))
-                          .map(tp => (
-                            <option key={`tp-${tp.id || tp.full_name}`} value={tp.full_name}>{tp.full_name}</option>
-                          ))
-                        }
+                        <option value="">-- Select Staff Member --</option>
+                        {(() => {
+                          const renderedNames = new Set();
+                          const opts = [];
+
+                          (portalAccessList || [])
+                            .filter(a => {
+                              const r = normalizeText(a.portal_role || "");
+                              return r.includes('teacher') || r.includes('muhaffiz') || r.includes('kibar') || r.includes('masool') || r.includes('musaid') || r.includes('admin') || r.includes('staff');
+                            })
+                            .forEach(a => {
+                              const n = a.full_name || a.email;
+                              if (n && !renderedNames.has(normalizeText(n))) {
+                                renderedNames.add(normalizeText(n));
+                                opts.push(<option key={`pa-${a.id || n}`} value={n}>{n} ({a.portal_role || 'Staff'})</option>);
+                              }
+                            });
+
+                          (teacherProfiles || []).forEach(tp => {
+                            const n = tp.full_name;
+                            if (n && !renderedNames.has(normalizeText(n))) {
+                              renderedNames.add(normalizeText(n));
+                              opts.push(<option key={`tp-${tp.id || n}`} value={n}>{n} (Profile)</option>);
+                            }
+                          });
+
+                          return opts;
+                        })()}
                       </select>
                     </label>
                   </div>
@@ -15892,7 +16112,10 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <button
                         className="delete-icon-btn"
-                        onClick={() => onDeleteRecord("teacher_profiles", "id")(profile.id)}
+                        onClick={() => {
+                          const targetTable = (portalRole === 'kibar-admin' || portalRole === 'kibar-teacher' || getSectionScope() === 'kibar') ? 'kibar_teacher_profiles' : 'teacher_profiles';
+                          onDeleteRecord(targetTable, "id")(profile.id);
+                        }}
                       >
                         <Trash size={16} />
                       </button>
@@ -25019,8 +25242,10 @@ export default function App() {
             archiveResultsResponse,
             announcementResponse,
             teacherProfilesResponse,
+            fallbackTeacherProfilesResponse,
             reportSettingsResponse,
             jadwalSettingsResponse,
+            portalAccessResponse,
           ] = await Promise.all([
             supabase
               .from(isKibar ? "kibar_student_daily_attendance" : "student_daily_attendance")
@@ -25038,8 +25263,10 @@ export default function App() {
               .limit(5000),
             supabase.from(isKibar ? "kibar_events" : "events").select("*").order("event_date", { ascending: false }).limit(200),
             supabase.from(isKibar ? "kibar_teacher_profiles" : "teacher_profiles").select("*").order("full_name", { ascending: true }),
+            Promise.resolve(supabase.from(isKibar ? "teacher_profiles" : "kibar_teacher_profiles").select("*").order("full_name", { ascending: true })).catch(() => ({ data: [] })),
             supabase.from(isKibar ? "kibar_report_settings" : "report_settings").select("*"),
             supabase.from(isKibar ? "kibar_jadwal_settings" : "jadwal_settings").select("*"),
+            Promise.resolve(supabase.from(isKibar ? "kibar_portal_access" : "portal_access").select("*")).catch(() => ({ data: [] })),
           ]);
 
           // Handle potential missing tables (404) or other fetch errors gracefully
@@ -25050,7 +25277,60 @@ export default function App() {
           if (jadwalSettingsResponse.data) setJadwalSettings(jadwalSettingsResponse.data);
           if (scheduleResponse.error) throw scheduleResponse.error;
           if (announcementResponse.error) throw announcementResponse.error;
-          if (teacherProfilesResponse.error) throw teacherProfilesResponse.error;
+
+          const rawTeacherProfiles = [
+            ...(teacherProfilesResponse.data || []),
+            ...(fallbackTeacherProfilesResponse?.data || [])
+          ];
+          const rawPortalAccess = portalAccessResponse?.data || [];
+
+          const teacherMap = new Map();
+          rawTeacherProfiles.forEach(tp => {
+            if (!tp) return;
+            const key = normalizeText(tp.full_name || tp.name || tp.email || tp.user_id || tp.id || "");
+            if (key) {
+              teacherMap.set(key, {
+                ...tp,
+                photo_url: cleanPhotoUrl(tp.photo_url || ""),
+                teacher_role: tp.teacher_role || (tp.role && (tp.role.includes('masool') ? 'masool' : tp.role.includes('musaid') ? 'musaid' : 'muhaffiz')) || 'muhaffiz',
+                phone_number: tp.phone_number || "",
+                whatsapp_number: tp.whatsapp_number || ""
+              });
+            }
+          });
+
+          rawPortalAccess
+            .filter(a => {
+              const r = (a.portal_role || "").toLowerCase();
+              return r.includes('teacher') || r.includes('muhaffiz') || r.includes('masool') || r.includes('musaid') || r.includes('staff');
+            })
+            .forEach(a => {
+              const key = normalizeText(a.full_name || a.email || a.user_id || a.id || "");
+              if (key && !teacherMap.has(key)) {
+                teacherMap.set(key, {
+                  id: a.user_id || a.id,
+                  user_id: a.user_id,
+                  full_name: a.full_name,
+                  email: a.email,
+                  photo_url: cleanPhotoUrl(a.photo_url || ""),
+                  phone_number: a.phone_number || "",
+                  whatsapp_number: a.whatsapp_number || "",
+                  teacher_role: (a.portal_role || "").toLowerCase().includes('masool') ? 'masool' : (a.portal_role || "").toLowerCase().includes('musaid') ? 'musaid' : 'muhaffiz',
+                  is_active: true
+                });
+              } else if (key && teacherMap.has(key)) {
+                const ex = teacherMap.get(key);
+                teacherMap.set(key, {
+                  ...ex,
+                  phone_number: ex.phone_number || a.phone_number || "",
+                  whatsapp_number: ex.whatsapp_number || a.whatsapp_number || "",
+                  photo_url: ex.photo_url || cleanPhotoUrl(a.photo_url || ""),
+                  teacher_role: ex.teacher_role || ((a.portal_role || "").toLowerCase().includes('masool') ? 'masool' : (a.portal_role || "").toLowerCase().includes('musaid') ? 'musaid' : ex.teacher_role)
+                });
+              }
+            });
+
+          const consolidatedTeacherProfiles = Array.from(teacherMap.values());
 
           const attendanceData = attendanceResponse.data || [];
           const allWeeklyResults = [
@@ -25061,7 +25341,7 @@ export default function App() {
           const processedStudents = buildStudents(
             rawProfiles,
             allWeeklyResults,
-            teacherProfilesResponse.data || []
+            consolidatedTeacherProfiles
           );
 
           // If multiple students, and none selected, use first
@@ -25137,7 +25417,7 @@ export default function App() {
             schedule: activeSchedule,
             attendance: activeAttendance || null,
             weeklyResult: activeResult || null,
-            teacherProfiles: (teacherProfilesResponse.data || []).map(p => ({ ...p, photo_url: cleanPhotoUrl(p.photo_url || "") })),
+            teacherProfiles: consolidatedTeacherProfiles,
             reportSettings: reportSettingsResponse.data || [],
           };
 
@@ -25148,6 +25428,11 @@ export default function App() {
 
         setParentData(nextParentState);
         setTeacherProfiles(nextParentState.teacherProfiles || []);
+        setSchoolData(curr => ({
+          ...curr,
+          teacherProfiles: nextParentState.teacherProfiles || [],
+          portalAccessList: nextParentState.teacherProfiles || curr.portalAccessList || []
+        }));
         try { localStorage.setItem('mauze_portal_cache', JSON.stringify({ role: role, parentData: nextParentState, schoolData: null, _t: Date.now() })); } catch (_) {}
       } else {
         // For admin and teacher roles, use get_all_child_profiles RPC (SECURITY DEFINER, bypasses RLS)
@@ -25399,44 +25684,72 @@ export default function App() {
      *   - Original teacher: can only VIEW badal progress on Badal page (read-only)
      */
     /*
-     * BADAL FLOW - Build all possible IDs for the current teacher
-     * (user.id, teacherIdentity, portalAccess matches, teacherProfiles matches)
+     * BADAL FLOW - Build all possible IDs and Names for the current teacher
+     * (user.id, user.email, teacherIdentity, portalAccess matches, teacherProfiles matches)
      */
     const rawId = user?.id || teacherIdentity;
     const allTeacherIds = [];
-    if (rawId) allTeacherIds.push(String(rawId));
-    if (user?.id && teacherIdentity && String(user.id) !== String(teacherIdentity)) allTeacherIds.push(String(teacherIdentity));
+    const allTeacherNames = new Set();
+
+    if (rawId) allTeacherIds.push(String(rawId).trim());
+    if (user?.id && teacherIdentity && String(user.id) !== String(teacherIdentity)) allTeacherIds.push(String(teacherIdentity).trim());
+    if (user?.email) allTeacherIds.push(String(user.email).trim().toLowerCase());
+    if (teacherIdentity) allTeacherNames.add(normalizeText(teacherIdentity));
+    if (portalAccess?.full_name) allTeacherNames.add(normalizeText(portalAccess.full_name));
+
     (Array.isArray(schoolData?.portalAccessList) ? schoolData.portalAccessList : [])
-      .filter(a => { const m = String(a.user_id) === String(rawId) || String(a.id) === String(rawId) || (a.full_name && normalizeText(a.full_name) === normalizeText(teacherIdentity)); return m; })
+      .filter(a => {
+        const m = String(a.user_id) === String(rawId) ||
+                  String(a.id) === String(rawId) ||
+                  (a.email && user?.email && String(a.email).trim().toLowerCase() === String(user.email).trim().toLowerCase()) ||
+                  (a.full_name && teacherIdentity && normalizeText(a.full_name) === normalizeText(teacherIdentity));
+        return m;
+      })
       .forEach(a => {
-        if (a.user_id && !allTeacherIds.includes(String(a.user_id))) allTeacherIds.push(String(a.user_id));
-        if (a.id && !allTeacherIds.includes(String(a.id))) allTeacherIds.push(String(a.id));
+        if (a.user_id && !allTeacherIds.includes(String(a.user_id).trim())) allTeacherIds.push(String(a.user_id).trim());
+        if (a.id && !allTeacherIds.includes(String(a.id).trim())) allTeacherIds.push(String(a.id).trim());
+        if (a.email && !allTeacherIds.includes(String(a.email).trim().toLowerCase())) allTeacherIds.push(String(a.email).trim().toLowerCase());
+        if (a.full_name) allTeacherNames.add(normalizeText(a.full_name));
       });
+
     (Array.isArray(teacherProfiles) ? teacherProfiles : [])
       .filter(p => {
         const m = String(p.user_id) === String(rawId) ||
                   String(p.id) === String(rawId) ||
-                  (p.full_name && normalizeText(p.full_name) === normalizeText(teacherIdentity));
+                  (p.email && user?.email && String(p.email).trim().toLowerCase() === String(user.email).trim().toLowerCase()) ||
+                  (p.full_name && teacherIdentity && normalizeText(p.full_name) === normalizeText(teacherIdentity));
         return m;
       })
       .forEach(p => {
-        if (p.user_id && !allTeacherIds.includes(String(p.user_id))) allTeacherIds.push(String(p.user_id));
-        if (p.id && !allTeacherIds.includes(String(p.id))) allTeacherIds.push(String(p.id));
+        if (p.user_id && !allTeacherIds.includes(String(p.user_id).trim())) allTeacherIds.push(String(p.user_id).trim());
+        if (p.id && !allTeacherIds.includes(String(p.id).trim())) allTeacherIds.push(String(p.id).trim());
+        if (p.email && !allTeacherIds.includes(String(p.email).trim().toLowerCase())) allTeacherIds.push(String(p.email).trim().toLowerCase());
+        if (p.full_name) allTeacherNames.add(normalizeText(p.full_name));
       });
 
     const matchedStudents = (portalRole === "admin" || portalRole === "kibar-admin")
       ? [...schoolData.students]
       : schoolData.students.filter((student) => {
-          const idMatch = allTeacherIds.some(uid =>
-            String(student.muhaffiz_id || "").trim() === String(uid).trim() ||
-            String(student.teacher_id || "").trim() === String(uid).trim() ||
-            String(student.original_teacher_id || "").trim() === String(uid).trim() ||
-            String(student.badal_teacher_id || "").trim() === String(uid).trim()
+          const idMatch = allTeacherIds.some(uid => {
+            const u = String(uid).trim().toLowerCase();
+            return (
+              (student.muhaffiz_id && String(student.muhaffiz_id).trim().toLowerCase() === u) ||
+              (student.teacher_id && String(student.teacher_id).trim().toLowerCase() === u) ||
+              (student.original_teacher_id && String(student.original_teacher_id).trim().toLowerCase() === u) ||
+              (student.badal_teacher_id && String(student.badal_teacher_id).trim().toLowerCase() === u)
+            );
+          });
+          const nameMatch = Array.from(allTeacherNames).some(name =>
+            (student.teacherName && normalizeText(student.teacherName) === name) ||
+            (student.teacher_name && normalizeText(student.teacher_name) === name) ||
+            (student.muhaffiz_name && normalizeText(student.muhaffiz_name) === name)
           );
-          const nameMatch = normalizeText(student.teacherName) === normalizeText(teacherIdentity);
-          /* Also try matching badal_teacher_id against user email as a fallback */
-          const emailMatch = !idMatch && student.badal_teacher_id && user?.email &&
-            normalizeText(student.badal_teacher_id) === normalizeText(user.email);
+          /* Also try matching badal_teacher_id or teacher_id against user email as a fallback */
+          const emailMatch = !idMatch && user?.email && (
+            (student.badal_teacher_id && normalizeText(student.badal_teacher_id) === normalizeText(user.email)) ||
+            (student.teacher_id && normalizeText(student.teacher_id) === normalizeText(user.email)) ||
+            (student.muhaffiz_id && normalizeText(student.muhaffiz_id) === normalizeText(user.email))
+          );
           return idMatch || nameMatch || emailMatch;
         });
 
@@ -26889,31 +27202,54 @@ const handleSendCustomNotification = async (event) => {
 
     console.log("Linking accounts for student:", student_id, { teacher_id, parent_id, original_teacher_id, badal_teacher_id });
 
-    const teacherRecord =
-      schoolData.portalAccessList.find(a => String(a.user_id) === String(teacher_id) || String(a.email) === String(teacher_id)) ||
-      schoolData.teacherProfiles.find(p => String(p.user_id) === String(teacher_id));
+    const isKibar = portalRole === "kibar-admin" || portalRole === "kibar-teacher" || getSectionScope() === "kibar";
+    const targetTable = isKibar ? "kibar_child_profiles" : "child_profiles";
 
-    const parentRecord = schoolData.portalAccessList.find(a => String(a.user_id) === String(parent_id) || String(a.email) === String(parent_id));
+    const allTeachers = [
+      ...(Array.isArray(schoolData?.portalAccessList) ? schoolData.portalAccessList : []),
+      ...(Array.isArray(schoolData?.teacherProfiles) ? schoolData.teacherProfiles : []),
+      ...(Array.isArray(teacherProfiles) ? teacherProfiles : [])
+    ];
+
+    const teacherRecord = teacher_id ? allTeachers.find(a =>
+      String(a.user_id || "").trim() === String(teacher_id).trim() ||
+      String(a.id || "").trim() === String(teacher_id).trim() ||
+      (a.email && String(a.email).trim().toLowerCase() === String(teacher_id).trim().toLowerCase()) ||
+      (a.full_name && normalizeText(a.full_name) === normalizeText(teacher_id))
+    ) : null;
+
+    const parentRecord = parent_id ? (schoolData?.portalAccessList || []).find(a =>
+      String(a.user_id || "").trim() === String(parent_id).trim() ||
+      String(a.id || "").trim() === String(parent_id).trim() ||
+      (a.email && String(a.email).trim().toLowerCase() === String(parent_id).trim().toLowerCase()) ||
+      (a.full_name && normalizeText(a.full_name) === normalizeText(parent_id))
+    ) : null;
 
     // Detect if parent or teacher actually changed/is new
-    const existingStudent = schoolData.students.find(s => String(s.student_id) === String(student_id));
-    const isNewTeacher = teacherRecord && (!existingStudent || String(existingStudent.muhaffiz_id) !== String(teacherRecord.user_id));
-    const isNewParent = parentRecord && (!existingStudent || String(existingStudent.user_id) !== String(parentRecord.user_id));
+    const existingStudent = schoolData?.students?.find(s =>
+      String(s.student_id) === String(student_id) || (s.allIds && s.allIds.includes(String(student_id)))
+    );
+    const isNewTeacher = teacherRecord && (!existingStudent || String(existingStudent.muhaffiz_id) !== String(teacherRecord.user_id || teacherRecord.id));
+    const isNewParent = parentRecord && (!existingStudent || String(existingStudent.user_id) !== String(parentRecord.user_id || parentRecord.id));
 
-    // Update child_profiles table directly
+    const resolvedTeacherId = teacherRecord ? (teacherRecord.user_id || teacherRecord.id || teacherRecord.email || teacher_id) : (teacher_id || null);
+    const resolvedTeacherName = teacherRecord ? (teacherRecord.full_name || teacherRecord.name) : (teacher_id ? teacher_id : null);
+
+    // Update child_profiles / kibar_child_profiles table directly
     // original_teacher_id: set on first assignment, preserved thereafter
     // badal_teacher_id: optional substitute teacher (null = no badal)
     const updatePayload = {
-      teacher_name: teacherRecord?.full_name || null,
-      teacher_id: teacherRecord?.user_id || teacher_id || null,
-      original_teacher_id: original_teacher_id || teacherRecord?.user_id || teacher_id || null,
+      teacher_name: resolvedTeacherName,
+      muhaffiz_name: resolvedTeacherName,
+      teacher_id: resolvedTeacherId,
+      muhaffiz_id: resolvedTeacherId,
+      original_teacher_id: original_teacher_id || resolvedTeacherId || null,
       badal_teacher_id: badal_teacher_id || null,
-      parent_user_id: parentRecord?.user_id || (parent_id?.includes('@') ? null : parent_id) || null,
-      parent_email: parentRecord?.email || (parent_id?.includes('@') ? parent_id : null) || null
+      parent_user_id: parentRecord ? (parentRecord.user_id || parentRecord.id) : (parent_id?.includes('@') ? null : parent_id) || null,
+      parent_email: parentRecord ? (parentRecord.email) : (parent_id?.includes('@') ? parent_id : null) || null
     };
 
     // Editable profile fields: apply them whenever they come from the form
-    // (even empty values, so cleared fields are saved properly instead of being skipped).
     const editableFields = { full_name, arabic_name, group_name, juz, surat, photo_url, its, whatsapp_number, gender };
     Object.entries(editableFields).forEach(([key, value]) => {
       if (value === undefined) return;
@@ -26921,26 +27257,39 @@ const handleSendCustomNotification = async (event) => {
       updatePayload[key] = trimmed || null;
     });
 
+    const numericStudentId = !isNaN(student_id) ? Number(student_id) : student_id;
+    updatePayload.student_id = numericStudentId;
+
+    // Use upsert to guarantee the doc is written with merge: true directly
+    const { error: upsertErr } = await supabase
+      .from(targetTable)
+      .upsert(updatePayload, { onConflict: "student_id" });
+
+    if (upsertErr) {
+      console.warn("Direct upsert warning:", upsertErr);
+    }
+
+    // Also update matching by student_id and id
     const { error: profileError } = await supabase
-      .from("child_profiles")
+      .from(targetTable)
       .update(updatePayload)
       .eq("student_id", student_id);
 
-    if (profileError) {
-      console.error("Link update error:", profileError);
-      return { ok: false, message: `Connection Failed: ${profileError.message}` };
+    if (numericStudentId !== student_id) {
+      await supabase.from(targetTable).update(updatePayload).eq("student_id", numericStudentId);
     }
+    await supabase.from(targetTable).update(updatePayload).eq("id", String(student_id));
 
-    // Secondary Check: If we have an ID for parent but it wasn't set, force it
-    if (parentRecord?.user_id && !updatePayload.parent_user_id) {
-      await supabase.from("child_profiles").update({ parent_user_id: parentRecord.user_id }).eq("student_id", student_id);
+    if (profileError && upsertErr) {
+      console.error("Link update error:", profileError);
+      return { ok: false, message: `Connection Failed: ${profileError.message || upsertErr.message}` };
     }
 
     // Push assignment notifications
     const studentName = full_name || existingStudent?.name || "Child";
 
     if (isNewTeacher) {
-      const targetTeacherUser = teacherRecord.user_id || teacherRecord.email || teacher_id;
+      const targetTeacherUser = teacherRecord?.user_id || teacherRecord?.email || teacher_id;
       if (targetTeacherUser) {
         broadcastNotification(
           "New Student Assigned",
@@ -26952,7 +27301,7 @@ const handleSendCustomNotification = async (event) => {
       }
     }
 
-    if (badal_teacher_id && badal_teacher_id !== teacherRecord?.user_id) {
+    if (badal_teacher_id && badal_teacher_id !== resolvedTeacherId) {
       broadcastNotification(
         "Badal Assignment",
         `${studentName} has been assigned to you as a Badal (substitute) student by the Admin.`,
@@ -26963,7 +27312,7 @@ const handleSendCustomNotification = async (event) => {
     }
 
     if (isNewParent) {
-      const targetParentUser = parentRecord.user_id || parentRecord.email || parent_id;
+      const targetParentUser = parentRecord?.user_id || parentRecord?.email || parent_id;
       if (targetParentUser) {
         broadcastNotification(
           "Child Linked to Account",
@@ -26978,8 +27327,8 @@ const handleSendCustomNotification = async (event) => {
     // Refresh school data locally so edited details show up immediately
     setSchoolData((current) => ({
       ...current,
-      students: current.students.map((s) =>
-        String(s.student_id) === String(student_id)
+      students: (current.students || []).map((s) =>
+        String(s.student_id) === String(student_id) || (s.allIds && s.allIds.includes(String(student_id)))
           ? {
             ...s,
             name: full_name !== undefined && String(full_name || '').trim() ? String(full_name).trim() : (s.name || null),
@@ -26994,9 +27343,10 @@ const handleSendCustomNotification = async (event) => {
               juz: juz !== undefined ? (String(juz || '').trim() || "N-A") : ((s.hifz && s.hifz.juz) || "N-A"),
               surat: surat !== undefined ? (String(surat || '').trim() || "Pending") : ((s.hifz && s.hifz.surat) || "Pending"),
             },
-            teacherName: teacherRecord?.full_name || "Unassigned teacher",
-            muhaffiz_id: teacherRecord?.user_id || teacher_id || null,
-            original_teacher_id: original_teacher_id || teacherRecord?.user_id || teacher_id || null,
+            teacherName: resolvedTeacherName || "Unassigned teacher",
+            muhaffiz_id: resolvedTeacherId,
+            teacher_id: resolvedTeacherId,
+            original_teacher_id: updatePayload.original_teacher_id,
             badal_teacher_id: badal_teacher_id || null,
             user_id: parentRecord?.user_id || null,
             parent_email: parentRecord?.email || null
@@ -27005,10 +27355,12 @@ const handleSendCustomNotification = async (event) => {
       ),
     }));
 
+    loadPortalData(portalRole, user, null, { silent: true }).catch(() => {});
+
     return {
       ok: true,
       studentName: studentName || existingStudent?.name || null,
-      teacherName: teacherRecord?.full_name || null,
+      teacherName: resolvedTeacherName || null,
       parentName: parentRecord?.full_name || null,
     };
   };
@@ -27016,16 +27368,27 @@ const handleSendCustomNotification = async (event) => {
   const handleUnassignChild = async (studentId) => {
     if (!window.confirm("Are you sure you want to remove this child from their assigned muhaffiz?")) return;
 
+    const isKibar = portalRole === "kibar-admin" || portalRole === "kibar-teacher" || getSectionScope() === "kibar";
+    const targetTable = isKibar ? "kibar_child_profiles" : "child_profiles";
+
+    const unassignPayload = {
+      teacher_name: null,
+      muhaffiz_name: null,
+      group_name: null,
+      teacher_id: null,
+      muhaffiz_id: null,
+      original_teacher_id: null,
+      badal_teacher_id: null,
+      parent_user_id: null,
+      parent_email: null
+    };
+
     const { error: profileError } = await supabase
-      .from("child_profiles")
-      .update({
-        teacher_name: null,
-        group_name: null,
-        teacher_id: null,
-        parent_user_id: null,
-        parent_email: null
-      })
+      .from(targetTable)
+      .update(unassignPayload)
       .eq("student_id", studentId);
+
+    await supabase.from(targetTable).update(unassignPayload).eq("id", String(studentId));
 
     if (profileError) {
       showAction("error", `Unassign Failed: ${profileError?.message || 'Unknown error'}`);
@@ -27035,13 +27398,14 @@ const handleSendCustomNotification = async (event) => {
     // Refresh school data locally
     setSchoolData((current) => ({
       ...current,
-      students: current.students.map((s) =>
-        String(s.student_id) === String(studentId)
-          ? { ...s, teacherName: "Unassigned teacher", groupName: "Ungrouped", muhaffiz_id: null, user_id: null }
+      students: (current.students || []).map((s) =>
+        String(s.student_id) === String(studentId) || (s.allIds && s.allIds.includes(String(studentId)))
+          ? { ...s, teacherName: "Unassigned teacher", groupName: "Ungrouped", muhaffiz_id: null, teacher_id: null, original_teacher_id: null, badal_teacher_id: null, user_id: null }
           : s
       ),
     }));
 
+    loadPortalData(portalRole, user, null, { silent: true }).catch(() => {});
     showAction("success", "Student unassigned and unlinked from all accounts.");
   };
 
@@ -27264,6 +27628,10 @@ const handleSendCustomNotification = async (event) => {
     event.preventDefault();
     const payload = adminForms.teacherProfile;
 
+    const isKibar = portalRole === "kibar-admin" || portalRole === "kibar-teacher" || getSectionScope() === "kibar";
+    const targetTeacherTable = isKibar ? "kibar_teacher_profiles" : "teacher_profiles";
+    const targetAccessTable = isKibar ? "kibar_portal_access" : "user_portal_access";
+
     const portalAccessList = schoolData.portalAccessList || [];
     const selectedAccess = portalAccessList.find(
       (access) => normalizeText(access.full_name) === normalizeText(payload.full_name)
@@ -27271,70 +27639,70 @@ const handleSendCustomNotification = async (event) => {
     const selectedProfile = teacherProfiles.find(
       (tp) => normalizeText(tp.full_name) === normalizeText(payload.full_name)
     );
-    const resolvedUserId = payload.user_id || selectedAccess?.user_id || selectedProfile?.user_id || null;
+    const resolvedUserId = payload.user_id || selectedAccess?.user_id || selectedProfile?.user_id || selectedProfile?.id || (payload.full_name ? ('staff_' + normalizeText(payload.full_name).replace(/[^a-zA-Z0-9]/g, '_')) : null);
 
-    if (!resolvedUserId) {
-      showAction("error", "Could not find a user ID for this staff member. Please ensure they have a Supabase Auth account linked.");
+    if (!resolvedUserId && !payload.full_name) {
+      showAction("error", "Please provide a name for this staff member.");
       return;
     }
 
-    // Find the existing teacher_profiles doc first. The Firestore-backed
-    // upsert keys new docs by `user_id`, but legacy/migrated rows may live
-    // under a different doc id - blindly upserting then created a SECOND doc
-    // instead of updating the existing one (duplicates + "didn't save").
     const { data: existingProfiles } = await supabase
-      .from("teacher_profiles")
-      .select("*")
-      .eq("user_id", resolvedUserId);
+      .from(targetTeacherTable)
+      .select("*");
 
-    const existingRows = Array.isArray(existingProfiles) ? existingProfiles : [];
-    const canonical = existingRows.find(r => String(r.id) === String(resolvedUserId));
+    const existingRows = Array.isArray(existingProfiles) ? existingProfiles.filter(r =>
+      String(r.user_id) === String(resolvedUserId) ||
+      String(r.id) === String(resolvedUserId) ||
+      (r.full_name && normalizeText(r.full_name) === normalizeText(payload.full_name))
+    ) : [];
+    const canonical = existingRows.find(r => String(r.id) === String(resolvedUserId) || String(r.user_id) === String(resolvedUserId));
     const existingRow = canonical || existingRows[0] || null;
 
     const resolvedEmail = (payload.email || selectedAccess?.email || existingRow?.email || "").trim();
 
     const profilePayload = {
+      id: existingRow?.id || resolvedUserId,
       user_id: resolvedUserId,
       full_name: payload.full_name,
-      photo_url: payload.photo_url,
-      phone_number: payload.phone_number,
-      whatsapp_number: payload.whatsapp_number,
+      photo_url: payload.photo_url || "",
+      phone_number: payload.phone_number || "",
+      whatsapp_number: payload.whatsapp_number || "",
       salary_per_minute: Number(payload.salary_per_minute || 2.3),
       show_salary_card: !!payload.show_salary_card,
       teacher_role: payload.teacher_role || "muhaffiz",
       is_active: true,
     };
-    if (existingRow?.id) profilePayload.id = existingRow.id;
     if (resolvedEmail) profilePayload.email = resolvedEmail;
 
     const { error: profileError } = await supabase
-      .from("teacher_profiles")
+      .from(targetTeacherTable)
       .upsert(profilePayload, { onConflict: "user_id" });
 
+    await supabase.from(targetTeacherTable).update(profilePayload).eq("id", profilePayload.id);
+
     if (profileError) {
-      showAction("error", profileError.message);
-      return;
+      console.warn("Teacher profile upsert warning:", profileError);
     }
 
-    // Clean up stale duplicate docs left by older buggy saves (a legacy doc id
-    // plus a user_id-keyed doc for the same teacher). The load-time dedupe
-    // hides them, this removes them for good now that the canonical one is saved.
+    // Clean up duplicate rows if any
     if (existingRows.length > 1 && existingRow) {
       const staleRows = existingRows.filter(r => String(r.id) !== String(existingRow.id));
       await Promise.all(staleRows.map(r =>
-        supabase.from("teacher_profiles").delete().eq("id", r.id)
+        supabase.from(targetTeacherTable).delete().eq("id", r.id)
       ));
     }
 
-    if (selectedAccess) {
+    if (selectedAccess?.user_id) {
       const { error: accessError } = await supabase
-        .from("user_portal_access")
+        .from(targetAccessTable)
         .update({
-          photo_url: payload.photo_url,
+          photo_url: payload.photo_url || "",
           salary_per_minute: Number(payload.salary_per_minute || 2.3),
           show_salary_card: !!payload.show_salary_card,
+          phone_number: payload.phone_number || "",
+          whatsapp_number: payload.whatsapp_number || ""
         })
-        .eq("user_id", resolvedUserId);
+        .eq("user_id", selectedAccess.user_id);
 
       if (accessError) {
         console.warn("Portal access sync warning:", accessError.message);
@@ -27345,7 +27713,7 @@ const handleSendCustomNotification = async (event) => {
     setAdminForms(curr => ({
       ...curr,
       teacherProfile: {
-        id: existingRow?.id || "",
+        id: existingRow?.id || resolvedUserId,
         user_id: resolvedUserId,
         full_name: payload.full_name,
         photo_url: payload.photo_url || "",
