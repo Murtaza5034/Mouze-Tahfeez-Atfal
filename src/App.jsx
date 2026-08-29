@@ -94,6 +94,8 @@ import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
 import TeacherLeaveApprovalPanel from "./TeacherLeaveApprovalPanel";
 import VideoCall from "./components/VideoCall";
+import TahfeezChatUI from "./components/TahfeezChatUI";
+import { addSystemMessage } from "./utils/chatUtils";
 import AdminHelpManagement from "./components/AdminHelpManagement";
 import PortalHelpGuidePage from "./components/PortalHelpGuidePage";
 import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
@@ -7196,6 +7198,8 @@ function ParentPortal({
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const backdropMouseDownRef = useRef(false);
   const notificationOpenedAtRef = useRef(0);
+  const [selectedTahfeezChat, setSelectedTahfeezChat] = useState(null);
+  const [tahfeezSearchQuery, setTahfeezSearchQuery] = useState("");
 
   const [parentViewedStatus, setParentViewedStatus] = useState(false);
   const [celebrationRank, setCelebrationRank] = useState(null); // 1, 2, or 3 for celebration popup
@@ -7215,6 +7219,8 @@ function ParentPortal({
     const studentName = child.name || child.full_name || "Student";
     const teacherName = child.teacherName || child.teacher_name || "Muhaffiz";
     const roomId = childSessionId;
+    
+    addSystemMessage(roomId, `${studentName} joined the video call`);
 
     const activeSession = activeSessions[childSessionId];
     if (activeSession) {
@@ -7260,6 +7266,9 @@ function ParentPortal({
   const handleParentJoinGroupClass = async (child) => {
     if (!child.groupName) return;
     const groupRoomId = `mouze-tahfeez-group-${child.groupName.replace(/\s+/g, '-').toLowerCase()}`;
+    const roomId = groupRoomId;
+    const studentName = child.name || child.full_name || "Student";
+    addSystemMessage(roomId, `${studentName} joined the group video call`);
     const activeGroupSession = activeSessions[groupRoomId];
     if (!activeGroupSession) {
       if (showAction) showAction("error", "Group class is not currently live.");
@@ -7810,82 +7819,33 @@ function ParentPortal({
   const bottomPages = allBottomPages.filter(p => pageVisibility[p.key] !== false);
 
   const renderOnlineTahfeezParent = () => {
+    const studentsList = [];
+    allProfiles.forEach(child => {
+      // Add individual chat
+      studentsList.push({
+        ...child,
+        isGroup: false,
+      });
+      // Add group chat if they have a group
+      if (child.groupName) {
+        studentsList.push({
+          student_id: `group_${child.groupName}`,
+          name: `${child.groupName} Group Session`,
+          isGroup: true,
+          room_id: `mouze-tahfeez-group-${child.groupName.replace(/\s+/g, '-').toLowerCase()}`,
+          teacherName: child.teacherName || child.teacher_name,
+        });
+      }
+    });
+
+    const filteredList = studentsList.filter(s => {
+      if (!tahfeezSearchQuery) return true;
+      const searchStr = tahfeezSearchQuery.toLowerCase();
+      const n = (s.name || s.full_name || s.teacherName || "").toLowerCase();
+      return n.includes(searchStr);
+    });
+
     return (
-      <div className="online-tahfeez-parent fade-in" style={{ paddingBottom: '80px', padding: '0 20px' }}>
-        <div className="section-header" style={{ marginBottom: '24px' }}>
-          <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Video size={24} style={{ color: 'var(--primary-gold)' }} />
-            Online Tahfeez Classroom
-          </h2>
-          <p className="subtitle">Join live Hifz classes and group sessions with your Muhaffiz instantly.</p>
-        </div>
-
-        {allProfiles.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>
-            No children registered in your portal.
-          </div>
-        ) : (
-          <div className="tahfeez-grid">
-            {allProfiles.map((child) => {
-              const childSessionId = `session_${child.student_id}`;
-              const activeSession = activeSessions[childSessionId];
-              const isClassLive = !!activeSession;
-              const teacherWaiting = activeSession?.started_by === "teacher";
-              
-              const groupRoomId = child.groupName 
-                ? `mouze-tahfeez-group-${child.groupName.replace(/\s+/g, '-').toLowerCase()}` 
-                : null;
-              const activeGroupSession = groupRoomId ? activeSessions[groupRoomId] : null;
-
-              return (
-                <div key={child.student_id} className="tahfeez-card">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                    <span className="tahfeez-badge">ITS: {child.its || "..."}</span>
-                    {isClassLive ? (
-                      <div className="pulse-indicator">
-                        <div className="pulse-dot" />
-                        <span>{teacherWaiting ? "Teacher Waiting" : "Live"}</span>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Offline</span>
-                    )}
-                  </div>
-                  
-                  <h3 className="tahfeez-title" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", fontSize: '1.4rem' }}>{child.name || child.full_name}</h3>
-                  <div className="tahfeez-meta">
-                    <p style={{ margin: "4px 0" }}><strong>Group:</strong> {child.groupName || "Ungrouped"}</p>
-                    <p style={{ margin: "4px 0" }}><strong>Muhaffiz:</strong> {child.teacherName || child.teacher_name || "Unassigned"}</p>
-                  </div>
-
-                  {teacherWaiting && (
-                    <div style={{
-                      background: "rgba(46, 204, 113, 0.1)",
-                      border: "1px solid rgba(46, 204, 113, 0.2)",
-                      borderRadius: "10px",
-                      padding: "10px 14px",
-                      marginBottom: "16px",
-                      fontSize: "0.85rem",
-                      color: "#27ae60",
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px"
-                    }}>
-                      <div className="pulse-dot" style={{ backgroundColor: "#2ecc71" }} />
-                      Your Muhaffiz is waiting! Join the call now.
-                    </div>
-                  )}
-                  <div className="tahfeez-actions">
-                    <button
-                      className="tahfeez-btn primary"
-                      onClick={() => handleParentStartCall(child)}
-                    >
-                      <Video size={16} /> {activeSessions[`session_${child.student_id}`] ? "Join 1-on-1 Call" : "1-on-1 Call"}
-                    </button>
-
-                    {child.groupName && (
-                      <button
-                        className={`tahfeez-btn ${activeSessions[`mouze-tahfeez-group-${child.groupName.replace(/\s+/g, '-').toLowerCase()}`] ? "primary pulse" : "secondary"}`}
                         onClick={() => handleParentJoinGroupClass(child)}
                       >
                         Group Class
@@ -8118,6 +8078,52 @@ function ParentPortal({
 
         {activePage === "Home" ? (
           <div className="home-dashboard fade-in">
+            {/* Premium Join Here Card */}
+            <div style={{
+              background: "linear-gradient(135deg, var(--primary-color), var(--primary-gold))",
+              borderRadius: "16px",
+              padding: "24px",
+              marginBottom: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
+              color: "#fff",
+              flexWrap: "wrap",
+              gap: "16px"
+            }}>
+              <div style={{ flex: "1 1 300px" }}>
+                <h2 style={{ fontSize: "1.5rem", marginBottom: "8px", fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", color: "#fff" }}>
+                  Live Online Tahfeez
+                </h2>
+                <p style={{ opacity: 0.9, fontSize: "0.95rem", margin: 0, color: "#fff" }}>
+                  Join your Muhaffiz for live 1-on-1 and group Hifz sessions.
+                </p>
+              </div>
+              <button 
+                onClick={() => { setActivePage("Online Tahfeez"); setMenuOpen(false); }}
+                style={{
+                  background: "#fff",
+                  color: "var(--primary-color)",
+                  padding: "12px 24px",
+                  borderRadius: "30px",
+                  fontWeight: "bold",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                  transition: "transform 0.2s"
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+                onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
+              >
+                <Video size={20} />
+                Join Here
+              </button>
+            </div>
+
             <div className="hifz-stats-premium-strip">
               {(() => {
                 const isFemaleTeacher = (t) => {
@@ -18695,6 +18701,8 @@ function TeacherPortal({
     const teacherId = user?.id || teacherIdentity;
     const roomId = childSessionId;
     
+    addSystemMessage(roomId, `Muhaffiz (${teacherName}) joined the video call`);
+    
     // Check if session already exists
     const { data: existing } = await supabase
       .from('online_tahfeez_sessions')
@@ -18748,6 +18756,8 @@ function TeacherPortal({
     const teacherName = portalAccess?.full_name || user?.user_metadata?.full_name || teacherIdentity || "Muhaffiz";
     const teacherId = user?.id || teacherIdentity;
     const roomId = groupRoomId;
+    
+    addSystemMessage(roomId, `Muhaffiz (${teacherName}) started the group video call`);
 
     const { data: existing } = await supabase
       .from('online_tahfeez_sessions')
@@ -18814,6 +18824,10 @@ function TeacherPortal({
     try {
       const { doc, setDoc, deleteDoc } = await import("firebase/firestore");
       const { db } = await import("./firebase/db.js");
+      
+      const teacherName = portalAccess?.full_name || user?.user_metadata?.full_name || teacherIdentity || "Muhaffiz";
+      addSystemMessage(roomId, `Muhaffiz (${teacherName}) ended the video call`);
+      
       const signalRef = doc(db, "tahfeez_signals", roomId);
       await setDoc(signalRef, { status: "ended" }, { merge: true });
       setTimeout(() => { deleteDoc(signalRef).catch(() => {}); }, 2000);
@@ -20226,7 +20240,6 @@ function TeacherPortal({
     const groupRoomId = selectedGroup 
       ? `mouze-tahfeez-group-${selectedGroup.replace(/\s+/g, '-').toLowerCase()}` 
       : `mouze-tahfeez-group-class`;
-    const isGroupClassLive = !!activeSessions[groupRoomId];
 
     const groupStudent = {
       student_id: 'group_class',
@@ -20242,276 +20255,37 @@ function TeacherPortal({
       return n.includes(searchStr);
     });
 
-    const activeChat = selectedTahfeezChat || null;
-
     return (
-      <div className="tahfeez-chat-container fade-in" style={{
-        display: "flex",
-        height: "calc(100vh - 80px)",
-        background: "var(--bg-color)",
-        overflow: "hidden",
-        borderTop: "1px solid var(--border-color)",
-      }}>
-        {/* Left Sidebar */}
-        <div className="tahfeez-chat-sidebar" style={{
-          width: "350px",
-          borderRight: "1px solid var(--border-color)",
-          display: "flex",
-          flexDirection: "column",
-          background: "var(--sidebar-bg)",
-        }}>
-          {/* Search Bar */}
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color)" }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              background: "var(--bg-color)",
-              borderRadius: "20px",
-              padding: "8px 16px",
-            }}>
-              <Search size={16} color="var(--text-muted)" style={{ marginRight: "8px" }} />
-              <input
-                type="text"
-                placeholder="search"
-                value={tahfeezSearchQuery}
-                onChange={(e) => setTahfeezSearchQuery(e.target.value)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  outline: "none",
-                  color: "var(--text-color)",
-                  width: "100%",
-                  fontSize: "0.9rem"
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Student List */}
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            {studentsList.map((student) => {
-              const childSessionId = student.isGroup ? student.room_id : `session_${student.student_id}`;
-              const activeSession = activeSessions[childSessionId];
-              const isClassLive = !!activeSession;
-              const parentWaiting = activeSession?.started_by === "parent";
-              const isSelected = activeChat?.student_id === student.student_id;
-
-              return (
-                <div
-                  key={student.student_id}
-                  onClick={() => setSelectedTahfeezChat(student)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "12px 16px",
-                    cursor: "pointer",
-                    background: isSelected ? "var(--bg-color)" : "transparent",
-                    borderBottom: "1px solid var(--border-color)",
-                    transition: "background 0.2s"
-                  }}
-                >
-                  {/* Avatar */}
-                  <div style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "50%",
-                    background: student.isGroup ? "var(--primary-color)" : "var(--primary-gold)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontWeight: "bold",
-                    fontSize: "1.2rem",
-                    marginRight: "12px",
-                    position: "relative",
-                    flexShrink: 0
-                  }}>
-                    {student.isGroup ? <Users size={24} /> : (student.name || student.full_name || "S")[0].toUpperCase()}
-                    {/* Status Dot */}
-                    <div style={{
-                      position: "absolute",
-                      bottom: 0,
-                      right: 0,
-                      width: "14px",
-                      height: "14px",
-                      borderRadius: "50%",
-                      background: isClassLive ? "#2ecc71" : "#e74c3c",
-                      border: "2px solid var(--sidebar-bg)",
-                    }} />
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, overflow: "hidden" }}>
-                    <div style={{ fontSize: "1rem", fontWeight: "600", color: "var(--text-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {student.name || student.full_name}
-                    </div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {student.isGroup ? "Combined Group Class" : (parentWaiting ? "Student Waiting..." : (student.its ? `ITS: ${student.its}` : "salam"))}
-                    </div>
-                  </div>
-                  
-                  {isClassLive && !student.isGroup && parentWaiting && (
-                    <div className="pulse-indicator" style={{ marginLeft: "8px" }}>
-                      <div className="pulse-dot" style={{ backgroundColor: "#2ecc71" }} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right Main Area */}
-        <div className="tahfeez-chat-main" style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          background: "var(--bg-color)"
-        }}>
-          {activeChat ? (
-            <>
-              {/* Header */}
-              <div style={{
-                padding: "16px 24px",
-                background: "var(--sidebar-bg)",
-                borderBottom: "1px solid var(--border-color)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between"
-              }}>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <div style={{
-                    width: "40px",
-                    height: "40px",
-                    borderRadius: "50%",
-                    background: activeChat.isGroup ? "var(--primary-color)" : "var(--primary-gold)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontWeight: "bold",
-                    marginRight: "16px"
-                  }}>
-                    {activeChat.isGroup ? <Users size={20} /> : (activeChat.name || activeChat.full_name || "S")[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: "600", color: "var(--text-color)", fontSize: "1.1rem" }}>
-                      {activeChat.name || activeChat.full_name}
-                    </div>
-                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                      {activeChat.isGroup ? "Group Session" : `${activeChat.its || 'Student'} - Online`}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "20px", color: "var(--text-muted)" }}>
-                  <BarChart2 size={20} style={{ cursor: "pointer" }} />
-                  <Edit2 size={20} style={{ cursor: "pointer" }} />
-                  <Book size={20} style={{ cursor: "pointer" }} />
-                  <div 
-                    onClick={() => {
-                      if (activeChat.isGroup) {
-                        handleStartGroupClass();
-                      } else {
-                        handleStartCall(activeChat);
-                      }
-                    }}
-                    style={{
-                      width: "40px",
-                      height: "40px",
-                      borderRadius: "50%",
-                      background: "var(--primary-color)",
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
-                    }}
-                  >
-                    <Phone size={18} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Chat Body */}
-              <div style={{
-                flex: 1,
-                padding: "24px",
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px"
-              }}>
-                {/* Date Badge */}
-                <div style={{ textAlign: "center", margin: "10px 0" }}>
-                  <span style={{
-                    background: "var(--border-color)",
-                    color: "var(--text-muted)",
-                    padding: "4px 12px",
-                    borderRadius: "12px",
-                    fontSize: "0.8rem"
-                  }}>
-                    {new Date().toLocaleDateString('en-GB')}
-                  </span>
-                </div>
-
-                {/* Placeholder Messages mapping to screenshot */}
-                <div style={{ alignSelf: "flex-start", background: "var(--sidebar-bg)", border: "1px solid var(--border-color)", padding: "10px 16px", borderRadius: "12px 12px 12px 0", maxWidth: "70%" }}>
-                  <div style={{ color: "var(--text-color)" }}>Salaam</div>
-                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textAlign: "right", marginTop: "4px" }}>2:59 PM</div>
-                </div>
-
-                <div style={{ alignSelf: "flex-end", background: "var(--primary-color)", color: "#fff", padding: "10px 16px", borderRadius: "12px 12px 0 12px", maxWidth: "70%" }}>
-                  <div>Already join chu</div>
-                  <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.7)", textAlign: "right", marginTop: "4px" }}>3:07 PM</div>
-                </div>
-                
-                <div style={{ alignSelf: "flex-end", background: "var(--primary-color)", color: "#fff", padding: "10px 16px", borderRadius: "12px 12px 0 12px", maxWidth: "70%" }}>
-                  <div>wait problem ch</div>
-                  <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.7)", textAlign: "right", marginTop: "4px" }}>3:08 PM</div>
-                </div>
-
-              </div>
-
-              {/* Message Input */}
-              <div style={{
-                padding: "16px 24px",
-                background: "var(--sidebar-bg)",
-                borderTop: "1px solid var(--border-color)"
-              }}>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  background: "var(--bg-color)",
-                  borderRadius: "24px",
-                  padding: "10px 20px",
-                  border: "1px solid var(--border-color)"
-                }}>
-                  <input
-                    type="text"
-                    placeholder="Type a message..."
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      outline: "none",
-                      color: "var(--text-color)",
-                      width: "100%",
-                      fontSize: "0.95rem"
-                    }}
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", flexDirection: "column" }}>
-              <Users size={64} style={{ opacity: 0.2, marginBottom: "16px" }} />
-              <h3>Online Tahfeez</h3>
-              <p>Select a student or group from the left to start a session.</p>
-            </div>
-          )}
-        </div>
-      </div>
+      <TahfeezChatUI
+        studentsList={studentsList}
+        activeChat={selectedTahfeezChat}
+        onSelectChat={setSelectedTahfeezChat}
+        searchQuery={tahfeezSearchQuery}
+        onSearchChange={setTahfeezSearchQuery}
+        activeSessions={activeSessions}
+        role="teacher"
+        currentUserId={user?.id || user?.user_metadata?.sub}
+        currentUserName={teacherIdentity || user?.user_metadata?.full_name}
+        onCallAction={async (chat) => {
+          if (chat.isGroup) {
+            handleStartGroupClass();
+          } else {
+            handleStartCall(chat);
+          }
+        }}
+        onSendMessage={(msgText, chat) => {
+          if (typeof window !== "undefined" && window.broadcastNotification) {
+            const receiverRole = "parents";
+            window.broadcastNotification(
+              "New Message from Muhaffiz",
+              msgText,
+              receiverRole,
+              chat?.student_id,
+              "Online Tahfeez"
+            );
+          }
+        }}
+      />
     );
   };
 
