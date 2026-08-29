@@ -71,6 +71,20 @@ function buildIceServers() {
   };
 }
 
+// Enhance SDP for crystal clear, high-bitrate Opus vocal recitation
+function tuneSdpForVocalClarity(sdp) {
+  if (!sdp) return sdp;
+  return sdp.replace(
+    /(a=fmtp:\d+ .*?)\r\n/g,
+    (match) => {
+      if (match.includes("opus") || match.includes("111")) {
+        return match.trim() + ";maxaveragebitrate=64000;stereo=0;sprop-stereo=0;useinbandfec=1;minptime=10;cng=off\r\n";
+      }
+      return match;
+    }
+  );
+}
+
 export default function VideoCall({ call, onClose }) {
   const {
     roomId,
@@ -93,17 +107,21 @@ export default function VideoCall({ call, onClose }) {
   const endedRef = useRef(false);
   const sessionIdRef = useRef(Date.now().toString());
   const audioContextRef = useRef(null);
+  const gainNodeRef = useRef(null);
   const localAnalyserRef = useRef(null);
   const remoteAnalyserRef = useRef(null);
   const animFrameRef = useRef(null);
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+  const [peerCamOn, setPeerCamOn] = useState(true);
+  const [peerMicOn, setPeerMicOn] = useState(true);
   const [facingMode, setFacingMode] = useState("user"); // "user" | "environment"
   const [layoutMode, setLayoutMode] = useState("grid"); // "grid" (side-by-side) | "pip" (focus)
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [hasRemoteAudio, setHasRemoteAudio] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [volumeBoost, setVolumeBoost] = useState(false);
   const [status, setStatus] = useState("initializing"); // "initializing" | "calling" | "connected" | "reconnecting" | "error"
   const [error, setError] = useState("");
   const [seconds, setSeconds] = useState(0);
@@ -128,7 +146,7 @@ export default function VideoCall({ call, onClose }) {
     }
   }, []);
 
-  // Setup Web Audio API volume analyzers for speaking detection
+  // Setup Web Audio API direct destination output & volume analyzers
   const setupAudioMonitoring = useCallback((localStream, remoteStream) => {
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -141,6 +159,7 @@ export default function VideoCall({ call, onClose }) {
         ctx.resume().catch(() => {});
       }
 
+      // Local microphone volume analysis
       if (localStream && localStream.getAudioTracks().length > 0) {
         try {
           const localSrc = ctx.createMediaStreamSource(localStream);
@@ -152,15 +171,30 @@ export default function VideoCall({ call, onClose }) {
         } catch (_) {}
       }
 
+      // Remote incoming sound: Direct route to hardware speaker destination via GainNode
       if (remoteStream && remoteStream.getAudioTracks().length > 0) {
         try {
           const remoteSrc = ctx.createMediaStreamSource(remoteStream);
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = volumeBoost ? 2.0 : 1.4;
+          gainNodeRef.current = gainNode;
+
           const remoteAnalyser = ctx.createAnalyser();
           remoteAnalyser.fftSize = 256;
           remoteAnalyser.smoothingTimeConstant = 0.4;
-          remoteSrc.connect(remoteAnalyser);
+
+          remoteSrc.connect(gainNode);
+          gainNode.connect(remoteAnalyser);
+
+          // Connect directly to hardware audio output if not spectator
+          if (!isSpectator) {
+            gainNode.connect(ctx.destination);
+          }
+
           remoteAnalyserRef.current = remoteAnalyser;
-        } catch (_) {}
+        } catch (e) {
+          console.warn("Direct WebAudio speaker output routing note:", e);
+        }
       }
 
       const localBuf = new Uint8Array(128);
@@ -192,7 +226,14 @@ export default function VideoCall({ call, onClose }) {
     } catch (e) {
       console.warn("Audio monitoring error:", e);
     }
-  }, []);
+  }, [isSpectator, volumeBoost]);
+
+  // Adjust volume gain node when boost is toggled
+  useEffect(() => {
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = volumeBoost ? 2.0 : 1.4;
+    }
+  }, [volumeBoost]);
 
   // Cleanup helper
   const stopLocal = useCallback(() => {
@@ -301,17 +342,34 @@ export default function VideoCall({ call, onClose }) {
     const next = !micOn;
     stream.getAudioTracks().forEach((t) => { t.enabled = next; });
     setMicOn(next);
-  }, [micOn]);
+
+    // Sync state to peer via signaling
+    if (roomId) {
+      try {
+        const roomRef = doc(db, SIGNAL_PATH, roomId);
+        const fieldName = role === "caller" ? "caller_mic_on" : "callee_mic_on";
+        updateDoc(roomRef, { [fieldName]: next }).catch(() => {});
+      } catch (_) {}
+    }
+  }, [micOn, roomId, role, SIGNAL_PATH]);
 
   // Toggle Camera
   const toggleCam = useCallback(async () => {
     const pc = pcRef.current;
     const stream = localStreamRef.current;
+    const next = !camOn;
 
     if (stream && stream.getVideoTracks().length > 0) {
-      const next = !camOn;
       stream.getVideoTracks().forEach((t) => { t.enabled = next; });
       setCamOn(next);
+
+      if (roomId) {
+        try {
+          const roomRef = doc(db, SIGNAL_PATH, roomId);
+          const fieldName = role === "caller" ? "caller_cam_on" : "callee_cam_on";
+          updateDoc(roomRef, { [fieldName]: next }).catch(() => {});
+        } catch (_) {}
+      }
       return;
     }
 
@@ -354,11 +412,19 @@ export default function VideoCall({ call, onClose }) {
           try { await localVideoRef.current.play(); } catch (_) {}
         }
         setCamOn(true);
+
+        if (roomId) {
+          try {
+            const roomRef = doc(db, SIGNAL_PATH, roomId);
+            const fieldName = role === "caller" ? "caller_cam_on" : "callee_cam_on";
+            updateDoc(roomRef, { [fieldName]: true }).catch(() => {});
+          } catch (_) {}
+        }
       }
     } catch (e) {
       console.warn("Unable to enable camera:", e);
     }
-  }, [camOn, facingMode]);
+  }, [camOn, facingMode, roomId, role, SIGNAL_PATH]);
 
   // Switch camera (front/back on mobile)
   const switchCamera = useCallback(async () => {
@@ -407,8 +473,8 @@ export default function VideoCall({ call, onClose }) {
     }
   }, [facingMode]);
 
-  // Unlock Audio
-  const handleUnlockAudio = () => {
+  // Global Audio Unlock Trigger on any click or touch
+  const handleGlobalAudioUnlock = () => {
     if (audioContextRef.current && audioContextRef.current.state === "suspended") {
       audioContextRef.current.resume().catch(() => {});
     }
@@ -418,7 +484,9 @@ export default function VideoCall({ call, onClose }) {
       }).catch(() => {});
     }
     if (remoteVideoRef.current) {
-      remoteVideoRef.current.play().catch(() => {});
+      remoteVideoRef.current.play().then(() => {
+        setHasRemoteVideo(true);
+      }).catch(() => {});
     }
   };
 
@@ -445,12 +513,11 @@ export default function VideoCall({ call, onClose }) {
       setStatus("initializing");
       setError("");
 
-      // 1. Acquire Local Media
+      // 1. Acquire Local Media (Mic + Cam) with vocal clarity constraints
       let stream = null;
       if (!isSpectator) {
         try {
           try {
-            // High fidelity audio constraints optimized for vocal recitation
             stream = await navigator.mediaDevices.getUserMedia({
               video: {
                 facingMode: "user",
@@ -459,7 +526,7 @@ export default function VideoCall({ call, onClose }) {
               },
               audio: {
                 echoCancellation: true,
-                noiseSuppression: true,
+                noiseSuppression: false, // Don't clip soft recitation phonemes
                 autoGainControl: true,
                 channelCount: 1,
                 sampleRate: 48000,
@@ -468,7 +535,7 @@ export default function VideoCall({ call, onClose }) {
             setCamOn(true);
             setMicOn(true);
           } catch (vidErr) {
-            console.warn("Attempt 1 failed, trying fallback video/audio:", vidErr);
+            console.warn("Standard media acquisition note, trying fallback:", vidErr);
             try {
               stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
               setCamOn(true);
@@ -481,7 +548,7 @@ export default function VideoCall({ call, onClose }) {
                 audioStream = await navigator.mediaDevices.getUserMedia({
                   audio: {
                     echoCancellation: true,
-                    noiseSuppression: true,
+                    noiseSuppression: false,
                     autoGainControl: true,
                   },
                 });
@@ -579,7 +646,7 @@ export default function VideoCall({ call, onClose }) {
         try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (_) {}
       }
 
-      // 3. Remote Track Handler
+      // 3. Remote Track Handler - Guarantees Immediate Display & Loud Output
       pc.ontrack = (ev) => {
         console.log(`[WebRTC] Remote track received: ${ev.track.kind}`);
         const track = ev.track;
@@ -591,10 +658,14 @@ export default function VideoCall({ call, onClose }) {
           track.onended = () => setHasRemoteVideo(false);
 
           if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = new MediaStream([track]);
-            remoteVideoRef.current.play().catch((err) => {
-              console.warn("[WebRTC] Remote video play note:", err);
-            });
+            const vidStream = new MediaStream([track]);
+            remoteVideoRef.current.srcObject = vidStream;
+            remoteVideoRef.current.onloadedmetadata = () => {
+              remoteVideoRef.current.play().catch(() => {});
+              setHasRemoteVideo(true);
+            };
+            remoteVideoRef.current.onplaying = () => setHasRemoteVideo(true);
+            remoteVideoRef.current.play().catch(() => {});
           }
         }
 
@@ -610,13 +681,13 @@ export default function VideoCall({ call, onClose }) {
             remoteAudioRef.current.play().then(() => {
               setAudioBlocked(false);
             }).catch((err) => {
-              console.warn("[WebRTC] Remote audio autoplay blocked:", err);
+              console.warn("[WebRTC] Remote audio autoplay prompt:", err);
               setAudioBlocked(true);
             });
           }
         }
 
-        // Attach audio analysis
+        // Connect WebAudio pipeline & volume visualizers
         setupAudioMonitoring(localStreamRef.current, new MediaStream(pc.getReceivers().map(r => r.track).filter(t => t.kind === "audio")));
         setStatus("connected");
       };
@@ -663,7 +734,7 @@ export default function VideoCall({ call, onClose }) {
               createdAt: Date.now(),
             });
           } catch (err) {
-            console.warn("[WebRTC] ICE candidate write error:", err);
+            console.warn("[WebRTC] ICE candidate write note:", err);
           }
         }
       };
@@ -683,7 +754,7 @@ export default function VideoCall({ call, onClose }) {
         try {
           await currentPc.addIceCandidate(new RTCIceCandidate(cand));
         } catch (err) {
-          console.warn("[WebRTC] addIceCandidate error:", err);
+          console.warn("[WebRTC] addIceCandidate note:", err);
         }
       };
 
@@ -696,7 +767,7 @@ export default function VideoCall({ call, onClose }) {
           try {
             await currentPc.addIceCandidate(new RTCIceCandidate(cand));
           } catch (err) {
-            console.warn("[WebRTC] flush ICE error:", err);
+            console.warn("[WebRTC] flush ICE note:", err);
           }
         }
       };
@@ -721,15 +792,21 @@ export default function VideoCall({ call, onClose }) {
             });
           }).catch(() => {});
 
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
+          const rawOffer = await pc.createOffer();
+          const tunedOffer = new RTCSessionDescription({
+            type: rawOffer.type,
+            sdp: tuneSdpForVocalClarity(rawOffer.sdp)
+          });
+          await pc.setLocalDescription(tunedOffer);
 
           await setDoc(roomRef, {
             sessionId: currentSessionId,
-            offer: { type: offer.type, sdp: offer.sdp },
+            offer: { type: tunedOffer.type, sdp: tunedOffer.sdp },
             answer: null,
             caller: { name: myName, role: myRole },
             caller_in_room: true,
+            caller_cam_on: camOn,
+            caller_mic_on: micOn,
             callee_in_room: false,
             started_at: Date.now(),
             status: "calling",
@@ -739,6 +816,14 @@ export default function VideoCall({ call, onClose }) {
             if (endedRef.current || !snapshot.exists()) return;
             const data = snapshot.data();
             if (!data) return;
+
+            // Track callee's live camera and mic state
+            if (data.callee_cam_on !== undefined) {
+              setPeerCamOn(data.callee_cam_on);
+            }
+            if (data.callee_mic_on !== undefined) {
+              setPeerMicOn(data.callee_mic_on);
+            }
 
             if (data.answer && data.sessionId === currentSessionId && !pc.remoteDescription) {
               try {
@@ -774,13 +859,19 @@ export default function VideoCall({ call, onClose }) {
             await pc.setRemoteDescription(new RTCSessionDescription(offerData));
             await flushRemoteCandidates();
 
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
+            const rawAnswer = await pc.createAnswer();
+            const tunedAnswer = new RTCSessionDescription({
+              type: rawAnswer.type,
+              sdp: tuneSdpForVocalClarity(rawAnswer.sdp)
+            });
+            await pc.setLocalDescription(tunedAnswer);
 
             await updateDoc(roomRef, {
-              answer: { type: answer.type, sdp: answer.sdp },
+              answer: { type: tunedAnswer.type, sdp: tunedAnswer.sdp },
               callee: { name: myName, role: myRole },
               callee_in_room: true,
+              callee_cam_on: camOn,
+              callee_mic_on: micOn,
               status: "connected",
             });
 
@@ -796,6 +887,14 @@ export default function VideoCall({ call, onClose }) {
           if (endedRef.current || !snapshot.exists()) return;
           const data = snapshot.data();
           if (!data) return;
+
+          // Track caller's live camera and mic state
+          if (data.caller_cam_on !== undefined) {
+            setPeerCamOn(data.caller_cam_on);
+          }
+          if (data.caller_mic_on !== undefined) {
+            setPeerMicOn(data.caller_mic_on);
+          }
 
           if (data.offer && !answerCreated) {
             await handleOffer(data.offer);
@@ -834,9 +933,16 @@ export default function VideoCall({ call, onClose }) {
   }[status] || status;
 
   const isTeacher = myRole === "teacher";
+  const showRemoteVideo = peerCamOn && hasRemoteVideo && status === "connected";
 
   return createPortal(
-    <div id="g" className={`vc-overlay ${isFullscreen ? "vc-fullscreen" : ""}`} role="dialog" aria-label="Video call">
+    <div
+      id="g"
+      className={`vc-overlay ${isFullscreen ? "vc-fullscreen" : ""}`}
+      role="dialog"
+      aria-label="Video call"
+      onClick={handleGlobalAudioUnlock}
+    >
       <div className={`vc-stage ${layoutMode === "grid" ? "vc-layout-grid" : "vc-layout-pip"}`}>
         {/* Dedicated Audio Element for Remote Sound */}
         <audio
@@ -852,7 +958,7 @@ export default function VideoCall({ call, onClose }) {
             <span className={`vc-dot ${status === "connected" ? "vc-dot-active" : ""}`} />
             <div className="vc-title-group">
               <span className="vc-room-label">
-                {isSpectator ? "Auditing Class (Spectator)" : "Live Tahfeez Class"}
+                {isSpectator ? "Auditing Class (Spectator)" : "Live Tahfeez Classroom"}
               </span>
               <span className="vc-role-badge">
                 {isTeacher ? "👨‍🏫 Muhaffiz Classroom" : "👦 Student Session"}
@@ -863,20 +969,29 @@ export default function VideoCall({ call, onClose }) {
             <span className="vc-status-pill">{statusLabel}</span>
             <button
               type="button"
-              className="vc-icon-btn"
-              onClick={() => setLayoutMode(layoutMode === "grid" ? "pip" : "grid")}
-              title={layoutMode === "grid" ? "Switch to Focus/PiP View" : "Switch to Side-by-Side Grid"}
+              className={`vc-icon-btn ${volumeBoost ? "active" : ""}`}
+              onClick={(e) => { e.stopPropagation(); setVolumeBoost(!volumeBoost); }}
+              title={volumeBoost ? "Volume Boost: +200% (Active)" : "Volume Boost: 140% (Click to boost)"}
             >
-              <LayoutGrid size={18} />
-              <span>{layoutMode === "grid" ? "Focus View" : "Dual Grid"}</span>
+              <Volume2 size={16} />
+              <span>{volumeBoost ? "Boost 2x" : "Speaker"}</span>
             </button>
             <button
               type="button"
               className="vc-icon-btn"
-              onClick={toggleFullscreen}
+              onClick={(e) => { e.stopPropagation(); setLayoutMode(layoutMode === "grid" ? "pip" : "grid"); }}
+              title={layoutMode === "grid" ? "Switch to Focus/PiP View" : "Switch to Side-by-Side Grid"}
+            >
+              <LayoutGrid size={16} />
+              <span>{layoutMode === "grid" ? "Focus" : "Dual Grid"}</span>
+            </button>
+            <button
+              type="button"
+              className="vc-icon-btn"
+              onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
-              {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
           </div>
         </div>
@@ -887,12 +1002,12 @@ export default function VideoCall({ call, onClose }) {
           <div className={`vc-video-box vc-remote-box ${remoteSpeaking ? "vc-speaking" : ""}`}>
             <video
               ref={remoteVideoRef}
-              className={`vc-video-elem ${hasRemoteVideo ? "vc-video-visible" : "vc-video-hidden"}`}
+              className={`vc-video-elem ${showRemoteVideo ? "vc-video-visible" : "vc-video-hidden"}`}
               autoPlay
               playsInline
               muted={true}
             />
-            {(!hasRemoteVideo || status !== "connected") && (
+            {!showRemoteVideo && (
               <div className="vc-avatar-placeholder">
                 <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
                   <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
@@ -903,7 +1018,7 @@ export default function VideoCall({ call, onClose }) {
                     <span className="vc-audio-wave">
                       <span></span><span></span><span></span><span></span>
                     </span>
-                    <span>Audio Connected · Camera Off</span>
+                    <span>{peerCamOn ? "Connecting camera…" : "Camera Off · Audio Live"}</span>
                   </div>
                 ) : (
                   <div className="vc-status-sub">{statusLabel}</div>
@@ -916,7 +1031,8 @@ export default function VideoCall({ call, onClose }) {
                 {isTeacher ? <User size={13} /> : <GraduationCap size={13} />}
                 <span>{peerName}</span>
               </div>
-              {remoteSpeaking && <span className="vc-speaking-tag">Speaking…</span>}
+              {!peerMicOn && <span className="vc-muted-tag">Muted</span>}
+              {remoteSpeaking && peerMicOn && <span className="vc-speaking-tag">Speaking…</span>}
             </div>
           </div>
 
@@ -953,14 +1069,14 @@ export default function VideoCall({ call, onClose }) {
 
         {/* Audio Unblock Banner if Browser Blocked Sound */}
         {audioBlocked && (
-          <div className="vc-audio-blocked-banner" onClick={handleUnlockAudio}>
+          <div className="vc-audio-blocked-banner" onClick={handleGlobalAudioUnlock}>
             <VolumeX size={18} />
-            <span>Tap here to enable audio playback</span>
+            <span>Tap here to enable speaker audio</span>
           </div>
         )}
 
         {/* Bottom Control Bar */}
-        <div className="vc-controls">
+        <div className="vc-controls" onClick={(e) => e.stopPropagation()}>
           {!isSpectator && (
             <>
               {/* Mic Toggle */}
