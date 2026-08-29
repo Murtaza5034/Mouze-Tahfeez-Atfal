@@ -8096,51 +8096,6 @@ function ParentPortal({
 
         {activePage === "Home" ? (
           <div className="home-dashboard fade-in">
-            {/* Premium Join Here Card */}
-            <div style={{
-              background: "linear-gradient(135deg, var(--primary-color), var(--primary-gold))",
-              borderRadius: "16px",
-              padding: "24px",
-              marginBottom: "24px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
-              color: "#fff",
-              flexWrap: "wrap",
-              gap: "16px"
-            }}>
-              <div style={{ flex: "1 1 300px" }}>
-                <h2 style={{ fontSize: "1.5rem", marginBottom: "8px", fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", color: "#fff" }}>
-                  Live Online Tahfeez
-                </h2>
-                <p style={{ opacity: 0.9, fontSize: "0.95rem", margin: 0, color: "#fff" }}>
-                  Join your Muhaffiz for live 1-on-1 and group Hifz sessions.
-                </p>
-              </div>
-              <button 
-                onClick={() => { setActivePage("Online Tahfeez"); setMenuOpen(false); }}
-                style={{
-                  background: "#fff",
-                  color: "var(--primary-color)",
-                  padding: "12px 24px",
-                  borderRadius: "30px",
-                  fontWeight: "bold",
-                  border: "none",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-                  transition: "transform 0.2s"
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-                onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
-              >
-                <Video size={20} />
-                Join Here
-              </button>
-            </div>
 
             <div className="hifz-stats-premium-strip">
               {(() => {
@@ -8386,6 +8341,67 @@ function ParentPortal({
                   );
                 })()}
               </div>
+
+              {pageVisibility["Online Tahfeez"] !== false && (
+                <div style={{
+                  background: "linear-gradient(135deg, #FFFCF5, #FFFDF8)",
+                  border: "1px solid rgba(212, 175, 55, 0.3)",
+                  borderRadius: "16px",
+                  padding: "20px 24px",
+                  marginBottom: "24px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: "0 8px 24px rgba(212, 175, 55, 0.08)",
+                  flexWrap: "wrap",
+                  gap: "16px",
+                  position: "relative",
+                  overflow: "hidden"
+                }}>
+                  {/* Subtle decorative glow */}
+                  <div style={{
+                    position: "absolute",
+                    top: "-20px", left: "-20px", width: "80px", height: "80px",
+                    background: "var(--primary-gold)", opacity: 0.05, borderRadius: "50%", filter: "blur(20px)"
+                  }} />
+                  <div style={{ flex: "1 1 300px", position: "relative", zIndex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                      <Video size={18} style={{ color: "var(--primary-gold)" }} />
+                      <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800, color: "var(--deep-brown)" }}>
+                        Live Online Tahfeez
+                      </h2>
+                    </div>
+                    <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--soft-brown)", fontWeight: 500 }}>
+                      Join your Muhaffiz for live 1-on-1 Hifz sessions.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => { setActivePage("Online Tahfeez"); setMenuOpen && setMenuOpen(false); }}
+                    style={{
+                      background: "linear-gradient(135deg, var(--primary-gold, #D4AF37), #B8860B)",
+                      color: "#fff",
+                      padding: "10px 24px",
+                      borderRadius: "30px",
+                      fontWeight: 700,
+                      fontSize: "0.9rem",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      boxShadow: "0 4px 12px rgba(212, 175, 55, 0.3)",
+                      transition: "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                      position: "relative",
+                      zIndex: 1
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = "0 6px 16px rgba(212, 175, 55, 0.4)"; }}
+                    onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(212, 175, 55, 0.3)"; }}
+                  >
+                    Enter Chat
+                    <ChevronRight size={16} style={{ marginLeft: "-2px" }} />
+                  </button>
+                </div>
+              )}
 
             <PremiumTodaySchedule
               schedule={pages.Schedule.schedule}
