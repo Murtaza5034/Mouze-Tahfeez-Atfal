@@ -7836,16 +7836,6 @@ function ParentPortal({
         photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
         subtext: `For ${child.name || child.full_name}`,
       });
-      // Add group chat if they have a group
-      if (child.groupName) {
-        studentsList.push({
-          student_id: `group_${child.groupName}`,
-          name: `${child.groupName} Group Session`,
-          isGroup: true,
-          room_id: `mouze-tahfeez-group-${child.groupName.replace(/\s+/g, '-').toLowerCase()}`,
-          teacherName: child.teacherName || child.teacher_name,
-        });
-      }
     });
 
     const filteredList = studentsList.filter(s => {
@@ -20265,18 +20255,7 @@ function TeacherPortal({
   }, [filteredStudents, parentViews]);
 
   const renderOnlineTahfeezTeacher = () => {
-    const groupRoomId = selectedGroup 
-      ? `mouze-tahfeez-group-${selectedGroup.replace(/\s+/g, '-').toLowerCase()}` 
-      : `mouze-tahfeez-group-class`;
-
-    const groupStudent = {
-      student_id: 'group_class',
-      name: selectedGroup ? `${selectedGroup} Group Session` : "General Group Session",
-      isGroup: true,
-      room_id: groupRoomId,
-    };
-
-    const studentsList = [groupStudent, ...filteredStudents].filter(s => {
+    const studentsList = [...filteredStudents].filter(s => {
       if (!tahfeezSearchQuery) return true;
       const searchStr = tahfeezSearchQuery.toLowerCase();
       const n = (s.name || s.full_name || "").toLowerCase();
