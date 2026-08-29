@@ -93,16 +93,25 @@ export default function TahfeezChatUI({
         .chat-item-hover:hover {
           background: rgba(150, 150, 150, 0.1) !important;
         }
+        .call-btn-anim {
+          animation: callBtnPulse 2s infinite;
+        }
+        @keyframes callBtnPulse {
+          0% { box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 200, 150, 50), 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(var(--primary-color-rgb, 200, 150, 50), 0); }
+          100% { box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 200, 150, 50), 0); }
+        }
       `}</style>
       
       {/* Left Sidebar */}
       <div className="tahfeez-chat-sidebar" style={{
         width: "350px",
-        borderRight: "1px solid var(--border-color)",
+        borderRight: "1px solid rgba(150, 150, 150, 0.2)",
         display: "flex",
         flexDirection: "column",
         background: "var(--sidebar-bg)",
-        boxShadow: "2px 0 10px rgba(0,0,0,0.02)",
+        boxShadow: "inset -1px 0 0 rgba(0,0,0,0.05), 4px 0 15px rgba(0,0,0,0.03)",
+        position: "relative",
         zIndex: 10
       }}>
         {/* Search Bar */}
@@ -262,31 +271,25 @@ export default function TahfeezChatUI({
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "20px", color: "var(--text-muted)" }}>
-                {role === "teacher" && (
-                  <>
-                    <BarChart2 size={22} className="chat-item-hover" style={{ cursor: "pointer", padding: "4px", borderRadius: "8px" }} />
-                    <Edit2 size={22} className="chat-item-hover" style={{ cursor: "pointer", padding: "4px", borderRadius: "8px" }} />
-                    <Book size={22} className="chat-item-hover" style={{ cursor: "pointer", padding: "4px", borderRadius: "8px" }} />
-                  </>
-                )}
+              <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
                 <div 
                   onClick={() => onCallAction(activeChat)}
-                  className="pulse"
+                  className="call-btn-anim"
                   style={{
                     padding: "10px 24px",
                     borderRadius: "30px",
-                    background: "linear-gradient(135deg, var(--primary-color), var(--primary-gold))",
-                    color: "#fff",
+                    background: "var(--primary-gold, #D4AF37)",
+                    color: "#3E2723", /* Dark Brown Text */
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
                     boxShadow: "0 6px 15px rgba(0,0,0,0.15)",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                    fontWeight: "600",
+                    transition: "transform 0.2s, box-shadow 0.2s, background 0.2s",
+                    fontWeight: "700",
                     fontSize: "0.95rem",
-                    gap: "8px"
+                    gap: "8px",
+                    border: "1px solid rgba(62, 39, 35, 0.1)"
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = "scale(1.05) translateY(-2px)";
