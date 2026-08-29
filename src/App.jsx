@@ -18678,6 +18678,8 @@ function TeacherPortal({
 }) {
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } = teacherData;
   const backdropMouseDownRef = useRef(false);
+  const [selectedTahfeezChat, setSelectedTahfeezChat] = useState(null);
+  const [tahfeezSearchQuery, setTahfeezSearchQuery] = useState("");
   const [activeCall, setActiveCall] = useState(null);
   const [activeSessions, setActiveSessions] = useState({});
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
@@ -20223,132 +20225,289 @@ function TeacherPortal({
       : `mouze-tahfeez-group-class`;
     const isGroupClassLive = !!activeSessions[groupRoomId];
 
+    const groupStudent = {
+      student_id: 'group_class',
+      name: selectedGroup ? `${selectedGroup} Group Session` : "General Group Session",
+      isGroup: true,
+      room_id: groupRoomId,
+    };
+
+    const studentsList = [groupStudent, ...filteredStudents].filter(s => {
+      if (!tahfeezSearchQuery) return true;
+      const searchStr = tahfeezSearchQuery.toLowerCase();
+      const n = (s.name || s.full_name || "").toLowerCase();
+      return n.includes(searchStr);
+    });
+
+    const activeChat = selectedTahfeezChat || null;
+
     return (
-      <div className="online-tahfeez-teacher fade-in" style={{ paddingBottom: '80px', padding: '0 20px' }}>
-        <div className="section-header" style={{ marginBottom: '24px' }}>
-          <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Video size={24} style={{ color: 'var(--primary-gold)' }} />
-            Online Tahfeez Classroom
-          </h2>
-          <p className="subtitle">Launch live video calls for your whole group or individual students.</p>
-        </div>
+      <div className="tahfeez-chat-container fade-in" style={{
+        display: "flex",
+        height: "calc(100vh - 80px)",
+        background: "var(--bg-color)",
+        overflow: "hidden",
+        borderTop: "1px solid var(--border-color)",
+      }}>
+        {/* Left Sidebar */}
+        <div className="tahfeez-chat-sidebar" style={{
+          width: "350px",
+          borderRight: "1px solid var(--border-color)",
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--sidebar-bg)",
+        }}>
+          {/* Search Bar */}
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color)" }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              background: "var(--bg-color)",
+              borderRadius: "20px",
+              padding: "8px 16px",
+            }}>
+              <Search size={16} color="var(--text-muted)" style={{ marginRight: "8px" }} />
+              <input
+                type="text"
+                placeholder="search"
+                value={tahfeezSearchQuery}
+                onChange={(e) => setTahfeezSearchQuery(e.target.value)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  outline: "none",
+                  color: "var(--text-color)",
+                  width: "100%",
+                  fontSize: "0.9rem"
+                }}
+              />
+            </div>
+          </div>
 
-        {/* Group Class Panel */}
-        <div className="tahfeez-card" style={{ maxWidth: '600px', marginBottom: '30px' }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span className="tahfeez-badge">Group Class</span>
-            {isGroupClassLive ? (
-              <div className="pulse-indicator">
-                <div className="pulse-dot" />
-                <span>Live Group Class</span>
-              </div>
-            ) : (
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Offline</span>
-            )}
-          </div>
-          <h3 className="tahfeez-title" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", fontSize: '1.4rem' }}>
-            {selectedGroup ? `${selectedGroup} Group Session` : "General Group Session"}
-          </h3>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", margin: "8px 0 20px" }}>
-            Start a combined session. All students in this group will see a button in their portal to join you.
-          </p>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button
-              className={`tahfeez-btn ${isGroupClassLive ? "primary pulse" : "primary"}`}
-              style={{ width: 'auto', minWidth: '180px' }}
-              onClick={handleStartGroupClass}
-            >
-              <Video size={16} /> {isGroupClassLive ? "Join Group Class" : "Start Group Class"}
-            </button>
-            {isGroupClassLive && (
-              <button
-                className="tahfeez-btn"
-                style={{ width: 'auto', background: "#e74c3c", color: "#fff", borderColor: "#c0392b" }}
-                onClick={() => handleTeacherEndSession(groupRoomId)}
-              >
-                End Group Session
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Individual Students List */}
-        <h3 style={{ margin: "30px 0 16px", color: "var(--deep-brown)", fontWeight: 700, fontSize: "1.1rem" }}>
-          Individual Student Class Sessions
-        </h3>
-        
-        {filteredStudents.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>
-            No students found in this group.
-          </div>
-        ) : (
-          <div className="tahfeez-grid">
-            {filteredStudents.map((student) => {
-              const childSessionId = `session_${student.student_id}`;
+          {/* Student List */}
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            {studentsList.map((student) => {
+              const childSessionId = student.isGroup ? student.room_id : `session_${student.student_id}`;
               const activeSession = activeSessions[childSessionId];
               const isClassLive = !!activeSession;
               const parentWaiting = activeSession?.started_by === "parent";
+              const isSelected = activeChat?.student_id === student.student_id;
 
               return (
-                <div key={student.student_id} className="tahfeez-card">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                    <span className="tahfeez-badge">ITS: {student.its || "..."}</span>
-                    {isClassLive ? (
-                      <div className="pulse-indicator">
-                        <div className="pulse-dot" />
-                        <span>{parentWaiting ? "Student Waiting" : "Live"}</span>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Offline</span>
-                    )}
-                  </div>
-
-                  <h3 className="tahfeez-title" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", fontSize: '1.4rem' }}>{student.name || student.full_name}</h3>
-                  <div className="tahfeez-meta">
-                    <p style={{ margin: "4px 0" }}><strong>Juz:</strong> {student.juz || "--"}</p>
-                    <p style={{ margin: "4px 0" }}><strong>Surat:</strong> {student.latestResult?.surat || student.surat || "--"}</p>
-                  </div>
-
-                  {parentWaiting && (
+                <div
+                  key={student.student_id}
+                  onClick={() => setSelectedTahfeezChat(student)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "12px 16px",
+                    cursor: "pointer",
+                    background: isSelected ? "var(--bg-color)" : "transparent",
+                    borderBottom: "1px solid var(--border-color)",
+                    transition: "background 0.2s"
+                  }}
+                >
+                  {/* Avatar */}
+                  <div style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    background: student.isGroup ? "var(--primary-color)" : "var(--primary-gold)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    fontWeight: "bold",
+                    fontSize: "1.2rem",
+                    marginRight: "12px",
+                    position: "relative",
+                    flexShrink: 0
+                  }}>
+                    {student.isGroup ? <Users size={24} /> : (student.name || student.full_name || "S")[0].toUpperCase()}
+                    {/* Status Dot */}
                     <div style={{
-                      background: "rgba(46, 204, 113, 0.1)",
-                      border: "1px solid rgba(46, 204, 113, 0.2)",
-                      borderRadius: "10px",
-                      padding: "10px 14px",
-                      marginBottom: "16px",
-                      fontSize: "0.85rem",
-                      color: "#27ae60",
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px"
-                    }}>
+                      position: "absolute",
+                      bottom: 0,
+                      right: 0,
+                      width: "14px",
+                      height: "14px",
+                      borderRadius: "50%",
+                      background: isClassLive ? "#2ecc71" : "#e74c3c",
+                      border: "2px solid var(--sidebar-bg)",
+                    }} />
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, overflow: "hidden" }}>
+                    <div style={{ fontSize: "1rem", fontWeight: "600", color: "var(--text-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {student.name || student.full_name}
+                    </div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {student.isGroup ? "Combined Group Class" : (parentWaiting ? "Student Waiting..." : (student.its ? `ITS: ${student.its}` : "salam"))}
+                    </div>
+                  </div>
+                  
+                  {isClassLive && !student.isGroup && parentWaiting && (
+                    <div className="pulse-indicator" style={{ marginLeft: "8px" }}>
                       <div className="pulse-dot" style={{ backgroundColor: "#2ecc71" }} />
-                      Student has joined and is waiting for you!
                     </div>
                   )}
-                  <div className="tahfeez-actions" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    <button
-                      className="tahfeez-btn primary"
-                      onClick={() => handleStartCall(student)}
-                    >
-                      <Video size={16} /> {isClassLive ? "Join Call" : "Call Student"}
-                    </button>
-                    {isClassLive && (
-                      <button
-                        className="tahfeez-btn"
-                        style={{ background: "#e74c3c", color: "#fff", borderColor: "#c0392b" }}
-                        onClick={() => handleTeacherEndSession(childSessionId)}
-                      >
-                        End Class
-                      </button>
-                    )}
-                  </div>
                 </div>
               );
             })}
           </div>
-        )}
+        </div>
+
+        {/* Right Main Area */}
+        <div className="tahfeez-chat-main" style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--bg-color)"
+        }}>
+          {activeChat ? (
+            <>
+              {/* Header */}
+              <div style={{
+                padding: "16px 24px",
+                background: "var(--sidebar-bg)",
+                borderBottom: "1px solid var(--border-color)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between"
+              }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <div style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "50%",
+                    background: activeChat.isGroup ? "var(--primary-color)" : "var(--primary-gold)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    fontWeight: "bold",
+                    marginRight: "16px"
+                  }}>
+                    {activeChat.isGroup ? <Users size={20} /> : (activeChat.name || activeChat.full_name || "S")[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: "600", color: "var(--text-color)", fontSize: "1.1rem" }}>
+                      {activeChat.name || activeChat.full_name}
+                    </div>
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                      {activeChat.isGroup ? "Group Session" : `${activeChat.its || 'Student'} - Online`}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "20px", color: "var(--text-muted)" }}>
+                  <BarChart2 size={20} style={{ cursor: "pointer" }} />
+                  <Edit2 size={20} style={{ cursor: "pointer" }} />
+                  <Book size={20} style={{ cursor: "pointer" }} />
+                  <div 
+                    onClick={() => {
+                      if (activeChat.isGroup) {
+                        handleStartGroupClass();
+                      } else {
+                        handleStartCall(activeChat);
+                      }
+                    }}
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      borderRadius: "50%",
+                      background: "var(--primary-color)",
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
+                    }}
+                  >
+                    <Phone size={18} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Chat Body */}
+              <div style={{
+                flex: 1,
+                padding: "24px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px"
+              }}>
+                {/* Date Badge */}
+                <div style={{ textAlign: "center", margin: "10px 0" }}>
+                  <span style={{
+                    background: "var(--border-color)",
+                    color: "var(--text-muted)",
+                    padding: "4px 12px",
+                    borderRadius: "12px",
+                    fontSize: "0.8rem"
+                  }}>
+                    {new Date().toLocaleDateString('en-GB')}
+                  </span>
+                </div>
+
+                {/* Placeholder Messages mapping to screenshot */}
+                <div style={{ alignSelf: "flex-start", background: "var(--sidebar-bg)", border: "1px solid var(--border-color)", padding: "10px 16px", borderRadius: "12px 12px 12px 0", maxWidth: "70%" }}>
+                  <div style={{ color: "var(--text-color)" }}>Salaam</div>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textAlign: "right", marginTop: "4px" }}>2:59 PM</div>
+                </div>
+
+                <div style={{ alignSelf: "flex-end", background: "var(--primary-color)", color: "#fff", padding: "10px 16px", borderRadius: "12px 12px 0 12px", maxWidth: "70%" }}>
+                  <div>Already join chu</div>
+                  <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.7)", textAlign: "right", marginTop: "4px" }}>3:07 PM</div>
+                </div>
+                
+                <div style={{ alignSelf: "flex-end", background: "var(--primary-color)", color: "#fff", padding: "10px 16px", borderRadius: "12px 12px 0 12px", maxWidth: "70%" }}>
+                  <div>wait problem ch</div>
+                  <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.7)", textAlign: "right", marginTop: "4px" }}>3:08 PM</div>
+                </div>
+
+              </div>
+
+              {/* Message Input */}
+              <div style={{
+                padding: "16px 24px",
+                background: "var(--sidebar-bg)",
+                borderTop: "1px solid var(--border-color)"
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  background: "var(--bg-color)",
+                  borderRadius: "24px",
+                  padding: "10px 20px",
+                  border: "1px solid var(--border-color)"
+                }}>
+                  <input
+                    type="text"
+                    placeholder="Type a message..."
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      outline: "none",
+                      color: "var(--text-color)",
+                      width: "100%",
+                      fontSize: "0.95rem"
+                    }}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", flexDirection: "column" }}>
+              <Users size={64} style={{ opacity: 0.2, marginBottom: "16px" }} />
+              <h3>Online Tahfeez</h3>
+              <p>Select a student or group from the left to start a session.</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
