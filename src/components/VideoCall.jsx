@@ -160,6 +160,8 @@ export default function VideoCall({ call, onClose }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
 
+  const lastProcessedOfferSdpRef = useRef("");
+  const lastProcessedAnswerSdpRef = useRef("");
   useEffect(() => { statusRef.current = status; }, [status]);
   useEffect(() => { camOnRef.current = camOn; }, [camOn]);
   useEffect(() => { micOnRef.current = micOn; }, [micOn]);
@@ -953,9 +955,11 @@ export default function VideoCall({ call, onClose }) {
         if (!offerData || !offerData.sdp) return;
         if (offerData.from === role) return; // this is our own offer echoed back
         if (pc.signalingState !== "stable") return;
+        if (offerData.sdp === lastProcessedOfferSdpRef.current) return; // Ignore duplicate offers from snapshots
 
         try {
           console.log(`[WebRTC] ${role} applying offer`);
+          lastProcessedOfferSdpRef.current = offerData.sdp;
           await pc.setRemoteDescription(new RTCSessionDescription(offerData));
           await flushRemoteCandidates();
 
@@ -986,9 +990,11 @@ export default function VideoCall({ call, onClose }) {
       const handleIncomingAnswer = async (answerData) => {
         if (!answerData || !answerData.sdp) return;
         if (pc.signalingState !== "have-local-offer") return; // not currently expecting an answer
+        if (answerData.sdp === lastProcessedAnswerSdpRef.current) return; // Ignore duplicate answers
 
         try {
           console.log(`[WebRTC] ${role} applying answer`);
+          lastProcessedAnswerSdpRef.current = answerData.sdp;
           await pc.setRemoteDescription(new RTCSessionDescription(answerData));
           await flushRemoteCandidates();
           initialNegotiationDoneRef.current = true;
