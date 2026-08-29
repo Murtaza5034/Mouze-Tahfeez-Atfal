@@ -7821,10 +7821,20 @@ function ParentPortal({
   const renderOnlineTahfeezParent = () => {
     const studentsList = [];
     allProfiles.forEach(child => {
+      // Find the teacher's profile to get the DP
+      const tName = child.teacherName || child.teacher_name;
+      const tProfile = (teacherProfiles || []).find(t => 
+        t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
+      );
+      
       // Add individual chat
       studentsList.push({
         ...child,
         isGroup: false,
+        name: tName || "Muhaffiz",
+        full_name: tName || "Muhaffiz",
+        photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
+        subtext: `For ${child.name || child.full_name}`,
       });
       // Add group chat if they have a group
       if (child.groupName) {

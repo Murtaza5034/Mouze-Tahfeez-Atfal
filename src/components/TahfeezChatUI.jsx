@@ -263,7 +263,7 @@ export default function TahfeezChatUI({
                     {displayName}
                   </div>
                   <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {student.isGroup ? "Combined Group Class" : (waitingForMe ? "Waiting in Call..." : (student.its ? `ITS: ${student.its}` : "salam"))}
+                    {student.isGroup ? "Combined Group Class" : (waitingForMe ? "Waiting in Call..." : (student.subtext || (student.its ? `ITS: ${student.its}` : "salam")))}
                   </div>
                 </div>
                 
@@ -352,7 +352,7 @@ export default function TahfeezChatUI({
                     {activeChat.name || activeChat.full_name || activeChat.teacherName}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", color: "var(--primary-color)", fontWeight: "500", marginTop: "2px" }}>
-                    {activeChat.isGroup ? "Group Session" : `${activeChat.its || 'Live Session'} - Online`}
+                    {activeChat.isGroup ? "Group Session" : (activeChat.subtext || `${activeChat.its || 'Live Session'} - Online`)}
                     {/* Simulated typing animation based on input focus */}
                     <div style={{ marginLeft: "8px", display: "flex", alignItems: "center", opacity: 0.6 }}>
                       <div className="typing-dot"></div>
@@ -510,8 +510,8 @@ export default function TahfeezChatUI({
                   }}
                 />
                 <button type="submit" style={{
-                  background: newMessage.trim() ? "var(--primary-color)" : "var(--border-color)",
-                  color: newMessage.trim() ? "#fff" : "var(--text-muted)",
+                  background: "var(--primary-gold, #D4AF37)",
+                  color: "#3E2723",
                   border: "none",
                   cursor: newMessage.trim() ? "pointer" : "default",
                   display: "flex",
@@ -520,9 +520,11 @@ export default function TahfeezChatUI({
                   width: "40px",
                   height: "40px",
                   borderRadius: "50%",
-                  transition: "all 0.2s",
+                  transition: "all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
                   marginLeft: "12px",
-                  boxShadow: newMessage.trim() ? "0 2px 6px rgba(0,0,0,0.15)" : "none"
+                  opacity: newMessage.trim() ? 1 : 0.5,
+                  transform: newMessage.trim() ? "scale(1.05)" : "scale(1)",
+                  boxShadow: newMessage.trim() ? "0 4px 12px rgba(212, 175, 55, 0.4)" : "none"
                 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "-2px" }}>
                     <line x1="22" y1="2" x2="11" y2="13"></line>
