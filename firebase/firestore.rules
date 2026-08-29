@@ -236,6 +236,12 @@ service cloud.firestore {
         allow read, write: if isSignedIn();
       }
     }
+    match /tahfeez_messages/{id} {
+      allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
     match /online_tahfeez_sessions/{id} {
       allow read, write: if isSignedIn();
       match /{allSubcollections=**} {
@@ -395,6 +401,12 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
     match /kibar_tahfeez_signals/{id} {
+      allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+    match /kibar_tahfeez_messages/{id} {
       allow read, write: if isSignedIn();
       match /{allSubcollections=**} {
         allow read, write: if isSignedIn();
