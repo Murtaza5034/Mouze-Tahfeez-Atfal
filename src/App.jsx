@@ -7846,20 +7846,38 @@ function ParentPortal({
     });
 
     return (
-                        onClick={() => handleParentJoinGroupClass(child)}
-                      >
-                        Group Class
-                      </button>
-                    )}
-                  </div>
-              </div>
-          );
-        })}
-      </div>
-    )}
-  </div>
-);
-};
+      <TahfeezChatUI
+        studentsList={filteredList}
+        activeChat={selectedTahfeezChat}
+        onSelectChat={setSelectedTahfeezChat}
+        searchQuery={tahfeezSearchQuery}
+        onSearchChange={setTahfeezSearchQuery}
+        activeSessions={activeSessions}
+        role={portalRole && portalRole.includes("student") ? "student" : "parent"}
+        currentUserId={user?.id || user?.user_metadata?.sub}
+        currentUserName={portalAccess?.full_name || user?.user_metadata?.full_name}
+        onCallAction={async (chat) => {
+          if (chat.isGroup) {
+            handleParentJoinGroupClass(chat);
+          } else {
+            handleParentStartCall(chat);
+          }
+        }}
+        onSendMessage={(msgText, chat) => {
+          if (typeof window !== "undefined" && window.broadcastNotification) {
+            const receiverRole = "teacher";
+            window.broadcastNotification(
+              "New Message",
+              msgText,
+              receiverRole,
+              null,
+              "Online Tahfeez"
+            );
+          }
+        }}
+      />
+    );
+  };
 
   return (
     <div className="parent-shell">
