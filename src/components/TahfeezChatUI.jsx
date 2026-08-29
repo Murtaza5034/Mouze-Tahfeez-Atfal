@@ -75,7 +75,7 @@ export default function TahfeezChatUI({
   };
 
   return (
-    <div className="tahfeez-chat-container fade-in" style={{
+    <div className={`tahfeez-chat-container fade-in ${activeChat ? 'mobile-chat-active' : ''}`} style={{
       display: "flex",
       height: "calc(100vh - 80px)",
       background: "var(--bg-color)",
@@ -118,10 +118,28 @@ export default function TahfeezChatUI({
         .typing-dot:nth-child(2) { animation-delay: -0.16s; }
         
         @media (max-width: 768px) {
+          body {
+            overflow: hidden !important;
+          }
+          .tahfeez-chat-container {
+            position: fixed !important;
+            top: 70px !important;
+            bottom: 95px !important;
+            left: 0 !important;
+            right: 0 !important;
+            height: auto !important;
+            width: 100% !important;
+            z-index: 990 !important;
+            border-top: none !important;
+          }
+          .tahfeez-chat-container.mobile-chat-active {
+            bottom: 0 !important;
+            z-index: 1100 !important; /* Covers the bottom nav (1000) */
+          }
           .mobile-hide-sidebar { display: none !important; }
           .mobile-hide-main { display: none !important; }
-          .tahfeez-chat-sidebar { width: 100% !important; border-right: none !important; }
-          .tahfeez-chat-main { width: 100% !important; }
+          .tahfeez-chat-sidebar { width: 100% !important; border-right: none !important; height: 100%; }
+          .tahfeez-chat-main { width: 100% !important; height: 100%; }
           .mobile-back-btn { display: flex !important; }
         }
         .mobile-back-btn { display: none; }
