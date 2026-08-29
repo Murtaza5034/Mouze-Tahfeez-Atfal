@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Users, Phone, BarChart2, Edit2, Book, MessageCircle, Video } from 'lucide-react';
+import { Search, Users, Phone, BarChart2, Edit2, Book, MessageCircle, Video, ArrowLeft } from 'lucide-react';
 import { db } from '../firebase/db';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
@@ -101,10 +101,34 @@ export default function TahfeezChatUI({
           70% { box-shadow: 0 0 0 10px rgba(var(--primary-color-rgb, 200, 150, 50), 0); }
           100% { box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 200, 150, 50), 0); }
         }
+        @keyframes typingBounce {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-4px); }
+        }
+        .typing-dot {
+          display: inline-block;
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background-color: var(--primary-color);
+          margin: 0 2px;
+          animation: typingBounce 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @media (max-width: 768px) {
+          .mobile-hide-sidebar { display: none !important; }
+          .mobile-hide-main { display: none !important; }
+          .tahfeez-chat-sidebar { width: 100% !important; border-right: none !important; }
+          .tahfeez-chat-main { width: 100% !important; }
+          .mobile-back-btn { display: flex !important; }
+        }
+        .mobile-back-btn { display: none; }
       `}</style>
       
       {/* Left Sidebar */}
-      <div className="tahfeez-chat-sidebar" style={{
+      <div className={`tahfeez-chat-sidebar ${activeChat ? 'mobile-hide-sidebar' : ''}`} style={{
         width: "350px",
         borderRight: "1px solid rgba(150, 150, 150, 0.2)",
         display: "flex",
@@ -225,7 +249,7 @@ export default function TahfeezChatUI({
       </div>
 
       {/* Right Main Area */}
-      <div className="tahfeez-chat-main" style={{
+      <div className={`tahfeez-chat-main ${!activeChat ? 'mobile-hide-main' : ''}`} style={{
         flex: 1,
         display: "flex",
         flexDirection: "column",
@@ -246,6 +270,13 @@ export default function TahfeezChatUI({
               zIndex: 5
             }}>
               <div style={{ display: "flex", alignItems: "center" }}>
+                <div 
+                  className="mobile-back-btn chat-item-hover" 
+                  onClick={() => onSelectChat(null)}
+                  style={{ marginRight: "12px", padding: "8px", cursor: "pointer", borderRadius: "50%", alignItems: "center", justifyContent: "center" }}
+                >
+                  <ArrowLeft size={22} color="var(--text-color)" />
+                </div>
                 <div style={{
                   width: "44px",
                   height: "44px",
@@ -265,8 +296,14 @@ export default function TahfeezChatUI({
                   <div style={{ fontWeight: "700", color: "var(--text-color)", fontSize: "1.15rem" }}>
                     {activeChat.name || activeChat.full_name || activeChat.teacherName}
                   </div>
-                  <div style={{ fontSize: "0.85rem", color: "var(--primary-color)", fontWeight: "500", marginTop: "2px" }}>
+                  <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", color: "var(--primary-color)", fontWeight: "500", marginTop: "2px" }}>
                     {activeChat.isGroup ? "Group Session" : `${activeChat.its || 'Live Session'} - Online`}
+                    {/* Simulated typing animation based on input focus */}
+                    <div style={{ marginLeft: "8px", display: "flex", alignItems: "center", opacity: 0.6 }}>
+                      <div className="typing-dot"></div>
+                      <div className="typing-dot"></div>
+                      <div className="typing-dot"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -361,22 +398,22 @@ export default function TahfeezChatUI({
                   return (
                     <div key={msg.id} className="chat-bubble-anim" style={{ 
                       alignSelf: isMine ? "flex-end" : "flex-start", 
-                      background: isMine ? "var(--primary-color)" : "var(--sidebar-bg)", 
-                      color: isMine ? "#fff" : "var(--text-color)", 
-                      border: isMine ? "none" : "1px solid var(--border-color)",
+                      background: isMine ? "var(--primary-gold, #D4AF37)" : "var(--sidebar-bg)", 
+                      color: isMine ? "#1A1A1A" : "var(--text-color)", 
+                      border: isMine ? "1px solid rgba(0,0,0,0.1)" : "1px solid var(--border-color)",
                       padding: "12px 18px", 
                       borderRadius: isMine ? "16px 16px 0 16px" : "16px 16px 16px 0", 
                       maxWidth: "75%",
                       boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                       position: "relative"
                     }}>
-                      <div style={{ wordBreak: "break-word", fontSize: "1rem", lineHeight: "1.4" }}>{msg.text}</div>
+                      <div style={{ wordBreak: "break-word", fontSize: "1rem", lineHeight: "1.4", fontWeight: isMine ? "500" : "400" }}>{msg.text}</div>
                       <div style={{ 
                         fontSize: "0.75rem", 
-                        color: isMine ? "rgba(255,255,255,0.8)" : "var(--text-muted)", 
+                        color: isMine ? "rgba(0,0,0,0.6)" : "var(--text-muted)", 
                         textAlign: "right", 
                         marginTop: "6px",
-                        fontWeight: "500"
+                        fontWeight: "600"
                       }}>
                         {formatTime(msg.timestamp)}
                       </div>
