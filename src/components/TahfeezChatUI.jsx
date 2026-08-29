@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Users, Phone, BarChart2, Edit2, Book, MessageCircle } from 'lucide-react';
+import { Search, Users, Phone, BarChart2, Edit2, Book, MessageCircle, Video } from 'lucide-react';
 import { db } from '../firebase/db';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
@@ -274,22 +274,31 @@ export default function TahfeezChatUI({
                   onClick={() => onCallAction(activeChat)}
                   className="pulse"
                   style={{
-                    width: "44px",
-                    height: "44px",
-                    borderRadius: "50%",
-                    background: "var(--primary-color)",
+                    padding: "10px 24px",
+                    borderRadius: "30px",
+                    background: "linear-gradient(135deg, var(--primary-color), var(--primary-gold))",
                     color: "#fff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    transition: "transform 0.2s"
+                    boxShadow: "0 6px 15px rgba(0,0,0,0.15)",
+                    transition: "transform 0.2s, box-shadow 0.2s",
+                    fontWeight: "600",
+                    fontSize: "0.95rem",
+                    gap: "8px"
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.1)"}
-                  onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = "scale(1.05) translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.2)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = "scale(1) translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 6px 15px rgba(0,0,0,0.15)";
+                  }}
                 >
-                  <Phone size={20} />
+                  <Video size={18} />
+                  <span>Join Call</span>
                 </div>
               </div>
             </div>
