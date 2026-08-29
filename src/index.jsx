@@ -4,7 +4,24 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 
 window.addEventListener('unhandledrejection', (event) => {
-  if (event.reason?.message?.includes('listener indicated an asynchronous response')) {
+  const msg = event.reason?.message || String(event.reason || '');
+  if (
+    msg.includes('message channel closed') ||
+    msg.includes('listener indicated an asynchronous response') ||
+    msg.includes('unload is not allowed')
+  ) {
+    event.preventDefault();
+  }
+});
+
+window.addEventListener('error', (event) => {
+  const msg = event.message || '';
+  const filename = event.filename || '';
+  if (
+    filename.includes('logsListener.bundle.js') ||
+    msg.includes('message channel closed') ||
+    msg.includes('listener indicated an asynchronous response')
+  ) {
     event.preventDefault();
   }
 });
