@@ -3412,7 +3412,38 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
     }
   });
 
-  const builtStudents = childProfiles.map((profile) => {
+  // Deduplicate childProfiles by student_id or id or name so identical rows are unified
+  const dedupedProfiles = [];
+  const seenStudentKeys = new Set();
+  (childProfiles || []).forEach((profile) => {
+    if (!profile) return;
+    const sId = profile.student_id || profile.its || profile.id;
+    const sName = normalizeText(profile.full_name || profile.name || "");
+    const dedupKey = sId ? `id:${String(sId).trim().toLowerCase()}` : `name:${sName}`;
+    if (!seenStudentKeys.has(dedupKey)) {
+      seenStudentKeys.add(dedupKey);
+      dedupedProfiles.push({ ...profile });
+    } else {
+      const existingIdx = dedupedProfiles.findIndex(p => {
+        const pId = p.student_id || p.its || p.id;
+        const pName = normalizeText(p.full_name || p.name || "");
+        return (sId && String(pId).trim().toLowerCase() === String(sId).trim().toLowerCase()) || (sName && pName === sName);
+      });
+      if (existingIdx !== -1) {
+        dedupedProfiles[existingIdx] = {
+          ...profile,
+          ...dedupedProfiles[existingIdx],
+          teacher_id: dedupedProfiles[existingIdx].teacher_id || profile.teacher_id || profile.muhaffiz_id,
+          muhaffiz_id: dedupedProfiles[existingIdx].muhaffiz_id || profile.muhaffiz_id || profile.teacher_id,
+          teacher_name: dedupedProfiles[existingIdx].teacher_name || profile.teacher_name || profile.muhaffiz_name,
+          parent_user_id: dedupedProfiles[existingIdx].parent_user_id || profile.parent_user_id || profile.user_id,
+          parent_email: dedupedProfiles[existingIdx].parent_email || profile.parent_email,
+        };
+      }
+    }
+  });
+
+  const builtStudents = dedupedProfiles.map((profile) => {
     const sId = profile.student_id || profile.its || profile.id;
     const numericId = !isNaN(sId) ? Number(sId) : sId;
     
@@ -7186,7 +7217,7 @@ function ParentPortal({
     if (activeSession) {
       setActiveCall({
         roomId,
-        role: "callee",
+        role: activeSession.started_by === "parent" ? "caller" : "callee",
         myName: studentName,
         peerName: teacherName,
         myRole: "parent",
@@ -8866,14 +8897,35 @@ function ParentPortal({
                   return 0;
                 });
 
-                const roleLabel = (t) => {
-                  const r = (t.teacher_role || t.portal_role || t.role || "").toLowerCase();
-                  if (r.includes('masool')) return 'Masool';
-                  if (r.includes('musaid')) return 'Musaid';
-                  return 'Staff';
+                const defaultMasool = {
+                  id: 'masool-head-taher',
+                  full_name: 'Janab Mulla Taher bhai Rawat',
+                  teacher_role: 'masool',
+                  phone_number: '+91 70215 59548',
+                  whatsapp_number: '+91 70215 59548',
+                  photo_url: 'https://xmlmfijikkptvwbkkoil.supabase.co/storage/v1/object/public/profile/Kg%20profile/1J7A7509.jpg'
                 };
 
-                const hasAnyCard = !!assignedTeacher || roleTeachers.length > 0;
+                const hasMasool = roleTeachers.some(t => {
+                  const r = (t.teacher_role || t.portal_role || t.role || "").toLowerCase();
+                  const n = (t.full_name || "").toLowerCase();
+                  return r.includes('masool') || n.includes('masool') || n.includes('taher bhai rawat');
+                }) || (assignedTeacher && (
+                  (assignedTeacher.teacher_role || "").toLowerCase().includes('masool') ||
+                  (assignedTeacher.full_name || "").toLowerCase().includes('taher bhai rawat')
+                ));
+
+                const finalRoleTeachers = hasMasool ? roleTeachers : [defaultMasool, ...roleTeachers];
+
+                const roleLabel = (t) => {
+                  const r = (t.teacher_role || t.portal_role || t.role || "").toLowerCase();
+                  const n = (t.full_name || "").toLowerCase();
+                  if (r.includes('masool') || n.includes('taher bhai rawat')) return 'Masool (Supervisor)';
+                  if (r.includes('musaid')) return 'Musaid (Assistant)';
+                  return 'Staff Member';
+                };
+
+                const hasAnyCard = !!assignedTeacher || finalRoleTeachers.length > 0;
 
                 return <>
                   {assignedTeacher && (() => {
@@ -8933,7 +8985,7 @@ function ParentPortal({
                     );
                   })()}
 
-                  {roleTeachers.length > 0 && (
+                  {finalRoleTeachers.length > 0 && (
                     <>
                       <div className="muhaffiz-divider">
                         <div className="muhaffiz-divider-line">
@@ -8945,7 +8997,7 @@ function ParentPortal({
                           You may also contact our Masool and Musaid for additional support.
                         </p>
                       </div>
-                      {roleTeachers.map(t => {
+                      {finalRoleTeachers.map(t => {
                         const rawWa = t.whatsapp_number || "";
                         const wa = rawWa.split("").filter(c => "0123456789".includes(c)).join("");
                         const phone = t.phone_number || rawWa || "";
@@ -11646,6 +11698,33 @@ function AdminPortal({
   const [assigning, setAssigning] = useState(false);
   const [reportSettingsSaved, setReportSettingsSaved] = useState(false);
   const [showAdminParentViewsModal, setShowAdminParentViewsModal] = useState(false);
+
+  const studentAssignmentOptions = useMemo(() => {
+    const seenKeys = new Set();
+    const list = [];
+    (students || []).forEach(s => {
+      if (!s) return;
+      const sid = String(s.student_id || s.id || '').trim();
+      const label = s.name || s.full_name || 'Unnamed Student';
+      const key = sid ? `id:${sid.toLowerCase()}` : `name:${normalizeText(label)}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        list.push({
+          value: s.student_id,
+          label,
+          sub: s.arabic_name ? `(${s.arabic_name})` : '',
+        });
+      }
+    });
+    return list;
+  }, [students]);
+
+  const isStudentAssigned = useCallback((s) => {
+    if (!s) return false;
+    const hasTeacher = Boolean(s.muhaffiz_id || s.teacher_id || (s.teacherName && s.teacherName !== 'Unassigned teacher' && s.teacherName !== 'No Teacher'));
+    const hasParent = Boolean(s.user_id || s.parent_user_id || s.parent_email);
+    return hasTeacher || hasParent;
+  }, []);
 
   const handleAssignClick = async (data) => {
     if (!data?.student_id) {
@@ -15449,13 +15528,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         <span>Select Student</span>
                         <SearchableSelect
                           name="student_id"
-                          options={students && students.length > 0
-                            ? students.map(s => ({
-                                value: s.student_id,
-                                label: s.name || 'Unnamed Student',
-                                sub: s.arabic_name ? `(${s.arabic_name})` : '',
-                              }))
-                            : []}
+                          options={studentAssignmentOptions}
                           value={registryStudentId || ""}
                           onChange={(val, form) => {
                             setRegistryStudentId(val || "");
@@ -15681,9 +15754,9 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
                 <div className="assigned-children-grid">
                   {students
-                    .filter(s => s.muhaffiz_id || s.user_id)
+                    .filter(isStudentAssigned)
                     .map(student => {
-                      const parent = portalAccessList.find(a => a.user_id === student.user_id);
+                      const parent = portalAccessList.find(a => (student.user_id && a.user_id === student.user_id) || (student.parent_email && a.email && normalizeText(a.email) === normalizeText(student.parent_email)));
                       return (
                         <article key={student.student_id} className="assigned-child-card card-appear">
                           <div className="child-card-main">
@@ -15759,7 +15832,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
                             <div className="detail-item">
                               <span className="detail-label">Parent:</span>
-                              <span className="detail-value">{parent?.full_name || "Unlinked"}</span>
+                              <span className="detail-value">{parent?.full_name || student.parent_email || "Unlinked"}</span>
                             </div>
                           </div>
                           <div className="child-card-actions">
@@ -15781,7 +15854,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         </article>
                       );
                     })}
-                  {students.filter(s => s.muhaffiz_id || s.user_id).length === 0 && (
+                  {students.filter(isStudentAssigned).length === 0 && (
                     <div className="empty-state">No linked students found.</div>
                   )}
                 </div>
@@ -15794,7 +15867,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 </div>
                 <div className="assigned-children-grid">
                   {students
-                    .filter(s => !s.muhaffiz_id && !s.user_id)
+                    .filter(s => !isStudentAssigned(s))
                     .map(student => (
                       <article key={student.student_id} className="assigned-child-card unassigned-card">
                         <div className="child-card-main">
@@ -15815,6 +15888,9 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         </div>
                       </article>
                     ))}
+                  {students.filter(s => !isStudentAssigned(s)).length === 0 && (
+                    <div className="empty-state">No unassigned students found. All students are linked!</div>
+                  )}
                 </div>
               </section>
             </div>
@@ -18638,16 +18714,27 @@ function TeacherPortal({
         if (onShowAction) onShowAction("error", "Failed to start call session: " + error.message);
         return;
       }
-    }
 
-    setActiveCall({
-      roomId,
-      role: "caller",
-      myName: teacherName,
-      peerName: studentName,
-      myRole: "teacher",
-      startedAt: new Date().toISOString()
-    });
+      setActiveCall({
+        roomId,
+        role: "caller",
+        myName: teacherName,
+        peerName: studentName,
+        myRole: "teacher",
+        startedAt: new Date().toISOString()
+      });
+    } else {
+      // If student/parent already started the session, teacher joins as callee
+      const isCaller = existing.started_by === "teacher";
+      setActiveCall({
+        roomId,
+        role: isCaller ? "caller" : "callee",
+        myName: teacherName,
+        peerName: studentName,
+        myRole: "teacher",
+        startedAt: existing.started_at || new Date().toISOString()
+      });
+    }
   };
 
   const handleStartGroupClass = async () => {
@@ -24624,9 +24711,29 @@ export default function App() {
         if (tap.leaveId) setPendingChatLeaveId(String(tap.leaveId));
       }
     };
+
+    const handleSwMessage = (event) => {
+      if (event?.data?.type === "mauze:notification-click") {
+        const notifData = event.data.data || {};
+        try {
+          localStorage.setItem(NOTIF_TAP_KEY, JSON.stringify(notifData));
+        } catch (_) {}
+        applyNotifTap();
+      }
+    };
+
     applyNotifTap();
     window.addEventListener("mauze:notification-tap", applyNotifTap);
-    return () => window.removeEventListener("mauze:notification-tap", applyNotifTap);
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", handleSwMessage);
+    }
+
+    return () => {
+      window.removeEventListener("mauze:notification-tap", applyNotifTap);
+      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", handleSwMessage);
+      }
+    };
   }, [portalRole, user, loading]);
 
   useEffect(() => {
@@ -25144,7 +25251,7 @@ export default function App() {
         let rawProfiles = parentProfileOverride ? [parentProfileOverride] : null;
         
         if (isKibar) {
-          // Kibar Student: fetch own profile directly from kibar_student_profiles / child_profiles
+          // Kibar Student: fetch own profile directly from kibar_student_profiles / kibar_child_profiles / child_profiles
           const studentProfile = await findKibarStudentProfile(currentUser.id, currentUser.email);
           if (studentProfile) {
             rawProfiles = [studentProfile];
@@ -25165,18 +25272,6 @@ export default function App() {
                 }
               } catch (_e) {}
             }
-            if (!rawProfiles || rawProfiles.length === 0) {
-              rawProfiles = [{
-                id: currentUser.id,
-                user_id: currentUser.id,
-                name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || "Student",
-                full_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || "Student",
-                student_id: currentUser.user_metadata?.student_id || currentUser.user_metadata?.its || currentUser.id,
-                its: currentUser.user_metadata?.its || currentUser.user_metadata?.its_number || "...",
-                section: "kibar",
-                is_kibar: true
-              }];
-            }
           }
         } else if (!rawProfiles || rawProfiles.length === 0) {
           try {
@@ -25190,12 +25285,53 @@ export default function App() {
           rawProfiles = await findParentProfilesFallback(currentUser.id, currentUser.email);
         }
 
-        // If no profiles found for this parent/kibar account, trigger the first-time student registry form
+        // Check if user is a returning/existing account or has already completed registration
+        const localRegDone = (
+          localStorage.getItem('mauze_reg_done_' + currentUser.id) === 'true' ||
+          localStorage.getItem('mauze_reg_done_' + (currentUser.email || '').toLowerCase()) === 'true' ||
+          localStorage.getItem('mauze_first_login_done_' + currentUser.id) === 'true' ||
+          localStorage.getItem('mauze_first_login_done_' + (currentUser.email || '').toLowerCase()) === 'true'
+        );
+
+        let isRegisteredInDb = false;
+        if (!localRegDone) {
+          try {
+            const { data: accessRecord } = await supabase
+              .from(isKibar ? "kibar_portal_access" : "user_portal_access")
+              .select("has_completed_registration, created_at, user_id, email")
+              .or(`user_id.eq.${currentUser.id},email.eq.${currentUser.email || ''}`)
+              .maybeSingle();
+            if (accessRecord?.has_completed_registration === true) {
+              isRegisteredInDb = true;
+            }
+          } catch (_) {}
+        }
+
+        const isExistingAccount = localRegDone || isRegisteredInDb;
+
+        // If no profiles found:
+        // 1. If truly a brand new first-time login (not existing and never completed registration), show mandatory First-Time Registry Modal
+        // 2. If existing/returning account, create fallback profile and DO NOT prompt the registration form
         if (!rawProfiles || rawProfiles.length === 0) {
-          console.log("[Portal] No student profile linked to parent account — prompting first-time student registration.");
-          setNeedsFirstTimeRegistration(true);
-          if (!silent) setLoading(false);
-          return;
+          if (!isExistingAccount) {
+            console.log("[Portal] Brand new account without student profile — prompting first-time student registration.");
+            setNeedsFirstTimeRegistration(true);
+            if (!silent) setLoading(false);
+            return;
+          } else {
+            console.log("[Portal] Existing account with unlinked profile — generating portal session without modal.");
+            setNeedsFirstTimeRegistration(false);
+            rawProfiles = [{
+              id: currentUser.id,
+              user_id: currentUser.id,
+              name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || (isKibar ? "Student" : "Child"),
+              full_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || (isKibar ? "Student" : "Child"),
+              student_id: currentUser.user_metadata?.student_id || currentUser.user_metadata?.its || currentUser.id,
+              its: currentUser.user_metadata?.its || currentUser.user_metadata?.its_number || "...",
+              section: isKibar ? "kibar" : "atfal",
+              is_kibar: isKibar
+            }];
+          }
         } else {
           setNeedsFirstTimeRegistration(false);
         }

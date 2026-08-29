@@ -72,18 +72,23 @@ export const getFCMToken = async (retries = 3) => {
       if ('serviceWorker' in navigator) {
         let registration = await navigator.serviceWorker.ready.catch(() => null);
         if (!registration) {
-          registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-            scope: '/'
-          });
-          await navigator.serviceWorker.ready;
+          try {
+            registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+              scope: '/'
+            });
+            await navigator.serviceWorker.ready;
+          } catch (regErr) {
+            console.warn('[FCM] Service worker registration attempt note:', regErr);
+          }
         }
         console.log('[FCM] Service Worker active registration:', registration?.scope);
         
         const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || "BNWhCt5Y0FaHfo6H4O5c3I8vtkZVbSduNgy65bZ7Il5BogYCif7s4RGmSMJzC73Y6bdCrJRwmUsXKALXJXlm2Sk";
-        const currentToken = await getToken(msgInstance, { 
-          vapidKey,
-          serviceWorkerRegistration: registration
-        });
+        const tokenOptions = { vapidKey };
+        if (registration) {
+          tokenOptions.serviceWorkerRegistration = registration;
+        }
+        const currentToken = await getToken(msgInstance, tokenOptions);
         
         if (currentToken) {
           console.log('[FCM] Official FCM Token retrieved:', currentToken.substring(0, 20) + '...');

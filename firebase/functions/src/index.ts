@@ -191,7 +191,14 @@ async function sendFcmInner(
 ): Promise<{ total: number; delivered: number; stale: number; failed: number }> {
   const uniq = [...new Set(tokens.filter(Boolean))];
   if (!uniq.length) return { total: 0, delivered: 0, stale: 0, failed: 0 };
-  const data: Record<string, string> = { ...dataMap, title, body, url: notificationUrl(dataMap) };
+  const notifTag = dataMap.notification_id || dataMap.id || dataMap.tag || tag || "mauze-tahfeez-notification";
+  const data: Record<string, string> = {
+    ...dataMap,
+    title,
+    body,
+    tag: notifTag,
+    url: notificationUrl(dataMap)
+  };
   let delivered = 0;
   let stale = 0;
   let failed = 0;
@@ -205,16 +212,19 @@ async function sendFcmInner(
       notification: { title, body },
       data,
       webpush: {
-        headers: { Urgency: "high" },
+        headers: {
+          Urgency: "high",
+          TTL: "86400",
+        },
         notification: {
           title,
           body,
-          icon: "/logo.png",
-          badge: "/logo.png",
-          tag,
-          renotify: true,
+          icon: "/LOGO ATFAAL-192.png",
+          badge: "/LOGO ATFAAL-192.png",
+          tag: notifTag,
+          renotify: false,
           requireInteraction: true,
-          data: { ...data, click_action: data.url },
+          data: { ...data, click_action: data.url, tag: notifTag },
         },
         fcm_options: { link: data.url },
       },
@@ -226,13 +236,26 @@ async function sendFcmInner(
           icon: "ic_notification",
           color: "#C5A059",
           visibility: "public",
-          // NOTE: no click_action here. Capacitor's PushNotifications plugin
-          // resolves taps from the launcher intent + the FCM data payload, and
-          // an unmatched click_action (no manifest intent-filter) can make the
-          // notification tap silently fail to open the app on some devices.
+          tag: notifTag,
         },
       },
-      apns: { payload: { aps: { sound: "default", "content-available": 1, badge: 1 } } },
+      apns: {
+        headers: {
+          "apns-priority": "10",
+          "apns-push-type": "alert",
+        },
+        payload: {
+          aps: {
+            alert: {
+              title,
+              body,
+            },
+            sound: "default",
+            badge: 1,
+            "content-available": 1,
+          },
+        },
+      },
     }));
     const res = await messaging.sendEach(messages);
     res.responses.forEach((r, idx) => {

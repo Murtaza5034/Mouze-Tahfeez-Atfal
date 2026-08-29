@@ -12,7 +12,21 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/db.js";
 import "./VideoCall.css";
-import { Mic, MicOff, Video, VideoOff, Phone, Volume2, VolumeX } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  Phone,
+  Volume2,
+  VolumeX,
+  SwitchCamera,
+  LayoutGrid,
+  Maximize2,
+  Minimize2,
+  User,
+  GraduationCap
+} from "lucide-react";
 
 function buildIceServers() {
   const stunUrls = [
@@ -28,7 +42,6 @@ function buildIceServers() {
 
   const servers = [
     { urls: stunUrls },
-    // Metered OpenRelay public WebRTC STUN/TURN relays for reliable NAT/CGNAT traversal on 4G/5G and WiFi
     {
       urls: [
         "turn:openrelay.metered.ca:80",
@@ -61,7 +74,7 @@ function buildIceServers() {
 export default function VideoCall({ call, onClose }) {
   const {
     roomId,
-    role, // "caller" | "callee"
+    role = "caller", // "caller" | "callee"
     myName = "You",
     peerName = "Peer",
     myRole = "user", // "teacher" | "parent" | "admin"
@@ -75,27 +88,128 @@ export default function VideoCall({ call, onClose }) {
   const remoteAudioRef = useRef(null);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
+  const remoteStreamRef = useRef(new MediaStream());
   const signalUnsubsRef = useRef([]);
   const endedRef = useRef(false);
   const sessionIdRef = useRef(Date.now().toString());
+  const audioContextRef = useRef(null);
+  const localAnalyserRef = useRef(null);
+  const remoteAnalyserRef = useRef(null);
+  const animFrameRef = useRef(null);
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+  const [facingMode, setFacingMode] = useState("user"); // "user" | "environment"
+  const [layoutMode, setLayoutMode] = useState("grid"); // "grid" (side-by-side) | "pip" (focus)
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [hasRemoteAudio, setHasRemoteAudio] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [status, setStatus] = useState("initializing"); // "initializing" | "calling" | "connected" | "reconnecting" | "error"
   const [error, setError] = useState("");
   const [seconds, setSeconds] = useState(0);
+  const [localSpeaking, setLocalSpeaking] = useState(false);
+  const [remoteSpeaking, setRemoteSpeaking] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
 
   const trackUnsub = useCallback((unsub) => {
     if (typeof unsub === "function") signalUnsubsRef.current.push(unsub);
   }, []);
 
-  // ----- cleanup helper for local device only -----
+  // Check if device has multiple video cameras (e.g. mobile front & rear)
+  useEffect(() => {
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+      navigator.mediaDevices.enumerateDevices().then((devices) => {
+        const videoInputs = devices.filter((d) => d.kind === "videoinput");
+        if (videoInputs.length > 1) {
+          setHasMultipleCameras(true);
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  // Setup Web Audio API volume analyzers for speaking detection
+  const setupAudioMonitoring = useCallback((localStream, remoteStream) => {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContextClass();
+      }
+      const ctx = audioContextRef.current;
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+
+      if (localStream && localStream.getAudioTracks().length > 0) {
+        try {
+          const localSrc = ctx.createMediaStreamSource(localStream);
+          const localAnalyser = ctx.createAnalyser();
+          localAnalyser.fftSize = 256;
+          localAnalyser.smoothingTimeConstant = 0.4;
+          localSrc.connect(localAnalyser);
+          localAnalyserRef.current = localAnalyser;
+        } catch (_) {}
+      }
+
+      if (remoteStream && remoteStream.getAudioTracks().length > 0) {
+        try {
+          const remoteSrc = ctx.createMediaStreamSource(remoteStream);
+          const remoteAnalyser = ctx.createAnalyser();
+          remoteAnalyser.fftSize = 256;
+          remoteAnalyser.smoothingTimeConstant = 0.4;
+          remoteSrc.connect(remoteAnalyser);
+          remoteAnalyserRef.current = remoteAnalyser;
+        } catch (_) {}
+      }
+
+      const localBuf = new Uint8Array(128);
+      const remoteBuf = new Uint8Array(128);
+
+      const checkVolume = () => {
+        if (endedRef.current) return;
+
+        if (localAnalyserRef.current) {
+          localAnalyserRef.current.getByteFrequencyData(localBuf);
+          let sum = 0;
+          for (let i = 0; i < localBuf.length; i++) sum += localBuf[i];
+          const avg = sum / localBuf.length;
+          setLocalSpeaking(avg > 14);
+        }
+
+        if (remoteAnalyserRef.current) {
+          remoteAnalyserRef.current.getByteFrequencyData(remoteBuf);
+          let sum = 0;
+          for (let i = 0; i < remoteBuf.length; i++) sum += remoteBuf[i];
+          const avg = sum / remoteBuf.length;
+          setRemoteSpeaking(avg > 14);
+        }
+
+        animFrameRef.current = requestAnimationFrame(checkVolume);
+      };
+
+      checkVolume();
+    } catch (e) {
+      console.warn("Audio monitoring error:", e);
+    }
+  }, []);
+
+  // Cleanup helper
   const stopLocal = useCallback(() => {
     if (endedRef.current) return;
     endedRef.current = true;
+
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+
+    try {
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+    } catch (_) {}
 
     try {
       const unsubs = signalUnsubsRef.current;
@@ -126,12 +240,19 @@ export default function VideoCall({ call, onClose }) {
     } catch (_) {}
 
     try {
+      if (remoteStreamRef.current) {
+        remoteStreamRef.current.getTracks().forEach((t) => {
+          try { t.stop(); } catch (_) {}
+        });
+      }
+    } catch (_) {}
+
+    try {
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
       if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     } catch (_) {}
 
-    // Mark self inactive in signaling so the other user sees reconnection status but stays in room
     if (roomId) {
       try {
         const roomRef = doc(db, SIGNAL_PATH, roomId);
@@ -141,13 +262,13 @@ export default function VideoCall({ call, onClose }) {
     }
   }, [roomId, role, SIGNAL_PATH]);
 
-  // ----- user clicks End button -----
+  // User clicks End button
   const handleEnd = useCallback(() => {
     stopLocal();
     if (onClose) onClose();
   }, [stopLocal, onClose]);
 
-  // ----- esc to end -----
+  // Escape key to end
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") handleEnd();
@@ -156,7 +277,7 @@ export default function VideoCall({ call, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleEnd]);
 
-  // ----- unmount safety -----
+  // Unmount safety
   useEffect(() => {
     return () => {
       stopLocal();
@@ -164,7 +285,7 @@ export default function VideoCall({ call, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ----- timer: ONLY runs when actively connected -----
+  // Timer: runs when actively connected
   useEffect(() => {
     if (status !== "connected") return;
     const t = setInterval(() => {
@@ -173,7 +294,7 @@ export default function VideoCall({ call, onClose }) {
     return () => clearInterval(t);
   }, [status]);
 
-  // ----- toggle mic -----
+  // Toggle Mic
   const toggleMic = useCallback(() => {
     const stream = localStreamRef.current;
     if (!stream) return;
@@ -182,7 +303,7 @@ export default function VideoCall({ call, onClose }) {
     setMicOn(next);
   }, [micOn]);
 
-  // ----- toggle cam -----
+  // Toggle Camera
   const toggleCam = useCallback(async () => {
     const pc = pcRef.current;
     const stream = localStreamRef.current;
@@ -200,9 +321,9 @@ export default function VideoCall({ call, onClose }) {
       try {
         videoStream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: "user",
-            width: { ideal: 640 },
-            height: { ideal: 480 }
+            facingMode,
+            width: { ideal: 640, max: 1280 },
+            height: { ideal: 480, max: 720 }
           }
         });
       } catch (_) {
@@ -237,18 +358,83 @@ export default function VideoCall({ call, onClose }) {
     } catch (e) {
       console.warn("Unable to enable camera:", e);
     }
-  }, [camOn]);
+  }, [camOn, facingMode]);
 
-  // ----- unlock audio if browser autoplay blocked it -----
+  // Switch camera (front/back on mobile)
+  const switchCamera = useCallback(async () => {
+    const nextMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(nextMode);
+
+    const stream = localStreamRef.current;
+    const pc = pcRef.current;
+    if (!stream) return;
+
+    try {
+      const oldVideoTrack = stream.getVideoTracks()[0];
+      if (oldVideoTrack) {
+        oldVideoTrack.stop();
+        stream.removeTrack(oldVideoTrack);
+      }
+
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { exact: nextMode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      }).catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: nextMode } }));
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (newVideoTrack) {
+        stream.addTrack(newVideoTrack);
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = new MediaStream([newVideoTrack]);
+          try { await localVideoRef.current.play(); } catch (_) {}
+        }
+
+        if (pc) {
+          const senders = pc.getSenders();
+          const videoSender = senders.find((s) => s.track && s.track.kind === "video");
+          if (videoSender) {
+            await videoSender.replaceTrack(newVideoTrack);
+          }
+        }
+        setCamOn(true);
+      }
+    } catch (err) {
+      console.warn("Error switching camera:", err);
+    }
+  }, [facingMode]);
+
+  // Unlock Audio
   const handleUnlockAudio = () => {
+    if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+      audioContextRef.current.resume().catch(() => {});
+    }
     if (remoteAudioRef.current) {
       remoteAudioRef.current.play().then(() => {
         setAudioBlocked(false);
       }).catch(() => {});
     }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.play().catch(() => {});
+    }
   };
 
-  // ----- main effect: start and maintain the WebRTC call -----
+  // Toggle Fullscreen
+  const toggleFullscreen = () => {
+    const elem = document.querySelector(".vc-overlay");
+    if (!elem) return;
+
+    if (!document.fullscreenElement) {
+      elem.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  };
+
+  // Main WebRTC Connection Pipeline
   useEffect(() => {
     if (!roomId || !role) return;
 
@@ -259,12 +445,12 @@ export default function VideoCall({ call, onClose }) {
       setStatus("initializing");
       setError("");
 
-      // 1. Acquire local media (cross-platform with robust fallback)
+      // 1. Acquire Local Media
       let stream = null;
       if (!isSpectator) {
         try {
           try {
-            // First attempt: Standard video + echo-cancelled audio
+            // High fidelity audio constraints optimized for vocal recitation
             stream = await navigator.mediaDevices.getUserMedia({
               video: {
                 facingMode: "user",
@@ -275,18 +461,20 @@ export default function VideoCall({ call, onClose }) {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
+                channelCount: 1,
+                sampleRate: 48000,
               },
             });
             setCamOn(true);
             setMicOn(true);
           } catch (vidErr) {
-            console.warn("Attempt 1 failed, trying simple video/audio:", vidErr);
+            console.warn("Attempt 1 failed, trying fallback video/audio:", vidErr);
             try {
               stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
               setCamOn(true);
               setMicOn(true);
             } catch (vidErr2) {
-              console.warn("Combined devices not available, trying audio-only and separate video:", vidErr2);
+              console.warn("Combined devices not available, acquiring audio and video separately:", vidErr2);
               let audioStream = null;
               let videoStream = null;
               try {
@@ -328,7 +516,6 @@ export default function VideoCall({ call, onClose }) {
               } else if (videoStream) {
                 stream = videoStream;
               } else {
-                // If neither is detected, create silent stream for viewing
                 try {
                   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                   const dest = audioCtx.createMediaStreamDestination();
@@ -342,7 +529,7 @@ export default function VideoCall({ call, onClose }) {
             }
           }
         } catch (mediaErr) {
-          console.warn("Media permissions/devices fallback active:", mediaErr);
+          console.warn("Media permissions fallback:", mediaErr);
           stream = new MediaStream();
           setCamOn(false);
           setMicOn(false);
@@ -353,7 +540,6 @@ export default function VideoCall({ call, onClose }) {
           return;
         }
 
-        // Enable all acquired tracks
         if (stream) {
           stream.getAudioTracks().forEach((t) => { t.enabled = true; });
           stream.getVideoTracks().forEach((t) => { t.enabled = true; });
@@ -383,7 +569,7 @@ export default function VideoCall({ call, onClose }) {
         });
       }
 
-      // Ensure transceivers exist in both directions with sendrecv so audio & video can flow symmetrically
+      // Bidirectional transceivers
       const hasAudio = stream && stream.getAudioTracks().length > 0;
       const hasVideo = stream && stream.getVideoTracks().length > 0;
       if (!hasAudio && pc.addTransceiver) {
@@ -393,29 +579,18 @@ export default function VideoCall({ call, onClose }) {
         try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (_) {}
       }
 
-      // 3. Remote track handler with independent video-only and audio-only streams
+      // 3. Remote Track Handler
       pc.ontrack = (ev) => {
-        console.log(`[WebRTC] Remote track received: ${ev.track.kind}, id: ${ev.track.id}`);
-
+        console.log(`[WebRTC] Remote track received: ${ev.track.kind}`);
         const track = ev.track;
 
         if (track.kind === "video") {
           setHasRemoteVideo(true);
-          track.onmute = () => {
-            console.log("[WebRTC] Remote video muted");
-            setHasRemoteVideo(false);
-          };
-          track.onunmute = () => {
-            console.log("[WebRTC] Remote video unmuted");
-            setHasRemoteVideo(true);
-          };
-          track.onended = () => {
-            console.log("[WebRTC] Remote video ended");
-            setHasRemoteVideo(false);
-          };
+          track.onmute = () => setHasRemoteVideo(false);
+          track.onunmute = () => setHasRemoteVideo(true);
+          track.onended = () => setHasRemoteVideo(false);
 
           if (remoteVideoRef.current) {
-            // Provide video-only stream to avoid WebKit/Chrome media pipeline audio muting
             remoteVideoRef.current.srcObject = new MediaStream([track]);
             remoteVideoRef.current.play().catch((err) => {
               console.warn("[WebRTC] Remote video play note:", err);
@@ -429,19 +604,20 @@ export default function VideoCall({ call, onClose }) {
           track.onunmute = () => setHasRemoteAudio(true);
 
           if (remoteAudioRef.current) {
-            // Provide audio-only stream for pristine, loud, unmuted voice
             remoteAudioRef.current.srcObject = new MediaStream([track]);
             remoteAudioRef.current.muted = isSpectator ? true : false;
             remoteAudioRef.current.volume = 1.0;
             remoteAudioRef.current.play().then(() => {
               setAudioBlocked(false);
             }).catch((err) => {
-              console.warn("[WebRTC] Remote audio autoplay blocked by browser policy:", err);
+              console.warn("[WebRTC] Remote audio autoplay blocked:", err);
               setAudioBlocked(true);
             });
           }
         }
 
+        // Attach audio analysis
+        setupAudioMonitoring(localStreamRef.current, new MediaStream(pc.getReceivers().map(r => r.track).filter(t => t.kind === "audio")));
         setStatus("connected");
       };
 
@@ -449,15 +625,13 @@ export default function VideoCall({ call, onClose }) {
         if (!pcRef.current) return;
         const cs = pcRef.current.connectionState;
         const ics = pcRef.current.iceConnectionState;
-        console.log(`[WebRTC] Connection state: ${cs}, ICE state: ${ics}`);
+        console.log(`[WebRTC] Connection: ${cs}, ICE: ${ics}`);
         if (cs === "connected" || ics === "connected" || ics === "completed") {
           setStatus("connected");
           setError("");
         } else if (cs === "disconnected" || ics === "disconnected") {
-          console.warn("[WebRTC] Temporary disconnect, waiting to reconnect...");
           setStatus("reconnecting");
         } else if (cs === "failed" || ics === "failed") {
-          console.warn("[WebRTC] ICE failed, attempting restart...");
           try {
             if (pcRef.current && pcRef.current.restartIce) {
               pcRef.current.restartIce();
@@ -476,7 +650,6 @@ export default function VideoCall({ call, onClose }) {
       const processedCandidateKeys = new Set();
       const pendingRemoteCandidates = [];
 
-      // When local ICE candidate is found
       pc.onicecandidate = async (ev) => {
         if (ev.candidate) {
           const candJson = ev.candidate.toJSON();
@@ -490,7 +663,7 @@ export default function VideoCall({ call, onClose }) {
               createdAt: Date.now(),
             });
           } catch (err) {
-            console.warn("[WebRTC] Error writing ICE candidate:", err);
+            console.warn("[WebRTC] ICE candidate write error:", err);
           }
         }
       };
@@ -523,12 +696,11 @@ export default function VideoCall({ call, onClose }) {
           try {
             await currentPc.addIceCandidate(new RTCIceCandidate(cand));
           } catch (err) {
-            console.warn("[WebRTC] flush ICE candidate error:", err);
+            console.warn("[WebRTC] flush ICE error:", err);
           }
         }
       };
 
-      // Listen for remote candidates from subcollection
       const unsubCandidates = onSnapshot(candidatesCol, (snap) => {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -543,7 +715,6 @@ export default function VideoCall({ call, onClose }) {
 
       if (role === "caller") {
         try {
-          // Clean up old stale candidates from prior calls
           getDocs(candidatesCol).then((oldCands) => {
             oldCands.forEach((docSnap) => {
               deleteDoc(docSnap.ref).catch(() => {});
@@ -553,7 +724,6 @@ export default function VideoCall({ call, onClose }) {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
 
-          // Overwrite signaling document with fresh session state (erases any stale old answers)
           await setDoc(roomRef, {
             sessionId: currentSessionId,
             offer: { type: offer.type, sdp: offer.sdp },
@@ -570,10 +740,9 @@ export default function VideoCall({ call, onClose }) {
             const data = snapshot.data();
             if (!data) return;
 
-            // When callee sends answer for this session
             if (data.answer && data.sessionId === currentSessionId && !pc.remoteDescription) {
               try {
-                console.log("[WebRTC] Caller received answer from Callee");
+                console.log("[WebRTC] Caller applying answer");
                 await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
                 await flushRemoteCandidates();
                 setStatus("connected");
@@ -582,7 +751,6 @@ export default function VideoCall({ call, onClose }) {
               }
             }
 
-            // Update peer in-room status
             if (data.callee_in_room === false && status === "connected") {
               setStatus("reconnecting");
             }
@@ -591,18 +759,18 @@ export default function VideoCall({ call, onClose }) {
 
           setStatus("calling");
         } catch (e) {
-          setError("Failed to start the call: " + (e?.message || e));
+          setError("Failed to start call: " + (e?.message || e));
           setStatus("error");
         }
       } else {
         // Callee
         let answerCreated = false;
 
-        const handleOffer = async (offerData, offerSessionId) => {
+        const handleOffer = async (offerData) => {
           if (answerCreated || !offerData || !offerData.sdp) return;
           answerCreated = true;
           try {
-            console.log("[WebRTC] Callee processing offer");
+            console.log("[WebRTC] Callee applying offer");
             await pc.setRemoteDescription(new RTCSessionDescription(offerData));
             await flushRemoteCandidates();
 
@@ -617,7 +785,6 @@ export default function VideoCall({ call, onClose }) {
             });
 
             setStatus("connected");
-            console.log("[WebRTC] Callee answer sent");
           } catch (err) {
             console.error("[WebRTC] Error creating answer on callee:", err);
             setError("Failed to join video call: " + (err.message || err));
@@ -631,10 +798,9 @@ export default function VideoCall({ call, onClose }) {
           if (!data) return;
 
           if (data.offer && !answerCreated) {
-            await handleOffer(data.offer, data.sessionId);
+            await handleOffer(data.offer);
           }
 
-          // If caller leaves, show reconnecting
           if (data.caller_in_room === false && status === "connected") {
             setStatus("reconnecting");
           }
@@ -667,20 +833,12 @@ export default function VideoCall({ call, onClose }) {
     error: "Error",
   }[status] || status;
 
-  return createPortal(
-    <div id="g" className="vc-overlay" role="dialog" aria-label="Video call">
-      <div className="vc-stage">
-        {/* Remote video element - always rendered in background for immediate GPU frame decoding */}
-        <video
-          ref={remoteVideoRef}
-          className="vc-remote"
-          autoPlay
-          playsInline
-          muted={true}
-          disablePictureInPicture={myRole !== "teacher"}
-        />
+  const isTeacher = myRole === "teacher";
 
-        {/* Dedicated HTML5 audio element for high-fidelity unmuted remote voice */}
+  return createPortal(
+    <div id="g" className={`vc-overlay ${isFullscreen ? "vc-fullscreen" : ""}`} role="dialog" aria-label="Video call">
+      <div className={`vc-stage ${layoutMode === "grid" ? "vc-layout-grid" : "vc-layout-pip"}`}>
+        {/* Dedicated Audio Element for Remote Sound */}
         <audio
           ref={remoteAudioRef}
           autoPlay
@@ -688,66 +846,116 @@ export default function VideoCall({ call, onClose }) {
           muted={isSpectator}
         />
 
-        {/* Premium Tahfeez Classroom Stage Overlay when video is off or connecting */}
-        {(!hasRemoteVideo || status !== "connected") && (
-          <div className="vc-remote-placeholder">
-            <div className="vc-avatar-pulse">
-              <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
-            </div>
-            <div className="vc-peer-name">{peerName}</div>
-            
-            {status === "connected" ? (
-              <div className="vc-audio-live-pill">
-                <span className="vc-audio-wave">
-                  <span></span><span></span><span></span><span></span>
-                </span>
-                <span>Audio Connected · Camera Off</span>
-              </div>
-            ) : (
-              <div className="vc-status-line">{statusLabel}</div>
-            )}
-
-            {error && <div className="vc-error">{error}</div>}
-          </div>
-        )}
-
-        {/* Click to unmute banner if browser autoplay policy blocked sound */}
-        {audioBlocked && (
-          <div className="vc-audio-blocked-banner" onClick={handleUnlockAudio}>
-            <VolumeX size={18} />
-            <span>Tap here to enable sound</span>
-          </div>
-        )}
-
-        {/* Top bar */}
+        {/* Top Header Bar */}
         <div className="vc-topbar">
           <div className="vc-topbar-left">
             <span className={`vc-dot ${status === "connected" ? "vc-dot-active" : ""}`} />
-            <span className="vc-room-label">
-              {isSpectator ? "Auditing Class (Spectator)" : "Online Tahfeez Class"}
-            </span>
+            <div className="vc-title-group">
+              <span className="vc-room-label">
+                {isSpectator ? "Auditing Class (Spectator)" : "Live Tahfeez Class"}
+              </span>
+              <span className="vc-role-badge">
+                {isTeacher ? "👨‍🏫 Muhaffiz Classroom" : "👦 Student Session"}
+              </span>
+            </div>
           </div>
           <div className="vc-topbar-right">
             <span className="vc-status-pill">{statusLabel}</span>
+            <button
+              type="button"
+              className="vc-icon-btn"
+              onClick={() => setLayoutMode(layoutMode === "grid" ? "pip" : "grid")}
+              title={layoutMode === "grid" ? "Switch to Focus/PiP View" : "Switch to Side-by-Side Grid"}
+            >
+              <LayoutGrid size={18} />
+              <span>{layoutMode === "grid" ? "Focus View" : "Dual Grid"}</span>
+            </button>
+            <button
+              type="button"
+              className="vc-icon-btn"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            </button>
           </div>
         </div>
 
-        {/* Picture-in-Picture Local Video */}
-        {!isSpectator && (
-          <div className="vc-local">
+        {/* Main Video Viewport (Dual Grid or Focus PiP) */}
+        <div className="vc-viewport">
+          {/* Remote Video Container */}
+          <div className={`vc-video-box vc-remote-box ${remoteSpeaking ? "vc-speaking" : ""}`}>
             <video
-              ref={localVideoRef}
+              ref={remoteVideoRef}
+              className={`vc-video-elem ${hasRemoteVideo ? "vc-video-visible" : "vc-video-hidden"}`}
               autoPlay
               playsInline
-              muted
-              disablePictureInPicture={myRole !== "teacher"}
+              muted={true}
             />
-            {!camOn && (
-              <div className="vc-local-off">
-                <VideoOff size={20} />
+            {(!hasRemoteVideo || status !== "connected") && (
+              <div className="vc-avatar-placeholder">
+                <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+                  <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+                </div>
+                <div className="vc-peer-name">{peerName}</div>
+                {status === "connected" ? (
+                  <div className="vc-audio-live-pill">
+                    <span className="vc-audio-wave">
+                      <span></span><span></span><span></span><span></span>
+                    </span>
+                    <span>Audio Connected · Camera Off</span>
+                  </div>
+                ) : (
+                  <div className="vc-status-sub">{statusLabel}</div>
+                )}
+                {error && <div className="vc-error-pill">{error}</div>}
               </div>
             )}
-            <div className="vc-local-name">{myName}{!micOn ? " · muted" : ""}</div>
+            <div className="vc-stream-tag">
+              <div className="vc-tag-user">
+                {isTeacher ? <User size={13} /> : <GraduationCap size={13} />}
+                <span>{peerName}</span>
+              </div>
+              {remoteSpeaking && <span className="vc-speaking-tag">Speaking…</span>}
+            </div>
+          </div>
+
+          {/* Local Video Container (Side-by-Side in Grid, Floating in PiP) */}
+          {!isSpectator && (
+            <div className={`vc-video-box vc-local-box ${localSpeaking ? "vc-speaking" : ""}`}>
+              <video
+                ref={localVideoRef}
+                className={`vc-video-elem vc-local-elem ${camOn ? "vc-video-visible" : "vc-video-hidden"}`}
+                autoPlay
+                playsInline
+                muted
+              />
+              {!camOn && (
+                <div className="vc-avatar-placeholder">
+                  <div className={`vc-avatar-circle local ${localSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+                    <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
+                  </div>
+                  <div className="vc-peer-name">{myName} (You)</div>
+                  <div className="vc-status-sub">Camera Off</div>
+                </div>
+              )}
+              <div className="vc-stream-tag">
+                <div className="vc-tag-user">
+                  {isTeacher ? <GraduationCap size={13} /> : <User size={13} />}
+                  <span>{myName} (You)</span>
+                </div>
+                {!micOn && <span className="vc-muted-tag">Muted</span>}
+                {localSpeaking && micOn && <span className="vc-speaking-tag">Speaking…</span>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Audio Unblock Banner if Browser Blocked Sound */}
+        {audioBlocked && (
+          <div className="vc-audio-blocked-banner" onClick={handleUnlockAudio}>
+            <VolumeX size={18} />
+            <span>Tap here to enable audio playback</span>
           </div>
         )}
 
@@ -755,34 +963,52 @@ export default function VideoCall({ call, onClose }) {
         <div className="vc-controls">
           {!isSpectator && (
             <>
+              {/* Mic Toggle */}
               <button
                 type="button"
-                className={`vc-btn ${micOn ? "" : "vc-btn-off"}`}
+                className={`vc-btn ${micOn ? "vc-btn-active" : "vc-btn-off"}`}
                 onClick={toggleMic}
-                title={micOn ? "Mute mic" : "Unmute mic"}
+                title={micOn ? "Mute Microphone" : "Unmute Microphone"}
               >
                 {micOn ? <Mic size={20} /> : <MicOff size={20} />}
                 <span>{micOn ? "Mute" : "Unmute"}</span>
               </button>
+
+              {/* Camera Toggle */}
               <button
                 type="button"
-                className={`vc-btn ${camOn ? "" : "vc-btn-off"}`}
+                className={`vc-btn ${camOn ? "vc-btn-active" : "vc-btn-off"}`}
                 onClick={toggleCam}
-                title={camOn ? "Turn camera off" : "Turn camera on"}
+                title={camOn ? "Turn Camera Off" : "Turn Camera On"}
               >
                 {camOn ? <Video size={20} /> : <VideoOff size={20} />}
-                <span>{camOn ? "Camera" : "Start Cam"}</span>
+                <span>{camOn ? "Stop Cam" : "Start Cam"}</span>
               </button>
+
+              {/* Switch Camera (Front/Rear/Mushaf) */}
+              {hasMultipleCameras && camOn && (
+                <button
+                  type="button"
+                  className="vc-btn"
+                  onClick={switchCamera}
+                  title="Flip Camera (Front / Mushaf)"
+                >
+                  <SwitchCamera size={20} />
+                  <span>Flip Cam</span>
+                </button>
+              )}
             </>
           )}
+
+          {/* End Call Button */}
           <button
             type="button"
             className="vc-btn vc-btn-end"
             onClick={handleEnd}
-            title={isSpectator ? "Leave Spectate" : "End call"}
+            title={isSpectator ? "Leave Classroom" : "End Call"}
           >
-            <Phone size={20} style={{ transform: "rotate(135deg)" }} />
-            <span>{isSpectator ? "Leave" : "End"}</span>
+            <Phone size={22} style={{ transform: "rotate(135deg)" }} />
+            <span>{isSpectator ? "Leave" : "End Call"}</span>
           </button>
         </div>
       </div>

@@ -156,10 +156,22 @@ export default function FirstTimeStudentRegistryModal({
         } catch (_) {}
       }
 
+      // Mark registration completed in database and local cache
+      try {
+        if (user?.id) {
+          localStorage.setItem('mauze_reg_done_' + user.id, 'true');
+          localStorage.setItem('mauze_first_login_done_' + user.id, 'true');
+        }
+        if (userEmail) {
+          localStorage.setItem('mauze_reg_done_' + userEmail.toLowerCase(), 'true');
+          localStorage.setItem('mauze_first_login_done_' + userEmail.toLowerCase(), 'true');
+        }
+      } catch (_) {}
+
       // Mark registration completed on user portal access
       if (user?.id) {
         try {
-          await supabase.from("user_portal_access").upsert({
+          const regPayload = {
             user_id: user.id,
             portal_role: portalRole,
             is_active: true,
@@ -167,7 +179,9 @@ export default function FirstTimeStudentRegistryModal({
             email: userEmail,
             full_name: fullName.trim(),
             updated_at: new Date().toISOString(),
-          });
+          };
+          await supabase.from("user_portal_access").upsert(regPayload, { onConflict: "user_id" });
+          await supabase.from(isKibar ? "kibar_portal_access" : "portal_access").upsert(regPayload, { onConflict: "user_id" });
         } catch (_) {}
       }
 

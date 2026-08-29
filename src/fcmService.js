@@ -47,6 +47,16 @@ if (isNativeAndroid()) {
   })();
 }
 
+// Listen for notification-click messages from the background Service Worker
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event?.data?.type === 'mauze:notification-click') {
+      const data = event.data.data || {};
+      stashNotificationTap(data);
+    }
+  });
+}
+
 class FCMService {
   constructor() {
     this.isSupported = false;
@@ -56,7 +66,7 @@ class FCMService {
     this.refreshInterval = null;
     this.isNative = false;
     this._shownIds = new Set();
-    this._dedupWindow = 30000;
+    this._dedupWindow = 20000;
   }
 
   _isDuplicate(id) {
@@ -70,7 +80,7 @@ class FCMService {
   _makeNotificationId(payload) {
     const n = payload?.notification || {};
     const d = payload?.data || {};
-    return d?.notification_id || d?.id || `${n?.title || ''}_${n?.body || ''}_${d?.timestamp || Date.now()}`;
+    return d?.notification_id || d?.id || d?.tag || `${n?.title || ''}_${n?.body || ''}`;
   }
 
   // Refresh token periodically (every 2 hours) to keep it valid
@@ -418,6 +428,26 @@ class FCMService {
 
       console.log('[FCM] Storing token for user:', user.id, 'with role:', userRole);
 
+      // Prune previous token for this device/browser if changed
+      try {
+        const previousToken = typeof localStorage !== 'undefined' ? localStorage.getItem('mauze_current_fcm_token') : null;
+        if (previousToken && previousToken !== token) {
+          await supabase
+            .from('user_fcm_tokens')
+            .delete()
+            .eq('fcm_token', previousToken);
+          console.log('[FCM] Pruned old stale token from database');
+        }
+      } catch (pruneErr) {
+        console.warn('[FCM] Note on pruning previous token:', pruneErr);
+      }
+
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('mauze_current_fcm_token', token);
+        }
+      } catch (_) {}
+
       const devInfo = getDeviceInfo();
       const deviceInfo = {
         userAgent: navigator.userAgent,
@@ -486,8 +516,8 @@ class FCMService {
       // Create notification options with official styling
       const options = {
         body: notification?.body || 'New notification from Mauze Tahfeez',
-        icon: '/LOGO ATFAAL.png',
-        badge: '/LOGO ATFAAL.png',
+        icon: '/LOGO ATFAAL-192.png',
+        badge: '/LOGO ATFAAL-192.png',
         vibrate: [200, 100, 200],
         data: {
           ...data,
@@ -495,7 +525,7 @@ class FCMService {
           timestamp: new Date().toISOString()
         },
         tag: notifId,
-        renotify: true,
+        renotify: false,
         requireInteraction: true,
         silent: false,
         dir: 'ltr',
@@ -504,7 +534,7 @@ class FCMService {
           {
             action: 'open',
             title: 'Open Portal',
-            icon: '/LOGO ATFAAL.png'
+            icon: '/LOGO ATFAAL-192.png'
           },
           {
             action: 'dismiss',

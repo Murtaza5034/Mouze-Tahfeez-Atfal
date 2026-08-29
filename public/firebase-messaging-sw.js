@@ -30,6 +30,31 @@ self.addEventListener('activate', function(event) {
 
 const CANONICAL_PROD_URL = "https://mouze-tahfeez-atfal.vercel.app";
 
+// ---------------------------------------------------------------------------
+// In-Memory Deduplication Cache (Prevents duplicate push popups)
+// ---------------------------------------------------------------------------
+const _recentPushCache = new Map();
+const DEDUP_WINDOW_MS = 15000; // 15 seconds
+
+function isRecentlyShown(key) {
+  if (!key) return false;
+  const now = Date.now();
+  const prev = _recentPushCache.get(key);
+  if (prev && (now - prev) < DEDUP_WINDOW_MS) {
+    return true;
+  }
+  _recentPushCache.set(key, now);
+  // Clean up old entries
+  if (_recentPushCache.size > 100) {
+    for (const [k, t] of _recentPushCache.entries()) {
+      if (now - t >= DEDUP_WINDOW_MS) {
+        _recentPushCache.delete(k);
+      }
+    }
+  }
+  return false;
+}
+
 // Extract clean path and query parameters, rewriting any outdated Vercel domain
 function sanitizeUrl(rawUrl) {
   if (!rawUrl) return '/';
@@ -45,7 +70,7 @@ function sanitizeUrl(rawUrl) {
 
     // If it's an absolute URL
     const parsed = new URL(rawUrl);
-    // Rebase onto the active origin so it never opens an outdated deploy preview or legacy domain
+    // Rebase onto active origin
     return new URL(parsed.pathname + parsed.search + parsed.hash, origin).href;
   } catch (_) {
     return '/';
@@ -85,23 +110,34 @@ function parsePushPayload(payload) {
   };
 }
 
-function makeNotifTag(info) {
-  return info.data?.notification_id || info.data?.id || `mauze-${info.title}-${Date.now()}`;
+function getDedupKey(info) {
+  const d = info.data || {};
+  return d.notification_id || d.id || d.tag || `${info.title}:::${info.body}`;
+}
+
+function makeDeterministicTag(info) {
+  const d = info.data || {};
+  if (d.tag) return d.tag;
+  if (d.notification_id) return d.notification_id;
+  if (d.id) return d.id;
+  // Deterministic clean slug tag without timestamps
+  const slug = (info.title || "mauze").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
+  return `mauze-${slug}`;
 }
 
 function buildNotificationOptions(info) {
   const options = {
     body: info.body,
-    icon: '/LOGO ATFAAL.png',
-    badge: '/LOGO ATFAAL.png',
+    icon: '/LOGO ATFAAL-192.png',
+    badge: '/LOGO ATFAAL-192.png',
     vibrate: [200, 100, 200],
     data: {
       ...info.data,
       url: info.url,
       timestamp: new Date().toISOString()
     },
-    tag: makeNotifTag(info),
-    renotify: true,
+    tag: makeDeterministicTag(info),
+    renotify: false,
     requireInteraction: true,
     silent: false,
     dir: 'ltr',
@@ -110,7 +146,7 @@ function buildNotificationOptions(info) {
       {
         action: 'open',
         title: 'Open Portal',
-        icon: '/LOGO ATFAAL.png'
+        icon: '/LOGO ATFAAL-192.png'
       },
       {
         action: 'dismiss',
@@ -122,18 +158,32 @@ function buildNotificationOptions(info) {
   return options;
 }
 
-// Background handler for Firebase SDK messages
-messaging.onBackgroundMessage(function(payload) {
+// Unified push display function with deduplication protection
+function displayPushNotification(payload) {
   try {
-    console.log('[SW] FCM background message received:', payload);
     const info = parsePushPayload(payload);
+    const dedupKey = getDedupKey(info);
+
+    if (isRecentlyShown(dedupKey)) {
+      console.log('[SW] Skipping duplicate push notification:', dedupKey);
+      return Promise.resolve();
+    }
+
+    console.log('[SW] Displaying background notification:', info.title);
     return self.registration.showNotification(info.title, buildNotificationOptions(info));
   } catch (err) {
-    console.error('[SW] Error in onBackgroundMessage:', err);
+    console.error('[SW] Error showing push notification:', err);
+    return Promise.resolve();
   }
+}
+
+// Background handler for Firebase SDK messages
+messaging.onBackgroundMessage(function(payload) {
+  console.log('[SW] FCM background message received:', payload);
+  return displayPushNotification(payload);
 });
 
-// Fallback raw push event listener to ensure background notifications always display
+// Fallback raw push event listener to ensure background notifications always display on all browsers/iOS
 self.addEventListener('push', function(event) {
   try {
     if (!event.data) return;
@@ -152,22 +202,20 @@ self.addEventListener('push', function(event) {
       }
     }
 
-    const info = parsePushPayload(payload);
-    event.waitUntil(
-      self.registration.showNotification(info.title, buildNotificationOptions(info))
-    );
+    event.waitUntil(displayPushNotification(payload));
   } catch (err) {
     console.error('[SW] Error handling raw push event:', err);
   }
 });
 
-// Notification click event handler
+// Notification click event handler: Opens exact target deep-link page
 self.addEventListener('notificationclick', function(event) {
   console.log('[SW] Notification click received:', event);
   event.notification.close();
   if (event.action === 'dismiss') return;
 
-  const targetUrl = buildDeepLinkUrl(event.notification.data);
+  const notifData = event.notification.data || {};
+  const targetUrl = buildDeepLinkUrl(notifData);
   console.log('[SW] Opening target URL:', targetUrl);
 
   event.waitUntil(
@@ -179,6 +227,15 @@ self.addEventListener('notificationclick', function(event) {
 
         for (const client of clientList) {
           if (client.url && client.url.startsWith(origin) && 'focus' in client) {
+            // Send in-app message so router can switch page immediately without jarring page reload
+            try {
+              client.postMessage({
+                type: 'mauze:notification-click',
+                data: notifData,
+                url: targetUrl
+              });
+            } catch (_) {}
+
             if ('navigate' in client) {
               client.navigate(targetUrl).catch(function() {});
             }
