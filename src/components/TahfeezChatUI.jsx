@@ -289,11 +289,23 @@ export default function TahfeezChatUI({
             }}>
               <div style={{ display: "flex", alignItems: "center" }}>
                 <div 
-                  className="mobile-back-btn chat-item-hover" 
+                  className="mobile-back-btn chat-item-hover pulse" 
                   onClick={() => onSelectChat(null)}
-                  style={{ marginRight: "12px", padding: "8px", cursor: "pointer", borderRadius: "50%", alignItems: "center", justifyContent: "center" }}
+                  style={{ 
+                    marginRight: "12px", 
+                    width: "40px",
+                    height: "40px",
+                    cursor: "pointer", 
+                    borderRadius: "50%", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    background: "rgba(212, 175, 55, 0.15)",
+                    border: "1px solid rgba(212, 175, 55, 0.3)",
+                    flexShrink: 0,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
+                  }}
                 >
-                  <ArrowLeft size={22} color="var(--text-color)" />
+                  <ArrowLeft size={22} color="var(--primary-gold, #D4AF37)" />
                 </div>
                 <div style={{
                   width: "44px",
@@ -306,6 +318,7 @@ export default function TahfeezChatUI({
                   color: "#fff",
                   fontWeight: "bold",
                   marginRight: "16px",
+                  flexShrink: 0,
                   boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
                 }}>
                   {activeChat.isGroup ? <Users size={20} /> : (activeChat.name || activeChat.full_name || activeChat.teacherName || "S")[0].toUpperCase()}
