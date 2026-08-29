@@ -49,7 +49,6 @@ function buildIceServers() {
         "turn:openrelay.metered.ca:80",
         "turn:openrelay.metered.ca:443",
         "turn:openrelay.metered.ca:443?transport=tcp",
-        "turns:openrelay.metered.ca:443?transport=tcp"
       ],
       username: "openrelay",
       credential: "openrelay"
@@ -829,8 +828,7 @@ export default function VideoCall({ call, onClose }) {
           // and mutes the raw <audio> element so audio isn't routed twice.
           connectRemoteAudio(new MediaStream([track]));
         }
-
-        setStatus("connected");
+        // Do NOT set status="connected" here. Wait for iceConnectionState to become "connected".
       };
 
       const checkConnectionState = () => {
