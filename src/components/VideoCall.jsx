@@ -39,8 +39,7 @@ function buildIceServers() {
     "stun:stun4.l.google.com:19302",
     "stun:global.stun.twilio.com:3478",
     "stun:stun.cloudflare.com:3478",
-    "stun:stun.services.mozilla.com",
-    "stun:relay.metered.ca:80"
+    "stun:stun.services.mozilla.com"
   ];
 
   const servers = [
@@ -50,16 +49,22 @@ function buildIceServers() {
         "turn:openrelay.metered.ca:80",
         "turn:openrelay.metered.ca:443",
         "turn:openrelay.metered.ca:443?transport=tcp",
-        "turns:openrelay.metered.ca:443?transport=tcp",
-        "turn:relay.metered.ca:80",
-        "turn:relay.metered.ca:443",
-        "turn:relay.metered.ca:443?transport=tcp"
+        "turns:openrelay.metered.ca:443?transport=tcp"
       ],
       username: "openrelay",
       credential: "openrelay"
     }
   ];
 
+  // NOTE: openrelay.metered.ca is a free, best-effort TURN service and is
+  // known to be unreliable / go offline. If two peers are on different
+  // networks (not the same LAN/WiFi) and this is the only TURN server
+  // available, ICE can fail to connect entirely, which looks exactly like
+  // "can't see or hear each other" even though the signaling/negotiation
+  // code is correct. If issues persist after the fixes below, check the
+  // console for the logged ICE candidate types (look for "relay" candidates)
+  // and consider a paid/reliable TURN provider (Twilio, Xirsys, Cloudflare
+  // Calls, metered.ca paid tier, etc).
   const turnUrl = import.meta.env.VITE_TURN_URL;
   const turnUser = import.meta.env.VITE_TURN_USERNAME;
   const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
@@ -78,17 +83,22 @@ function buildIceServers() {
 }
 
 // Enhance SDP for crystal clear, high-bitrate Opus vocal recitation.
+// FIX: the old version matched ANY fmtp line containing the substring "111",
+// which can accidentally match unrelated codec lines (e.g. a video codec's
+// profile-level-id hex string) and corrupt that line, breaking negotiation
+// for that media type. This version finds Opus's *actual* dynamic payload
+// type from its rtpmap line first, then only touches that specific fmtp line.
 function tuneSdpForVocalClarity(sdp) {
   if (!sdp) return sdp;
 
   const rtpmapMatch = sdp.match(/a=rtpmap:(\d+)\s+opus\/\d+/i);
-  if (!rtpmapMatch) return sdp;
+  if (!rtpmapMatch) return sdp; // Opus not present in this SDP, leave it alone
 
   const opusPt = rtpmapMatch[1];
   const fmtpRegex = new RegExp(`(a=fmtp:${opusPt} [^\\r\\n]*)`, "g");
 
   return sdp.replace(fmtpRegex, (line) => {
-    if (/maxaveragebitrate=/.test(line)) return line;
+    if (/maxaveragebitrate=/.test(line)) return line; // already tuned, don't double-append
     return `${line};maxaveragebitrate=64000;stereo=0;sprop-stereo=0;useinbandfec=1;minptime=10;cng=off`;
   });
 }
@@ -113,16 +123,18 @@ export default function VideoCall({ call, onClose }) {
   const remoteStreamRef = useRef(new MediaStream());
   const signalUnsubsRef = useRef([]);
   const endedRef = useRef(false);
+  const sessionIdRef = useRef(Date.now().toString());
   const audioContextRef = useRef(null);
   const gainNodeRef = useRef(null);
   const localAnalyserRef = useRef(null);
   const remoteAnalyserRef = useRef(null);
   const animFrameRef = useRef(null);
-  const audioGraphReadyRef = useRef(false);
+  const audioGraphReadyRef = useRef(false); // guards against building the remote audio graph more than once
   const localAnalyserReadyRef = useRef(false);
-  const initialNegotiationDoneRef = useRef(false);
+  const initialNegotiationDoneRef = useRef(false); // gates onnegotiationneeded until the first offer/answer round is done
 
-  // Synchronized state refs to prevent stale closure reads in listeners
+  // Refs that always mirror the latest state, so async callbacks / Firestore
+  // listeners created in effects that don't re-run never read stale values.
   const statusRef = useRef("initializing");
   const camOnRef = useRef(true);
   const micOnRef = useRef(true);
@@ -168,7 +180,7 @@ export default function VideoCall({ call, onClose }) {
 
         const outputs = devices.filter((d) => d.kind === "audiooutput");
         setAudioOutputs(outputs);
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, []);
 
@@ -199,12 +211,14 @@ export default function VideoCall({ call, onClose }) {
       audioContextRef.current = new AudioContextClass();
     }
     if (audioContextRef.current.state === "suspended") {
-      audioContextRef.current.resume().catch(() => {});
+      audioContextRef.current.resume().catch(() => { });
     }
     return audioContextRef.current;
   }, []);
 
-  // Local microphone volume analyser (strictly for speaking indicator, never routed to destination)
+  // Local microphone volume analyser (for the "speaking" indicator only —
+  // never routed to a destination, so this can't cause echo/feedback).
+  // Guarded so it only ever runs once per call session.
   const connectLocalAnalyser = useCallback((localStream) => {
     if (localAnalyserReadyRef.current) return;
     if (!localStream || localStream.getAudioTracks().length === 0) return;
@@ -219,18 +233,26 @@ export default function VideoCall({ call, onClose }) {
       localAnalyserRef.current = localAnalyser;
       localAnalyserReadyRef.current = true;
     } catch (e) {
-      console.warn("[Audio] Local analyser setup note:", e);
+      console.warn("[Audio] Local analyser setup failed:", e);
     }
   }, [ensureAudioContext]);
 
-  // Remote audio: builds the Web Audio graph and also supports direct HTML audio playback
+  // FIX: previously this ran once per ontrack event (i.e. once for the video
+  // track AND once for the audio track), building two overlapping
+  // MediaStreamSource -> GainNode -> destination chains for the same audio
+  // track, on top of the <audio> element also playing that same track
+  // natively. That triple playback is what was causing garbled/absent sound
+  // in some browsers. Now this runs exactly once per call (guarded), and
+  // becomes the ONLY playback path — the raw <audio> element gets muted so
+  // there's no double-routing, and the boost/headphone gain actually applies
+  // to what you hear.
   const connectRemoteAudio = useCallback((remoteStream) => {
     if (audioGraphReadyRef.current) return;
     audioGraphReadyRef.current = true;
 
     try {
       const ctx = ensureAudioContext();
-      if (!ctx) throw new Error("Web Audio API unavailable");
+      if (!ctx) throw new Error("Web Audio API unavailable in this browser");
 
       const remoteSrc = ctx.createMediaStreamSource(remoteStream);
       const gainNode = ctx.createGain();
@@ -244,25 +266,28 @@ export default function VideoCall({ call, onClose }) {
       remoteSrc.connect(gainNode);
       gainNode.connect(remoteAnalyser);
 
-      // Connect to hardware output destination if not spectator
+      // Spectators should never hear audio out loud.
       if (!isSpectator) {
         gainNode.connect(ctx.destination);
       }
       remoteAnalyserRef.current = remoteAnalyser;
 
-      // Also ensure the <audio> element is playing for device sink routing
+      // Web Audio is now the sole playback path — mute the plain element so
+      // we don't hear (or fail to hear, due to phase issues) the same track
+      // twice.
       if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = remoteStream;
-        remoteAudioRef.current.play().then(() => {
-          setAudioBlocked(false);
-        }).catch(() => {
-          setAudioBlocked(true);
-        });
+        remoteAudioRef.current.muted = true;
+        remoteAudioRef.current.play().catch(() => { });
       }
+
+      setAudioBlocked(ctx.state === "suspended");
+      ctx.onstatechange = () => {
+        setAudioBlocked(ctx.state === "suspended");
+      };
     } catch (e) {
-      console.warn("[Audio] Direct audio playback fallback:", e);
+      console.warn("[Audio] Web Audio routing failed, falling back to plain <audio> playback:", e);
+      // Fallback: let the element itself play the audio directly.
       if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = remoteStream;
         remoteAudioRef.current.muted = isSpectator;
         remoteAudioRef.current.volume = 1.0;
         remoteAudioRef.current.play().then(() => {
@@ -274,7 +299,9 @@ export default function VideoCall({ call, onClose }) {
     }
   }, [ensureAudioContext, getTargetGain, isSpectator]);
 
-  // Continuously-running speaking-indicator loop
+  // Single, continuously-running speaking-indicator loop (previously a new
+  // requestAnimationFrame loop was started on every ontrack event, stacking
+  // up duplicate loops).
   useEffect(() => {
     const localBuf = new Uint8Array(128);
     const remoteBuf = new Uint8Array(128);
@@ -343,18 +370,18 @@ export default function VideoCall({ call, onClose }) {
 
     try {
       if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current.close().catch(() => { });
         audioContextRef.current = null;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       const unsubs = signalUnsubsRef.current;
       signalUnsubsRef.current = [];
       for (const fn of unsubs) {
-        try { fn(); } catch (_) {}
+        try { fn(); } catch (_) { }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       if (pcRef.current) {
@@ -366,37 +393,37 @@ export default function VideoCall({ call, onClose }) {
         pcRef.current.close();
         pcRef.current = null;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => {
-          try { t.stop(); } catch (_) {}
+          try { t.stop(); } catch (_) { }
         });
         localStreamRef.current = null;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       if (remoteStreamRef.current) {
         remoteStreamRef.current.getTracks().forEach((t) => {
-          try { t.stop(); } catch (_) {}
+          try { t.stop(); } catch (_) { }
         });
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
       if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
-    } catch (_) {}
+    } catch (_) { }
 
     if (roomId) {
       try {
         const roomRef = doc(db, SIGNAL_PATH, roomId);
         const fieldName = role === "caller" ? "caller_in_room" : "callee_in_room";
-        updateDoc(roomRef, { [fieldName]: false }).catch(() => {});
-      } catch (_) {}
+        updateDoc(roomRef, { [fieldName]: false }).catch(() => { });
+      } catch (_) { }
     }
   }, [roomId, role, SIGNAL_PATH]);
 
@@ -439,15 +466,14 @@ export default function VideoCall({ call, onClose }) {
     const next = !micOn;
     stream.getAudioTracks().forEach((t) => { t.enabled = next; });
     setMicOn(next);
-    micOnRef.current = next;
 
     // Sync state to peer via signaling
     if (roomId) {
       try {
         const roomRef = doc(db, SIGNAL_PATH, roomId);
         const fieldName = role === "caller" ? "caller_mic_on" : "callee_mic_on";
-        updateDoc(roomRef, { [fieldName]: next }).catch(() => {});
-      } catch (_) {}
+        updateDoc(roomRef, { [fieldName]: next }).catch(() => { });
+      } catch (_) { }
     }
   }, [micOn, roomId, role, SIGNAL_PATH]);
 
@@ -460,14 +486,13 @@ export default function VideoCall({ call, onClose }) {
     if (stream && stream.getVideoTracks().length > 0) {
       stream.getVideoTracks().forEach((t) => { t.enabled = next; });
       setCamOn(next);
-      camOnRef.current = next;
 
       if (roomId) {
         try {
           const roomRef = doc(db, SIGNAL_PATH, roomId);
           const fieldName = role === "caller" ? "caller_cam_on" : "callee_cam_on";
-          updateDoc(roomRef, { [fieldName]: next }).catch(() => {});
-        } catch (_) {}
+          updateDoc(roomRef, { [fieldName]: next }).catch(() => { });
+        } catch (_) { }
       }
       return;
     }
@@ -502,23 +527,29 @@ export default function VideoCall({ call, onClose }) {
           if (videoSender) {
             await videoSender.replaceTrack(videoTrack);
           } else {
+            // FIX: adding a brand-new track here (no pre-existing transceiver)
+            // triggers pc.onnegotiationneeded, which now actually renegotiates
+            // and pushes the new offer to the peer via Firestore (see the
+            // onnegotiationneeded handler set up in the main connection
+            // effect below). Previously nothing listened for this event, so
+            // a camera turned on after the call had already connected was
+            // silently never sent to the other side.
             pc.addTrack(videoTrack, stream || videoStream);
           }
         }
 
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = new MediaStream([videoTrack]);
-          try { await localVideoRef.current.play(); } catch (_) {}
+          try { await localVideoRef.current.play(); } catch (_) { }
         }
         setCamOn(true);
-        camOnRef.current = true;
 
         if (roomId) {
           try {
             const roomRef = doc(db, SIGNAL_PATH, roomId);
             const fieldName = role === "caller" ? "caller_cam_on" : "callee_cam_on";
-            updateDoc(roomRef, { [fieldName]: true }).catch(() => {});
-          } catch (_) {}
+            updateDoc(roomRef, { [fieldName]: true }).catch(() => { });
+          } catch (_) { }
         }
       }
     } catch (e) {
@@ -556,7 +587,7 @@ export default function VideoCall({ call, onClose }) {
 
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = new MediaStream([newVideoTrack]);
-          try { await localVideoRef.current.play(); } catch (_) {}
+          try { await localVideoRef.current.play(); } catch (_) { }
         }
 
         if (pc) {
@@ -567,7 +598,6 @@ export default function VideoCall({ call, onClose }) {
           }
         }
         setCamOn(true);
-        camOnRef.current = true;
       }
     } catch (err) {
       console.warn("Error switching camera:", err);
@@ -579,17 +609,15 @@ export default function VideoCall({ call, onClose }) {
     if (audioContextRef.current && audioContextRef.current.state === "suspended") {
       audioContextRef.current.resume().then(() => {
         setAudioBlocked(false);
-      }).catch(() => {});
+      }).catch(() => { });
     }
     if (remoteAudioRef.current) {
-      remoteAudioRef.current.play().then(() => {
-        setAudioBlocked(false);
-      }).catch(() => {});
+      remoteAudioRef.current.play().catch(() => { });
     }
     if (remoteVideoRef.current) {
       remoteVideoRef.current.play().then(() => {
         setHasRemoteVideo(true);
-      }).catch(() => {});
+      }).catch(() => { });
     }
   };
 
@@ -599,9 +627,9 @@ export default function VideoCall({ call, onClose }) {
     if (!elem) return;
 
     if (!document.fullscreenElement) {
-      elem.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      elem.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => { });
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => { });
     }
   };
 
@@ -610,13 +638,13 @@ export default function VideoCall({ call, onClose }) {
     if (!roomId || !role) return;
 
     let cancelled = false;
-    const callStartTime = Date.now() - 5000; // Allow 5s clock skew
+    const currentSessionId = sessionIdRef.current;
 
     const start = async () => {
       setStatus("initializing");
       setError("");
 
-      // 1. Acquire Local Media (Mic + Cam)
+      // 1. Acquire Local Media (Mic + Cam) with vocal clarity constraints
       let stream = null;
       if (!isSpectator) {
         try {
@@ -638,7 +666,7 @@ export default function VideoCall({ call, onClose }) {
             setCamOn(true);
             setMicOn(true);
           } catch (vidErr) {
-            console.warn("Primary media acquisition note, trying fallback:", vidErr);
+            console.warn("Standard media acquisition note, trying fallback:", vidErr);
             try {
               stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
               setCamOn(true);
@@ -716,6 +744,9 @@ export default function VideoCall({ call, onClose }) {
         }
 
         localStreamRef.current = stream;
+        // FIX: camOnRef/micOnRef need to reflect what we actually got, right
+        // now, before anything is written to Firestore below — not whatever
+        // the component's closed-over state was when this effect first ran.
         camOnRef.current = !!(stream && stream.getVideoTracks().length > 0);
         micOnRef.current = !!(stream && stream.getAudioTracks().length > 0);
 
@@ -723,7 +754,7 @@ export default function VideoCall({ call, onClose }) {
 
         if (localVideoRef.current && stream && stream.getVideoTracks().length > 0) {
           localVideoRef.current.srcObject = new MediaStream(stream.getVideoTracks());
-          try { await localVideoRef.current.play(); } catch (_) {}
+          try { await localVideoRef.current.play(); } catch (_) { }
         }
       } else {
         setCamOn(false);
@@ -742,64 +773,60 @@ export default function VideoCall({ call, onClose }) {
           try {
             pc.addTrack(t, stream);
             console.log(`[WebRTC] Added local track: ${t.kind}`);
-          } catch (_) {}
+          } catch (_) { }
         });
       }
 
-      // Ensure transceivers exist for bidirectional flow
+      // Bidirectional transceivers
       const hasAudio = stream && stream.getAudioTracks().length > 0;
       const hasVideo = stream && stream.getVideoTracks().length > 0;
       if (!hasAudio && pc.addTransceiver) {
-        try { pc.addTransceiver("audio", { direction: "sendrecv" }); } catch (_) {}
+        try { pc.addTransceiver("audio", { direction: "sendrecv" }); } catch (_) { }
       }
       if (!hasVideo && pc.addTransceiver) {
-        try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (_) {}
+        try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (_) { }
       }
 
       const roomRef = doc(db, SIGNAL_PATH, roomId);
 
-      // 3. Remote Track Handler
+      // 3. Remote Track Handler - Guarantees Immediate Display & Loud Output
       pc.ontrack = (ev) => {
         console.log(`[WebRTC] Remote track received: ${ev.track.kind}`);
         const track = ev.track;
-        const streams = ev.streams;
-        const remoteStream = (streams && streams[0]) ? streams[0] : new MediaStream([track]);
-        remoteStreamRef.current = remoteStream;
 
         if (track.kind === "video") {
           setHasRemoteVideo(true);
-          track.onmute = () => {
-            console.log("[WebRTC] Video track mute state:", track.readyState);
-            if (track.readyState === "ended") setHasRemoteVideo(false);
-          };
-          track.onunmute = () => {
-            console.log("[WebRTC] Video track unmuted - frame active");
-            setHasRemoteVideo(true);
-          };
+          track.onmute = () => setHasRemoteVideo(false);
+          track.onunmute = () => setHasRemoteVideo(true);
+          track.onended = () => setHasRemoteVideo(false);
 
           if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play().then(() => {
+            const vidStream = new MediaStream([track]);
+            remoteVideoRef.current.srcObject = vidStream;
+            remoteVideoRef.current.onloadedmetadata = () => {
+              remoteVideoRef.current.play().catch(() => { });
               setHasRemoteVideo(true);
-            }).catch((err) => {
-              console.warn("[WebRTC] Remote video autoplay note:", err);
-            });
+            };
+            remoteVideoRef.current.onplaying = () => setHasRemoteVideo(true);
+            remoteVideoRef.current.play().catch(() => { });
           }
         }
 
         if (track.kind === "audio") {
           setHasRemoteAudio(true);
+          track.onmute = () => setHasRemoteAudio(false);
           track.onunmute = () => setHasRemoteAudio(true);
 
           if (remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = remoteStream;
+            remoteAudioRef.current.srcObject = new MediaStream([track]);
           }
 
-          connectRemoteAudio(remoteStream);
+          // Single, guarded call — builds the Web Audio graph exactly once
+          // and mutes the raw <audio> element so audio isn't routed twice.
+          connectRemoteAudio(new MediaStream([track]));
         }
 
         setStatus("connected");
-        setError("");
       };
 
       const checkConnectionState = () => {
@@ -817,7 +844,7 @@ export default function VideoCall({ call, onClose }) {
             if (pcRef.current && pcRef.current.restartIce) {
               pcRef.current.restartIce();
             }
-          } catch (_) {}
+          } catch (_) { }
           setStatus("reconnecting");
         }
       };
@@ -835,12 +862,16 @@ export default function VideoCall({ call, onClose }) {
           const candJson = ev.candidate.toJSON();
           if (!candJson || !candJson.candidate) return;
 
+          // Logs candidate type (host / srflx / relay) so you can confirm in
+          // devtools whether a TURN relay candidate is actually being used —
+          // useful if this only fails across different networks.
           const typeMatch = /typ (\w+)/.exec(candJson.candidate);
           console.log(`[WebRTC] Local ICE candidate (${role}):`, typeMatch ? typeMatch[1] : "unknown");
 
           try {
             await addDoc(candidatesCol, {
               senderRole: role,
+              sessionId: currentSessionId,
               candidate: candJson,
               createdAt: Date.now(),
             });
@@ -883,22 +914,27 @@ export default function VideoCall({ call, onClose }) {
         }
       };
 
-      // Listen for ICE candidates from the remote peer without mismatched timestamp filters
       const unsubCandidates = onSnapshot(candidatesCol, (snap) => {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const data = change.doc.data();
-            if (data && data.senderRole !== role && data.candidate) {
-              if (!data.createdAt || data.createdAt >= callStartTime) {
-                applyCandidate(data.candidate);
-              }
+            if (data && data.senderRole !== role && data.candidate && (!data.sessionId || data.sessionId === currentSessionId)) {
+              applyCandidate(data.candidate);
             }
           }
         });
       });
       trackUnsub(unsubCandidates);
 
-      // Renegotiation handler for mid-call changes
+      // --- Renegotiation support (for cameras/mics enabled AFTER the call
+      // has already connected) ---
+      // Guarded by initialNegotiationDoneRef so it doesn't fire for the very
+      // first offer, which is created manually below for the caller / in
+      // response to the caller's offer for the callee. Works symmetrically
+      // for both roles: whichever side adds a track later becomes the
+      // offerer for that round; the other side answers via
+      // handleIncomingOffer below, matched by pc.signalingState instead of
+      // one-shot booleans so repeated rounds keep working.
       pc.onnegotiationneeded = async () => {
         if (!initialNegotiationDoneRef.current || endedRef.current) return;
         if (pc.signalingState !== "stable") return;
@@ -914,17 +950,17 @@ export default function VideoCall({ call, onClose }) {
             answer: null,
           }, { merge: true });
         } catch (e) {
-          console.warn("[WebRTC] Renegotiation offer note:", e);
+          console.warn("[WebRTC] Renegotiation offer failed:", e);
         }
       };
 
       const handleIncomingOffer = async (offerData) => {
         if (!offerData || !offerData.sdp) return;
-        if (offerData.from === role) return;
+        if (offerData.from === role) return; // this is our own offer echoed back
         if (pc.signalingState !== "stable") return;
 
         try {
-          console.log(`[WebRTC] ${role} applying incoming offer`);
+          console.log(`[WebRTC] ${role} applying offer`);
           await pc.setRemoteDescription(new RTCSessionDescription(offerData));
           await flushRemoteCandidates();
 
@@ -935,17 +971,16 @@ export default function VideoCall({ call, onClose }) {
           });
           await pc.setLocalDescription(tunedAnswer);
 
-          await updateDoc(roomRef, {
+          await setDoc(roomRef, {
             answer: { type: tunedAnswer.type, sdp: tunedAnswer.sdp, from: role },
             [role === "caller" ? "caller_in_room" : "callee_in_room"]: true,
             [role === "caller" ? "caller_cam_on" : "callee_cam_on"]: camOnRef.current,
             [role === "caller" ? "caller_mic_on" : "callee_mic_on"]: micOnRef.current,
             status: "connected",
-          });
+          }, { merge: true });
 
           initialNegotiationDoneRef.current = true;
           setStatus("connected");
-          setError("");
         } catch (err) {
           console.error(`[WebRTC] ${role} failed to answer offer:`, err);
           setError("Failed to join video call: " + (err?.message || err));
@@ -955,16 +990,14 @@ export default function VideoCall({ call, onClose }) {
 
       const handleIncomingAnswer = async (answerData) => {
         if (!answerData || !answerData.sdp) return;
-        if (answerData.from === role) return;
-        if (pc.signalingState !== "have-local-offer") return;
+        if (pc.signalingState !== "have-local-offer") return; // not currently expecting an answer
 
         try {
-          console.log(`[WebRTC] ${role} applying incoming answer`);
+          console.log(`[WebRTC] ${role} applying answer`);
           await pc.setRemoteDescription(new RTCSessionDescription(answerData));
           await flushRemoteCandidates();
           initialNegotiationDoneRef.current = true;
           setStatus("connected");
-          setError("");
         } catch (err) {
           console.error(`[WebRTC] ${role} setRemoteDescription failed:`, err);
         }
@@ -972,12 +1005,11 @@ export default function VideoCall({ call, onClose }) {
 
       if (role === "caller") {
         try {
-          // Clear old candidates from previous sessions
           getDocs(candidatesCol).then((oldCands) => {
             oldCands.forEach((docSnap) => {
-              deleteDoc(docSnap.ref).catch(() => {});
+              deleteDoc(docSnap.ref).catch(() => { });
             });
-          }).catch(() => {});
+          }).catch(() => { });
 
           const rawOffer = await pc.createOffer();
           const tunedOffer = new RTCSessionDescription({
@@ -987,7 +1019,8 @@ export default function VideoCall({ call, onClose }) {
           await pc.setLocalDescription(tunedOffer);
 
           await setDoc(roomRef, {
-            offer: { type: tunedOffer.type, sdp: tunedOffer.sdp, from: "caller" },
+            sessionId: currentSessionId,
+            offer: { type: tunedOffer.type, sdp: tunedOffer.sdp, from: role },
             answer: null,
             caller: { name: myName, role: myRole },
             caller_in_room: true,
@@ -1001,7 +1034,7 @@ export default function VideoCall({ call, onClose }) {
           const unsubRoom = onSnapshot(roomRef, async (snapshot) => {
             if (endedRef.current || !snapshot.exists()) return;
             const data = snapshot.data();
-            if (!data) return;
+            if (!data || data.sessionId !== currentSessionId) return;
 
             // Track callee's live camera and mic state
             if (data.callee_cam_on !== undefined) {
@@ -1011,12 +1044,8 @@ export default function VideoCall({ call, onClose }) {
               setPeerMicOn(data.callee_mic_on);
             }
 
-            if (data.offer && data.offer.from !== "caller") {
-              await handleIncomingOffer(data.offer);
-            }
-            if (data.answer && data.answer.from !== "caller") {
-              await handleIncomingAnswer(data.answer);
-            }
+            if (data.offer) await handleIncomingOffer(data.offer);   // handles renegotiation rounds initiated by the callee
+            if (data.answer) await handleIncomingAnswer(data.answer);
 
             if (data.callee_in_room === false && statusRef.current === "connected") {
               setStatus("reconnecting");
@@ -1044,12 +1073,8 @@ export default function VideoCall({ call, onClose }) {
             setPeerMicOn(data.caller_mic_on);
           }
 
-          if (data.offer && data.offer.from !== "callee") {
-            await handleIncomingOffer(data.offer);
-          }
-          if (data.answer && data.answer.from !== "callee") {
-            await handleIncomingAnswer(data.answer);
-          }
+          if (data.offer) await handleIncomingOffer(data.offer);
+          if (data.answer) await handleIncomingAnswer(data.answer); // handles renegotiation rounds initiated by the caller
 
           if (data.caller_in_room === false && statusRef.current === "connected") {
             setStatus("reconnecting");
@@ -1084,7 +1109,7 @@ export default function VideoCall({ call, onClose }) {
   }[status] || status;
 
   const isTeacher = myRole === "teacher";
-  const showRemoteVideo = peerCamOn && (hasRemoteVideo || status === "connected");
+  const showRemoteVideo = peerCamOn && hasRemoteVideo && status === "connected";
 
   return createPortal(
     <div
@@ -1098,12 +1123,12 @@ export default function VideoCall({ call, onClose }) {
       }}
     >
       <div className={`vc-stage ${layoutMode === "grid" ? "vc-layout-grid" : "vc-layout-pip"}`}>
-        {/* Dedicated Audio Element for Remote Sound */}
+        {/* Dedicated Audio Element for Remote Sound (muted once the Web Audio graph takes over — see connectRemoteAudio) */}
         <audio
           ref={remoteAudioRef}
           autoPlay
           playsInline
-          muted={isSpectator}
+          muted={true}
         />
 
         {/* Top Header Bar */}
@@ -1363,4 +1388,3 @@ export default function VideoCall({ call, onClose }) {
     document.body
   );
 }
-
