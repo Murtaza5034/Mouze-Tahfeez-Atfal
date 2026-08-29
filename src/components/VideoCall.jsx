@@ -472,7 +472,9 @@ export default function VideoCall({ call, onClose }) {
       try {
         const roomRef = doc(db, SIGNAL_PATH, roomId);
         const fieldName = role === "caller" ? "caller_mic_on" : "callee_mic_on";
-        updateDoc(roomRef, { [fieldName]: next }).catch(() => { });
+        updateDoc(roomRef, { [fieldName]: next }).catch((err) => {
+          console.error("[WebRTC] Failed to sync mic state to Firestore (check security rules):", err);
+        });
       } catch (_) { }
     }
   }, [micOn, roomId, role, SIGNAL_PATH]);
@@ -491,7 +493,9 @@ export default function VideoCall({ call, onClose }) {
         try {
           const roomRef = doc(db, SIGNAL_PATH, roomId);
           const fieldName = role === "caller" ? "caller_cam_on" : "callee_cam_on";
-          updateDoc(roomRef, { [fieldName]: next }).catch(() => { });
+          updateDoc(roomRef, { [fieldName]: next }).catch((err) => {
+            console.error("[WebRTC] Failed to sync cam state to Firestore (check security rules):", err);
+          });
         } catch (_) { }
       }
       return;
@@ -923,6 +927,10 @@ export default function VideoCall({ call, onClose }) {
             }
           }
         });
+      }, (err) => {
+        console.error(`[WebRTC] (${role}) candidates listener error — likely a Firestore security-rule permission issue:`, err);
+        setError("Signaling error: " + (err?.message || err));
+        setStatus("error");
       });
       trackUnsub(unsubCandidates);
 
@@ -1050,6 +1058,10 @@ export default function VideoCall({ call, onClose }) {
             if (data.callee_in_room === false && statusRef.current === "connected") {
               setStatus("reconnecting");
             }
+          }, (err) => {
+            console.error("[WebRTC] (caller) room listener error — likely a Firestore security-rule permission issue:", err);
+            setError("Signaling error: " + (err?.message || err));
+            setStatus("error");
           });
           trackUnsub(unsubRoom);
 
@@ -1079,6 +1091,10 @@ export default function VideoCall({ call, onClose }) {
           if (data.caller_in_room === false && statusRef.current === "connected") {
             setStatus("reconnecting");
           }
+        }, (err) => {
+          console.error("[WebRTC] (callee) room listener error — likely a Firestore security-rule permission issue:", err);
+          setError("Signaling error: " + (err?.message || err));
+          setStatus("error");
         });
         trackUnsub(unsubRoom);
 
