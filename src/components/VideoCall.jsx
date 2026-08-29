@@ -873,7 +873,7 @@ export default function VideoCall({ call, onClose }) {
           try {
             await addDoc(candidatesCol, {
               senderRole: role,
-              sessionId: currentSessionId,
+              sessionId: sessionIdRef.current,
               candidate: candJson,
               createdAt: Date.now(),
             });
@@ -920,7 +920,9 @@ export default function VideoCall({ call, onClose }) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const data = change.doc.data();
-            if (data && data.senderRole !== role && data.candidate && (!data.sessionId || data.sessionId === currentSessionId)) {
+            // Allow candidates from the other role.
+            // We use sessionIdRef.current to allow the callee to adopt the caller's sessionId.
+            if (data && data.senderRole !== role && data.candidate && (!data.sessionId || data.sessionId === sessionIdRef.current)) {
               applyCandidate(data.candidate);
             }
           }
@@ -1074,6 +1076,10 @@ export default function VideoCall({ call, onClose }) {
           if (endedRef.current || !snapshot.exists()) return;
           const data = snapshot.data();
           if (!data) return;
+
+          if (data.sessionId && data.sessionId !== sessionIdRef.current) {
+            sessionIdRef.current = data.sessionId;
+          }
 
           // Track caller's live camera and mic state
           if (data.caller_cam_on !== undefined) {
