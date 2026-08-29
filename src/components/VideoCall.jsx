@@ -249,54 +249,38 @@ export default function VideoCall({ call, onClose }) {
     if (audioGraphReadyRef.current) return;
     audioGraphReadyRef.current = true;
 
+    // Use native <audio> element for reliable playback.
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = isSpectator;
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.play().then(() => {
+        setAudioBlocked(false);
+      }).catch(() => {
+        setAudioBlocked(true);
+      });
+    }
+
+    // Only use AudioContext for the speaking indicator (AnalyserNode).
+    // Do NOT route to ctx.destination to avoid double playback / Web Audio API silent bugs.
     try {
       const ctx = ensureAudioContext();
-      if (!ctx) throw new Error("Web Audio API unavailable in this browser");
+      if (!ctx) return;
 
       const remoteSrc = ctx.createMediaStreamSource(remoteStream);
-      const gainNode = ctx.createGain();
-      gainNode.gain.value = getTargetGain();
-      gainNodeRef.current = gainNode;
-
       const remoteAnalyser = ctx.createAnalyser();
       remoteAnalyser.fftSize = 256;
       remoteAnalyser.smoothingTimeConstant = 0.4;
 
-      remoteSrc.connect(gainNode);
-      gainNode.connect(remoteAnalyser);
-
-      // Spectators should never hear audio out loud.
-      if (!isSpectator) {
-        gainNode.connect(ctx.destination);
-      }
+      remoteSrc.connect(remoteAnalyser);
       remoteAnalyserRef.current = remoteAnalyser;
 
-      // Web Audio is now the sole playback path — mute the plain element so
-      // we don't hear (or fail to hear, due to phase issues) the same track
-      // twice.
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.muted = true;
-        remoteAudioRef.current.play().catch(() => { });
-      }
-
-      setAudioBlocked(ctx.state === "suspended");
       ctx.onstatechange = () => {
-        setAudioBlocked(ctx.state === "suspended");
+        if (ctx.state === "suspended") setAudioBlocked(true);
       };
     } catch (e) {
-      console.warn("[Audio] Web Audio routing failed, falling back to plain <audio> playback:", e);
-      // Fallback: let the element itself play the audio directly.
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.muted = isSpectator;
-        remoteAudioRef.current.volume = 1.0;
-        remoteAudioRef.current.play().then(() => {
-          setAudioBlocked(false);
-        }).catch(() => {
-          setAudioBlocked(true);
-        });
-      }
+      console.warn("[Audio] Remote analyser setup failed:", e);
     }
-  }, [ensureAudioContext, getTargetGain, isSpectator]);
+  }, [ensureAudioContext, isSpectator]);
 
   // Single, continuously-running speaking-indicator loop (previously a new
   // requestAnimationFrame loop was started on every ontrack event, stacking
@@ -798,9 +782,13 @@ export default function VideoCall({ call, onClose }) {
         const track = ev.track;
 
         if (track.kind === "video") {
-          setHasRemoteVideo(true);
+          // Do not set hasRemoteVideo to true here yet. Wait for onplaying.
           track.onmute = () => setHasRemoteVideo(false);
-          track.onunmute = () => setHasRemoteVideo(true);
+          track.onunmute = () => {
+            if (remoteVideoRef.current && remoteVideoRef.current.readyState >= 2) {
+              setHasRemoteVideo(true);
+            }
+          };
           track.onended = () => setHasRemoteVideo(false);
 
           if (remoteVideoRef.current) {
@@ -808,7 +796,6 @@ export default function VideoCall({ call, onClose }) {
             remoteVideoRef.current.srcObject = vidStream;
             remoteVideoRef.current.onloadedmetadata = () => {
               remoteVideoRef.current.play().catch(() => { });
-              setHasRemoteVideo(true);
             };
             remoteVideoRef.current.onplaying = () => setHasRemoteVideo(true);
             remoteVideoRef.current.play().catch(() => { });
