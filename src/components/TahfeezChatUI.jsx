@@ -231,7 +231,19 @@ export default function TahfeezChatUI({
                   flexShrink: 0,
                   boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
                 }}>
-                  {student.isGroup ? <Users size={24} /> : displayName[0].toUpperCase()}
+                  {student.isGroup ? (
+                    <Users size={24} />
+                  ) : student.photoUrl || student.photo_url || student.avatar_url || student.photo ? (
+                    <img 
+                      src={student.photoUrl || student.photo_url || student.avatar_url || student.photo} 
+                      alt={displayName} 
+                      referrerPolicy="no-referrer"
+                      style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                      onError={(e) => e.target.style.display = 'none'}
+                    />
+                  ) : (
+                    displayName[0].toUpperCase()
+                  )}
                   {/* Status Dot */}
                   <div style={{
                     position: "absolute",
@@ -321,7 +333,19 @@ export default function TahfeezChatUI({
                   flexShrink: 0,
                   boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
                 }}>
-                  {activeChat.isGroup ? <Users size={20} /> : (activeChat.name || activeChat.full_name || activeChat.teacherName || "S")[0].toUpperCase()}
+                  {activeChat.isGroup ? (
+                    <Users size={20} />
+                  ) : activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo ? (
+                    <img 
+                      src={activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo} 
+                      alt={activeChat.name || "Student"} 
+                      referrerPolicy="no-referrer"
+                      style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                      onError={(e) => e.target.style.display = 'none'}
+                    />
+                  ) : (
+                    (activeChat.name || activeChat.full_name || activeChat.teacherName || "S")[0].toUpperCase()
+                  )}
                 </div>
                 <div>
                   <div style={{ fontWeight: "700", color: "var(--text-color)", fontSize: "1.15rem" }}>
