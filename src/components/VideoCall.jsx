@@ -39,7 +39,8 @@ function buildIceServers() {
     "stun:stun4.l.google.com:19302",
     "stun:global.stun.twilio.com:3478",
     "stun:stun.cloudflare.com:3478",
-    "stun:stun.services.mozilla.com"
+    "stun:stun.services.mozilla.com",
+    "stun:relay.metered.ca:80"
   ];
 
   const servers = [
@@ -49,16 +50,16 @@ function buildIceServers() {
         "turn:openrelay.metered.ca:80",
         "turn:openrelay.metered.ca:443",
         "turn:openrelay.metered.ca:443?transport=tcp",
-        "turns:openrelay.metered.ca:443?transport=tcp"
+        "turns:openrelay.metered.ca:443?transport=tcp",
+        "turn:relay.metered.ca:80",
+        "turn:relay.metered.ca:443",
+        "turn:relay.metered.ca:443?transport=tcp"
       ],
       username: "openrelay",
       credential: "openrelay"
     }
   ];
 
-  // NOTE: openrelay.metered.ca is a free, best-effort TURN service.
-  // For production environments with strict symmetric NATs / mobile firewalls,
-  // configure custom TURN credentials via VITE_TURN_URL / VITE_TURN_USERNAME.
   const turnUrl = import.meta.env.VITE_TURN_URL;
   const turnUser = import.meta.env.VITE_TURN_USERNAME;
   const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
@@ -77,7 +78,6 @@ function buildIceServers() {
 }
 
 // Enhance SDP for crystal clear, high-bitrate Opus vocal recitation.
-// Matches Opus's actual dynamic payload type from its rtpmap line.
 function tuneSdpForVocalClarity(sdp) {
   if (!sdp) return sdp;
 
@@ -113,7 +113,6 @@ export default function VideoCall({ call, onClose }) {
   const remoteStreamRef = useRef(new MediaStream());
   const signalUnsubsRef = useRef([]);
   const endedRef = useRef(false);
-  const sessionIdRef = useRef(Date.now().toString());
   const audioContextRef = useRef(null);
   const gainNodeRef = useRef(null);
   const localAnalyserRef = useRef(null);
@@ -180,7 +179,7 @@ export default function VideoCall({ call, onClose }) {
   // Compute gain factor based on output mode & volume boost
   const getTargetGain = useCallback(() => {
     if (audioOutputMode === "headphones") {
-      return 1.0; // Standard line level for headphones (prevents ear fatigue & feedback)
+      return 1.0; // Standard clean line level for headphones (prevents ear fatigue & feedback)
     }
     return volumeBoost ? 2.0 : 1.4; // Boosted output for room loudspeaker
   }, [audioOutputMode, volumeBoost]);
@@ -224,14 +223,14 @@ export default function VideoCall({ call, onClose }) {
     }
   }, [ensureAudioContext]);
 
-  // Remote audio: builds the Web Audio graph once and handles loud, clear routing
+  // Remote audio: builds the Web Audio graph and also supports direct HTML audio playback
   const connectRemoteAudio = useCallback((remoteStream) => {
     if (audioGraphReadyRef.current) return;
     audioGraphReadyRef.current = true;
 
     try {
       const ctx = ensureAudioContext();
-      if (!ctx) throw new Error("Web Audio API unavailable in this browser");
+      if (!ctx) throw new Error("Web Audio API unavailable");
 
       const remoteSrc = ctx.createMediaStreamSource(remoteStream);
       const gainNode = ctx.createGain();
@@ -251,19 +250,19 @@ export default function VideoCall({ call, onClose }) {
       }
       remoteAnalyserRef.current = remoteAnalyser;
 
-      // Web Audio is the primary playback path — mute the element to avoid double routing
+      // Also ensure the <audio> element is playing for device sink routing
       if (remoteAudioRef.current) {
-        remoteAudioRef.current.muted = true;
-        remoteAudioRef.current.play().catch(() => {});
+        remoteAudioRef.current.srcObject = remoteStream;
+        remoteAudioRef.current.play().then(() => {
+          setAudioBlocked(false);
+        }).catch(() => {
+          setAudioBlocked(true);
+        });
       }
-
-      setAudioBlocked(ctx.state === "suspended");
-      ctx.onstatechange = () => {
-        setAudioBlocked(ctx.state === "suspended");
-      };
     } catch (e) {
-      console.warn("[Audio] Web Audio routing note, using direct playback:", e);
+      console.warn("[Audio] Direct audio playback fallback:", e);
       if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
         remoteAudioRef.current.muted = isSpectator;
         remoteAudioRef.current.volume = 1.0;
         remoteAudioRef.current.play().then(() => {
@@ -583,7 +582,9 @@ export default function VideoCall({ call, onClose }) {
       }).catch(() => {});
     }
     if (remoteAudioRef.current) {
-      remoteAudioRef.current.play().catch(() => {});
+      remoteAudioRef.current.play().then(() => {
+        setAudioBlocked(false);
+      }).catch(() => {});
     }
     if (remoteVideoRef.current) {
       remoteVideoRef.current.play().then(() => {
@@ -609,13 +610,13 @@ export default function VideoCall({ call, onClose }) {
     if (!roomId || !role) return;
 
     let cancelled = false;
-    const currentSessionId = sessionIdRef.current;
+    const callStartTime = Date.now() - 5000; // Allow 5s clock skew
 
     const start = async () => {
       setStatus("initializing");
       setError("");
 
-      // 1. Acquire Local Media (Mic + Cam) with vocal clarity constraints
+      // 1. Acquire Local Media (Mic + Cam)
       let stream = null;
       if (!isSpectator) {
         try {
@@ -637,7 +638,7 @@ export default function VideoCall({ call, onClose }) {
             setCamOn(true);
             setMicOn(true);
           } catch (vidErr) {
-            console.warn("Standard media acquisition note, trying fallback:", vidErr);
+            console.warn("Primary media acquisition note, trying fallback:", vidErr);
             try {
               stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
               setCamOn(true);
@@ -745,7 +746,7 @@ export default function VideoCall({ call, onClose }) {
         });
       }
 
-      // Bidirectional transceivers
+      // Ensure transceivers exist for bidirectional flow
       const hasAudio = stream && stream.getAudioTracks().length > 0;
       const hasVideo = stream && stream.getVideoTracks().length > 0;
       if (!hasAudio && pc.addTransceiver) {
@@ -761,38 +762,44 @@ export default function VideoCall({ call, onClose }) {
       pc.ontrack = (ev) => {
         console.log(`[WebRTC] Remote track received: ${ev.track.kind}`);
         const track = ev.track;
+        const streams = ev.streams;
+        const remoteStream = (streams && streams[0]) ? streams[0] : new MediaStream([track]);
+        remoteStreamRef.current = remoteStream;
 
         if (track.kind === "video") {
           setHasRemoteVideo(true);
-          track.onmute = () => setHasRemoteVideo(false);
-          track.onunmute = () => setHasRemoteVideo(true);
-          track.onended = () => setHasRemoteVideo(false);
+          track.onmute = () => {
+            console.log("[WebRTC] Video track mute state:", track.readyState);
+            if (track.readyState === "ended") setHasRemoteVideo(false);
+          };
+          track.onunmute = () => {
+            console.log("[WebRTC] Video track unmuted - frame active");
+            setHasRemoteVideo(true);
+          };
 
           if (remoteVideoRef.current) {
-            const vidStream = new MediaStream([track]);
-            remoteVideoRef.current.srcObject = vidStream;
-            remoteVideoRef.current.onloadedmetadata = () => {
-              remoteVideoRef.current.play().catch(() => {});
+            remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play().then(() => {
               setHasRemoteVideo(true);
-            };
-            remoteVideoRef.current.onplaying = () => setHasRemoteVideo(true);
-            remoteVideoRef.current.play().catch(() => {});
+            }).catch((err) => {
+              console.warn("[WebRTC] Remote video autoplay note:", err);
+            });
           }
         }
 
         if (track.kind === "audio") {
           setHasRemoteAudio(true);
-          track.onmute = () => setHasRemoteAudio(false);
           track.onunmute = () => setHasRemoteAudio(true);
 
           if (remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = new MediaStream([track]);
+            remoteAudioRef.current.srcObject = remoteStream;
           }
 
-          connectRemoteAudio(new MediaStream([track]));
+          connectRemoteAudio(remoteStream);
         }
 
         setStatus("connected");
+        setError("");
       };
 
       const checkConnectionState = () => {
@@ -834,7 +841,6 @@ export default function VideoCall({ call, onClose }) {
           try {
             await addDoc(candidatesCol, {
               senderRole: role,
-              sessionId: currentSessionId,
               candidate: candJson,
               createdAt: Date.now(),
             });
@@ -877,12 +883,15 @@ export default function VideoCall({ call, onClose }) {
         }
       };
 
+      // Listen for ICE candidates from the remote peer without mismatched timestamp filters
       const unsubCandidates = onSnapshot(candidatesCol, (snap) => {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const data = change.doc.data();
-            if (data && data.senderRole !== role && data.candidate && (!data.sessionId || data.sessionId === currentSessionId)) {
-              applyCandidate(data.candidate);
+            if (data && data.senderRole !== role && data.candidate) {
+              if (!data.createdAt || data.createdAt >= callStartTime) {
+                applyCandidate(data.candidate);
+              }
             }
           }
         });
@@ -905,7 +914,7 @@ export default function VideoCall({ call, onClose }) {
             answer: null,
           }, { merge: true });
         } catch (e) {
-          console.warn("[WebRTC] Renegotiation offer failed:", e);
+          console.warn("[WebRTC] Renegotiation offer note:", e);
         }
       };
 
@@ -915,7 +924,7 @@ export default function VideoCall({ call, onClose }) {
         if (pc.signalingState !== "stable") return;
 
         try {
-          console.log(`[WebRTC] ${role} applying offer`);
+          console.log(`[WebRTC] ${role} applying incoming offer`);
           await pc.setRemoteDescription(new RTCSessionDescription(offerData));
           await flushRemoteCandidates();
 
@@ -926,16 +935,17 @@ export default function VideoCall({ call, onClose }) {
           });
           await pc.setLocalDescription(tunedAnswer);
 
-          await setDoc(roomRef, {
+          await updateDoc(roomRef, {
             answer: { type: tunedAnswer.type, sdp: tunedAnswer.sdp, from: role },
             [role === "caller" ? "caller_in_room" : "callee_in_room"]: true,
             [role === "caller" ? "caller_cam_on" : "callee_cam_on"]: camOnRef.current,
             [role === "caller" ? "caller_mic_on" : "callee_mic_on"]: micOnRef.current,
             status: "connected",
-          }, { merge: true });
+          });
 
           initialNegotiationDoneRef.current = true;
           setStatus("connected");
+          setError("");
         } catch (err) {
           console.error(`[WebRTC] ${role} failed to answer offer:`, err);
           setError("Failed to join video call: " + (err?.message || err));
@@ -945,14 +955,16 @@ export default function VideoCall({ call, onClose }) {
 
       const handleIncomingAnswer = async (answerData) => {
         if (!answerData || !answerData.sdp) return;
+        if (answerData.from === role) return;
         if (pc.signalingState !== "have-local-offer") return;
 
         try {
-          console.log(`[WebRTC] ${role} applying answer`);
+          console.log(`[WebRTC] ${role} applying incoming answer`);
           await pc.setRemoteDescription(new RTCSessionDescription(answerData));
           await flushRemoteCandidates();
           initialNegotiationDoneRef.current = true;
           setStatus("connected");
+          setError("");
         } catch (err) {
           console.error(`[WebRTC] ${role} setRemoteDescription failed:`, err);
         }
@@ -960,6 +972,7 @@ export default function VideoCall({ call, onClose }) {
 
       if (role === "caller") {
         try {
+          // Clear old candidates from previous sessions
           getDocs(candidatesCol).then((oldCands) => {
             oldCands.forEach((docSnap) => {
               deleteDoc(docSnap.ref).catch(() => {});
@@ -974,8 +987,7 @@ export default function VideoCall({ call, onClose }) {
           await pc.setLocalDescription(tunedOffer);
 
           await setDoc(roomRef, {
-            sessionId: currentSessionId,
-            offer: { type: tunedOffer.type, sdp: tunedOffer.sdp, from: role },
+            offer: { type: tunedOffer.type, sdp: tunedOffer.sdp, from: "caller" },
             answer: null,
             caller: { name: myName, role: myRole },
             caller_in_room: true,
@@ -989,7 +1001,7 @@ export default function VideoCall({ call, onClose }) {
           const unsubRoom = onSnapshot(roomRef, async (snapshot) => {
             if (endedRef.current || !snapshot.exists()) return;
             const data = snapshot.data();
-            if (!data || data.sessionId !== currentSessionId) return;
+            if (!data) return;
 
             // Track callee's live camera and mic state
             if (data.callee_cam_on !== undefined) {
@@ -999,8 +1011,12 @@ export default function VideoCall({ call, onClose }) {
               setPeerMicOn(data.callee_mic_on);
             }
 
-            if (data.offer) await handleIncomingOffer(data.offer);
-            if (data.answer) await handleIncomingAnswer(data.answer);
+            if (data.offer && data.offer.from !== "caller") {
+              await handleIncomingOffer(data.offer);
+            }
+            if (data.answer && data.answer.from !== "caller") {
+              await handleIncomingAnswer(data.answer);
+            }
 
             if (data.callee_in_room === false && statusRef.current === "connected") {
               setStatus("reconnecting");
@@ -1028,8 +1044,12 @@ export default function VideoCall({ call, onClose }) {
             setPeerMicOn(data.caller_mic_on);
           }
 
-          if (data.offer) await handleIncomingOffer(data.offer);
-          if (data.answer) await handleIncomingAnswer(data.answer);
+          if (data.offer && data.offer.from !== "callee") {
+            await handleIncomingOffer(data.offer);
+          }
+          if (data.answer && data.answer.from !== "callee") {
+            await handleIncomingAnswer(data.answer);
+          }
 
           if (data.caller_in_room === false && statusRef.current === "connected") {
             setStatus("reconnecting");
@@ -1064,7 +1084,7 @@ export default function VideoCall({ call, onClose }) {
   }[status] || status;
 
   const isTeacher = myRole === "teacher";
-  const showRemoteVideo = peerCamOn && hasRemoteVideo && status === "connected";
+  const showRemoteVideo = peerCamOn && (hasRemoteVideo || status === "connected");
 
   return createPortal(
     <div
@@ -1083,7 +1103,7 @@ export default function VideoCall({ call, onClose }) {
           ref={remoteAudioRef}
           autoPlay
           playsInline
-          muted={true}
+          muted={isSpectator}
         />
 
         {/* Top Header Bar */}
