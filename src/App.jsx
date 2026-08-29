@@ -7275,7 +7275,7 @@ function ParentPortal({
       return;
     }
 
-    const studentName = child.name || child.full_name || "Student";
+
     const teacherName = activeGroupSession.teacher_name || "Muhaffiz";
 
     setActiveCall({
