@@ -86,6 +86,9 @@ import {
   Pencil,
   Video,
   HelpCircle,
+  BarChart2,
+  Edit2,
+  Book,
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
