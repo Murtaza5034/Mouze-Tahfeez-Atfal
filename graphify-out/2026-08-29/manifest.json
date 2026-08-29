@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1787982650.8609326,
-    "seen": 1787982941.2230551,
-    "ast_hash": "34cc1abcc24659f72f5374df3e1bca08",
+    "mtime": 1787983218.5749166,
+    "seen": 1787983284.2854292,
+    "ast_hash": "036efd20bd1d2af23080f68ee24fcadf",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6480,9 +6480,9 @@
     "semantic_hash": "74fd7d2d9c40c67c3de485cffe325e75"
   },
   "src/components/VideoCall.jsx": {
-    "mtime": 1787812271.4253986,
-    "seen": 1787812438.2008305,
-    "ast_hash": "26a8a5b200c1d8d048fe4774ddcd46dc",
+    "mtime": 1787983175.4384902,
+    "seen": 1787983284.2868268,
+    "ast_hash": "2e54aa18744102b5bcd98d326ad1ad06",
     "semantic_hash": ""
   },
   "src/downloadUtils.js": {

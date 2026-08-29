@@ -20,12 +20,14 @@ import {
   Phone,
   Volume2,
   VolumeX,
+  Headphones,
   SwitchCamera,
   LayoutGrid,
   Maximize2,
   Minimize2,
   User,
-  GraduationCap
+  GraduationCap,
+  ChevronDown
 } from "lucide-react";
 
 function buildIceServers() {
@@ -121,6 +123,10 @@ export default function VideoCall({ call, onClose }) {
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [hasRemoteAudio, setHasRemoteAudio] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [audioOutputMode, setAudioOutputMode] = useState("speaker"); // "speaker" | "headphones"
+  const [audioOutputs, setAudioOutputs] = useState([]);
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState("");
+  const [showAudioDeviceMenu, setShowAudioDeviceMenu] = useState(false);
   const [volumeBoost, setVolumeBoost] = useState(false);
   const [status, setStatus] = useState("initializing"); // "initializing" | "calling" | "connected" | "reconnecting" | "error"
   const [error, setError] = useState("");
@@ -134,17 +140,32 @@ export default function VideoCall({ call, onClose }) {
     if (typeof unsub === "function") signalUnsubsRef.current.push(unsub);
   }, []);
 
-  // Check if device has multiple video cameras (e.g. mobile front & rear)
-  useEffect(() => {
+  // Enumerate hardware devices (cameras and audio outputs)
+  const refreshDevices = useCallback(() => {
     if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
       navigator.mediaDevices.enumerateDevices().then((devices) => {
         const videoInputs = devices.filter((d) => d.kind === "videoinput");
         if (videoInputs.length > 1) {
           setHasMultipleCameras(true);
         }
+
+        const outputs = devices.filter((d) => d.kind === "audiooutput");
+        setAudioOutputs(outputs);
       }).catch(() => {});
     }
   }, []);
+
+  useEffect(() => {
+    refreshDevices();
+  }, [refreshDevices]);
+
+  // Compute gain factor based on output mode & volume boost
+  const getTargetGain = useCallback(() => {
+    if (audioOutputMode === "headphones") {
+      return 1.0; // Standard clean line level for headphones (prevents ear fatigue & feedback)
+    }
+    return volumeBoost ? 2.0 : 1.4; // Boosted output for room loudspeaker
+  }, [audioOutputMode, volumeBoost]);
 
   // Setup Web Audio API direct destination output & volume analyzers
   const setupAudioMonitoring = useCallback((localStream, remoteStream) => {
@@ -176,7 +197,7 @@ export default function VideoCall({ call, onClose }) {
         try {
           const remoteSrc = ctx.createMediaStreamSource(remoteStream);
           const gainNode = ctx.createGain();
-          gainNode.gain.value = volumeBoost ? 2.0 : 1.4;
+          gainNode.gain.value = getTargetGain();
           gainNodeRef.current = gainNode;
 
           const remoteAnalyser = ctx.createAnalyser();
@@ -226,14 +247,40 @@ export default function VideoCall({ call, onClose }) {
     } catch (e) {
       console.warn("Audio monitoring error:", e);
     }
-  }, [isSpectator, volumeBoost]);
+  }, [getTargetGain, isSpectator]);
 
-  // Adjust volume gain node when boost is toggled
+  // Adjust volume gain node when mode or boost changes
   useEffect(() => {
     if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = volumeBoost ? 2.0 : 1.4;
+      gainNodeRef.current.gain.value = getTargetGain();
     }
-  }, [volumeBoost]);
+  }, [getTargetGain]);
+
+  // Handle switching audio output mode (Speaker vs Headphones)
+  const handleSelectAudioMode = (mode) => {
+    setAudioOutputMode(mode);
+    setShowAudioDeviceMenu(false);
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = mode === "headphones" ? 1.0 : (volumeBoost ? 2.0 : 1.4);
+    }
+  };
+
+  // Handle switching to a specific hardware audio output device
+  const handleSelectSpecificDevice = async (deviceId) => {
+    setSelectedAudioDeviceId(deviceId);
+    setShowAudioDeviceMenu(false);
+
+    try {
+      if (remoteAudioRef.current && typeof remoteAudioRef.current.setSinkId === "function") {
+        await remoteAudioRef.current.setSinkId(deviceId);
+      }
+      if (audioContextRef.current && typeof audioContextRef.current.setSinkId === "function") {
+        await audioContextRef.current.setSinkId(deviceId);
+      }
+    } catch (err) {
+      console.warn("Failed to set audio sink ID:", err);
+    }
+  };
 
   // Cleanup helper
   const stopLocal = useCallback(() => {
@@ -941,7 +988,10 @@ export default function VideoCall({ call, onClose }) {
       className={`vc-overlay ${isFullscreen ? "vc-fullscreen" : ""}`}
       role="dialog"
       aria-label="Video call"
-      onClick={handleGlobalAudioUnlock}
+      onClick={() => {
+        handleGlobalAudioUnlock();
+        if (showAudioDeviceMenu) setShowAudioDeviceMenu(false);
+      }}
     >
       <div className={`vc-stage ${layoutMode === "grid" ? "vc-layout-grid" : "vc-layout-pip"}`}>
         {/* Dedicated Audio Element for Remote Sound */}
@@ -967,31 +1017,108 @@ export default function VideoCall({ call, onClose }) {
           </div>
           <div className="vc-topbar-right">
             <span className="vc-status-pill">{statusLabel}</span>
-            <button
-              type="button"
-              className={`vc-icon-btn ${volumeBoost ? "active" : ""}`}
-              onClick={(e) => { e.stopPropagation(); setVolumeBoost(!volumeBoost); }}
-              title={volumeBoost ? "Volume Boost: +200% (Active)" : "Volume Boost: 140% (Click to boost)"}
-            >
-              <Volume2 size={16} />
-              <span>{volumeBoost ? "Boost 2x" : "Speaker"}</span>
-            </button>
+
+            {/* Audio Output Selector (Speaker vs Headphones) */}
+            <div className="vc-audio-output-wrapper" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className={`vc-icon-btn ${audioOutputMode === "headphones" ? "active" : ""}`}
+                onClick={() => setShowAudioDeviceMenu(!showAudioDeviceMenu)}
+                title="Choose Audio Output (Speaker / Headphones)"
+              >
+                {audioOutputMode === "headphones" ? <Headphones size={15} /> : <Volume2 size={15} />}
+                <span>{audioOutputMode === "headphones" ? "Headphones" : "Speaker"}</span>
+                <ChevronDown size={12} style={{ opacity: 0.7 }} />
+              </button>
+
+              {showAudioDeviceMenu && (
+                <div className="vc-audio-device-menu">
+                  <div className="vc-menu-header">Audio Output Mode</div>
+                  <button
+                    type="button"
+                    className={`vc-menu-item ${audioOutputMode === "speaker" ? "active" : ""}`}
+                    onClick={() => handleSelectAudioMode("speaker")}
+                  >
+                    <Volume2 size={16} />
+                    <div className="vc-menu-text">
+                      <span className="vc-menu-title">Loudspeaker</span>
+                      <span className="vc-menu-desc">Room audio & boosted clarity</span>
+                    </div>
+                    {audioOutputMode === "speaker" && <span className="vc-check">✓</span>}
+                  </button>
+                  <button
+                    type="button"
+                    className={`vc-menu-item ${audioOutputMode === "headphones" ? "active" : ""}`}
+                    onClick={() => handleSelectAudioMode("headphones")}
+                  >
+                    <Headphones size={16} />
+                    <div className="vc-menu-text">
+                      <span className="vc-menu-title">Headphones / Earphones</span>
+                      <span className="vc-menu-desc">Standard gain, zero acoustic echo</span>
+                    </div>
+                    {audioOutputMode === "headphones" && <span className="vc-check">✓</span>}
+                  </button>
+
+                  {/* Volume Boost Option for Speaker Mode */}
+                  {audioOutputMode === "speaker" && (
+                    <button
+                      type="button"
+                      className={`vc-menu-item ${volumeBoost ? "active" : ""}`}
+                      onClick={() => setVolumeBoost(!volumeBoost)}
+                    >
+                      <Volume2 size={16} />
+                      <div className="vc-menu-text">
+                        <span className="vc-menu-title">2x Volume Boost</span>
+                        <span className="vc-menu-desc">{volumeBoost ? "Active (+200% loud)" : "Normal (+140% loud)"}</span>
+                      </div>
+                      {volumeBoost && <span className="vc-check">✓</span>}
+                    </button>
+                  )}
+
+                  {/* Specific Hardware Audio Devices (if available) */}
+                  {audioOutputs.length > 1 && (
+                    <>
+                      <div className="vc-menu-divider" />
+                      <div className="vc-menu-header">Hardware Devices</div>
+                      {audioOutputs.map((device, idx) => (
+                        <button
+                          key={device.deviceId || idx}
+                          type="button"
+                          className={`vc-menu-item ${selectedAudioDeviceId === device.deviceId ? "active" : ""}`}
+                          onClick={() => handleSelectSpecificDevice(device.deviceId)}
+                        >
+                          <Volume2 size={14} />
+                          <div className="vc-menu-text">
+                            <span className="vc-menu-title">{device.label || `Output Device ${idx + 1}`}</span>
+                          </div>
+                          {selectedAudioDeviceId === device.deviceId && <span className="vc-check">✓</span>}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Layout Mode Button */}
             <button
               type="button"
               className="vc-icon-btn"
               onClick={(e) => { e.stopPropagation(); setLayoutMode(layoutMode === "grid" ? "pip" : "grid"); }}
               title={layoutMode === "grid" ? "Switch to Focus/PiP View" : "Switch to Side-by-Side Grid"}
             >
-              <LayoutGrid size={16} />
+              <LayoutGrid size={15} />
               <span>{layoutMode === "grid" ? "Focus" : "Dual Grid"}</span>
             </button>
+
+            {/* Fullscreen Button */}
             <button
               type="button"
               className="vc-icon-btn"
               onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
-              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
           </div>
         </div>
