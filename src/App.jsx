@@ -7855,7 +7855,7 @@ function ParentPortal({
         activeSessions={activeSessions}
         role={portalRole && portalRole.includes("student") ? "student" : "parent"}
         currentUserId={user?.id || user?.user_metadata?.sub}
-        currentUserName={portalAccess?.full_name || user?.user_metadata?.full_name}
+        currentUserName={parentData?.full_name || parentData?.name || user?.user_metadata?.full_name}
         onCallAction={async (chat) => {
           if (chat.isGroup) {
             handleParentJoinGroupClass(chat);
