@@ -7218,7 +7218,39 @@ function ParentPortal({
     const childSessionId = `session_${child.student_id}`;
     const studentName = child.name || child.full_name || "Student";
     const teacherName = child.teacherName || child.teacher_name || "Muhaffiz";
+    const targetTeacherId = child.teacher_id || child.teacherId;
     const roomId = childSessionId;
+
+    // Check if teacher is currently busy in a 1-on-1 session with another student
+    const activeSessionsList = Object.values(activeSessions || {});
+    const busyWithOther = activeSessionsList.find(s => {
+      if (!s) return false;
+      const isOneOnOne = s.type === "1-on-1" || (!s.type && String(s.id).startsWith("session_"));
+      if (!isOneOnOne) return false;
+      const sStudentId = String(s.student_id || "");
+      if (sStudentId && sStudentId === String(child.student_id)) return false;
+      if (s.id === childSessionId) return false;
+
+      const sTeacherId = String(s.teacher_id || "");
+      const sTeacherName = (s.teacher_name || "").trim().toLowerCase();
+      const myTId = String(targetTeacherId || "");
+      const myTName = (teacherName || "").trim().toLowerCase();
+
+      const idMatch = myTId && sTeacherId && (myTId === sTeacherId);
+      const nameMatch = myTName && sTeacherName && (
+        myTName === sTeacherName ||
+        myTName.includes(sTeacherName) ||
+        sTeacherName.includes(myTName)
+      );
+      return idMatch || nameMatch;
+    });
+
+    if (busyWithOther) {
+      if (showAction) {
+        showAction("info", `Your Muhaffiz (${teacherName}) is currently in a 1-on-1 session with another student and will join you soon.`);
+      }
+      return;
+    }
     
     addSystemMessage(roomId, `${studentName} joined the video call`);
 
@@ -7233,15 +7265,15 @@ function ParentPortal({
         startedAt: activeSession.started_at || new Date().toISOString()
       });
 
-      const targetTeacherId = activeSession.teacher_id || child.teacher_id || child.teacherId;
-      if (targetTeacherId) {
+      const actualTeacherId = activeSession.teacher_id || targetTeacherId;
+      if (actualTeacherId) {
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         supabase.functions.invoke('fcm-notification', {
           body: {
             title: "Live Tahfeez Classroom",
             body: `Student ${studentName} joined the class at ${timeStr}.`,
             targetRole: "teacher",
-            targetUser: String(targetTeacherId),
+            targetUser: String(actualTeacherId),
             section: getSectionScope() === "kibar" ? "kibar" : "atfal",
             data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
           }
@@ -7260,6 +7292,7 @@ function ParentPortal({
         type: "1-on-1",
         student_id: String(child.student_id),
         student_name: studentName,
+        teacher_id: String(targetTeacherId || ""),
         teacher_name: teacherName,
       });
 
@@ -7277,7 +7310,6 @@ function ParentPortal({
       startedAt
     });
 
-    const targetTeacherId = child.teacher_id || child.teacherId;
     if (targetTeacherId) {
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       supabase.functions.invoke('fcm-notification', {
@@ -7305,7 +7337,6 @@ function ParentPortal({
       return;
     }
 
-
     const teacherName = activeGroupSession.teacher_name || "Muhaffiz";
 
     setActiveCall({
@@ -7323,8 +7354,6 @@ function ParentPortal({
   };
 
   useEffect(() => {
-    if (activePage !== "Online Tahfeez") return;
-
     const fetchSessions = async () => {
       const { data, error } = await supabase.from('online_tahfeez_sessions').select('*');
       if (!error && data) {
@@ -7342,13 +7371,13 @@ function ParentPortal({
       })
       .subscribe();
 
-    const poll = setInterval(fetchSessions, 10000);
+    const poll = setInterval(fetchSessions, 5000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(poll);
     };
-  }, [activePage]);
+  }, []);
   const [parentActionStatuses, setParentActionStatuses] = useState(() => {
     try {
       const saved = localStorage.getItem('parent-quick-action-statuses');
@@ -7857,12 +7886,18 @@ function ParentPortal({
         t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
       );
       
+      const tId = child.teacher_id || child.teacherId || tProfile?.id || tProfile?.user_id;
+
       // Add individual chat
       studentsList.push({
         ...child,
         isGroup: false,
         name: tName || "Muhaffiz",
         full_name: tName || "Muhaffiz",
+        teacher_id: tId,
+        teacherId: tId,
+        teacher_name: tName || "Muhaffiz",
+        teacherName: tName || "Muhaffiz",
         photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
         subtext: `For ${child.name || child.full_name}`,
       });
@@ -8372,66 +8407,129 @@ function ParentPortal({
                 })()}
               </div>
 
-              {pageVisibility["Online Tahfeez"] !== false && (
-                <div style={{
-                  background: "linear-gradient(135deg, #FFFCF5, #FFFDF8)",
-                  border: "1px solid rgba(212, 175, 55, 0.3)",
-                  borderRadius: "16px",
-                  padding: "20px 24px",
-                  marginBottom: "24px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  boxShadow: "0 8px 24px rgba(212, 175, 55, 0.08)",
-                  flexWrap: "wrap",
-                  gap: "16px",
-                  position: "relative",
-                  overflow: "hidden"
-                }}>
-                  {/* Subtle decorative glow */}
+              {pageVisibility["Online Tahfeez"] !== false && (() => {
+                const currentChild = studentProfile || allProfiles[0] || {};
+                const tName = currentChild.teacherName || currentChild.teacher_name || "Muhaffiz";
+                const tId = String(currentChild.teacher_id || currentChild.teacherId || "");
+                const normTName = (tName || "").trim().toLowerCase();
+
+                const sessionsList = Object.values(activeSessions || {});
+                const isTeacherBusyWithOther = sessionsList.some(s => {
+                  if (!s) return false;
+                  const is1on1 = s.type === "1-on-1" || (!s.type && String(s.id).startsWith("session_"));
+                  if (!is1on1) return false;
+                  if (String(s.student_id) === String(currentChild.student_id) || s.id === `session_${currentChild.student_id}`) return false;
+                  const sTId = String(s.teacher_id || "");
+                  const sTName = (s.teacher_name || "").trim().toLowerCase();
+                  return (tId && sTId && tId === sTId) || (normTName && sTName && (normTName === sTName || normTName.includes(sTName) || sTName.includes(normTName)));
+                });
+
+                const isOwnSessionLive = !!activeSessions[`session_${currentChild.student_id}`];
+
+                return (
                   <div style={{
-                    position: "absolute",
-                    top: "-20px", left: "-20px", width: "80px", height: "80px",
-                    background: "var(--primary-gold)", opacity: 0.05, borderRadius: "50%", filter: "blur(20px)"
-                  }} />
-                  <div style={{ flex: "1 1 300px", position: "relative", zIndex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                      <Video size={18} style={{ color: "var(--primary-gold)" }} />
-                      <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800, color: "var(--deep-brown)" }}>
-                        Live Online Tahfeez
-                      </h2>
+                    background: "linear-gradient(135deg, #FFFCF5, #FFFDF8)",
+                    border: isTeacherBusyWithOther ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(34, 197, 94, 0.4)",
+                    borderRadius: "16px",
+                    padding: "20px 24px",
+                    marginBottom: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    boxShadow: isTeacherBusyWithOther ? "0 8px 24px rgba(245, 158, 11, 0.08)" : "0 8px 24px rgba(34, 197, 94, 0.12)",
+                    flexWrap: "wrap",
+                    gap: "16px",
+                    position: "relative",
+                    overflow: "hidden"
+                  }}>
+                    {/* Subtle decorative glow */}
+                    <div style={{
+                      position: "absolute",
+                      top: "-20px", left: "-20px", width: "90px", height: "90px",
+                      background: isTeacherBusyWithOther ? "#f59e0b" : "#22c55e", 
+                      opacity: 0.08, 
+                      borderRadius: "50%", 
+                      filter: "blur(20px)"
+                    }} />
+                    <div style={{ flex: "1 1 300px", position: "relative", zIndex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px", flexWrap: "wrap" }}>
+                        <Video size={19} style={{ color: isTeacherBusyWithOther ? "#d97706" : "#16a34a" }} />
+                        <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800, color: "var(--deep-brown)" }}>
+                          Live Online Tahfeez
+                        </h2>
+                        {isTeacherBusyWithOther ? (
+                          <span style={{
+                            background: "rgba(245, 158, 11, 0.14)",
+                            color: "#b45309",
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            padding: "3px 10px",
+                            borderRadius: "20px",
+                            border: "1px solid rgba(245, 158, 11, 0.35)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px"
+                          }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#d97706" }} />
+                            In Session
+                          </span>
+                        ) : (
+                          <span style={{
+                            background: "rgba(34, 197, 94, 0.12)",
+                            color: "#15803d",
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            padding: "3px 10px",
+                            borderRadius: "20px",
+                            border: "1px solid rgba(34, 197, 94, 0.35)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px"
+                          }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
+                            {isOwnSessionLive ? "Muhaffiz Waiting" : "Teacher Available"}
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--soft-brown)", fontWeight: 500 }}>
+                        {isTeacherBusyWithOther
+                          ? `Muhaffiz ${tName} is currently in a 1-on-1 session with another student. Will join you shortly.`
+                          : `Join Muhaffiz ${tName} for live 1-on-1 recitation.`
+                        }
+                      </p>
                     </div>
-                    <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--soft-brown)", fontWeight: 500 }}>
-                      Join your Muhaffiz for live 1-on-1 Hifz sessions.
-                    </p>
+                    <button 
+                      onClick={() => { setActivePage("Online Tahfeez"); setMenuOpen && setMenuOpen(false); }}
+                      style={{
+                        background: isTeacherBusyWithOther 
+                          ? "linear-gradient(135deg, #d97706, #b45309)"
+                          : "linear-gradient(135deg, #10b981, #059669)",
+                        color: "#fff",
+                        padding: "10px 24px",
+                        borderRadius: "30px",
+                        fontWeight: 700,
+                        fontSize: "0.9rem",
+                        border: "none",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        boxShadow: isTeacherBusyWithOther 
+                          ? "0 4px 14px rgba(217, 119, 6, 0.35)" 
+                          : "0 0 16px rgba(16, 185, 129, 0.55), 0 4px 12px rgba(16, 185, 129, 0.3)",
+                        transition: "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                        position: "relative",
+                        zIndex: 1
+                      }}
+                      onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+                      onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                    >
+                      Enter Classroom
+                      <ChevronRight size={16} style={{ marginLeft: "-2px" }} />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => { setActivePage("Online Tahfeez"); setMenuOpen && setMenuOpen(false); }}
-                    style={{
-                      background: "linear-gradient(135deg, var(--primary-gold, #D4AF37), #B8860B)",
-                      color: "#fff",
-                      padding: "10px 24px",
-                      borderRadius: "30px",
-                      fontWeight: 700,
-                      fontSize: "0.9rem",
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      boxShadow: "0 4px 12px rgba(212, 175, 55, 0.3)",
-                      transition: "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-                      position: "relative",
-                      zIndex: 1
-                    }}
-                    onMouseOver={(e) => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = "0 6px 16px rgba(212, 175, 55, 0.4)"; }}
-                    onMouseOut={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(212, 175, 55, 0.3)"; }}
-                  >
-                    Enter Chat
-                    <ChevronRight size={16} style={{ marginLeft: "-2px" }} />
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
             <PremiumTodaySchedule
               schedule={pages.Schedule.schedule}

@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Users, Phone, BarChart2, Edit2, Book, MessageCircle, Video, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { 
+  Search, Users, Phone, BarChart2, Edit2, Book, MessageCircle, 
+  Video, ArrowLeft, Lock, Clock, AlertCircle, CheckCircle2, 
+  Sparkles, X, ShieldAlert, Wifi 
+} from 'lucide-react';
 import { db } from '../firebase/db';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
@@ -11,14 +15,17 @@ export default function TahfeezChatUI({
   onSearchChange,
   onCallAction,
   activeSessions = {},
-  role = "teacher", // "teacher" or "parent"
+  role = "teacher", // "teacher", "parent", or "student"
   currentUserId,
   currentUserName
 }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [busyModalData, setBusyModalData] = useState(null); // { teacherName, busySession } or null
   const messagesEndRef = useRef(null);
   
+  const isStudentOrParent = role === "parent" || role === "student" || role === "kibar-student";
+
   const getRoomId = (chat) => {
     if (!chat) return null;
     if (chat.isGroup) return chat.room_id;
@@ -26,6 +33,57 @@ export default function TahfeezChatUI({
   };
   
   const activeRoomId = getRoomId(activeChat);
+
+  // Helper to check if teacher is busy in 1-on-1 session with another student
+  const checkTeacherBusy = (chat) => {
+    if (!chat || !isStudentOrParent) return { isBusy: false, busySession: null };
+    
+    // Group classes allow multiple participants
+    if (chat.isGroup) return { isBusy: false, busySession: null };
+
+    const currentStudentId = String(chat.student_id || "");
+    const chatRoomId = `session_${currentStudentId}`;
+    
+    const teacherId = String(chat.teacher_id || chat.teacherId || "");
+    const teacherName = (chat.teacherName || chat.teacher_name || chat.name || "").trim().toLowerCase();
+
+    const sessionsList = Object.values(activeSessions || {});
+    const busySession = sessionsList.find(s => {
+      if (!s) return false;
+      
+      // Must be a 1-on-1 session
+      const isOneOnOne = s.type === "1-on-1" || (!s.type && String(s.id).startsWith("session_"));
+      if (!isOneOnOne) return false;
+
+      const sStudentId = String(s.student_id || "");
+      
+      // If the session belongs to THIS student, the teacher is waiting for THIS student!
+      if (sStudentId && sStudentId === currentStudentId) return false;
+      if (s.id === chatRoomId) return false;
+
+      const sTeacherId = String(s.teacher_id || "");
+      const sTeacherName = (s.teacher_name || "").trim().toLowerCase();
+
+      // Check if session is with the same teacher (by ID or Name)
+      const idMatch = teacherId && sTeacherId && (teacherId === sTeacherId);
+      const nameMatch = teacherName && sTeacherName && (
+        teacherName === sTeacherName ||
+        teacherName.includes(sTeacherName) ||
+        sTeacherName.includes(teacherName)
+      );
+
+      return idMatch || nameMatch;
+    });
+
+    return {
+      isBusy: !!busySession,
+      busySession
+    };
+  };
+
+  const activeTeacherBusyState = useMemo(() => {
+    return checkTeacherBusy(activeChat);
+  }, [activeChat, activeSessions, isStudentOrParent]);
 
   useEffect(() => {
     if (!activeRoomId) {
@@ -68,11 +126,32 @@ export default function TahfeezChatUI({
     }
   };
 
+  const handleCallButtonClick = () => {
+    if (!activeChat) return;
+
+    if (isStudentOrParent && !activeChat.isGroup) {
+      const { isBusy, busySession } = activeTeacherBusyState;
+      if (isBusy) {
+        setBusyModalData({
+          teacherName: activeChat.teacherName || activeChat.teacher_name || activeChat.name || "Muhaffiz",
+          busySession
+        });
+        return;
+      }
+    }
+
+    if (onCallAction) {
+      onCallAction(activeChat);
+    }
+  };
+
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
+
+  const isOwnRoomLive = activeRoomId ? !!activeSessions[activeRoomId] : false;
 
   return (
     <div className={`tahfeez-chat-container fade-in ${activeChat ? 'mobile-chat-active' : ''}`} style={{
@@ -97,9 +176,47 @@ export default function TahfeezChatUI({
           animation: callBtnPulse 2s infinite;
         }
         @keyframes callBtnPulse {
-          0% { box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 200, 150, 50), 0.4); }
-          70% { box-shadow: 0 0 0 10px rgba(var(--primary-color-rgb, 200, 150, 50), 0); }
-          100% { box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 200, 150, 50), 0); }
+          0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+        }
+        @keyframes greenGlowPulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7), 0 0 16px rgba(34, 197, 94, 0.5);
+            transform: scale(1);
+          }
+          50% {
+            box-shadow: 0 0 0 10px rgba(34, 197, 94, 0), 0 0 28px rgba(34, 197, 94, 0.85);
+            transform: scale(1.03);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0), 0 0 16px rgba(34, 197, 94, 0.5);
+            transform: scale(1);
+          }
+        }
+        @keyframes greenBeaconPing {
+          0% { transform: scale(0.95); opacity: 0.9; }
+          50% { transform: scale(1.4); opacity: 0.15; }
+          100% { transform: scale(0.95); opacity: 0.9; }
+        }
+        .call-btn-green-glow {
+          animation: greenGlowPulse 2.2s infinite ease-in-out;
+          background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(255, 255, 255, 0.4) !important;
+          box-shadow: 0 0 20px rgba(34, 197, 94, 0.6) !important;
+        }
+        .call-btn-busy {
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(217, 119, 6, 0.22) 100%) !important;
+          color: #d97706 !important;
+          border: 1px solid rgba(245, 158, 11, 0.45) !important;
+          box-shadow: 0 2px 10px rgba(245, 158, 11, 0.15) !important;
+          cursor: pointer !important;
+          opacity: 0.95;
+        }
+        .call-btn-busy:hover {
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.24) 0%, rgba(217, 119, 6, 0.32) 100%) !important;
+          transform: scale(1.02);
         }
         @keyframes typingBounce {
           0%, 60%, 100% { transform: translateY(0); }
@@ -110,7 +227,7 @@ export default function TahfeezChatUI({
           width: 4px;
           height: 4px;
           border-radius: 50%;
-          background-color: var(--primary-color);
+          background-color: var(--primary-color, #d4af37);
           margin: 0 2px;
           animation: typingBounce 1.4s infinite ease-in-out both;
         }
@@ -134,7 +251,7 @@ export default function TahfeezChatUI({
           }
           .tahfeez-chat-container.mobile-chat-active {
             bottom: 0 !important;
-            z-index: 1100 !important; /* Covers the bottom nav (1000) */
+            z-index: 1100 !important;
           }
           .mobile-hide-sidebar { display: none !important; }
           .mobile-hide-main { display: none !important; }
@@ -185,7 +302,7 @@ export default function TahfeezChatUI({
           </div>
         </div>
 
-        {/* Student List */}
+        {/* Student / Teacher List */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {studentsList.map((student) => {
             const childSessionId = student.isGroup ? student.room_id : `session_${student.student_id}`;
@@ -196,7 +313,29 @@ export default function TahfeezChatUI({
               : activeSession?.started_by === "teacher";
             
             const isSelected = activeChat?.student_id === student.student_id && activeChat?.isGroup === student.isGroup;
-            const displayName = student.name || student.full_name || (role === "parent" && student.teacherName ? student.teacherName : "Unknown");
+            const displayName = student.name || student.full_name || (isStudentOrParent && student.teacherName ? student.teacherName : "Unknown");
+            
+            const studentTeacherBusy = checkTeacherBusy(student);
+
+            // Determine status dot and subtext
+            let statusDotColor = "#94a3b8";
+            let statusSubtext = student.subtext || (student.its ? `ITS: ${student.its}` : "");
+
+            if (isStudentOrParent && !student.isGroup) {
+              if (isClassLive) {
+                statusDotColor = "#22c55e";
+                statusSubtext = "● Muhaffiz is Waiting • Join";
+              } else if (studentTeacherBusy.isBusy) {
+                statusDotColor = "#f59e0b";
+                statusSubtext = "● In session with another student";
+              } else {
+                statusDotColor = "#22c55e";
+                statusSubtext = "● Muhaffiz Available • Ready";
+              }
+            } else if (isClassLive) {
+              statusDotColor = "#22c55e";
+              if (waitingForMe) statusSubtext = "Waiting in Call...";
+            }
 
             return (
               <div
@@ -239,7 +378,7 @@ export default function TahfeezChatUI({
                       alt={displayName} 
                       referrerPolicy="no-referrer"
                       style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                      onError={(e) => e.target.style.display = 'none'}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   ) : (
                     displayName[0].toUpperCase()
@@ -252,8 +391,9 @@ export default function TahfeezChatUI({
                     width: "12px",
                     height: "12px",
                     borderRadius: "50%",
-                    background: isClassLive ? "#2ecc71" : "#e74c3c",
+                    background: statusDotColor,
                     border: "2px solid var(--sidebar-bg)",
+                    boxShadow: statusDotColor === "#22c55e" ? "0 0 6px rgba(34, 197, 94, 0.8)" : "none"
                   }} />
                 </div>
 
@@ -262,8 +402,16 @@ export default function TahfeezChatUI({
                   <div style={{ fontSize: "1.05rem", fontWeight: isSelected ? "700" : "600", color: "var(--text-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {displayName}
                   </div>
-                  <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {student.isGroup ? "Combined Group Class" : (waitingForMe ? "Waiting in Call..." : (student.subtext || (student.its ? `ITS: ${student.its}` : "salam")))}
+                  <div style={{ 
+                    fontSize: "0.82rem", 
+                    color: isStudentOrParent && studentTeacherBusy.isBusy ? "#d97706" : (isStudentOrParent && !student.isGroup ? "#16a34a" : "var(--text-muted)"), 
+                    fontWeight: isStudentOrParent ? "600" : "400",
+                    marginTop: "4px", 
+                    whiteSpace: "nowrap", 
+                    overflow: "hidden", 
+                    textOverflow: "ellipsis" 
+                  }}>
+                    {statusSubtext}
                   </div>
                 </div>
                 
@@ -341,7 +489,7 @@ export default function TahfeezChatUI({
                       alt={activeChat.name || "Student"} 
                       referrerPolicy="no-referrer"
                       style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                      onError={(e) => e.target.style.display = 'none'}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   ) : (
                     (activeChat.name || activeChat.full_name || activeChat.teacherName || "S")[0].toUpperCase()
@@ -351,9 +499,25 @@ export default function TahfeezChatUI({
                   <div style={{ fontWeight: "700", color: "var(--text-color)", fontSize: "1.15rem" }}>
                     {activeChat.name || activeChat.full_name || activeChat.teacherName}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", color: "var(--primary-color)", fontWeight: "500", marginTop: "2px" }}>
-                    {activeChat.isGroup ? "Group Session" : (activeChat.subtext || `${activeChat.its || 'Live Session'} - Online`)}
-                    {/* Simulated typing animation based on input focus */}
+                  <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", fontWeight: "600", marginTop: "2px" }}>
+                    {isStudentOrParent ? (
+                      activeTeacherBusyState.isBusy ? (
+                        <span style={{ color: "#d97706", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#d97706", animation: "pulse 1.8s infinite" }} />
+                          In Session with another student • Please wait
+                        </span>
+                      ) : (
+                        <span style={{ color: "#16a34a", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e", animation: "pulse 1.8s infinite" }} />
+                          {isOwnRoomLive ? "Muhaffiz is Waiting in Room" : "Muhaffiz Available • Ready for Class"}
+                        </span>
+                      )
+                    ) : (
+                      <span style={{ color: "var(--primary-color)" }}>
+                        {activeChat.isGroup ? "Group Session" : (activeChat.subtext || `${activeChat.its || 'Live Session'} - Online`)}
+                      </span>
+                    )}
+                    {/* Simulated typing animation */}
                     <div style={{ marginLeft: "8px", display: "flex", alignItems: "center", opacity: 0.6 }}>
                       <div className="typing-dot"></div>
                       <div className="typing-dot"></div>
@@ -363,38 +527,127 @@ export default function TahfeezChatUI({
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                <div 
-                  onClick={() => onCallAction(activeChat)}
-                  className="call-btn-anim"
-                  style={{
-                    padding: "10px 24px",
-                    borderRadius: "30px",
-                    background: "var(--primary-gold, #D4AF37)",
-                    color: "#3E2723", /* Dark Brown Text */
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    boxShadow: "0 6px 15px rgba(0,0,0,0.15)",
-                    transition: "transform 0.2s, box-shadow 0.2s, background 0.2s",
-                    fontWeight: "700",
-                    fontSize: "0.95rem",
-                    gap: "8px",
-                    border: "1px solid rgba(62, 39, 35, 0.1)"
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = "scale(1.05) translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.2)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = "scale(1) translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 6px 15px rgba(0,0,0,0.15)";
-                  }}
-                >
-                  <Video size={18} />
-                  <span>Join Call</span>
-                </div>
+              {/* Call Action Button */}
+              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                {isStudentOrParent ? (
+                  activeTeacherBusyState.isBusy ? (
+                    /* Blocked / In Session Button */
+                    <button 
+                      type="button"
+                      onClick={handleCallButtonClick}
+                      className="call-btn-busy"
+                      style={{
+                        padding: "10px 22px",
+                        borderRadius: "30px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: "700",
+                        fontSize: "0.9rem",
+                        gap: "8px",
+                        transition: "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                        position: "relative"
+                      }}
+                      title="Your Muhaffiz is currently in session with another student. Click for status."
+                    >
+                      <Clock size={16} color="#d97706" />
+                      <span>Teacher in Session</span>
+                      <span style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "50%",
+                        background: "#d97706",
+                        marginLeft: "2px",
+                        boxShadow: "0 0 6px #d97706"
+                      }} />
+                    </button>
+                  ) : (
+                    /* Available Button with Brilliant Green Glow Lights Effect */
+                    <button 
+                      type="button"
+                      onClick={handleCallButtonClick}
+                      className="call-btn-green-glow"
+                      style={{
+                        padding: "10px 24px",
+                        borderRadius: "30px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        fontWeight: "700",
+                        fontSize: "0.92rem",
+                        gap: "8px",
+                        transition: "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                        position: "relative"
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "scale(1.04) translateY(-1px)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "scale(1) translateY(0)";
+                      }}
+                    >
+                      <span style={{
+                        position: "relative",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}>
+                        <span style={{
+                          position: "absolute",
+                          width: "14px",
+                          height: "14px",
+                          borderRadius: "50%",
+                          background: "#86efac",
+                          animation: "greenBeaconPing 1.6s cubic-bezier(0, 0, 0.2, 1) infinite"
+                        }} />
+                        <span style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          background: "#ffffff",
+                          position: "relative"
+                        }} />
+                      </span>
+                      <Video size={18} />
+                      <span>{isOwnRoomLive ? "Muhaffiz Waiting • Join" : "Join Video Call"}</span>
+                    </button>
+                  )
+                ) : (
+                  /* Teacher Role */
+                  <button 
+                    type="button"
+                    onClick={handleCallButtonClick}
+                    className={isOwnRoomLive ? "call-btn-green-glow" : "call-btn-anim"}
+                    style={{
+                      padding: "10px 24px",
+                      borderRadius: "30px",
+                      background: isOwnRoomLive ? undefined : "var(--primary-gold, #D4AF37)",
+                      color: isOwnRoomLive ? "#ffffff" : "#3E2723",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      boxShadow: "0 6px 15px rgba(0,0,0,0.15)",
+                      fontWeight: "700",
+                      fontSize: "0.95rem",
+                      gap: "8px",
+                      border: "1px solid rgba(62, 39, 35, 0.1)",
+                      transition: "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = "scale(1.05) translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.2)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = "scale(1) translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 6px 15px rgba(0,0,0,0.15)";
+                    }}
+                  >
+                    <Video size={18} />
+                    <span>{isOwnRoomLive ? "Student Waiting • Join" : (activeChat.isGroup ? "Start Group Class" : "Start 1-on-1 Call")}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -546,6 +799,171 @@ export default function TahfeezChatUI({
           </div>
         )}
       </div>
+
+      {/* Professional Teacher Busy / In-Session Alert Modal */}
+      {busyModalData && (
+        <div 
+          className="tahfeez-busy-modal-overlay fade-in"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.65)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "20px"
+          }}
+          onClick={() => setBusyModalData(null)}
+        >
+          <div 
+            className="tahfeez-busy-modal-card card-appear"
+            style={{
+              background: "linear-gradient(145deg, #ffffff, #fdfbf7)",
+              borderRadius: "24px",
+              padding: "32px 26px 28px",
+              maxWidth: "460px",
+              width: "100%",
+              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(212, 175, 55, 0.35)",
+              position: "relative",
+              textAlign: "center"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              type="button"
+              onClick={() => setBusyModalData(null)}
+              style={{
+                position: "absolute",
+                top: "16px",
+                right: "16px",
+                background: "rgba(0,0,0,0.05)",
+                border: "none",
+                borderRadius: "50%",
+                width: "36px",
+                height: "36px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "var(--deep-brown, #3E2723)",
+                transition: "all 0.2s"
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            {/* Amber Status Glow Ring */}
+            <div style={{
+              width: "76px",
+              height: "76px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.28))",
+              border: "2px solid rgba(245, 158, 11, 0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 18px",
+              boxShadow: "0 10px 24px rgba(245, 158, 11, 0.25)"
+            }}>
+              <Clock size={36} color="#d97706" />
+            </div>
+
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              background: "rgba(245, 158, 11, 0.12)",
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+              color: "#b45309",
+              padding: "5px 14px",
+              borderRadius: "20px",
+              fontSize: "0.78rem",
+              fontWeight: 800,
+              marginBottom: "14px",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em"
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#d97706", animation: "pulse 1.5s infinite" }} />
+              1-on-1 Class In Progress
+            </div>
+
+            <h3 style={{
+              margin: "0 0 10px 0",
+              fontSize: "1.35rem",
+              fontWeight: 800,
+              color: "var(--deep-brown, #2C1810)",
+              letterSpacing: "-0.01em"
+            }}>
+              Muhaffiz is on Another Session
+            </h3>
+
+            <p style={{
+              margin: "0 0 18px 0",
+              fontSize: "0.95rem",
+              color: "var(--soft-brown, #5D4037)",
+              lineHeight: 1.55
+            }}>
+              Your Muhaffiz <strong style={{ color: "var(--deep-brown, #2C1810)" }}>{busyModalData.teacherName || "Muhaffiz"}</strong> is currently taking a 1-on-1 recitation session with another student and will join you soon.
+            </p>
+
+            <div style={{
+              background: "linear-gradient(135deg, rgba(34, 197, 94, 0.09), rgba(16, 185, 129, 0.05))",
+              border: "1px dashed rgba(34, 197, 94, 0.5)",
+              borderRadius: "14px",
+              padding: "14px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              textAlign: "left",
+              marginBottom: "22px"
+            }}>
+              <div style={{
+                width: "38px",
+                height: "38px",
+                borderRadius: "10px",
+                background: "rgba(34, 197, 94, 0.18)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0
+              }}>
+                <Sparkles size={20} color="#16a34a" />
+              </div>
+              <div style={{ fontSize: "0.85rem", color: "#166534", lineHeight: 1.45, fontWeight: 600 }}>
+                The <strong>Join Video Call</strong> button will automatically illuminate in <strong>glowing green</strong> the moment your Muhaffiz is free!
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setBusyModalData(null)}
+              style={{
+                width: "100%",
+                padding: "13px 20px",
+                borderRadius: "30px",
+                background: "linear-gradient(135deg, var(--primary-gold, #D4AF37), #B8860B)",
+                color: "#ffffff",
+                fontWeight: 700,
+                fontSize: "0.95rem",
+                border: "none",
+                cursor: "pointer",
+                boxShadow: "0 6px 18px rgba(212, 175, 55, 0.35)",
+                transition: "transform 0.15s, box-shadow 0.15s"
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.02)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+            >
+              Understood, I'll Wait
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
