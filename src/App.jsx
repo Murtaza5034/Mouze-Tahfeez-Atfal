@@ -7232,6 +7232,21 @@ function ParentPortal({
         myRole: "parent",
         startedAt: activeSession.started_at || new Date().toISOString()
       });
+
+      const targetTeacherId = activeSession.teacher_id || child.teacher_id || child.teacherId;
+      if (targetTeacherId) {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        supabase.functions.invoke('fcm-notification', {
+          body: {
+            title: "Live Tahfeez Classroom",
+            body: `Student ${studentName} joined the class at ${timeStr}.`,
+            targetRole: "teacher",
+            targetUser: String(targetTeacherId),
+            section: getSectionScope() === "kibar" ? "kibar" : "atfal",
+            data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+          }
+        }).catch(err => console.warn("FCM join class error:", err));
+      }
       return;
     }
 
@@ -7261,6 +7276,21 @@ function ParentPortal({
       myRole: "parent",
       startedAt
     });
+
+    const targetTeacherId = child.teacher_id || child.teacherId;
+    if (targetTeacherId) {
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      supabase.functions.invoke('fcm-notification', {
+        body: {
+          title: "Live Tahfeez Classroom",
+          body: `Student ${studentName} joined the class at ${timeStr}.`,
+          targetRole: "teacher",
+          targetUser: String(targetTeacherId),
+          section: getSectionScope() === "kibar" ? "kibar" : "atfal",
+          data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+        }
+      }).catch(err => console.warn("FCM join class error:", err));
+    }
   };
 
   const handleParentJoinGroupClass = async (child) => {
@@ -9640,7 +9670,7 @@ function ParentPortal({
       )}
       {activeCall && (
         <VideoCall
-          call={activeCall}
+          call={{ ...activeCall, isTeacher: false }}
           onClose={handleCallClose}
         />
       )}
@@ -11998,7 +12028,14 @@ function AdminPortal({
     };
 
     const fetchLogs = async () => {
-      const { data, error } = await supabase.from('online_tahfeez_logs').select('*').order('started_at', { ascending: false }).limit(50);
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const { data, error } = await supabase
+        .from('online_tahfeez_logs')
+        .select('*')
+        .gte('started_at', startOfDay.toISOString())
+        .order('started_at', { ascending: false })
+        .limit(500);
       if (!error && data) {
         setTahfeezLogs(data);
       }
@@ -12906,29 +12943,94 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
   };
 
   const renderOnlineTahfeezTracking = () => {
-    const sessions = Object.values(activeSessions);
+    // Group active sessions and historical logs for today by student/group
+    const grouped = {};
+    
+    Object.values(activeSessions).forEach(sess => {
+      const name = sess.type === "group" ? sess.group_name : sess.student_name;
+      if (!name) return;
+      if (!grouped[name]) {
+        grouped[name] = {
+          name,
+          type: sess.type,
+          teacher: sess.teacher_name,
+          isActive: true,
+          totalDuration: 0,
+          segments: [],
+          activeSessionData: sess
+        };
+      } else {
+        grouped[name].isActive = true;
+        grouped[name].activeSessionData = sess;
+      }
+      
+      grouped[name].segments.push({
+        id: sess.id,
+        started_at: sess.started_at,
+        ended_at: null,
+        duration_seconds: 0,
+        isLive: true
+      });
+    });
+
+    tahfeezLogs.forEach(log => {
+      const name = log.type === "group" ? log.group_name : log.student_name;
+      if (!name) return;
+      if (!grouped[name]) {
+        grouped[name] = {
+          name,
+          type: log.type,
+          teacher: log.teacher_name,
+          isActive: false,
+          totalDuration: 0,
+          segments: []
+        };
+      }
+      grouped[name].totalDuration += (log.duration_seconds || 0);
+      grouped[name].segments.push({
+        id: log.id,
+        started_at: log.started_at,
+        ended_at: log.ended_at,
+        duration_seconds: log.duration_seconds || 0,
+        isLive: false
+      });
+    });
+
+    const studentList = Object.values(grouped).sort((a, b) => b.isActive - a.isActive);
+    const liveCount = Object.keys(activeSessions).length;
+    
+    // Helper to format duration
+    const formatDur = (secs) => {
+      if (!secs) return "0s";
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    };
 
     return (
       <div className="online-tahfeez-tracking fade-in" style={{ paddingBottom: '80px', padding: '0 24px' }}>
         <div className="section-header" style={{ marginBottom: '24px' }}>
           <h2 className="premium-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Video size={24} style={{ color: 'var(--primary-gold)' }} />
-            Online Tahfeez Live Tracking
+            Online Tahfeez Daily Tracking
           </h2>
-          <p className="subtitle">Monitor active classes across the academy and join as a spectating auditor.</p>
+          <p className="subtitle">Monitor today's active and completed online classes with detailed time logs.</p>
         </div>
 
         <div className="tahfeez-card" style={{ maxWidth: '400px', marginBottom: '24px' }}>
-          <h4 style={{ margin: '0 0 8px', color: 'var(--deep-brown)' }}>Active Sessions Status</h4>
+          <h4 style={{ margin: '0 0 8px', color: 'var(--deep-brown)' }}>Live Overview</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="pulse-dot" style={{ backgroundColor: sessions.length > 0 ? '#2ecc71' : '#ff9f43' }} />
+            <div className="pulse-dot" style={{ backgroundColor: liveCount > 0 ? '#2ecc71' : '#ff9f43' }} />
             <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>
-              {sessions.length} class{sessions.length !== 1 ? 'es' : ''} currently live
+              {liveCount} class{liveCount !== 1 ? 'es' : ''} currently live
             </span>
           </div>
         </div>
 
-        {sessions.length === 0 ? (
+        {studentList.length === 0 ? (
           <div style={{
             textAlign: 'center',
             padding: '60px 20px',
@@ -12938,50 +13040,107 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             color: 'var(--text-muted)'
           }}>
             <Video size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
-            <div>No classes are active at the moment. Active sessions will appear here in real-time.</div>
+            <div>No classes have occurred today yet. Active sessions will appear here in real-time.</div>
           </div>
         ) : (
-          <div className="tahfeez-grid">
-            {sessions.map((sess) => {
-              const isGroup = sess.type === "group";
+          <div className="tahfeez-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+            {studentList.map((student, idx) => {
+              const isGroup = student.type === "group";
+              
+              // Sort segments by started_at ascending to show sr no 1, 2, 3 chronologically
+              student.segments.sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+
+              // Compute total duration including currently live segment if any
+              let displayDuration = student.totalDuration;
+              const liveSeg = student.segments.find(s => s.isLive);
+              if (liveSeg && liveSeg.started_at) {
+                const liveSecs = Math.round((new Date().getTime() - new Date(liveSeg.started_at).getTime()) / 1000);
+                displayDuration += (liveSecs > 0 ? liveSecs : 0);
+              }
+
               return (
-                <div key={sess.id} className="tahfeez-card">
+                <div key={idx} className="tahfeez-card" style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
                     <span className="tahfeez-badge" style={{ background: isGroup ? '#3498db' : '#f1c40f', color: '#fff' }}>
                       {isGroup ? "Group Class" : "1-on-1"}
                     </span>
-                    <div className="pulse-indicator">
-                      <div className="pulse-dot" />
-                      <span>Live</span>
+                    {student.isActive ? (
+                      <div className="pulse-indicator">
+                        <div className="pulse-dot" />
+                        <span>Live Now</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '20px' }}>
+                        Offline
+                      </div>
+                    )}
+                  </div>
+
+                  <h3 className="tahfeez-title" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", fontSize: '1.5rem', marginBottom: '4px' }}>
+                    {student.name}
+                  </h3>
+                  
+                  <div className="tahfeez-meta" style={{ marginBottom: "16px", background: 'rgba(0,0,0,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.04)' }}>
+                    <p style={{ margin: "0 0 6px", display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Muhaffiz:</span> 
+                      <strong>{student.teacher}</strong>
+                    </p>
+                    <p style={{ margin: "0 0 6px", display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Date:</span> 
+                      <strong>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</strong>
+                    </p>
+                    <p style={{ margin: "0", display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Total Duration Today:</span> 
+                      <strong style={{ color: 'var(--primary-gold)' }}>{formatDur(displayDuration)}</strong>
+                    </p>
+                  </div>
+                  
+                  <div style={{ flex: 1 }}>
+                    <h5 style={{ margin: '0 0 10px', color: 'var(--text-main)', fontSize: '0.9rem', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '6px' }}>Call History</h5>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                      {student.segments.map((seg, sIdx) => (
+                        <div key={seg.id || sIdx} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: seg.isLive ? 'rgba(46, 204, 113, 0.08)' : '#fff', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${seg.isLive ? 'rgba(46, 204, 113, 0.3)' : 'rgba(0,0,0,0.06)'}`, fontSize: '0.85rem' }}>
+                          <div style={{ background: seg.isLive ? '#2ecc71' : 'var(--deep-brown)', color: '#fff', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.75rem', flexShrink: 0 }}>
+                            {sIdx + 1}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>Start:</span>
+                              <strong>{new Date(seg.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>End:</span>
+                              <strong>{seg.isLive ? <span style={{ color: '#2ecc71', animation: 'pulse 1.5s infinite' }}>Ongoing...</span> : new Date(seg.ended_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</strong>
+                            </div>
+                          </div>
+                          {!seg.isLive && (
+                            <div style={{ fontWeight: 600, color: 'var(--text-muted)', marginLeft: '4px', borderLeft: '1px solid rgba(0,0,0,0.1)', paddingLeft: '10px' }}>
+                              {formatDur(seg.duration_seconds)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <h3 className="tahfeez-title" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", fontSize: '1.4rem' }}>
-                    {isGroup ? sess.group_name : sess.student_name}
-                  </h3>
-                  
-                  <div className="tahfeez-meta" style={{ margin: "12px 0 20px" }}>
-                    <p style={{ margin: "4px 0" }}><strong>Muhaffiz:</strong> {sess.teacher_name}</p>
-                    <p style={{ margin: "4px 0" }}>
-                      <strong>Started:</strong> {new Date(sess.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  <div className="tahfeez-actions" style={{ gap: '8px' }}>
-                    <button
-                      className="tahfeez-btn primary"
-                      style={{ background: '#2ecc71', flex: 1 }}
-                      onClick={() => handleAdminSpectate(sess)}
-                    >
-                      👁️ Spectate
-                    </button>
-                    <button
-                      className="tahfeez-btn secondary"
-                      style={{ border: '1px solid #ff4d4d', color: '#ff4d4d', background: 'transparent' }}
-                      onClick={() => handleAdminEndSession(sess)}
-                    >
-                      🛑 End
-                    </button>
-                  </div>
+                  {student.isActive && student.activeSessionData && (
+                    <div className="tahfeez-actions" style={{ gap: '8px', marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed rgba(0,0,0,0.1)' }}>
+                      <button
+                        className="tahfeez-btn primary"
+                        style={{ background: '#2ecc71', flex: 1 }}
+                        onClick={() => handleAdminSpectate(student.activeSessionData)}
+                      >
+                        👁️ Spectate
+                      </button>
+                      <button
+                        className="tahfeez-btn secondary"
+                        style={{ border: '1px solid #ff4d4d', color: '#ff4d4d', background: 'transparent' }}
+                        onClick={() => handleAdminEndSession(student.activeSessionData)}
+                      >
+                        🛑 End
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -18417,7 +18576,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
       {activeCall && (
         <VideoCall
-          call={activeCall}
+          call={{ ...activeCall, isTeacher: true }}
           onClose={handleCallClose}
         />
       )}
@@ -18770,6 +18929,21 @@ function TeacherPortal({
         myRole: "teacher",
         startedAt: new Date().toISOString()
       });
+
+      const targetUserId = student.parent_user_id || student.user_id || student.id;
+      if (targetUserId) {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        supabase.functions.invoke('fcm-notification', {
+          body: {
+            title: "Live Tahfeez Classroom",
+            body: `Muhaffiz ${teacherName} joined the class for ${studentName} at ${timeStr}.`,
+            targetRole: "parent",
+            targetUser: String(targetUserId),
+            section: getSectionScope() === "kibar" ? "kibar" : "atfal",
+            data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+          }
+        }).catch(err => console.warn("FCM join class error:", err));
+      }
     } else {
       // If student/parent already started the session, teacher joins as callee
       const isCaller = existing.started_by === "teacher";
@@ -18781,6 +18955,21 @@ function TeacherPortal({
         myRole: "teacher",
         startedAt: existing.started_at || new Date().toISOString()
       });
+
+      const targetUserId = student.parent_user_id || student.user_id || student.id;
+      if (targetUserId) {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        supabase.functions.invoke('fcm-notification', {
+          body: {
+            title: "Live Tahfeez Classroom",
+            body: `Muhaffiz ${teacherName} joined the class for ${studentName} at ${timeStr}.`,
+            targetRole: "parent",
+            targetUser: String(targetUserId),
+            section: getSectionScope() === "kibar" ? "kibar" : "atfal",
+            data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+          }
+        }).catch(err => console.warn("FCM join class error:", err));
+      }
     }
   };
 
@@ -18847,6 +19036,40 @@ function TeacherPortal({
             type: activeSession.type || "1-on-1",
             group_name: activeSession.group_name || null
           });
+
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        let targetUserId = null;
+        if (activeSession.student_id) {
+          const { data: stData } = await supabase.from('child_profiles').select('parent_user_id, user_id').eq('student_id', activeSession.student_id).maybeSingle();
+          if (stData) targetUserId = stData.parent_user_id || stData.user_id;
+        }
+
+        if (targetUserId) {
+          supabase.functions.invoke('fcm-notification', {
+            body: {
+              title: "Class Ended",
+              body: `Muhaffiz ${activeSession.teacher_name || 'Teacher'} ended the class at ${timeStr}.`,
+              targetRole: "parent",
+              targetUser: String(targetUserId),
+              section: getSectionScope() === "kibar" ? "kibar" : "atfal",
+              data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+            }
+          }).catch(err => console.warn("FCM end class error:", err));
+        }
+
+        if (activeSession.teacher_id) {
+          supabase.functions.invoke('fcm-notification', {
+            body: {
+              title: "Class Ended",
+              body: `You ended the class with ${activeSession.student_name || 'Student'} at ${timeStr}.`,
+              targetRole: "teacher",
+              targetUser: String(activeSession.teacher_id),
+              section: getSectionScope() === "kibar" ? "kibar" : "atfal",
+              data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+            }
+          }).catch(err => console.warn("FCM end class error:", err));
+        }
       } catch (e) {
         console.error("Failed to write online tahfeez log:", e);
       }
@@ -23551,7 +23774,7 @@ function TeacherPortal({
       )}
       {activeCall && (
         <VideoCall
-          call={activeCall}
+          call={{ ...activeCall, isTeacher: true }}
           onClose={handleCallClose}
         />
       )}

@@ -28,8 +28,9 @@
 
 .vc-stage {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
   max-width: 100%;
   max-height: 100%;
   background: #0d0c0a;
@@ -58,10 +59,16 @@
   padding: 16px 24px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   background: linear-gradient(to bottom, rgba(10, 9, 7, 0.9) 0%, rgba(10, 9, 7, 0) 100%);
   z-index: 50;
   pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .vc-topbar {
+    padding: 12px 12px;
+  }
 }
 
 .vc-topbar-left {
@@ -69,12 +76,36 @@
   align-items: center;
   gap: 12px;
   pointer-events: auto;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .vc-title-group {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+}
+
+.vc-room-label {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.2px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-role-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #d4af37;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .vc-dot {
@@ -84,6 +115,7 @@
   background: #f39c12;
   box-shadow: 0 0 10px #f39c12;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .vc-dot-active {
@@ -97,26 +129,22 @@
   100% { opacity: 1; }
 }
 
-.vc-room-label {
-  color: #ffffff;
-  font-weight: 800;
-  font-size: 1.05rem;
-  letter-spacing: -0.2px;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-}
-
-.vc-role-badge {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #d4af37;
-  letter-spacing: 0.2px;
-}
-
 .vc-topbar-right {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
   pointer-events: auto;
+  flex: 1 1 auto;
+  max-width: 60%;
+}
+
+@media (max-width: 600px) {
+  .vc-topbar-right {
+    gap: 6px;
+    max-width: 65%;
+  }
 }
 
 .vc-status-pill {
@@ -130,6 +158,7 @@
   letter-spacing: 0.5px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  white-space: nowrap;
 }
 
 .vc-icon-btn {
@@ -146,6 +175,20 @@
   cursor: pointer;
   backdrop-filter: blur(10px);
   transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .vc-status-pill, .vc-icon-btn {
+    padding: 4px 10px;
+    font-size: 0.7rem;
+  }
+  .vc-room-label {
+    font-size: 0.9rem;
+  }
+  .vc-role-badge {
+    font-size: 0.65rem;
+  }
 }
 
 .vc-icon-btn:hover {
@@ -162,71 +205,147 @@
   box-shadow: 0 0 12px rgba(46, 204, 113, 0.35);
 }
 
-/* Audio Output Selector Dropdown */
+/* Audio Output Selector Modal / Dropdown */
 .vc-audio-output-wrapper {
   position: relative;
   display: inline-flex;
 }
 
-.vc-audio-device-menu {
-  position: absolute;
-  top: calc(100% + 8px);
+.vc-audio-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
   right: 0;
-  width: 250px;
-  background: rgba(20, 18, 15, 0.95);
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  border-radius: 12px;
-  padding: 8px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  z-index: 1000;
-  animation: vcMenuFadeIn 0.15s ease-out;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+  padding: 16px;
+  animation: vcAudioModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes vcMenuFadeIn {
+@keyframes vcAudioModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.vc-audio-modal-card {
+  position: relative;
+  width: min(92vw, 360px);
+  max-height: 85vh;
+  background: linear-gradient(145deg, #1c1813 0%, #12100d 100%);
+  border: 1.5px solid rgba(212, 175, 55, 0.55);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.95), 0 0 35px rgba(212, 175, 55, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: vcAudioCardSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes vcAudioCardSlideUp {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(18px) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
+.vc-audio-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: rgba(212, 175, 55, 0.1);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.vc-audio-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #d4af37;
+  letter-spacing: 0.3px;
+}
+
+.vc-audio-modal-close {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f7f5f0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vc-audio-modal-close:hover {
+  background: rgba(231, 76, 60, 0.3);
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+  transform: scale(1.1);
+}
+
+.vc-audio-modal-list {
+  padding: 10px 12px 14px 12px;
+  overflow-y: auto;
+  max-height: calc(85vh - 70px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .vc-menu-header {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: rgba(212, 175, 55, 0.8);
-  font-weight: 700;
-  padding: 4px 8px 6px 8px;
+  color: rgba(212, 175, 55, 0.85);
+  font-weight: 800;
+  padding: 6px 10px 4px 10px;
 }
 
 .vc-menu-item {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 8px 10px;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
   color: #f7f5f0;
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s ease;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vc-menu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(212, 175, 55, 0.15);
+  border-color: rgba(212, 175, 55, 0.45);
+  transform: translateY(-1px);
 }
 
 .vc-menu-item.active {
-  background: rgba(212, 175, 55, 0.15);
-  border-color: rgba(212, 175, 55, 0.4);
+  background: rgba(212, 175, 55, 0.22);
+  border-color: #d4af37;
+  color: #d4af37;
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.2);
+}
+
+.vc-menu-icon {
+  flex-shrink: 0;
   color: #d4af37;
 }
 
@@ -234,27 +353,29 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .vc-menu-title {
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .vc-menu-desc {
-  font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .vc-check {
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   color: #2ecc71;
-  font-weight: 800;
+  font-weight: 900;
+  flex-shrink: 0;
 }
 
 .vc-menu-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(212, 175, 55, 0.2);
   margin: 6px 0;
 }
 
@@ -494,6 +615,14 @@
   color: #f7f5f0;
   font-size: 0.78rem;
   font-weight: 600;
+  max-width: 100%;
+}
+
+.vc-tag-user span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
 }
 
 .vc-speaking-tag {
@@ -546,13 +675,15 @@
 /* Bottom Control Bar */
 .vc-controls {
   position: absolute;
-  bottom: 24px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 24px;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+  padding: 10px 20px;
   border-radius: 40px;
   background: rgba(18, 15, 12, 0.85);
   border: 1.5px solid rgba(212, 175, 55, 0.35);
@@ -560,74 +691,99 @@
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
   z-index: 70;
+  max-width: 95%;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s;
+}
+
+.vc-controls-hidden {
+  transform: translate(-50%, 150%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vc-unhide-btn {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(18, 15, 12, 0.85);
+  border: 1.5px solid rgba(212, 175, 55, 0.35);
+  color: #d4af37;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 70;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  transition: all 0.3s ease;
+}
+.vc-unhide-btn:hover {
+  background: rgba(212, 175, 55, 0.15);
+  transform: translateX(-50%) scale(1.05);
 }
 
 .vc-btn {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  width: 58px;
-  height: 58px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: #e5e0d8;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  background: rgba(26, 22, 17, 0.85);
+  color: #f7f5f0;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.vc-btn span {
-  font-size: 0.58rem;
-  font-weight: 700;
-  color: rgba(229, 224, 216, 0.7);
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
+  outline: none;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .vc-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  background: rgba(212, 175, 55, 0.2);
+  border-color: rgba(212, 175, 55, 0.6);
+  color: #d4af37;
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.35);
+}
+
+.vc-btn:active {
+  transform: scale(0.86);
+  transition: transform 0.08s ease;
 }
 
 .vc-btn-active {
-  background: rgba(212, 175, 55, 0.15);
-  border: 1px solid rgba(212, 175, 55, 0.35);
-  color: #d4af37;
-}
-
-.vc-btn-active span {
-  color: #d4af37;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.28) 0%, rgba(184, 134, 11, 0.4) 100%) !important;
+  border: 1.5px solid #d4af37 !important;
+  color: #d4af37 !important;
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.45), inset 0 0 8px rgba(212, 175, 55, 0.2) !important;
 }
 
 .vc-btn-off {
-  background: rgba(231, 76, 60, 0.18);
-  border: 1px solid rgba(231, 76, 60, 0.45);
-  color: #ff6b6b;
-}
-
-.vc-btn-off span {
-  color: #ff6b6b;
+  background: rgba(231, 76, 60, 0.18) !important;
+  border: 1.5px solid rgba(231, 76, 60, 0.6) !important;
+  color: #ff6b6b !important;
+  box-shadow: 0 0 14px rgba(231, 76, 60, 0.3) !important;
 }
 
 .vc-btn-end {
-  background: #e74c3c;
-  color: #ffffff;
-  box-shadow: 0 8px 24px rgba(231, 76, 60, 0.45);
-}
-
-.vc-btn-end span {
-  color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.45) !important;
 }
 
 .vc-btn-end:hover {
-  background: #d9381e;
-  transform: translateY(-3px) scale(1.06);
-  box-shadow: 0 12px 32px rgba(231, 76, 60, 0.65);
+  background: linear-gradient(135deg, #ff5e4d 0%, #d64536 100%) !important;
+  transform: translateY(-2px) scale(1.06) !important;
+  box-shadow: 0 8px 26px rgba(231, 76, 60, 0.6) !important;
 }
 
 /* Responsive Mobile Layout */
@@ -635,16 +791,20 @@
   .vc-layout-grid .vc-viewport {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
-    gap: 8px;
-    padding: 60px 8px 90px 8px;
+    gap: 12px;
+    padding: 70px 12px 90px 12px;
   }
 
   .vc-layout-pip .vc-local-box {
-    width: 130px;
-    height: 90px;
-    bottom: 95px;
+    width: 110px;
+    height: 150px;
+    bottom: 140px;
     right: 14px;
-    border-radius: 12px;
+    border-radius: 14px;
+  }
+  
+  .vc-tag-user span {
+    max-width: 70px;
   }
 
   .vc-topbar {
@@ -657,16 +817,936 @@
 
   .vc-controls {
     bottom: 16px;
-    gap: 10px;
-    padding: 8px 16px;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 30px;
+    width: auto;
+    max-width: 98%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .vc-controls::-webkit-scrollbar {
+    display: none;
   }
 
   .vc-btn {
-    width: 50px;
-    height: 50px;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
   }
 
-  .vc-btn span {
-    font-size: 0.5rem;
+  .vc-unhide-btn {
+    bottom: 16px;
+    width: 44px;
+    height: 44px;
   }
 }
+
+/* ============================================================
+   PREMIUM MULTI 3-SCREEN GRID MODE (Misri Quran + Student Video + Teacher Floating Thumb)
+   ============================================================ */
+
+.vc-layout-quran .vc-quran-viewport {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 14px;
+  padding: 68px 16px 95px 16px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background: #0a0907;
+  overflow: hidden;
+}
+
+/* Screen 1: Quran Box */
+.vc-quran-box {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #15130f;
+  border-radius: 20px;
+  border: 1.5px solid rgba(212, 175, 55, 0.4);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+/* Screen 2: Student Video Feed in Quran Mode */
+.vc-student-box-quran {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #14120e;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  z-index: 10;
+}
+
+.vc-student-box-quran.vc-speaking {
+  border-color: #2ecc71 !important;
+  box-shadow: 0 0 0 2.5px rgba(46, 204, 113, 0.4), 0 16px 40px rgba(46, 204, 113, 0.25) !important;
+}
+
+/* Screen 3: Teacher Miniature Self-View ("very little size") */
+.vc-teacher-mini-floating {
+  position: absolute;
+  bottom: 105px;
+  right: 26px;
+  width: 116px;
+  height: 82px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid rgba(212, 175, 55, 0.65);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
+  background: #100e0b;
+  z-index: 45;
+  transition: all 0.25s ease;
+}
+
+.vc-teacher-mini-floating:hover {
+  transform: scale(1.06) translateY(-2px);
+  border-color: rgba(212, 175, 55, 0.95);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95);
+}
+
+.vc-mini-teacher-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  background: rgba(12, 10, 8, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #d4af37;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-mini-muted-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e74c3c;
+  flex-shrink: 0;
+}
+
+.vc-mini-teacher-off {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #181511;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.62rem;
+  gap: 3px;
+}
+
+.vc-mini-avatar-sub {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4af37 0%, #a67c1e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #12100d;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+/* Quran Button & PiP Button Highlighting */
+.vc-btn-quran-active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.3) 0%, rgba(184, 134, 11, 0.4) 100%) !important;
+  border: 1.5px solid #d4af37 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.45) !important;
+}
+
+.vc-pip-header-btn {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: #d4af37;
+}
+
+.vc-pip-header-btn:hover {
+  background: rgba(212, 175, 55, 0.25);
+  border-color: rgba(212, 175, 55, 0.7);
+}
+
+/* ============================================================
+   MISRI QURAN VIEWER COMPONENT STYLES
+   ============================================================ */
+
+.misri-quran-viewer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #110f0b;
+  color: #f7f5f0;
+  overflow: hidden;
+  user-select: none;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* Quran Topbar */
+.mq-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: linear-gradient(180deg, rgba(24, 21, 16, 0.95) 0%, rgba(18, 15, 12, 0.9) 100%);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+  z-index: 20;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.mq-info-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.78rem;
+  color: #f7f5f0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mq-surah-name {
+  color: #d4af37;
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 0.92rem;
+}
+
+.mq-meta-separator {
+  color: rgba(212, 175, 55, 0.4);
+  font-size: 0.7rem;
+}
+
+.mq-topbar-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mq-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e5e0d8;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mq-tool-btn:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: rgba(212, 175, 55, 0.5);
+  color: #d4af37;
+}
+
+.mq-tool-btn.active {
+  background: rgba(212, 175, 55, 0.25);
+  border-color: #d4af37;
+  color: #d4af37;
+}
+
+.mq-zoom-group {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mq-zoom-btn {
+  background: transparent;
+  border: none;
+  color: #e5e0d8;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.mq-zoom-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.25);
+  color: #d4af37;
+}
+
+.mq-zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mq-zoom-btn.reset {
+  padding: 4px 6px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.65rem;
+}
+
+/* Surah / Juz Selector Bar */
+.mq-selector-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(14, 12, 9, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 8px;
+  z-index: 15;
+  flex-wrap: wrap;
+}
+
+.mq-select-wrapper {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 110px;
+}
+
+.mq-select {
+  width: 100%;
+  background: #1c1914;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: #f7f5f0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.mq-select:focus {
+  border-color: #d4af37;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
+}
+
+.mq-page-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #1c1914;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 8px;
+  padding: 2px 4px;
+}
+
+.mq-step-btn {
+  background: transparent;
+  border: none;
+  color: #d4af37;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.mq-step-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.2);
+}
+
+.mq-step-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.mq-page-form {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mq-page-input {
+  width: 38px;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.mq-total-pages {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+/* Viewport & Canvas */
+.mq-viewport {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  background: #14120e;
+  padding: 8px 6px 36px 6px;
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+}
+
+.mq-page-canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 620px;
+  min-height: min-content;
+  margin: 0 auto;
+  transition: transform 0.15s ease-out;
+}
+
+.mq-page-card {
+  position: relative;
+  width: 100%;
+  background: #fffdf5;
+  border: 2px solid rgba(212, 175, 55, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(212, 175, 55, 0.12);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.mq-mushaf-image {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  display: block;
+  object-fit: contain;
+  background: #fffdf5;
+  border-radius: 8px;
+  filter: none;
+  transition: opacity 0.25s ease;
+}
+
+.mq-mushaf-image.loading {
+  opacity: 0;
+}
+
+.mq-mushaf-image.loaded {
+  opacity: 1;
+}
+
+/* Loading & Error States */
+.mq-loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #d4af37;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 40px 20px;
+}
+
+.mq-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(212, 175, 55, 0.2);
+  border-top-color: #d4af37;
+  border-radius: 50%;
+  animation: mqSpin 0.8s linear infinite;
+}
+
+@keyframes mqSpin {
+  to { transform: rotate(360deg); }
+}
+
+.mq-error-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 30px;
+  color: #f7f5f0;
+}
+
+.mq-error-box h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: #ff6b6b;
+}
+
+.mq-error-box p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 260px;
+}
+
+.mq-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(212, 175, 55, 0.2);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  color: #d4af37;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Tajweed Text Mode */
+.mq-tajweed-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 16px 20px;
+  box-sizing: border-box;
+}
+
+.mq-tajweed-content {
+  max-width: 650px;
+  margin: 0 auto;
+  direction: rtl;
+  text-align: justify;
+  line-height: 2.2;
+}
+
+.mq-surah-header {
+  text-align: center;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.4);
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+}
+
+.mq-surah-header h3 {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 1.6rem;
+  color: #d4af37;
+  margin: 0;
+}
+
+.mq-surah-subtitle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  direction: ltr;
+  margin-top: 4px;
+}
+
+.mq-tajweed-verse {
+  display: inline;
+  font-family: 'Kanz al Marjaan', 'Al-Kanz', serif;
+  font-size: 1.25rem;
+  color: #f7f5f0;
+}
+
+.mq-verse-key {
+  color: #d4af37;
+  font-weight: 800;
+  margin: 0 4px;
+  font-size: 0.95rem;
+}
+
+/* Bottom Quick Nav Pill */
+.mq-quick-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: rgba(14, 12, 9, 0.9);
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+  z-index: 15;
+}
+
+.mq-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f7f5f0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mq-quick-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.25);
+  border-color: #d4af37;
+  color: #d4af37;
+}
+
+.mq-quick-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.mq-quick-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mq-quick-surah {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 0.88rem;
+  color: #d4af37;
+}
+
+.mq-quick-page {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================================
+   TEACHER IN-APP FLOATING MINI PLAYER WIDGET
+   ============================================================ */
+
+.vc-floating-mini-player {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 280px;
+  height: 84px;
+  background: rgba(18, 15, 12, 0.95);
+  border: 1.5px solid rgba(212, 175, 55, 0.65);
+  border-radius: 18px;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.85), 0 0 20px rgba(212, 175, 55, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 10px;
+  z-index: 9999999;
+  cursor: pointer;
+  animation: vcMiniPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vc-floating-mini-player:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95), 0 0 25px rgba(212, 175, 55, 0.35);
+}
+
+@keyframes vcMiniPopIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.vc-mini-video-wrap {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #090807;
+  flex-shrink: 0;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+}
+
+.vc-mini-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vc-mini-video.visible { display: block; }
+.vc-mini-video.hidden { display: none; }
+
+.vc-mini-avatar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #d4af37 0%, #a67c1e 100%);
+  color: #12100d;
+  font-weight: 800;
+  font-size: 1.3rem;
+}
+
+.vc-mini-speaking-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 8px #2ecc71;
+  animation: vcLiveDot 1s infinite alternate;
+}
+
+.vc-mini-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vc-mini-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-mini-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #d4af37;
+  font-weight: 700;
+}
+
+.vc-mini-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vc-mini-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vc-mini-btn:hover {
+  background: rgba(212, 175, 55, 0.3);
+  color: #d4af37;
+  transform: scale(1.1);
+}
+
+.vc-mini-btn.expand {
+  background: rgba(212, 175, 55, 0.2);
+  color: #d4af37;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+}
+
+.vc-mini-btn.muted {
+  background: rgba(231, 76, 60, 0.25);
+  color: #ff6b6b;
+}
+
+.vc-mini-btn.end {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+}
+
+/* ============================================================
+   STUDENT LOCKED NAVIGATION ALERT TOAST
+   ============================================================ */
+
+.vc-back-lock-toast {
+  position: absolute;
+  top: 75px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(28, 22, 14, 0.96) 0%, rgba(18, 14, 9, 0.98) 100%);
+  border: 1.5px solid #d4af37;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.85), 0 0 25px rgba(212, 175, 55, 0.3);
+  padding: 12px 18px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 99999;
+  max-width: min(92vw, 420px);
+  animation: vcLockSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@keyframes vcLockSlideDown {
+  from { opacity: 0; transform: translate(-50%, -20px) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+.vc-lock-icon {
+  color: #d4af37;
+  flex-shrink: 0;
+}
+
+.vc-lock-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vc-lock-title {
+  color: #d4af37;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.vc-lock-desc {
+  color: #e5e0d8;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+/* ============================================================
+   DYNAMIC RESPONSIVE ADJUSTMENTS FOR ALL MOBILE SCREEN SIZES
+   ============================================================ */
+
+@media (max-width: 768px) {
+  /* Mobile Portrait: Quran stacked on top (55%), Student video below (45%) */
+  .vc-layout-quran .vc-quran-viewport {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1.25fr 0.85fr;
+    gap: 8px;
+    padding: 58px 8px 84px 8px;
+  }
+
+  .vc-teacher-mini-floating {
+    width: 90px;
+    height: 64px;
+    bottom: 95px;
+    right: 12px;
+    border-radius: 10px;
+  }
+
+  .vc-mini-teacher-badge {
+    font-size: 0.52rem;
+    padding: 1px 4px;
+  }
+
+  .mq-mushaf-image {
+    width: 100%;
+    height: auto;
+    max-height: none;
+  }
+
+  .mq-topbar {
+    padding: 6px 10px;
+  }
+
+  .mq-info-badge {
+    padding: 2px 8px;
+    font-size: 0.68rem;
+  }
+
+  .mq-surah-name {
+    font-size: 0.8rem;
+  }
+
+  .mq-tool-btn {
+    padding: 3px 6px;
+    font-size: 0.65rem;
+  }
+
+  .mq-selector-bar {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .mq-select {
+    padding: 4px 6px;
+    font-size: 0.68rem;
+  }
+
+  .mq-quick-nav {
+    padding: 4px 8px;
+  }
+
+  .mq-quick-btn {
+    padding: 3px 8px;
+    font-size: 0.65rem;
+  }
+
+  .vc-floating-mini-player {
+    bottom: 16px;
+    right: 12px;
+    width: min(calc(100vw - 24px), 270px);
+    height: 76px;
+    padding: 6px 10px;
+  }
+
+  .vc-mini-video-wrap {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Tablet / iPad split */
+  .vc-layout-quran .vc-quran-viewport {
+    grid-template-columns: 1fr 1fr;
+    padding: 65px 12px 90px 12px;
+  }
+
+  .vc-teacher-mini-floating {
+    width: 105px;
+    height: 75px;
+    bottom: 105px;
+    right: 18px;
+  }
+}
+

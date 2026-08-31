@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/db.js";
 import "./VideoCall.css";
+import MisriQuranViewer from "./MisriQuranViewer.jsx";
 import {
   Mic,
   MicOff,
@@ -27,7 +28,13 @@ import {
   Minimize2,
   User,
   GraduationCap,
-  ChevronDown
+  ChevronDown,
+  ChevronUp,
+  BookOpen,
+  PictureInPicture2,
+  ShieldAlert,
+  ExternalLink,
+  X
 } from "lucide-react";
 
 function buildIceServers() {
@@ -55,15 +62,6 @@ function buildIceServers() {
     }
   ];
 
-  // NOTE: openrelay.metered.ca is a free, best-effort TURN service and is
-  // known to be unreliable / go offline. If two peers are on different
-  // networks (not the same LAN/WiFi) and this is the only TURN server
-  // available, ICE can fail to connect entirely, which looks exactly like
-  // "can't see or hear each other" even though the signaling/negotiation
-  // code is correct. If issues persist after the fixes below, check the
-  // console for the logged ICE candidate types (look for "relay" candidates)
-  // and consider a paid/reliable TURN provider (Twilio, Xirsys, Cloudflare
-  // Calls, metered.ca paid tier, etc).
   const turnUrl = import.meta.env.VITE_TURN_URL;
   const turnUser = import.meta.env.VITE_TURN_USERNAME;
   const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
@@ -82,22 +80,17 @@ function buildIceServers() {
 }
 
 // Enhance SDP for crystal clear, high-bitrate Opus vocal recitation.
-// FIX: the old version matched ANY fmtp line containing the substring "111",
-// which can accidentally match unrelated codec lines (e.g. a video codec's
-// profile-level-id hex string) and corrupt that line, breaking negotiation
-// for that media type. This version finds Opus's *actual* dynamic payload
-// type from its rtpmap line first, then only touches that specific fmtp line.
 function tuneSdpForVocalClarity(sdp) {
   if (!sdp) return sdp;
 
   const rtpmapMatch = sdp.match(/a=rtpmap:(\d+)\s+opus\/\d+/i);
-  if (!rtpmapMatch) return sdp; // Opus not present in this SDP, leave it alone
+  if (!rtpmapMatch) return sdp;
 
   const opusPt = rtpmapMatch[1];
   const fmtpRegex = new RegExp(`(a=fmtp:${opusPt} [^\\r\\n]*)`, "g");
 
   return sdp.replace(fmtpRegex, (line) => {
-    if (/maxaveragebitrate=/.test(line)) return line; // already tuned, don't double-append
+    if (/maxaveragebitrate=/.test(line)) return line;
     return `${line};maxaveragebitrate=64000;stereo=0;sprop-stereo=0;useinbandfec=1;minptime=10;cng=off`;
   });
 }
@@ -112,6 +105,7 @@ export default function VideoCall({ call, onClose }) {
     isSpectator = false,
   } = call || {};
 
+  const isTeacher = myRole === "teacher" || call?.isTeacher === true;
   const SIGNAL_PATH = "tahfeez_signals";
 
   const localVideoRef = useRef(null);
@@ -128,12 +122,10 @@ export default function VideoCall({ call, onClose }) {
   const localAnalyserRef = useRef(null);
   const remoteAnalyserRef = useRef(null);
   const animFrameRef = useRef(null);
-  const audioGraphReadyRef = useRef(false); // guards against building the remote audio graph more than once
+  const audioGraphReadyRef = useRef(false);
   const localAnalyserReadyRef = useRef(false);
-  const initialNegotiationDoneRef = useRef(false); // gates onnegotiationneeded until the first offer/answer round is done
+  const initialNegotiationDoneRef = useRef(false);
 
-  // Refs that always mirror the latest state, so async callbacks / Firestore
-  // listeners created in effects that don't re-run never read stale values.
   const statusRef = useRef("initializing");
   const camOnRef = useRef(true);
   const micOnRef = useRef(true);
@@ -143,7 +135,11 @@ export default function VideoCall({ call, onClose }) {
   const [peerCamOn, setPeerCamOn] = useState(true);
   const [peerMicOn, setPeerMicOn] = useState(true);
   const [facingMode, setFacingMode] = useState("user"); // "user" | "environment"
-  const [layoutMode, setLayoutMode] = useState("grid"); // "grid" (side-by-side) | "pip" (focus)
+  const [layoutMode, setLayoutMode] = useState(() => window.innerWidth <= 768 ? "pip" : "grid"); // "grid" | "pip"
+  const [quranOpen, setQuranOpen] = useState(false);
+  const [quranPage, setQuranPage] = useState(1);
+  const [isTeacherMinimized, setIsTeacherMinimized] = useState(false);
+  const [showBackLockAlert, setShowBackLockAlert] = useState(false);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [hasRemoteAudio, setHasRemoteAudio] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
@@ -152,16 +148,83 @@ export default function VideoCall({ call, onClose }) {
   const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState("");
   const [showAudioDeviceMenu, setShowAudioDeviceMenu] = useState(false);
   const [volumeBoost, setVolumeBoost] = useState(false);
-  const [status, setStatus] = useState("initializing"); // "initializing" | "calling" | "connected" | "reconnecting" | "error"
+  const [status, setStatus] = useState("initializing");
   const [error, setError] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [localSpeaking, setLocalSpeaking] = useState(false);
   const [remoteSpeaking, setRemoteSpeaking] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [controlsHidden, setControlsHidden] = useState(false);
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
 
-  const lastProcessedOfferSdpRef = useRef("");
-  const lastProcessedAnswerSdpRef = useRef("");
+  // Student Back Navigation Lock (Active for student/parent only)
+  useEffect(() => {
+    if (isTeacher) return;
+
+    // Push dummy state to capture back button
+    const dummyState = { tahfeezCallLocked: true, timestamp: Date.now() };
+    try {
+      window.history.pushState(dummyState, "", window.location.href);
+    } catch (_) { }
+
+    const handlePopState = (e) => {
+      // Re-push state to block back navigation
+      try {
+        window.history.pushState(dummyState, "", window.location.href);
+      } catch (_) { }
+      setShowBackLockAlert(true);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "Online Tahfeez class is in session. Are you sure you want to leave?";
+      return e.returnValue;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isTeacher]);
+
+  // Auto-dismiss student locked back alert after 3.8s
+  useEffect(() => {
+    if (!showBackLockAlert) return;
+    const timer = setTimeout(() => setShowBackLockAlert(false), 3800);
+    return () => clearTimeout(timer);
+  }, [showBackLockAlert]);
+
+  // Teacher Picture-in-Picture & Minimize handler
+  const handleTeacherPip = useCallback(async () => {
+    if (!isTeacher) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (remoteVideoRef.current && document.pictureInPictureEnabled) {
+        await remoteVideoRef.current.requestPictureInPicture();
+      } else {
+        setIsTeacherMinimized((prev) => !prev);
+      }
+    } catch (err) {
+      console.warn("[PiP] Native Picture-in-Picture note, using in-app floating mode:", err);
+      setIsTeacherMinimized((prev) => !prev);
+    }
+  }, [isTeacher]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+      setControlsHidden(isFull);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   useEffect(() => { statusRef.current = status; }, [status]);
   useEffect(() => { camOnRef.current = camOn; }, [camOn]);
   useEffect(() => { micOnRef.current = micOn; }, [micOn]);
@@ -611,7 +674,7 @@ export default function VideoCall({ call, onClose }) {
   };
 
   // Toggle Fullscreen
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     const elem = document.querySelector(".vc-overlay");
     if (!elem) return;
 
@@ -620,7 +683,7 @@ export default function VideoCall({ call, onClose }) {
     } else {
       document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => { });
     }
-  };
+  }, []);
 
   // Main WebRTC Connection Pipeline
   useEffect(() => {
@@ -951,15 +1014,18 @@ export default function VideoCall({ call, onClose }) {
         }
       };
 
+      let lastProcessedOfferSdp = "";
+      let lastProcessedAnswerSdp = "";
+
       const handleIncomingOffer = async (offerData) => {
         if (!offerData || !offerData.sdp) return;
         if (offerData.from === role) return; // this is our own offer echoed back
         if (pc.signalingState !== "stable") return;
-        if (offerData.sdp === lastProcessedOfferSdpRef.current) return; // Ignore duplicate offers from snapshots
+        if (offerData.sdp === lastProcessedOfferSdp) return; // Ignore duplicate offers from snapshots
 
         try {
           console.log(`[WebRTC] ${role} applying offer`);
-          lastProcessedOfferSdpRef.current = offerData.sdp;
+          lastProcessedOfferSdp = offerData.sdp;
           await pc.setRemoteDescription(new RTCSessionDescription(offerData));
           await flushRemoteCandidates();
 
@@ -990,11 +1056,11 @@ export default function VideoCall({ call, onClose }) {
       const handleIncomingAnswer = async (answerData) => {
         if (!answerData || !answerData.sdp) return;
         if (pc.signalingState !== "have-local-offer") return; // not currently expecting an answer
-        if (answerData.sdp === lastProcessedAnswerSdpRef.current) return; // Ignore duplicate answers
+        if (answerData.sdp === lastProcessedAnswerSdp) return; // Ignore duplicate answers
 
         try {
           console.log(`[WebRTC] ${role} applying answer`);
-          lastProcessedAnswerSdpRef.current = answerData.sdp;
+          lastProcessedAnswerSdp = answerData.sdp;
           await pc.setRemoteDescription(new RTCSessionDescription(answerData));
           await flushRemoteCandidates();
           initialNegotiationDoneRef.current = true;
@@ -1107,6 +1173,85 @@ export default function VideoCall({ call, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, role]);
 
+  // Global Keyboard Shortcuts (Laptop/PC Controls for Teacher Recitation)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // Don't intercept when user is actively typing in inputs or select dropdowns
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (
+        activeTag === "input" ||
+        activeTag === "textarea" ||
+        activeTag === "select" ||
+        document.activeElement?.isContentEditable
+      ) {
+        return;
+      }
+
+      // 1. Spacebar -> Mute / Unmute Microphone
+      if (e.code === "Space" || e.key === " ") {
+        e.preventDefault();
+        toggleMic();
+        return;
+      }
+
+      // 2. 'F' or 'f' -> Fullscreen Toggle
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+
+      // 3. 'H' or 'h' -> Hide / Unhide Bottom Bar
+      if (e.key === "h" || e.key === "H") {
+        e.preventDefault();
+        setControlsHidden((prev) => !prev);
+        return;
+      }
+
+      // 4. Quran Navigation & Scrolling (Arrow keys)
+      if (quranOpen) {
+        // ArrowLeft -> Next Page (in Mushaf RTL layout)
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setQuranPage((p) => Math.min(604, p + 1));
+          return;
+        }
+
+        // ArrowRight -> Previous Page
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          setQuranPage((p) => Math.max(1, p - 1));
+          return;
+        }
+
+        // ArrowDown -> Scroll Quran Page Down smoothly
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          const vp = document.querySelector(".mq-viewport");
+          if (vp) {
+            vp.scrollBy({ top: 160, behavior: "smooth" });
+          }
+          return;
+        }
+
+        // ArrowUp -> Scroll Quran Page Up smoothly
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          const vp = document.querySelector(".mq-viewport");
+          if (vp) {
+            vp.scrollBy({ top: -160, behavior: "smooth" });
+          }
+          return;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, [toggleMic, toggleFullscreen, quranOpen]);
+
   if (!call) return null;
 
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
@@ -1121,8 +1266,76 @@ export default function VideoCall({ call, onClose }) {
     error: "Error",
   }[status] || status;
 
-  const isTeacher = myRole === "teacher";
   const showRemoteVideo = peerCamOn && hasRemoteVideo && status === "connected";
+
+  // If teacher minimized the call into floating in-app mini player
+  if (isTeacher && isTeacherMinimized) {
+    return createPortal(
+      <div
+        className="vc-floating-mini-player"
+        onClick={() => setIsTeacherMinimized(false)}
+        role="dialog"
+        aria-label="Active Call Floating Widget"
+        title="Click to expand full classroom screen"
+      >
+        <audio ref={remoteAudioRef} autoPlay playsInline muted={true} />
+
+        {/* Video feed or mini avatar in floating card */}
+        <div className="vc-mini-video-wrap">
+          <video
+            ref={remoteVideoRef}
+            className={`vc-mini-video ${showRemoteVideo ? "visible" : "hidden"}`}
+            autoPlay
+            playsInline
+            muted={true}
+          />
+          {!showRemoteVideo && (
+            <div className="vc-mini-avatar">
+              <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+            </div>
+          )}
+          {remoteSpeaking && <span className="vc-mini-speaking-dot" />}
+        </div>
+
+        {/* Info & mini controls */}
+        <div className="vc-mini-info">
+          <div className="vc-mini-name">{peerName}</div>
+          <div className="vc-mini-status">
+            <span className="vc-dot vc-dot-active" style={{ width: 7, height: 7 }} />
+            <span>{statusLabel}</span>
+          </div>
+        </div>
+
+        <div className="vc-mini-actions" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className={`vc-mini-btn ${micOn ? "" : "muted"}`}
+            onClick={toggleMic}
+            title={micOn ? "Mute" : "Unmute"}
+          >
+            {micOn ? <Mic size={14} /> : <MicOff size={14} />}
+          </button>
+          <button
+            type="button"
+            className="vc-mini-btn expand"
+            onClick={() => setIsTeacherMinimized(false)}
+            title="Expand Full Screen"
+          >
+            <Maximize2 size={14} />
+          </button>
+          <button
+            type="button"
+            className="vc-mini-btn end"
+            onClick={handleEnd}
+            title="End Call"
+          >
+            <Phone size={14} style={{ transform: "rotate(135deg)" }} />
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   return createPortal(
     <div
@@ -1135,8 +1348,29 @@ export default function VideoCall({ call, onClose }) {
         if (showAudioDeviceMenu) setShowAudioDeviceMenu(false);
       }}
     >
-      <div className={`vc-stage ${layoutMode === "grid" ? "vc-layout-grid" : "vc-layout-pip"}`}>
-        {/* Dedicated Audio Element for Remote Sound (muted once the Web Audio graph takes over — see connectRemoteAudio) */}
+      {/* Student Navigation Locked Notification Toast */}
+      {showBackLockAlert && (
+        <div className="vc-back-lock-toast" role="alert">
+          <ShieldAlert size={24} className="vc-lock-icon" />
+          <div className="vc-lock-text">
+            <div className="vc-lock-title">Online Tahfeez Class In Progress</div>
+            <div className="vc-lock-desc">
+              Navigation is disabled for students during live recitation. Please stay in class or use the End button.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div
+        className={`vc-stage ${
+          quranOpen
+            ? "vc-layout-quran"
+            : layoutMode === "grid"
+            ? "vc-layout-grid"
+            : "vc-layout-pip"
+        }`}
+      >
+        {/* Dedicated Audio Element for Remote Sound */}
         <audio
           ref={remoteAudioRef}
           autoPlay
@@ -1150,191 +1384,183 @@ export default function VideoCall({ call, onClose }) {
             <span className={`vc-dot ${status === "connected" ? "vc-dot-active" : ""}`} />
             <div className="vc-title-group">
               <span className="vc-room-label">
-                {isSpectator ? "Auditing Class (Spectator)" : "Live Tahfeez Classroom"}
+                {isSpectator ? "Auditing Class (Spectator)" : "Online Tahfeez"}
               </span>
               <span className="vc-role-badge">
-                {isTeacher ? "👨‍🏫 Muhaffiz Classroom" : "👦 Student Session"}
+                Mauze Tahfeez Galiakot
               </span>
             </div>
           </div>
           <div className="vc-topbar-right">
             <span className="vc-status-pill">{statusLabel}</span>
 
-            {/* Audio Output Selector (Speaker vs Headphones) */}
-            <div className="vc-audio-output-wrapper" onClick={(e) => e.stopPropagation()}>
+            {/* Teacher-Only Picture-in-Picture / Minimize button in header */}
+            {isTeacher && (
               <button
                 type="button"
-                className={`vc-icon-btn ${audioOutputMode === "headphones" ? "active" : ""}`}
-                onClick={() => setShowAudioDeviceMenu(!showAudioDeviceMenu)}
-                title="Choose Audio Output (Speaker / Headphones)"
+                className="vc-icon-btn vc-pip-header-btn"
+                onClick={handleTeacherPip}
+                title="Picture-in-Picture / Minimize to background"
               >
-                {audioOutputMode === "headphones" ? <Headphones size={15} /> : <Volume2 size={15} />}
-                <span>{audioOutputMode === "headphones" ? "Headphones" : "Speaker"}</span>
-                <ChevronDown size={12} style={{ opacity: 0.7 }} />
+                <PictureInPicture2 size={14} />
+                <span>PiP</span>
               </button>
-
-              {showAudioDeviceMenu && (
-                <div className="vc-audio-device-menu">
-                  <div className="vc-menu-header">Audio Output Mode</div>
-                  <button
-                    type="button"
-                    className={`vc-menu-item ${audioOutputMode === "speaker" ? "active" : ""}`}
-                    onClick={() => handleSelectAudioMode("speaker")}
-                  >
-                    <Volume2 size={16} />
-                    <div className="vc-menu-text">
-                      <span className="vc-menu-title">Loudspeaker</span>
-                      <span className="vc-menu-desc">Room audio & boosted clarity</span>
-                    </div>
-                    {audioOutputMode === "speaker" && <span className="vc-check">✓</span>}
-                  </button>
-                  <button
-                    type="button"
-                    className={`vc-menu-item ${audioOutputMode === "headphones" ? "active" : ""}`}
-                    onClick={() => handleSelectAudioMode("headphones")}
-                  >
-                    <Headphones size={16} />
-                    <div className="vc-menu-text">
-                      <span className="vc-menu-title">Headphones / Earphones</span>
-                      <span className="vc-menu-desc">Standard gain, zero acoustic echo</span>
-                    </div>
-                    {audioOutputMode === "headphones" && <span className="vc-check">✓</span>}
-                  </button>
-
-                  {/* Volume Boost Option for Speaker Mode */}
-                  {audioOutputMode === "speaker" && (
-                    <button
-                      type="button"
-                      className={`vc-menu-item ${volumeBoost ? "active" : ""}`}
-                      onClick={() => setVolumeBoost(!volumeBoost)}
-                    >
-                      <Volume2 size={16} />
-                      <div className="vc-menu-text">
-                        <span className="vc-menu-title">2x Volume Boost</span>
-                        <span className="vc-menu-desc">{volumeBoost ? "Active (+200% loud)" : "Normal (+140% loud)"}</span>
-                      </div>
-                      {volumeBoost && <span className="vc-check">✓</span>}
-                    </button>
-                  )}
-
-                  {/* Specific Hardware Audio Devices (if available) */}
-                  {audioOutputs.length > 1 && (
-                    <>
-                      <div className="vc-menu-divider" />
-                      <div className="vc-menu-header">Hardware Devices</div>
-                      {audioOutputs.map((device, idx) => (
-                        <button
-                          key={device.deviceId || idx}
-                          type="button"
-                          className={`vc-menu-item ${selectedAudioDeviceId === device.deviceId ? "active" : ""}`}
-                          onClick={() => handleSelectSpecificDevice(device.deviceId)}
-                        >
-                          <Volume2 size={14} />
-                          <div className="vc-menu-text">
-                            <span className="vc-menu-title">{device.label || `Output Device ${idx + 1}`}</span>
-                          </div>
-                          {selectedAudioDeviceId === device.deviceId && <span className="vc-check">✓</span>}
-                        </button>
-                      ))}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Layout Mode Button */}
-            <button
-              type="button"
-              className="vc-icon-btn"
-              onClick={(e) => { e.stopPropagation(); setLayoutMode(layoutMode === "grid" ? "pip" : "grid"); }}
-              title={layoutMode === "grid" ? "Switch to Focus/PiP View" : "Switch to Side-by-Side Grid"}
-            >
-              <LayoutGrid size={15} />
-              <span>{layoutMode === "grid" ? "Focus" : "Dual Grid"}</span>
-            </button>
-
-            {/* Fullscreen Button */}
-            <button
-              type="button"
-              className="vc-icon-btn"
-              onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            >
-              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-            </button>
+            )}
           </div>
         </div>
 
-        {/* Main Video Viewport (Dual Grid or Focus PiP) */}
-        <div className="vc-viewport">
-          {/* Remote Video Container */}
-          <div className={`vc-video-box vc-remote-box ${remoteSpeaking ? "vc-speaking" : ""}`}>
-            <video
-              ref={remoteVideoRef}
-              className={`vc-video-elem ${showRemoteVideo ? "vc-video-visible" : "vc-video-hidden"}`}
-              autoPlay
-              playsInline
-              muted={true}
-            />
-            {!showRemoteVideo && (
-              <div className="vc-avatar-placeholder">
-                <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
-                  <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
-                </div>
-                <div className="vc-peer-name">{peerName}</div>
-                {status === "connected" ? (
-                  <div className="vc-audio-live-pill">
-                    <span className="vc-audio-wave">
-                      <span></span><span></span><span></span><span></span>
-                    </span>
-                    <span>{peerCamOn ? "Connecting camera…" : "Camera Off · Audio Live"}</span>
-                  </div>
-                ) : (
-                  <div className="vc-status-sub">{statusLabel}</div>
-                )}
-                {error && <div className="vc-error-pill">{error}</div>}
-              </div>
-            )}
-            <div className="vc-stream-tag">
-              <div className="vc-tag-user">
-                {isTeacher ? <User size={13} /> : <GraduationCap size={13} />}
-                <span>{peerName}</span>
-              </div>
-              {!peerMicOn && <span className="vc-muted-tag">Muted</span>}
-              {remoteSpeaking && peerMicOn && <span className="vc-speaking-tag">Speaking…</span>}
+        {/* Main Viewport */}
+        {quranOpen ? (
+          /* ============================================================
+             PREMIUM MULTI 3-SCREEN GRID MODE (Misri Quran + Student Video + Teacher Self-Cam)
+             ============================================================ */
+          <div className="vc-viewport vc-quran-viewport">
+            {/* Screen 1: Misri Quran Reader (Primary reading view) */}
+            <div className="vc-quran-box">
+              <MisriQuranViewer
+                currentPage={quranPage}
+                onPageChange={setQuranPage}
+                compact={false}
+              />
             </div>
-          </div>
 
-          {/* Local Video Container (Side-by-Side in Grid, Floating in PiP) */}
-          {!isSpectator && (
-            <div className={`vc-video-box vc-local-box ${localSpeaking ? "vc-speaking" : ""}`}>
+            {/* Screen 2: Student Remote Video Feed */}
+            <div className={`vc-student-box-quran ${remoteSpeaking ? "vc-speaking" : ""}`}>
               <video
-                ref={localVideoRef}
-                className={`vc-video-elem vc-local-elem ${camOn ? "vc-video-visible" : "vc-video-hidden"}`}
+                ref={remoteVideoRef}
+                className={`vc-video-elem ${showRemoteVideo ? "vc-video-visible" : "vc-video-hidden"}`}
                 autoPlay
                 playsInline
-                muted
+                muted={true}
               />
-              {!camOn && (
+              {!showRemoteVideo && (
                 <div className="vc-avatar-placeholder">
-                  <div className={`vc-avatar-circle local ${localSpeaking ? "vc-avatar-pulse-active" : ""}`}>
-                    <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
+                  <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+                    <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
                   </div>
-                  <div className="vc-peer-name">{myName} (You)</div>
-                  <div className="vc-status-sub">Camera Off</div>
+                  <div className="vc-peer-name">{peerName}</div>
+                  {status === "connected" ? (
+                    <div className="vc-audio-live-pill">
+                      <span className="vc-audio-wave">
+                        <span></span><span></span><span></span><span></span>
+                      </span>
+                      <span>{peerCamOn ? "Connecting camera…" : "Camera Off · Audio Live"}</span>
+                    </div>
+                  ) : (
+                    <div className="vc-status-sub">{statusLabel}</div>
+                  )}
+                  {error && <div className="vc-error-pill">{error}</div>}
                 </div>
               )}
               <div className="vc-stream-tag">
                 <div className="vc-tag-user">
-                  {isTeacher ? <GraduationCap size={13} /> : <User size={13} />}
-                  <span>{myName} (You)</span>
+                  {isTeacher ? <User size={13} /> : <GraduationCap size={13} />}
+                  <span>{peerName}</span>
                 </div>
-                {!micOn && <span className="vc-muted-tag">Muted</span>}
-                {localSpeaking && micOn && <span className="vc-speaking-tag">Speaking…</span>}
+                {!peerMicOn && <span className="vc-muted-tag">Muted</span>}
+                {remoteSpeaking && peerMicOn && <span className="vc-speaking-tag">Speaking…</span>}
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Screen 3: Teacher Miniature Self-View (very little size floating preview) */}
+            {!isSpectator && (
+              <div className={`vc-teacher-mini-floating ${localSpeaking ? "vc-speaking" : ""}`}>
+                <video
+                  ref={localVideoRef}
+                  className={`vc-video-elem vc-local-elem ${camOn ? "vc-video-visible" : "vc-video-hidden"}`}
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                {!camOn && (
+                  <div className="vc-mini-teacher-off">
+                    <div className="vc-mini-avatar-sub">
+                      <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
+                    </div>
+                    <span>Cam Off</span>
+                  </div>
+                )}
+                <div className="vc-mini-teacher-badge">
+                  <span>{isTeacher ? "You (Muhaffiz)" : "You"}</span>
+                  {!micOn && <span className="vc-mini-muted-dot" />}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ============================================================
+             STANDARD DUAL VIEWPORT (Grid or Focus PiP)
+             ============================================================ */
+          <div className="vc-viewport">
+            {/* Remote Video Container */}
+            <div className={`vc-video-box vc-remote-box ${remoteSpeaking ? "vc-speaking" : ""}`}>
+              <video
+                ref={remoteVideoRef}
+                className={`vc-video-elem ${showRemoteVideo ? "vc-video-visible" : "vc-video-hidden"}`}
+                autoPlay
+                playsInline
+                muted={true}
+              />
+              {!showRemoteVideo && (
+                <div className="vc-avatar-placeholder">
+                  <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+                    <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+                  </div>
+                  <div className="vc-peer-name">{peerName}</div>
+                  {status === "connected" ? (
+                    <div className="vc-audio-live-pill">
+                      <span className="vc-audio-wave">
+                        <span></span><span></span><span></span><span></span>
+                      </span>
+                      <span>{peerCamOn ? "Connecting camera…" : "Camera Off · Audio Live"}</span>
+                    </div>
+                  ) : (
+                    <div className="vc-status-sub">{statusLabel}</div>
+                  )}
+                  {error && <div className="vc-error-pill">{error}</div>}
+                </div>
+              )}
+              <div className="vc-stream-tag">
+                <div className="vc-tag-user">
+                  {isTeacher ? <User size={13} /> : <GraduationCap size={13} />}
+                  <span>{peerName}</span>
+                </div>
+                {!peerMicOn && <span className="vc-muted-tag">Muted</span>}
+                {remoteSpeaking && peerMicOn && <span className="vc-speaking-tag">Speaking…</span>}
+              </div>
+            </div>
+
+            {/* Local Video Container */}
+            {!isSpectator && (
+              <div className={`vc-video-box vc-local-box ${localSpeaking ? "vc-speaking" : ""}`}>
+                <video
+                  ref={localVideoRef}
+                  className={`vc-video-elem vc-local-elem ${camOn ? "vc-video-visible" : "vc-video-hidden"}`}
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                {!camOn && (
+                  <div className="vc-avatar-placeholder">
+                    <div className={`vc-avatar-circle local ${localSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+                      <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
+                    </div>
+                    <div className="vc-peer-name">{myName} (You)</div>
+                    <div className="vc-status-sub">Camera Off</div>
+                  </div>
+                )}
+                <div className="vc-stream-tag">
+                  <div className="vc-tag-user">
+                    {isTeacher ? <GraduationCap size={13} /> : <User size={13} />}
+                    <span>{myName} (You)</span>
+                  </div>
+                  {!micOn && <span className="vc-muted-tag">Muted</span>}
+                  {localSpeaking && micOn && <span className="vc-speaking-tag">Speaking…</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Audio Unblock Banner if Browser Blocked Sound */}
         {audioBlocked && (
@@ -1344,30 +1570,118 @@ export default function VideoCall({ call, onClose }) {
           </div>
         )}
 
-        {/* Bottom Control Bar */}
-        <div className="vc-controls" onClick={(e) => e.stopPropagation()}>
+        {/* Audio Device Selection Modal Overlay (Fixes mobile positioning and clipping bugs on all devices) */}
+        {showAudioDeviceMenu && (
+          <div
+            className="vc-audio-menu-overlay"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAudioDeviceMenu(false);
+            }}
+          >
+            <div className="vc-audio-modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="vc-audio-modal-header">
+                <div className="vc-audio-modal-title">
+                  <Volume2 size={16} />
+                  <span>Audio Output Mode</span>
+                </div>
+                <button
+                  type="button"
+                  className="vc-audio-modal-close"
+                  onClick={() => setShowAudioDeviceMenu(false)}
+                  title="Close Menu"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="vc-audio-modal-list">
+                <button
+                  type="button"
+                  className={`vc-menu-item ${audioOutputMode === "speaker" ? "active" : ""}`}
+                  onClick={() => handleSelectAudioMode("speaker")}
+                >
+                  <Volume2 size={18} className="vc-menu-icon" />
+                  <div className="vc-menu-text">
+                    <span className="vc-menu-title">Loudspeaker</span>
+                    <span className="vc-menu-desc">Loud audio for room recitation</span>
+                  </div>
+                  {audioOutputMode === "speaker" && <span className="vc-check">✓</span>}
+                </button>
+
+                <button
+                  type="button"
+                  className={`vc-menu-item ${audioOutputMode === "headphones" ? "active" : ""}`}
+                  onClick={() => handleSelectAudioMode("headphones")}
+                >
+                  <Headphones size={18} className="vc-menu-icon" />
+                  <div className="vc-menu-text">
+                    <span className="vc-menu-title">Receiver / Headphones</span>
+                    <span className="vc-menu-desc">Earpiece audio mode</span>
+                  </div>
+                  {audioOutputMode === "headphones" && <span className="vc-check">✓</span>}
+                </button>
+
+                {audioOutputs.length > 1 && (
+                  <>
+                    <div className="vc-menu-divider" />
+                    <div className="vc-menu-header">Hardware Audio Devices</div>
+                    {audioOutputs.map((device, idx) => (
+                      <button
+                        key={device.deviceId || idx}
+                        type="button"
+                        className={`vc-menu-item ${selectedAudioDeviceId === device.deviceId ? "active" : ""}`}
+                        onClick={() => handleSelectSpecificDevice(device.deviceId)}
+                      >
+                        <Volume2 size={18} className="vc-menu-icon" />
+                        <div className="vc-menu-text">
+                          <span className="vc-menu-title">{device.label || `Output Device ${idx + 1}`}</span>
+                        </div>
+                        {selectedAudioDeviceId === device.deviceId && <span className="vc-check">✓</span>}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Control Bar (Pure Luxury Icons with Smooth Tap Animations) */}
+        <div className={`vc-controls ${controlsHidden ? 'vc-controls-hidden' : ''}`} onClick={(e) => e.stopPropagation()}>
+          {/* Audio Output Mode Button */}
+          <button
+            type="button"
+            className={`vc-btn ${audioOutputMode === "headphones" ? "vc-btn-active" : ""}`}
+            onClick={() => setShowAudioDeviceMenu(!showAudioDeviceMenu)}
+            title="Choose Audio Output (Speaker / Headphones)"
+            aria-label="Audio Output"
+          >
+            {audioOutputMode === "headphones" ? <Headphones size={22} /> : <Volume2 size={22} />}
+          </button>
+
           {!isSpectator && (
             <>
-              {/* Mic Toggle */}
+              {/* Mic Toggle Button */}
               <button
                 type="button"
                 className={`vc-btn ${micOn ? "vc-btn-active" : "vc-btn-off"}`}
                 onClick={toggleMic}
                 title={micOn ? "Mute Microphone" : "Unmute Microphone"}
+                aria-label={micOn ? "Mute" : "Unmute"}
               >
-                {micOn ? <Mic size={20} /> : <MicOff size={20} />}
-                <span>{micOn ? "Mute" : "Unmute"}</span>
+                {micOn ? <Mic size={22} /> : <MicOff size={22} />}
               </button>
 
-              {/* Camera Toggle */}
+              {/* Camera Toggle Button */}
               <button
                 type="button"
                 className={`vc-btn ${camOn ? "vc-btn-active" : "vc-btn-off"}`}
                 onClick={toggleCam}
                 title={camOn ? "Turn Camera Off" : "Turn Camera On"}
+                aria-label={camOn ? "Turn Camera Off" : "Turn Camera On"}
               >
-                {camOn ? <Video size={20} /> : <VideoOff size={20} />}
-                <span>{camOn ? "Stop Cam" : "Start Cam"}</span>
+                {camOn ? <Video size={22} /> : <VideoOff size={22} />}
               </button>
 
               {/* Switch Camera (Front/Rear/Mushaf) */}
@@ -1377,13 +1691,75 @@ export default function VideoCall({ call, onClose }) {
                   className="vc-btn"
                   onClick={switchCamera}
                   title="Flip Camera (Front / Mushaf)"
+                  aria-label="Flip Camera"
                 >
-                  <SwitchCamera size={20} />
-                  <span>Flip Cam</span>
+                  <SwitchCamera size={22} />
                 </button>
               )}
             </>
           )}
+
+          {/* MISRI QURAN BUTTON (ONLY FOR TEACHER PORTAL) */}
+          {isTeacher && (
+            <button
+              type="button"
+              className={`vc-btn ${quranOpen ? "vc-btn-active vc-btn-quran-active" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setQuranOpen(!quranOpen);
+              }}
+              title={quranOpen ? "Close Quran View (Return to Full Video)" : "Open Misri Quran (Multi 3-Screen View)"}
+              aria-label="Misri Quran"
+            >
+              <BookOpen size={22} />
+            </button>
+          )}
+
+          {/* Teacher-Only Picture-in-Picture & Minimize Button */}
+          {isTeacher && (
+            <button
+              type="button"
+              className="vc-btn vc-btn-pip"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTeacherPip();
+              }}
+              title="Picture-in-Picture / Minimize (Teacher Only)"
+              aria-label="Picture-in-Picture"
+            >
+              <PictureInPicture2 size={22} />
+            </button>
+          )}
+
+          {/* Layout Mode Button (Only active when Quran mode is closed) */}
+          {!quranOpen && (
+            <button
+              type="button"
+              className="vc-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLayoutMode(layoutMode === "grid" ? "pip" : "grid");
+              }}
+              title={layoutMode === "grid" ? "Switch to Focus/PiP View" : "Switch to Side-by-Side Grid"}
+              aria-label="Toggle Layout Mode"
+            >
+              <LayoutGrid size={22} />
+            </button>
+          )}
+
+          {/* Fullscreen Button */}
+          <button
+            type="button"
+            className="vc-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFullscreen();
+            }}
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            aria-label="Fullscreen"
+          >
+            {isFullscreen ? <Minimize2 size={22} /> : <Maximize2 size={22} />}
+          </button>
 
           {/* End Call Button */}
           <button
@@ -1391,11 +1767,41 @@ export default function VideoCall({ call, onClose }) {
             className="vc-btn vc-btn-end"
             onClick={handleEnd}
             title={isSpectator ? "Leave Classroom" : "End Call"}
+            aria-label="End Call"
           >
-            <Phone size={22} style={{ transform: "rotate(135deg)" }} />
-            <span>{isSpectator ? "Leave" : "End Call"}</span>
+            <Phone size={24} style={{ transform: "rotate(135deg)" }} />
+          </button>
+
+          {/* Hide Controls Button */}
+          <button
+            type="button"
+            className="vc-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setControlsHidden(true);
+            }}
+            title="Hide Controls"
+            aria-label="Hide Controls"
+          >
+            <ChevronDown size={22} />
           </button>
         </div>
+
+        {/* Floating Unhide Button */}
+        {controlsHidden && (
+          <button
+            type="button"
+            className="vc-unhide-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setControlsHidden(false);
+            }}
+            title="Show Controls"
+            aria-label="Show Controls"
+          >
+            <ChevronUp size={24} />
+          </button>
+        )}
       </div>
     </div>,
     document.body
