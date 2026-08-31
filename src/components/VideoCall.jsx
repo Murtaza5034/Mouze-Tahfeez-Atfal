@@ -191,12 +191,76 @@ export default function VideoCall({ call, onClose }) {
     };
   }, [isTeacher]);
 
-  // Auto-dismiss student locked back alert after 3.8s
+  // Quran Dynamic Stretchable Split View (Resizable divider for Quran & Student screen)
+  const [quranSplitRatio, setQuranSplitRatio] = useState(() => window.innerWidth <= 768 ? 56 : 58);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const isDraggingSplitRef = useRef(false);
+  const quranViewportRef = useRef(null);
+
+  // Handle start of split drag (touch or mouse)
+  const handleSplitDragStart = useCallback((e) => {
+    e.preventDefault();
+    isDraggingSplitRef.current = true;
+    setIsDraggingSplit(true);
+  }, []);
+
+  // Quick snap toggle when clicking the resizer pill
+  const handleSplitQuickSnap = useCallback((e) => {
+    e.stopPropagation();
+    setQuranSplitRatio((prev) => {
+      if (prev >= 68) return 36; // Focus student video
+      if (prev <= 42) return 56; // Balanced split
+      return 74; // Maximize Quran reading view
+    });
+  }, []);
+
+  // Smooth global drag tracking for resizable split view (Mobile touch + Desktop mouse)
   useEffect(() => {
-    if (!showBackLockAlert) return;
-    const timer = setTimeout(() => setShowBackLockAlert(false), 3800);
-    return () => clearTimeout(timer);
-  }, [showBackLockAlert]);
+    const handleMove = (e) => {
+      if (!isDraggingSplitRef.current || !quranViewportRef.current) return;
+      
+      const rect = quranViewportRef.current.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      const isMobile = window.innerWidth <= 768;
+      let ratio;
+      if (isMobile) {
+        // Vertical height ratio
+        const curY = clientY - rect.top;
+        ratio = (curY / rect.height) * 100;
+      } else {
+        // Horizontal width ratio
+        const curX = clientX - rect.left;
+        ratio = (curX / rect.width) * 100;
+      }
+
+      // Allow fluid resizing between 20% and 80%
+      const clamped = Math.max(20, Math.min(80, ratio));
+      setQuranSplitRatio(Math.round(clamped));
+    };
+
+    const handleEnd = () => {
+      if (isDraggingSplitRef.current) {
+        isDraggingSplitRef.current = false;
+        setIsDraggingSplit(false);
+      }
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleEnd);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleEnd);
+    window.addEventListener("touchcancel", handleEnd);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleEnd);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleEnd);
+      window.removeEventListener("touchcancel", handleEnd);
+    };
+  }, []);
 
   // Teacher Picture-in-Picture & Minimize handler
   const handleTeacherPip = useCallback(async () => {
@@ -1413,10 +1477,24 @@ export default function VideoCall({ call, onClose }) {
         {quranOpen ? (
           /* ============================================================
              PREMIUM MULTI 3-SCREEN GRID MODE (Misri Quran + Student Video + Teacher Self-Cam)
+             WITH DYNAMIC MOBILE & DESKTOP STRETCHABLE RESIZABLE SPLIT VIEW
              ============================================================ */
-          <div className="vc-viewport vc-quran-viewport">
-            {/* Screen 1: Misri Quran Reader (Primary reading view) */}
-            <div className="vc-quran-box">
+          <div 
+            ref={quranViewportRef}
+            className={`vc-viewport vc-quran-viewport ${isDraggingSplit ? "vc-split-dragging" : ""}`}
+            style={{
+              "--quran-split-ratio": `${quranSplitRatio}%`
+            }}
+          >
+            {/* Screen 1: Misri Quran Reader (Primary reading view - Dynamic Stretched Size) */}
+            <div 
+              className="vc-quran-box"
+              style={{
+                flex: `0 0 ${quranSplitRatio}%`,
+                maxHeight: typeof window !== "undefined" && window.innerWidth <= 768 ? `${quranSplitRatio}%` : "100%",
+                maxWidth: typeof window !== "undefined" && window.innerWidth > 768 ? `${quranSplitRatio}%` : "100%"
+              }}
+            >
               <MisriQuranViewer
                 currentPage={quranPage}
                 onPageChange={setQuranPage}
@@ -1424,8 +1502,34 @@ export default function VideoCall({ call, onClose }) {
               />
             </div>
 
-            {/* Screen 2: Student Remote Video Feed */}
-            <div className={`vc-student-box-quran ${remoteSpeaking ? "vc-speaking" : ""}`}>
+            {/* Stretchable Split Resizer Bar / Multi-Screen Drag Divider */}
+            <div
+              className={`vc-split-resizer ${isDraggingSplit ? "active" : ""}`}
+              onMouseDown={handleSplitDragStart}
+              onTouchStart={handleSplitDragStart}
+              title="Drag to stretch / adjust Quran and Student video screen size"
+            >
+              <div 
+                className="vc-resizer-pill"
+                onClick={handleSplitQuickSnap}
+                title="Tap to cycle screen presets (74% / 56% / 36%)"
+              >
+                <div className="vc-resizer-grip" />
+                <span className="vc-resizer-ratio-tooltip">
+                  {quranSplitRatio}% Quran
+                </span>
+              </div>
+            </div>
+
+            {/* Screen 2: Student Remote Video Feed (Dynamically adapts to remaining space) */}
+            <div 
+              className={`vc-student-box-quran ${remoteSpeaking ? "vc-speaking" : ""}`}
+              style={{
+                flex: "1 1 auto",
+                minHeight: 0,
+                minWidth: 0
+              }}
+            >
               <video
                 ref={remoteVideoRef}
                 className={`vc-video-elem ${showRemoteVideo ? "vc-video-visible" : "vc-video-hidden"}`}
