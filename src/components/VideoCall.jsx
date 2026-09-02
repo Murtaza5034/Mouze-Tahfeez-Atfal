@@ -429,6 +429,7 @@ export default function VideoCall({ call, onClose }) {
   const peerJoinedRef = useRef(false);
   // Timer ref for delayed ICE restart on transient disconnects.
   const iceRestartTimerRef = useRef(null);
+  const handleEndRef = useRef(null);
 
   // Ultra-Lightweight Class Audio Recording (Opus 16kbps)
   const recorderRef = useRef(null);
@@ -523,7 +524,7 @@ export default function VideoCall({ call, onClose }) {
         .then(({ App }) => {
           App.addListener("backButton", () => {
             // Auto-end call when student presses hardware back
-            handleEnd();
+            if (handleEndRef.current) handleEndRef.current();
           }).then((handle) => {
             capacitorBackSub = handle;
           }).catch(() => {});
@@ -533,7 +534,7 @@ export default function VideoCall({ call, onClose }) {
 
     // 4. Custom Event listener from Native Android MainActivity bridge → AUTO-END CALL
     const handleNativeBack = () => {
-      handleEnd();
+      if (handleEndRef.current) handleEndRef.current();
     };
     window.addEventListener("tahfeez-back-blocked", handleNativeBack);
 
@@ -547,27 +548,27 @@ export default function VideoCall({ call, onClose }) {
 
     const handlePopState = () => {
       // Student pressed browser back — end the call
-      handleEnd();
+      if (handleEndRef.current) handleEndRef.current();
     };
     window.addEventListener("popstate", handlePopState, { capture: true });
 
     // 6. App backgrounded / tab hidden → AUTO-END CALL
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        handleEnd();
+        if (handleEndRef.current) handleEndRef.current();
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // 7. pagehide (iOS Safari background / PWA close)
     const handlePageHide = () => {
-      handleEnd();
+      if (handleEndRef.current) handleEndRef.current();
     };
     window.addEventListener("pagehide", handlePageHide);
 
     // 8. BeforeUnload — end call on tab/window close
     const handleBeforeUnload = () => {
-      handleEnd();
+      if (handleEndRef.current) handleEndRef.current();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
@@ -610,7 +611,7 @@ export default function VideoCall({ call, onClose }) {
         clearTimeout(backLockToastTimerRef.current);
       }
     };
-  }, [isTeacher, handleEnd, roomId]);
+  }, [isTeacher]);
 
   // Hook for draggable + multi-corner drag resizing (desktop) + 2-finger pinch resizing (mobile)
   const initialPipWidth = typeof window !== "undefined" && window.innerWidth <= 768 ? 130 : 175;
@@ -1260,6 +1261,10 @@ export default function VideoCall({ call, onClose }) {
     stopLocal();
     if (onClose) onClose();
   }, [stopLocal, onClose]);
+
+  useEffect(() => {
+    handleEndRef.current = handleEnd;
+  }, [handleEnd]);
 
   // Escape key to end
   useEffect(() => {
