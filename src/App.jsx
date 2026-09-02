@@ -7212,63 +7212,6 @@ function ParentPortal({
   const [selectedTahfeezChat, setSelectedTahfeezChat] = useState(null);
   const [tahfeezSearchQuery, setTahfeezSearchQuery] = useState("");
 
-  // Auto-select chat when navigating directly to Online Tahfeez (e.g. from FCM push click)
-  useEffect(() => {
-    if (activePage === "Online Tahfeez" && !selectedTahfeezChat && (allProfiles || []).length > 0) {
-      if (selectedStudentId) {
-        const matching = allProfiles.find(c => String(c.student_id || c.id) === String(selectedStudentId));
-        if (matching) {
-          const tName = matching.teacherName || matching.teacher_name || "Muhaffiz";
-          const tProfile = (teacherProfiles || []).find(t => 
-            t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
-          );
-          const tId = matching.teacher_id || matching.teacherId || tProfile?.id || tProfile?.user_id;
-          const sName = matching.name || matching.full_name || matching.student_name || "Student";
-          setSelectedTahfeezChat({
-            ...matching,
-            isGroup: false,
-            student_id: matching.student_id || matching.id,
-            student_name: sName,
-            studentName: sName,
-            name: tName,
-            full_name: tName,
-            teacher_id: tId,
-            teacherId: tId,
-            teacher_name: tName,
-            teacherName: tName,
-            photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
-            subtext: `For ${sName}`,
-          });
-          return;
-        }
-      }
-      if (allProfiles.length === 1) {
-        const first = allProfiles[0];
-        const tName = first.teacherName || first.teacher_name || "Muhaffiz";
-        const tProfile = (teacherProfiles || []).find(t => 
-          t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
-        );
-        const tId = first.teacher_id || first.teacherId || tProfile?.id || tProfile?.user_id;
-        const sName = first.name || first.full_name || first.student_name || "Student";
-        setSelectedTahfeezChat({
-          ...first,
-          isGroup: false,
-          student_id: first.student_id || first.id,
-          student_name: sName,
-          studentName: sName,
-          name: tName,
-          full_name: tName,
-          teacher_id: tId,
-          teacherId: tId,
-          teacher_name: tName,
-          teacherName: tName,
-          photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
-          subtext: `For ${sName}`,
-        });
-      }
-    }
-  }, [activePage, selectedStudentId, allProfiles, teacherProfiles]);
-
   const [parentViewedStatus, setParentViewedStatus] = useState(false);
   const [celebrationRank, setCelebrationRank] = useState(null); // 1, 2, or 3 for celebration popup
   const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
@@ -7706,6 +7649,63 @@ function ParentPortal({
   };
 
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData || {};
+
+  // Auto-select chat when navigating directly to Online Tahfeez (e.g. from FCM push click)
+  useEffect(() => {
+    if (activePage === "Online Tahfeez" && !selectedTahfeezChat && (allProfiles || []).length > 0) {
+      if (selectedStudentId) {
+        const matching = allProfiles.find(c => String(c.student_id || c.id) === String(selectedStudentId));
+        if (matching) {
+          const tName = matching.teacherName || matching.teacher_name || "Muhaffiz";
+          const tProfile = (teacherProfiles || []).find(t => 
+            t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
+          );
+          const tId = matching.teacher_id || matching.teacherId || tProfile?.id || tProfile?.user_id;
+          const sName = matching.name || matching.full_name || matching.student_name || "Student";
+          setSelectedTahfeezChat({
+            ...matching,
+            isGroup: false,
+            student_id: matching.student_id || matching.id,
+            student_name: sName,
+            studentName: sName,
+            name: tName,
+            full_name: tName,
+            teacher_id: tId,
+            teacherId: tId,
+            teacher_name: tName,
+            teacherName: tName,
+            photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
+            subtext: `For ${sName}`,
+          });
+          return;
+        }
+      }
+      if (allProfiles.length === 1) {
+        const first = allProfiles[0];
+        const tName = first.teacherName || first.teacher_name || "Muhaffiz";
+        const tProfile = (teacherProfiles || []).find(t => 
+          t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
+        );
+        const tId = first.teacher_id || first.teacherId || tProfile?.id || tProfile?.user_id;
+        const sName = first.name || first.full_name || first.student_name || "Student";
+        setSelectedTahfeezChat({
+          ...first,
+          isGroup: false,
+          student_id: first.student_id || first.id,
+          student_name: sName,
+          studentName: sName,
+          name: tName,
+          full_name: tName,
+          teacher_id: tId,
+          teacherId: tId,
+          teacher_name: tName,
+          teacherName: tName,
+          photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
+          subtext: `For ${sName}`,
+        });
+      }
+    }
+  }, [activePage, selectedStudentId, allProfiles, teacherProfiles]);
 
   const isKibarStudent = portalRole === "kibar-student" ||
     getSectionScope() === "kibar" ||
