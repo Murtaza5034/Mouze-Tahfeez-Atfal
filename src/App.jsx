@@ -103,6 +103,10 @@ import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
 import FirstTimeStudentRegistryModal from "./components/FirstTimeStudentRegistryModal";
 import ParentViewsModal from "./components/ParentViewsModal";
 import TahfeezAudioRecordingsModal from "./components/TahfeezAudioRecordingsModal";
+import AppUpdatePopup from "./AppUpdatePopup";
+import PrivacyPolicy from "./PrivacyPolicy";
+import PremiumTodaySchedule from "./PremiumTodaySchedule";
+import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
 import "./style.css";
@@ -110,6 +114,7 @@ import "./salary.css";
 import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
+import "./premium-today-schedule.css";
 
 const LottieTrophy = ({ size = 120 }) => {
   return (
@@ -877,11 +882,6 @@ const LazyJadwalTrackingView = React.lazy(() => import("./JadwalTrackingView"));
 const LazyTakhteetProgress = React.lazy(() => import("./TakhteetProgress"));
 const LazySupportBot = React.lazy(() => import("./SupportBot"));
 const LazyAppUpdateManager = React.lazy(() => import("./AppUpdateManager"));
-import AppUpdatePopup from "./AppUpdatePopup";
-import PrivacyPolicy from "./PrivacyPolicy";
-import PremiumTodaySchedule from "./PremiumTodaySchedule";
-import SearchableSelect from "./SearchableSelect";
-import "./premium-today-schedule.css";
 
 const fixArabicScript = (text) => {
   if (!text) return "";

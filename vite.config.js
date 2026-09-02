@@ -109,7 +109,7 @@ export function getRefreshReg() {
   ],
   base: '/',
   build: {
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: false,
     minify: 'esbuild',
     cssCodeSplit: true,
@@ -136,21 +136,6 @@ export function getRefreshReg() {
               return 'vendor-ai';
             }
             return 'vendor';
-          }
-          if (id.includes('src/Jadwal') || id.includes('src/SelfJadwal') || id.includes('src/JadwalTrackingView')) {
-            return 'pages-jadwal';
-          }
-          if (id.includes('src/MarhalaPosts')) {
-            return 'pages-marhala';
-          }
-          if (id.includes('src/TakhteetProgress')) {
-            return 'pages-takhteet';
-          }
-          if (id.includes('src/SupportBot')) {
-            return 'pages-support';
-          }
-          if (id.includes('src/AppUpdateManager') || id.includes('src/AppUpdatePopup')) {
-            return 'pages-update';
           }
         },
         chunkFileNames: 'assets/[name]-[hash].js',
