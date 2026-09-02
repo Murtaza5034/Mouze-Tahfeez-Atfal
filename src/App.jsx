@@ -7089,6 +7089,42 @@ function ChildLeaveApply({
 const resolveRedirectPage = (page, role) => {
   if (!page) return "Home";
   
+  // 1. Clean string and extract parameter if passed as full URL or query string (e.g. /?redirectPage=Online%20Tahfeez)
+  let target = String(page).trim();
+  if (target.includes("redirectPage=")) {
+    try {
+      target = decodeURIComponent(target.split("redirectPage=")[1].split("&")[0]);
+    } catch (_) {}
+  }
+  target = target.replace(/^\/+/, '').replace(/\/+$/, '').trim();
+  if (!target || target === "/" || target.toLowerCase() === "home") return "Home";
+
+  const lower = target.toLowerCase();
+  if (lower.includes("online-tahfeez") || lower.includes("online tahfeez") || lower.includes("live tahfeez") || lower.includes("tahfeez")) {
+    return role === "admin" || role === "kibar-admin" ? "Online Tahfeez Tracking" : "Online Tahfeez";
+  }
+  if (lower.includes("jadwal-tracking") || lower.includes("jadwal tracking")) {
+    return role === "admin" || role === "kibar-admin" ? "Jadwal Tracking" : "Jadwal";
+  }
+  if (lower.includes("self-jadwal") || lower.includes("self jadwal")) {
+    return "Self Jadwal";
+  }
+  if (lower.includes("jadwal")) {
+    return "Jadwal";
+  }
+  if (lower.includes("inbox") || lower.includes("notification") || lower.includes("announcement")) {
+    return role === "admin" || role === "kibar-admin" ? "Notifications" : "Inbox";
+  }
+  if (lower.includes("leave")) {
+    return role === "admin" || role === "kibar-admin" ? "Leave Management" : "Apply Leave";
+  }
+  if (lower.includes("my group") || lower.includes("my-group") || lower.includes("students")) {
+    return role === "teacher" || role === "kibar-teacher" ? "My Group" : "Home";
+  }
+  if (lower.includes("fill result") || lower.includes("result") || lower.includes("report")) {
+    return role === "teacher" || role === "kibar-teacher" ? "Fill Result" : "Home";
+  }
+
   if (role === "parents" || role === "kibar-student") {
     const parentMap = {
       "Notifications": "Inbox",
@@ -7109,7 +7145,7 @@ const resolveRedirectPage = (page, role) => {
       "Online Tahfeez": "Online Tahfeez",
       "Home": "Home"
     };
-    return parentMap[page] || page;
+    return parentMap[target] || "Home";
   }
   
   if (role === "teacher" || role === "kibar-teacher") {
@@ -7133,15 +7169,15 @@ const resolveRedirectPage = (page, role) => {
       "Online Tahfeez": "Online Tahfeez",
       "Help Videos": "Help Videos",
     };
-    return teacherMap[page] || page;
+    return teacherMap[target] || "Home";
   }
   
   if (role === "admin" || role === "kibar-admin") {
-    if (page === "Inbox") return "Notifications";
-    return page;
+    if (target === "Inbox") return "Notifications";
+    return target;
   }
 
-  return page;
+  return target || "Home";
 };
 
 function ParentPortal({
@@ -8488,33 +8524,47 @@ function ParentPortal({
                                           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
                                           Open
                                         </button>
-                                        {notif.redirect_page && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              let targetPage = notif.redirect_page;
-                                              if (targetPage.startsWith("Jadwal")) {
-                                                const parts = targetPage.split(":");
-                                                if (parts[1]) {
-                                                  onSelectChild(parts[1]);
+                                        {(() => {
+                                          const rawRedirect = notif.redirect_page || notif.redirectPage || notif.data?.redirectPage || notif.url || ((notif.title && notif.title.toLowerCase().includes("tahfeez")) || (notif.body && notif.body.toLowerCase().includes("joined")) ? "Online Tahfeez" : "");
+                                          if (!rawRedirect) return null;
+                                          return (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                let targetPage = rawRedirect;
+                                                if (targetPage.includes("redirectPage=")) {
+                                                  try {
+                                                    targetPage = decodeURIComponent(targetPage.split("redirectPage=")[1].split("&")[0]);
+                                                  } catch (_) {}
                                                 }
-                                                targetPage = "Jadwal";
-                                              }
-                                              setActivePage(resolveRedirectPage(targetPage, "parents"));
-                                            }}
-                                            style={{
-                                              background: 'rgba(0,0,0,0.04)', border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)',
-                                              borderRadius: '8px', padding: '5px 10px',
-                                              fontWeight: 700, fontSize: '0.72rem',
-                                              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'background 0.15s'
-                                            }}
-                                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,175,55,0.12)'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                                            title="Go to page"
-                                          >
-                                            <ChevronRight size={11} /> GO TO PAGE
-                                          </button>
-                                        )}
+                                                targetPage = targetPage.replace(/^\/+/, '').trim();
+                                                if (targetPage.startsWith("Jadwal")) {
+                                                  const parts = targetPage.split(":");
+                                                  if (parts[1]) {
+                                                    onSelectChild && onSelectChild(parts[1]);
+                                                  }
+                                                  targetPage = "Jadwal";
+                                                }
+                                                if (notif.student_id || notif.studentId || notif.data?.student_id) {
+                                                  onSelectChild && onSelectChild(notif.student_id || notif.studentId || notif.data?.student_id);
+                                                }
+                                                const resolved = resolveRedirectPage(targetPage, "parents");
+                                                setActivePage(resolved);
+                                              }}
+                                              style={{
+                                                background: 'rgba(0,0,0,0.04)', border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)',
+                                                borderRadius: '8px', padding: '5px 10px',
+                                                fontWeight: 700, fontSize: '0.72rem',
+                                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'background 0.15s'
+                                              }}
+                                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,175,55,0.12)'}
+                                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                                              title="Go to page"
+                                            >
+                                              <ChevronRight size={11} /> GO TO PAGE
+                                            </button>
+                                          );
+                                        })()}
                                         <span style={{ marginLeft: 'auto', background: typeBg, color: typeColor, border: `1px solid ${typeBorder}`, borderRadius: '5px', padding: '1px 7px', fontSize: '0.63rem', fontWeight: 700, textTransform: 'capitalize' }}>
                                           {notif.type || 'alert'}
                                         </span>
@@ -9470,26 +9520,39 @@ function ParentPortal({
                         <button className="notif-view-btn" onClick={(e) => openNotificationDetail(e, n)}>
                           VIEW <ChevronRight size={14} />
                         </button>
-                        {n.redirect_page && (
-                          <button 
-                            className="notif-view-btn gold" 
-                            style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              let targetPage = n.redirect_page;
-                              if (targetPage.startsWith("Jadwal")) {
-                                const parts = targetPage.split(":");
-                                if (parts[1]) {
-                                  onSelectChild(parts[1]);
+                        {(() => {
+                          const rawRedirect = n.redirect_page || n.redirectPage || n.data?.redirectPage || n.url || ((n.title && n.title.toLowerCase().includes("tahfeez")) || (n.body && n.body.toLowerCase().includes("joined")) ? "Online Tahfeez" : "");
+                          if (!rawRedirect) return null;
+                          return (
+                            <button 
+                              className="notif-view-btn gold" 
+                              style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                let targetPage = rawRedirect;
+                                if (targetPage.includes("redirectPage=")) {
+                                  try {
+                                    targetPage = decodeURIComponent(targetPage.split("redirectPage=")[1].split("&")[0]);
+                                  } catch (_) {}
                                 }
-                                targetPage = "Jadwal";
-                              }
-                              setActivePage(resolveRedirectPage(targetPage, "parents"));
-                            }}
-                          >
-                            GO TO PAGE <ChevronRight size={14} />
-                          </button>
-                        )}
+                                targetPage = targetPage.replace(/^\/+/, '').trim();
+                                if (targetPage.startsWith("Jadwal")) {
+                                  const parts = targetPage.split(":");
+                                  if (parts[1]) {
+                                    onSelectChild && onSelectChild(parts[1]);
+                                  }
+                                  targetPage = "Jadwal";
+                                }
+                                if (n.student_id || n.studentId || n.data?.student_id) {
+                                  onSelectChild && onSelectChild(n.student_id || n.studentId || n.data?.student_id);
+                                }
+                                setActivePage(resolveRedirectPage(targetPage, "parents"));
+                              }}
+                            >
+                              GO TO PAGE <ChevronRight size={14} />
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -9563,25 +9626,38 @@ function ParentPortal({
                 )}
               </div>
               <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                {selectedNotification.redirect_page && (
-                  <button 
-                    className="premium-btn gold" 
-                    onClick={() => {
-                      let targetPage = selectedNotification.redirect_page;
-                      if (targetPage.startsWith("Jadwal")) {
-                        const parts = targetPage.split(":");
-                        if (parts[1]) {
-                          onSelectChild(parts[1]);
+                {(() => {
+                  const rawRedirect = selectedNotification.redirect_page || selectedNotification.redirectPage || selectedNotification.data?.redirectPage || selectedNotification.url || ((selectedNotification.title && selectedNotification.title.toLowerCase().includes("tahfeez")) || (selectedNotification.body && selectedNotification.body.toLowerCase().includes("joined")) ? "Online Tahfeez" : "");
+                  if (!rawRedirect) return null;
+                  return (
+                    <button 
+                      className="premium-btn gold" 
+                      onClick={() => {
+                        let targetPage = rawRedirect;
+                        if (targetPage.includes("redirectPage=")) {
+                          try {
+                            targetPage = decodeURIComponent(targetPage.split("redirectPage=")[1].split("&")[0]);
+                          } catch (_) {}
                         }
-                        targetPage = "Jadwal";
-                      }
-                      setActivePage(resolveRedirectPage(targetPage, "parents"));
-                      closeNotificationDetail();
-                    }}
-                  >
-                    Go to Page
-                  </button>
-                )}
+                        targetPage = targetPage.replace(/^\/+/, '').trim();
+                        if (targetPage.startsWith("Jadwal")) {
+                          const parts = targetPage.split(":");
+                          if (parts[1]) {
+                            onSelectChild && onSelectChild(parts[1]);
+                          }
+                          targetPage = "Jadwal";
+                        }
+                        if (selectedNotification.student_id || selectedNotification.studentId || selectedNotification.data?.student_id) {
+                          onSelectChild && onSelectChild(selectedNotification.student_id || selectedNotification.studentId || selectedNotification.data?.student_id);
+                        }
+                        setActivePage(resolveRedirectPage(targetPage, "parents"));
+                        closeNotificationDetail();
+                      }}
+                    >
+                      Go to Page
+                    </button>
+                  );
+                })()}
                 <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={closeNotificationDetail}>Understood</button>
               </div>
             </div>
@@ -21384,33 +21460,47 @@ function TeacherPortal({
                                          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
                                          Open
                                        </button>
-                                       {notif.redirect_page && (
-                                         <button
-                                           onClick={(e) => {
-                                             e.stopPropagation();
-                                             let targetPage = notif.redirect_page;
-                                             if (targetPage.startsWith("Jadwal")) {
-                                               const parts = notif.redirect_page.split(":");
-                                               if (parts[1]) {
-                                                 setActiveStudentId(parts[1]);
+                                       {(() => {
+                                         const rawRedirect = notif.redirect_page || notif.redirectPage || notif.data?.redirectPage || notif.url || ((notif.title && notif.title.toLowerCase().includes("tahfeez")) || (notif.body && notif.body.toLowerCase().includes("joined")) ? "Online Tahfeez" : "");
+                                         if (!rawRedirect) return null;
+                                         return (
+                                           <button
+                                             onClick={(e) => {
+                                               e.stopPropagation();
+                                               let targetPage = rawRedirect;
+                                               if (targetPage.includes("redirectPage=")) {
+                                                 try {
+                                                   targetPage = decodeURIComponent(targetPage.split("redirectPage=")[1].split("&")[0]);
+                                                 } catch (_) {}
                                                }
-                                               targetPage = "Jadwal";
-                                             }
-                                             setActivePage(resolveRedirectPage(targetPage, "teacher"));
-                                           }}
-                                           style={{
-                                             background: 'rgba(0,0,0,0.04)', border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)',
-                                             borderRadius: '8px', padding: '5px 10px',
-                                             fontWeight: 700, fontSize: '0.72rem',
-                                             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'background 0.15s'
-                                           }}
-                                           onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,175,55,0.12)'}
-                                           onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                                           title="Go to page"
-                                         >
-                                           <ChevronRight size={11} /> GO TO PAGE
-                                         </button>
-                                       )}
+                                               targetPage = targetPage.replace(/^\/+/, '').trim();
+                                               if (targetPage.startsWith("Jadwal")) {
+                                                 const parts = targetPage.split(":");
+                                                 if (parts[1]) {
+                                                   setActiveStudentId(parts[1]);
+                                                 }
+                                                 targetPage = "Jadwal";
+                                               }
+                                               if (notif.student_id || notif.studentId || notif.data?.student_id) {
+                                                 setActiveStudentId(notif.student_id || notif.studentId || notif.data?.student_id);
+                                               }
+                                               const resolved = resolveRedirectPage(targetPage, "teacher");
+                                               setActivePage(resolved);
+                                             }}
+                                             style={{
+                                               background: 'rgba(0,0,0,0.04)', border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)',
+                                               borderRadius: '8px', padding: '5px 10px',
+                                               fontWeight: 700, fontSize: '0.72rem',
+                                               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'background 0.15s'
+                                             }}
+                                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,175,55,0.12)'}
+                                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                                             title="Go to page"
+                                           >
+                                             <ChevronRight size={11} /> GO TO PAGE
+                                           </button>
+                                         );
+                                       })()}
                                        <span style={{ marginLeft: 'auto', background: typeBg, color: typeColor, border: `1px solid ${typeBorder}`, borderRadius: '5px', padding: '1px 7px', fontSize: '0.63rem', fontWeight: 700, textTransform: 'capitalize' }}>
                                          {notif.type || 'alert'}
                                        </span>
@@ -23670,26 +23760,39 @@ function TeacherPortal({
                           <button className="notif-view-btn" onClick={(e) => openNotificationDetail(e, n)}>
                             VIEW <ChevronRight size={14} />
                           </button>
-                          {n.redirect_page && (
-                            <button 
-                              className="notif-view-btn gold" 
-                              style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                let targetPage = n.redirect_page;
-                                if (targetPage.startsWith("Jadwal")) {
-                                  const parts = n.redirect_page.split(":");
-                                  if (parts[1]) {
-                                    setActiveStudentId(parts[1]);
+                          {(() => {
+                            const rawRedirect = n.redirect_page || n.redirectPage || n.data?.redirectPage || n.url || ((n.title && n.title.toLowerCase().includes("tahfeez")) || (n.body && n.body.toLowerCase().includes("joined")) ? "Online Tahfeez" : "");
+                            if (!rawRedirect) return null;
+                            return (
+                              <button 
+                                className="notif-view-btn gold" 
+                                style={{ border: '1px solid var(--primary-gold)', color: 'var(--primary-gold)' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  let targetPage = rawRedirect;
+                                  if (targetPage.includes("redirectPage=")) {
+                                    try {
+                                      targetPage = decodeURIComponent(targetPage.split("redirectPage=")[1].split("&")[0]);
+                                    } catch (_) {}
                                   }
-                                  targetPage = "Jadwal";
-                                }
-                                setActivePage(resolveRedirectPage(targetPage, "teacher"));
-                              }}
-                            >
-                              GO TO PAGE <ChevronRight size={14} />
-                            </button>
-                          )}
+                                  targetPage = targetPage.replace(/^\/+/, '').trim();
+                                  if (targetPage.startsWith("Jadwal")) {
+                                    const parts = targetPage.split(":");
+                                    if (parts[1]) {
+                                      setActiveStudentId(parts[1]);
+                                    }
+                                    targetPage = "Jadwal";
+                                  }
+                                  if (n.student_id || n.studentId || n.data?.student_id) {
+                                    setActiveStudentId(n.student_id || n.studentId || n.data?.student_id);
+                                  }
+                                  setActivePage(resolveRedirectPage(targetPage, "teacher"));
+                                }}
+                              >
+                                GO TO PAGE <ChevronRight size={14} />
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -23763,25 +23866,38 @@ function TeacherPortal({
                   )}
                 </div>
                 <div className="notif-overlay-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  {selectedNotification.redirect_page && (
-                    <button 
-                      className="premium-btn gold" 
-                      onClick={() => {
-                        let targetPage = selectedNotification.redirect_page;
-                        if (targetPage.startsWith("Jadwal")) {
-                          const parts = targetPage.split(":");
-                          if (parts[1]) {
-                            setActiveStudentId(parts[1]);
+                  {(() => {
+                    const rawRedirect = selectedNotification.redirect_page || selectedNotification.redirectPage || selectedNotification.data?.redirectPage || selectedNotification.url || ((selectedNotification.title && selectedNotification.title.toLowerCase().includes("tahfeez")) || (selectedNotification.body && selectedNotification.body.toLowerCase().includes("joined")) ? "Online Tahfeez" : "");
+                    if (!rawRedirect) return null;
+                    return (
+                      <button 
+                        className="premium-btn gold" 
+                        onClick={() => {
+                          let targetPage = rawRedirect;
+                          if (targetPage.includes("redirectPage=")) {
+                            try {
+                              targetPage = decodeURIComponent(targetPage.split("redirectPage=")[1].split("&")[0]);
+                            } catch (_) {}
                           }
-                          targetPage = "Jadwal";
-                        }
-                        setActivePage(resolveRedirectPage(targetPage, "teacher"));
-                        closeNotificationDetail();
-                      }}
-                    >
-                      Go to Page
-                    </button>
-                  )}
+                          targetPage = targetPage.replace(/^\/+/, '').trim();
+                          if (targetPage.startsWith("Jadwal")) {
+                            const parts = targetPage.split(":");
+                            if (parts[1]) {
+                              setActiveStudentId(parts[1]);
+                            }
+                            targetPage = "Jadwal";
+                          }
+                          if (selectedNotification.student_id || selectedNotification.studentId || selectedNotification.data?.student_id) {
+                            setActiveStudentId(selectedNotification.student_id || selectedNotification.studentId || selectedNotification.data?.student_id);
+                          }
+                          setActivePage(resolveRedirectPage(targetPage, "teacher"));
+                          closeNotificationDetail();
+                        }}
+                      >
+                        Go to Page
+                      </button>
+                    );
+                  })()}
                   <button className="premium-btn secondary" style={{ background: '#f5f5f5', border: '1px solid #ccc', color: '#333' }} onClick={closeNotificationDetail}>Close</button>
                 </div>
               </div>

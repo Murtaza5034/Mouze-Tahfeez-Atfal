@@ -423,6 +423,12 @@ export default function VideoCall({ call, onClose }) {
   const audioGraphReadyRef = useRef(false);
   const localAnalyserReadyRef = useRef(false);
   const initialNegotiationDoneRef = useRef(false);
+  // Tracks whether the remote peer has ever joined this session.
+  // Used to prevent the "reconnecting" status from firing on the initial
+  // Firestore snapshot (which still has callee_in_room/caller_in_room = false).
+  const peerJoinedRef = useRef(false);
+  // Timer ref for delayed ICE restart on transient disconnects.
+  const iceRestartTimerRef = useRef(null);
 
   // Ultra-Lightweight Class Audio Recording (Opus 16kbps)
   const recorderRef = useRef(null);
@@ -702,7 +708,12 @@ export default function VideoCall({ call, onClose }) {
       if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
         remoteVideoRef.current.srcObject = remoteStreamRef.current;
       }
-      remoteVideoRef.current.play().catch(() => {});
+      remoteVideoRef.current.onplaying = () => setHasRemoteVideo(true);
+      remoteVideoRef.current.play().then(() => setHasRemoteVideo(true)).catch(() => {});
+    }
+    // Ensure audio continues playing after view changes (PiP, minimize, Quran)
+    if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
+      remoteAudioRef.current.play().catch(() => {});
     }
   }, [isTeacherMinimized, quranOpen, hasRemoteVideo]);
 
@@ -934,22 +945,18 @@ export default function VideoCall({ call, onClose }) {
     }
   }, [ensureAudioContext]);
 
-  // FIX: previously this ran once per ontrack event (i.e. once for the video
-  // track AND once for the audio track), building two overlapping
-  // MediaStreamSource -> GainNode -> destination chains for the same audio
-  // track, on top of the <audio> element also playing that same track
-  // natively. That triple playback is what was causing garbled/absent sound
-  // in some browsers. Now this runs exactly once per call (guarded), and
-  // becomes the ONLY playback path — the raw <audio> element gets muted so
-  // there's no double-routing, and the boost/headphone gain actually applies
-  // to what you hear.
+  // This runs exactly once per call (guarded by audioGraphReadyRef).
+  // The <audio> element (muted={isSpectator}) is the playback path for all non-spectators.
+  // The Web Audio API is used only for the AnalyserNode (speaking indicator) —
+  // it does NOT route to audioContext.destination, so there is no double-playback.
   const connectRemoteAudio = useCallback((remoteStream) => {
     if (audioGraphReadyRef.current) return;
     audioGraphReadyRef.current = true;
 
     // Use native <audio> element for reliable playback.
+    // Note: do NOT set .muted here — the JSX prop (muted={isSpectator}) controls it;
+    // imperative .muted assignment gets overridden by React on the next re-render.
     if (remoteAudioRef.current) {
-      remoteAudioRef.current.muted = isSpectator;
       remoteAudioRef.current.volume = 1.0;
       remoteAudioRef.current.play().then(() => {
         setAudioBlocked(false);
@@ -1110,6 +1117,11 @@ export default function VideoCall({ call, onClose }) {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
+    }
+
+    if (iceRestartTimerRef.current) {
+      clearTimeout(iceRestartTimerRef.current);
+      iceRestartTimerRef.current = null;
     }
 
     try {
@@ -1595,8 +1607,10 @@ export default function VideoCall({ call, onClose }) {
             remoteAudioRef.current.srcObject = new MediaStream([track]);
           }
 
-          // Single, guarded call — builds the Web Audio graph exactly once
-          // and mutes the raw <audio> element so audio isn't routed twice.
+          // Single, guarded call — builds the Web Audio analyser graph exactly once.
+          // The <audio> element (muted={isSpectator}) is the ONLY playback path.
+          // connectRemoteAudio only creates an AnalyserNode for the speaking indicator,
+          // it does NOT route to audioContext.destination, so there's no double-playback.
           connectRemoteAudio(new MediaStream([track]));
           startCallAudioRecording();
         }
@@ -1608,13 +1622,37 @@ export default function VideoCall({ call, onClose }) {
         const cs = pcRef.current.connectionState;
         const ics = pcRef.current.iceConnectionState;
         console.log(`[WebRTC] Connection: ${cs}, ICE: ${ics}`);
+
         if (cs === "connected" || ics === "connected" || ics === "completed") {
+          // Clear any pending ICE restart timer — we're back!
+          if (iceRestartTimerRef.current) {
+            clearTimeout(iceRestartTimerRef.current);
+            iceRestartTimerRef.current = null;
+          }
           setStatus("connected");
           setError("");
           startCallAudioRecording();
         } else if (cs === "disconnected" || ics === "disconnected") {
-          setStatus("reconnecting");
+          // "disconnected" is transient on mobile — give it 3 s to recover
+          // before marking as reconnecting and attempting ICE restart.
+          if (!iceRestartTimerRef.current) {
+            iceRestartTimerRef.current = setTimeout(() => {
+              iceRestartTimerRef.current = null;
+              if (!pcRef.current) return;
+              const curCs = pcRef.current.connectionState;
+              const curIcs = pcRef.current.iceConnectionState;
+              if (curCs === "disconnected" || curIcs === "disconnected" ||
+                  curCs === "failed" || curIcs === "failed") {
+                try { pcRef.current.restartIce(); } catch (_) {}
+                setStatus("reconnecting");
+              }
+            }, 3000);
+          }
         } else if (cs === "failed" || ics === "failed") {
+          if (iceRestartTimerRef.current) {
+            clearTimeout(iceRestartTimerRef.current);
+            iceRestartTimerRef.current = null;
+          }
           try {
             if (pcRef.current && pcRef.current.restartIce) {
               pcRef.current.restartIce();
@@ -1737,13 +1775,9 @@ export default function VideoCall({ call, onClose }) {
 
       let lastProcessedOfferSdp = "";
       let lastProcessedAnswerSdp = "";
+      let pendingOfferData = null; // offer that arrived while signalingState != stable
 
-      const handleIncomingOffer = async (offerData) => {
-        if (!offerData || !offerData.sdp) return;
-        if (offerData.from === role) return; // this is our own offer echoed back
-        if (pc.signalingState !== "stable") return;
-        if (offerData.sdp === lastProcessedOfferSdp) return; // Ignore duplicate offers from snapshots
-
+      const processOffer = async (offerData) => {
         try {
           console.log(`[WebRTC] ${role} applying offer`);
           lastProcessedOfferSdp = offerData.sdp;
@@ -1766,12 +1800,40 @@ export default function VideoCall({ call, onClose }) {
           }, { merge: true });
 
           initialNegotiationDoneRef.current = true;
+          peerJoinedRef.current = true;
           setStatus("connected");
         } catch (err) {
           console.error(`[WebRTC] ${role} failed to answer offer:`, err);
           setError("Failed to join video call: " + (err?.message || err));
           setStatus("error");
         }
+      };
+
+      const handleIncomingOffer = async (offerData) => {
+        if (!offerData || !offerData.sdp) return;
+        if (offerData.from === role) return; // this is our own offer echoed back
+        if (offerData.sdp === lastProcessedOfferSdp) return; // Ignore duplicate offers from snapshots
+
+        if (pc.signalingState !== "stable") {
+          // Queue the offer; process it once we return to stable state
+          pendingOfferData = offerData;
+          const pollStable = () => {
+            if (endedRef.current || !pcRef.current) return;
+            if (pcRef.current.signalingState === "stable") {
+              const queued = pendingOfferData;
+              pendingOfferData = null;
+              if (queued && queued.sdp !== lastProcessedOfferSdp) {
+                processOffer(queued);
+              }
+            } else {
+              setTimeout(pollStable, 200);
+            }
+          };
+          setTimeout(pollStable, 200);
+          return;
+        }
+
+        await processOffer(offerData);
       };
 
       const handleIncomingAnswer = async (answerData) => {
@@ -1785,6 +1847,7 @@ export default function VideoCall({ call, onClose }) {
           await pc.setRemoteDescription(new RTCSessionDescription(answerData));
           await flushRemoteCandidates();
           initialNegotiationDoneRef.current = true;
+          peerJoinedRef.current = true;
           setStatus("connected");
         } catch (err) {
           console.error(`[WebRTC] ${role} setRemoteDescription failed:`, err);
@@ -1840,7 +1903,10 @@ export default function VideoCall({ call, onClose }) {
             if (data.offer) await handleIncomingOffer(data.offer);   // handles renegotiation rounds initiated by the callee
             if (data.answer) await handleIncomingAnswer(data.answer);
 
-            if (data.callee_in_room === false && statusRef.current === "connected") {
+            // Only set reconnecting if peer had previously joined (peerJoinedRef ensures
+            // we don't trigger reconnecting from the initial callee_in_room:false state).
+            if (data.callee_in_room === true) peerJoinedRef.current = true;
+            if (data.callee_in_room === false && peerJoinedRef.current && statusRef.current === "connected") {
               setStatus("reconnecting");
             }
           }, (err) => {
@@ -1882,7 +1948,9 @@ export default function VideoCall({ call, onClose }) {
           if (data.offer) await handleIncomingOffer(data.offer);
           if (data.answer) await handleIncomingAnswer(data.answer); // handles renegotiation rounds initiated by the caller
 
-          if (data.caller_in_room === false && statusRef.current === "connected") {
+          // Only set reconnecting if peer had previously joined.
+          if (data.caller_in_room === true) peerJoinedRef.current = true;
+          if (data.caller_in_room === false && peerJoinedRef.current && statusRef.current === "connected") {
             setStatus("reconnecting");
           }
         }, (err) => {
@@ -2036,7 +2104,7 @@ export default function VideoCall({ call, onClose }) {
         aria-label="Active Call Floating Widget"
         title="Tap to expand classroom screen · Drag anywhere · Drag corners or pinch to resize"
       >
-        <audio ref={remoteAudioRef} autoPlay playsInline muted={true} />
+        <audio ref={remoteAudioRef} autoPlay playsInline muted={isSpectator} />
 
         {/* Hidden Fallback Video for Native PiP */}
         <video
@@ -2186,7 +2254,7 @@ export default function VideoCall({ call, onClose }) {
           ref={remoteAudioRef}
           autoPlay
           playsInline
-          muted={true}
+          muted={isSpectator}
         />
 
         {/* Hidden Fallback Video for Native PiP */}
