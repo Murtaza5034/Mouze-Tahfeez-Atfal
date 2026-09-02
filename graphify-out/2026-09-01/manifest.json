@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1788286028.889957,
-    "seen": 1788286399.291711,
-    "ast_hash": "6745d21c29315ad2cba75e88e8532a6b",
+    "mtime": 1788108778.543418,
+    "seen": 1788252228.782467,
+    "ast_hash": "844b7aebd8916897b0d14e1434786c88",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1788286192.784091,
-    "seen": 1788286399.2917142,
+    "mtime": 1788108905.862175,
+    "seen": 1788252228.7824693,
     "ast_hash": "7158d716c36a84c268c69ae529cfa853",
     "semantic_hash": "7158d716c36a84c268c69ae529cfa853"
   },
@@ -5520,10 +5520,10 @@
     "semantic_hash": "fbaf7cc870c663eb52dcf218531c439d"
   },
   "android/app/src/main/java/com/mauzetahfeez/myapp/MainActivity.java": {
-    "mtime": 1788327396.1418295,
-    "seen": 1788327530.1272528,
-    "ast_hash": "46e9052429ae762369c0e367dabe1ac1",
-    "semantic_hash": ""
+    "mtime": 1786588348.4623518,
+    "seen": 1787510537.2113726,
+    "ast_hash": "ec882cbe547a431a1f0b16239a6ac728",
+    "semantic_hash": "ec882cbe547a431a1f0b16239a6ac728"
   },
   "android/app/src/main/java/com/mauzetahfeez/myapp/MyApplication.java": {
     "mtime": 1786278390.7489843,
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1788286192.7822025,
-    "seen": 1788286399.2921305,
+    "mtime": 1788108905.862175,
+    "seen": 1788252228.7831354,
     "ast_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4",
     "semantic_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4"
   },
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1788286021.5106435,
-    "seen": 1788286399.2982717,
-    "ast_hash": "be62d61dcd756e96c16ee50b94b92909",
+    "mtime": 1788108785.9458878,
+    "seen": 1788252228.7896805,
+    "ast_hash": "3bf64d0d7a3adc1b1d6e444b8ad29aac",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788329639.5650413,
-    "seen": 1788329720.724889,
-    "ast_hash": "933b5f845a16f6d2f482d8eb373f623a",
+    "mtime": 1788253511.2778685,
+    "seen": 1788253578.6059759,
+    "ast_hash": "f9a01c888ca396b393c6e5e21df97456",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6480,9 +6480,9 @@
     "semantic_hash": "74fd7d2d9c40c67c3de485cffe325e75"
   },
   "src/components/VideoCall.jsx": {
-    "mtime": 1788331017.7489867,
-    "seen": 1788331079.1706207,
-    "ast_hash": "01ad682fcd2643e9e33eb6b79a13658a",
+    "mtime": 1788253300.7831926,
+    "seen": 1788253578.607422,
+    "ast_hash": "9326684e3f2b9923b8977607b225b615",
     "semantic_hash": ""
   },
   "src/downloadUtils.js": {
@@ -6528,9 +6528,9 @@
     "semantic_hash": "ae40b216f49b4caf65da9db6516f23cd"
   },
   "src/firebase/db.js": {
-    "mtime": 1788329650.7647002,
-    "seen": 1788329720.726632,
-    "ast_hash": "fa732abe53bc5dbfb63142b43ab19b47",
+    "mtime": 1787655585.9271457,
+    "seen": 1787664163.12398,
+    "ast_hash": "35afb320eb0a7f59db0aa2e9946c4172",
     "semantic_hash": ""
   },
   "src/firebase/realtime.js": {
@@ -6552,10 +6552,10 @@
     "semantic_hash": "6732ffd7ad5daebcfdf96577d9549906"
   },
   "src/hooks/useMobileBackNavigation.jsx": {
-    "mtime": 1788327626.8836753,
-    "seen": 1788327692.408438,
-    "ast_hash": "437815fff12b31b0e4e107ab537f92ea",
-    "semantic_hash": ""
+    "mtime": 1787510186.7128007,
+    "seen": 1787510537.2115242,
+    "ast_hash": "2c31aef52e8bd5e0d803a272c236b5d7",
+    "semantic_hash": "2c31aef52e8bd5e0d803a272c236b5d7"
   },
   "src/index.jsx": {
     "mtime": 1787985866.2025425,
@@ -10029,12 +10029,6 @@
     "mtime": 1788000391.5482197,
     "seen": 1788252228.7945051,
     "ast_hash": "2d509a2f5664ac1027e90ff2e213d190",
-    "semantic_hash": ""
-  },
-  "src/components/TahfeezAudioRecordingsModal.jsx": {
-    "mtime": 1788329918.705942,
-    "seen": 1788329978.690606,
-    "ast_hash": "4c8b22c3c231225c6de065b6f6b51143",
     "semantic_hash": ""
   }
 }

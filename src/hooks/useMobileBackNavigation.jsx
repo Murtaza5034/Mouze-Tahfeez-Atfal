@@ -122,7 +122,13 @@ export function useMobileBackNavigation({
    * Unified goBack handler
    */
   const goBack = useCallback(() => {
-    if (isAppLocked) return false;
+    const isCallOverlayPresent = typeof document !== "undefined" && !!document.querySelector(".vc-overlay");
+    const isNativeLocked = typeof window !== "undefined" && !!window.MauzeBackLockBridge?.isCallLocked?.();
+
+    if (isAppLocked || isNativeLocked || isCallOverlayPresent) {
+      // Disallow any navigation when app or active class is locked
+      return true; // Return true to signal that back was consumed and prevent fallbacks
+    }
 
     // 1. Check open modals hierarchy first (close topmost modal)
     const activeModals = modalsRef.current || [];
@@ -242,6 +248,9 @@ export function useMobileBackNavigation({
     const SWIPE_MAX_TRAVEL = 130; // Max visual elastic travel
 
     const handleTouchStart = (e) => {
+      const isCallOverlayPresent = typeof document !== "undefined" && !!document.querySelector(".vc-overlay");
+      const isNativeLocked = typeof window !== "undefined" && !!window.MauzeBackLockBridge?.isCallLocked?.();
+      if (isAppLocked || isNativeLocked || isCallOverlayPresent) return;
       if (!e.touches || e.touches.length !== 1) return;
       const touch = e.touches[0];
 
@@ -259,7 +268,9 @@ export function useMobileBackNavigation({
     };
 
     const handleTouchMove = (e) => {
-      if (!isEdgeSwipe || isSwipeCancelled || !e.touches || e.touches.length !== 1) return;
+      const isCallOverlayPresent = typeof document !== "undefined" && !!document.querySelector(".vc-overlay");
+      const isNativeLocked = typeof window !== "undefined" && !!window.MauzeBackLockBridge?.isCallLocked?.();
+      if (isAppLocked || isNativeLocked || isCallOverlayPresent || !isEdgeSwipe || isSwipeCancelled || !e.touches || e.touches.length !== 1) return;
       const touch = e.touches[0];
       const dx = touch.clientX - touchStartX;
       const dy = touch.clientY - touchStartY;

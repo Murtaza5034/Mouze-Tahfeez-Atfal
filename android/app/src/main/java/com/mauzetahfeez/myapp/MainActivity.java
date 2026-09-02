@@ -43,9 +43,11 @@ import java.io.OutputStream;
 public class MainActivity extends BridgeActivity {
 
     private static final int STORAGE_PERMISSION_REQUEST_CODE = 1001;
+    private static final int MEDIA_PERMISSION_REQUEST_CODE = 2002;
 
     private WebView webView;
     private SharedPreferences prefs;
+    private volatile boolean isStudentCallLocked = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,11 +58,17 @@ public class MainActivity extends BridgeActivity {
         // Create FCM notification channel for Android 8.0+
         createNotificationChannel();
 
-        // Expose the notification-tap bridge to the WebView as early as possible
-        // so cold-start taps (app launched from a notification) are never missed.
+        // Prompt for camera and audio permissions for WebRTC calling
+        requestMediaPermissions();
+
+        // Expose bridges to the WebView as early as possible
         try {
             WebView wv = getBridge().getWebView();
-            if (wv != null) wv.addJavascriptInterface(new MauzeNotifBridge(), "MauzeNotifBridge");
+            if (wv != null) {
+                wv.addJavascriptInterface(new MauzeNotifBridge(), "MauzeNotifBridge");
+                wv.addJavascriptInterface(new MauzeMediaPermissionBridge(), "MauzeMediaPermissionBridge");
+                wv.addJavascriptInterface(new MauzeBackLockBridge(), "MauzeBackLockBridge");
+            }
         } catch (Exception ignored) {}
 
         getBridge().getWebView().post(() -> {
@@ -162,6 +170,50 @@ public class MainActivity extends BridgeActivity {
                         STORAGE_PERMISSION_REQUEST_CODE
                 );
             }
+        }
+    }
+
+    public void requestMediaPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            boolean hasCam = ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+            boolean hasMic = ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+            if (!hasCam || !hasMic) {
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{
+                                android.Manifest.permission.CAMERA,
+                                android.Manifest.permission.RECORD_AUDIO,
+                                android.Manifest.permission.MODIFY_AUDIO_SETTINGS
+                        },
+                        MEDIA_PERMISSION_REQUEST_CODE
+                );
+            }
+        }
+    }
+
+    private class MauzeMediaPermissionBridge {
+        @JavascriptInterface
+        public boolean hasMediaPermissions() {
+            boolean hasCam = ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+            boolean hasMic = ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+            return hasCam && hasMic;
+        }
+
+        @JavascriptInterface
+        public void requestMediaPermissions() {
+            runOnUiThread(() -> MainActivity.this.requestMediaPermissions());
+        }
+    }
+
+    private class MauzeBackLockBridge {
+        @JavascriptInterface
+        public void setCallLocked(boolean locked) {
+            isStudentCallLocked = locked;
+        }
+
+        @JavascriptInterface
+        public boolean isCallLocked() {
+            return isStudentCallLocked;
         }
     }
 
@@ -362,21 +414,48 @@ public class MainActivity extends BridgeActivity {
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
 
+        settings.setMediaPlaybackRequiresUserGesture(false);
+
         webView.addJavascriptInterface(
                 new MauzeDownloadInterface(), "MauzeDownloader");
 
         webView.addJavascriptInterface(new MauzeNotifBridge(), "MauzeNotifBridge");
+        webView.addJavascriptInterface(new MauzeMediaPermissionBridge(), "MauzeMediaPermissionBridge");
+        webView.addJavascriptInterface(new MauzeBackLockBridge(), "MauzeBackLockBridge");
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (isStudentCallLocked) {
+                runOnUiThread(() -> {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tahfeez-back-blocked'));", null);
+                    }
+                    Toast.makeText(MainActivity.this, "Online Tahfeez class is in progress. Please stay in class or end call.", Toast.LENGTH_SHORT).show();
+                });
+                return true; // Completely consume event to disallow leaving active class
+            }
             if (webView != null && webView.canGoBack()) {
                 webView.goBack();
                 return true;
             }
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (isStudentCallLocked) {
+            runOnUiThread(() -> {
+                if (webView != null) {
+                    webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tahfeez-back-blocked'));", null);
+                }
+                Toast.makeText(MainActivity.this, "Online Tahfeez class is in progress. Please stay in class or end call.", Toast.LENGTH_SHORT).show();
+            });
+            return;
+        }
+        super.onBackPressed();
     }
 
     private void setupDownloadListener() {

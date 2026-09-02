@@ -5,7 +5,7 @@ import {
   Sparkles, X, ShieldAlert, Wifi 
 } from 'lucide-react';
 import { db } from '../firebase/db';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 
 export default function TahfeezChatUI({
   studentsList = [],
@@ -21,6 +21,8 @@ export default function TahfeezChatUI({
 }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [peerIsTyping, setPeerIsTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
   const [busyModalData, setBusyModalData] = useState(null); // { teacherName, busySession } or null
   const messagesEndRef = useRef(null);
   
@@ -106,12 +108,79 @@ export default function TahfeezChatUI({
     return () => unsubscribe();
   }, [activeRoomId]);
 
+  // Listen to peer typing status in this chat room
+  useEffect(() => {
+    if (!activeRoomId) {
+      setPeerIsTyping(false);
+      return;
+    }
+
+    const typingDocRef = doc(db, "tahfeez_typing", activeRoomId);
+    const unsubscribe = onSnapshot(typingDocRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setPeerIsTyping(false);
+        return;
+      }
+      const data = snapshot.data() || {};
+      const myId = String(currentUserId || role);
+      const now = Date.now();
+      
+      const someoneElseTyping = Object.entries(data).some(([userId, info]) => {
+        if (userId === myId) return false;
+        return info && info.isTyping === true && (now - (info.updatedAt || 0) < 4000);
+      });
+
+      setPeerIsTyping(someoneElseTyping);
+    }, () => {});
+
+    return () => unsubscribe();
+  }, [activeRoomId, currentUserId, role]);
+
+  const handleTypingChange = (e) => {
+    const val = e.target.value;
+    setNewMessage(val);
+
+    if (!activeRoomId) return;
+
+    const myId = String(currentUserId || role);
+    const typingDocRef = doc(db, "tahfeez_typing", activeRoomId);
+
+    setDoc(typingDocRef, {
+      [myId]: {
+        isTyping: val.trim().length > 0,
+        userName: currentUserName || (role === "teacher" ? "Muhaffiz" : "Student"),
+        updatedAt: Date.now()
+      }
+    }, { merge: true }).catch(() => {});
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      setDoc(typingDocRef, {
+        [myId]: {
+          isTyping: false,
+          userName: currentUserName || (role === "teacher" ? "Muhaffiz" : "Student"),
+          updatedAt: Date.now()
+        }
+      }, { merge: true }).catch(() => {});
+    }, 2500);
+  };
+
   const handleSendMessage = async (e) => {
     e?.preventDefault();
     if (!newMessage.trim() || !activeRoomId) return;
     
     const msgText = newMessage.trim();
     setNewMessage("");
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    const myId = String(currentUserId || role);
+    const typingDocRef = doc(db, "tahfeez_typing", activeRoomId);
+    setDoc(typingDocRef, {
+      [myId]: {
+        isTyping: false,
+        updatedAt: Date.now()
+      }
+    }, { merge: true }).catch(() => {});
     
     try {
       await addDoc(collection(db, "tahfeez_messages", activeRoomId, "messages"), {
@@ -224,10 +293,10 @@ export default function TahfeezChatUI({
         }
         .typing-dot {
           display: inline-block;
-          width: 4px;
-          height: 4px;
+          width: 5px;
+          height: 5px;
           border-radius: 50%;
-          background-color: var(--primary-color, #d4af37);
+          background-color: var(--deep-brown, #3d2b1f);
           margin: 0 2px;
           animation: typingBounce 1.4s infinite ease-in-out both;
         }
@@ -517,12 +586,15 @@ export default function TahfeezChatUI({
                         {activeChat.isGroup ? "Group Session" : (activeChat.subtext || `${activeChat.its || 'Live Session'} - Online`)}
                       </span>
                     )}
-                    {/* Simulated typing animation */}
-                    <div style={{ marginLeft: "8px", display: "flex", alignItems: "center", opacity: 0.6 }}>
-                      <div className="typing-dot"></div>
-                      <div className="typing-dot"></div>
-                      <div className="typing-dot"></div>
-                    </div>
+                    {/* Live typing animation - only shown when peer is actively typing */}
+                    {peerIsTyping && (
+                      <div style={{ marginLeft: "8px", display: "flex", alignItems: "center", gap: "2px" }}>
+                        <span style={{ fontSize: "0.75rem", color: "var(--deep-brown, #3d2b1f)", fontWeight: 700, marginRight: "4px" }}>typing</span>
+                        <div className="typing-dot"></div>
+                        <div className="typing-dot"></div>
+                        <div className="typing-dot"></div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -729,6 +801,27 @@ export default function TahfeezChatUI({
                   );
                 })
               )}
+              {peerIsTyping && (
+                <div className="chat-bubble-anim" style={{
+                  alignSelf: "flex-start",
+                  background: "var(--sidebar-bg)",
+                  border: "1px solid var(--border-color)",
+                  padding: "8px 14px",
+                  borderRadius: "16px 16px 16px 0",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
+                  marginBottom: "4px"
+                }}>
+                  <span style={{ fontSize: "0.8rem", color: "var(--text-color)", fontWeight: 600 }}>Typing</span>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
 
@@ -752,7 +845,7 @@ export default function TahfeezChatUI({
                   type="text"
                   placeholder="Type your message here..."
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={handleTypingChange}
                   style={{
                     border: "none",
                     background: "transparent",

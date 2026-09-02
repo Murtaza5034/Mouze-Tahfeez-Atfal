@@ -31,9 +31,12 @@ const CATEGORIES = [
   "Results & Reports",
 ];
 
+// In-memory cache for fast instant rendering without flashing
+let cachedTutorials = null;
+
 export default function AdminHelpManagement({ showAction }) {
-  const [tutorials, setTutorials] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [tutorials, setTutorials] = useState(() => cachedTutorials || []);
+  const [loading, setLoading] = useState(() => !cachedTutorials || cachedTutorials.length === 0);
   const [filterAudience, setFilterAudience] = useState("all"); // "all" | "teachers" | "parents"
   const [filterCategory, setFilterCategory] = useState("All");
 
@@ -61,8 +64,10 @@ export default function AdminHelpManagement({ showAction }) {
   const fileInputRef = useRef(null);
 
   // Fetch tutorials
-  const fetchTutorials = async () => {
-    setLoading(true);
+  const fetchTutorials = async (silent = false) => {
+    if (!silent && (!cachedTutorials || cachedTutorials.length === 0)) {
+      setLoading(true);
+    }
     try {
       const { data, error } = await supabase
         .from("help_tutorials")
@@ -73,7 +78,9 @@ export default function AdminHelpManagement({ showAction }) {
       if (error) {
         console.warn("Error loading tutorials:", error);
       } else {
-        setTutorials(data || []);
+        const rows = data || [];
+        cachedTutorials = rows;
+        setTutorials(rows);
       }
     } catch (err) {
       console.error("Fetch tutorials exception:", err);
@@ -83,7 +90,7 @@ export default function AdminHelpManagement({ showAction }) {
   };
 
   useEffect(() => {
-    fetchTutorials();
+    fetchTutorials(cachedTutorials && cachedTutorials.length > 0);
   }, []);
 
   const openCreateModal = () => {

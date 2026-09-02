@@ -89,6 +89,7 @@ import {
   BarChart2,
   Edit2,
   Book,
+  Headphones,
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -101,6 +102,7 @@ import PortalHelpGuidePage from "./components/PortalHelpGuidePage";
 import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
 import FirstTimeStudentRegistryModal from "./components/FirstTimeStudentRegistryModal";
 import ParentViewsModal from "./components/ParentViewsModal";
+import TahfeezAudioRecordingsModal from "./components/TahfeezAudioRecordingsModal";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
 import "./style.css";
@@ -1575,14 +1577,15 @@ function ELearningModal({ isOpen, onClose }) {
 }
 
 function PremiumHifzCard({ user }) {
-  const [trackCount, setTrackCount] = useState(0);
-  const [trackedDays, setTrackedDays] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialLocalDays = useMemo(() => user ? loadTrackedDays(user.id) : [], [user]);
+  const [trackCount, setTrackCount] = useState(() => initialLocalDays.length);
+  const [trackedDays, setTrackedDays] = useState(() => initialLocalDays);
+  const [loading, setLoading] = useState(false);
 
   const fetchTrackingData = async () => {
     if (!user) return;
     try {
-      setLoading(true);
+      if (trackedDays.length === 0) setLoading(true);
       const { data, error } = await supabase
         .from('elearning_tracking')
         .select('tracked_date')
@@ -5005,10 +5008,9 @@ function useParentLeaveData(studentProfileOrId, isKibarProp = null) {
           studentProfileOrId.ITS,
           studentProfileOrId.its,
           studentProfileOrId.its_number,
-          ...(studentProfileOrId.allIds || []),
-          user?.id
+          ...(studentProfileOrId.allIds || [])
         ]
-      : [studentProfileOrId, user?.id]
+      : [studentProfileOrId]
     ).filter(Boolean).map(String);
 
     const uniqueIds = [...new Set(candidateIds)];
@@ -5020,13 +5022,20 @@ function useParentLeaveData(studentProfileOrId, isKibarProp = null) {
     const studentLeavesTable = isKibar ? "kibar_student_leaves" : "student_leaves";
     const eventLeavesTable = isKibar ? "kibar_event_leaves" : "event_leaves";
     
+    const targetIdsSet = new Set(uniqueIds.map(id => id.trim().toLowerCase()));
     const [studentRes, parentRes, eventRes] = await Promise.all([
       supabase.from(studentLeavesTable).select("*").in("student_id", uniqueIds),
       user?.id ? supabase.from(studentLeavesTable).select("*").eq("parent_id", user.id) : { data: [] },
       supabase.from(eventLeavesTable).select("*")
     ]);
 
-    const combinedStudentLeaves = [...(studentRes.data || []), ...(parentRes.data || [])];
+    const combinedStudentLeaves = [
+      ...(studentRes.data || []),
+      ...(parentRes.data || []).filter(l => {
+        const sid = String(l.student_id || '').trim().toLowerCase();
+        return sid && targetIdsSet.has(sid);
+      })
+    ];
     const seen = new Set();
     const uniqueStudentLeaves = combinedStudentLeaves.filter(l => {
       const lid = String(l.id);
@@ -5228,9 +5237,9 @@ function MonthlyLeaveCountCard({ studentProfile, onGoApplyLeave }) {
   const { leaves, loading } = useParentLeaveData(studentProfile);
   const currentKey = getLocalDateKey(new Date()).slice(0, 7);
   const currentLeaves = (leaves || []).filter((l) => (l.dateFrom || "").slice(0, 7) === currentKey);
-  const count = currentLeaves.length;
   const studentC = currentLeaves.filter((l) => l.kind === "student").length;
   const eventC = currentLeaves.filter((l) => l.kind === "event").length;
+  const count = studentC;
   const monthName = formatMonthKeyLabel(currentKey);
 
   return (
@@ -5247,7 +5256,7 @@ function MonthlyLeaveCountCard({ studentProfile, onGoApplyLeave }) {
             <small> this month</small>
           </span>
           <span className="mlb-sub">
-            {loading ? "Loading..." : `${monthName} · ${studentC} personal · ${eventC} school event`}
+            {loading ? "Loading..." : `${monthName} · ${studentC} personal · ${eventC} school event${eventC === 1 ? '' : 's'}`}
           </span>
         </div>
         <span className="mlb-action">
@@ -5906,6 +5915,7 @@ function ChildLeaveApply({
   const monthCounts = useMemo(() => {
     const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
     (allLeaveRecords || []).forEach((l) => {
+      if (l.kind !== "student") return;
       const fi = getFatemiInfo(l.dateFrom);
       if (Number(fi.year) === FATEMI_YEAR_1448 && fi.month >= 1 && fi.month <= 7) {
         counts[fi.month] = (counts[fi.month] || 0) + 1;
@@ -7145,6 +7155,7 @@ function ParentPortal({
   setMenuOpen,
   onRoleChange,
   teacherProfiles = [],
+  selectedStudentId,
   setSelectedStudentId,
   onSelectChild,
   onLogout,
@@ -7201,6 +7212,63 @@ function ParentPortal({
   const [selectedTahfeezChat, setSelectedTahfeezChat] = useState(null);
   const [tahfeezSearchQuery, setTahfeezSearchQuery] = useState("");
 
+  // Auto-select chat when navigating directly to Online Tahfeez (e.g. from FCM push click)
+  useEffect(() => {
+    if (activePage === "Online Tahfeez" && !selectedTahfeezChat && (allProfiles || []).length > 0) {
+      if (selectedStudentId) {
+        const matching = allProfiles.find(c => String(c.student_id || c.id) === String(selectedStudentId));
+        if (matching) {
+          const tName = matching.teacherName || matching.teacher_name || "Muhaffiz";
+          const tProfile = (teacherProfiles || []).find(t => 
+            t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
+          );
+          const tId = matching.teacher_id || matching.teacherId || tProfile?.id || tProfile?.user_id;
+          const sName = matching.name || matching.full_name || matching.student_name || "Student";
+          setSelectedTahfeezChat({
+            ...matching,
+            isGroup: false,
+            student_id: matching.student_id || matching.id,
+            student_name: sName,
+            studentName: sName,
+            name: tName,
+            full_name: tName,
+            teacher_id: tId,
+            teacherId: tId,
+            teacher_name: tName,
+            teacherName: tName,
+            photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
+            subtext: `For ${sName}`,
+          });
+          return;
+        }
+      }
+      if (allProfiles.length === 1) {
+        const first = allProfiles[0];
+        const tName = first.teacherName || first.teacher_name || "Muhaffiz";
+        const tProfile = (teacherProfiles || []).find(t => 
+          t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
+        );
+        const tId = first.teacher_id || first.teacherId || tProfile?.id || tProfile?.user_id;
+        const sName = first.name || first.full_name || first.student_name || "Student";
+        setSelectedTahfeezChat({
+          ...first,
+          isGroup: false,
+          student_id: first.student_id || first.id,
+          student_name: sName,
+          studentName: sName,
+          name: tName,
+          full_name: tName,
+          teacher_id: tId,
+          teacherId: tId,
+          teacher_name: tName,
+          teacherName: tName,
+          photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
+          subtext: `For ${sName}`,
+        });
+      }
+    }
+  }, [activePage, selectedStudentId, allProfiles, teacherProfiles]);
+
   const [parentViewedStatus, setParentViewedStatus] = useState(false);
   const [celebrationRank, setCelebrationRank] = useState(null); // 1, 2, or 3 for celebration popup
   const [downloadPopup, setDownloadPopup] = useState(null); // { filePath, fileName } or null
@@ -7215,8 +7283,9 @@ function ParentPortal({
   const [activeSessions, setActiveSessions] = useState({});
 
   const handleParentStartCall = async (child) => {
-    const childSessionId = `session_${child.student_id}`;
-    const studentName = child.name || child.full_name || "Student";
+    const studentName = child.student_name || child.studentName || child.child_name || child.childName || (child.subtext ? child.subtext.replace(/^For\s+/i, '').trim() : '') || child.name || child.full_name || "Student";
+    const studentId = child.student_id || child.studentId || child.id;
+    const childSessionId = `session_${studentId}`;
     const teacherName = child.teacherName || child.teacher_name || "Muhaffiz";
     const targetTeacherId = child.teacher_id || child.teacherId;
     const roomId = childSessionId;
@@ -7228,7 +7297,7 @@ function ParentPortal({
       const isOneOnOne = s.type === "1-on-1" || (!s.type && String(s.id).startsWith("session_"));
       if (!isOneOnOne) return false;
       const sStudentId = String(s.student_id || "");
-      if (sStudentId && sStudentId === String(child.student_id)) return false;
+      if (sStudentId && sStudentId === String(studentId)) return false;
       if (s.id === childSessionId) return false;
 
       const sTeacherId = String(s.teacher_id || "");
@@ -7271,7 +7340,7 @@ function ParentPortal({
         supabase.functions.invoke('fcm-notification', {
           body: {
             title: "Live Tahfeez Classroom",
-            body: `Student ${studentName} joined the class at ${timeStr}.`,
+            body: `Student ${studentName} joined the class at ${timeStr}. Tap to join now!`,
             targetRole: "teacher",
             targetUser: String(actualTeacherId),
             section: getSectionScope() === "kibar" ? "kibar" : "atfal",
@@ -7290,7 +7359,7 @@ function ParentPortal({
         started_by: "parent",
         started_at: startedAt,
         type: "1-on-1",
-        student_id: String(child.student_id),
+        student_id: String(studentId),
         student_name: studentName,
         teacher_id: String(targetTeacherId || ""),
         teacher_name: teacherName,
@@ -7315,7 +7384,7 @@ function ParentPortal({
       supabase.functions.invoke('fcm-notification', {
         body: {
           title: "Live Tahfeez Classroom",
-          body: `Student ${studentName} joined the class at ${timeStr}.`,
+          body: `Student ${studentName} joined the class at ${timeStr}. Tap to join now!`,
           targetRole: "teacher",
           targetUser: String(targetTeacherId),
           section: getSectionScope() === "kibar" ? "kibar" : "atfal",
@@ -7329,7 +7398,7 @@ function ParentPortal({
     if (!child.groupName) return;
     const groupRoomId = `mouze-tahfeez-group-${child.groupName.replace(/\s+/g, '-').toLowerCase()}`;
     const roomId = groupRoomId;
-    const studentName = child.name || child.full_name || "Student";
+    const studentName = child.student_name || child.studentName || (child.subtext ? child.subtext.replace(/^For\s+/i, '').trim() : '') || child.name || child.full_name || "Student";
     addSystemMessage(roomId, `${studentName} joined the group video call`);
     const activeGroupSession = activeSessions[groupRoomId];
     if (!activeGroupSession) {
@@ -7349,8 +7418,56 @@ function ParentPortal({
     });
   };
 
-  const handleCallClose = () => {
+  const handleCallClose = async () => {
+    const currentCall = activeCall;
     setActiveCall(null);
+    if (!currentCall || !currentCall.roomId) return;
+    const roomId = currentCall.roomId;
+    try {
+      let activeSession = activeSessions[roomId];
+      if (!activeSession) {
+        const { data } = await supabase.from('online_tahfeez_sessions').select('*').eq('id', roomId).maybeSingle();
+        if (data) activeSession = data;
+      }
+      const endedAt = new Date().toISOString();
+      const startedAt = activeSession?.started_at || currentCall.startedAt || endedAt;
+      const durationSeconds = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+      if (activeSession) {
+        await supabase
+          .from('online_tahfeez_logs')
+          .insert({
+            student_id: activeSession.student_id || null,
+            student_name: activeSession.student_name || currentCall.myName || null,
+            teacher_id: activeSession.teacher_id || null,
+            teacher_name: activeSession.teacher_name || currentCall.peerName || null,
+            started_at: startedAt,
+            ended_at: endedAt,
+            duration_seconds: durationSeconds,
+            type: activeSession.type || (roomId.includes('group') ? "group" : "1-on-1"),
+            group_name: activeSession.group_name || null
+          });
+
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (activeSession.teacher_id) {
+          supabase.functions.invoke('fcm-notification', {
+            body: {
+              title: "Class Session Ended",
+              body: `Student ${activeSession.student_name || currentCall.myName || 'Student'} ended the class session at ${timeStr}.`,
+              targetRole: "teacher",
+              targetUser: String(activeSession.teacher_id),
+              section: getSectionScope() === "kibar" ? "kibar" : "atfal",
+              data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+            }
+          }).catch(err => console.warn("FCM end class error:", err));
+        }
+      }
+      await supabase.from('online_tahfeez_sessions').delete().eq('id', roomId);
+      const { doc, setDoc, deleteDoc } = await import("firebase/firestore");
+      const { db } = await import("./firebase/db.js");
+      const signalRef = doc(db, "tahfeez_signals", roomId);
+      await setDoc(signalRef, { status: "ended" }, { merge: true });
+      setTimeout(() => { deleteDoc(signalRef).catch(() => {}); }, 2000);
+    } catch (_) {}
   };
 
   useEffect(() => {
@@ -7881,7 +7998,9 @@ function ParentPortal({
     const studentsList = [];
     allProfiles.forEach(child => {
       // Find the teacher's profile to get the DP
-      const tName = child.teacherName || child.teacher_name;
+      const studentRealName = child.name || child.full_name || child.student_name || child.studentName || "Student";
+      const studentId = child.student_id || child.studentId || child.id;
+      const tName = child.teacherName || child.teacher_name || "Muhaffiz";
       const tProfile = (teacherProfiles || []).find(t => 
         t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
       );
@@ -7892,6 +8011,10 @@ function ParentPortal({
       studentsList.push({
         ...child,
         isGroup: false,
+        student_id: studentId,
+        studentId: studentId,
+        student_name: studentRealName,
+        studentName: studentRealName,
         name: tName || "Muhaffiz",
         full_name: tName || "Muhaffiz",
         teacher_id: tId,
@@ -7899,7 +8022,7 @@ function ParentPortal({
         teacher_name: tName || "Muhaffiz",
         teacherName: tName || "Muhaffiz",
         photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
-        subtext: `For ${child.name || child.full_name}`,
+        subtext: `For ${studentRealName}`,
       });
     });
 
@@ -9777,6 +9900,9 @@ function ParentPortal({
 }
 
 
+// In-memory cache for fast instant rendering of admin leaves without flashing
+const cachedAdminLeaves = { kibar: null, atfal: null };
+
 function AdminLeaveManagement({
   onShowAction,
   students = [],
@@ -9792,8 +9918,9 @@ function AdminLeaveManagement({
   const LEAVES_TABLE = sectionKibar ? 'kibar_student_leaves' : 'student_leaves';
   const EVENT_LEAVES_TABLE = sectionKibar ? 'kibar_event_leaves' : 'event_leaves';
 
-  const [leaves, setLeaves] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialLeaves = (sectionKibar ? cachedAdminLeaves.kibar : cachedAdminLeaves.atfal) || [];
+  const [leaves, setLeaves] = useState(initialLeaves);
+  const [loading, setLoading] = useState(initialLeaves.length === 0);
   const [filter, setFilter] = useState("Pending");
   const [chatModal, setChatModal] = useState(null); // leave object or null
   const [chatMessage, setChatMessage] = useState("");
@@ -9803,6 +9930,10 @@ function AdminLeaveManagement({
   const [approveDropdown, setApproveDropdown] = useState(null); // leave.id or null
   const [sendingAction, setSendingAction] = useState(null); // id being processed
   const chatBodyRef = useRef(null);
+  const studentsRef = useRef(students);
+  useEffect(() => {
+    studentsRef.current = students;
+  }, [students]);
 
   const normalizeLeaveStatus = (st) => {
     const s = String(st || "Pending").trim().toLowerCase();
@@ -9959,8 +10090,10 @@ function AdminLeaveManagement({
     }
   };
 
-  const fetchLeaves = useCallback(async () => {
-    setLoading(true);
+  const fetchLeaves = useCallback(async (silent = false) => {
+    if (!silent && leaves.length === 0) {
+      setLoading(true);
+    }
     let allLeaves = [];
     try {
       // 1. Fetch all known Kibar student profiles to build complete Kibar ID and name sets
@@ -9990,8 +10123,9 @@ function AdminLeaveManagement({
       );
 
       // Also include any students passed in if we are in Kibar mode
-      if (sectionKibar && students) {
-        students.forEach(s => {
+      const currentStudents = studentsRef.current || [];
+      if (sectionKibar && currentStudents) {
+        currentStudents.forEach(s => {
           if (s.student_id) kibarIdSet.add(String(s.student_id).trim().toLowerCase());
           if (s.id) kibarIdSet.add(String(s.id).trim().toLowerCase());
           if (s.user_id) kibarIdSet.add(String(s.user_id).trim().toLowerCase());
@@ -10065,7 +10199,7 @@ function AdminLeaveManagement({
           .select('*');
         if (atfalError) {
           console.error("Atfal Admin Leave Fetch Error:", atfalError);
-          if (onShowAction) onShowAction("error", "Database Error: " + atfalError.message);
+          if (onShowAction && !silent) onShowAction("error", "Database Error: " + atfalError.message);
         } else if (atfalData) {
           // EXCLUDE any Kibar student leaves so they NEVER leak into Atfal admin
           allLeaves = atfalData.filter(l => !isKibarLeave(l));
@@ -10081,15 +10215,20 @@ function AdminLeaveManagement({
       return timeB - timeA;
     });
 
+    if (sectionKibar) {
+      cachedAdminLeaves.kibar = allLeaves;
+    } else {
+      cachedAdminLeaves.atfal = allLeaves;
+    }
     setLeaves(allLeaves);
     setLoading(false);
-  }, [sectionKibar, students, onShowAction]);
+  }, [sectionKibar]);
 
   useEffect(() => {
-    fetchLeaves();
-    const interval = setInterval(fetchLeaves, 8000);
+    fetchLeaves(initialLeaves.length > 0);
+    const interval = setInterval(() => fetchLeaves(true), 15000);
     return () => clearInterval(interval);
-  }, [fetchLeaves]);
+  }, [fetchLeaves, sectionKibar]);
 
   // Auto-scroll chat to the latest message (WhatsApp-style)
   useEffect(() => {
@@ -11100,22 +11239,28 @@ function AdminLeaveManagement({
   );
 }
 
-function AdminAttendanceTracking({ students, teacherProfiles, onShowAction }) {
-  const [attendanceMap, setAttendanceMap] = useState({});
-  const [loading, setLoading] = useState(true);
-const [expandedTeacherId, setExpandedTeacherId] = useState(null);
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+// In-memory cache for fast instant rendering of attendance tracking without flashing
+const cachedAttendanceTracking = {};
 
-  useEffect(() => {
-    fetchTodayAttendance();
-    const interval = setInterval(fetchTodayAttendance, 60000);
-    return () => clearInterval(interval);
-  }, []);
-  
-  const fetchTodayAttendance = async () => {
+function AdminAttendanceTracking({ students, teacherProfiles, onShowAction, portalRole, isKibar }) {
+  const sectionKibar = isKibar !== null
+    ? Boolean(isKibar)
+    : (portalRole === "kibar-admin" || getSectionScope() === 'kibar');
+  const ATT_TABLE = sectionKibar ? 'kibar_student_daily_attendance' : 'student_daily_attendance';
+  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const cacheKey = `${ATT_TABLE}_${today}`;
+
+  const [attendanceMap, setAttendanceMap] = useState(() => cachedAttendanceTracking[cacheKey] || {});
+  const [loading, setLoading] = useState(() => !cachedAttendanceTracking[cacheKey]);
+  const [expandedTeacherId, setExpandedTeacherId] = useState(null);
+
+  const fetchTodayAttendance = async (silent = false) => {
+    if (!silent && !cachedAttendanceTracking[cacheKey]) {
+      setLoading(true);
+    }
     try {
       const { data, error } = await supabase
-        .from('student_daily_attendance')
+        .from(ATT_TABLE)
         .select('*')
         .eq('attendance_date', today);
       
@@ -11124,13 +11269,21 @@ const [expandedTeacherId, setExpandedTeacherId] = useState(null);
         data.forEach(rec => {
           map[String(rec.student_id).trim().toLowerCase()] = rec.status;
         });
+        cachedAttendanceTracking[cacheKey] = map;
         setAttendanceMap(map);
       }
     } catch (e) {
       console.error("Attendance Tracking fetch error:", e);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+
+  useEffect(() => {
+    fetchTodayAttendance(Boolean(cachedAttendanceTracking[cacheKey]));
+    const interval = setInterval(() => fetchTodayAttendance(true), 30000);
+    return () => clearInterval(interval);
+  }, [cacheKey, today]);
   
   const teacherData = useMemo(() => {
     const result = [];
@@ -11368,29 +11521,39 @@ const [expandedTeacherId, setExpandedTeacherId] = useState(null);
   );
 }
 
+// In-memory cache for fast instant rendering of event leaves without flashing
+const cachedEventLeaveData = { events: null, eventLeaves: null };
+
 function PremiumEventLeavePage({ onShowAction, user }) {
-  const [events, setEvents] = useState([]);
-  const [eventLeaves, setEventLeaves] = useState([]);
+  const [events, setEvents] = useState(() => cachedEventLeaveData.events || []);
+  const [eventLeaves, setEventLeaves] = useState(() => cachedEventLeaveData.eventLeaves || []);
   const [selectedEvent, setSelectedEvent] = useState("");
   const [customEventName, setCustomEventName] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !cachedEventLeaveData.events && !cachedEventLeaveData.eventLeaves);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    const load = async (silent = false) => {
+      if (!silent) setLoading(true);
       const [evRes, lvRes] = await Promise.all([
         supabase.from("miqaat_calendar").select("*").order("id"),
         supabase.from("event_leaves").select("*").order("created_at", { ascending: false })
       ]);
-      if (!evRes.error) setEvents(evRes.data || []);
-      if (!lvRes.error) setEventLeaves(lvRes.data || []);
+      if (!evRes.error) {
+        cachedEventLeaveData.events = evRes.data || [];
+        setEvents(evRes.data || []);
+      }
+      if (!lvRes.error) {
+        cachedEventLeaveData.eventLeaves = lvRes.data || [];
+        setEventLeaves(lvRes.data || []);
+      }
       setLoading(false);
     };
-    load();
+    const hasCache = Boolean(cachedEventLeaveData.events && cachedEventLeaveData.eventLeaves);
+    load(hasCache);
   }, []);
 
   const sendNotificationToAll = async (title, body) => {
@@ -12086,6 +12249,26 @@ function AdminPortal({
   };
 
   const handleAdminEndSession = async (sess) => {
+    if (!sess) return;
+    const endedAt = new Date().toISOString();
+    const startedAt = sess.started_at || endedAt;
+    const durationSeconds = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+    try {
+      await supabase
+        .from('online_tahfeez_logs')
+        .insert({
+          student_id: sess.student_id || null,
+          student_name: sess.student_name || null,
+          teacher_id: sess.teacher_id || null,
+          teacher_name: sess.teacher_name || null,
+          started_at: startedAt,
+          ended_at: endedAt,
+          duration_seconds: durationSeconds,
+          type: sess.type || "1-on-1",
+          group_name: sess.group_name || null
+        });
+    } catch (_) {}
+
     // Delete session from database
     await supabase
       .from('online_tahfeez_sessions')
@@ -12112,6 +12295,8 @@ function AdminPortal({
     setActiveCall(null);
   };
   const [tahfeezLogs, setTahfeezLogs] = useState([]);
+  const [tahfeezTrackingSearch, setTahfeezTrackingSearch] = useState("");
+  const [audioRecordingsModalStudent, setAudioRecordingsModalStudent] = useState(null);
 
   useEffect(() => {
     if (activePage !== "Online Tahfeez Tracking") return;
@@ -12203,41 +12388,6 @@ function AdminPortal({
       }
     });
   }, []);
-
-  useEffect(() => {
-    if (!attSelChild) return;
-    setAttLoading(true);
-    const allDates = [];
-    const now = new Date();
-    for (let m = 0; m < 6; m++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
-      const year = d.getFullYear();
-      const month = d.getMonth() + 1;
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const start = `${year}-${String(month).padStart(2, '0')}-01`;
-      const end = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
-      allDates.push({ year, month, start, end });
-    }
-    Promise.all(
-      allDates.map(range =>
-        supabase
-          .from("student_daily_attendance")
-          .select("*")
-          .eq("student_id", String(attSelChild))
-          .gte("attendance_date", range.start)
-          .lte("attendance_date", range.end)
-      )
-    ).then(responses => {
-      const merged = {};
-      responses.forEach(({ data, error }) => {
-        if (!error && data) {
-          data.forEach(r => { merged[r.attendance_date] = r.status; });
-        }
-      });
-      setAttendanceRecords(merged);
-      setAttLoading(false);
-    });
-  }, [attSelChild]);
 
   const computeRankChange = (student, wr) => {
     const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
@@ -12501,6 +12651,48 @@ const handleDownloadAllReports = async () => {
     }
   };
 
+  useEffect(() => {
+    if (!attSelChild) return;
+    const isKibar = portalRole === "kibar-admin" || getSectionScope() === 'kibar';
+    const ATT_TABLE = isKibar ? 'kibar_student_daily_attendance' : 'student_daily_attendance';
+    const cacheKey = `att_records_${ATT_TABLE}_${attSelChild}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setAttendanceRecords(JSON.parse(cached));
+      } catch (_) {}
+    } else {
+      setAttLoading(true);
+    }
+
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const startDate = `${sixMonthsAgo.getFullYear()}-${String(sixMonthsAgo.getMonth() + 1).padStart(2, '0')}-01`;
+
+    supabase
+      .from(ATT_TABLE)
+      .select("attendance_date, status")
+      .eq("student_id", String(attSelChild))
+      .gte("attendance_date", startDate)
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const merged = {};
+          data.forEach(r => { merged[r.attendance_date] = r.status; });
+          setAttendanceRecords(merged);
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(merged)); } catch (_) {}
+        }
+        setAttLoading(false);
+      });
+  }, [attSelChild, portalRole]);
+
+  const getDayName = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr + 'T00:00:00Z');
+      return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getUTCDay()];
+    } catch { return ''; }
+  };
+
   const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Online Tahfeez Tracking", "Help Management", "Global Settings", "Email Settings", "App Update"];
   const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
 
@@ -12545,16 +12737,34 @@ const handleDownloadAllReports = async () => {
     viewedStudentIds.has(String(s.student_id).trim().toLowerCase())
   ).length;
 
-  // ── Leave Count & Attendance Tracking Overview Stats ──
+  // ── Leave Count & Attendance Tracking Overview Stats (In-Memory Cached & Non-Blocking) ──
+  const isKibarPortal = portalRole === "kibar-admin" || getSectionScope() === 'kibar';
+  const overviewCacheRef = useRef({
+    pendingLeaveCount: 0,
+    attNotMarkedCount: 0,
+    attAllMarkedCount: 0,
+    loaded: false
+  });
+
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
   const [attNotMarkedCount, setAttNotMarkedCount] = useState(0);
   const [attAllMarkedCount, setAttAllMarkedCount] = useState(0);
-  const [overviewAttLoading, setOverviewAttLoading] = useState(true);
+  const [overviewAttLoading, setOverviewAttLoading] = useState(() => !overviewCacheRef.current.loaded);
+
+  const overviewStudentsRef = useRef(students);
+  const overviewTeachersRef = useRef(teacherProfiles);
+  useEffect(() => { overviewStudentsRef.current = students; }, [students]);
+  useEffect(() => { overviewTeachersRef.current = teacherProfiles; }, [teacherProfiles]);
 
   useEffect(() => {
-    const fetchOverviewStats = async () => {
+    const fetchOverviewStats = async (silent = false) => {
+      if (!silent && !overviewCacheRef.current.loaded) {
+        setOverviewAttLoading(true);
+      }
       try {
         const isKibar = portalRole === "kibar-admin" || getSectionScope() === 'kibar';
+        const currentStudents = overviewStudentsRef.current || [];
+        const currentTeachers = overviewTeachersRef.current || [];
 
         // 1. Fetch kibar student profiles to build ID and name sets for accurate section separation
         let kibarProfiles = [];
@@ -12582,8 +12792,8 @@ const handleDownloadAllReports = async () => {
           ]).filter(Boolean)
         );
 
-        if (isKibar && students) {
-          students.forEach(s => {
+        if (isKibar && currentStudents) {
+          currentStudents.forEach(s => {
             if (s.student_id) kibarIdSet.add(String(s.student_id).trim().toLowerCase());
             if (s.id) kibarIdSet.add(String(s.id).trim().toLowerCase());
             if (s.user_id) kibarIdSet.add(String(s.user_id).trim().toLowerCase());
@@ -12620,7 +12830,6 @@ const handleDownloadAllReports = async () => {
 
         let count = 0;
         if (isKibar) {
-          // Kibar Admin: Load from kibar_student_leaves + kibar leaves in atfal_student_leaves
           let allKibarLeaves = [];
           const { data: kibarLeaves } = await supabase.from('kibar_student_leaves').select('*');
           if (kibarLeaves) allKibarLeaves.push(...kibarLeaves);
@@ -12638,7 +12847,6 @@ const handleDownloadAllReports = async () => {
 
           count = allKibarLeaves.filter(l => isPending(l.status)).length;
         } else {
-          // Atfal Admin: strictly non-Kibar student leaves
           const { data: atfalLeaves } = await supabase.from('student_leaves').select('*');
           if (atfalLeaves) {
             const atfalOnly = atfalLeaves.filter(l => !isKibarLeave(l));
@@ -12647,7 +12855,6 @@ const handleDownloadAllReports = async () => {
         }
         setPendingLeaveCount(count);
 
-        // Fetch today's attendance for teacher tracking
         const todayStr = new Date().toISOString().split('T')[0];
         const ATT_TABLE = isKibar ? 'kibar_student_daily_attendance' : 'student_daily_attendance';
         const { data: attData } = await supabase
@@ -12664,9 +12871,9 @@ const handleDownloadAllReports = async () => {
 
         let notMarked = 0;
         let allMarked = 0;
-        const activeTeachers = teacherProfiles.filter(t => t.is_active !== false && t.user_id);
+        const activeTeachers = currentTeachers.filter(t => t.is_active !== false && t.user_id);
         activeTeachers.forEach(teacher => {
-          const teacherStudents = students.filter(s =>
+          const teacherStudents = currentStudents.filter(s =>
             String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.user_id || "") ||
             String(s.muhaffiz_id || s.original_teacher_id || "") === String(teacher.id || "")
           );
@@ -12684,10 +12891,17 @@ const handleDownloadAllReports = async () => {
 
         setAttNotMarkedCount(notMarked);
         setAttAllMarkedCount(allMarked);
+        overviewCacheRef.current = {
+          pendingLeaveCount: count,
+          attNotMarkedCount: notMarked,
+          attAllMarkedCount: allMarked,
+          loaded: true
+        };
       } catch (e) {
         console.error("Overview stats fetch error:", e);
+      } finally {
+        setOverviewAttLoading(false);
       }
-      setOverviewAttLoading(false);
     };
     fetchOverviewStats();
     const interval = setInterval(fetchOverviewStats, 15000);
@@ -13041,51 +13255,126 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
   };
 
   const renderOnlineTahfeezTracking = () => {
-    // Group active sessions and historical logs for today by student/group
+    const allStudents = (students || adminData?.students || []).filter(Boolean);
+    const customGroups = adminData?.customGroups || [];
+
+    const getStudentKey = (id, name) => {
+      if (id != null && String(id).trim() !== "") return String(id).trim().toLowerCase();
+      return (name || "").trim().toLowerCase();
+    };
+
     const grouped = {};
-    
-    Object.values(activeSessions).forEach(sess => {
-      const name = sess.type === "group" ? sess.group_name : sess.student_name;
-      if (!name) return;
-      if (!grouped[name]) {
-        grouped[name] = {
-          name,
-          type: sess.type,
-          teacher: sess.teacher_name,
+
+    // 1. Initialize all registered students so their cards are always present
+    allStudents.forEach(st => {
+      const sid = st.student_id != null ? st.student_id : st.id;
+      const key = getStudentKey(sid, st.name || st.full_name);
+      if (!key) return;
+      grouped[key] = {
+        key,
+        id: sid,
+        name: st.name || st.full_name || st.arabic_name || "Student",
+        arabic_name: st.arabic_name || "",
+        type: "1-on-1",
+        teacher: st.teacherName || st.teacher_name || "Not Assigned",
+        isActive: false,
+        totalDuration: 0,
+        segments: [],
+        activeSessionData: null,
+        studentData: st
+      };
+    });
+
+    // 2. Include Custom Groups
+    customGroups.forEach(g => {
+      const gName = g.group_name || g.name;
+      if (!gName) return;
+      const key = `group_${gName.trim().toLowerCase()}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          key,
+          id: key,
+          name: gName,
+          arabic_name: "",
+          type: "group",
+          teacher: g.teacher_name || g.teacherName || "Not Assigned",
+          isActive: false,
+          totalDuration: 0,
+          segments: [],
+          activeSessionData: null,
+          isGroup: true
+        };
+      }
+    });
+
+    // 3. Merge Live Active Sessions
+    Object.values(activeSessions || {}).forEach(sess => {
+      if (!sess) return;
+      const isGroup = sess.type === "group";
+      const key = isGroup
+        ? `group_${(sess.group_name || sess.student_name || "").trim().toLowerCase()}`
+        : getStudentKey(sess.student_id, sess.student_name);
+
+      if (!key) return;
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          key,
+          id: sess.student_id || sess.id,
+          name: isGroup ? sess.group_name : (sess.student_name || "Student"),
+          arabic_name: "",
+          type: sess.type || (isGroup ? "group" : "1-on-1"),
+          teacher: sess.teacher_name || "Muhaffiz",
           isActive: true,
           totalDuration: 0,
           segments: [],
           activeSessionData: sess
         };
       } else {
-        grouped[name].isActive = true;
-        grouped[name].activeSessionData = sess;
+        grouped[key].isActive = true;
+        grouped[key].activeSessionData = sess;
+        if (sess.teacher_name) grouped[key].teacher = sess.teacher_name;
       }
-      
-      grouped[name].segments.push({
+
+      grouped[key].segments.push({
         id: sess.id,
-        started_at: sess.started_at,
+        started_at: sess.started_at || new Date().toISOString(),
         ended_at: null,
         duration_seconds: 0,
         isLive: true
       });
     });
 
-    tahfeezLogs.forEach(log => {
-      const name = log.type === "group" ? log.group_name : log.student_name;
-      if (!name) return;
-      if (!grouped[name]) {
-        grouped[name] = {
-          name,
-          type: log.type,
-          teacher: log.teacher_name,
+    // 4. Merge Historical Logs for Today
+    (tahfeezLogs || []).forEach(log => {
+      if (!log) return;
+      const isGroup = log.type === "group";
+      const key = isGroup
+        ? `group_${(log.group_name || log.student_name || "").trim().toLowerCase()}`
+        : getStudentKey(log.student_id, log.student_name);
+
+      if (!key) return;
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          key,
+          id: log.student_id || log.id,
+          name: isGroup ? log.group_name : (log.student_name || "Student"),
+          arabic_name: "",
+          type: log.type || (isGroup ? "group" : "1-on-1"),
+          teacher: log.teacher_name || "Muhaffiz",
           isActive: false,
           totalDuration: 0,
           segments: []
         };
       }
-      grouped[name].totalDuration += (log.duration_seconds || 0);
-      grouped[name].segments.push({
+
+      if (log.teacher_name && grouped[key].teacher === "Not Assigned") {
+        grouped[key].teacher = log.teacher_name;
+      }
+
+      grouped[key].totalDuration += (log.duration_seconds || 0);
+      grouped[key].segments.push({
         id: log.id,
         started_at: log.started_at,
         ended_at: log.ended_at,
@@ -13094,19 +13383,42 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
       });
     });
 
-    const studentList = Object.values(grouped).sort((a, b) => b.isActive - a.isActive);
-    const liveCount = Object.keys(activeSessions).length;
-    
+    // 5. Sort: Live first, then Completed Today, then alphabetical
+    let studentList = Object.values(grouped).sort((a, b) => {
+      if (a.isActive !== b.isActive) return (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0);
+      const aDone = a.totalDuration > 0 ? 1 : 0;
+      const bDone = b.totalDuration > 0 ? 1 : 0;
+      if (aDone !== bDone) return bDone - aDone;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+
+    // Filter by search query if provided
+    if (tahfeezTrackingSearch.trim()) {
+      const q = tahfeezTrackingSearch.trim().toLowerCase();
+      studentList = studentList.filter(s => 
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.arabic_name && s.arabic_name.toLowerCase().includes(q)) ||
+        (s.teacher && s.teacher.toLowerCase().includes(q)) ||
+        (s.id && String(s.id).toLowerCase().includes(q))
+      );
+    }
+
+    const totalStudentsCount = allStudents.length;
+    const liveCount = Object.values(grouped).filter(s => s.isActive).length;
+    const completedTodayCount = Object.values(grouped).filter(s => !s.isActive && s.totalDuration > 0).length;
+
     // Helper to format duration
     const formatDur = (secs) => {
       if (!secs) return "0s";
       const h = Math.floor(secs / 3600);
       const m = Math.floor((secs % 3600) / 60);
       const s = secs % 60;
-      if (h > 0) return `${h}h ${m}m`;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
       if (m > 0) return `${m}m ${s}s`;
       return `${s}s`;
     };
+
+    const todayDateFormatted = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 
     return (
       <div className="online-tahfeez-tracking fade-in" style={{ paddingBottom: '80px', padding: '0 24px' }}>
@@ -13115,16 +13427,54 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             <Video size={24} style={{ color: 'var(--primary-gold)' }} />
             Online Tahfeez Daily Tracking
           </h2>
-          <p className="subtitle">Monitor today's active and completed online classes with detailed time logs.</p>
+          <p className="subtitle">Real-time status and daily call logs for all registered students.</p>
         </div>
 
-        <div className="tahfeez-card" style={{ maxWidth: '400px', marginBottom: '24px' }}>
-          <h4 style={{ margin: '0 0 8px', color: 'var(--deep-brown)' }}>Live Overview</h4>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="pulse-dot" style={{ backgroundColor: liveCount > 0 ? '#2ecc71' : '#ff9f43' }} />
-            <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>
-              {liveCount} class{liveCount !== 1 ? 'es' : ''} currently live
-            </span>
+        {/* Top Summary & Search Bar */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="tahfeez-card" style={{ padding: '12px 18px', minWidth: '170px' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '4px' }}>Total Students</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--deep-brown)' }}>{totalStudentsCount}</div>
+            </div>
+
+            <div className="tahfeez-card" style={{ padding: '12px 18px', minWidth: '170px', border: liveCount > 0 ? '1px solid rgba(46, 204, 113, 0.4)' : undefined }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className="pulse-dot" style={{ backgroundColor: liveCount > 0 ? '#2ecc71' : '#ccc', width: '8px', height: '8px' }} />
+                Live Now
+              </div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: liveCount > 0 ? '#2ecc71' : 'var(--deep-brown)' }}>{liveCount}</div>
+            </div>
+
+            <div className="tahfeez-card" style={{ padding: '12px 18px', minWidth: '170px' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={13} color="#22c55e" />
+                Done Today
+              </div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#22c55e' }}>{completedTodayCount}</div>
+            </div>
+          </div>
+
+          {/* Search Input */}
+          <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search student or teacher..."
+              value={tahfeezTrackingSearch}
+              onChange={(e) => setTahfeezTrackingSearch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 14px 10px 38px',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--card-bg)',
+                color: 'var(--text-color)',
+                fontSize: '0.9rem',
+                outline: 'none',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+              }}
+            />
           </div>
         </div>
 
@@ -13138,17 +13488,17 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             color: 'var(--text-muted)'
           }}>
             <Video size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
-            <div>No classes have occurred today yet. Active sessions will appear here in real-time.</div>
+            <div>No matching students found.</div>
           </div>
         ) : (
           <div className="tahfeez-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
             {studentList.map((student, idx) => {
               const isGroup = student.type === "group";
               
-              // Sort segments by started_at ascending to show sr no 1, 2, 3 chronologically
+              // Sort segments chronologically
               student.segments.sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
 
-              // Compute total duration including currently live segment if any
+              // Compute total duration including live ongoing session if any
               let displayDuration = student.totalDuration;
               const liveSeg = student.segments.find(s => s.isLive);
               if (liveSeg && liveSeg.started_at) {
@@ -13157,7 +13507,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
               }
 
               return (
-                <div key={idx} className="tahfeez-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div key={student.key || idx} className="tahfeez-card card-appear" style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
                     <span className="tahfeez-badge" style={{ background: isGroup ? '#3498db' : '#f1c40f', color: '#fff' }}>
                       {isGroup ? "Group Class" : "1-on-1"}
@@ -13165,18 +13515,28 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                     {student.isActive ? (
                       <div className="pulse-indicator">
                         <div className="pulse-dot" />
-                        <span>Live Now</span>
+                        <span style={{ color: '#2ecc71', fontWeight: 700 }}>Live Now</span>
+                      </div>
+                    ) : student.totalDuration > 0 ? (
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.25)', padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <CheckCircle2 size={13} color="#22c55e" />
+                        <span>Class Done Today</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '20px' }}>
-                        Offline
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.06)', padding: '4px 10px', borderRadius: '20px' }}>
+                        No Class Today
                       </div>
                     )}
                   </div>
 
-                  <h3 className="tahfeez-title" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", fontSize: '1.5rem', marginBottom: '4px' }}>
+                  <h3 className="tahfeez-title" style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", fontSize: '1.45rem', marginBottom: '4px' }}>
                     {student.name}
                   </h3>
+                  {student.arabic_name && (
+                    <div style={{ fontSize: '1rem', color: 'var(--primary-gold)', fontFamily: "'Al-Kanz', serif", marginTop: '-2px', marginBottom: '8px' }}>
+                      {student.arabic_name}
+                    </div>
+                  )}
                   
                   <div className="tahfeez-meta" style={{ marginBottom: "16px", background: 'rgba(0,0,0,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.04)' }}>
                     <p style={{ margin: "0 0 6px", display: 'flex', justifyContent: 'space-between' }}>
@@ -13184,42 +13544,61 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       <strong>{student.teacher}</strong>
                     </p>
                     <p style={{ margin: "0 0 6px", display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Date:</span> 
-                      <strong>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</strong>
+                      <span style={{ color: 'var(--text-secondary)' }}>Day & Date:</span> 
+                      <strong>{todayDateFormatted}</strong>
                     </p>
                     <p style={{ margin: "0", display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Total Duration Today:</span> 
-                      <strong style={{ color: 'var(--primary-gold)' }}>{formatDur(displayDuration)}</strong>
+                      <strong style={{ color: displayDuration > 0 ? 'var(--primary-gold)' : 'var(--text-muted)' }}>
+                        {formatDur(displayDuration)}
+                      </strong>
                     </p>
                   </div>
                   
                   <div style={{ flex: 1 }}>
                     <h5 style={{ margin: '0 0 10px', color: 'var(--text-main)', fontSize: '0.9rem', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '6px' }}>Call History</h5>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
-                      {student.segments.map((seg, sIdx) => (
-                        <div key={seg.id || sIdx} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: seg.isLive ? 'rgba(46, 204, 113, 0.08)' : '#fff', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${seg.isLive ? 'rgba(46, 204, 113, 0.3)' : 'rgba(0,0,0,0.06)'}`, fontSize: '0.85rem' }}>
-                          <div style={{ background: seg.isLive ? '#2ecc71' : 'var(--deep-brown)', color: '#fff', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.75rem', flexShrink: 0 }}>
-                            {sIdx + 1}
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                              <span style={{ color: 'var(--text-secondary)' }}>Start:</span>
-                              <strong>{new Date(seg.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: 'var(--text-secondary)' }}>End:</span>
-                              <strong>{seg.isLive ? <span style={{ color: '#2ecc71', animation: 'pulse 1.5s infinite' }}>Ongoing...</span> : new Date(seg.ended_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</strong>
-                            </div>
-                          </div>
-                          {!seg.isLive && (
-                            <div style={{ fontWeight: 600, color: 'var(--text-muted)', marginLeft: '4px', borderLeft: '1px solid rgba(0,0,0,0.1)', paddingLeft: '10px' }}>
-                              {formatDur(seg.duration_seconds)}
-                            </div>
-                          )}
+                      {student.segments.length === 0 ? (
+                        <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', fontStyle: 'italic', background: 'rgba(0,0,0,0.02)', borderRadius: '8px' }}>
+                          No call sessions recorded yet today
                         </div>
-                      ))}
+                      ) : (
+                        student.segments.map((seg, sIdx) => (
+                          <div key={seg.id || sIdx} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: seg.isLive ? 'rgba(46, 204, 113, 0.08)' : '#fff', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${seg.isLive ? 'rgba(46, 204, 113, 0.3)' : 'rgba(0,0,0,0.06)'}`, fontSize: '0.85rem' }}>
+                            <div style={{ background: seg.isLive ? '#2ecc71' : 'var(--deep-brown)', color: '#fff', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.75rem', flexShrink: 0 }}>
+                              {sIdx + 1}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Start:</span>
+                                <strong>{new Date(seg.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>End:</span>
+                                <strong>{seg.isLive ? <span style={{ color: '#2ecc71', animation: 'pulse 1.5s infinite' }}>Ongoing...</span> : new Date(seg.ended_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</strong>
+                              </div>
+                            </div>
+                            {!seg.isLive && (
+                              <div style={{ fontWeight: 600, color: 'var(--text-muted)', marginLeft: '4px', borderLeft: '1px solid rgba(0,0,0,0.1)', paddingLeft: '10px' }}>
+                                {formatDur(seg.duration_seconds)}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
+
+                  {/* Listen Audio Recordings Button */}
+                  <button
+                    type="button"
+                    className="tahfeez-audio-trigger-btn"
+                    onClick={() => setAudioRecordingsModalStudent(student)}
+                    title="Listen to class audio recordings for this student"
+                  >
+                    <Headphones size={15} style={{ color: "var(--primary-gold)" }} />
+                    <span>Listen Audio</span>
+                  </button>
 
                   {student.isActive && student.activeSessionData && (
                     <div className="tahfeez-actions" style={{ gap: '8px', marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed rgba(0,0,0,0.1)' }}>
@@ -13243,6 +13622,14 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
               );
             })}
           </div>
+        )}
+
+        {/* Class Audio Recordings Modal */}
+        {audioRecordingsModalStudent && (
+          <TahfeezAudioRecordingsModal
+            student={audioRecordingsModalStudent}
+            onClose={() => setAudioRecordingsModalStudent(null)}
+          />
         )}
       </div>
     );
@@ -13555,7 +13942,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             </section>
           ) : null}
           {activePage === "App Update" ? (
-            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading App Update Manager...</p></div>}>
+            <Suspense fallback={<div style={{ padding: '60px 20px', textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto 12px' }} /><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading App Update Manager...</p></div>}>
               <LazyAppUpdateManager onBroadcastNotification={broadcastNotification} />
             </Suspense>
           ) : null}
@@ -14083,7 +14470,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           ) : null}
 
           {activePage === "Jadwal Tracking" ? (
-            <Suspense fallback={<div className="loading-screen"><div className="spinner" /><p>Loading Jadwal Tracking...</p></div>}>
+            <Suspense fallback={<div style={{ padding: '60px 20px', textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto 12px' }} /><p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading Jadwal Tracking...</p></div>}>
               <LazyJadwalTrackingView
                 students={students}
                 onShowAction={onShowAction}
@@ -16854,6 +17241,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
               students={students}
               teacherProfiles={teacherProfiles}
               onShowAction={onShowAction}
+              portalRole={portalRole}
             />
           )}
           {activePage === "Event Leave" ? (
@@ -18944,6 +19332,7 @@ function TeacherPortal({
   parentViews = [],
   schoolData,
   teacherProfiles = [],
+  selectedStudentId,
   selectedNotification,
   setSelectedNotification,
   activeStudentId,
@@ -18985,10 +19374,21 @@ function TeacherPortal({
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
   const [showParentViewsModal, setShowParentViewsModal] = useState(false);
 
+  // Auto-select student chat when navigating directly to Online Tahfeez (e.g. from FCM push click)
+  useEffect(() => {
+    if (activePage === "Online Tahfeez" && selectedStudentId && (filteredStudents || []).length > 0) {
+      const match = filteredStudents.find(s => String(s.student_id || s.id) === String(selectedStudentId));
+      if (match) {
+        setSelectedTahfeezChat(match);
+      }
+    }
+  }, [activePage, selectedStudentId, filteredStudents]);
+
   const handleStartCall = async (student) => {
-    const childSessionId = `session_${student.student_id}`;
+    const studentId = student.student_id || student.studentId || student.id;
+    const childSessionId = `session_${studentId}`;
     const teacherName = portalAccess?.full_name || user?.user_metadata?.full_name || teacherIdentity || "Muhaffiz";
-    const studentName = student.name || student.full_name || "Student";
+    const studentName = student.student_name || student.studentName || student.name || student.full_name || "Student";
     const teacherId = user?.id || teacherIdentity;
     const roomId = childSessionId;
     
@@ -19009,7 +19409,7 @@ function TeacherPortal({
           started_by: "teacher",
           started_at: new Date().toISOString(),
           type: "1-on-1",
-          student_id: String(student.student_id),
+          student_id: String(studentId),
           student_name: studentName,
           teacher_id: String(teacherId),
           teacher_name: teacherName,
@@ -19028,15 +19428,21 @@ function TeacherPortal({
         startedAt: new Date().toISOString()
       });
 
-      const targetUserId = student.parent_user_id || student.user_id || student.id;
+      let targetUserId = student.parent_user_id || student.user_id || student.id;
+      if (!targetUserId && studentId) {
+        const { data: stData } = await supabase.from('child_profiles').select('parent_user_id, user_id').eq('student_id', studentId).maybeSingle();
+        if (stData) targetUserId = stData.parent_user_id || stData.user_id;
+      }
+
       if (targetUserId) {
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         supabase.functions.invoke('fcm-notification', {
           body: {
             title: "Live Tahfeez Classroom",
-            body: `Muhaffiz ${teacherName} joined the class for ${studentName} at ${timeStr}.`,
-            targetRole: "parent",
+            body: `Muhaffiz ${teacherName} joined the class for ${studentName} at ${timeStr}. Tap to join now!`,
+            targetRole: "parents",
             targetUser: String(targetUserId),
+            targetStudentId: String(studentId),
             section: getSectionScope() === "kibar" ? "kibar" : "atfal",
             data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
           }
@@ -19054,15 +19460,21 @@ function TeacherPortal({
         startedAt: existing.started_at || new Date().toISOString()
       });
 
-      const targetUserId = student.parent_user_id || student.user_id || student.id;
+      let targetUserId = student.parent_user_id || student.user_id || student.id;
+      if (!targetUserId && studentId) {
+        const { data: stData } = await supabase.from('child_profiles').select('parent_user_id, user_id').eq('student_id', studentId).maybeSingle();
+        if (stData) targetUserId = stData.parent_user_id || stData.user_id;
+      }
+
       if (targetUserId) {
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         supabase.functions.invoke('fcm-notification', {
           body: {
             title: "Live Tahfeez Classroom",
-            body: `Muhaffiz ${teacherName} joined the class for ${studentName} at ${timeStr}.`,
-            targetRole: "parent",
+            body: `Muhaffiz ${teacherName} joined the class for ${studentName} at ${timeStr}. Tap to join now!`,
+            targetRole: "parents",
             targetUser: String(targetUserId),
+            targetStudentId: String(studentId),
             section: getSectionScope() === "kibar" ? "kibar" : "atfal",
             data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
           }
@@ -19147,9 +19559,10 @@ function TeacherPortal({
           supabase.functions.invoke('fcm-notification', {
             body: {
               title: "Class Ended",
-              body: `Muhaffiz ${activeSession.teacher_name || 'Teacher'} ended the class at ${timeStr}.`,
-              targetRole: "parent",
+              body: `Muhaffiz ${activeSession.teacher_name || 'Teacher'} ended the class for ${activeSession.student_name || 'Student'} at ${timeStr}.`,
+              targetRole: "parents",
               targetUser: String(targetUserId),
+              targetStudentId: String(activeSession.student_id || ''),
               section: getSectionScope() === "kibar" ? "kibar" : "atfal",
               data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
             }
@@ -19190,8 +19603,12 @@ function TeacherPortal({
     if (onShowAction) onShowAction("success", "Class session ended successfully.");
   };
 
-  const handleCallClose = () => {
+  const handleCallClose = async () => {
+    const currentCall = activeCall;
     setActiveCall(null);
+    if (currentCall?.roomId) {
+      await handleTeacherEndSession(currentCall.roomId);
+    }
   };
 
   useEffect(() => {
@@ -24970,11 +25387,16 @@ export default function App() {
         }
       } catch (_) {}
 
-      let targetPage = tap.redirectPage || tap.redirect_page || "";
-      let targetStudentId = tap.studentId || tap.student_id || "";
+      let targetPage = tap.redirectPage || tap.redirect_page || tap.page || tap.redirect || "";
+      let targetStudentId = tap.studentId || tap.student_id || tap.targetStudentId || tap.target_student_id || "";
       if (!targetPage && typeof tap.url === "string" && tap.url.includes("redirectPage=")) {
         try {
           targetPage = decodeURIComponent(tap.url.split("redirectPage=")[1].split("&")[0]);
+        } catch (_) {}
+      }
+      if (!targetStudentId && typeof tap.url === "string" && tap.url.includes("studentId=")) {
+        try {
+          targetStudentId = decodeURIComponent(tap.url.split("studentId=")[1].split("&")[0]);
         } catch (_) {}
       }
       if (!targetPage || targetPage === "/" || targetPage === "null") return;
@@ -24985,7 +25407,12 @@ export default function App() {
       }
       const resolved = resolveRedirectPage(targetPage, portalRole);
       if (resolved) {
-        if (targetStudentId) setSelectedStudentId(targetStudentId);
+        if (targetStudentId) {
+          setSelectedStudentId(targetStudentId);
+          try {
+            localStorage.setItem("mauze-selected-child", targetStudentId);
+          } catch (_) {}
+        }
         setActivePage(resolved);
         setActionMessage(null);
         if (tap.leaveId) setPendingChatLeaveId(String(tap.leaveId));
@@ -28336,6 +28763,13 @@ const handleSendCustomNotification = async (event) => {
     reduceAnimations,
   });
 
+  const adminDataMemo = useMemo(() => ({
+    ...schoolData,
+    customGroups,
+    teacherAttendance,
+    supportTickets,
+  }), [schoolData, customGroups, teacherAttendance, supportTickets]);
+
   // Public route: Show Privacy Policy without authentication
   // Supports both /privacy path and ?page=privacy query param
   if (typeof window !== "undefined" && (
@@ -28542,12 +28976,7 @@ const handleSendCustomNotification = async (event) => {
         ) : (portalRole === "admin" || portalRole === "kibar-admin") ? (
           <AdminPortal
             activePage={activePage}
-            adminData={{
-              ...schoolData,
-              customGroups,
-              teacherAttendance,
-              supportTickets,
-            }}
+            adminData={adminDataMemo}
             parentViews={parentViews}
             onParentViewsReset={handleParentViewsReset}
             adminForms={adminForms}
@@ -28670,6 +29099,8 @@ const handleSendCustomNotification = async (event) => {
             onSearchSelect={handleSearchSelect}
             setMenuOpen={setMenuOpen}
             setSelectedAnnouncement={setSelectedAnnouncement}
+            selectedStudentId={selectedStudentId}
+            setSelectedStudentId={setSelectedStudentId}
             teacherData={teacherData}
             teacherForms={teacherForms}
             setTeacherForms={setTeacherForms}

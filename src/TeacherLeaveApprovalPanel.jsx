@@ -144,6 +144,9 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
   return { inboxError, fcmError, fcmData, waError, waSent };
 };
 
+// In-memory cache for fast instant rendering without flashing
+const cachedTeacherLeaves = { kibar: null, atfal: null };
+
 export default function TeacherLeaveApprovalPanel({
   students = [],
   teacherProfiles = [],
@@ -158,27 +161,34 @@ export default function TeacherLeaveApprovalPanel({
   const CHILD_PROFILES_TABLE = sectionKibar ? 'kibar_child_profiles' : 'child_profiles';
   const BADAL_ASSIGNMENTS_TABLE = sectionKibar ? 'kibar_badal_assignments' : 'badal_assignments';
 
-  const [tlLeaves, setTlLeaves] = useState([]);
-  const [tlLoading, setTlLoading] = useState(true);
+  const initialLeaves = (sectionKibar ? cachedTeacherLeaves.kibar : cachedTeacherLeaves.atfal) || [];
+  const [tlLeaves, setTlLeaves] = useState(initialLeaves);
+  const [tlLoading, setTlLoading] = useState(initialLeaves.length === 0);
   const [tlFilter, setTlFilter] = useState("pending");
   const [tlBadalModal, setTlBadalModal] = useState(null);
   const [tlAssignments, setTlAssignments] = useState({});
   const [tlSubmitting, setTlSubmitting] = useState(false);
   const [tlComment, setTlComment] = useState("");
 
-  const fetchTlLeaves = () => {
-    setTlLoading(true);
+  const fetchTlLeaves = (silent = false) => {
+    if (!silent && tlLeaves.length === 0) {
+      setTlLoading(true);
+    }
     supabase.from(TEACHER_LEAVES_TABLE).select("*").then(({ data, error }) => {
       if (!error) {
         const rows = data || [];
         rows.sort((a, b) => new Date(b.created_at || b.createdAt || b.from_date || 0) - new Date(a.created_at || a.createdAt || a.from_date || 0));
+        if (sectionKibar) cachedTeacherLeaves.kibar = rows;
+        else cachedTeacherLeaves.atfal = rows;
         setTlLeaves(rows);
       }
       setTlLoading(false);
     });
   };
 
-  useEffect(() => { fetchTlLeaves(); }, [sectionKibar]);
+  useEffect(() => { 
+    fetchTlLeaves(initialLeaves.length > 0); 
+  }, [sectionKibar]);
 
   /* Auto-restore expired leaves on load */
   useEffect(() => {

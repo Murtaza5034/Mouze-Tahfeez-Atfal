@@ -11,6 +11,7 @@ import {
   addDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/db.js";
+import { supabase } from "../supabaseClient.js";
 import "./VideoCall.css";
 import MisriQuranViewer from "./MisriQuranViewer.jsx";
 import {
@@ -95,6 +96,301 @@ function tuneSdpForVocalClarity(sdp) {
   });
 }
 
+// Hook for draggable + 4-corner drag resizing (desktop) + two-finger pinch-to-resize (mobile) portrait floating PiP
+function useFloatingPortraitPip(initialPosFactory, initialWidth = 140) {
+  const [pos, setPos] = useState(initialPosFactory);
+  const [width, setWidth] = useState(initialWidth);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [isPinching, setIsPinching] = useState(false);
+
+  const stateRef = useRef({
+    pos,
+    width,
+    startTouchX: 0,
+    startTouchY: 0,
+    startPosX: 0,
+    startPosY: 0,
+    startWidth: 0,
+    pinchStartDist: 0,
+    pinchStartWidth: 0,
+    resizeCorner: null,
+    didMove: false,
+  });
+
+  useEffect(() => {
+    stateRef.current.pos = pos;
+    stateRef.current.width = width;
+  }, [pos, width]);
+
+  // Keep strictly within viewport bounds on window resize / orientation change
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth <= 768;
+      const margin = 8;
+      const maxAllowedW = Math.min(window.innerWidth - margin * 2, isMobile ? 380 : 650);
+      const minAllowedW = isMobile ? 90 : 110;
+
+      let curW = stateRef.current.width;
+      if (curW > maxAllowedW) curW = maxAllowedW;
+      if (curW < minAllowedW) curW = minAllowedW;
+      if (curW !== stateRef.current.width) setWidth(curW);
+
+      const h = Math.round(curW * 1.42);
+      const cur = stateRef.current.pos;
+      const maxX = Math.max(margin, window.innerWidth - curW - margin);
+      const maxY = Math.max(margin, window.innerHeight - h - margin);
+      const clampedX = Math.max(margin, Math.min(maxX, cur.x));
+      const clampedY = Math.max(margin, Math.min(maxY, cur.y));
+      if (clampedX !== cur.x || clampedY !== cur.y) {
+        setPos({ x: clampedX, y: clampedY });
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+    };
+  }, []);
+
+  // 1. Touch Handlers on Main Card (1 touch = Drag, 2 touches = Pinch-to-Resize)
+  const handleTouchStart = useCallback((e) => {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      stateRef.current.startTouchX = t.clientX;
+      stateRef.current.startTouchY = t.clientY;
+      stateRef.current.startPosX = stateRef.current.pos.x;
+      stateRef.current.startPosY = stateRef.current.pos.y;
+      stateRef.current.didMove = false;
+      setIsDragging(true);
+    } else if (e.touches.length >= 2) {
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+      stateRef.current.pinchStartDist = dist;
+      stateRef.current.pinchStartWidth = stateRef.current.width;
+      stateRef.current.startPosX = stateRef.current.pos.x;
+      stateRef.current.startPosY = stateRef.current.pos.y;
+      setIsPinching(true);
+      setIsDragging(false);
+      if (e.cancelable) e.preventDefault();
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    const margin = 8;
+    const isMobile = window.innerWidth <= 768;
+    const minW = isMobile ? 90 : 110;
+    const maxW = Math.min(window.innerWidth - margin * 2, isMobile ? 380 : 650);
+
+    if (e.touches.length >= 2) {
+      if (e.cancelable) e.preventDefault();
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+      if (stateRef.current.pinchStartDist > 0) {
+        const ratio = dist / stateRef.current.pinchStartDist;
+        const newW = Math.max(minW, Math.min(maxW, Math.round(stateRef.current.pinchStartWidth * ratio)));
+        setWidth(newW);
+
+        const newH = Math.round(newW * 1.42);
+        const maxX = Math.max(margin, window.innerWidth - newW - margin);
+        const maxY = Math.max(margin, window.innerHeight - newH - margin);
+        setPos((prev) => ({
+          x: Math.max(margin, Math.min(maxX, prev.x)),
+          y: Math.max(margin, Math.min(maxY, prev.y)),
+        }));
+      }
+    } else if (e.touches.length === 1 && !isPinching) {
+      const t = e.touches[0];
+      const dx = t.clientX - stateRef.current.startTouchX;
+      const dy = t.clientY - stateRef.current.startTouchY;
+      if (Math.hypot(dx, dy) > 5) {
+        stateRef.current.didMove = true;
+      }
+      const curW = stateRef.current.width;
+      const curH = Math.round(curW * 1.42);
+      const maxX = Math.max(margin, window.innerWidth - curW - margin);
+      const maxY = Math.max(margin, window.innerHeight - curH - margin);
+      const newX = Math.max(margin, Math.min(maxX, stateRef.current.startPosX + dx));
+      const newY = Math.max(margin, Math.min(maxY, stateRef.current.startPosY + dy));
+      setPos({ x: newX, y: newY });
+      if (e.cancelable) e.preventDefault();
+    }
+  }, [isPinching]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+    setIsPinching(false);
+    stateRef.current.pinchStartDist = 0;
+  }, []);
+
+  // 2. Mouse Drag (Move window anywhere on screen)
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest("button") || e.target.closest(".vc-pip-resize-handle") || e.target.closest(".vc-mini-card-controls")) {
+      return;
+    }
+    stateRef.current.startTouchX = e.clientX;
+    stateRef.current.startTouchY = e.clientY;
+    stateRef.current.startPosX = stateRef.current.pos.x;
+    stateRef.current.startPosY = stateRef.current.pos.y;
+    stateRef.current.didMove = false;
+    setIsDragging(true);
+
+    const handleMouseMove = (moveEv) => {
+      const dx = moveEv.clientX - stateRef.current.startTouchX;
+      const dy = moveEv.clientY - stateRef.current.startTouchY;
+      if (Math.hypot(dx, dy) > 5) {
+        stateRef.current.didMove = true;
+      }
+      const margin = 8;
+      const curW = stateRef.current.width;
+      const curH = Math.round(curW * 1.42);
+      const maxX = Math.max(margin, window.innerWidth - curW - margin);
+      const maxY = Math.max(margin, window.innerHeight - curH - margin);
+      const newX = Math.max(margin, Math.min(maxX, stateRef.current.startPosX + dx));
+      const newY = Math.max(margin, Math.min(maxY, stateRef.current.startPosY + dy));
+      setPos({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  // 3. Corner Resize Drag Handlers (Desktop Mouse + Mobile Single-Touch corner dragging)
+  const startResize = useCallback((corner, clientX, clientY) => {
+    const isMobile = window.innerWidth <= 768;
+    const margin = 8;
+    const minW = isMobile ? 90 : 110;
+    const maxW = Math.min(window.innerWidth - margin * 2, isMobile ? 380 : 650);
+
+    stateRef.current.resizeCorner = corner;
+    stateRef.current.startTouchX = clientX;
+    stateRef.current.startTouchY = clientY;
+    stateRef.current.startPosX = stateRef.current.pos.x;
+    stateRef.current.startPosY = stateRef.current.pos.y;
+    stateRef.current.startWidth = stateRef.current.width;
+    stateRef.current.didMove = true;
+    setIsResizing(true);
+
+    const onMove = (curX, curY) => {
+      const dx = curX - stateRef.current.startTouchX;
+      const dy = curY - stateRef.current.startTouchY;
+      const startW = stateRef.current.startWidth;
+      const startX = stateRef.current.startPosX;
+      const startY = stateRef.current.startPosY;
+
+      let deltaW = 0;
+      if (corner === "br") {
+        deltaW = Math.max(dx, dy / 1.42);
+      } else if (corner === "bl") {
+        deltaW = Math.max(-dx, dy / 1.42);
+      } else if (corner === "tr") {
+        deltaW = Math.max(dx, -dy / 1.42);
+      } else if (corner === "tl") {
+        deltaW = Math.max(-dx, -dy / 1.42);
+      }
+
+      const newW = Math.max(minW, Math.min(maxW, Math.round(startW + deltaW)));
+      const newH = Math.round(newW * 1.42);
+
+      let newX = startX;
+      let newY = startY;
+
+      if (corner === "bl" || corner === "tl") {
+        newX = startX - (newW - startW);
+      }
+      if (corner === "tr" || corner === "tl") {
+        newY = startY - (newH - Math.round(startW * 1.42));
+      }
+
+      const maxX = Math.max(margin, window.innerWidth - newW - margin);
+      const maxY = Math.max(margin, window.innerHeight - newH - margin);
+      newX = Math.max(margin, Math.min(maxX, newX));
+      newY = Math.max(margin, Math.min(maxY, newY));
+
+      setWidth(newW);
+      setPos({ x: newX, y: newY });
+    };
+
+    const handleMouseMove = (moveEv) => {
+      onMove(moveEv.clientX, moveEv.clientY);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      stateRef.current.resizeCorner = null;
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    const handleTouchMove = (touchEv) => {
+      if (touchEv.touches.length > 0) {
+        if (touchEv.cancelable) touchEv.preventDefault();
+        const t = touchEv.touches[0];
+        onMove(t.clientX, t.clientY);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      setIsResizing(false);
+      stateRef.current.resizeCorner = null;
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", handleTouchEnd);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd);
+    window.addEventListener("touchcancel", handleTouchEnd);
+  }, []);
+
+  const getResizeHandleProps = useCallback((corner) => ({
+    onMouseDown: (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      startResize(corner, e.clientX, e.clientY);
+    },
+    onTouchStart: (e) => {
+      e.stopPropagation();
+      if (e.touches.length > 0) {
+        if (e.cancelable) e.preventDefault();
+        startResize(corner, e.touches[0].clientX, e.touches[0].clientY);
+      }
+    },
+  }), [startResize]);
+
+  return {
+    pos,
+    setPos,
+    width,
+    setWidth,
+    height: Math.round(width * 1.42),
+    isDragging,
+    isResizing,
+    isPinching,
+    didMoveRef: stateRef,
+    getResizeHandleProps,
+    bind: {
+      onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove,
+      onTouchEnd: handleTouchEnd,
+      onTouchCancel: handleTouchEnd,
+      onMouseDown: handleMouseDown,
+    },
+  };
+}
+
 export default function VideoCall({ call, onClose }) {
   const {
     roomId,
@@ -111,6 +407,8 @@ export default function VideoCall({ call, onClose }) {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const pipFallbackCanvasRef = useRef(null);
+  const pipFallbackVideoRef = useRef(null);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteStreamRef = useRef(new MediaStream());
@@ -126,6 +424,9 @@ export default function VideoCall({ call, onClose }) {
   const localAnalyserReadyRef = useRef(false);
   const initialNegotiationDoneRef = useRef(false);
 
+  // Ultra-Lightweight Class Audio Recording (Opus 16kbps)
+  const recorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
   const statusRef = useRef("initializing");
   const camOnRef = useRef(true);
   const micOnRef = useRef(true);
@@ -139,6 +440,7 @@ export default function VideoCall({ call, onClose }) {
   const [quranOpen, setQuranOpen] = useState(false);
   const [quranPage, setQuranPage] = useState(1);
   const [isTeacherMinimized, setIsTeacherMinimized] = useState(false);
+  const [isNativePipActive, setIsNativePipActive] = useState(false);
   const [showBackLockAlert, setShowBackLockAlert] = useState(false);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [hasRemoteAudio, setHasRemoteAudio] = useState(false);
@@ -157,127 +459,329 @@ export default function VideoCall({ call, onClose }) {
   const [controlsHidden, setControlsHidden] = useState(false);
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
 
-  // Student Back Navigation Lock (Active for student/parent only)
+  const [lockToastShake, setLockToastShake] = useState(false);
+  const backLockToastTimerRef = useRef(null);
+
+  // Trigger Student Navigation Locked Alert Toast + Vibration
+  const triggerBackLockAlert = useCallback(() => {
+    setShowBackLockAlert(true);
+    setLockToastShake(true);
+    setTimeout(() => setLockToastShake(false), 600);
+
+    try {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate([180, 80, 180]);
+      }
+    } catch (_) {}
+
+    if (backLockToastTimerRef.current) clearTimeout(backLockToastTimerRef.current);
+    backLockToastTimerRef.current = setTimeout(() => {
+      setShowBackLockAlert(false);
+    }, 4500);
+  }, []);
+
+  // Multi-Layered Student Back Navigation & System Lock (Active for student/parent only)
   useEffect(() => {
     if (isTeacher) return;
 
-    // Push dummy state to capture back button
-    const dummyState = { tahfeezCallLocked: true, timestamp: Date.now() };
+    // 1. Inform Native Android Java Bridge
     try {
-      window.history.pushState(dummyState, "", window.location.href);
-    } catch (_) { }
+      if (typeof window !== "undefined" && window.MauzeBackLockBridge) {
+        window.MauzeBackLockBridge.setCallLocked(true);
+      }
+    } catch (_) {}
+
+    // 2. Hardware / Android Back Button Listener via Capacitor App Plugin
+    let capacitorBackSub = null;
+    if (typeof window !== "undefined") {
+      import("@capacitor/app")
+        .then(({ App }) => {
+          App.addListener("backButton", () => {
+            triggerBackLockAlert();
+          }).then((handle) => {
+            capacitorBackSub = handle;
+          }).catch(() => {});
+        })
+        .catch(() => {});
+    }
+
+    // 3. Custom Event listener from Native Android MainActivity bridge
+    const handleNativeBlocked = () => {
+      triggerBackLockAlert();
+    };
+    window.addEventListener("tahfeez-back-blocked", handleNativeBlocked);
+
+    // 4. Browser / Webview History Trap (Continuous trap entries)
+    const trapKey = "tahfeez_lock_" + Date.now();
+    try {
+      for (let i = 0; i < 4; i++) {
+        window.history.pushState({ tahfeezCallLocked: true, trapKey }, "", window.location.href);
+      }
+    } catch (_) {}
 
     const handlePopState = (e) => {
-      // Re-push state to block back navigation
       try {
-        window.history.pushState(dummyState, "", window.location.href);
-      } catch (_) { }
-      setShowBackLockAlert(true);
+        window.history.pushState({ tahfeezCallLocked: true, trapKey }, "", window.location.href);
+      } catch (_) {}
+      triggerBackLockAlert();
     };
 
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("popstate", handlePopState, { capture: true });
 
+    // 5. BeforeUnload Warning
     const handleBeforeUnload = (e) => {
       e.preventDefault();
-      e.returnValue = "Online Tahfeez class is in session. Are you sure you want to leave?";
+      e.returnValue = "Online Tahfeez class is in session. Navigation is locked. Please stay in class or use End Call.";
       return e.returnValue;
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
 
+    // 6. Screen Wake Lock (Keeps mobile device screen awake during student recitation)
+    let wakeLockObj = null;
+    if (typeof navigator !== "undefined" && navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request("screen")
+        .then((wl) => { wakeLockObj = wl; })
+        .catch(() => {});
+    }
+
     return () => {
-      window.removeEventListener("popstate", handlePopState);
+      // Release locks on exit
+      try {
+        if (typeof window !== "undefined" && window.MauzeBackLockBridge) {
+          window.MauzeBackLockBridge.setCallLocked(false);
+        }
+      } catch (_) {}
+
+      if (capacitorBackSub && capacitorBackSub.remove) {
+        capacitorBackSub.remove();
+      }
+      window.removeEventListener("tahfeez-back-blocked", handleNativeBlocked);
+      window.removeEventListener("popstate", handlePopState, { capture: true });
       window.removeEventListener("beforeunload", handleBeforeUnload);
+
+      if (wakeLockObj && wakeLockObj.release) {
+        wakeLockObj.release().catch(() => {});
+      }
+      if (backLockToastTimerRef.current) {
+        clearTimeout(backLockToastTimerRef.current);
+      }
     };
-  }, [isTeacher]);
+  }, [isTeacher, triggerBackLockAlert]);
 
-  // Quran Dynamic Stretchable Split View (Resizable divider for Quran & Student screen)
-  const [quranSplitRatio, setQuranSplitRatio] = useState(() => window.innerWidth <= 768 ? 56 : 58);
-  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
-  const isDraggingSplitRef = useRef(false);
-  const quranViewportRef = useRef(null);
+  // Hook for draggable + multi-corner drag resizing (desktop) + 2-finger pinch resizing (mobile)
+  const initialPipWidth = typeof window !== "undefined" && window.innerWidth <= 768 ? 130 : 175;
 
-  // Handle start of split drag (touch or mouse)
-  const handleSplitDragStart = useCallback((e) => {
-    e.preventDefault();
-    isDraggingSplitRef.current = true;
-    setIsDraggingSplit(true);
-  }, []);
+  const quranPip = useFloatingPortraitPip(
+    () => ({
+      x: typeof window !== "undefined" ? Math.max(10, window.innerWidth - (window.innerWidth <= 768 ? 145 : 195)) : 200,
+      y: typeof window !== "undefined" && window.innerWidth <= 768 ? 68 : 80,
+    }),
+    initialPipWidth
+  );
 
-  // Quick snap toggle when clicking the resizer pill
-  const handleSplitQuickSnap = useCallback((e) => {
-    e.stopPropagation();
-    setQuranSplitRatio((prev) => {
-      if (prev >= 68) return 36; // Focus student video
-      if (prev <= 42) return 56; // Balanced split
-      return 74; // Maximize Quran reading view
-    });
-  }, []);
+  const minimizedPip = useFloatingPortraitPip(
+    () => ({
+      x: typeof window !== "undefined" ? Math.max(10, window.innerWidth - (window.innerWidth <= 768 ? 145 : 195)) : 200,
+      y: typeof window !== "undefined" ? Math.max(10, window.innerHeight - (window.innerWidth <= 768 ? 250 : 320)) : 400,
+    }),
+    initialPipWidth
+  );
 
-  // Smooth global drag tracking for resizable split view (Mobile touch + Desktop mouse)
+  // Maintain dynamic animated fallback video stream for native OS PiP (supports PiP even when camera is off or audio-only)
   useEffect(() => {
-    const handleMove = (e) => {
-      if (!isDraggingSplitRef.current || !quranViewportRef.current) return;
-      
-      const rect = quranViewportRef.current.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    let animId = null;
+    let canvas = pipFallbackCanvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.width = 480;
+      canvas.height = 680;
+      pipFallbackCanvasRef.current = canvas;
+    }
 
-      const isMobile = window.innerWidth <= 768;
-      let ratio;
-      if (isMobile) {
-        // Vertical height ratio
-        const curY = clientY - rect.top;
-        ratio = (curY / rect.height) * 100;
-      } else {
-        // Horizontal width ratio
-        const curX = clientX - rect.left;
-        ratio = (curX / rect.width) * 100;
+    const ctx = canvas.getContext("2d");
+    let angle = 0;
+
+    const drawFrame = () => {
+      if (endedRef.current) return;
+      angle += 0.04;
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Dark luxury background
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, "#16130e");
+      grad.addColorStop(1, "#0a0907");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Gold / Green border
+      ctx.strokeStyle = remoteSpeaking ? "#2ecc71" : "rgba(212, 175, 55, 0.7)";
+      ctx.lineWidth = 6;
+      ctx.strokeRect(3, 3, w - 6, h - 6);
+
+      // Header Bar in Canvas
+      ctx.fillStyle = "rgba(212, 175, 55, 0.15)";
+      ctx.fillRect(10, 10, w - 20, 52);
+      ctx.fillStyle = "#d4af37";
+      ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Mauze Tahfeez Online", w / 2, 42);
+
+      // Avatar circle center coordinates
+      const cx = w / 2;
+      const cy = h / 2 - 30;
+      const baseRadius = 80;
+
+      // Animated speaking waves
+      if (remoteSpeaking) {
+        const pulse = Math.sin(angle * 3) * 12;
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseRadius + 18 + pulse, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(46, 204, 113, 0.25)";
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseRadius + 8 + pulse * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(46, 204, 113, 0.4)";
+        ctx.fill();
       }
 
-      // Allow fluid resizing between 20% and 80%
-      const clamped = Math.max(20, Math.min(80, ratio));
-      setQuranSplitRatio(Math.round(clamped));
+      // Avatar Background
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+      ctx.fillStyle = "#262118";
+      ctx.fill();
+      ctx.strokeStyle = remoteSpeaking ? "#2ecc71" : "#d4af37";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // Avatar Letter
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 72px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText((peerName || "?").slice(0, 1).toUpperCase(), cx, cy);
+
+      // Student Name
+      ctx.fillStyle = "#f7f5f0";
+      ctx.font = "bold 26px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(peerName || "Student", cx, cy + baseRadius + 45);
+
+      // Live Recitation Status
+      ctx.fillStyle = remoteSpeaking ? "#2ecc71" : "#d4af37";
+      ctx.font = "600 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(
+        remoteSpeaking ? "Reciting Live • Speaking" : (status === "connected" ? "Audio Live • In Class" : "Connecting…"),
+        cx,
+        cy + baseRadius + 78
+      );
+
+      animId = requestAnimationFrame(drawFrame);
     };
 
-    const handleEnd = () => {
-      if (isDraggingSplitRef.current) {
-        isDraggingSplitRef.current = false;
-        setIsDraggingSplit(false);
-      }
-    };
+    drawFrame();
 
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleEnd);
-    window.addEventListener("touchmove", handleMove, { passive: false });
-    window.addEventListener("touchend", handleEnd);
-    window.addEventListener("touchcancel", handleEnd);
+    // Stream canvas to fallback video
+    if (pipFallbackVideoRef.current && typeof canvas.captureStream === "function") {
+      try {
+        if (!pipFallbackVideoRef.current.srcObject) {
+          const stream = canvas.captureStream(24);
+          pipFallbackVideoRef.current.srcObject = stream;
+        }
+        pipFallbackVideoRef.current.play().catch(() => {});
+      } catch (_) {}
+    }
 
     return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleEnd);
-      window.removeEventListener("touchmove", handleMove);
-      window.removeEventListener("touchend", handleEnd);
-      window.removeEventListener("touchcancel", handleEnd);
+      if (animId) cancelAnimationFrame(animId);
     };
-  }, []);
+  }, [peerName, remoteSpeaking, status]);
 
-  // Teacher Picture-in-Picture & Minimize handler
-  const handleTeacherPip = useCallback(async () => {
-    if (!isTeacher) return;
+  // Sync remote video stream whenever view changes (e.g. minimizing or opening Quran)
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStreamRef.current && remoteStreamRef.current.getVideoTracks().length > 0) {
+      if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+        remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      }
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [isTeacherMinimized, quranOpen, hasRemoteVideo]);
+
+  // Native Picture-in-Picture event listeners
+  useEffect(() => {
+    const handleEnterPip = () => setIsNativePipActive(true);
+    const handleLeavePip = () => setIsNativePipActive(false);
+
+    const rVid = remoteVideoRef.current;
+    const fVid = pipFallbackVideoRef.current;
+
+    if (rVid) {
+      rVid.addEventListener("enterpictureinpicture", handleEnterPip);
+      rVid.addEventListener("leavepictureinpicture", handleLeavePip);
+    }
+    if (fVid) {
+      fVid.addEventListener("enterpictureinpicture", handleEnterPip);
+      fVid.addEventListener("leavepictureinpicture", handleLeavePip);
+    }
+
+    return () => {
+      if (rVid) {
+        rVid.removeEventListener("enterpictureinpicture", handleEnterPip);
+        rVid.removeEventListener("leavepictureinpicture", handleLeavePip);
+      }
+      if (fVid) {
+        fVid.removeEventListener("enterpictureinpicture", handleEnterPip);
+        fVid.removeEventListener("leavepictureinpicture", handleLeavePip);
+      }
+    };
+  }, [isTeacherMinimized, quranOpen]);
+
+  // Request true OS-Level Picture-in-Picture (Floats over all other apps / WhatsApp / PDFs)
+  const requestNativePip = useCallback(async () => {
     try {
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
-      } else if (remoteVideoRef.current && document.pictureInPictureEnabled) {
-        await remoteVideoRef.current.requestPictureInPicture();
+        setIsNativePipActive(false);
+        return;
+      }
+
+      const showVideo = peerCamOn && hasRemoteVideo && status === "connected";
+      const targetVideo = (showVideo && remoteVideoRef.current)
+        ? remoteVideoRef.current
+        : pipFallbackVideoRef.current;
+
+      if (targetVideo && typeof targetVideo.requestPictureInPicture === "function") {
+        try {
+          if (targetVideo.readyState === 0 && targetVideo.load) targetVideo.load();
+          await targetVideo.play().catch(() => {});
+          await targetVideo.requestPictureInPicture();
+          setIsNativePipActive(true);
+        } catch (pipErr) {
+          console.warn("[PiP] Target video PiP note:", pipErr);
+          // Try fallback video if primary failed
+          if (pipFallbackVideoRef.current && targetVideo !== pipFallbackVideoRef.current) {
+            await pipFallbackVideoRef.current.play().catch(() => {});
+            await pipFallbackVideoRef.current.requestPictureInPicture();
+            setIsNativePipActive(true);
+          } else {
+            // If native OS PiP is completely unavailable, toggle in-app floating mode
+            setIsTeacherMinimized((prev) => !prev);
+          }
+        }
       } else {
+        // Fallback to in-app floating mode
         setIsTeacherMinimized((prev) => !prev);
       }
     } catch (err) {
-      console.warn("[PiP] Native Picture-in-Picture note, using in-app floating mode:", err);
+      console.warn("[PiP] requestNativePip error:", err);
       setIsTeacherMinimized((prev) => !prev);
     }
-  }, [isTeacher]);
+  }, [peerCamOn, hasRemoteVideo, status]);
+
+  // Teacher Picture-in-Picture handler (Requests OS PiP so teacher can use other apps)
+  const handleTeacherPip = useCallback(async () => {
+    if (!isTeacher) return;
+    await requestNativePip();
+  }, [isTeacher, requestNativePip]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -343,6 +847,71 @@ export default function VideoCall({ call, onClose }) {
     }
     return audioContextRef.current;
   }, []);
+
+  // Ultra-Lightweight Class Audio Recording (Opus 16kbps)
+  const mixedDestRef = useRef(null);
+  const recordingMimeTypeRef = useRef("audio/webm;codecs=opus");
+  const localAudioSourceRef = useRef(null);
+  const remoteAudioSourceRef = useRef(null);
+
+  const startCallAudioRecording = useCallback(() => {
+    if (isSpectator || recorderRef.current) return;
+    if (typeof window === "undefined" || !window.MediaRecorder) return;
+
+    try {
+      const ctx = ensureAudioContext();
+      if (!ctx) return;
+
+      if (!mixedDestRef.current) {
+        mixedDestRef.current = ctx.createMediaStreamDestination();
+      }
+      const dest = mixedDestRef.current;
+
+      // Connect local mic
+      if (localStreamRef.current && localStreamRef.current.getAudioTracks().length > 0 && !localAudioSourceRef.current) {
+        try {
+          const lSrc = ctx.createMediaStreamSource(localStreamRef.current);
+          lSrc.connect(dest);
+          localAudioSourceRef.current = lSrc;
+        } catch (_) {}
+      }
+
+      // Connect remote audio
+      if (remoteStreamRef.current && remoteStreamRef.current.getAudioTracks().length > 0 && !remoteAudioSourceRef.current) {
+        try {
+          const rSrc = ctx.createMediaStreamSource(remoteStreamRef.current);
+          rSrc.connect(dest);
+          remoteAudioSourceRef.current = rSrc;
+        } catch (_) {}
+      }
+
+      let mimeType = "audio/webm;codecs=opus";
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        if (MediaRecorder.isTypeSupported("audio/webm")) mimeType = "audio/webm";
+        else if (MediaRecorder.isTypeSupported("audio/mp4")) mimeType = "audio/mp4";
+        else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) mimeType = "audio/ogg;codecs=opus";
+        else mimeType = "";
+      }
+      recordingMimeTypeRef.current = mimeType || "audio/webm";
+
+      const rec = new MediaRecorder(dest.stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 16000 // Ultra-lightweight Opus voice compression (approx 120KB per minute)
+      });
+
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
+      };
+
+      rec.start(4000);
+      recorderRef.current = rec;
+      console.log("[AudioRecord] Ultra-light Opus class recording started @ 16kbps");
+    } catch (err) {
+      console.warn("[AudioRecord] Note:", err);
+    }
+  }, [ensureAudioContext, isSpectator]);
 
   // Local microphone volume analyser (for the "speaking" indicator only —
   // never routed to a destination, so this can't cause echo/feedback).
@@ -475,6 +1044,69 @@ export default function VideoCall({ call, onClose }) {
     if (endedRef.current) return;
     endedRef.current = true;
 
+    // Stop and upload class audio recording
+    if (recorderRef.current) {
+      try {
+        if (recorderRef.current.state !== "inactive") {
+          recorderRef.current.stop();
+        }
+        const chunks = [...recordedChunksRef.current];
+        const mType = recordingMimeTypeRef.current || "audio/webm";
+        const studentIdVal = call?.studentId || call?.student_id || (roomId ? roomId.replace(/^session_/, '') : null);
+        const studentNameVal = call?.studentName || call?.student_name || (myRole === "teacher" ? peerName : myName);
+        const teacherNameVal = call?.teacherName || call?.teacher_name || (myRole === "teacher" ? myName : peerName);
+        const startedAtIso = call?.startedAt || new Date().toISOString();
+        const endedAtIso = new Date().toISOString();
+        const durSecs = Math.max(0, Math.round((new Date(endedAtIso).getTime() - new Date(startedAtIso).getTime()) / 1000));
+
+        if (chunks.length > 0 && durSecs >= 3) {
+          const blob = new Blob(chunks, { type: mType });
+          if (blob.size > 500) {
+            const ext = mType.includes("mp4") ? "mp4" : "webm";
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const fileName = `call_${roomId || 'rec'}_${Date.now()}.${ext}`;
+            const filePath = `recordings/${dateStr}/${fileName}`;
+
+            supabase.storage.from("tahfeez_recordings").upload(filePath, blob, {
+              contentType: mType,
+              cacheControl: "31536000"
+            }).then(async ({ data: upData, error: upErr }) => {
+              if (!upErr && upData) {
+                const { data: urlData } = await supabase.storage.from("tahfeez_recordings").getPublicUrl(filePath);
+                const audioUrl = urlData?.publicUrl || upData.publicUrl || "";
+                if (audioUrl) {
+                  const fileSizeKb = Math.round(blob.size / 1024);
+                  // Update existing log record
+                  await supabase.from("online_tahfeez_logs").update({
+                    audio_url: audioUrl,
+                    recording_url: audioUrl,
+                    file_size_kb: fileSizeKb
+                  }).eq("id", roomId);
+
+                  // Also ensure record exists in online_tahfeez_logs
+                  await supabase.from("online_tahfeez_logs").upsert({
+                    id: roomId,
+                    student_id: String(studentIdVal || ''),
+                    student_name: studentNameVal,
+                    teacher_name: teacherNameVal,
+                    started_at: startedAtIso,
+                    ended_at: endedAtIso,
+                    duration_seconds: durSecs,
+                    audio_url: audioUrl,
+                    recording_url: audioUrl,
+                    file_size_kb: fileSizeKb,
+                    type: call?.type || "1-on-1"
+                  }, { onConflict: "id" });
+                }
+              }
+            }).catch((e) => console.warn("[AudioRecord] Upload note:", e));
+          }
+        }
+      } catch (recErr) {
+        console.warn("[AudioRecord] Teardown note:", recErr);
+      }
+    }
+
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
@@ -534,10 +1166,13 @@ export default function VideoCall({ call, onClose }) {
       try {
         const roomRef = doc(db, SIGNAL_PATH, roomId);
         const fieldName = role === "caller" ? "caller_in_room" : "callee_in_room";
-        updateDoc(roomRef, { [fieldName]: false }).catch(() => { });
+        updateDoc(roomRef, { 
+          [fieldName]: false,
+          ...(isSpectator ? {} : { status: "ended", ended_at: Date.now() })
+        }).catch(() => { });
       } catch (_) { }
     }
-  }, [roomId, role, SIGNAL_PATH]);
+  }, [roomId, role, SIGNAL_PATH, isSpectator, call, myRole, peerName, myName]);
 
   // User clicks End button
   const handleEnd = useCallback(() => {
@@ -615,6 +1250,14 @@ export default function VideoCall({ call, onClose }) {
 
     // Camera not yet acquired - request camera
     try {
+      if (window.MauzeMediaPermissionBridge) {
+        try {
+          if (!window.MauzeMediaPermissionBridge.hasMediaPermissions()) {
+            window.MauzeMediaPermissionBridge.requestMediaPermissions();
+            await new Promise((r) => setTimeout(r, 600));
+          }
+        } catch (_) {}
+      }
       let videoStream = null;
       try {
         videoStream = await navigator.mediaDevices.getUserMedia({
@@ -763,6 +1406,14 @@ export default function VideoCall({ call, onClose }) {
       // 1. Acquire Local Media (Mic + Cam) with vocal clarity constraints
       let stream = null;
       if (!isSpectator) {
+        if (window.MauzeMediaPermissionBridge) {
+          try {
+            if (!window.MauzeMediaPermissionBridge.hasMediaPermissions()) {
+              window.MauzeMediaPermissionBridge.requestMediaPermissions();
+              await new Promise((r) => setTimeout(r, 600));
+            }
+          } catch (_) {}
+        }
         try {
           try {
             stream = await navigator.mediaDevices.getUserMedia({
@@ -911,6 +1562,11 @@ export default function VideoCall({ call, onClose }) {
         const track = ev.track;
 
         if (track.kind === "video") {
+          // Keep remoteStreamRef updated for seamless view switches
+          const oldTracks = remoteStreamRef.current.getVideoTracks();
+          oldTracks.forEach((t) => remoteStreamRef.current.removeTrack(t));
+          remoteStreamRef.current.addTrack(track);
+
           // Do not set hasRemoteVideo to true here yet. Wait for onplaying.
           track.onmute = () => setHasRemoteVideo(false);
           track.onunmute = () => {
@@ -921,8 +1577,7 @@ export default function VideoCall({ call, onClose }) {
           track.onended = () => setHasRemoteVideo(false);
 
           if (remoteVideoRef.current) {
-            const vidStream = new MediaStream([track]);
-            remoteVideoRef.current.srcObject = vidStream;
+            remoteVideoRef.current.srcObject = remoteStreamRef.current;
             remoteVideoRef.current.onloadedmetadata = () => {
               remoteVideoRef.current.play().catch(() => { });
             };
@@ -943,6 +1598,7 @@ export default function VideoCall({ call, onClose }) {
           // Single, guarded call — builds the Web Audio graph exactly once
           // and mutes the raw <audio> element so audio isn't routed twice.
           connectRemoteAudio(new MediaStream([track]));
+          startCallAudioRecording();
         }
         // Do NOT set status="connected" here. Wait for iceConnectionState to become "connected".
       };
@@ -955,6 +1611,7 @@ export default function VideoCall({ call, onClose }) {
         if (cs === "connected" || ics === "connected" || ics === "completed") {
           setStatus("connected");
           setError("");
+          startCallAudioRecording();
         } else if (cs === "disconnected" || ics === "disconnected") {
           setStatus("reconnecting");
         } else if (cs === "failed" || ics === "failed") {
@@ -1167,6 +1824,11 @@ export default function VideoCall({ call, onClose }) {
             const data = snapshot.data();
             if (!data || data.sessionId !== currentSessionId) return;
 
+            if (data.status === "ended") {
+              handleEnd();
+              return;
+            }
+
             // Track callee's live camera and mic state
             if (data.callee_cam_on !== undefined) {
               setPeerCamOn(data.callee_cam_on);
@@ -1199,6 +1861,11 @@ export default function VideoCall({ call, onClose }) {
           if (endedRef.current || !snapshot.exists()) return;
           const data = snapshot.data();
           if (!data) return;
+
+          if (data.status === "ended") {
+            handleEnd();
+            return;
+          }
 
           if (data.sessionId && data.sessionId !== sessionIdRef.current) {
             sessionIdRef.current = data.sessionId;
@@ -1316,6 +1983,22 @@ export default function VideoCall({ call, onClose }) {
     };
   }, [toggleMic, toggleFullscreen, quranOpen]);
 
+  // Ensure video elements have srcObject attached whenever view mode changes
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStreamRef.current && remoteStreamRef.current.getVideoTracks().length > 0) {
+      if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+        remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      }
+      remoteVideoRef.current.play().then(() => setHasRemoteVideo(true)).catch(() => {});
+    }
+    if (localVideoRef.current && localStreamRef.current && localStreamRef.current.getVideoTracks().length > 0) {
+      if (localVideoRef.current.srcObject !== localStreamRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+      }
+      localVideoRef.current.play().catch(() => {});
+    }
+  }, [quranOpen, isTeacherMinimized, layoutMode, camOn, status]);
+
   if (!call) return null;
 
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
@@ -1332,45 +2015,71 @@ export default function VideoCall({ call, onClose }) {
 
   const showRemoteVideo = peerCamOn && hasRemoteVideo && status === "connected";
 
-  // If teacher minimized the call into floating in-app mini player
+  // If teacher minimized the call into floating in-app mini player (Portrait + Movable + 4-Corner Resizable + Pinch-Resizable)
   if (isTeacher && isTeacherMinimized) {
     return createPortal(
       <div
-        className="vc-floating-mini-player"
-        onClick={() => setIsTeacherMinimized(false)}
+        className={`vc-floating-mini-player vc-floating-portrait-card ${minimizedPip.isDragging ? "vc-pip-dragging" : ""} ${minimizedPip.isResizing ? "vc-pip-resizing" : ""} ${remoteSpeaking ? "vc-speaking" : ""}`}
+        style={{
+          left: `${minimizedPip.pos.x}px`,
+          top: `${minimizedPip.pos.y}px`,
+          width: `${minimizedPip.width}px`,
+          height: `${minimizedPip.height}px`,
+        }}
+        {...minimizedPip.bind}
+        onClick={() => {
+          if (!minimizedPip.didMoveRef.current.didMove) {
+            setIsTeacherMinimized(false);
+          }
+        }}
         role="dialog"
         aria-label="Active Call Floating Widget"
-        title="Click to expand full classroom screen"
+        title="Tap to expand classroom screen · Drag anywhere · Drag corners or pinch to resize"
       >
         <audio ref={remoteAudioRef} autoPlay playsInline muted={true} />
 
-        {/* Video feed or mini avatar in floating card */}
-        <div className="vc-mini-video-wrap">
-          <video
-            ref={remoteVideoRef}
-            className={`vc-mini-video ${showRemoteVideo ? "visible" : "hidden"}`}
-            autoPlay
-            playsInline
-            muted={true}
-          />
-          {!showRemoteVideo && (
-            <div className="vc-mini-avatar">
+        {/* Hidden Fallback Video for Native PiP */}
+        <video
+          ref={pipFallbackVideoRef}
+          style={{ position: "fixed", width: 1, height: 1, opacity: 0, pointerEvents: "none", zIndex: -100 }}
+          autoPlay
+          playsInline
+          muted
+        />
+
+        {/* Video feed or portrait avatar */}
+        <video
+          ref={remoteVideoRef}
+          className={`vc-video-elem vc-mini-card-video ${showRemoteVideo ? "vc-video-visible" : "vc-video-hidden"}`}
+          autoPlay
+          playsInline
+          muted={true}
+        />
+        {!showRemoteVideo && (
+          <div className="vc-avatar-placeholder vc-mini-avatar-portrait">
+            <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
               <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
             </div>
-          )}
-          {remoteSpeaking && <span className="vc-mini-speaking-dot" />}
-        </div>
-
-        {/* Info & mini controls */}
-        <div className="vc-mini-info">
-          <div className="vc-mini-name">{peerName}</div>
-          <div className="vc-mini-status">
-            <span className="vc-dot vc-dot-active" style={{ width: 7, height: 7 }} />
-            <span>{statusLabel}</span>
+            <div className="vc-mini-card-peer">{peerName}</div>
           </div>
+        )}
+
+        {/* Top Info Bar: Name & Timer */}
+        <div className="vc-mini-card-topbar" onClick={(e) => e.stopPropagation()}>
+          <div className="vc-mini-card-info">
+            <span className="vc-dot vc-dot-active" style={{ width: 6, height: 6 }} />
+            <span className="vc-mini-card-name">{peerName}</span>
+          </div>
+          <span className="vc-mini-card-time">{statusLabel}</span>
         </div>
 
-        <div className="vc-mini-actions" onClick={(e) => e.stopPropagation()}>
+        {/* Action Controls */}
+        <div
+          className="vc-mini-card-controls"
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <button
             type="button"
             className={`vc-mini-btn ${micOn ? "" : "muted"}`}
@@ -1378,6 +2087,14 @@ export default function VideoCall({ call, onClose }) {
             title={micOn ? "Mute" : "Unmute"}
           >
             {micOn ? <Mic size={14} /> : <MicOff size={14} />}
+          </button>
+          <button
+            type="button"
+            className={`vc-mini-btn pip ${isNativePipActive ? "active" : ""}`}
+            onClick={requestNativePip}
+            title={isNativePipActive ? "Exit System PiP" : "Pop out System PiP (Over all apps)"}
+          >
+            <PictureInPicture2 size={14} />
           </button>
           <button
             type="button"
@@ -1396,6 +2113,28 @@ export default function VideoCall({ call, onClose }) {
             <Phone size={14} style={{ transform: "rotate(135deg)" }} />
           </button>
         </div>
+
+        {/* 4 Corner Drag Resize Handles (Desktop Mouse & Touch Drag) */}
+        <div
+          className="vc-pip-resize-handle vc-pip-resize-handle-br"
+          {...minimizedPip.getResizeHandleProps("br")}
+          title="Drag corner to resize (Desktop / Touch)"
+        />
+        <div
+          className="vc-pip-resize-handle vc-pip-resize-handle-bl"
+          {...minimizedPip.getResizeHandleProps("bl")}
+          title="Drag corner to resize (Desktop / Touch)"
+        />
+        <div
+          className="vc-pip-resize-handle vc-pip-resize-handle-tr"
+          {...minimizedPip.getResizeHandleProps("tr")}
+          title="Drag corner to resize (Desktop / Touch)"
+        />
+        <div
+          className="vc-pip-resize-handle vc-pip-resize-handle-tl"
+          {...minimizedPip.getResizeHandleProps("tl")}
+          title="Drag corner to resize (Desktop / Touch)"
+        />
       </div>,
       document.body
     );
@@ -1414,14 +2153,22 @@ export default function VideoCall({ call, onClose }) {
     >
       {/* Student Navigation Locked Notification Toast */}
       {showBackLockAlert && (
-        <div className="vc-back-lock-toast" role="alert">
-          <ShieldAlert size={24} className="vc-lock-icon" />
+        <div className={`vc-back-lock-toast ${lockToastShake ? "vc-toast-shake" : ""}`} role="alert">
+          <ShieldAlert size={26} className="vc-lock-icon" />
           <div className="vc-lock-text">
             <div className="vc-lock-title">Online Tahfeez Class In Progress</div>
             <div className="vc-lock-desc">
-              Navigation is disabled for students during live recitation. Please stay in class or use the End button.
+              Mobile & system navigation is locked during class. You must stay in this live session. To exit, tap the <strong>End Call</strong> button below.
             </div>
           </div>
+          <button
+            type="button"
+            className="vc-lock-close-btn"
+            onClick={() => setShowBackLockAlert(false)}
+            title="Dismiss notification"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
@@ -1442,6 +2189,15 @@ export default function VideoCall({ call, onClose }) {
           muted={true}
         />
 
+        {/* Hidden Fallback Video for Native PiP */}
+        <video
+          ref={pipFallbackVideoRef}
+          style={{ position: "fixed", width: 1, height: 1, opacity: 0, pointerEvents: "none", zIndex: -100 }}
+          autoPlay
+          playsInline
+          muted
+        />
+
         {/* Top Header Bar */}
         <div className="vc-topbar">
           <div className="vc-topbar-left">
@@ -1451,24 +2207,35 @@ export default function VideoCall({ call, onClose }) {
                 {isSpectator ? "Auditing Class (Spectator)" : "Online Tahfeez"}
               </span>
               <span className="vc-role-badge">
-                Mauze Tahfeez Galiakot
+                {isTeacher ? `Student: ${peerName}` : `Muhaffiz: ${peerName}`}
               </span>
             </div>
           </div>
           <div className="vc-topbar-right">
             <span className="vc-status-pill">{statusLabel}</span>
 
-            {/* Teacher-Only Picture-in-Picture / Minimize button in header */}
+            {/* Teacher-Only Picture-in-Picture & Minimize buttons in header */}
             {isTeacher && (
-              <button
-                type="button"
-                className="vc-icon-btn vc-pip-header-btn"
-                onClick={handleTeacherPip}
-                title="Picture-in-Picture / Minimize to background"
-              >
-                <PictureInPicture2 size={14} />
-                <span>PiP</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={`vc-icon-btn vc-pip-header-btn ${isNativePipActive ? "vc-pip-active" : ""}`}
+                  onClick={requestNativePip}
+                  title={isNativePipActive ? "Exit System Picture-in-Picture" : "System Picture-in-Picture (Floats over all apps / WhatsApp / PDFs)"}
+                >
+                  <PictureInPicture2 size={14} />
+                  <span>{isNativePipActive ? "PiP Active" : "PiP"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vc-icon-btn vc-pip-header-btn"
+                  onClick={() => setIsTeacherMinimized(true)}
+                  title="Minimize to In-App Floating Card"
+                >
+                  <Minimize2 size={14} />
+                  <span>Minimize</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -1476,25 +2243,11 @@ export default function VideoCall({ call, onClose }) {
         {/* Main Viewport */}
         {quranOpen ? (
           /* ============================================================
-             PREMIUM MULTI 3-SCREEN GRID MODE (Misri Quran + Student Video + Teacher Self-Cam)
-             WITH DYNAMIC MOBILE & DESKTOP STRETCHABLE RESIZABLE SPLIT VIEW
+             FULL QURAN PAGE VIEW + FLOATING MOVABLE PORTRAIT PIP STUDENT SCREEN
              ============================================================ */
-          <div 
-            ref={quranViewportRef}
-            className={`vc-viewport vc-quran-viewport ${isDraggingSplit ? "vc-split-dragging" : ""}`}
-            style={{
-              "--quran-split-ratio": `${quranSplitRatio}%`
-            }}
-          >
-            {/* Screen 1: Misri Quran Reader (Primary reading view - Dynamic Stretched Size) */}
-            <div 
-              className="vc-quran-box"
-              style={{
-                flex: `0 0 ${quranSplitRatio}%`,
-                maxHeight: typeof window !== "undefined" && window.innerWidth <= 768 ? `${quranSplitRatio}%` : "100%",
-                maxWidth: typeof window !== "undefined" && window.innerWidth > 768 ? `${quranSplitRatio}%` : "100%"
-              }}
-            >
+          <div className="vc-viewport vc-quran-viewport">
+            {/* Screen 1: Full Quran Page Reader (100% full view) */}
+            <div className="vc-quran-box full">
               <MisriQuranViewer
                 currentPage={quranPage}
                 onPageChange={setQuranPage}
@@ -1502,33 +2255,17 @@ export default function VideoCall({ call, onClose }) {
               />
             </div>
 
-            {/* Stretchable Split Resizer Bar / Multi-Screen Drag Divider */}
+            {/* Screen 2: Floating Movable & 4-Corner Resizable Portrait Student PiP */}
             <div
-              className={`vc-split-resizer ${isDraggingSplit ? "active" : ""}`}
-              onMouseDown={handleSplitDragStart}
-              onTouchStart={handleSplitDragStart}
-              title="Drag to stretch / adjust Quran and Student video screen size"
-            >
-              <div 
-                className="vc-resizer-pill"
-                onClick={handleSplitQuickSnap}
-                title="Tap to cycle screen presets (74% / 56% / 36%)"
-              >
-                <div className="vc-resizer-grip" />
-                <span className="vc-resizer-ratio-tooltip">
-                  {quranSplitRatio}% Quran
-                </span>
-              </div>
-            </div>
-
-            {/* Screen 2: Student Remote Video Feed (Dynamically adapts to remaining space) */}
-            <div 
-              className={`vc-student-box-quran ${remoteSpeaking ? "vc-speaking" : ""}`}
+              className={`vc-floating-student-pip ${quranPip.isDragging ? "vc-pip-dragging" : ""} ${quranPip.isResizing ? "vc-pip-resizing" : ""} ${remoteSpeaking ? "vc-speaking" : ""}`}
               style={{
-                flex: "1 1 auto",
-                minHeight: 0,
-                minWidth: 0
+                left: `${quranPip.pos.x}px`,
+                top: `${quranPip.pos.y}px`,
+                width: `${quranPip.width}px`,
+                height: `${quranPip.height}px`,
               }}
+              {...quranPip.bind}
+              title="Drag anywhere · Drag corners or pinch to resize"
             >
               <video
                 ref={remoteVideoRef}
@@ -1538,58 +2275,67 @@ export default function VideoCall({ call, onClose }) {
                 muted={true}
               />
               {!showRemoteVideo && (
-                <div className="vc-avatar-placeholder">
+                <div className="vc-avatar-placeholder vc-pip-avatar">
                   <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
                     <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
                   </div>
-                  <div className="vc-peer-name">{peerName}</div>
-                  {status === "connected" ? (
-                    <div className="vc-audio-live-pill">
-                      <span className="vc-audio-wave">
-                        <span></span><span></span><span></span><span></span>
-                      </span>
-                      <span>{peerCamOn ? "Connecting camera…" : "Camera Off · Audio Live"}</span>
-                    </div>
-                  ) : (
-                    <div className="vc-status-sub">{statusLabel}</div>
-                  )}
-                  {error && <div className="vc-error-pill">{error}</div>}
+                  <div className="vc-pip-name">{peerName}</div>
+                  <div className="vc-pip-status-sub">
+                    {status === "connected" ? "Audio Live" : statusLabel}
+                  </div>
                 </div>
               )}
-              <div className="vc-stream-tag">
+
+              {/* Participant Tag / Info */}
+              <div className="vc-pip-tag">
                 <div className="vc-tag-user">
-                  {isTeacher ? <User size={13} /> : <GraduationCap size={13} />}
-                  <span>{peerName}</span>
+                  {isTeacher ? <User size={11} /> : <GraduationCap size={11} />}
+                  <span title={peerName}>{peerName} {isTeacher ? "(Student)" : "(Muhaffiz)"}</span>
                 </div>
                 {!peerMicOn && <span className="vc-muted-tag">Muted</span>}
                 {remoteSpeaking && peerMicOn && <span className="vc-speaking-tag">Speaking…</span>}
               </div>
-            </div>
 
-            {/* Screen 3: Teacher Miniature Self-View (very little size floating preview) */}
-            {!isSpectator && (
-              <div className={`vc-teacher-mini-floating ${localSpeaking ? "vc-speaking" : ""}`}>
-                <video
-                  ref={localVideoRef}
-                  className={`vc-video-elem vc-local-elem ${camOn ? "vc-video-visible" : "vc-video-hidden"}`}
-                  autoPlay
-                  playsInline
-                  muted
-                />
-                {!camOn && (
-                  <div className="vc-mini-teacher-off">
-                    <div className="vc-mini-avatar-sub">
+              {/* Embedded Mini Cam Preview */}
+              {!isSpectator && (
+                <div className={`vc-pip-teacher-thumb ${localSpeaking ? "vc-speaking" : ""}`}>
+                  <video
+                    ref={localVideoRef}
+                    className={`vc-video-elem vc-local-elem ${camOn ? "vc-video-visible" : "vc-video-hidden"}`}
+                    autoPlay
+                    playsInline
+                    muted
+                  />
+                  {!camOn && (
+                    <div className="vc-pip-teacher-off">
                       <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
                     </div>
-                    <span>Cam Off</span>
-                  </div>
-                )}
-                <div className="vc-mini-teacher-badge">
-                  <span>{isTeacher ? "You (Muhaffiz)" : "You"}</span>
-                  {!micOn && <span className="vc-mini-muted-dot" />}
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* 4 Corner Drag Resize Handles (Desktop Mouse & Touch Drag) */}
+              <div
+                className="vc-pip-resize-handle vc-pip-resize-handle-br"
+                {...quranPip.getResizeHandleProps("br")}
+                title="Drag corner to resize (Desktop / Touch)"
+              />
+              <div
+                className="vc-pip-resize-handle vc-pip-resize-handle-bl"
+                {...quranPip.getResizeHandleProps("bl")}
+                title="Drag corner to resize (Desktop / Touch)"
+              />
+              <div
+                className="vc-pip-resize-handle vc-pip-resize-handle-tr"
+                {...quranPip.getResizeHandleProps("tr")}
+                title="Drag corner to resize (Desktop / Touch)"
+              />
+              <div
+                className="vc-pip-resize-handle vc-pip-resize-handle-tl"
+                {...quranPip.getResizeHandleProps("tl")}
+                title="Drag corner to resize (Desktop / Touch)"
+              />
+            </div>
           </div>
         ) : (
           /* ============================================================
@@ -1627,7 +2373,7 @@ export default function VideoCall({ call, onClose }) {
               <div className="vc-stream-tag">
                 <div className="vc-tag-user">
                   {isTeacher ? <User size={13} /> : <GraduationCap size={13} />}
-                  <span>{peerName}</span>
+                  <span title={peerName}>{peerName} {isTeacher ? "(Student)" : "(Muhaffiz)"}</span>
                 </div>
                 {!peerMicOn && <span className="vc-muted-tag">Muted</span>}
                 {remoteSpeaking && peerMicOn && <span className="vc-speaking-tag">Speaking…</span>}
@@ -1656,7 +2402,7 @@ export default function VideoCall({ call, onClose }) {
                 <div className="vc-stream-tag">
                   <div className="vc-tag-user">
                     {isTeacher ? <GraduationCap size={13} /> : <User size={13} />}
-                    <span>{myName} (You)</span>
+                    <span title={myName}>{myName} (You)</span>
                   </div>
                   {!micOn && <span className="vc-muted-tag">Muted</span>}
                   {localSpeaking && micOn && <span className="vc-speaking-tag">Speaking…</span>}
@@ -1819,19 +2565,35 @@ export default function VideoCall({ call, onClose }) {
             </button>
           )}
 
-          {/* Teacher-Only Picture-in-Picture & Minimize Button */}
+          {/* Teacher-Only System Picture-in-Picture Button */}
           {isTeacher && (
             <button
               type="button"
-              className="vc-btn vc-btn-pip"
+              className={`vc-btn vc-btn-pip ${isNativePipActive ? "vc-btn-active" : ""}`}
               onClick={(e) => {
                 e.stopPropagation();
-                handleTeacherPip();
+                requestNativePip();
               }}
-              title="Picture-in-Picture / Minimize (Teacher Only)"
+              title={isNativePipActive ? "Exit System Picture-in-Picture" : "System Picture-in-Picture (Floats over all apps / WhatsApp / PDFs)"}
               aria-label="Picture-in-Picture"
             >
               <PictureInPicture2 size={22} />
+            </button>
+          )}
+
+          {/* Teacher-Only In-App Minimize Button */}
+          {isTeacher && (
+            <button
+              type="button"
+              className="vc-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsTeacherMinimized(true);
+              }}
+              title="Minimize to In-App Floating Card"
+              aria-label="Minimize Call"
+            >
+              <Minimize2 size={22} />
             </button>
           )}
 

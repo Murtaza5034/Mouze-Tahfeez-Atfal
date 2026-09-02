@@ -1,0 +1,677 @@
+/* ============================================================
+   Online Tahfeez Class Audio Recordings Modal Styles
+   Ultra-responsive with mobile dynamic fit & permanent delete alert
+   ============================================================ */
+
+.tahfeez-audio-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 6, 4, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: clamp(8px, 2.5vw, 20px);
+  animation: audioModalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-sizing: border-box;
+}
+
+@keyframes audioModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.tahfeez-audio-modal-card {
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  background: linear-gradient(165deg, #1e1913 0%, #110f0c 100%);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: clamp(16px, 3.5vw, 24px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.75), 0 0 35px rgba(212, 175, 55, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  color: #f7f5f0;
+  animation: audioCardSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-sizing: border-box;
+}
+
+@keyframes audioCardSlideUp {
+  from { transform: translateY(20px) scale(0.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* Modal Header */
+.tahfeez-audio-modal-header {
+  padding: clamp(14px, 3vw, 20px) clamp(16px, 3.5vw, 24px) clamp(12px, 2.5vw, 16px);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(25, 21, 16, 0.88);
+  gap: 10px;
+}
+
+.tahfeez-audio-header-left {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2vw, 14px);
+  min-width: 0;
+  flex: 1;
+}
+
+.tahfeez-audio-header-icon {
+  width: clamp(38px, 8vw, 44px);
+  height: clamp(38px, 8vw, 44px);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #d4af37 0%, #a67c1e 100%);
+  color: #12100d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.35);
+  flex-shrink: 0;
+}
+
+.tahfeez-audio-header-title {
+  margin: 0;
+  font-size: clamp(0.95rem, 2.8vw, 1.15rem);
+  font-weight: 800;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tahfeez-audio-header-sub {
+  font-size: clamp(0.7rem, 2vw, 0.8rem);
+  color: #d4af37;
+  font-weight: 600;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tahfeez-audio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tahfeez-audio-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e5e0d8;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.tahfeez-audio-close-btn:hover {
+  background: rgba(231, 76, 60, 0.2);
+  border-color: rgba(231, 76, 60, 0.4);
+  color: #ff6b6b;
+  transform: rotate(90deg);
+}
+
+/* Student Banner inside modal */
+.tahfeez-audio-student-banner {
+  margin: clamp(10px, 2.5vw, 16px) clamp(14px, 3.5vw, 24px) 0;
+  padding: clamp(10px, 2.5vw, 14px) clamp(12px, 3vw, 18px);
+  border-radius: clamp(12px, 2.5vw, 16px);
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tahfeez-audio-student-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tahfeez-audio-student-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4af37, #99751e);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.tahfeez-audio-student-name {
+  font-weight: 800;
+  font-size: clamp(0.9rem, 2.6vw, 1.05rem);
+  color: #f7f5f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tahfeez-audio-student-teacher {
+  font-size: clamp(0.72rem, 1.9vw, 0.8rem);
+  color: #bfa15f;
+  margin-top: 1px;
+}
+
+/* Bulk Delete Button in Banner */
+.tahfeez-bulk-delete-btn {
+  background: rgba(231, 76, 60, 0.12);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  color: #ff6b6b;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: clamp(0.72rem, 2vw, 0.78rem);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.tahfeez-bulk-delete-btn:hover {
+  background: rgba(231, 76, 60, 0.25);
+  border-color: rgba(231, 76, 60, 0.55);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Date Filters Toolbar */
+.tahfeez-audio-date-bar {
+  padding: clamp(10px, 2vw, 14px) clamp(14px, 3.5vw, 24px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  -webkit-overflow-scrolling: touch;
+}
+
+.tahfeez-date-chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: clamp(0.72rem, 2vw, 0.8rem);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cfc8be;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.tahfeez-date-chip:hover {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: #f7f5f0;
+}
+
+.tahfeez-date-chip.active {
+  background: linear-gradient(135deg, #d4af37 0%, #b8942e 100%);
+  color: #12100d;
+  border-color: #f6dc88;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.3);
+}
+
+.tahfeez-date-chip-badge {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+}
+
+.tahfeez-date-chip.active .tahfeez-date-chip-badge {
+  background: rgba(18, 16, 13, 0.4);
+  color: #ffffff;
+}
+
+/* Body / Recordings List */
+.tahfeez-audio-modal-body {
+  padding: clamp(14px, 3vw, 20px) clamp(14px, 3.5vw, 24px) clamp(20px, 4vw, 28px);
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Recording Card */
+.tahfeez-rec-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: clamp(14px, 2.5vw, 18px);
+  padding: clamp(12px, 2.5vw, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.25s ease;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.tahfeez-rec-card:hover {
+  border-color: rgba(212, 175, 55, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.tahfeez-rec-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tahfeez-rec-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tahfeez-rec-time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 4px 9px;
+  border-radius: 9px;
+  color: #f7f5f0;
+  font-size: clamp(0.72rem, 2vw, 0.8rem);
+  font-weight: 700;
+}
+
+.tahfeez-rec-dur-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(46, 204, 113, 0.12);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+  padding: 4px 8px;
+  border-radius: 9px;
+  color: #2ecc71;
+  font-size: clamp(0.7rem, 1.9vw, 0.75rem);
+  font-weight: 700;
+}
+
+.tahfeez-rec-size-badge {
+  font-size: 0.7rem;
+  color: #8c8275;
+  font-weight: 600;
+}
+
+/* Individual Delete Button on Audio Card */
+.tahfeez-card-delete-btn {
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.25);
+  color: #ff6b6b;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.tahfeez-card-delete-btn:hover {
+  background: rgba(231, 76, 60, 0.25);
+  border-color: rgba(231, 76, 60, 0.55);
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+/* Audio Player UI */
+.tahfeez-player-box {
+  background: rgba(14, 12, 9, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: clamp(10px, 2vw, 14px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tahfeez-player-main-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 2vw, 12px);
+}
+
+.tahfeez-play-btn {
+  width: clamp(38px, 8vw, 44px);
+  height: clamp(38px, 8vw, 44px);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4af37 0%, #b8942e 100%);
+  border: none;
+  color: #12100d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.35);
+}
+
+.tahfeez-play-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+}
+
+.tahfeez-player-track {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tahfeez-player-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  cursor: pointer;
+  accent-color: #d4af37;
+}
+
+.tahfeez-player-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #9c9285;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Speed and Volume Controls */
+.tahfeez-player-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tahfeez-speed-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tahfeez-speed-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #bfb5a6;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tahfeez-speed-chip.active {
+  background: #d4af37;
+  color: #12100d;
+  border-color: #f6dc88;
+}
+
+.tahfeez-player-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tahfeez-download-audio-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cfc8be;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.tahfeez-download-audio-btn:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: #ffffff;
+}
+
+/* Audio Button on Student Card */
+.tahfeez-audio-trigger-btn {
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(184, 148, 46, 0.08) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: var(--deep-brown, #3d2b1f);
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-top: 10px;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.08);
+}
+
+.tahfeez-audio-trigger-btn:hover {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.28) 0%, rgba(184, 148, 46, 0.18) 100%);
+  border-color: rgba(212, 175, 55, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.18);
+}
+
+.tahfeez-audio-empty-state {
+  text-align: center;
+  padding: clamp(30px, 6vw, 44px) 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1.5px dashed rgba(212, 175, 55, 0.2);
+  border-radius: 16px;
+  color: #9c9285;
+}
+
+.tahfeez-audio-empty-icon {
+  margin-bottom: 10px;
+  color: #d4af37;
+  opacity: 0.6;
+}
+
+/* ============================================================
+   PREMIUM PERMANENT DELETE CONFIRMATION MODAL
+   ============================================================ */
+
+.tahfeez-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100005;
+  padding: 16px;
+  animation: confirmFadeIn 0.2s ease forwards;
+  box-sizing: border-box;
+}
+
+@keyframes confirmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.tahfeez-confirm-card {
+  width: 100%;
+  max-width: 440px;
+  background: linear-gradient(170deg, #241b17 0%, #15100d 100%);
+  border: 1.5px solid rgba(231, 76, 60, 0.4);
+  border-radius: 20px;
+  padding: clamp(20px, 5vw, 28px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(231, 76, 60, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: #f7f5f0;
+  animation: confirmPop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-sizing: border-box;
+  position: relative;
+}
+
+@keyframes confirmPop {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.tahfeez-confirm-icon-wrap {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(231, 76, 60, 0.15);
+  border: 1.5px solid rgba(231, 76, 60, 0.4);
+  color: #ff6b6b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: 0 0 20px rgba(231, 76, 60, 0.25);
+}
+
+.tahfeez-confirm-title {
+  font-size: clamp(1.1rem, 3.2vw, 1.25rem);
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 8px;
+}
+
+.tahfeez-confirm-desc {
+  font-size: clamp(0.82rem, 2.4vw, 0.9rem);
+  color: #cfc8be;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+
+.tahfeez-confirm-detail-box {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  color: #bfa15f;
+  margin-bottom: 20px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tahfeez-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.tahfeez-confirm-cancel-btn {
+  flex: 1;
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e5e0d8;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tahfeez-confirm-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.tahfeez-confirm-delete-btn {
+  flex: 1;
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  border: none;
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(231, 76, 60, 0.4);
+}
+
+.tahfeez-confirm-delete-btn:hover {
+  background: linear-gradient(135deg, #ff5252 0%, #d32f2f 100%);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.6);
+  transform: translateY(-1px);
+}
+
+.tahfeez-confirm-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

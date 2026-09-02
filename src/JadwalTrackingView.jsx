@@ -310,13 +310,13 @@ const setCache = (key, data) => {
 
 const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
   const [viewMode, setViewMode] = useState('miqaat');
-  const [jadwalData, setJadwalData] = useState({});
-  const [selfJadwalData, setSelfJadwalData] = useState({});
+  const [jadwalSettings, setJadwalSettings] = useState(() => getCache('settings') || null);
+  const [jadwalData, setJadwalData] = useState(() => getCache('teacher_jadwal') || {});
+  const [selfJadwalData, setSelfJadwalData] = useState(() => getCache('self_jadwal') || {});
   const [portalUserMap, setPortalUserMap] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getCache('settings') && !getCache('teacher_jadwal'));
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [expandedStudent, setExpandedStudent] = useState(null);
-  const [jadwalSettings, setJadwalSettings] = useState(null);
 
   const range = useMemo(() => getWeekRange(viewMode, jadwalSettings), [viewMode, jadwalSettings]);
   const dayDateStrings = useMemo(() => getDayDateStrings(range), [range]);
@@ -330,11 +330,12 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
   }, [portalAccessList]);
 
   useEffect(() => {
-    loadAllData();
+    const hasCachedData = Boolean(getCache('settings') || getCache('teacher_jadwal'));
+    loadAllData(hasCachedData);
   }, []);
 
-  const loadAllData = async () => {
-    setLoading(true);
+  const loadAllData = async (silent = false) => {
+    if (!silent) setLoading(true);
     await Promise.all([
       fetchJadwalSettings(),
       fetchTeacherJadwal(),
@@ -344,8 +345,6 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
   };
 
   const fetchJadwalSettings = async () => {
-    let data = getCache('settings');
-    if (data) { setJadwalSettings(data); return; }
     try {
       const { data: result } = await supabase
         .from('jadwal_settings')
@@ -360,8 +359,6 @@ const JadwalTrackingView = ({ students, onShowAction, portalAccessList }) => {
   };
 
   const fetchTeacherJadwal = async () => {
-    let data = getCache('teacher_jadwal');
-    if (data) { setJadwalData(data); return; }
     try {
       const { data: result, error } = await supabase
         .from('jadawal')
