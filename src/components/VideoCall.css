@@ -523,6 +523,24 @@
   box-shadow: 0 8px 24px rgba(74, 144, 226, 0.35);
 }
 
+.vc-avatar-circle.vc-has-logo {
+  background: radial-gradient(circle at center, #231e17 0%, #110e0a 100%) !important;
+  border: 2.5px solid #d4af37;
+  padding: 6px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.4), 0 0 16px rgba(212, 175, 55, 0.2);
+}
+
+.vc-avatar-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
 .vc-avatar-pulse-active {
   transform: scale(1.08);
   box-shadow: 0 0 0 6px rgba(46, 204, 113, 0.4), 0 0 30px rgba(46, 204, 113, 0.5) !important;
@@ -1020,6 +1038,11 @@
   margin-bottom: 4px;
 }
 
+.vc-pip-avatar .vc-avatar-circle.vc-has-logo {
+  padding: 4px;
+  border-width: 1.5px;
+}
+
 .vc-pip-name {
   font-size: 0.75rem;
   font-weight: 700;
@@ -1100,6 +1123,15 @@
   color: #d4af37;
   font-size: 0.75rem;
   font-weight: 800;
+  padding: 3px;
+}
+
+.vc-pip-teacher-off img {
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  border-radius: 50%;
+  display: block;
 }
 
 /* Multi-Corner Resize Handles (Desktop Mouse & Touch Drag) */
@@ -1760,6 +1792,11 @@
   width: 48px;
   height: 48px;
   font-size: 1.3rem;
+}
+
+.vc-mini-avatar-portrait .vc-avatar-circle.vc-has-logo {
+  padding: 4px;
+  border-width: 2px;
 }
 
 .vc-mini-card-peer {

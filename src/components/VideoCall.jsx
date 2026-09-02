@@ -594,6 +594,15 @@ export default function VideoCall({ call, onClose }) {
   );
 
   // Maintain dynamic animated fallback video stream for native OS PiP (supports PiP even when camera is off or audio-only)
+  const pipLogoImgRef = useRef(null);
+  useEffect(() => {
+    if (typeof Image !== "undefined" && !pipLogoImgRef.current) {
+      const img = new Image();
+      img.src = "/logo.png";
+      pipLogoImgRef.current = img;
+    }
+  }, []);
+
   useEffect(() => {
     let animId = null;
     let canvas = pipFallbackCanvasRef.current;
@@ -661,11 +670,33 @@ export default function VideoCall({ call, onClose }) {
       ctx.lineWidth = 4;
       ctx.stroke();
 
-      // Avatar Letter
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 72px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-      ctx.textBaseline = "middle";
-      ctx.fillText((peerName || "?").slice(0, 1).toUpperCase(), cx, cy);
+      // Avatar content: show Mauze Tahfeez logo when remote is teacher (!isTeacher)
+      if (!isTeacher && pipLogoImgRef.current && pipLogoImgRef.current.complete && pipLogoImgRef.current.naturalWidth > 0) {
+        try {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(cx, cy, baseRadius - 6, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(
+            pipLogoImgRef.current,
+            cx - baseRadius + 10,
+            cy - baseRadius + 10,
+            (baseRadius - 10) * 2,
+            (baseRadius - 10) * 2
+          );
+          ctx.restore();
+        } catch (_) {
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 72px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+          ctx.textBaseline = "middle";
+          ctx.fillText((peerName || "?").slice(0, 1).toUpperCase(), cx, cy);
+        }
+      } else {
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 72px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillText((peerName || "?").slice(0, 1).toUpperCase(), cx, cy);
+      }
 
       // Student Name
       ctx.fillStyle = "#f7f5f0";
@@ -2125,8 +2156,12 @@ export default function VideoCall({ call, onClose }) {
         />
         {!showRemoteVideo && (
           <div className="vc-avatar-placeholder vc-mini-avatar-portrait">
-            <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
-              <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+            <div className={`vc-avatar-circle ${!isTeacher ? "vc-has-logo" : ""} ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+              {!isTeacher ? (
+                <img src="/logo.png" alt="Mauze Tahfeez" className="vc-avatar-logo" />
+              ) : (
+                <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+              )}
             </div>
             <div className="vc-mini-card-peer">{peerName}</div>
           </div>
@@ -2344,8 +2379,12 @@ export default function VideoCall({ call, onClose }) {
               />
               {!showRemoteVideo && (
                 <div className="vc-avatar-placeholder vc-pip-avatar">
-                  <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
-                    <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+                  <div className={`vc-avatar-circle ${!isTeacher ? "vc-has-logo" : ""} ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+                    {!isTeacher ? (
+                      <img src="/logo.png" alt="Mauze Tahfeez" className="vc-avatar-logo" />
+                    ) : (
+                      <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+                    )}
                   </div>
                   <div className="vc-pip-name">{peerName}</div>
                   <div className="vc-pip-status-sub">
@@ -2376,7 +2415,11 @@ export default function VideoCall({ call, onClose }) {
                   />
                   {!camOn && (
                     <div className="vc-pip-teacher-off">
-                      <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
+                      {isTeacher ? (
+                        <img src="/logo.png" alt="Mauze Tahfeez" />
+                      ) : (
+                        <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2421,8 +2464,12 @@ export default function VideoCall({ call, onClose }) {
               />
               {!showRemoteVideo && (
                 <div className="vc-avatar-placeholder">
-                  <div className={`vc-avatar-circle ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
-                    <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+                  <div className={`vc-avatar-circle ${!isTeacher ? "vc-has-logo" : ""} ${remoteSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+                    {!isTeacher ? (
+                      <img src="/logo.png" alt="Mauze Tahfeez" className="vc-avatar-logo" />
+                    ) : (
+                      <span>{(peerName || "?").slice(0, 1).toUpperCase()}</span>
+                    )}
                   </div>
                   <div className="vc-peer-name">{peerName}</div>
                   {status === "connected" ? (
@@ -2460,8 +2507,12 @@ export default function VideoCall({ call, onClose }) {
                 />
                 {!camOn && (
                   <div className="vc-avatar-placeholder">
-                    <div className={`vc-avatar-circle local ${localSpeaking ? "vc-avatar-pulse-active" : ""}`}>
-                      <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
+                    <div className={`vc-avatar-circle local ${isTeacher ? "vc-has-logo" : ""} ${localSpeaking ? "vc-avatar-pulse-active" : ""}`}>
+                      {isTeacher ? (
+                        <img src="/logo.png" alt="Mauze Tahfeez" className="vc-avatar-logo" />
+                      ) : (
+                        <span>{(myName || "Y").slice(0, 1).toUpperCase()}</span>
+                      )}
                     </div>
                     <div className="vc-peer-name">{myName} (You)</div>
                     <div className="vc-status-sub">Camera Off</div>
