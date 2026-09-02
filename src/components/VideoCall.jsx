@@ -486,7 +486,7 @@ export default function VideoCall({ call, onClose }) {
     }, 4500);
   }, []);
 
-  // Multi-Layered Student Back Navigation & System Lock (Active for student/parent only)
+  // Multi-Layered Student Back Navigation, Bottom Nav Block & Auto-End (Active for student/parent only)
   useEffect(() => {
     if (isTeacher) return;
 
@@ -497,13 +497,33 @@ export default function VideoCall({ call, onClose }) {
       }
     } catch (_) {}
 
-    // 2. Hardware / Android Back Button Listener via Capacitor App Plugin
+    // 2. Block bottom mobile navigation bar: prevent overscroll gestures
+    const prevOverscroll = document.body.style.overscrollBehavior;
+    const prevTouchAction = document.body.style.touchAction;
+    const prevDocOverscroll = document.documentElement.style.overscrollBehavior;
+    document.body.style.overscrollBehavior = "none";
+    document.body.style.touchAction = "none";
+    document.documentElement.style.overscrollBehavior = "none";
+
+    // Block touch swipe-up from the bottom 60px (Android bottom nav gesture zone)
+    const handleBottomNavBlock = (e) => {
+      const touch = e.touches[0];
+      if (touch && touch.clientY > window.innerHeight - 60) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("touchstart", handleBottomNavBlock, { passive: false, capture: true });
+    document.addEventListener("touchmove", handleBottomNavBlock, { passive: false, capture: true });
+
+    // 3. Hardware / Android Back Button via Capacitor App Plugin → AUTO-END CALL
     let capacitorBackSub = null;
     if (typeof window !== "undefined") {
       import("@capacitor/app")
         .then(({ App }) => {
           App.addListener("backButton", () => {
-            triggerBackLockAlert();
+            // Auto-end call when student presses hardware back
+            handleEnd();
           }).then((handle) => {
             capacitorBackSub = handle;
           }).catch(() => {});
@@ -511,13 +531,13 @@ export default function VideoCall({ call, onClose }) {
         .catch(() => {});
     }
 
-    // 3. Custom Event listener from Native Android MainActivity bridge
-    const handleNativeBlocked = () => {
-      triggerBackLockAlert();
+    // 4. Custom Event listener from Native Android MainActivity bridge → AUTO-END CALL
+    const handleNativeBack = () => {
+      handleEnd();
     };
-    window.addEventListener("tahfeez-back-blocked", handleNativeBlocked);
+    window.addEventListener("tahfeez-back-blocked", handleNativeBack);
 
-    // 4. Browser / Webview History Trap (Continuous trap entries)
+    // 5. Browser / Webview popstate (browser back) → AUTO-END CALL
     const trapKey = "tahfeez_lock_" + Date.now();
     try {
       for (let i = 0; i < 4; i++) {
@@ -525,24 +545,33 @@ export default function VideoCall({ call, onClose }) {
       }
     } catch (_) {}
 
-    const handlePopState = (e) => {
-      try {
-        window.history.pushState({ tahfeezCallLocked: true, trapKey }, "", window.location.href);
-      } catch (_) {}
-      triggerBackLockAlert();
+    const handlePopState = () => {
+      // Student pressed browser back — end the call
+      handleEnd();
     };
-
     window.addEventListener("popstate", handlePopState, { capture: true });
 
-    // 5. BeforeUnload Warning
-    const handleBeforeUnload = (e) => {
-      e.preventDefault();
-      e.returnValue = "Online Tahfeez class is in session. Navigation is locked. Please stay in class or use End Call.";
-      return e.returnValue;
+    // 6. App backgrounded / tab hidden → AUTO-END CALL
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        handleEnd();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 7. pagehide (iOS Safari background / PWA close)
+    const handlePageHide = () => {
+      handleEnd();
+    };
+    window.addEventListener("pagehide", handlePageHide);
+
+    // 8. BeforeUnload — end call on tab/window close
+    const handleBeforeUnload = () => {
+      handleEnd();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // 6. Screen Wake Lock (Keeps mobile device screen awake during student recitation)
+    // 9. Screen Wake Lock (Keeps mobile device screen awake during student recitation)
     let wakeLockObj = null;
     if (typeof navigator !== "undefined" && navigator.wakeLock && navigator.wakeLock.request) {
       navigator.wakeLock.request("screen")
@@ -558,11 +587,20 @@ export default function VideoCall({ call, onClose }) {
         }
       } catch (_) {}
 
+      // Restore body styles
+      document.body.style.overscrollBehavior = prevOverscroll;
+      document.body.style.touchAction = prevTouchAction;
+      document.documentElement.style.overscrollBehavior = prevDocOverscroll;
+      document.removeEventListener("touchstart", handleBottomNavBlock, { capture: true });
+      document.removeEventListener("touchmove", handleBottomNavBlock, { capture: true });
+
       if (capacitorBackSub && capacitorBackSub.remove) {
         capacitorBackSub.remove();
       }
-      window.removeEventListener("tahfeez-back-blocked", handleNativeBlocked);
+      window.removeEventListener("tahfeez-back-blocked", handleNativeBack);
       window.removeEventListener("popstate", handlePopState, { capture: true });
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("beforeunload", handleBeforeUnload);
 
       if (wakeLockObj && wakeLockObj.release) {
@@ -572,7 +610,7 @@ export default function VideoCall({ call, onClose }) {
         clearTimeout(backLockToastTimerRef.current);
       }
     };
-  }, [isTeacher, triggerBackLockAlert]);
+  }, [isTeacher, handleEnd, roomId]);
 
   // Hook for draggable + multi-corner drag resizing (desktop) + 2-finger pinch resizing (mobile)
   const initialPipWidth = typeof window !== "undefined" && window.innerWidth <= 768 ? 130 : 175;
