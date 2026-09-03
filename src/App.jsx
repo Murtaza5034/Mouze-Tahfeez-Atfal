@@ -97,6 +97,8 @@ import TeacherLeaveApprovalPanel from "./TeacherLeaveApprovalPanel";
 import VideoCall from "./components/VideoCall";
 import TahfeezChatUI from "./components/TahfeezChatUI";
 import { addSystemMessage } from "./utils/chatUtils";
+import { db } from "./firebase/db";
+import { collection, onSnapshot } from "firebase/firestore";
 import AdminHelpManagement from "./components/AdminHelpManagement";
 import PortalHelpGuidePage from "./components/PortalHelpGuidePage";
 import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
@@ -7260,6 +7262,21 @@ function ParentPortal({
   const [showHomeSupportBot, setShowHomeSupportBot] = useState(false);
   const [activeCall, setActiveCall] = useState(null);
   const [activeSessions, setActiveSessions] = useState({});
+  const [onlineTahfeezAssignments, setOnlineTahfeezAssignments] = useState({});
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "tahfeez_online_assignments"), (snap) => {
+      const map = {};
+      snap.forEach(d => {
+        const data = d.data();
+        if (data && data.status === "active") {
+          map[String(d.id)] = { id: d.id, ...data };
+        }
+      });
+      setOnlineTahfeezAssignments(map);
+    }, (err) => console.warn("online assignments parent listener error:", err));
+    return () => unsub();
+  }, []);
 
   const handleParentStartCall = async (child) => {
     const studentName = child.student_name || child.studentName || child.child_name || child.childName || (child.subtext ? child.subtext.replace(/^For\s+/i, '').trim() : '') || child.name || child.full_name || "Student";
@@ -8035,13 +8052,18 @@ function ParentPortal({
     allProfiles.forEach(child => {
       // Find the teacher's profile to get the DP
       const studentRealName = child.name || child.full_name || child.student_name || child.studentName || "Student";
-      const studentId = child.student_id || child.studentId || child.id;
-      const tName = child.teacherName || child.teacher_name || "Muhaffiz";
+      const studentId = String(child.student_id || child.studentId || child.id || "");
+      
+      const onlineAssignment = onlineTahfeezAssignments[studentId];
+      const hasOnlineSub = onlineAssignment && onlineAssignment.teacher_name;
+
+      const tName = hasOnlineSub ? onlineAssignment.teacher_name : (child.teacherName || child.teacher_name || "Muhaffiz");
       const tProfile = (teacherProfiles || []).find(t => 
         t.full_name && tName && t.full_name.trim().toLowerCase() === tName.trim().toLowerCase()
       );
       
-      const tId = child.teacher_id || child.teacherId || tProfile?.id || tProfile?.user_id;
+      const tId = hasOnlineSub ? (onlineAssignment.teacher_id || tProfile?.id || tProfile?.user_id) : (child.teacher_id || child.teacherId || tProfile?.id || tProfile?.user_id);
+      const tPhoto = hasOnlineSub ? (onlineAssignment.teacher_photo || tProfile?.photo_url || null) : (tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null);
 
       // Add individual chat
       studentsList.push({
@@ -8057,8 +8079,9 @@ function ParentPortal({
         teacherId: tId,
         teacher_name: tName || "Muhaffiz",
         teacherName: tName || "Muhaffiz",
-        photoUrl: tProfile?.photo_url || tProfile?.photoUrl || tProfile?.avatar_url || null,
-        subtext: `For ${studentRealName}`,
+        photoUrl: tPhoto,
+        subtext: hasOnlineSub ? `For ${studentRealName} • Online Muhaffiz` : `For ${studentRealName}`,
+        isOnlineSubstituted: !!hasOnlineSub
       });
     });
 
@@ -21140,9 +21163,15 @@ function TeacherPortal({
       return n.includes(searchStr);
     });
 
+    const isKibarTeacher = portalRole === "kibar-teacher" || portalRole === "kibar_teacher";
+    const teacherPhoto = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(teacherIdentity))?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url || null;
+
     return (
       <TahfeezChatUI
         studentsList={studentsList}
+        allPortalStudents={schoolData?.students || []}
+        isKibar={isKibarTeacher}
+        currentTeacherPhoto={teacherPhoto}
         activeChat={selectedTahfeezChat}
         onSelectChat={setSelectedTahfeezChat}
         searchQuery={tahfeezSearchQuery}
@@ -21150,7 +21179,7 @@ function TeacherPortal({
         activeSessions={activeSessions}
         role="teacher"
         currentUserId={user?.id || user?.user_metadata?.sub}
-        currentUserName={teacherIdentity || user?.user_metadata?.full_name}
+        currentUserName={portalAccess?.full_name || teacherIdentity || user?.user_metadata?.full_name || "Muhaffiz"}
         onCallAction={async (chat) => {
           if (chat.isGroup) {
             handleStartGroupClass();

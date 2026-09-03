@@ -3,14 +3,18 @@ import {
   Search, Users, Phone, BarChart2, Edit2, Book, MessageCircle, 
   Video, ArrowLeft, Lock, Clock, AlertCircle, CheckCircle2, 
   Sparkles, X, ShieldAlert, Wifi,
-  Mic, Send, Smile, Paperclip, Camera, Play, Pause, Trash2, CheckCheck, Loader2
+  Mic, Send, Smile, Paperclip, Camera, Play, Pause, Trash2, CheckCheck, Loader2,
+  UserPlus, Plus, AlertTriangle, Check
 } from 'lucide-react';
 import { db } from '../firebase/db';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import storageApi from '../firebase/storage.js';
 
 export default function TahfeezChatUI({
   studentsList = [],
+  allPortalStudents = [],
+  isKibar = false,
+  currentTeacherPhoto = null,
   activeChat = null,
   onSelectChat,
   searchQuery,
@@ -28,6 +32,28 @@ export default function TahfeezChatUI({
   const typingTimeoutRef = useRef(null);
   const [busyModalData, setBusyModalData] = useState(null); // { teacherName, busySession } or null
   const messagesEndRef = useRef(null);
+
+  // Online Tahfeez Temporary Student Assignments State
+  const [onlineAssignments, setOnlineAssignments] = useState({});
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [addModalSearch, setAddModalSearch] = useState("");
+  const [conflictAlert, setConflictAlert] = useState(null); // { show: boolean, message: string }
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Listen to Online Tahfeez Assignments in Real-time
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "tahfeez_online_assignments"), (snap) => {
+      const map = {};
+      snap.forEach(d => {
+        const data = d.data();
+        if (data && data.status === "active") {
+          map[String(d.id)] = { id: d.id, ...data };
+        }
+      });
+      setOnlineAssignments(map);
+    }, (err) => console.warn("online assignments listener error:", err));
+    return () => unsub();
+  }, []);
   
   // Audio Voice Note Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -451,6 +477,138 @@ export default function TahfeezChatUI({
     }
   };
 
+  // Combined list of students including temporary online additions for teachers
+  const combinedStudentsList = useMemo(() => {
+    if (role !== "teacher") return studentsList;
+
+    const myId = String(currentUserId || "").trim().toLowerCase();
+    const myName = (currentUserName || "").trim().toLowerCase();
+
+    const myAssignments = Object.values(onlineAssignments).filter(a => {
+      if (!a || a.status !== "active") return false;
+      const aTId = String(a.teacher_id || "").trim().toLowerCase();
+      const aTName = (a.teacher_name || "").trim().toLowerCase();
+      return (myId && aTId === myId) || (myName && aTName === myName);
+    });
+
+    const result = [...studentsList];
+    const existingIds = new Set(studentsList.map(s => String(s.student_id || s.id || "")));
+
+    myAssignments.forEach(a => {
+      const sId = String(a.student_id || "");
+      if (!sId || existingIds.has(sId)) return;
+
+      const portalMatch = (allPortalStudents || []).find(s => String(s.student_id || s.id) === sId);
+      const studentObj = {
+        ...(portalMatch || {}),
+        id: sId,
+        student_id: sId,
+        studentId: sId,
+        name: a.student_name || portalMatch?.name || portalMatch?.full_name || "Student",
+        full_name: a.student_name || portalMatch?.full_name || portalMatch?.name || "Student",
+        student_name: a.student_name || portalMatch?.name || "Student",
+        studentName: a.student_name || portalMatch?.name || "Student",
+        its: a.student_its || portalMatch?.its || "",
+        groupName: portalMatch?.groupName || portalMatch?.group_name || a.group_name || "",
+        photoUrl: portalMatch?.photo_url || portalMatch?.photoUrl || null,
+        isOnlineAdded: true,
+        onlineAssignment: a
+      };
+      result.push(studentObj);
+      existingIds.add(sId);
+    });
+
+    return result;
+  }, [studentsList, onlineAssignments, role, currentUserId, currentUserName, allPortalStudents]);
+
+  // Handle adding an online student
+  const handleAddOnlineStudent = async (student) => {
+    const studentId = String(student.student_id || student.id);
+    const studentName = student.name || student.full_name || student.student_name || "Student";
+    
+    // Concurrency check: if another teacher already added this student
+    const existingAssignment = onlineAssignments[studentId];
+    if (existingAssignment && existingAssignment.status === "active") {
+      const existingTeacherId = String(existingAssignment.teacher_id || "").trim().toLowerCase();
+      const myId = String(currentUserId || "").trim().toLowerCase();
+      if (existingTeacherId && existingTeacherId !== myId) {
+        setConflictAlert({
+          show: true,
+          message: `This student is already added to ${existingAssignment.teacher_name || "another teacher"} for Online Tahfeez.`
+        });
+        return;
+      }
+    }
+
+    try {
+      setActionLoadingId(studentId);
+      await setDoc(doc(db, "tahfeez_online_assignments", studentId), {
+        student_id: studentId,
+        student_name: studentName,
+        student_its: student.its || "",
+        group_name: student.groupName || student.group_name || "",
+        teacher_id: String(currentUserId || ""),
+        teacher_name: currentUserName || "Muhaffiz",
+        teacher_photo: currentTeacherPhoto || null,
+        portal: isKibar ? "kibar" : "atfal",
+        assigned_at: new Date().toISOString(),
+        status: "active"
+      });
+
+      setShowAddStudentModal(false);
+
+      const chatObj = {
+        ...student,
+        id: studentId,
+        student_id: studentId,
+        studentId: studentId,
+        name: studentName,
+        full_name: studentName,
+        isGroup: false,
+        isOnlineAdded: true
+      };
+      if (onSelectChat) onSelectChat(chatObj);
+    } catch (err) {
+      console.error("Failed to add online student:", err);
+      alert("Failed to add student: " + err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Handle removing / releasing an online student
+  const handleRemoveOnlineStudent = async (studentId) => {
+    if (!studentId) return;
+    try {
+      setActionLoadingId(studentId);
+      await deleteDoc(doc(db, "tahfeez_online_assignments", String(studentId)));
+      if (activeChat && String(activeChat.student_id || activeChat.id) === String(studentId)) {
+        if (onSelectChat) onSelectChat(null);
+      }
+    } catch (err) {
+      console.error("Failed to remove online student:", err);
+      alert("Failed to remove student: " + err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Filtered portal students for the Add Student modal
+  const modalPortalStudents = useMemo(() => {
+    if (!showAddStudentModal) return [];
+    let list = allPortalStudents || [];
+    if (addModalSearch.trim()) {
+      const q = addModalSearch.toLowerCase().trim();
+      list = list.filter(s => {
+        const name = (s.name || s.full_name || s.student_name || "").toLowerCase();
+        const its = String(s.its || "").toLowerCase();
+        const grp = (s.groupName || s.group_name || "").toLowerCase();
+        return name.includes(q) || its.includes(q) || grp.includes(q);
+      });
+    }
+    return list;
+  }, [allPortalStudents, showAddStudentModal, addModalSearch]);
+
   const handleCallButtonClick = () => {
     if (!activeChat) return;
 
@@ -829,7 +987,7 @@ export default function TahfeezChatUI({
         zIndex: 10
       }}>
         {/* Search Bar */}
-        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-color)" }}>
+        <div style={{ padding: "14px 16px 10px", borderBottom: role === "teacher" ? "none" : "1px solid var(--border-color)" }}>
           <div style={{
             display: "flex",
             alignItems: "center",
@@ -856,14 +1014,50 @@ export default function TahfeezChatUI({
           </div>
         </div>
 
+        {/* Add Student for Online Tahfeez Button (Teachers only) */}
+        {role === "teacher" && (
+          <div style={{ padding: "0 16px 12px", borderBottom: "1px solid var(--border-color)" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setAddModalSearch("");
+                setShowAddStudentModal(true);
+              }}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                padding: "9px 16px",
+                background: "#00a884",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "20px",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "background 0.15s ease",
+                boxShadow: "none"
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#008f6f"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#00a884"; }}
+              title="Add any student from this portal for Online Tahfeez"
+            >
+              <UserPlus size={16} color="#ffffff" strokeWidth={2.2} />
+              <span>Add Student for Online Tahfeez</span>
+            </button>
+          </div>
+        )}
+
         {/* Chat List */}
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {studentsList.length === 0 ? (
+          {combinedStudentsList.length === 0 ? (
             <div style={{ padding: "30px 20px", textAlign: "center", color: "var(--text-muted)" }}>
               No chats available
             </div>
           ) : (
-            studentsList.map((chat) => {
+            combinedStudentsList.map((chat) => {
               const isSelected = activeChat && (
                 (chat.isGroup && activeChat.isGroup && chat.room_id === activeChat.room_id) ||
                 (!chat.isGroup && !activeChat.isGroup && chat.student_id === activeChat.student_id)
@@ -931,7 +1125,7 @@ export default function TahfeezChatUI({
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "3px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
                       <span style={{
                         fontWeight: isSelected ? "700" : "600",
                         color: "var(--text-color)",
@@ -942,6 +1136,20 @@ export default function TahfeezChatUI({
                       }}>
                         {chat.name || chat.full_name || chat.teacherName}
                       </span>
+                      {chat.isOnlineAdded && (
+                        <span style={{
+                          fontSize: "10px",
+                          background: "#dcfce7",
+                          color: "#166534",
+                          padding: "1px 6px",
+                          borderRadius: "10px",
+                          fontWeight: "600",
+                          marginLeft: "6px",
+                          flexShrink: 0
+                        }}>
+                          Online Added
+                        </span>
+                      )}
                     </div>
                     <div style={{
                       fontSize: "0.82rem",
@@ -1073,6 +1281,20 @@ export default function TahfeezChatUI({
                         }}
                       >
                         {displayName}
+                        {activeChat.isOnlineAdded && (
+                          <span style={{
+                            fontSize: "10px",
+                            background: "#dcfce7",
+                            color: "#166534",
+                            padding: "1px 6px",
+                            borderRadius: "10px",
+                            fontWeight: "600",
+                            marginLeft: "6px",
+                            display: "inline-block"
+                          }}>
+                            Online Added
+                          </span>
+                        )}
                       </div>
                       
                       <div style={{ 
@@ -1157,26 +1379,53 @@ export default function TahfeezChatUI({
                     </button>
                   )
                 ) : (
-                  <button 
-                    type="button"
-                    onClick={handleCallButtonClick}
-                    className="call-btn-green-glow"
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "18px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "5px",
-                      fontWeight: "700",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      boxShadow: "0 2px 6px rgba(0, 168, 132, 0.35)",
-                      whiteSpace: "nowrap"
-                    }}
-                  >
-                    <Video size={16} />
-                    <span>{isOwnRoomLive ? "Join" : (activeChat.isGroup ? "Start Class" : "Start Call")}</span>
-                  </button>
+                  <>
+                    {activeChat.isOnlineAdded && (
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveOnlineStudent(activeChat.student_id || activeChat.id)}
+                        title="Release student from your Online Tahfeez class"
+                        style={{
+                          padding: "5px 9px",
+                          borderRadius: "18px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          fontWeight: "600",
+                          fontSize: "11.5px",
+                          cursor: "pointer",
+                          background: "#fef2f2",
+                          color: "#b91c1c",
+                          border: "1px solid #fecaca",
+                          whiteSpace: "nowrap",
+                          marginRight: "6px"
+                        }}
+                      >
+                        <Trash2 size={13} />
+                        <span>Release</span>
+                      </button>
+                    )}
+                    <button 
+                      type="button"
+                      onClick={handleCallButtonClick}
+                      className="call-btn-green-glow"
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "18px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "5px",
+                        fontWeight: "700",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 6px rgba(0, 168, 132, 0.35)",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      <Video size={16} />
+                      <span>{isOwnRoomLive ? "Join" : (activeChat.isGroup ? "Start Class" : "Start Call")}</span>
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1669,6 +1918,418 @@ export default function TahfeezChatUI({
             >
               Understood, I'll Wait
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Conflict Alert Modal (When another teacher already added this student) */}
+      {conflictAlert?.show && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1400,
+          padding: "16px",
+          backdropFilter: "blur(4px)"
+        }}>
+          <div style={{
+            background: "#ffffff",
+            borderRadius: "18px",
+            padding: "24px 20px",
+            maxWidth: "410px",
+            width: "100%",
+            textAlign: "center",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+            animation: "chatSlideIn 0.2s ease"
+          }}>
+            <div style={{
+              width: "56px",
+              height: "56px",
+              borderRadius: "50%",
+              background: "#fef3c7",
+              color: "#d97706",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px"
+            }}>
+              <AlertTriangle size={30} />
+            </div>
+            <h3 style={{ margin: "0 0 10px", fontSize: "1.1rem", fontWeight: 700, color: "#111b21" }}>
+              Student Already Added
+            </h3>
+            <p style={{ margin: "0 0 20px", fontSize: "0.92rem", color: "#475569", lineHeight: 1.5 }}>
+              {conflictAlert.message}
+            </p>
+            <button
+              type="button"
+              onClick={() => setConflictAlert(null)}
+              style={{
+                width: "100%",
+                padding: "11px 16px",
+                background: "#00a884",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "24px",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+                cursor: "pointer",
+                boxShadow: "none"
+              }}
+            >
+              OK, Understood
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Student for Online Tahfeez - Premium Modal */}
+      {showAddStudentModal && (
+        <div 
+          onClick={() => setShowAddStudentModal(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(11, 20, 26, 0.65)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1300,
+            padding: "16px",
+            backdropFilter: "blur(4px)"
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#ffffff",
+              borderRadius: "18px",
+              width: "100%",
+              maxWidth: "540px",
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
+              animation: "chatSlideIn 0.2s ease"
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: "16px 20px",
+              borderBottom: "1px solid rgba(0,0,0,0.08)",
+              background: "#f0f2f5",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <UserPlus size={19} color="#00a884" />
+                  <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#111b21" }}>
+                    Add Student for Online Tahfeez
+                  </h3>
+                </div>
+                <p style={{ margin: "3px 0 0", fontSize: "0.8rem", color: "#667781" }}>
+                  {isKibar ? "Tahfeez al Kibar Portal Students" : "Atfal Portal Students"} • {modalPortalStudents.length} students
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddStudentModal(false)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#667781",
+                  padding: "6px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Search Bar */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "#ffffff" }}>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                background: "#f0f2f5",
+                borderRadius: "24px",
+                padding: "8px 14px",
+                border: "1px solid rgba(0,0,0,0.06)"
+              }}>
+                <Search size={17} color="#667781" style={{ marginRight: "8px" }} />
+                <input
+                  type="text"
+                  placeholder="Search student name, ITS, group..."
+                  value={addModalSearch}
+                  onChange={(e) => setAddModalSearch(e.target.value)}
+                  autoFocus
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    outline: "none",
+                    color: "#111b21",
+                    width: "100%",
+                    fontSize: "0.9rem"
+                  }}
+                />
+                {addModalSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setAddModalSearch("")}
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: "#667781", padding: 0 }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Student List */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", maxHeight: "55vh" }}>
+              {modalPortalStudents.length === 0 ? (
+                <div style={{ padding: "40px 20px", textAlign: "center", color: "#667781" }}>
+                  <Users size={36} color="#94a3b8" style={{ marginBottom: "8px", opacity: 0.7 }} />
+                  <p style={{ margin: 0, fontSize: "0.92rem", fontWeight: 500 }}>No students found</p>
+                  <p style={{ margin: "4px 0 0", fontSize: "0.8rem", color: "#94a3b8" }}>Try adjusting your search query</p>
+                </div>
+              ) : (
+                modalPortalStudents.map((s) => {
+                  const sId = String(s.student_id || s.id || "");
+                  const sName = s.name || s.full_name || s.student_name || "Student";
+                  const sIts = s.its || "";
+                  const sGroup = s.groupName || s.group_name || "";
+                  const sRegularTeacher = s.teacherName || s.teacher_name || s.muhaffiz_name || "";
+
+                  const assignment = onlineAssignments[sId];
+                  const hasAssignment = assignment && assignment.status === "active";
+                  const myId = String(currentUserId || "").trim().toLowerCase();
+                  const myName = (currentUserName || "").trim().toLowerCase();
+                  const aTId = String(assignment?.teacher_id || "").trim().toLowerCase();
+                  const aTName = (assignment?.teacher_name || "").trim().toLowerCase();
+
+                  const isAddedByMe = hasAssignment && ((myId && aTId === myId) || (myName && aTName === myName));
+                  const isAddedByOther = hasAssignment && !isAddedByMe;
+                  const isMyRegular = studentsList.some(regular => String(regular.student_id || regular.id) === sId && !regular.isOnlineAdded);
+                  const isLoading = actionLoadingId === sId;
+
+                  return (
+                    <div
+                      key={sId || sName}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 16px",
+                        borderBottom: "1px solid rgba(0,0,0,0.04)",
+                        transition: "background 0.12s ease"
+                      }}
+                      className="chat-item-hover"
+                    >
+                      {/* Left: Avatar + Info */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          width: "40px",
+                          height: "40px",
+                          borderRadius: "50%",
+                          background: "#00a884",
+                          color: "#ffffff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 700,
+                          fontSize: "15px",
+                          flexShrink: 0,
+                          overflow: "hidden"
+                        }}>
+                          {s.photo_url || s.photoUrl || s.avatar_url ? (
+                            <img
+                              src={s.photo_url || s.photoUrl || s.avatar_url}
+                              alt={sName}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                            />
+                          ) : (
+                            (sName[0] || "S").toUpperCase()
+                          )}
+                        </div>
+
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            fontWeight: 600,
+                            fontSize: "0.93rem",
+                            color: "#111b21",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis"
+                          }}>
+                            {sName}
+                          </div>
+                          <div style={{
+                            fontSize: "0.78rem",
+                            color: "#667781",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            flexWrap: "wrap",
+                            marginTop: "2px"
+                          }}>
+                            {sIts && <span>ITS: {sIts}</span>}
+                            {sGroup && <span>• {sGroup}</span>}
+                            {sRegularTeacher && !isMyRegular && (
+                              <span style={{ color: "#8696a0" }}>• Reg: {sRegularTeacher}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div style={{ marginLeft: "10px", flexShrink: 0 }}>
+                        {isAddedByMe ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{
+                              fontSize: "11px",
+                              color: "#166534",
+                              background: "#dcfce7",
+                              padding: "4px 8px",
+                              borderRadius: "12px",
+                              fontWeight: 600
+                            }}>
+                              Added by You
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOnlineStudent(sId)}
+                              disabled={isLoading}
+                              style={{
+                                background: "#fef2f2",
+                                color: "#b91c1c",
+                                border: "1px solid #fecaca",
+                                borderRadius: "14px",
+                                padding: "4px 8px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                cursor: "pointer"
+                              }}
+                            >
+                              {isLoading ? "..." : "Release"}
+                            </button>
+                          </div>
+                        ) : isAddedByOther ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConflictAlert({
+                                show: true,
+                                message: `This student is already added to ${assignment.teacher_name || "another teacher"} for Online Tahfeez.`
+                              });
+                            }}
+                            style={{
+                              background: "#fffbeb",
+                              color: "#b45309",
+                              border: "1px solid #fde68a",
+                              borderRadius: "14px",
+                              padding: "5px 10px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            title="Click to view details"
+                          >
+                            <Clock size={12} />
+                            <span>Active with {assignment.teacher_name || "Other"}</span>
+                          </button>
+                        ) : isMyRegular ? (
+                          <span style={{
+                            fontSize: "11px",
+                            color: "#0369a1",
+                            background: "#e0f2fe",
+                            padding: "4px 9px",
+                            borderRadius: "12px",
+                            fontWeight: 600
+                          }}>
+                            Your Student
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddOnlineStudent(s)}
+                            disabled={isLoading}
+                            style={{
+                              background: "#00a884",
+                              color: "#ffffff",
+                              border: "none",
+                              borderRadius: "16px",
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              transition: "background 0.15s ease"
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "#008f6f"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = "#00a884"; }}
+                          >
+                            {isLoading ? <Loader2 size={13} className="animate-spin" /> : <Plus size={14} />}
+                            <span>Add</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: "12px 20px",
+              background: "#f0f2f5",
+              borderTop: "1px solid rgba(0,0,0,0.06)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}>
+              <div style={{ fontSize: "0.78rem", color: "#667781" }}>
+                Added students appear in your chat bar and can join your Online Tahfeez classes.
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddStudentModal(false)}
+                style={{
+                  background: "#e2e8f0",
+                  color: "#334155",
+                  border: "none",
+                  borderRadius: "16px",
+                  padding: "6px 14px",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  cursor: "pointer"
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
