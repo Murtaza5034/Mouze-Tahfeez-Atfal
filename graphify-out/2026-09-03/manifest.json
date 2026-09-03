@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1788354805.7178404,
-    "seen": 1788420563.981559,
-    "ast_hash": "01428b29ba533a02fece9312ac4e8527",
+    "mtime": 1788286028.889957,
+    "seen": 1788286399.291711,
+    "ast_hash": "6745d21c29315ad2cba75e88e8532a6b",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1788354871.4720535,
-    "seen": 1788420563.9815629,
+    "mtime": 1788286192.784091,
+    "seen": 1788286399.2917142,
     "ast_hash": "7158d716c36a84c268c69ae529cfa853",
     "semantic_hash": "7158d716c36a84c268c69ae529cfa853"
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1788354871.4710467,
-    "seen": 1788420563.9820604,
+    "mtime": 1788286192.7822025,
+    "seen": 1788286399.2921305,
     "ast_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4",
     "semantic_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4"
   },
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1788354796.0673368,
-    "seen": 1788420563.9880018,
-    "ast_hash": "8b2b179b28287bdfa3add9f278d79670",
+    "mtime": 1788286021.5106435,
+    "seen": 1788286399.2982717,
+    "ast_hash": "be62d61dcd756e96c16ee50b94b92909",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788418555.1399436,
-    "seen": 1788420563.9900608,
-    "ast_hash": "4c0ba2a398d44b8b44a2808ed706c328",
+    "mtime": 1788329639.5650413,
+    "seen": 1788329720.724889,
+    "ast_hash": "933b5f845a16f6d2f482d8eb373f623a",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6480,9 +6480,9 @@
     "semantic_hash": "74fd7d2d9c40c67c3de485cffe325e75"
   },
   "src/components/VideoCall.jsx": {
-    "mtime": 1788420489.9243464,
-    "seen": 1788420563.9915318,
-    "ast_hash": "d42c59c0bc45f83ce8fcac493a5fe6b4",
+    "mtime": 1788331017.7489867,
+    "seen": 1788331079.1706207,
+    "ast_hash": "01ad682fcd2643e9e33eb6b79a13658a",
     "semantic_hash": ""
   },
   "src/downloadUtils.js": {
@@ -6630,9 +6630,9 @@
     "semantic_hash": "957bbea90bb141a8c66d5fe0b0321a96"
   },
   "vite.config.js": {
-    "mtime": 1788354800.9600005,
-    "seen": 1788420563.9930618,
-    "ast_hash": "e70c6da7bf4b0b76378e66248f07f5e7",
+    "mtime": 1787668461.3222764,
+    "seen": 1787676112.8786328,
+    "ast_hash": "a9e16e775d1d244d7f7acb8a89c71bc7",
     "semantic_hash": ""
   },
   ".agents/rules/graphify.md": {
@@ -10020,9 +10020,9 @@
     "semantic_hash": ""
   },
   "src/components/TahfeezChatUI.jsx": {
-    "mtime": 1788418422.372993,
-    "seen": 1788420563.9915302,
-    "ast_hash": "b79fd9a96ee63c2b9971575fba8a6446",
+    "mtime": 1788253403.317115,
+    "seen": 1788253578.6074207,
+    "ast_hash": "521478ef2a7e5841a0d08dcfc4a2cc06",
     "semantic_hash": ""
   },
   "src/utils/chatUtils.js": {

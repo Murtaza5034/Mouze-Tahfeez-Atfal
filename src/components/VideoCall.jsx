@@ -47,7 +47,10 @@ function buildIceServers() {
     "stun:stun4.l.google.com:19302",
     "stun:global.stun.twilio.com:3478",
     "stun:stun.cloudflare.com:3478",
-    "stun:stun.services.mozilla.com"
+    "stun:stun.services.mozilla.com:3478",
+    "stun:stun.nextcloud.com:443",
+    "stun:stun.sipgate.net:3478",
+    "stun:stun.voipbuster.com:3478"
   ];
 
   const servers = [
@@ -1459,9 +1462,18 @@ export default function VideoCall({ call, onClose }) {
       }).catch(() => { });
     }
     if (remoteAudioRef.current) {
-      remoteAudioRef.current.play().catch(() => { });
+      if (remoteAudioRef.current.srcObject !== remoteStreamRef.current && remoteStreamRef.current.getAudioTracks().length > 0) {
+        remoteAudioRef.current.srcObject = remoteStreamRef.current;
+      }
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.play().then(() => {
+        setAudioBlocked(false);
+      }).catch(() => { });
     }
     if (remoteVideoRef.current) {
+      if (remoteVideoRef.current.srcObject !== remoteStreamRef.current && remoteStreamRef.current.getVideoTracks().length > 0) {
+        remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      }
       remoteVideoRef.current.play().then(() => {
         setHasRemoteVideo(true);
       }).catch(() => { });
@@ -1655,33 +1667,41 @@ export default function VideoCall({ call, onClose }) {
           oldTracks.forEach((t) => remoteStreamRef.current.removeTrack(t));
           remoteStreamRef.current.addTrack(track);
 
-          // Do not set hasRemoteVideo to true here yet. Wait for onplaying.
-          track.onmute = () => setHasRemoteVideo(false);
+          // Mark remote video received immediately
+          setHasRemoteVideo(true);
+
           track.onunmute = () => {
-            if (remoteVideoRef.current && remoteVideoRef.current.readyState >= 2) {
-              setHasRemoteVideo(true);
+            console.log("[WebRTC] Video track unmuted");
+            setHasRemoteVideo(true);
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.play().catch(() => { });
             }
           };
-          track.onended = () => setHasRemoteVideo(false);
+          track.onended = () => {
+            setHasRemoteVideo(false);
+          };
 
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStreamRef.current;
             remoteVideoRef.current.onloadedmetadata = () => {
-              remoteVideoRef.current.play().catch(() => { });
+              remoteVideoRef.current.play().then(() => setHasRemoteVideo(true)).catch(() => { });
             };
-            remoteVideoRef.current.onplaying = () => setHasRemoteVideo(true);
-            remoteVideoRef.current.play().catch(() => { });
+            remoteVideoRef.current.onplaying = () => {
+              setHasRemoteVideo(true);
+            };
+            remoteVideoRef.current.play().then(() => setHasRemoteVideo(true)).catch(() => { });
           }
         }
 
         if (track.kind === "audio") {
           setHasRemoteAudio(true);
           track.onmute = () => setHasRemoteAudio(false);
-          track.onunmute = () => setHasRemoteAudio(true);
-
-          if (remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = new MediaStream([track]);
-          }
+          track.onunmute = () => {
+            setHasRemoteAudio(true);
+            if (remoteAudioRef.current) {
+              remoteAudioRef.current.play().catch(() => { });
+            }
+          };
 
           if (remoteStreamRef.current) {
             const oldAudioTracks = remoteStreamRef.current.getAudioTracks();
@@ -1689,14 +1709,27 @@ export default function VideoCall({ call, onClose }) {
             remoteStreamRef.current.addTrack(track);
           }
 
-          // Single, guarded call — builds the Web Audio analyser graph exactly once.
-          // The <audio> element (muted={isSpectator}) is the ONLY playback path.
-          // connectRemoteAudio only creates an AnalyserNode for the speaking indicator,
-          // it does NOT route to audioContext.destination, so there's no double-playback.
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = remoteStreamRef.current;
+            remoteAudioRef.current.volume = 1.0;
+            remoteAudioRef.current.play().then(() => {
+              setAudioBlocked(false);
+            }).catch((err) => {
+              console.warn("[WebRTC] remoteAudio play note:", err);
+              setAudioBlocked(true);
+            });
+          }
+
+          // Build Web Audio analyser graph for speaking indicator
           connectRemoteAudio(new MediaStream([track]));
           startCallAudioRecording();
         }
-        // Do NOT set status="connected" here. Wait for iceConnectionState to become "connected".
+
+        // When live tracks arrive, connection is active
+        if (track.enabled && track.readyState === "live") {
+          setStatus("connected");
+          setError("");
+        }
       };
 
       const checkConnectionState = () => {
@@ -1757,9 +1790,6 @@ export default function VideoCall({ call, onClose }) {
           const candJson = ev.candidate.toJSON();
           if (!candJson || !candJson.candidate) return;
 
-          // Logs candidate type (host / srflx / relay) so you can confirm in
-          // devtools whether a TURN relay candidate is actually being used —
-          // useful if this only fails across different networks.
           const typeMatch = /typ (\w+)/.exec(candJson.candidate);
           console.log(`[WebRTC] Local ICE candidate (${role}):`, typeMatch ? typeMatch[1] : "unknown");
 
@@ -1813,9 +1843,12 @@ export default function VideoCall({ call, onClose }) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const data = change.doc.data();
-            // Allow candidates from the other role.
-            // We use sessionIdRef.current to allow the callee to adopt the caller's sessionId.
-            if (data && data.senderRole !== role && data.candidate && (!data.sessionId || data.sessionId === sessionIdRef.current)) {
+            // Accept any valid candidate from the other role created during this session
+            if (data && data.senderRole !== role && data.candidate) {
+              const now = Date.now();
+              if (data.createdAt && (now - data.createdAt > 180000)) {
+                return; // ignore stale candidates from past calls
+              }
               applyCandidate(data.candidate);
             }
           }
@@ -2133,13 +2166,20 @@ export default function VideoCall({ call, onClose }) {
     };
   }, [toggleMic, toggleFullscreen, quranOpen]);
 
-  // Ensure video elements have srcObject attached whenever view mode changes
+  // Ensure video and audio elements have srcObject attached whenever view mode changes
   useEffect(() => {
     if (remoteVideoRef.current && remoteStreamRef.current && remoteStreamRef.current.getVideoTracks().length > 0) {
       if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
         remoteVideoRef.current.srcObject = remoteStreamRef.current;
       }
       remoteVideoRef.current.play().then(() => setHasRemoteVideo(true)).catch(() => {});
+    }
+    if (remoteAudioRef.current && remoteStreamRef.current && remoteStreamRef.current.getAudioTracks().length > 0) {
+      if (remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
+        remoteAudioRef.current.srcObject = remoteStreamRef.current;
+      }
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.play().then(() => setAudioBlocked(false)).catch(() => {});
     }
     if (localVideoRef.current && localStreamRef.current && localStreamRef.current.getVideoTracks().length > 0) {
       if (localVideoRef.current.srcObject !== localStreamRef.current) {
@@ -2163,7 +2203,7 @@ export default function VideoCall({ call, onClose }) {
     error: "Error",
   }[status] || status;
 
-  const showRemoteVideo = peerCamOn && hasRemoteVideo && status === "connected";
+  const showRemoteVideo = peerCamOn && hasRemoteVideo;
 
   // If teacher minimized the call into floating in-app mini player (Portrait + Movable + 4-Corner Resizable + Pinch-Resizable)
   if (isTeacher && isTeacherMinimized) {
@@ -2300,6 +2340,7 @@ export default function VideoCall({ call, onClose }) {
       className={`vc-overlay ${isFullscreen ? "vc-fullscreen" : ""}`}
       role="dialog"
       aria-label="Video call"
+      onTouchStart={handleGlobalAudioUnlock}
       onClick={() => {
         handleGlobalAudioUnlock();
         if (showAudioDeviceMenu) setShowAudioDeviceMenu(false);
@@ -2393,6 +2434,33 @@ export default function VideoCall({ call, onClose }) {
             )}
           </div>
         </div>
+
+        {/* Audio Blocked Autoplay Alert Banner */}
+        {audioBlocked && (
+          <div
+            className="vc-audio-blocked-banner"
+            onClick={handleGlobalAudioUnlock}
+            onTouchStart={handleGlobalAudioUnlock}
+            style={{
+              background: "linear-gradient(90deg, #d97706, #b45309)",
+              color: "#fff",
+              padding: "7px 16px",
+              fontSize: "13px",
+              fontWeight: "600",
+              textAlign: "center",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              zIndex: 10,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.4)"
+            }}
+          >
+            <VolumeX size={16} />
+            <span>Audio paused by device. Tap anywhere to enable speaker sound.</span>
+          </div>
+        )}
 
         {/* Main Viewport */}
         {quranOpen ? (

@@ -486,10 +486,12 @@
 
 .vc-video-visible {
   display: block;
+  opacity: 1;
 }
 
 .vc-video-hidden {
-  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none;
 }
 
 /* Avatar / Placeholder when Camera Off or Connecting */
