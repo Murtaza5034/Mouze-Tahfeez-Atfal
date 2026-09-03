@@ -9259,13 +9259,61 @@ function ParentPortal({
                   (assignedTeacher.full_name || "").toLowerCase().includes('taher bhai rawat')
                 ));
 
-                const finalRoleTeachers = hasMasool ? roleTeachers : [defaultMasool, ...roleTeachers];
+                const rawRoleTeachers = hasMasool ? roleTeachers : [defaultMasool, ...roleTeachers];
+
+                // Deduplicate role teachers strictly so that no teacher/masool appears twice
+                const seenTeacherKeys = new Set();
+                const finalRoleTeachers = [];
+
+                rawRoleTeachers.forEach(t => {
+                  if (!t) return;
+                  const normName = normalizeText(t.full_name || t.name || "");
+                  const isTaher = normName.includes('taher') && (normName.includes('rawat') || normName.includes('bhai'));
+                  const cleanPhone = (t.phone_number || t.whatsapp_number || "").replace(/\D/g, "");
+
+                  let dedupKey = "";
+                  if (isTaher) {
+                    dedupKey = "taher-bhai-rawat";
+                  } else if (cleanPhone && cleanPhone.length >= 7) {
+                    dedupKey = `phone-${cleanPhone.slice(-10)}`;
+                  } else if (normName) {
+                    dedupKey = `name-${normName}`;
+                  } else {
+                    dedupKey = `id-${t.id || t.user_id || Math.random()}`;
+                  }
+
+                  // Prevent duplicate if this teacher is already shown as assignedTeacher
+                  if (assignedTeacher) {
+                    const assignedNorm = normalizeText(assignedTeacher.full_name || assignedTeacher.name || "");
+                    const assignedIsTaher = assignedNorm.includes('taher') && (assignedNorm.includes('rawat') || assignedNorm.includes('bhai'));
+                    const assignedCleanPhone = (assignedTeacher.phone_number || assignedTeacher.whatsapp_number || "").replace(/\D/g, "");
+
+                    if (isTaher && assignedIsTaher) return;
+                    if (cleanPhone && assignedCleanPhone && cleanPhone.slice(-10) === assignedCleanPhone.slice(-10)) return;
+                    if (normName && assignedNorm && normName === assignedNorm) return;
+                  }
+
+                  if (!seenTeacherKeys.has(dedupKey)) {
+                    seenTeacherKeys.add(dedupKey);
+                    if (isTaher) {
+                      finalRoleTeachers.push({
+                        ...defaultMasool,
+                        ...t,
+                        phone_number: t.phone_number || defaultMasool.phone_number,
+                        whatsapp_number: t.whatsapp_number || defaultMasool.whatsapp_number,
+                        photo_url: t.photo_url || defaultMasool.photo_url
+                      });
+                    } else {
+                      finalRoleTeachers.push(t);
+                    }
+                  }
+                });
 
                 const roleLabel = (t) => {
                   const r = (t.teacher_role || t.portal_role || t.role || "").toLowerCase();
                   const n = (t.full_name || "").toLowerCase();
-                  if (r.includes('masool') || n.includes('taher bhai rawat')) return 'Masool (Supervisor)';
-                  if (r.includes('musaid')) return 'Musaid (Assistant)';
+                  if (r.includes('masool') || n.includes('taher bhai rawat')) return 'Masool';
+                  if (r.includes('musaid')) return 'Musaid';
                   return 'Staff Member';
                 };
 
