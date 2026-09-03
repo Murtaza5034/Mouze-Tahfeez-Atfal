@@ -936,7 +936,7 @@ export default function VideoCall({ call, onClose }) {
   const remoteAudioSourceRef = useRef(null);
 
   const startCallAudioRecording = useCallback(() => {
-    if (isSpectator || recorderRef.current) return;
+    if (isSpectator) return;
     if (typeof window === "undefined" || !window.MediaRecorder) return;
 
     try {
@@ -965,6 +965,8 @@ export default function VideoCall({ call, onClose }) {
           remoteAudioSourceRef.current = rSrc;
         } catch (_) {}
       }
+
+      if (recorderRef.current) return;
 
       let mimeType = "audio/webm;codecs=opus";
       if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -1679,6 +1681,12 @@ export default function VideoCall({ call, onClose }) {
 
           if (remoteAudioRef.current) {
             remoteAudioRef.current.srcObject = new MediaStream([track]);
+          }
+
+          if (remoteStreamRef.current) {
+            const oldAudioTracks = remoteStreamRef.current.getAudioTracks();
+            oldAudioTracks.forEach(t => remoteStreamRef.current.removeTrack(t));
+            remoteStreamRef.current.addTrack(track);
           }
 
           // Single, guarded call — builds the Web Audio analyser graph exactly once.
