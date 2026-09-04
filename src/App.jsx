@@ -8622,6 +8622,7 @@ function ParentPortal({
                 <AtfalGemLeagueCard
                   studentProfile={studentProfile || allProfiles[0]}
                   weeklyResult={weeklyResult}
+                  allProfiles={allProfiles}
                 />
               </div>
             )}

@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1788422253.3892019,
-    "seen": 1788501820.1282542,
-    "ast_hash": "be2a561e30bb8432815e8bd1cbe7d0bb",
+    "mtime": 1788517849.821193,
+    "seen": 1788518208.4758632,
+    "ast_hash": "f776f8062627b4d6d86767790712a6f9",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1788499748.5748892,
-    "seen": 1788501820.128257,
+    "mtime": 1788517895.8881822,
+    "seen": 1788518208.475866,
     "ast_hash": "7158d716c36a84c268c69ae529cfa853",
     "semantic_hash": "7158d716c36a84c268c69ae529cfa853"
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1788499748.5748892,
-    "seen": 1788501820.128693,
+    "mtime": 1788517895.8881822,
+    "seen": 1788518208.4763334,
     "ast_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4",
     "semantic_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4"
   },
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1788422236.353198,
-    "seen": 1788501820.1339233,
-    "ast_hash": "8a76f9770345fa912ef686f8ff248ee2",
+    "mtime": 1788517820.0876875,
+    "seen": 1788518208.482184,
+    "ast_hash": "20a39d2b18172909bf072788f2ff3101",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788504354.216419,
-    "seen": 1788504465.1720178,
-    "ast_hash": "968423f2484a04fb74bd7aec5fbca48a",
+    "mtime": 1788517814.349325,
+    "seen": 1788518208.4843066,
+    "ast_hash": "8238e931c4f618c3d00402868491f650",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6630,9 +6630,9 @@
     "semantic_hash": "957bbea90bb141a8c66d5fe0b0321a96"
   },
   "vite.config.js": {
-    "mtime": 1788422242.744806,
-    "seen": 1788501820.1388814,
-    "ast_hash": "39ba2862c86572a83ebdceddd6ebe099",
+    "mtime": 1788517832.1215174,
+    "seen": 1788518208.487385,
+    "ast_hash": "5152f37752569f9c641000461d50d80b",
     "semantic_hash": ""
   },
   ".agents/rules/graphify.md": {
@@ -10038,9 +10038,9 @@
     "semantic_hash": ""
   },
   "src/components/AtfalGemLeagueCard.jsx": {
-    "mtime": 1788510551.7883048,
-    "seen": 1788515561.2176194,
-    "ast_hash": "f784583865d1fb343ee4450b2e4306f9",
+    "mtime": 1788517796.745436,
+    "seen": 1788518208.485295,
+    "ast_hash": "dbdcac9f776c98ad7532d269181300f8",
     "semantic_hash": ""
   },
   "src/components/AtfalTeacherLeagueEntry.jsx": {

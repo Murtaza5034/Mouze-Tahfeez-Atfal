@@ -171,9 +171,10 @@ const MONTHS_LIST = [
   { id: "rajab", label: "Rajab al-Asab", short: "Rajab", hijri: "رجب الأصب" },
 ];
 
-export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, customGemsData }) {
+export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, customGemsData, allProfiles }) {
   const studentName = studentProfile?.name || studentProfile?.full_name || studentProfile?.student_name || "Student";
-  const studentAvatar = studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || studentProfile?.photo || null;
+  const rawStudentAvatar = studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || studentProfile?.photo || null;
+  const studentAvatar = rawStudentAvatar && !rawStudentAvatar.includes("unsplash.com") ? rawStudentAvatar : null;
   const studentId = String(studentProfile?.student_id || studentProfile?.id || "");
 
   // Real-time Teacher-Filled Gem League data for this student
@@ -182,6 +183,8 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
   const [leaderboardList, setLeaderboardList] = useState([]);
   // Active selected month
   const [activeMonthId, setActiveMonthId] = useState("safar");
+  // Real-time map of genuine student profile photos from child_profiles
+  const [studentPhotosMap, setStudentPhotosMap] = useState({});
 
   // 1. Subscribe to this student's live doc
   useEffect(() => {
@@ -234,6 +237,89 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
     }
     return () => unsub();
   }, [studentId]);
+
+  // 1b. Subscribe to child_profiles to resolve authentic student profile pictures for the leaderboard
+  useEffect(() => {
+    let unsub = () => {};
+    try {
+      const db = getFirestore(firebaseApp);
+      const cpCol = collection(db, "child_profiles");
+      unsub = onSnapshot(
+        cpCol,
+        (snap) => {
+          const map = {};
+          snap.forEach((d) => {
+            const data = d.data();
+            const sid = String(data.student_id || d.id || "");
+            const photo = data.photo_url || data.photoUrl || data.photo || data.avatar_url || null;
+            const name = data.full_name || data.student_name || data.name || "";
+            if (photo && typeof photo === "string" && !photo.includes("unsplash.com")) {
+              if (sid) map[sid] = photo;
+              if (name) {
+                map[name.trim().toLowerCase()] = photo;
+                const clean = name.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase();
+                if (clean) map[clean] = photo;
+              }
+            }
+          });
+          if (Object.keys(map).length > 0) {
+            setStudentPhotosMap((prev) => ({ ...prev, ...map }));
+          }
+        },
+        (err) => {
+          console.warn("child_profiles photo snapshot note:", err);
+        }
+      );
+    } catch (_e) {
+      supabase
+        .from("child_profiles")
+        .select("student_id, photo_url, full_name")
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            const map = {};
+            data.forEach((d) => {
+              const sid = String(d.student_id || "");
+              const photo = d.photo_url || null;
+              const name = d.full_name || "";
+              if (photo && !photo.includes("unsplash.com")) {
+                if (sid) map[sid] = photo;
+                if (name) {
+                  map[name.trim().toLowerCase()] = photo;
+                  const clean = name.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase();
+                  if (clean) map[clean] = photo;
+                }
+              }
+            });
+            setStudentPhotosMap((prev) => ({ ...prev, ...map }));
+          }
+        })
+        .catch(() => {});
+    }
+    return () => unsub();
+  }, []);
+
+  // Ingest any allProfiles provided directly
+  useEffect(() => {
+    if (allProfiles && allProfiles.length > 0) {
+      const map = {};
+      allProfiles.forEach((p) => {
+        const sid = String(p.student_id || p.id || "");
+        const photo = p.photoUrl || p.photo_url || p.photo || p.avatar_url || null;
+        const name = p.name || p.full_name || p.student_name || "";
+        if (photo && !photo.includes("unsplash.com")) {
+          if (sid) map[sid] = photo;
+          if (name) {
+            map[name.trim().toLowerCase()] = photo;
+            const clean = name.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase();
+            if (clean) map[clean] = photo;
+          }
+        }
+      });
+      if (Object.keys(map).length > 0) {
+        setStudentPhotosMap((prev) => ({ ...prev, ...map }));
+      }
+    }
+  }, [allProfiles]);
 
   // 2. Subscribe to all entries for live Monthly Top 3
   useEffect(() => {
@@ -362,11 +448,37 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
         (Number(w.week4?.activity) || 0);
       const gems = Math.max(Number(m.monthly_total) || 0, weekSum);
 
+      const sName = entry.student_name || "Student";
+      const cleanName = sName.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase();
+
+      // Resolve real profile photo
+      const rawEntryPhoto =
+        (entry.photo_url && !entry.photo_url.includes("unsplash.com") ? entry.photo_url : null) ||
+        (entry.photoUrl && !entry.photoUrl.includes("unsplash.com") ? entry.photoUrl : null) ||
+        (entry.avatar_url && !entry.avatar_url.includes("unsplash.com") ? entry.avatar_url : null) ||
+        (entry.photo && !entry.photo.includes("unsplash.com") ? entry.photo : null);
+
+      const realPhoto =
+        rawEntryPhoto ||
+        studentPhotosMap[sId] ||
+        studentPhotosMap[sName.trim().toLowerCase()] ||
+        studentPhotosMap[cleanName] ||
+        (sId === studentId && studentAvatar && !studentAvatar.includes("unsplash.com") ? studentAvatar : null) ||
+        null;
+
+      // If we resolved an authentic photo from child_profiles but atfal_gem_league lacked it, backfill
+      if (realPhoto && !rawEntryPhoto) {
+        try {
+          const db = getFirestore(firebaseApp);
+          setDoc(doc(db, "atfal_gem_league", sId), { photo_url: realPhoto }, { merge: true }).catch(() => {});
+        } catch (_e) {}
+      }
+
       candidateMap.set(sId, {
         id: sId,
-        name: entry.student_name || "Student",
+        name: sName,
         gems: Math.max(0, gems),
-        avatar: entry.photo_url || entry.avatar_url || entry.photo || null,
+        avatar: realPhoto,
         isCurrentStudent: sId === studentId,
       });
     });
@@ -374,18 +486,24 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
     // 2. Ensure current student's live score is up-to-date
     if (studentId) {
       const curScore = Number(leagueData?.monthlyScore) || 0;
+      const myCleanPhoto =
+        studentAvatar ||
+        studentPhotosMap[studentId] ||
+        studentPhotosMap[studentName?.trim().toLowerCase()] ||
+        null;
+
       if (candidateMap.has(studentId)) {
         const item = candidateMap.get(studentId);
         item.gems = Math.max(item.gems, curScore);
         if (studentName) item.name = studentName;
-        if (studentAvatar) item.avatar = studentAvatar;
+        if (myCleanPhoto) item.avatar = myCleanPhoto;
         item.isCurrentStudent = true;
       } else {
         candidateMap.set(studentId, {
           id: studentId,
           name: studentName || "Student",
           gems: Math.max(0, curScore),
-          avatar: studentAvatar || null,
+          avatar: myCleanPhoto,
           isCurrentStudent: true,
         });
       }
@@ -403,21 +521,21 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
           id: "benchmark-husain",
           name: "Husain",
           gems: maxScore > 0 ? Math.round(maxScore * 0.82) : 80,
-          avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+          avatar: studentPhotosMap["benchmark-husain"] || studentPhotosMap["husain"] || null,
           isCurrentStudent: false,
         },
         {
           id: "benchmark-fatema",
           name: "Fatema",
           gems: maxScore > 0 ? Math.round(maxScore * 0.68) : 70,
-          avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
+          avatar: studentPhotosMap["benchmark-fatema"] || studentPhotosMap["fatema"] || null,
           isCurrentStudent: false,
         },
         {
           id: "benchmark-sakina",
           name: "Sakina",
           gems: maxScore > 0 ? Math.round(maxScore * 0.55) : 60,
-          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+          avatar: studentPhotosMap["benchmark-sakina"] || studentPhotosMap["sakina"] || null,
           isCurrentStudent: false,
         },
       ];
@@ -438,22 +556,41 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
     });
 
     // 5. Select Top 3 and assign ranks 1, 2, 3
-    return candidates.slice(0, 3).map((item, idx) => ({
-      rank: idx + 1,
-      id: item.id,
-      name: item.name,
-      gems: item.gems,
-      avatar:
-        item.avatar ||
-        (item.isCurrentStudent ? studentAvatar : null) ||
-        [
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-          "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
-        ][idx % 3],
-      isCurrentStudent: item.isCurrentStudent,
-    }));
-  }, [leaderboardList, activeMonthId, studentId, studentName, studentAvatar, leagueData?.monthlyScore]);
+    return candidates.slice(0, 3).map((item, idx) => {
+      const rank = idx + 1;
+      let photo = item.avatar;
+      if (!photo || photo.includes("unsplash.com")) {
+        if (item.isCurrentStudent && studentAvatar && !studentAvatar.includes("unsplash.com")) {
+          photo = studentAvatar;
+        } else {
+          photo =
+            studentPhotosMap[item.id] ||
+            studentPhotosMap[item.name?.trim().toLowerCase()] ||
+            studentPhotosMap[item.name?.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase()] ||
+            null;
+        }
+      }
+
+      // Elegant initial medallion SVG if no uploaded photo exists
+      if (!photo || photo.includes("unsplash.com")) {
+        const initial = (item.name || "S").trim().charAt(0).toUpperCase();
+        const bgColors = ["#1e3a8a", "#1e293b", "#431407"];
+        const borderColors = ["#facc15", "#cbd5e1", "#ea580c"];
+        const bg = bgColors[idx % 3];
+        const stroke = borderColors[idx % 3];
+        photo = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="${encodeURIComponent(bg)}" stroke="${encodeURIComponent(stroke)}" stroke-width="4"/><text x="50%" y="55%" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="42" font-weight="900" fill="%23ffffff" text-anchor="middle" dominant-baseline="middle">${initial}</text></svg>`;
+      }
+
+      return {
+        rank,
+        id: item.id,
+        name: item.name,
+        gems: item.gems,
+        avatar: photo,
+        isCurrentStudent: item.isCurrentStudent,
+      };
+    });
+  }, [leaderboardList, activeMonthId, studentId, studentName, studentAvatar, leagueData?.monthlyScore, studentPhotosMap]);
 
   return (
     <div className="atfal-gem-league-container fade-in">
