@@ -609,47 +609,43 @@ export default function AtfalTeacherLeagueEntry({
     }
   };
 
-  // Week metadata configuration
+  // Week metadata configuration with 3D gem PNG assets
   const WEEKS_META = [
     {
       key: "week1",
       number: 1,
       titleAr: "الأسبوع - ١",
       titleEn: "Week 1",
-      postItGem: EmeraldGemSvg,
-      postItName: "Emerald",
-      activityGem: RubyGemSvg,
-      activityName: "Ruby",
+      gemImg: "/assets/gems/gem-week1-emerald.png",
+      gemName: "Emerald",
+      gemTheme: "emerald",
     },
     {
       key: "week2",
       number: 2,
       titleAr: "الأسبوع - ٢",
       titleEn: "Week 2",
-      postItGem: AmethystGemSvg,
-      postItName: "Amethyst",
-      activityGem: EmeraldGemSvg,
-      activityName: "Emerald",
+      gemImg: "/assets/gems/gem-week2-ruby.png",
+      gemName: "Heart Ruby",
+      gemTheme: "ruby",
     },
     {
       key: "week3",
       number: 3,
       titleAr: "الأسبوع - ٣",
       titleEn: "Week 3",
-      postItGem: CyanSapphireGemSvg,
-      postItName: "Cyan Sapphire",
-      activityGem: LavenderGemSvg,
-      activityName: "Lavender",
+      gemImg: "/assets/gems/gem-week3-sapphire.png",
+      gemName: "Royal Sapphire",
+      gemTheme: "sapphire",
     },
     {
       key: "week4",
       number: 4,
       titleAr: "الأسبوع - ٤",
       titleEn: "Week 4",
-      postItGem: RoyalBlueGemSvg,
-      postItName: "Royal Sapphire",
-      activityGem: AmberTopazGemSvg,
-      activityName: "Amber Topaz",
+      gemImg: "/assets/gems/gem-week4-diamond.png",
+      gemName: "Brilliant Diamond",
+      gemTheme: "diamond",
     },
   ];
 
@@ -699,6 +695,7 @@ export default function AtfalTeacherLeagueEntry({
               className={`league-week-pill ${selectedWeekFilter === "1" ? "active" : ""}`}
               onClick={() => setSelectedWeekFilter("1")}
             >
+              <img src="/assets/gems/gem-week1-emerald.png" alt="W1" className="pill-gem-mini" />
               الأسبوع ١
             </button>
             <button
@@ -706,6 +703,7 @@ export default function AtfalTeacherLeagueEntry({
               className={`league-week-pill ${selectedWeekFilter === "2" ? "active" : ""}`}
               onClick={() => setSelectedWeekFilter("2")}
             >
+              <img src="/assets/gems/gem-week2-ruby.png" alt="W2" className="pill-gem-mini" />
               الأسبوع ٢
             </button>
             <button
@@ -713,6 +711,7 @@ export default function AtfalTeacherLeagueEntry({
               className={`league-week-pill ${selectedWeekFilter === "3" ? "active" : ""}`}
               onClick={() => setSelectedWeekFilter("3")}
             >
+              <img src="/assets/gems/gem-week3-sapphire.png" alt="W3" className="pill-gem-mini" />
               الأسبوع ٣
             </button>
             <button
@@ -720,6 +719,7 @@ export default function AtfalTeacherLeagueEntry({
               className={`league-week-pill ${selectedWeekFilter === "4" ? "active" : ""}`}
               onClick={() => setSelectedWeekFilter("4")}
             >
+              <img src="/assets/gems/gem-week4-diamond.png" alt="W4" className="pill-gem-mini" />
               الأسبوع ٤
             </button>
           </div>
@@ -856,14 +856,16 @@ export default function AtfalTeacherLeagueEntry({
               const postItScore = Number(weekData.post_it) || 0;
               const activityScore = Number(weekData.activity) || 0;
               const weekTotal = postItScore + activityScore;
-              const PostItGem = week.postItGem;
-              const ActivityGem = week.activityGem;
 
               return (
                 <div key={week.key} className="parchment-week-card">
                   {/* Week Header */}
                   <div className="week-card-header">
-                    <span className="week-ar-tag">{week.titleAr}</span>
+                    <div className="week-card-header-left">
+                      <img src={week.gemImg} alt={week.gemName} className="header-mini-3d-gem" />
+                      <span className="week-ar-tag">{week.titleAr}</span>
+                      <span className="week-en-tag">({week.gemName})</span>
+                    </div>
                     <span className="week-total-pill">Total: {weekTotal} / 120</span>
                   </div>
 
@@ -873,7 +875,7 @@ export default function AtfalTeacherLeagueEntry({
                     <div className="week-col post-it-col">
                       <span className="gem-category-label">POST-IT GEMS</span>
                       <div className="gem-graphic-box">
-                        <PostItGem />
+                        <img src={week.gemImg} alt={week.gemName} className="teacher-3d-gem-img" />
                       </div>
 
                       {/* Marks Input Box (out of 60) */}
@@ -923,7 +925,7 @@ export default function AtfalTeacherLeagueEntry({
                     <div className="week-col activity-col">
                       <span className="gem-category-label">ACTIVITY GEMS</span>
                       <div className="gem-graphic-box">
-                        <ActivityGem />
+                        <img src={week.gemImg} alt={week.gemName} className="teacher-3d-gem-img" />
                       </div>
                       <span className="activity-breakdown-sub">
                         ATTENDANCE | JADEED | MURAJAH | TILAWAT

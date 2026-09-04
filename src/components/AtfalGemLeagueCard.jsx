@@ -5,95 +5,14 @@ import { doc, onSnapshot, getDoc, getDocs, collection, getFirestore } from 'fire
 import { firebaseApp } from '../firebase/config';
 
 // ---------------------------------------------------------------------------
-// 4 DISTINCT WEEKLY GEM SVGS (MATCHING TEACHER HIFZ LEAGUE PDF 1448H)
+// 4 DISTINCT REAL 3D GEM ASSETS (WEEK 1-4)
 // ---------------------------------------------------------------------------
-const EmeraldGemSvg = () => (
-  <svg className="league-week-gem-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="emGradCore" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#d1fae5" />
-        <stop offset="35%" stopColor="#10b981" />
-        <stop offset="70%" stopColor="#047857" />
-        <stop offset="100%" stopColor="#064e3b" />
-      </linearGradient>
-    </defs>
-    <polygon points="50,6 88,26 88,74 50,94 12,74 12,26" fill="url(#emGradCore)" stroke="#a7f3d0" strokeWidth="2.5" />
-    <polygon points="50,6 72,30 28,30" fill="#ecfdf5" fillOpacity="0.85" />
-    <polygon points="50,6 88,26 72,30" fill="#6ee7b7" fillOpacity="0.75" />
-    <polygon points="50,6 12,26 28,30" fill="#a7f3d0" fillOpacity="0.8" />
-    <polygon points="72,30 88,26 88,74 70,70" fill="#047857" fillOpacity="0.7" />
-    <polygon points="28,30 12,26 12,74 30,70" fill="#10b981" fillOpacity="0.65" />
-    <polygon points="28,30 72,30 70,70 30,70" fill="#10b981" fillOpacity="0.9" />
-    <polygon points="30,70 70,70 50,94" fill="#065f46" fillOpacity="0.9" />
-    <circle cx="44" cy="42" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #6ee7b7)" />
-  </svg>
-);
-
-const RubyGemSvg = () => (
-  <svg className="league-week-gem-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="rubyGradCore" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#ffe4e6" />
-        <stop offset="35%" stopColor="#f43f5e" />
-        <stop offset="70%" stopColor="#e11d48" />
-        <stop offset="100%" stopColor="#881337" />
-      </linearGradient>
-    </defs>
-    <polygon points="50,8 86,28 86,72 50,92 14,72 14,28" fill="url(#rubyGradCore)" stroke="#fecdd3" strokeWidth="2.5" />
-    <polygon points="50,8 72,30 28,30" fill="#fff1f2" fillOpacity="0.9" />
-    <polygon points="50,8 86,28 72,30" fill="#fb7185" fillOpacity="0.75" />
-    <polygon points="50,8 14,28 28,30" fill="#fda4af" fillOpacity="0.8" />
-    <polygon points="28,30 72,30 68,68 32,68" fill="#f43f5e" fillOpacity="0.9" />
-    <polygon points="32,68 68,68 50,92" fill="#9f1239" fillOpacity="0.95" />
-    <polygon points="72,30 86,28 86,72 68,68" fill="#be123c" fillOpacity="0.8" />
-    <polygon points="28,30 14,28 14,72 32,68" fill="#e11d48" fillOpacity="0.75" />
-    <circle cx="45" cy="40" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #fda4af)" />
-  </svg>
-);
-
-const AmethystGemSvg = () => (
-  <svg className="league-week-gem-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="amethystGradCore" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#f5d0fe" />
-        <stop offset="35%" stopColor="#d946ef" />
-        <stop offset="70%" stopColor="#a21caf" />
-        <stop offset="100%" stopColor="#4a044e" />
-      </linearGradient>
-    </defs>
-    <polygon points="50,8 86,28 86,72 50,92 14,72 14,28" fill="url(#amethystGradCore)" stroke="#f5d0fe" strokeWidth="2.5" />
-    <polygon points="50,8 72,30 28,30" fill="#fdf4ff" fillOpacity="0.9" />
-    <polygon points="50,8 86,28 72,30" fill="#e879f9" fillOpacity="0.75" />
-    <polygon points="50,8 14,28 28,30" fill="#f0abfc" fillOpacity="0.8" />
-    <polygon points="28,30 72,30 68,68 32,68" fill="#c026d3" fillOpacity="0.9" />
-    <polygon points="32,68 68,68 50,92" fill="#701a75" fillOpacity="0.95" />
-    <polygon points="72,30 86,28 86,72 68,68" fill="#86198f" fillOpacity="0.8" />
-    <polygon points="28,30 14,28 14,72 32,68" fill="#a21caf" fillOpacity="0.75" />
-    <circle cx="45" cy="40" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #f0abfc)" />
-  </svg>
-);
-
-const CyanSapphireGemSvg = () => (
-  <svg className="league-week-gem-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="cyanGradCore" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#cffafe" />
-        <stop offset="35%" stopColor="#22d3ee" />
-        <stop offset="70%" stopColor="#0891b2" />
-        <stop offset="100%" stopColor="#164e63" />
-      </linearGradient>
-    </defs>
-    <polygon points="50,8 86,28 86,72 50,92 14,72 14,28" fill="url(#cyanGradCore)" stroke="#a5f3fc" strokeWidth="2.5" />
-    <polygon points="50,8 72,30 28,30" fill="#ecfeff" fillOpacity="0.9" />
-    <polygon points="50,8 86,28 72,30" fill="#67e8f9" fillOpacity="0.75" />
-    <polygon points="50,8 14,28 28,30" fill="#a5f3fc" fillOpacity="0.8" />
-    <polygon points="28,30 72,30 68,68 32,68" fill="#06b6d4" fillOpacity="0.9" />
-    <polygon points="32,68 68,68 50,92" fill="#0e7490" fillOpacity="0.95" />
-    <polygon points="72,30 86,28 86,72 68,68" fill="#155e75" fillOpacity="0.8" />
-    <polygon points="28,30 14,28 14,72 32,68" fill="#0891b2" fillOpacity="0.75" />
-    <circle cx="45" cy="40" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #67e8f9)" />
-  </svg>
-);
+export const GEM_3D_ASSETS = {
+  1: '/assets/gems/gem-week1-emerald.png',
+  2: '/assets/gems/gem-week2-ruby.png',
+  3: '/assets/gems/gem-week3-sapphire.png',
+  4: '/assets/gems/gem-week4-diamond.png',
+};
 
 // Sparkling Corner Facet Decor
 const CornerGem = ({ position = 'top-left', color = 'cyan' }) => (
@@ -378,10 +297,10 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
     const weeks = curMonth.weeks || {};
 
     const weekDefinitions = [
-      { num: 1, key: "week1", name: "Emerald Week", color: "#10b981", gradClass: "emerald" },
-      { num: 2, key: "week2", name: "Ruby Week", color: "#f43f5e", gradClass: "ruby" },
-      { num: 3, key: "week3", name: "Amethyst Week", color: "#a855f7", gradClass: "amethyst" },
-      { num: 4, key: "week4", name: "Sapphire Week", color: "#06b6d4", gradClass: "sapphire" },
+      { num: 1, key: "week1", name: "Emerald Week", gemImg: GEM_3D_ASSETS[1], color: "#10b981", gradClass: "emerald" },
+      { num: 2, key: "week2", name: "Ruby Week", gemImg: GEM_3D_ASSETS[2], color: "#f43f5e", gradClass: "ruby" },
+      { num: 3, key: "week3", name: "Sapphire Week", gemImg: GEM_3D_ASSETS[3], color: "#3b82f6", gradClass: "sapphire" },
+      { num: 4, key: "week4", name: "Diamond Week", gemImg: GEM_3D_ASSETS[4], color: "#06b6d4", gradClass: "diamond" },
     ];
 
     const weeksArray = weekDefinitions.map((def) => {
@@ -393,6 +312,7 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
         weekNum: def.num,
         weekKey: def.key,
         name: def.name,
+        gemImg: def.gemImg,
         color: def.color,
         gradClass: def.gradClass,
         postIt,
@@ -628,10 +548,11 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
                     className={`gem-timeline-node ${w.isCompleted ? 'node-active' : 'node-pending'}`}
                   >
                     <div className="timeline-gem-icon-node">
-                      {w.weekNum === 1 && <EmeraldGemSvg />}
-                      {w.weekNum === 2 && <RubyGemSvg />}
-                      {w.weekNum === 3 && <AmethystGemSvg />}
-                      {w.weekNum === 4 && <CyanSapphireGemSvg />}
+                      <img
+                        src={w.gemImg}
+                        alt={w.name}
+                        className="timeline-3d-gem-img"
+                      />
                     </div>
                     <span className="timeline-node-pill">
                       Week {w.weekNum}
@@ -652,10 +573,11 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
               >
                 <div className="gem-week-card-top">
                   <div className={`gem-week-icon-halo halo-${w.gradClass}`}>
-                    {w.weekNum === 1 && <EmeraldGemSvg />}
-                    {w.weekNum === 2 && <RubyGemSvg />}
-                    {w.weekNum === 3 && <AmethystGemSvg />}
-                    {w.weekNum === 4 && <CyanSapphireGemSvg />}
+                    <img
+                      src={w.gemImg}
+                      alt={w.name}
+                      className="week-card-3d-gem-img"
+                    />
                   </div>
                   <div className="gem-week-info-col">
                     <div className="week-header-sub">
