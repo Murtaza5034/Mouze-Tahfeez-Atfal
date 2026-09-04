@@ -453,6 +453,62 @@ body.dark-mode .topbar-sub-kibar {
   flex-shrink: 0;
 }
 
+.topbar-actions-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.topbar-refresh-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 50%, #f0f9ff 100%);
+  border: 1.5px solid #bae6fd;
+  color: #0284c7;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.12);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.topbar-refresh-btn svg {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
+}
+
+.topbar-refresh-btn:hover {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  color: #0369a1;
+  border-color: #38bdf8;
+  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.28);
+  transform: translateY(-2px) scale(1.04);
+}
+
+.topbar-refresh-btn:hover svg {
+  transform: rotate(60deg) scale(1.1);
+}
+
+.topbar-refresh-btn:active {
+  transform: scale(0.88);
+  color: #075985;
+  background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%);
+  box-shadow: 0 0 0 5px rgba(2, 132, 199, 0.18);
+}
+
+.topbar-refresh-btn.refreshing,
+.topbar-refresh-btn.refreshing svg,
+.topbar-refresh-spin {
+  animation: topbar-refresh-spin 0.75s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+}
+
 .topbar-logout-btn {
   position: relative;
   overflow: hidden;

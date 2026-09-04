@@ -1,0 +1,946 @@
+/* ==========================================================================
+   ATFAL TEACHER LEAGUE ENTRY STYLES ("HIFZ LEAGUE 1448H")
+   Replicating the 4-Page PDF Parchment & Jewels Reference
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+.atfal-league-entry-root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 10px 14px 40px;
+  box-sizing: border-box;
+  font-family: 'Outfit', sans-serif;
+  color: #2e1a0d;
+}
+
+/* --------------------------------------------------------------------------
+   TOP CONTROLS & SELECTION BAR
+   -------------------------------------------------------------------------- */
+.league-controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  background: #ffffff;
+  padding: 18px 22px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(197, 160, 89, 0.4);
+  box-shadow: 0 4px 20px rgba(61, 43, 31, 0.08);
+  margin-top: 4px;
+  position: relative;
+  z-index: 10;
+}
+
+.atfal-league-entry-root.dark-theme .league-controls-bar {
+  background: #171720;
+  border-color: rgba(197, 160, 89, 0.25);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.league-control-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 240px;
+}
+
+.league-control-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #78350f;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.atfal-league-entry-root.dark-theme .league-control-label {
+  color: #fbbf24;
+}
+
+.league-select-wrap select,
+.league-student-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: #fdfaf3;
+  border: 1.5px solid #d4af37;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #451a03;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Outfit', 'Amiri', sans-serif;
+}
+
+.atfal-league-entry-root.dark-theme .league-select-wrap select,
+.atfal-league-entry-root.dark-theme .league-student-select {
+  background: #232332;
+  border-color: rgba(212, 175, 55, 0.5);
+  color: #fef08a;
+}
+
+.league-select-wrap select:focus,
+.league-student-select:focus {
+  border-color: #b45309;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
+}
+
+/* Week Pills */
+.league-week-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.league-week-pill {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(197, 160, 89, 0.4);
+  background: #fbf6ee;
+  color: #78350f;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.atfal-league-entry-root.dark-theme .league-week-pill {
+  background: #232332;
+  color: #cbd5e1;
+  border-color: rgba(197, 160, 89, 0.25);
+}
+
+.league-week-pill:hover {
+  background: #fef08a;
+  color: #451a03;
+}
+
+.league-week-pill.active {
+  background: linear-gradient(135deg, #d4af37, #b45309);
+  color: #ffffff;
+  border-color: #92400e;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.3);
+}
+
+/* Student Switcher */
+.league-student-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.student-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid #d4af37;
+  background: #fbf6ee;
+  color: #78350f;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.atfal-league-entry-root.dark-theme .student-nav-btn {
+  background: #232332;
+  color: #fbbf24;
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.student-nav-btn:hover {
+  background: #d4af37;
+  color: #ffffff;
+}
+
+.student-select-field {
+  flex: 1;
+}
+
+/* --------------------------------------------------------------------------
+   STUDENT INFO & ACTION BANNER
+   -------------------------------------------------------------------------- */
+.league-status-banner-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.8), rgba(253, 230, 138, 0.5));
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 14px;
+  padding: 12px 18px;
+}
+
+.atfal-league-entry-root.dark-theme .league-status-banner-wrap {
+  background: linear-gradient(135deg, rgba(35, 30, 25, 0.9), rgba(45, 35, 20, 0.85));
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.league-student-info-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-badge-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid #d4af37;
+  overflow: hidden;
+  background: #fef08a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.student-badge-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.student-badge-name {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #451a03;
+}
+
+.atfal-league-entry-root.dark-theme .student-badge-name {
+  color: #fef08a;
+}
+
+.student-badge-sub {
+  font-size: 0.82rem;
+  color: #78350f;
+  font-weight: 600;
+}
+
+.atfal-league-entry-root.dark-theme .student-badge-sub {
+  color: #d1d5db;
+}
+
+.league-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kalam-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1.5px solid #d4af37;
+  color: #78350f;
+  padding: 9px 15px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.atfal-league-entry-root.dark-theme .kalam-toggle-btn {
+  background: #232332;
+  color: #fef08a;
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.kalam-toggle-btn:hover {
+  background: #fef3c7;
+  transform: translateY(-1px);
+}
+
+.league-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+  transition: all 0.2s ease;
+}
+
+.league-save-btn:hover {
+  background: linear-gradient(135deg, #10b981, #059669);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+}
+
+.league-save-btn.saved {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+}
+
+.league-error-toast {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #f87171;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+/* --------------------------------------------------------------------------
+   AUTHENTIC PDF PARCHMENT SHEET
+   -------------------------------------------------------------------------- */
+.parchment-sheet-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.parchment-sheet {
+  position: relative;
+  width: 100%;
+  background: #fcf8ee;
+  background: linear-gradient(135deg, #fdfaf3 0%, #f7eedb 50%, #f4e8cb 100%);
+  border: 3px double #b8860b;
+  outline: 1px solid #78350f;
+  outline-offset: -8px;
+  border-radius: 20px;
+  padding: 34px 28px 40px;
+  box-shadow: 0 10px 35px rgba(61, 43, 31, 0.12), inset 0 0 80px rgba(184, 134, 11, 0.08);
+  box-sizing: border-box;
+}
+
+.atfal-league-entry-root.dark-theme .parchment-sheet {
+  background: linear-gradient(135deg, #1b1715 0%, #151210 50%, #1c1815 100%);
+  border-color: #d4af37;
+  outline-color: #b45309;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(212, 175, 55, 0.05);
+}
+
+/* Ornate Corner Elements */
+.parchment-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid #b8860b;
+  pointer-events: none;
+}
+
+.c-top-left {
+  top: 14px;
+  left: 14px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.c-top-right {
+  top: 14px;
+  right: 14px;
+  border-left: none;
+  border-bottom: none;
+}
+
+.c-bottom-left {
+  bottom: 14px;
+  left: 14px;
+  border-right: none;
+  border-top: none;
+}
+
+.c-bottom-right {
+  bottom: 14px;
+  right: 14px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Parchment Header */
+.parchment-header {
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.parchment-crest-flourish {
+  color: #b8860b;
+  font-size: 0.9rem;
+  letter-spacing: 4px;
+}
+
+.hifz-league-title {
+  margin: 4px 0 2px;
+  font-family: 'Cinzel', serif;
+  font-size: 2.4rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #451a03;
+  text-shadow: 1px 1px 0px rgba(254, 240, 138, 0.6);
+}
+
+.atfal-league-entry-root.dark-theme .hifz-league-title {
+  color: #fef08a;
+  text-shadow: 0 0 16px rgba(254, 240, 138, 0.3);
+}
+
+.atfal-tahfeez-subtitle {
+  margin: 0;
+  font-family: 'Amiri', serif;
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: #78350f;
+  direction: rtl;
+}
+
+.atfal-league-entry-root.dark-theme .atfal-tahfeez-subtitle {
+  color: #fcd34d;
+}
+
+.parchment-ornamental-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px auto 14px;
+  width: 220px;
+}
+
+.parchment-ornamental-line::before,
+.parchment-ornamental-line::after {
+  content: "";
+  flex: 1;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, #b8860b, transparent);
+}
+
+.ornament-gem {
+  color: #d4af37;
+  font-size: 0.85rem;
+}
+
+/* Month Ribbon Badge */
+.parchment-month-banner {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.month-banner-ribbon {
+  background: #ffffff;
+  border: 1.5px solid #d4af37;
+  padding: 6px 28px;
+  border-radius: 30px;
+  box-shadow: 0 3px 12px rgba(184, 134, 11, 0.15);
+}
+
+.atfal-league-entry-root.dark-theme .month-banner-ribbon {
+  background: #232020;
+  border-color: #f59e0b;
+}
+
+.banner-ar-text {
+  font-family: 'Amiri', serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #78350f;
+  direction: rtl;
+}
+
+.atfal-league-entry-root.dark-theme .banner-ar-text {
+  color: #fef08a;
+}
+
+/* --------------------------------------------------------------------------
+   4 WEEKS ENTRY CARDS GRID
+   -------------------------------------------------------------------------- */
+.parchment-weeks-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 26px;
+}
+
+@media (max-width: 900px) {
+  .parchment-weeks-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.parchment-week-card {
+  background: #ffffff;
+  border: 1.5px solid rgba(197, 160, 89, 0.45);
+  border-radius: 14px;
+  padding: 16px 16px 18px;
+  box-shadow: 0 4px 16px rgba(61, 43, 31, 0.05);
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.atfal-league-entry-root.dark-theme .parchment-week-card {
+  background: #201c1a;
+  border-color: rgba(212, 175, 55, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.parchment-week-card:hover {
+  border-color: #d4af37;
+  box-shadow: 0 6px 20px rgba(184, 134, 11, 0.15);
+}
+
+.week-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px dashed rgba(197, 160, 89, 0.4);
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+}
+
+.week-ar-tag {
+  font-family: 'Amiri', serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #78350f;
+  direction: rtl;
+}
+
+.atfal-league-entry-root.dark-theme .week-ar-tag {
+  color: #fef08a;
+}
+
+.week-total-pill {
+  font-size: 0.8rem;
+  font-weight: 800;
+  background: #fef3c7;
+  color: #78350f;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+}
+
+.atfal-league-entry-root.dark-theme .week-total-pill {
+  background: #36291a;
+  color: #fbbf24;
+}
+
+/* Two Columns: Post-It & Activity */
+.week-columns-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 500px) {
+  .week-columns-wrap {
+    grid-template-columns: 1fr;
+  }
+}
+
+.week-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 10px;
+  background: #fdfaf3;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 10px;
+}
+
+.atfal-league-entry-root.dark-theme .week-col {
+  background: #191614;
+  border-color: rgba(212, 175, 55, 0.2);
+}
+
+.gem-category-label {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: #78350f;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.atfal-league-entry-root.dark-theme .gem-category-label {
+  color: #fcd34d;
+}
+
+.activity-breakdown-sub {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #92400e;
+  line-height: 1.2;
+  margin: 3px 0 8px;
+  letter-spacing: 0.4px;
+}
+
+.atfal-league-entry-root.dark-theme .activity-breakdown-sub {
+  color: #fde68a;
+  opacity: 0.85;
+}
+
+.gem-graphic-box {
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.1));
+  transition: transform 0.2s ease;
+}
+
+.gem-graphic-box:hover {
+  transform: scale(1.12);
+}
+
+.league-gem-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Score Input Row */
+.gem-input-box-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.gem-input-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+}
+
+.gem-score-input {
+  width: 60px;
+  height: 40px;
+  background: #ffffff;
+  border: 2px solid #d4af37;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #451a03;
+  outline: none;
+  transition: all 0.2s;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.atfal-league-entry-root.dark-theme .gem-score-input {
+  background: #2b2520;
+  border-color: #f59e0b;
+  color: #fef08a;
+}
+
+.gem-score-input:focus {
+  border-color: #b45309;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.3);
+}
+
+.gem-max-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.atfal-league-entry-root.dark-theme .gem-max-label {
+  color: #fde68a;
+}
+
+/* Stepper Buttons (-5, +5, 60) */
+.gem-stepper-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.gem-stepper-btns button {
+  padding: 3px 7px;
+  background: #fbf6ee;
+  border: 1px solid rgba(184, 134, 11, 0.35);
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #78350f;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.atfal-league-entry-root.dark-theme .gem-stepper-btns button {
+  background: #2d2621;
+  color: #fde68a;
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.gem-stepper-btns button:hover {
+  background: #fef08a;
+  color: #451a03;
+}
+
+.gem-stepper-btns button.btn-full-gems {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  border-color: #047857;
+}
+
+/* --------------------------------------------------------------------------
+   BOTTOM SUMMARY: MONTHLY & YEARLY CHESTS
+   -------------------------------------------------------------------------- */
+.parchment-summary-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 10px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 650px) {
+  .parchment-summary-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+.summary-chest-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #ffffff;
+  border: 2px solid #d4af37;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 16px rgba(184, 134, 11, 0.12);
+}
+
+.atfal-league-entry-root.dark-theme .summary-chest-card {
+  background: #201c1a;
+  border-color: #b45309;
+}
+
+.chest-graphic-wrap {
+  width: 68px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+.treasure-chest-svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 4px 8px rgba(184, 134, 11, 0.3));
+}
+
+.chest-text-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.chest-badge-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #78350f;
+  letter-spacing: 0.8px;
+}
+
+.atfal-league-entry-root.dark-theme .chest-badge-title {
+  color: #fbbf24;
+}
+
+.chest-score-display {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #b45309;
+  line-height: 1.1;
+}
+
+.atfal-league-entry-root.dark-theme .chest-score-display {
+  color: #fef08a;
+  text-shadow: 0 0 10px rgba(254, 240, 138, 0.4);
+}
+
+.chest-subtext {
+  font-size: 0.75rem;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.atfal-league-entry-root.dark-theme .chest-subtext {
+  color: #9ca3af;
+}
+
+/* Official Footer Seal */
+.parchment-footer-seal {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+}
+
+.official-arabic-seal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1.5px solid #b8860b;
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: rgba(254, 243, 199, 0.4);
+}
+
+.seal-ar-line1 {
+  font-family: 'Amiri', serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #78350f;
+  direction: rtl;
+}
+
+.seal-ar-line2 {
+  font-family: 'Amiri', serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #92400e;
+  direction: rtl;
+}
+
+.seal-star-flourish {
+  font-size: 0.65rem;
+  color: #d4af37;
+  letter-spacing: 3px;
+  margin-top: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   KALAM MUBARAK MODAL (From Page 1 of PDF)
+   -------------------------------------------------------------------------- */
+.kalam-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.kalam-modal-content {
+  position: relative;
+  background: #fdfaf3;
+  background: linear-gradient(135deg, #fdfaf3, #f5eedb);
+  border: 3px double #b8860b;
+  border-radius: 20px;
+  max-width: 650px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 30px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.kalam-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: #fef08a;
+  border: 1px solid #d4af37;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #78350f;
+  transition: all 0.2s;
+}
+
+.kalam-close-btn:hover {
+  background: #fde047;
+  transform: rotate(90deg);
+}
+
+.kalam-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.kalam-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #451a03;
+  margin: 0;
+}
+
+.kalam-sub {
+  font-family: 'Amiri', serif;
+  font-size: 1.4rem;
+  color: #78350f;
+  margin: 4px 0 0;
+}
+
+.kalam-divider {
+  color: #d4af37;
+  margin-top: 6px;
+}
+
+.kalam-body-ar {
+  text-align: right;
+  font-family: 'Amiri', serif;
+  font-size: 1.25rem;
+  line-height: 2;
+  color: #3d2b1f;
+}
+
+.kalam-intro {
+  font-weight: 700;
+  color: #78350f;
+  margin-bottom: 12px;
+}
+
+.kalam-quote-box {
+  margin: 0 0 12px;
+  padding: 14px 18px;
+  background: rgba(254, 240, 138, 0.35);
+  border-right: 4px solid #b8860b;
+  border-radius: 8px;
+  font-size: 1.2rem;
+}
+
+.highlight-phrase {
+  font-weight: 800;
+  color: #78350f;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.kalam-reference {
+  font-size: 0.95rem;
+  color: #92400e;
+  margin: 0 0 14px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.kalam-divider-small {
+  text-align: center;
+  color: #d4af37;
+  margin: 10px 0;
+}

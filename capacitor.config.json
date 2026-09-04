@@ -3,6 +3,11 @@
   "appName": "Mauze Tahfeez",
   "webDir": "dist",
   "bundledWebRuntime": false,
+  "server": {
+    "url": "https://mouze-tahfeez-atfal.vercel.app",
+    "cleartext": true,
+    "androidScheme": "https"
+  },
   "android": {
     "allowMixedContent": true,
     "captureInput": true,

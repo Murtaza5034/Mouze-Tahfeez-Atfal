@@ -1,0 +1,1339 @@
+/* ==========================================================================
+   ATFAL GEM LEAGUE | MONTHLY LEAGUE & WEEKLY PROGRESS STYLES
+   Engineered for flawless fit across desktop, tablet, and all mobile screens.
+   ========================================================================== */
+
+/* Grid wrapper when placed inside .home-dashboard */
+.atfal-gem-league-grid-wrapper {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+/* Outer Container */
+.atfal-gem-league-container {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 18px 0 10px 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #f8fafc;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+/* Main Luxury Dark-Mode Plaque */
+.gem-card-main-plaque {
+  position: relative;
+  background:
+    radial-gradient(circle at 12% 15%, rgba(56, 189, 248, 0.16), transparent 45%),
+    radial-gradient(circle at 88% 18%, rgba(251, 191, 36, 0.14), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(99, 102, 241, 0.1), transparent 60%),
+    linear-gradient(155deg, #090e1a 0%, #0d172e 45%, #070b16 100%);
+  border-radius: 22px;
+  padding: 26px 24px 20px 24px;
+  box-shadow:
+    0 18px 45px -10px rgba(0, 0, 0, 0.75),
+    0 0 0 1.5px rgba(56, 189, 248, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.8);
+  overflow: visible;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Half Overlay / Half Out Floating Curved-Corner Rectangle Plaque */
+.gem-league-floating-badge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 22px;
+  background: linear-gradient(180deg, #131f38 0%, #080e1c 100%);
+  border: 1.5px solid #d4af37;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.7),
+    0 0 18px rgba(212, 175, 55, 0.5),
+    inset 0 1px 1px rgba(255, 248, 220, 0.4);
+  white-space: nowrap;
+}
+
+.gem-league-floating-badge .sparkle-star {
+  font-size: 0.95rem;
+  color: #facc15;
+  text-shadow: 0 0 8px rgba(250, 204, 21, 0.9);
+  animation: pulseSparkle 2.5s infinite ease-in-out;
+  flex-shrink: 0;
+}
+
+.gem-league-floating-badge .s-right {
+  animation-delay: 1.25s;
+}
+
+.floating-badge-text {
+  font-size: clamp(0.85rem, 1.8vw, 0.98rem);
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #fffbeb 0%, #fde047 35%, #eab308 70%, #b45309 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.85));
+  line-height: 1.2;
+}
+
+/* Corner Crystal Facets */
+.gem-card-corner-facet {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));
+}
+
+.gem-card-corner-facet.color-gold {
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.4));
+}
+
+.corner-top-left {
+  top: 0;
+  left: 0;
+}
+
+.corner-bottom-left {
+  bottom: 0;
+  left: 0;
+  transform: scaleY(-1);
+}
+
+.corner-top-right {
+  top: 0;
+  right: 0;
+}
+
+.corner-bottom-right {
+  bottom: 0;
+  right: 0;
+  transform: scaleY(-1);
+}
+
+/* ==========================================================================
+   CARD HEADER (Student Profile | Glowing Jewel Orb | Total League Points)
+   ========================================================================== */
+.gem-card-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 6px;
+  margin-bottom: 20px;
+  padding-bottom: 4px;
+  z-index: 2;
+}
+
+/* Left Student Info */
+.gem-header-student {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.gem-student-avatar-ring {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  padding: 2.5px;
+  background: linear-gradient(135deg, #fef08a, #d4af37, #b45309);
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.55), inset 0 0 6px rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
+.gem-student-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.gem-student-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #1e293b;
+  color: #facc15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.25rem;
+}
+
+.avatar-sparkle-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  color: #fef08a;
+  font-size: 0.8rem;
+  text-shadow: 0 0 6px #f59e0b;
+}
+
+.gem-student-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gem-student-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: clamp(140px, 25vw, 320px);
+  line-height: 1.25;
+}
+
+.gem-student-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #facc15;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+/* Center Glowing Gem Centerpiece Orb */
+.central-gem-orb-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 82px;
+  height: 82px;
+  flex-shrink: 0;
+}
+
+.gem-ambient-glow {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.48) 0%, rgba(56, 189, 248, 0.3) 45%, transparent 70%);
+  filter: blur(14px);
+  animation: pulseGlow 3s infinite alternate ease-in-out;
+}
+
+.gem-light-rays {
+  position: absolute;
+  width: 115px;
+  height: 115px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.2) 45deg,
+    transparent 90deg,
+    rgba(56, 189, 248, 0.25) 180deg,
+    transparent 270deg,
+    rgba(255, 255, 255, 0.2) 315deg,
+    transparent 360deg
+  );
+  animation: rotateRays 18s infinite linear;
+}
+
+.central-faceted-gem-svg {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  z-index: 2;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.65));
+}
+
+/* Right Points Group */
+.gem-header-points {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+
+.points-text-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.points-label {
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.points-sub {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.points-value {
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #facc15;
+  text-shadow: 0 0 16px rgba(250, 204, 21, 0.7), 0 2px 4px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+.small-inline-diamond {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8));
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   MONTHLY MAIN BODY (EXPANDED MONTHLY LEAGUE)
+   ========================================================================== */
+.gem-monthly-main-body {
+  position: relative;
+  background: rgba(11, 19, 36, 0.78);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 18px;
+  padding: 20px 22px 18px 22px;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.08),
+    0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 2;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Top Banner with Navigation and Score */
+.gem-monthly-top-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.monthly-banner-title-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.monthly-banner-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.monthly-lead-title {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #fde047;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(253, 224, 71, 0.4);
+}
+
+.monthly-hijri-sub {
+  font-family: 'Amiri', 'Traditional Arabic', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #a5f3fc;
+  text-shadow: 0 0 8px rgba(165, 243, 252, 0.4);
+}
+
+/* Month Navigation Pills */
+.monthly-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.monthly-nav-pill {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.monthly-nav-pill:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #ffffff;
+  background: rgba(30, 41, 59, 0.85);
+}
+
+.monthly-nav-pill.pill-active {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+/* Score Callout */
+.gem-monthly-score-callout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.monthly-score-caption {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.monthly-score-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1.5px solid rgba(250, 204, 21, 0.4);
+  border-radius: 12px;
+  padding: 4px 12px;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.2);
+}
+
+.score-num {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #fde047;
+  text-shadow: 0 0 10px rgba(253, 224, 71, 0.5);
+}
+
+.score-max {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+/* ==========================================================================
+   TIMELINE PROGRESS SECTION
+   ========================================================================== */
+.gem-timeline-section {
+  position: relative;
+  padding: 8px 4px 26px 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gem-timeline-track-rail {
+  position: relative;
+  height: 12px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.8), 0 0 14px rgba(56, 189, 248, 0.25);
+  width: 100%;
+}
+
+.gem-timeline-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #10b981 0%, #f43f5e 35%, #a855f7 70%, #06b6d4 100%);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.gem-timeline-nodes-wrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  pointer-events: none;
+}
+
+.gem-timeline-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.timeline-gem-icon-node {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+  margin-top: -2px;
+  transition: transform 0.2s ease;
+}
+
+.node-active .timeline-gem-icon-node {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.8));
+}
+
+.node-pending {
+  opacity: 0.55;
+  filter: grayscale(40%);
+}
+
+.timeline-node-pill {
+  position: absolute;
+  top: 28px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.node-active .timeline-node-pill {
+  color: #ffffff;
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgba(30, 58, 138, 0.9);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+}
+
+.node-score-sub {
+  color: #fde047;
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   4-WEEK PROGRESS CARDS (FILLED WITH TEACHER'S MARKS)
+   ========================================================================== */
+.gem-weekly-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.gem-week-card {
+  position: relative;
+  background: rgba(15, 23, 42, 0.65);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-width: 0;
+}
+
+.gem-week-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Distinct Gem Theme Colors */
+.week-color-emerald {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+.week-color-emerald.week-filled {
+  background: linear-gradient(160deg, rgba(6, 78, 59, 0.25) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.15);
+}
+
+.week-color-ruby {
+  border-color: rgba(244, 63, 94, 0.35);
+}
+.week-color-ruby.week-filled {
+  background: linear-gradient(160deg, rgba(136, 19, 55, 0.25) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(244, 63, 94, 0.6);
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.15);
+}
+
+.week-color-amethyst {
+  border-color: rgba(168, 85, 247, 0.35);
+}
+.week-color-amethyst.week-filled {
+  background: linear-gradient(160deg, rgba(74, 4, 78, 0.25) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.15);
+}
+
+.week-color-sapphire {
+  border-color: rgba(6, 182, 212, 0.35);
+}
+.week-color-sapphire.week-filled {
+  background: linear-gradient(160deg, rgba(22, 78, 99, 0.25) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(6, 182, 212, 0.6);
+  box-shadow: 0 0 14px rgba(6, 182, 212, 0.15);
+}
+
+/* Week Card Top */
+.gem-week-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gem-week-icon-halo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.halo-emerald {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.halo-ruby {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.4);
+}
+
+.halo-amethyst {
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.halo-sapphire {
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+}
+
+.league-week-gem-svg {
+  width: 32px;
+  height: 32px;
+}
+
+.gem-week-info-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.week-header-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.week-number-tag {
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #f1f5f9;
+}
+
+.week-status-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.status-earned {
+  background: rgba(250, 204, 21, 0.2);
+  color: #fde047;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+}
+
+.status-pending {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.week-score-big {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.week-score-val {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #facc15;
+}
+
+.week-score-denom {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+/* Breakdown of 2 activities */
+.gem-week-breakdown-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(11, 19, 36, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+}
+
+.breakdown-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.stat-label {
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.stat-num {
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.stat-limit {
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+.breakdown-dot {
+  color: #475569;
+}
+
+/* Week Progress Wrap */
+.gem-week-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gem-week-progress-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.gem-week-progress-bar {
+  height: 100%;
+  border-radius: 12px;
+  transition: width 0.8s ease-in-out;
+}
+
+.bar-emerald {
+  background: linear-gradient(90deg, #34d399, #10b981);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+}
+
+.bar-ruby {
+  background: linear-gradient(90deg, #fb7185, #f43f5e);
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.7);
+}
+
+.bar-amethyst {
+  background: linear-gradient(90deg, #c084fc, #a855f7);
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.7);
+}
+
+.bar-sapphire {
+  background: linear-gradient(90deg, #38bdf8, #06b6d4);
+  box-shadow: 0 0 6px rgba(6, 182, 212, 0.7);
+}
+
+.gem-week-percent {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #cbd5e1;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ==========================================================================
+   REWARDS CALLOUT DIVIDER
+   ========================================================================== */
+.gem-rewards-callout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.reward-line-left,
+.reward-line-right {
+  flex: 1;
+  max-width: 100px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(250, 204, 21, 0.5));
+}
+
+.reward-line-right {
+  background: linear-gradient(90deg, rgba(250, 204, 21, 0.5), transparent);
+}
+
+.reward-text {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #fde047;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(253, 224, 71, 0.5);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   MONTHLY TOP 3 LEADERBOARD
+   ========================================================================== */
+.gem-monthly-leaderboard-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.gem-leaderboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gem-sub-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gem-sub-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: #f1f5f9;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.gem-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #bae6fd;
+  white-space: nowrap;
+}
+
+/* Podium Row */
+.gem-monthly-podium-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.gem-monthly-podium-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+  min-width: 0;
+}
+
+.gem-monthly-podium-card:hover {
+  transform: translateY(-2px);
+}
+
+.gem-monthly-podium-card.rank-1 {
+  border: 1.5px solid #facc15;
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.3);
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);
+}
+
+.gem-monthly-podium-card.rank-2 {
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 0 10px rgba(203, 213, 225, 0.2);
+}
+
+.gem-monthly-podium-card.rank-3 {
+  border: 1.5px solid #ea580c;
+  box-shadow: 0 0 10px rgba(234, 88, 12, 0.2);
+}
+
+.gem-monthly-podium-card.is-current-student {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+.crown-holder {
+  position: absolute;
+  top: -12px;
+  left: 12px;
+}
+
+.crown-svg-icon {
+  width: 18px;
+  height: 18px;
+  filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.8));
+}
+
+.podium-avatar-wrapper {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.monthly-podium-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: block;
+}
+
+.podium-rank-tag {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.tag-rank-1 {
+  background: #facc15;
+  color: #713f12;
+}
+
+.tag-rank-2 {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.tag-rank-3 {
+  background: #f97316;
+  color: #ffffff;
+}
+
+.monthly-podium-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.monthly-podium-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.you-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-left: 3px;
+}
+
+.monthly-podium-score-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.monthly-podium-score {
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: #fde047;
+}
+
+.monthly-score-sub {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+/* Bottom Traditional Seal */
+.gem-card-bottom-seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.bottom-arabic-seal {
+  font-family: 'Amiri', 'Traditional Arabic', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fbbf24;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
+.bottom-seal-sep {
+  color: #d4af37;
+  font-size: 0.7rem;
+}
+
+/* Animations */
+@keyframes pulseSparkle {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes pulseGlow {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes rotateRays {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN (TABLET & ALL MOBILE SCREENS)
+   ========================================================================== */
+
+/* Tablets (<= 960px) */
+@media (max-width: 960px) {
+  .gem-weekly-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+}
+
+/* Mobile Screens (<= 680px) */
+@media (max-width: 680px) {
+  .atfal-gem-league-container {
+    margin: 14px 0 6px 0;
+  }
+
+  .gem-card-main-plaque {
+    padding: 22px 12px 14px 12px;
+    border-radius: 18px;
+  }
+
+  .gem-league-floating-badge {
+    padding: 4px 14px;
+    gap: 6px;
+    border-radius: 10px;
+  }
+
+  .floating-badge-text {
+    font-size: 0.76rem;
+    letter-spacing: 0.08em;
+  }
+
+  .gem-card-corner-facet {
+    width: 26px;
+    height: 26px;
+    opacity: 0.7;
+  }
+
+  /* Header on Mobile: Student left, Points right, Jewel Orb centered below */
+  .gem-card-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "student points"
+      "orb orb";
+    align-items: center;
+    gap: 10px 8px;
+    margin-bottom: 14px;
+  }
+
+  .gem-header-student {
+    grid-area: student;
+    gap: 8px;
+  }
+
+  .gem-student-avatar-ring {
+    width: 40px;
+    height: 40px;
+  }
+
+  .gem-student-name {
+    font-size: 0.95rem;
+    max-width: 160px;
+  }
+
+  .gem-student-badge {
+    font-size: 0.72rem;
+  }
+
+  .gem-header-points {
+    grid-area: points;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .points-label {
+    font-size: 0.7rem;
+  }
+
+  .points-value {
+    font-size: 1.25rem;
+  }
+
+  .central-gem-orb-wrapper {
+    grid-area: orb;
+    margin: 0 auto;
+    width: 64px;
+    height: 64px;
+  }
+
+  .central-faceted-gem-svg {
+    width: 54px;
+    height: 54px;
+  }
+
+  /* Monthly Body */
+  .gem-monthly-main-body {
+    padding: 14px 10px 12px 10px;
+    gap: 14px;
+    border-radius: 14px;
+  }
+
+  .gem-monthly-top-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .monthly-banner-header-row {
+    justify-content: space-between;
+  }
+
+  .monthly-lead-title {
+    font-size: 0.88rem;
+  }
+
+  .monthly-hijri-sub {
+    font-size: 0.92rem;
+  }
+
+  .monthly-pills-row {
+    overflow-x: auto;
+    padding-bottom: 4px;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .monthly-nav-pill {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+  }
+
+  .gem-monthly-score-callout {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 4px 8px;
+    border-radius: 10px;
+  }
+
+  /* Timeline on Mobile */
+  .gem-timeline-section {
+    padding: 6px 2px 24px 2px;
+  }
+
+  .timeline-gem-icon-node {
+    width: 26px;
+    height: 26px;
+  }
+
+  .timeline-node-pill {
+    top: 24px;
+    font-size: 0.6rem;
+    padding: 1px 5px;
+  }
+
+  /* Week Cards Grid on Mobile */
+  .gem-weekly-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .gem-week-card {
+    padding: 10px 10px;
+  }
+
+  /* Podium on Mobile */
+  .gem-monthly-podium-row {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .gem-monthly-podium-card {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    padding: 8px 4px 6px 4px !important;
+    gap: 4px !important;
+  }
+
+  .crown-holder {
+    position: static !important;
+    margin-bottom: -4px;
+    margin-top: -2px;
+  }
+
+  .crown-svg-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .podium-avatar-wrapper {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .monthly-podium-info {
+    align-items: center;
+    width: 100%;
+  }
+
+  .monthly-podium-name {
+    font-size: 0.72rem !important;
+    max-width: 100%;
+  }
+
+  .monthly-podium-score {
+    font-size: 0.76rem !important;
+  }
+
+  .reward-text {
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+  }
+
+  .reward-line-left,
+  .reward-line-right {
+    max-width: 35px;
+  }
+
+  .bottom-arabic-seal {
+    font-size: 0.88rem;
+  }
+}
+
+/* Extra Small Phones (<= 380px) */
+@media (max-width: 380px) {
+  .gem-card-main-plaque {
+    padding: 20px 8px 10px 8px;
+  }
+
+  .gem-student-name {
+    font-size: 0.84rem;
+    max-width: 110px;
+  }
+
+  .gem-student-avatar-ring {
+    width: 34px;
+    height: 34px;
+  }
+
+  .points-label {
+    font-size: 0.62rem;
+  }
+
+  .points-value {
+    font-size: 1.05rem;
+  }
+
+  .monthly-podium-name {
+    font-size: 0.65rem !important;
+  }
+
+  .monthly-podium-score {
+    font-size: 0.68rem !important;
+  }
+}

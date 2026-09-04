@@ -108,6 +108,8 @@ import TahfeezAudioRecordingsModal from "./components/TahfeezAudioRecordingsModa
 import AppUpdatePopup from "./AppUpdatePopup";
 import PrivacyPolicy from "./PrivacyPolicy";
 import PremiumTodaySchedule from "./PremiumTodaySchedule";
+import AtfalGemLeagueCard from "./components/AtfalGemLeagueCard";
+import AtfalTeacherLeagueEntry from "./components/AtfalTeacherLeagueEntry";
 import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
@@ -7197,6 +7199,8 @@ function ParentPortal({
   setSelectedStudentId,
   onSelectChild,
   onLogout,
+  onRefresh,
+  isRefreshing = false,
   loadPortalData,
   portalRole,
   reportSettings: propReportSettings = [],
@@ -8299,9 +8303,19 @@ function ParentPortal({
             </div>
           </div>
 
-          <button className="topbar-logout-btn" onClick={onLogout} title="Logout">
-            <Power size={22} />
-          </button>
+          <div className="topbar-actions-group">
+            <button
+              className={`topbar-refresh-btn ${isRefreshing ? "refreshing" : ""}`}
+              onClick={onRefresh}
+              title="Refresh App & Data"
+              aria-label="Refresh App & Data"
+            >
+              <RotateCw size={20} className={isRefreshing ? "topbar-refresh-spin" : ""} />
+            </button>
+            <button className="topbar-logout-btn" onClick={onLogout} title="Logout" aria-label="Logout">
+              <Power size={22} />
+            </button>
+          </div>
         </header>
 
       <main className="parent-main">
@@ -8602,6 +8616,15 @@ function ParentPortal({
                   );
                 })()}
               </div>
+
+            {!isKibarStudent && (
+              <div className="atfal-gem-league-grid-wrapper" style={{ gridColumn: '1 / -1', width: '100%' }}>
+                <AtfalGemLeagueCard
+                  studentProfile={studentProfile || allProfiles[0]}
+                  weeklyResult={weeklyResult}
+                />
+              </div>
+            )}
 
               {pageVisibility["Online Tahfeez"] !== false && (() => {
                 const currentChild = studentProfile || allProfiles[0] || {};
@@ -12091,6 +12114,8 @@ function AdminPortal({
   onCreateSchedule,
   onCreatePortalAccess,
   onLogout,
+  onRefresh,
+  isRefreshing = false,
   onRecordTeacherAttendance,
   selectedStudentId,
   setMenuOpen,
@@ -13951,9 +13976,19 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             </div>
           </div>
 
-          <button className="topbar-logout-btn" onClick={onLogout} title="Logout" aria-label="Logout">
-            <Power size={22} />
-          </button>
+          <div className="topbar-actions-group">
+            <button
+              className={`topbar-refresh-btn ${isRefreshing ? "refreshing" : ""}`}
+              onClick={onRefresh}
+              title="Refresh App & Data"
+              aria-label="Refresh App & Data"
+            >
+              <RotateCw size={20} className={isRefreshing ? "topbar-refresh-spin" : ""} />
+            </button>
+            <button className="topbar-logout-btn" onClick={onLogout} title="Logout" aria-label="Logout">
+              <Power size={22} />
+            </button>
+          </div>
         </header>
 
         <section className="admin-content-pad">
@@ -19457,6 +19492,8 @@ function TeacherPortal({
   activePage,
   menuOpen,
   onLogout,
+  onRefresh,
+  isRefreshing = false,
   onTeacherFormChange,
   onTeacherGroupFilterChange,
   onTeacherResultSubmit,
@@ -21232,6 +21269,7 @@ function TeacherPortal({
             { id: "Home", label: "Home", icon: Sparkles },
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
+            ...(!isKibarTeacher ? [{ id: "Hifz League", label: "Hifz League", icon: Trophy }] : []),
             { id: "Overview", label: "Performance", icon: Layers3 },
             { id: "Jadwal", label: "Jadwal", icon: Calendar },
             { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
@@ -21297,7 +21335,19 @@ function TeacherPortal({
             </div>
           </div>
 
-          <button className="topbar-logout-btn" onClick={onLogout}><Power size={22} /></button>
+          <div className="topbar-actions-group">
+            <button
+              className={`topbar-refresh-btn ${isRefreshing ? "refreshing" : ""}`}
+              onClick={onRefresh}
+              title="Refresh App & Data"
+              aria-label="Refresh App & Data"
+            >
+              <RotateCw size={20} className={isRefreshing ? "topbar-refresh-spin" : ""} />
+            </button>
+            <button className="topbar-logout-btn" onClick={onLogout} title="Logout" aria-label="Logout">
+              <Power size={22} />
+            </button>
+          </div>
         </header>
 
         <section className="admin-content-pad">
@@ -24423,6 +24473,14 @@ function TeacherPortal({
                 );
               })()}
             </div>
+          ) : (activePage === "Hifz League" || activePage === "League Entry") && !isKibarTeacher ? (
+            <AtfalTeacherLeagueEntry
+              students={filteredStudents || []}
+              allStudents={schoolData?.students || []}
+              teacherIdentity={teacherIdentity}
+              currentUserId={user?.id}
+              isDarkMode={isDarkMode}
+            />
           ) : activePage === "Online Tahfeez" ? (
             renderOnlineTahfeezTeacher()
           ) : activePage === "Help Videos" ? (
@@ -27014,6 +27072,55 @@ export default function App() {
     setLoading(false);
   };
 
+  const [isAppRefreshing, setIsAppRefreshing] = useState(false);
+
+  const handleGlobalRefresh = useCallback(async () => {
+    if (isAppRefreshing) return;
+    setIsAppRefreshing(true);
+    try {
+      showAction("success", "Refreshing application & data...");
+
+      // 1. Force update Service Worker registrations
+      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const reg of registrations) {
+            await reg.update().catch(() => {});
+          }
+        } catch (swErr) {
+          console.warn("ServiceWorker update error:", swErr);
+        }
+      }
+
+      // 2. Clear browser cache storage so updated assets/bundles are flushed
+      if (typeof window !== "undefined" && "caches" in window) {
+        try {
+          const cacheKeys = await caches.keys();
+          await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+        } catch (cacheErr) {
+          console.warn("Cache purge error:", cacheErr);
+        }
+      }
+
+      // 3. Clear temporary query and storage caches
+      try {
+        sessionStorage.clear();
+      } catch (e) {}
+
+      // 4. Force reload latest portal data in memory
+      if (user && portalRole) {
+        await loadPortalData(portalRole, user, null, { silent: true, force: true }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn("Global refresh error:", err);
+    } finally {
+      // 5. Reload window cleanly to evaluate updated code and reflect fixes
+      setTimeout(() => {
+        window.location.reload();
+      }, 400);
+    }
+  }, [isAppRefreshing, user, portalRole, loadPortalData, showAction]);
+
   const handleAppUnlock = () => {
     setAppLocked(false);
     setAppLockedState(false);
@@ -29127,6 +29234,8 @@ const handleSendCustomNotification = async (event) => {
             loading={loading}
             menuOpen={menuOpen}
             onLogout={handleLogout}
+            onRefresh={handleGlobalRefresh}
+            isRefreshing={isAppRefreshing}
             onRoleChange={storeRole}
             parentData={parentData}
             portalRole={portalRole}
@@ -29192,6 +29301,8 @@ const handleSendCustomNotification = async (event) => {
             onCreateSchedule={handleCreateSchedule}
             onDeleteRecord={handleDeleteRecord}
             onLogout={handleLogout}
+            onRefresh={handleGlobalRefresh}
+            isRefreshing={isAppRefreshing}
             onRecordTeacherAttendance={handleRecordTeacherAttendance}
             onRoleChange={storeRole}
             onSendCustomNotification={handleSendCustomNotification}
@@ -29279,6 +29390,8 @@ const handleSendCustomNotification = async (event) => {
             monthlySalary={monthlySalary}
             notifications={notificationsList}
             onLogout={handleLogout}
+            onRefresh={handleGlobalRefresh}
+            isRefreshing={isAppRefreshing}
             onRoleChange={storeRole}
             onTeacherFormChange={handleTeacherFormChange}
             onTeacherGroupFilterChange={handleTeacherGroupFilterChange}

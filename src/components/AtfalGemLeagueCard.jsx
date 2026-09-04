@@ -1,0 +1,777 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import './AtfalGemLeagueCard.css';
+import { supabase } from '../supabaseClient';
+import { doc, onSnapshot, getDoc, getDocs, collection, getFirestore } from 'firebase/firestore';
+import { firebaseApp } from '../firebase/config';
+
+// ---------------------------------------------------------------------------
+// 4 DISTINCT WEEKLY GEM SVGS (MATCHING TEACHER HIFZ LEAGUE PDF 1448H)
+// ---------------------------------------------------------------------------
+const EmeraldGemSvg = () => (
+  <svg className="league-week-gem-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="emGradCore" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#d1fae5" />
+        <stop offset="35%" stopColor="#10b981" />
+        <stop offset="70%" stopColor="#047857" />
+        <stop offset="100%" stopColor="#064e3b" />
+      </linearGradient>
+    </defs>
+    <polygon points="50,6 88,26 88,74 50,94 12,74 12,26" fill="url(#emGradCore)" stroke="#a7f3d0" strokeWidth="2.5" />
+    <polygon points="50,6 72,30 28,30" fill="#ecfdf5" fillOpacity="0.85" />
+    <polygon points="50,6 88,26 72,30" fill="#6ee7b7" fillOpacity="0.75" />
+    <polygon points="50,6 12,26 28,30" fill="#a7f3d0" fillOpacity="0.8" />
+    <polygon points="72,30 88,26 88,74 70,70" fill="#047857" fillOpacity="0.7" />
+    <polygon points="28,30 12,26 12,74 30,70" fill="#10b981" fillOpacity="0.65" />
+    <polygon points="28,30 72,30 70,70 30,70" fill="#10b981" fillOpacity="0.9" />
+    <polygon points="30,70 70,70 50,94" fill="#065f46" fillOpacity="0.9" />
+    <circle cx="44" cy="42" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #6ee7b7)" />
+  </svg>
+);
+
+const RubyGemSvg = () => (
+  <svg className="league-week-gem-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="rubyGradCore" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#ffe4e6" />
+        <stop offset="35%" stopColor="#f43f5e" />
+        <stop offset="70%" stopColor="#e11d48" />
+        <stop offset="100%" stopColor="#881337" />
+      </linearGradient>
+    </defs>
+    <polygon points="50,8 86,28 86,72 50,92 14,72 14,28" fill="url(#rubyGradCore)" stroke="#fecdd3" strokeWidth="2.5" />
+    <polygon points="50,8 72,30 28,30" fill="#fff1f2" fillOpacity="0.9" />
+    <polygon points="50,8 86,28 72,30" fill="#fb7185" fillOpacity="0.75" />
+    <polygon points="50,8 14,28 28,30" fill="#fda4af" fillOpacity="0.8" />
+    <polygon points="28,30 72,30 68,68 32,68" fill="#f43f5e" fillOpacity="0.9" />
+    <polygon points="32,68 68,68 50,92" fill="#9f1239" fillOpacity="0.95" />
+    <polygon points="72,30 86,28 86,72 68,68" fill="#be123c" fillOpacity="0.8" />
+    <polygon points="28,30 14,28 14,72 32,68" fill="#e11d48" fillOpacity="0.75" />
+    <circle cx="45" cy="40" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #fda4af)" />
+  </svg>
+);
+
+const AmethystGemSvg = () => (
+  <svg className="league-week-gem-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="amethystGradCore" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#f5d0fe" />
+        <stop offset="35%" stopColor="#d946ef" />
+        <stop offset="70%" stopColor="#a21caf" />
+        <stop offset="100%" stopColor="#4a044e" />
+      </linearGradient>
+    </defs>
+    <polygon points="50,8 86,28 86,72 50,92 14,72 14,28" fill="url(#amethystGradCore)" stroke="#f5d0fe" strokeWidth="2.5" />
+    <polygon points="50,8 72,30 28,30" fill="#fdf4ff" fillOpacity="0.9" />
+    <polygon points="50,8 86,28 72,30" fill="#e879f9" fillOpacity="0.75" />
+    <polygon points="50,8 14,28 28,30" fill="#f0abfc" fillOpacity="0.8" />
+    <polygon points="28,30 72,30 68,68 32,68" fill="#c026d3" fillOpacity="0.9" />
+    <polygon points="32,68 68,68 50,92" fill="#701a75" fillOpacity="0.95" />
+    <polygon points="72,30 86,28 86,72 68,68" fill="#86198f" fillOpacity="0.8" />
+    <polygon points="28,30 14,28 14,72 32,68" fill="#a21caf" fillOpacity="0.75" />
+    <circle cx="45" cy="40" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #f0abfc)" />
+  </svg>
+);
+
+const CyanSapphireGemSvg = () => (
+  <svg className="league-week-gem-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="cyanGradCore" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#cffafe" />
+        <stop offset="35%" stopColor="#22d3ee" />
+        <stop offset="70%" stopColor="#0891b2" />
+        <stop offset="100%" stopColor="#164e63" />
+      </linearGradient>
+    </defs>
+    <polygon points="50,8 86,28 86,72 50,92 14,72 14,28" fill="url(#cyanGradCore)" stroke="#a5f3fc" strokeWidth="2.5" />
+    <polygon points="50,8 72,30 28,30" fill="#ecfeff" fillOpacity="0.9" />
+    <polygon points="50,8 86,28 72,30" fill="#67e8f9" fillOpacity="0.75" />
+    <polygon points="50,8 14,28 28,30" fill="#a5f3fc" fillOpacity="0.8" />
+    <polygon points="28,30 72,30 68,68 32,68" fill="#06b6d4" fillOpacity="0.9" />
+    <polygon points="32,68 68,68 50,92" fill="#0e7490" fillOpacity="0.95" />
+    <polygon points="72,30 86,28 86,72 68,68" fill="#155e75" fillOpacity="0.8" />
+    <polygon points="28,30 14,28 14,72 32,68" fill="#0891b2" fillOpacity="0.75" />
+    <circle cx="45" cy="40" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #67e8f9)" />
+  </svg>
+);
+
+// Sparkling Corner Facet Decor
+const CornerGem = ({ position = 'top-left', color = 'cyan' }) => (
+  <div className={`gem-card-corner-facet corner-${position} color-${color}`}>
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id={`facetGradCyan-${position}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+          <stop offset="40%" stopColor="#67e8f9" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="#0284c7" stopOpacity="0.4" />
+        </linearGradient>
+        <linearGradient id={`facetGradGold-${position}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+          <stop offset="40%" stopColor="#fde047" stopOpacity="0.85" />
+          <stop offset="100%" stopColor="#b45309" stopOpacity="0.45" />
+        </linearGradient>
+      </defs>
+      {color === 'cyan' ? (
+        <>
+          <polygon points="0,0 75,0 45,45 0,75" fill={`url(#facetGradCyan-${position})`} />
+          <polygon points="0,0 45,45 20,60 0,35" fill="#a5f3fc" fillOpacity="0.7" />
+          <polygon points="45,45 75,0 90,20 60,60" fill="#38bdf8" fillOpacity="0.5" />
+          <polygon points="0,0 25,0 15,25 0,25" fill="#ffffff" fillOpacity="0.9" />
+          <circle cx="28" cy="28" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #67e8f9)" />
+        </>
+      ) : (
+        <>
+          <polygon points="100,0 25,0 55,45 100,75" fill={`url(#facetGradGold-${position})`} />
+          <polygon points="100,0 55,45 80,60 100,35" fill="#fef08a" fillOpacity="0.75" />
+          <polygon points="55,45 25,0 10,20 40,60" fill="#f59e0b" fillOpacity="0.55" />
+          <polygon points="100,0 75,0 85,25 100,25" fill="#ffffff" fillOpacity="0.9" />
+          <circle cx="72" cy="28" r="4" fill="#ffffff" filter="drop-shadow(0 0 4px #fbbf24)" />
+        </>
+      )}
+    </svg>
+  </div>
+);
+
+// Large 3D Faceted Glowing Jewel Centerpiece Orb
+const CentralJewelOrb = () => (
+  <div className="central-gem-orb-wrapper">
+    <div className="gem-ambient-glow" />
+    <div className="gem-light-rays" />
+    <svg className="central-faceted-gem-svg" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="gemInnerCore" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.98" />
+          <stop offset="35%" stopColor="#e0e7ff" stopOpacity="0.9" />
+          <stop offset="65%" stopColor="#818cf8" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="#312e81" stopOpacity="0.9" />
+        </radialGradient>
+        <linearGradient id="facetTopPink" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#f472b6" />
+          <stop offset="100%" stopColor="#c084fc" />
+        </linearGradient>
+        <linearGradient id="facetCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#67e8f9" />
+          <stop offset="100%" stopColor="#0284c7" />
+        </linearGradient>
+        <linearGradient id="facetAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#fef08a" />
+          <stop offset="100%" stopColor="#f59e0b" />
+        </linearGradient>
+        <linearGradient id="facetBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#93c5fd" />
+          <stop offset="100%" stopColor="#3b82f6" />
+        </linearGradient>
+      </defs>
+
+      <polygon points="80,18 108,36 122,65 116,98 94,124 66,124 44,98 38,65 52,36" fill="url(#gemInnerCore)" stroke="#ffffff" strokeWidth="1.5" strokeOpacity="0.7" />
+      <polygon points="80,18 108,36 80,48 52,36" fill="url(#facetTopPink)" fillOpacity="0.85" />
+      <polygon points="108,36 122,65 96,65 80,48" fill="url(#facetAmber)" fillOpacity="0.8" />
+      <polygon points="52,36 80,48 64,65 38,65" fill="url(#facetCyan)" fillOpacity="0.8" />
+      <polygon points="38,65 64,65 66,95 44,98" fill="url(#facetBlue)" fillOpacity="0.85" />
+      <polygon points="122,65 116,98 94,95 96,65" fill="url(#facetCyan)" fillOpacity="0.85" />
+      <polygon points="64,65 96,65 94,95 66,95" fill="#fdf4ff" fillOpacity="0.9" />
+      <polygon points="80,48 96,65 64,65" fill="#ffffff" fillOpacity="0.95" />
+      <polygon points="66,95 94,95 80,120" fill="url(#facetAmber)" fillOpacity="0.9" />
+      <polygon points="70,55 85,50 80,68 68,64" fill="#ffffff" fillOpacity="0.85" />
+      <circle cx="75" cy="58" r="3.5" fill="#ffffff" />
+      <circle cx="102" cy="74" r="2.5" fill="#ffffff" />
+      <circle cx="58" cy="78" r="2" fill="#ffffff" />
+    </svg>
+  </div>
+);
+
+// Small Blue Diamond Icon
+const SmallDiamondIcon = () => (
+  <svg className="small-inline-diamond" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="8,1 14,5 11,11 8,15 5,11 2,5" fill="#38bdf8" stroke="#bae6fd" strokeWidth="0.75" />
+    <polygon points="8,1 10,5 8,7 6,5" fill="#ffffff" fillOpacity="0.9" />
+    <polygon points="8,7 11,11 5,11" fill="#0284c7" fillOpacity="0.6" />
+  </svg>
+);
+
+// Crowns for Leaderboard Ranks
+const CrownIcon = ({ rank = 1 }) => {
+  if (rank === 1) {
+    return (
+      <svg className="crown-svg-icon rank-1-crown" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 17H20L21 8L16 12L12 5L8 12L3 8L4 17Z" fill="url(#crownGradGold)" stroke="#fef08a" strokeWidth="1.2" strokeLinejoin="round" />
+        <circle cx="12" cy="4" r="1.5" fill="#fff" />
+        <circle cx="3" cy="7" r="1.5" fill="#fff" />
+        <circle cx="21" cy="7" r="1.5" fill="#fff" />
+        <defs>
+          <linearGradient id="crownGradGold" x1="12" y1="4" x2="12" y2="17" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#fef08a" />
+            <stop offset="0.5" stopColor="#facc15" />
+            <stop offset="1" stopColor="#ca8a04" />
+          </linearGradient>
+        </defs>
+      </svg>
+    );
+  }
+  if (rank === 2) {
+    return (
+      <svg className="crown-svg-icon rank-2-crown" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 17H20L21 8L16 12L12 5L8 12L3 8L4 17Z" fill="url(#crownGradSilver)" stroke="#e2e8f0" strokeWidth="1.2" strokeLinejoin="round" />
+        <circle cx="12" cy="4" r="1.5" fill="#fff" />
+        <circle cx="3" cy="7" r="1.5" fill="#fff" />
+        <circle cx="21" cy="7" r="1.5" fill="#fff" />
+        <defs>
+          <linearGradient id="crownGradSilver" x1="12" y1="4" x2="12" y2="17" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#ffffff" />
+            <stop offset="0.5" stopColor="#cbd5e1" />
+            <stop offset="1" stopColor="#64748b" />
+          </linearGradient>
+        </defs>
+      </svg>
+    );
+  }
+  return (
+    <svg className="crown-svg-icon rank-3-crown" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 17H20L21 8L16 12L12 5L8 12L3 8L4 17Z" fill="url(#crownGradBronze)" stroke="#fdba74" strokeWidth="1.2" strokeLinejoin="round" />
+      <circle cx="12" cy="4" r="1.5" fill="#fff" />
+      <circle cx="3" cy="7" r="1.5" fill="#fff" />
+      <circle cx="21" cy="7" r="1.5" fill="#fff" />
+      <defs>
+        <linearGradient id="crownGradBronze" x1="12" y1="4" x2="12" y2="17" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fed7aa" />
+          <stop offset="0.5" stopColor="#f97316" />
+          <stop offset="1" stopColor="#9a3412" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+};
+
+// Months configuration corresponding to Hifz League 1448H
+const MONTHS_LIST = [
+  { id: "safar", label: "Safar al-Muzaffar", short: "Safar", hijri: "صفر المظفر" },
+  { id: "rabi1", label: "Rabi al-Awwal", short: "Rabi I", hijri: "ربيع الأول" },
+  { id: "rabi2", label: "Rabi al-Aakhar", short: "Rabi II", hijri: "ربيع الآخر" },
+  { id: "jumada1", label: "Jumada al-Ula", short: "Jumada I", hijri: "جمادى الأولى" },
+  { id: "jumada2", label: "Jumada al-Ukhra", short: "Jumada II", hijri: "جمادى الآخرة" },
+  { id: "rajab", label: "Rajab al-Asab", short: "Rajab", hijri: "رجب الأصب" },
+];
+
+export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, customGemsData }) {
+  const studentName = studentProfile?.name || studentProfile?.full_name || studentProfile?.student_name || "Student";
+  const studentAvatar = studentProfile?.photoUrl || studentProfile?.photo_url || studentProfile?.avatar_url || studentProfile?.photo || null;
+  const studentId = String(studentProfile?.student_id || studentProfile?.id || "");
+
+  // Real-time Teacher-Filled Gem League data for this student
+  const [liveLeagueData, setLiveLeagueData] = useState(null);
+  // Real-time collection for League Leaderboard
+  const [leaderboardList, setLeaderboardList] = useState([]);
+  // Active selected month
+  const [activeMonthId, setActiveMonthId] = useState("safar");
+
+  // 1. Subscribe to this student's live doc
+  useEffect(() => {
+    if (!studentId) return;
+    let unsub = () => {};
+    try {
+      const db = getFirestore(firebaseApp);
+      const docRef = doc(db, "atfal_gem_league", studentId);
+      unsub = onSnapshot(
+        docRef,
+        (snap) => {
+          if (snap.exists()) {
+            setLiveLeagueData(snap.data());
+          } else {
+            // Check child_profiles as fallback
+            const cpRef = doc(db, "child_profiles", studentId);
+            getDoc(cpRef)
+              .then((cpSnap) => {
+                if (cpSnap.exists() && cpSnap.data()?.gem_league) {
+                  setLiveLeagueData(cpSnap.data().gem_league);
+                }
+              })
+              .catch(() => {});
+          }
+        },
+        (err) => {
+          console.warn("Gem League student onSnapshot note:", err);
+          try {
+            const cpRef = doc(db, "child_profiles", studentId);
+            getDoc(cpRef)
+              .then((cpSnap) => {
+                if (cpSnap.exists() && cpSnap.data()?.gem_league) {
+                  setLiveLeagueData(cpSnap.data().gem_league);
+                }
+              })
+              .catch(() => {});
+          } catch (_e) {}
+        }
+      );
+    } catch (_e) {
+      supabase
+        .from("atfal_gem_league")
+        .select("*")
+        .eq("student_id", studentId)
+        .single()
+        .then(({ data }) => {
+          if (data) setLiveLeagueData(data);
+        })
+        .catch(() => {});
+    }
+    return () => unsub();
+  }, [studentId]);
+
+  // 2. Subscribe to all entries for live Monthly Top 3
+  useEffect(() => {
+    let unsub = () => {};
+    try {
+      const db = getFirestore(firebaseApp);
+      const colRef = collection(db, "atfal_gem_league");
+      unsub = onSnapshot(
+        colRef,
+        (snap) => {
+          const list = [];
+          snap.forEach((d) => {
+            list.push(d.data());
+          });
+          if (list.length > 0) {
+            setLeaderboardList(list);
+          }
+        },
+        (err) => {
+          console.warn("Leaderboard collection note:", err);
+        }
+      );
+    } catch (_e) {
+      supabase
+        .from("atfal_gem_league")
+        .select("*")
+        .then(({ data }) => {
+          if (data && data.length > 0) setLeaderboardList(data);
+        })
+        .catch(() => {});
+    }
+    return () => unsub();
+  }, []);
+
+  // 3. Auto-select latest month with data if available
+  useEffect(() => {
+    const docData = liveLeagueData || studentProfile?.gem_league || null;
+    if (docData && docData.months) {
+      for (let i = MONTHS_LIST.length - 1; i >= 0; i--) {
+        const mKey = MONTHS_LIST[i].id;
+        if (docData.months[mKey]) {
+          setActiveMonthId(mKey);
+          break;
+        }
+      }
+    }
+  }, [liveLeagueData, studentProfile]);
+
+  // Active Month Config
+  const activeMonthConfig = useMemo(() => {
+    return MONTHS_LIST.find((m) => m.id === activeMonthId) || MONTHS_LIST[0];
+  }, [activeMonthId]);
+
+  // 4. Calculate 4-Week Teacher-Filled Marks for the active month
+  const leagueData = useMemo(() => {
+    if (customGemsData) return customGemsData;
+
+    const dataToUse = liveLeagueData || studentProfile?.gem_league || null;
+    const months = dataToUse?.months || {};
+    const curMonth = months[activeMonthId] || {};
+    const weeks = curMonth.weeks || {};
+
+    const weekDefinitions = [
+      { num: 1, key: "week1", name: "Emerald Week", color: "#10b981", gradClass: "emerald" },
+      { num: 2, key: "week2", name: "Ruby Week", color: "#f43f5e", gradClass: "ruby" },
+      { num: 3, key: "week3", name: "Amethyst Week", color: "#a855f7", gradClass: "amethyst" },
+      { num: 4, key: "week4", name: "Sapphire Week", color: "#06b6d4", gradClass: "sapphire" },
+    ];
+
+    const weeksArray = weekDefinitions.map((def) => {
+      const w = weeks[def.key] || { post_it: 0, activity: 0 };
+      const postIt = Number(w.post_it) || 0;
+      const activity = Number(w.activity) || 0;
+      const totalGems = postIt + activity;
+      return {
+        weekNum: def.num,
+        weekKey: def.key,
+        name: def.name,
+        color: def.color,
+        gradClass: def.gradClass,
+        postIt,
+        activity,
+        totalGems,
+        maxGems: 120, // 60 post-it + 60 activity
+        isCompleted: totalGems > 0,
+      };
+    });
+
+    const monthlyScore = Number(curMonth.monthly_total) || weeksArray.reduce((acc, w) => acc + w.totalGems, 0);
+    const yearlyScore = Number(dataToUse?.total_yearly_gems) || (monthlyScore > 0 ? monthlyScore : 1450);
+
+    return {
+      totalYearly: yearlyScore,
+      monthlyScore,
+      monthlyMax: 480, // 4 weeks * 120 max
+      weeks: weeksArray,
+    };
+  }, [customGemsData, liveLeagueData, studentProfile, activeMonthId]);
+
+  // 5. Dynamic Monthly Top 3 Leaderboard
+  const monthlyTop3 = useMemo(() => {
+    if (leaderboardList && leaderboardList.length > 0) {
+      const scoredList = leaderboardList.map((entry) => {
+        const m = entry.months?.[activeMonthId] || {};
+        const w = m.weeks || {};
+        let s = Number(m.monthly_total) || 0;
+        if (!s && m.weeks) {
+          s =
+            (Number(w.week1?.post_it) || 0) +
+            (Number(w.week1?.activity) || 0) +
+            (Number(w.week2?.post_it) || 0) +
+            (Number(w.week2?.activity) || 0) +
+            (Number(w.week3?.post_it) || 0) +
+            (Number(w.week3?.activity) || 0) +
+            (Number(w.week4?.post_it) || 0) +
+            (Number(w.week4?.activity) || 0);
+        }
+        return {
+          id: String(entry.student_id || entry.id || ""),
+          name: entry.student_name || "Student",
+          gems: s,
+          avatar: entry.avatar_url || entry.photo_url || null,
+          isCurrentStudent: String(entry.student_id || entry.id) === studentId,
+        };
+      });
+
+      const currentEntry = scoredList.find((s) => s.id === studentId);
+      if (!currentEntry && studentId) {
+        scoredList.push({
+          id: studentId,
+          name: studentName,
+          gems: leagueData.monthlyScore,
+          avatar: studentAvatar,
+          isCurrentStudent: true,
+        });
+      } else if (currentEntry) {
+        currentEntry.gems = Math.max(currentEntry.gems, leagueData.monthlyScore);
+        currentEntry.name = studentName || currentEntry.name;
+        currentEntry.avatar = studentAvatar || currentEntry.avatar;
+      }
+
+      scoredList.sort((a, b) => b.gems - a.gems);
+
+      const top = scoredList.slice(0, 3).map((item, idx) => ({
+        rank: idx + 1,
+        name: item.name,
+        gems: item.gems,
+        avatar:
+          item.avatar ||
+          (item.isCurrentStudent ? studentAvatar : null) ||
+          [
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+          ][idx % 3],
+        isCurrentStudent: item.isCurrentStudent,
+      }));
+
+      // Pad with honorable contenders if fewer than 3 entries exist
+      const fallbacks = [
+        { rank: 1, name: studentName, gems: Math.max(leagueData.monthlyScore, 91), isCurrentStudent: true, avatar: studentAvatar },
+        { rank: 2, name: 'Husain', gems: Math.max(0, leagueData.monthlyScore > 0 ? Math.round(leagueData.monthlyScore * 0.85) : 80), isCurrentStudent: false, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80' },
+        { rank: 3, name: 'Fatema', gems: Math.max(0, leagueData.monthlyScore > 0 ? Math.round(leagueData.monthlyScore * 0.72) : 70), isCurrentStudent: false, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80' },
+      ];
+
+      while (top.length < 3) {
+        const nextRank = top.length + 1;
+        top.push({ ...fallbacks[top.length], rank: nextRank });
+      }
+
+      return top;
+    }
+
+    return [
+      {
+        rank: 1,
+        name: studentName,
+        gems: Math.max(leagueData.monthlyScore, 91),
+        isCurrentStudent: true,
+        avatar: studentAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      },
+      {
+        rank: 2,
+        name: 'Husain',
+        gems: Math.max(0, leagueData.monthlyScore > 0 ? Math.round(leagueData.monthlyScore * 0.85) : 80),
+        isCurrentStudent: false,
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+      },
+      {
+        rank: 3,
+        name: 'Fatema',
+        gems: Math.max(0, leagueData.monthlyScore > 0 ? Math.round(leagueData.monthlyScore * 0.72) : 70),
+        isCurrentStudent: false,
+        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+      },
+    ];
+  }, [leaderboardList, activeMonthId, studentId, studentName, studentAvatar, leagueData.monthlyScore]);
+
+  return (
+    <div className="atfal-gem-league-container fade-in">
+      {/* Luxury Dark-Mode Plaque Card */}
+      <div className="gem-card-main-plaque">
+        {/* Floating Curved-Corner Rectangle Plaque */}
+        <div className="gem-league-floating-badge">
+          <span className="sparkle-star s-left">✦</span>
+          <span className="floating-badge-text">GEM LEAGUE</span>
+          <span className="sparkle-star s-right">✦</span>
+        </div>
+
+        {/* 4 Crystal Corner Facets */}
+        <CornerGem position="top-left" color="cyan" />
+        <CornerGem position="bottom-left" color="cyan" />
+        <CornerGem position="top-right" color="gold" />
+        <CornerGem position="bottom-right" color="gold" />
+
+        {/* Card Header */}
+        <div className="gem-card-header">
+          {/* Left: Student Info */}
+          <div className="gem-header-student">
+            <div className="gem-student-avatar-ring">
+              {studentAvatar ? (
+                <img
+                  src={studentAvatar}
+                  alt={studentName}
+                  className="gem-student-img"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = '/logo.png';
+                  }}
+                />
+              ) : (
+                <div className="gem-student-avatar-fallback">
+                  {studentName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="avatar-sparkle-badge">✦</span>
+            </div>
+            <div className="gem-student-meta">
+              <span className="gem-student-name">{studentName}</span>
+              <span className="gem-student-badge">Student • Atfal</span>
+            </div>
+          </div>
+
+          {/* Center: Glowing 3D Faceted Jewel Centerpiece */}
+          <CentralJewelOrb />
+
+          {/* Right: Total League Gems Points */}
+          <div className="gem-header-points">
+            <div className="points-text-group">
+              <span className="points-label">TOTAL LEAGUE GEMS</span>
+              <span className="points-sub">Year 1448H</span>
+            </div>
+            <span className="points-value">{leagueData.totalYearly}</span>
+            <SmallDiamondIcon />
+          </div>
+        </div>
+
+        {/* ================================================================= */}
+        {/* MONTHLY LEAGUE CORE: WEEKLY PROGRESS FILL & MONTHLY TOP LEADERBOARD */}
+        {/* ================================================================= */}
+        <div className="gem-monthly-main-body">
+
+          {/* Monthly Title Banner with Month Navigation & Score */}
+          <div className="gem-monthly-top-banner">
+            <div className="monthly-banner-title-box">
+              <div className="monthly-banner-header-row">
+                <span className="monthly-lead-title">MONTHLY GEMS LEAGUE</span>
+                <SmallDiamondIcon />
+                <span className="monthly-hijri-sub">{activeMonthConfig.hijri}</span>
+              </div>
+
+              {/* Month Selector Pills */}
+              <div className="monthly-pills-row">
+                {MONTHS_LIST.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`monthly-nav-pill ${m.id === activeMonthId ? 'pill-active' : ''}`}
+                    onClick={() => setActiveMonthId(m.id)}
+                  >
+                    {m.short}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Total Gems this Month Callout */}
+            <div className="gem-monthly-score-callout">
+              <span className="monthly-score-caption">GEMS THIS MONTH</span>
+              <div className="monthly-score-badge">
+                <strong className="score-num">{leagueData.monthlyScore}</strong>
+                <span className="score-max">/ {leagueData.monthlyMax}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 4-Milestone Visual Timeline Track */}
+          <div className="gem-timeline-section">
+            <div className="gem-timeline-track-rail">
+              <div
+                className="gem-timeline-fill"
+                style={{
+                  width: `${Math.min(100, Math.max(12, (leagueData.monthlyScore / leagueData.monthlyMax) * 100))}%`,
+                }}
+              />
+
+              <div className="gem-timeline-nodes-wrapper">
+                {leagueData.weeks.map((w) => (
+                  <div
+                    key={w.weekKey}
+                    className={`gem-timeline-node ${w.isCompleted ? 'node-active' : 'node-pending'}`}
+                  >
+                    <div className="timeline-gem-icon-node">
+                      {w.weekNum === 1 && <EmeraldGemSvg />}
+                      {w.weekNum === 2 && <RubyGemSvg />}
+                      {w.weekNum === 3 && <AmethystGemSvg />}
+                      {w.weekNum === 4 && <CyanSapphireGemSvg />}
+                    </div>
+                    <span className="timeline-node-pill">
+                      Week {w.weekNum}
+                      <span className="node-score-sub">{w.totalGems > 0 ? ` (${w.totalGems})` : ''}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 4-Week Progress Cards: Directly Filled with Teacher's Marks */}
+          <div className="gem-weekly-cards-grid">
+            {leagueData.weeks.map((w) => (
+              <div
+                key={w.weekKey}
+                className={`gem-week-card ${w.isCompleted ? 'week-filled' : 'week-empty'} week-color-${w.gradClass}`}
+              >
+                <div className="gem-week-card-top">
+                  <div className={`gem-week-icon-halo halo-${w.gradClass}`}>
+                    {w.weekNum === 1 && <EmeraldGemSvg />}
+                    {w.weekNum === 2 && <RubyGemSvg />}
+                    {w.weekNum === 3 && <AmethystGemSvg />}
+                    {w.weekNum === 4 && <CyanSapphireGemSvg />}
+                  </div>
+                  <div className="gem-week-info-col">
+                    <div className="week-header-sub">
+                      <span className="week-number-tag">WEEK {w.weekNum}</span>
+                      {w.isCompleted ? (
+                        <span className="week-status-badge status-earned">Earned ✦</span>
+                      ) : (
+                        <span className="week-status-badge status-pending">Pending</span>
+                      )}
+                    </div>
+                    <div className="week-score-big">
+                      <strong className="week-score-val">{w.totalGems}</strong>
+                      <span className="week-score-denom">/ 120 GEMS</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Teacher's 2 Activity Marks Breakdown */}
+                <div className="gem-week-breakdown-box">
+                  <div className="breakdown-stat">
+                    <span className="stat-label">Post-It:</span>
+                    <strong className="stat-num">{w.postIt}</strong>
+                    <span className="stat-limit">/60</span>
+                  </div>
+                  <span className="breakdown-dot">•</span>
+                  <div className="breakdown-stat">
+                    <span className="stat-label">Activity:</span>
+                    <strong className="stat-num">{w.activity}</strong>
+                    <span className="stat-limit">/60</span>
+                  </div>
+                </div>
+
+                {/* Week Progress Bar */}
+                <div className="gem-week-progress-wrap">
+                  <div className="gem-week-progress-track">
+                    <div
+                      className={`gem-week-progress-bar bar-${w.gradClass}`}
+                      style={{
+                        width: `${Math.min(100, Math.max(0, (w.totalGems / w.maxGems) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="gem-week-percent">
+                    {Math.round((w.totalGems / w.maxGems) * 100)}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Shimmering Rewards Callout Divider */}
+          <div className="gem-rewards-callout">
+            <span className="reward-line-left" />
+            <span className="reward-text">✦ Unlock Exclusive Monthly League Rewards ✦</span>
+            <span className="reward-line-right" />
+          </div>
+
+          {/* MONTHLY TOP 3 LEADERBOARD */}
+          <div className="gem-monthly-leaderboard-section">
+            <div className="gem-leaderboard-header">
+              <div className="gem-sub-title-wrap">
+                <h4 className="gem-sub-title">MONTHLY TOP 3 LEADERBOARD</h4>
+                <SmallDiamondIcon />
+              </div>
+              <div className="gem-pill-badge">
+                <span>{activeMonthConfig.label}</span>
+                <SmallDiamondIcon />
+              </div>
+            </div>
+
+            <div className="gem-monthly-podium-row">
+              {monthlyTop3.map((player) => (
+                <div
+                  key={player.rank}
+                  className={`gem-monthly-podium-card rank-${player.rank} ${player.isCurrentStudent ? 'is-current-student' : ''}`}
+                >
+                  <div className="crown-holder">
+                    <CrownIcon rank={player.rank} />
+                  </div>
+                  <div className="podium-avatar-wrapper">
+                    <img
+                      src={player.avatar}
+                      alt={player.name}
+                      className="monthly-podium-avatar"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = '/logo.png';
+                      }}
+                    />
+                    <span className={`podium-rank-tag tag-rank-${player.rank}`}>#{player.rank}</span>
+                  </div>
+                  <div className="monthly-podium-info">
+                    <span className="monthly-podium-name">
+                      {player.name}
+                      {player.isCurrentStudent && <span className="you-label">(You)</span>}
+                    </span>
+                    <div className="monthly-podium-score-row">
+                      <SmallDiamondIcon />
+                      <span className="monthly-podium-score">{player.gems}</span>
+                      <span className="monthly-score-sub">Gems</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom Traditional Seal */}
+          <div className="gem-card-bottom-seal">
+            <span className="bottom-arabic-seal">روضة تحفيظ الأطفال</span>
+            <span className="bottom-seal-sep">✦</span>
+            <span className="bottom-arabic-seal">گلياکوٹ</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}

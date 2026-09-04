@@ -115,6 +115,9 @@ service cloud.firestore {
     match /student_daily_attendance/{id} {
       allow read, write: if isSignedIn();
     }
+    match /atfal_gem_league/{id} {
+      allow read, write: if isSignedIn();
+    }
 
     // ---------- teacher_profiles ----------
     match /teacher_profiles/{id} {
@@ -249,6 +252,12 @@ service cloud.firestore {
       }
     }
     match /online_tahfeez_logs/{id} {
+      allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+    match /tahfeez_online_assignments/{id} {
       allow read, write: if isSignedIn();
       match /{allSubcollections=**} {
         allow read, write: if isSignedIn();
@@ -419,6 +428,12 @@ service cloud.firestore {
       }
     }
     match /kibar_online_tahfeez_logs/{id} {
+      allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+    match /kibar_tahfeez_online_assignments/{id} {
       allow read, write: if isSignedIn();
       match /{allSubcollections=**} {
         allow read, write: if isSignedIn();
