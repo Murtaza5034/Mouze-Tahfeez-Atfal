@@ -509,6 +509,7 @@ export default function AtfalTeacherLeagueEntry({
       ...studentLeagueDoc,
       student_id: String(selectedStudentId),
       student_name: activeStudent?.name || studentLeagueDoc.student_name || "Student",
+      photo_url: activeStudent?.photo_url || activeStudent?.photoUrl || activeStudent?.photo || studentLeagueDoc?.photo_url || null,
       teacher_id: currentUserId || studentLeagueDoc.teacher_id || "",
       teacher_name: teacherIdentity || studentLeagueDoc.teacher_name || "Teacher",
       year: "1448H",

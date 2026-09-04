@@ -10038,15 +10038,39 @@
     "semantic_hash": ""
   },
   "src/components/AtfalGemLeagueCard.jsx": {
-    "mtime": 1788506558.5256555,
-    "seen": 1788506698.9201107,
-    "ast_hash": "0d1eab6daff7986be1ea5902f03814c3",
+    "mtime": 1788510551.7883048,
+    "seen": 1788515561.2176194,
+    "ast_hash": "f784583865d1fb343ee4450b2e4306f9",
     "semantic_hash": ""
   },
   "src/components/AtfalTeacherLeagueEntry.jsx": {
-    "mtime": 1788504924.500494,
-    "seen": 1788505328.1388593,
-    "ast_hash": "69952660abdee3ae64b3ee0335a4ef8c",
+    "mtime": 1788510630.4678218,
+    "seen": 1788515561.217622,
+    "ast_hash": "192ab25b8767ba582b51dc1919f375bf",
+    "semantic_hash": ""
+  },
+  "public/assets/gems/gem-week1-emerald.png": {
+    "mtime": 1788508216.6407895,
+    "seen": 1788509332.908864,
+    "ast_hash": "6b94a13b6b5e1db8d63c05e4e0bd5c7d",
+    "semantic_hash": ""
+  },
+  "public/assets/gems/gem-week2-ruby.png": {
+    "mtime": 1788508217.4423196,
+    "seen": 1788509332.9088655,
+    "ast_hash": "bcf2486e5decfde94e0efc378cc99abf",
+    "semantic_hash": ""
+  },
+  "public/assets/gems/gem-week3-sapphire.png": {
+    "mtime": 1788508216.8570473,
+    "seen": 1788509332.908867,
+    "ast_hash": "322eb4d69b9dde1c22500b865cbf201d",
+    "semantic_hash": ""
+  },
+  "public/assets/gems/gem-week4-diamond.png": {
+    "mtime": 1788508216.707153,
+    "seen": 1788509332.9088678,
+    "ast_hash": "c25c6b3ddd9fbc75f13c9d92e7dd4e0e",
     "semantic_hash": ""
   }
 }

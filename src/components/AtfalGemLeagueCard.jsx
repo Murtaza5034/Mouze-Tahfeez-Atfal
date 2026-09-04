@@ -246,7 +246,13 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
         (snap) => {
           const list = [];
           snap.forEach((d) => {
-            list.push(d.data());
+            const data = d.data();
+            list.push({
+              ...data,
+              student_id: String(data.student_id || d.id || ""),
+              student_name: data.student_name || "Student",
+              photo_url: data.photo_url || data.avatar_url || data.photo || null,
+            });
           });
           if (list.length > 0) {
             setLeaderboardList(list);
@@ -336,102 +342,118 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
 
   // 5. Dynamic Monthly Top 3 Leaderboard
   const monthlyTop3 = useMemo(() => {
-    if (leaderboardList && leaderboardList.length > 0) {
-      const scoredList = leaderboardList.map((entry) => {
-        const m = entry.months?.[activeMonthId] || {};
-        const w = m.weeks || {};
-        let s = Number(m.monthly_total) || 0;
-        if (!s && m.weeks) {
-          s =
-            (Number(w.week1?.post_it) || 0) +
-            (Number(w.week1?.activity) || 0) +
-            (Number(w.week2?.post_it) || 0) +
-            (Number(w.week2?.activity) || 0) +
-            (Number(w.week3?.post_it) || 0) +
-            (Number(w.week3?.activity) || 0) +
-            (Number(w.week4?.post_it) || 0) +
-            (Number(w.week4?.activity) || 0);
-        }
-        return {
-          id: String(entry.student_id || entry.id || ""),
-          name: entry.student_name || "Student",
-          gems: s,
-          avatar: entry.avatar_url || entry.photo_url || null,
-          isCurrentStudent: String(entry.student_id || entry.id) === studentId,
-        };
-      });
+    const candidateMap = new Map();
 
-      const currentEntry = scoredList.find((s) => s.id === studentId);
-      if (!currentEntry && studentId) {
-        scoredList.push({
+    // 1. Process all entries from atfal_gem_league
+    (leaderboardList || []).forEach((entry) => {
+      const sId = String(entry.student_id || entry.id || "");
+      if (!sId) return;
+
+      const m = entry.months?.[activeMonthId] || {};
+      const w = m.weeks || {};
+      const weekSum =
+        (Number(w.week1?.post_it) || 0) +
+        (Number(w.week1?.activity) || 0) +
+        (Number(w.week2?.post_it) || 0) +
+        (Number(w.week2?.activity) || 0) +
+        (Number(w.week3?.post_it) || 0) +
+        (Number(w.week3?.activity) || 0) +
+        (Number(w.week4?.post_it) || 0) +
+        (Number(w.week4?.activity) || 0);
+      const gems = Math.max(Number(m.monthly_total) || 0, weekSum);
+
+      candidateMap.set(sId, {
+        id: sId,
+        name: entry.student_name || "Student",
+        gems: Math.max(0, gems),
+        avatar: entry.photo_url || entry.avatar_url || entry.photo || null,
+        isCurrentStudent: sId === studentId,
+      });
+    });
+
+    // 2. Ensure current student's live score is up-to-date
+    if (studentId) {
+      const curScore = Number(leagueData?.monthlyScore) || 0;
+      if (candidateMap.has(studentId)) {
+        const item = candidateMap.get(studentId);
+        item.gems = Math.max(item.gems, curScore);
+        if (studentName) item.name = studentName;
+        if (studentAvatar) item.avatar = studentAvatar;
+        item.isCurrentStudent = true;
+      } else {
+        candidateMap.set(studentId, {
           id: studentId,
-          name: studentName,
-          gems: leagueData.monthlyScore,
-          avatar: studentAvatar,
+          name: studentName || "Student",
+          gems: Math.max(0, curScore),
+          avatar: studentAvatar || null,
           isCurrentStudent: true,
         });
-      } else if (currentEntry) {
-        currentEntry.gems = Math.max(currentEntry.gems, leagueData.monthlyScore);
-        currentEntry.name = studentName || currentEntry.name;
-        currentEntry.avatar = studentAvatar || currentEntry.avatar;
       }
-
-      scoredList.sort((a, b) => b.gems - a.gems);
-
-      const top = scoredList.slice(0, 3).map((item, idx) => ({
-        rank: idx + 1,
-        name: item.name,
-        gems: item.gems,
-        avatar:
-          item.avatar ||
-          (item.isCurrentStudent ? studentAvatar : null) ||
-          [
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-          ][idx % 3],
-        isCurrentStudent: item.isCurrentStudent,
-      }));
-
-      // Pad with honorable contenders if fewer than 3 entries exist
-      const fallbacks = [
-        { rank: 1, name: studentName, gems: Math.max(leagueData.monthlyScore, 91), isCurrentStudent: true, avatar: studentAvatar },
-        { rank: 2, name: 'Husain', gems: Math.max(0, leagueData.monthlyScore > 0 ? Math.round(leagueData.monthlyScore * 0.85) : 80), isCurrentStudent: false, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80' },
-        { rank: 3, name: 'Fatema', gems: Math.max(0, leagueData.monthlyScore > 0 ? Math.round(leagueData.monthlyScore * 0.72) : 70), isCurrentStudent: false, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80' },
-      ];
-
-      while (top.length < 3) {
-        const nextRank = top.length + 1;
-        top.push({ ...fallbacks[top.length], rank: nextRank });
-      }
-
-      return top;
     }
 
-    return [
-      {
-        rank: 1,
-        name: studentName,
-        gems: Math.max(leagueData.monthlyScore, 91),
-        isCurrentStudent: true,
-        avatar: studentAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      },
-      {
-        rank: 2,
-        name: 'Husain',
-        gems: Math.max(0, leagueData.monthlyScore > 0 ? Math.round(leagueData.monthlyScore * 0.85) : 80),
-        isCurrentStudent: false,
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      },
-      {
-        rank: 3,
-        name: 'Fatema',
-        gems: Math.max(0, leagueData.monthlyScore > 0 ? Math.round(leagueData.monthlyScore * 0.72) : 70),
-        isCurrentStudent: false,
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      },
-    ];
-  }, [leaderboardList, activeMonthId, studentId, studentName, studentAvatar, leagueData.monthlyScore]);
+    const candidates = Array.from(candidateMap.values());
+    const realWithGems = candidates.filter((c) => c.gems > 0);
+    const maxScore = candidates.reduce((max, c) => Math.max(max, c.gems), 0);
+
+    // 3. If fewer than 3 real students have scores > 0, provide benchmark contenders so
+    // the 3-podium layout displays prestige without 0-gem students outranking higher scores.
+    if (realWithGems.length < 3) {
+      const benchmarkContenders = [
+        {
+          id: "benchmark-husain",
+          name: "Husain",
+          gems: maxScore > 0 ? Math.round(maxScore * 0.82) : 80,
+          avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+          isCurrentStudent: false,
+        },
+        {
+          id: "benchmark-fatema",
+          name: "Fatema",
+          gems: maxScore > 0 ? Math.round(maxScore * 0.68) : 70,
+          avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
+          isCurrentStudent: false,
+        },
+        {
+          id: "benchmark-sakina",
+          name: "Sakina",
+          gems: maxScore > 0 ? Math.round(maxScore * 0.55) : 60,
+          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+          isCurrentStudent: false,
+        },
+      ];
+
+      for (const bench of benchmarkContenders) {
+        if (!candidates.some((c) => c.name.toLowerCase() === bench.name.toLowerCase())) {
+          candidates.push(bench);
+        }
+      }
+    }
+
+    // 4. Strict descending order by gems
+    candidates.sort((a, b) => {
+      if (b.gems !== a.gems) return b.gems - a.gems;
+      if (a.id.startsWith("benchmark-") && !b.id.startsWith("benchmark-")) return 1;
+      if (!a.id.startsWith("benchmark-") && b.id.startsWith("benchmark-")) return -1;
+      return a.name.localeCompare(b.name);
+    });
+
+    // 5. Select Top 3 and assign ranks 1, 2, 3
+    return candidates.slice(0, 3).map((item, idx) => ({
+      rank: idx + 1,
+      id: item.id,
+      name: item.name,
+      gems: item.gems,
+      avatar:
+        item.avatar ||
+        (item.isCurrentStudent ? studentAvatar : null) ||
+        [
+          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+          "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
+        ][idx % 3],
+      isCurrentStudent: item.isCurrentStudent,
+    }));
+  }, [leaderboardList, activeMonthId, studentId, studentName, studentAvatar, leagueData?.monthlyScore]);
 
   return (
     <div className="atfal-gem-league-container fade-in">
@@ -651,7 +673,7 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
             <div className="gem-monthly-podium-row">
               {monthlyTop3.map((player) => (
                 <div
-                  key={player.rank}
+                  key={player.id || player.rank}
                   className={`gem-monthly-podium-card rank-${player.rank} ${player.isCurrentStudent ? 'is-current-student' : ''}`}
                 >
                   <div className="crown-holder">
@@ -670,10 +692,14 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
                     <span className={`podium-rank-tag tag-rank-${player.rank}`}>#{player.rank}</span>
                   </div>
                   <div className="monthly-podium-info">
-                    <span className="monthly-podium-name">
-                      {player.name}
-                      {player.isCurrentStudent && <span className="you-label">(You)</span>}
-                    </span>
+                    <div className="monthly-podium-name-wrap">
+                      <span className="monthly-podium-name" title={player.name}>
+                        {player.name}
+                      </span>
+                      {player.isCurrentStudent && (
+                        <span className="podium-you-pill">You</span>
+                      )}
+                    </div>
                     <div className="monthly-podium-score-row">
                       <SmallDiamondIcon />
                       <span className="monthly-podium-score">{player.gems}</span>
