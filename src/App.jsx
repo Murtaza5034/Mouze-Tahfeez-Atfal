@@ -2938,8 +2938,9 @@ async function authorizePortalAccess(user, requestedRole) {
 
   setSectionScope(SECTION_FOR_ROLE(finalRole));
   let tableAccess = await findPortalAccess(user.id);
-  // Also check kibar_user_portal_access if tableAccess is empty
-  if (!tableAccess && finalRole.startsWith("kibar-")) {
+  // Always also check kibar_user_portal_access — a kibar-teacher may have no atfal row.
+  // If tableAccess is null OR if the atfal row doesn't match a kibar role, look in kibar table.
+  if (!tableAccess || (tableAccess && !tableAccess.portal_role?.startsWith("kibar-") && finalRole.startsWith("kibar-"))) {
     try {
       const { data: kibarDirect } = await supabase
         .from("kibar_user_portal_access")
@@ -3134,6 +3135,19 @@ async function resolveInitialPortal(user, preferredRole) {
   try {
     storedRole = localStorage.getItem(STORAGE_KEYS.role) || localStorage.getItem("mauze-portal-role");
   } catch (_) {}
+
+  // 0. ALWAYS check assigned roles from metadata FIRST — kibar-teacher and kibar-admin
+  //    must NEVER be overridden by a stored "parents" default role.
+  if (assigned.includes("kibar-teacher")) {
+    setSectionScope("kibar");
+    const access = await authorizePortalAccess(user, "kibar-teacher");
+    if (access.ok) return access;
+  }
+  if (assigned.includes("kibar-admin")) {
+    setSectionScope("kibar");
+    const access = await authorizePortalAccess(user, "kibar-admin");
+    if (access.ok) return access;
+  }
 
   // 1. If preferredRole or storedRole is specified, try that first:
   let candidateRole = preferredRole || storedRole;
@@ -27017,10 +27031,28 @@ export default function App() {
 
   const handleLoginSuccess = async (loggedInUser, selectedRole, rememberMe = true) => {
     try {
-      let access = await authorizePortalAccess(loggedInUser, selectedRole);
+      // Always respect kibar-teacher / kibar-admin from metadata — never let a stored
+      // "parents" default override a teacher's access.
+      const assignedAtLogin = getAssignedRoles(loggedInUser);
+      let effectiveRole = selectedRole;
+      if (assignedAtLogin.includes("kibar-teacher") && effectiveRole !== "kibar-teacher") {
+        effectiveRole = "kibar-teacher";
+        setSectionScope("kibar");
+      } else if (assignedAtLogin.includes("kibar-admin") && effectiveRole !== "kibar-admin") {
+        effectiveRole = "kibar-admin";
+        setSectionScope("kibar");
+      } else if (effectiveRole === "teacher" && assignedAtLogin.includes("kibar-teacher")) {
+        effectiveRole = "kibar-teacher";
+        setSectionScope("kibar");
+      } else if (effectiveRole === "admin" && assignedAtLogin.includes("kibar-admin")) {
+        effectiveRole = "kibar-admin";
+        setSectionScope("kibar");
+      }
+
+      let access = await authorizePortalAccess(loggedInUser, effectiveRole);
 
       if (!access.ok) {
-        const resolved = await resolveInitialPortal(loggedInUser, selectedRole);
+        const resolved = await resolveInitialPortal(loggedInUser, effectiveRole);
         if (resolved.ok) {
           access = resolved;
         }
