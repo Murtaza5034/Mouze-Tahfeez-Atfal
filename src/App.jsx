@@ -21717,7 +21717,7 @@ function TeacherPortal({
                  })()}
                </div>
 
-               <AtfalLeagueTop3Card isTeacher={true} />
+               {!isKibarTeacher && <AtfalLeagueTop3Card isTeacher={true} />}
 
                <div className="premium-quick-panel card-appear">
                  <div className="quick-panel-header">
