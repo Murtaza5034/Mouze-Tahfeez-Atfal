@@ -417,6 +417,78 @@
   }
 }
 
+.portal-mismatch-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border: 1.5px solid #fb923c;
+  border-radius: 14px;
+  padding: 13px 15px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.12);
+  animation: slideInDown 0.3s ease-out;
+  text-align: left;
+}
+
+.portal-mismatch-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.portal-mismatch-icon {
+  color: #ea580c;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.portal-mismatch-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.portal-mismatch-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #9a3412;
+  letter-spacing: 0.2px;
+}
+
+.portal-mismatch-desc {
+  font-size: 12px;
+  color: #c2410c;
+  line-height: 1.35;
+}
+
+.portal-mismatch-desc strong {
+  color: #7c2d12;
+}
+
+.portal-mismatch-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
+}
+
+.portal-mismatch-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(234, 88, 12, 0.35);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
 .error-message {
   display: flex;
   align-items: center;

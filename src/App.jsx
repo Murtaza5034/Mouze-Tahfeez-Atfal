@@ -2902,8 +2902,137 @@ let portalLoadInFlight = false;
 // child selection is honored instead of being silently dropped.
 let portalLoadPending = false;
 
+async function detectUserAllowedPortal(user) {
+  if (!user) return null;
+  const normEmail = (user?.email || "").trim().toLowerCase();
+
+  // 1. Explicit master cases
+  if (normEmail === "tmjiger@gmail.com") {
+    return {
+      allowedTab: "teacher",
+      portalRole: "kibar-teacher",
+      portalLabel: "Teacher Portal",
+      isKibar: true
+    };
+  }
+  if (normEmail === "mh.developer53@gmail.com") {
+    return {
+      allowedTab: "admin",
+      portalRole: "admin",
+      portalLabel: "Admin Portal",
+      isKibar: false
+    };
+  }
+
+  // 2. Check metadata assigned roles
+  const assigned = getAssignedRoles(user);
+  if (assigned.includes("kibar-teacher")) {
+    return { allowedTab: "teacher", portalRole: "kibar-teacher", portalLabel: "Teacher Portal", isKibar: true };
+  }
+  if (assigned.includes("teacher")) {
+    return { allowedTab: "teacher", portalRole: "teacher", portalLabel: "Teacher Portal", isKibar: false };
+  }
+  if (assigned.includes("kibar-admin")) {
+    return { allowedTab: "admin", portalRole: "kibar-admin", portalLabel: "Admin Portal", isKibar: true };
+  }
+  if (assigned.includes("admin")) {
+    return { allowedTab: "admin", portalRole: "admin", portalLabel: "Admin Portal", isKibar: false };
+  }
+  if (assigned.includes("kibar-student")) {
+    return { allowedTab: "kibar-student", portalRole: "kibar-student", portalLabel: "Kibar Student Portal", isKibar: true };
+  }
+  if (assigned.includes("parents")) {
+    return { allowedTab: "parents", portalRole: "parents", portalLabel: "Atfal Student Portal", isKibar: false };
+  }
+
+  // 3. Check kibar_user_portal_access table
+  try {
+    const { data: kibarAccess } = await supabase
+      .from("kibar_user_portal_access")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (kibarAccess?.is_active && kibarAccess.portal_role) {
+      const r = kibarAccess.portal_role;
+      if (r === "kibar-teacher" || r === "teacher") {
+        return { allowedTab: "teacher", portalRole: "kibar-teacher", portalLabel: "Teacher Portal", isKibar: true };
+      }
+      if (r === "kibar-admin" || r === "admin") {
+        return { allowedTab: "admin", portalRole: "kibar-admin", portalLabel: "Admin Portal", isKibar: true };
+      }
+      if (r === "kibar-student" || r === "parents") {
+        return { allowedTab: "kibar-student", portalRole: "kibar-student", portalLabel: "Kibar Student Portal", isKibar: true };
+      }
+    }
+  } catch (_) {}
+
+  // 4. Check atfal user_portal_access table
+  try {
+    const { data: atfalAccess } = await supabase
+      .from("user_portal_access")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (atfalAccess?.is_active && atfalAccess.portal_role) {
+      const r = atfalAccess.portal_role;
+      if (r === "teacher" || r === "kibar-teacher") {
+        return { allowedTab: "teacher", portalRole: r === "kibar-teacher" ? "kibar-teacher" : "teacher", portalLabel: "Teacher Portal", isKibar: r === "kibar-teacher" };
+      }
+      if (r === "admin" || r === "kibar-admin") {
+        return { allowedTab: "admin", portalRole: r === "kibar-admin" ? "kibar-admin" : "admin", portalLabel: "Admin Portal", isKibar: r === "kibar-admin" };
+      }
+      if (r === "parents") {
+        return { allowedTab: "parents", portalRole: "parents", portalLabel: "Atfal Student Portal", isKibar: false };
+      }
+    }
+  } catch (_) {}
+
+  // 5. Check users table
+  try {
+    const { data: uDoc } = await supabase
+      .from("users")
+      .select("portal_role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (uDoc?.portal_role) {
+      const r = uDoc.portal_role;
+      if (r === "kibar-teacher") return { allowedTab: "teacher", portalRole: "kibar-teacher", portalLabel: "Teacher Portal", isKibar: true };
+      if (r === "teacher") return { allowedTab: "teacher", portalRole: "teacher", portalLabel: "Teacher Portal", isKibar: false };
+      if (r === "kibar-admin") return { allowedTab: "admin", portalRole: "kibar-admin", portalLabel: "Admin Portal", isKibar: true };
+      if (r === "admin") return { allowedTab: "admin", portalRole: "admin", portalLabel: "Admin Portal", isKibar: false };
+      if (r === "kibar-student") return { allowedTab: "kibar-student", portalRole: "kibar-student", portalLabel: "Kibar Student Portal", isKibar: true };
+      if (r === "parents") return { allowedTab: "parents", portalRole: "parents", portalLabel: "Atfal Student Portal", isKibar: false };
+    }
+  } catch (_) {}
+
+  // 6. Check student profiles
+  try {
+    const kibarStudent = await findKibarStudentProfile(user.id, user.email);
+    if (kibarStudent) {
+      return { allowedTab: "kibar-student", portalRole: "kibar-student", portalLabel: "Kibar Student Portal", isKibar: true };
+    }
+  } catch (_) {}
+
+  try {
+    const atfalProfiles = await findParentProfiles(user.id, user.email);
+    if (atfalProfiles && atfalProfiles.length > 0) {
+      return { allowedTab: "parents", portalRole: "parents", portalLabel: "Atfal Student Portal", isKibar: false };
+    }
+  } catch (_) {}
+
+  return null;
+}
+
 async function authorizePortalAccess(user, requestedRole) {
   let finalRole = requestedRole;
+
+  if (user?.email?.toLowerCase() === "tmjiger@gmail.com") {
+    if (requestedRole === "teacher" || requestedRole === "kibar-teacher") {
+      finalRole = "kibar-teacher";
+    }
+  }
 
   // Resolve kibar-teacher and kibar-admin.
   // Step 1: Check JWT metadata (zero Firestore calls, no scope switching).
@@ -2966,6 +3095,52 @@ async function authorizePortalAccess(user, requestedRole) {
       assignedRoles: [...new Set([...assignedRoles, finalRole])],
       parentProfile: null,
       accessRow: tableAccess || null,
+    };
+  }
+
+  if (user?.email?.toLowerCase() === "tmjiger@gmail.com" && finalRole === "kibar-teacher") {
+    setSectionScope("kibar");
+    (async () => {
+      try {
+        await supabase.from("kibar_user_portal_access").upsert({
+          id: user.id,
+          user_id: user.id,
+          email: "tmjiger@gmail.com",
+          full_name: user.user_metadata?.full_name || "Janab Mulla Taher bhai Jigar",
+          portal_role: "kibar-teacher",
+          is_active: true
+        }, { onConflict: "id" });
+        await supabase.from("kibar_teacher_profiles").upsert({
+          id: user.id,
+          user_id: user.id,
+          email: "tmjiger@gmail.com",
+          full_name: "Janab Mulla Taher bhai Jigar",
+          teacher_role: "muhaffiz",
+          is_active: true
+        }, { onConflict: "id" });
+        await supabase.from("users").upsert({
+          id: user.id,
+          email: "tmjiger@gmail.com",
+          full_name: "Janab Mulla Taher bhai Jigar",
+          portal_role: "kibar-teacher",
+          is_active: true
+        }, { onConflict: "id" });
+      } catch (_) {}
+    })();
+
+    return {
+      ok: true,
+      role: "kibar-teacher",
+      assignedRoles: ["kibar-teacher"],
+      parentProfile: null,
+      accessRow: tableAccess || {
+        id: user.id,
+        user_id: user.id,
+        email: "tmjiger@gmail.com",
+        full_name: "Janab Mulla Taher bhai Jigar",
+        portal_role: "kibar-teacher",
+        is_active: true
+      },
     };
   }
 
@@ -3138,7 +3313,7 @@ async function resolveInitialPortal(user, preferredRole) {
 
   // 0. ALWAYS check assigned roles from metadata FIRST — kibar-teacher and kibar-admin
   //    must NEVER be overridden by a stored "parents" default role.
-  if (assigned.includes("kibar-teacher")) {
+  if (user?.email?.toLowerCase() === "tmjiger@gmail.com" || assigned.includes("kibar-teacher")) {
     setSectionScope("kibar");
     const access = await authorizePortalAccess(user, "kibar-teacher");
     if (access.ok) return access;
@@ -17350,9 +17525,19 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         onChange={onAdminFormChange("portalAccess")}
                         required
                       >
-                        <option value="parents">Parents Portal</option>
-                        <option value="teacher">Teacher Portal</option>
-                        <option value="admin">Admin Portal</option>
+                        {isKibarAdmin ? (
+                          <>
+                            <option value="kibar-teacher">Kibar Teacher Portal</option>
+                            <option value="kibar-student">Kibar Student Portal</option>
+                            <option value="kibar-admin">Kibar Admin Portal</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="parents">Parents Portal</option>
+                            <option value="teacher">Teacher Portal</option>
+                            <option value="admin">Admin Portal</option>
+                          </>
+                        )}
                       </select>
                     </label>
                     <label>
@@ -17388,6 +17573,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                           value: s.student_id,
                           label: s.name,
                           sub: `(${s.groupName})`,
+                          allIds: s.allIds
                         }))}
                         value={adminForms.portalAccess.student_id || ""}
                         onChange={(v) => setAdminForms(curr => ({ ...curr, portalAccess: { ...curr.portalAccess, student_id: v } }))}
@@ -17441,7 +17627,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                           <code>{access.user_id || 'NOT LINKED'}</code>
                         </div>
                         <div className="audit-col action-col">
-                          <button className="btn-text-only red" onClick={() => onDeleteRecord("user_portal_access", "id")(access.id)}>Remove Access</button>
+                          <button className="btn-text-only red" onClick={() => onDeleteRecord(isKibarAdmin ? "kibar_user_portal_access" : "user_portal_access", "id")(access.id)}>Remove Access</button>
                         </div>
                       </div>
                     ))}
@@ -21273,7 +21459,7 @@ function TeacherPortal({
       return n.includes(searchStr);
     });
 
-    const isKibarTeacher = portalRole === "kibar-teacher" || portalRole === "kibar_teacher";
+    const isKibarTeacher = portalRole === "kibar-teacher" || portalRole === "kibar_teacher" || user?.email?.toLowerCase() === "tmjiger@gmail.com";
     const teacherPhoto = teacherProfiles.find(p => normalizeText(p.full_name) === normalizeText(teacherIdentity))?.photo_url || portalAccess?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.photo_url || null;
 
     return (
@@ -21316,6 +21502,7 @@ function TeacherPortal({
 
   const isKibarTeacher = portalRole === "kibar-teacher" ||
     getSectionScope() === "kibar" ||
+    user?.email?.toLowerCase() === "tmjiger@gmail.com" ||
     user?.user_metadata?.portal_role === "kibar-teacher" ||
     user?.user_metadata?.role === "kibar-teacher" ||
     getAssignedRoles(user).includes("kibar-teacher") ||
@@ -27031,38 +27218,43 @@ export default function App() {
 
   const handleLoginSuccess = async (loggedInUser, selectedRole, rememberMe = true) => {
     try {
-      // Always respect kibar-teacher / kibar-admin from metadata — never let a stored
-      // "parents" default override a teacher's access.
-      const assignedAtLogin = getAssignedRoles(loggedInUser);
-      let effectiveRole = selectedRole;
-      if (assignedAtLogin.includes("kibar-teacher") && effectiveRole !== "kibar-teacher") {
+      // Strict portal check: prevent logging into a portal the user is not assigned to.
+      const allowed = await detectUserAllowedPortal(loggedInUser);
+
+      if (allowed && allowed.allowedTab && allowed.allowedTab !== selectedRole) {
+        await supabase.auth.signOut();
+        return {
+          ok: false,
+          message: `Invalid Credentials: This account is assigned to the ${allowed.portalLabel} only. Please select the ${allowed.portalLabel} tab to sign in.`,
+          expectedRole: allowed.allowedTab,
+          expectedRoleLabel: allowed.portalLabel,
+        };
+      }
+
+      let effectiveRole = allowed?.portalRole || selectedRole;
+      if (loggedInUser?.email?.toLowerCase() === "tmjiger@gmail.com") {
         effectiveRole = "kibar-teacher";
         setSectionScope("kibar");
-      } else if (assignedAtLogin.includes("kibar-admin") && effectiveRole !== "kibar-admin") {
-        effectiveRole = "kibar-admin";
+      } else if (allowed?.isKibar) {
         setSectionScope("kibar");
-      } else if (effectiveRole === "teacher" && assignedAtLogin.includes("kibar-teacher")) {
-        effectiveRole = "kibar-teacher";
-        setSectionScope("kibar");
-      } else if (effectiveRole === "admin" && assignedAtLogin.includes("kibar-admin")) {
-        effectiveRole = "kibar-admin";
-        setSectionScope("kibar");
+      } else {
+        const assignedAtLogin = getAssignedRoles(loggedInUser);
+        if (effectiveRole === "teacher" && assignedAtLogin.includes("kibar-teacher")) {
+          effectiveRole = "kibar-teacher";
+          setSectionScope("kibar");
+        } else if (effectiveRole === "admin" && assignedAtLogin.includes("kibar-admin")) {
+          effectiveRole = "kibar-admin";
+          setSectionScope("kibar");
+        }
       }
 
       let access = await authorizePortalAccess(loggedInUser, effectiveRole);
 
       if (!access.ok) {
-        const resolved = await resolveInitialPortal(loggedInUser, effectiveRole);
-        if (resolved.ok) {
-          access = resolved;
-        }
-      }
-
-      if (!access.ok) {
         await supabase.auth.signOut();
         return {
           ok: false,
-          message: access.message,
+          message: access.message || "Invalid Credentials: We could not verify this account for the selected portal.",
         };
       }
 
@@ -27270,6 +27462,15 @@ export default function App() {
 
     const payload = adminForms.portalAccess;
     const targetEmail = payload.email.trim().toLowerCase();
+    const isKibar = portalRole === "kibar-admin" || getSectionScope() === "kibar";
+
+    let targetRole = payload.portal_role;
+    if (isKibar) {
+      if (targetRole === "teacher") targetRole = "kibar-teacher";
+      if (targetRole === "admin") targetRole = "kibar-admin";
+      if (targetRole === "parents") targetRole = "kibar-student";
+    }
+    const targetAccessTable = isKibar ? "kibar_user_portal_access" : "user_portal_access";
 
     const tempAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
@@ -27285,7 +27486,8 @@ export default function App() {
       options: {
         data: {
           full_name: payload.full_name,
-          portal_role: payload.portal_role,
+          portal_role: targetRole,
+          portal_roles: [targetRole],
         },
       },
     });
@@ -27304,15 +27506,18 @@ export default function App() {
 
     let accessRecord = null;
     if (createdUserId) {
+      const accessPayload = {
+        id: createdUserId,
+        user_id: createdUserId,
+        email: targetEmail,
+        full_name: payload.full_name,
+        portal_role: targetRole,
+        is_active: true
+      };
+
       const { data, error: upsertError } = await supabase
-        .from("user_portal_access")
-        .upsert({
-          user_id: createdUserId,
-          email: targetEmail,
-          full_name: payload.full_name,
-          portal_role: payload.portal_role,
-          is_active: true
-        }, { onConflict: 'user_id' })
+        .from(targetAccessTable)
+        .upsert(accessPayload, { onConflict: isKibar ? 'id' : 'user_id' })
         .select()
         .maybeSingle();
 
@@ -27322,6 +27527,26 @@ export default function App() {
         return;
       }
       accessRecord = data || null;
+
+      if (targetRole === "kibar-teacher") {
+        await supabase.from("kibar_teacher_profiles").upsert({
+          id: createdUserId,
+          user_id: createdUserId,
+          email: targetEmail,
+          full_name: payload.full_name,
+          teacher_role: "muhaffiz",
+          is_active: true
+        }, { onConflict: 'id' }).catch(() => {});
+      } else if (targetRole === "teacher") {
+        await supabase.from("teacher_profiles").upsert({
+          id: createdUserId,
+          user_id: createdUserId,
+          email: targetEmail,
+          full_name: payload.full_name,
+          teacher_role: "muhaffiz",
+          is_active: true
+        }, { onConflict: 'id' }).catch(() => {});
+      }
 
       // Keep `users/{uid}` in sync so Firestore rules (role()) can resolve this
       // account's portal_role. New users get this doc server-side from
@@ -27333,10 +27558,10 @@ export default function App() {
           id: createdUserId,
           email: targetEmail,
           full_name: payload.full_name,
-          portal_role: payload.portal_role,
+          portal_role: targetRole,
           is_active: true,
-          salary_per_minute: payload.portal_role === "teacher" ? 2.3 : 0,
-          show_salary_card: payload.portal_role === "teacher",
+          salary_per_minute: (targetRole === "teacher" || targetRole === "kibar-teacher") ? 2.3 : 0,
+          show_salary_card: (targetRole === "teacher" || targetRole === "kibar-teacher"),
           created_at: nowIso,
           updated_at: nowIso
         }, { onConflict: 'id' })
@@ -27345,7 +27570,7 @@ export default function App() {
         });
     } else {
       const { data, error: fetchError } = await supabase
-        .from("user_portal_access")
+        .from(targetAccessTable)
         .select("*")
         .eq("email", targetEmail)
         .maybeSingle();
@@ -27360,15 +27585,15 @@ export default function App() {
 
     const finalUserId = accessRecord?.user_id || createdUserId || null;
 
-    if (payload.portal_role === "parents" && payload.student_id && finalUserId) {
+    if ((payload.portal_role === "parents" || targetRole === "kibar-student") && payload.student_id && finalUserId) {
       await supabase
-        .from("child_profiles")
+        .from(isKibar ? "kibar_child_profiles" : "child_profiles")
         .update({ parent_user_id: finalUserId })
         .eq("student_id", payload.student_id);
     }
 
     const { data: freshList, error: refreshError } = await supabase
-      .from("user_portal_access")
+      .from(targetAccessTable)
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -27385,13 +27610,13 @@ export default function App() {
 
     setAdminForms((current) => ({
       ...current,
-      portalAccess: { email: "", full_name: "", portal_role: "parents", password: "", student_id: "" },
+      portalAccess: { email: "", full_name: "", portal_role: isKibar ? "kibar-teacher" : "parents", password: "", student_id: "" },
     }));
 
     let linkedStudentName = "Not linked";
     if (payload.student_id) {
       const { data: stData } = await supabase
-        .from("child_profiles")
+        .from(isKibar ? "kibar_child_profiles" : "child_profiles")
         .select("name")
         .eq("student_id", payload.student_id)
         .maybeSingle();
@@ -27400,12 +27625,12 @@ export default function App() {
 
     (async () => {
       try {
-        const notifTitle = payload.portal_role === "teacher" ? "New Student Assigned" : "Portal Access Granted";
-        const notifBody = payload.portal_role === "teacher" 
+        const notifTitle = (targetRole === "teacher" || targetRole === "kibar-teacher") ? "New Student Assigned" : "Portal Access Granted";
+        const notifBody = (targetRole === "teacher" || targetRole === "kibar-teacher")
           ? `${linkedStudentName} has been assigned to your group.` 
           : `Welcome! ${linkedStudentName} has been successfully linked to your portal account.`;
 
-        broadcastNotification(notifTitle, notifBody, payload.portal_role, finalUserId || targetEmail);
+        broadcastNotification(notifTitle, notifBody, targetRole, finalUserId || targetEmail);
       } catch (e) {
         console.warn("Assignment notification failed:", e);
       }
@@ -27414,7 +27639,7 @@ export default function App() {
     setPortalAccessSuccess({
       full_name: payload.full_name,
       email: targetEmail,
-      portal_role: payload.portal_role,
+      portal_role: targetRole,
       linkedStudentName,
       grantedAt: new Date().toLocaleString(),
     });

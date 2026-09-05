@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { AlertCircle, ArrowLeft, BookOpen, Check, CheckCircle2, Eye, EyeOff, GraduationCap, KeyRound, Loader2, Lock, LogIn, Mail, Send, ShieldCheck, Smartphone, Users, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Eye, EyeOff, GraduationCap, KeyRound, Loader2, Lock, LogIn, Mail, Send, ShieldAlert, ShieldCheck, Smartphone, Users, X } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import lottie from "lottie-web";
 // Bundled at build time so the welcome animation never depends on a network
@@ -59,6 +59,7 @@ export default function Login({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [mismatchInfo, setMismatchInfo] = useState(null);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [forgotStep, setForgotStep] = useState(1); // 1: Passwords, 2: Phone & OTP
   const [forgotNewPassword, setForgotNewPassword] = useState("");
@@ -141,6 +142,7 @@ export default function Login({ onLoginSuccess }) {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setMismatchInfo(null);
     setButtonFeedback(null);
 
     let lastError = null;
@@ -202,6 +204,12 @@ export default function Login({ onLoginSuccess }) {
           setLoading(false);
           if (!result?.ok) {
             setError(result?.message || "This account cannot access the selected portal.");
+            if (result?.expectedRole) {
+              setMismatchInfo({
+                role: result.expectedRole,
+                label: result.expectedRoleLabel || result.expectedRole
+              });
+            }
           } else {
             setButtonFeedback("success");
           }
@@ -219,6 +227,12 @@ export default function Login({ onLoginSuccess }) {
             setLoading(false);
             if (!result?.ok) {
               setError(result?.message || "This account cannot access the selected portal.");
+              if (result?.expectedRole) {
+                setMismatchInfo({
+                  role: result.expectedRole,
+                  label: result.expectedRoleLabel || result.expectedRole
+                });
+              }
             } else {
               setButtonFeedback("success");
             }
@@ -247,6 +261,7 @@ export default function Login({ onLoginSuccess }) {
   const handleRoleSwitch = (roleId) => {
     setSelectedRole(roleId);
     setError(null);
+    setMismatchInfo(null);
     if (!rememberMe) {
       setEmail("");
       setPassword("");
@@ -335,6 +350,30 @@ export default function Login({ onLoginSuccess }) {
                 </button>
               </div>
             </div>
+
+            {mismatchInfo && (
+              <div className="portal-mismatch-banner card-appear">
+                <div className="portal-mismatch-top">
+                  <ShieldAlert size={20} className="portal-mismatch-icon" />
+                  <div className="portal-mismatch-content">
+                    <span className="portal-mismatch-title">Portal Access Restricted</span>
+                    <span className="portal-mismatch-desc">
+                      This ID is available to login at <strong>{mismatchInfo.label}</strong> only.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="portal-mismatch-action-btn"
+                  onClick={() => {
+                    handleRoleSwitch(mismatchInfo.role);
+                  }}
+                >
+                  <span>Switch to {mismatchInfo.label}</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            )}
 
             {error && (
               <div className="error-message">
