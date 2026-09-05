@@ -3157,6 +3157,25 @@ async function authorizePortalAccess(user, requestedRole) {
   // Allow admin access if teacher's email is in teacher_admin_access list
   if (isAdminRole && user?.email) {
     try {
+      const isKibarTeacherUser = assignedRoles.includes("kibar-teacher") || user?.email?.toLowerCase() === "tmjiger@gmail.com";
+      const isAtfalTeacherUser = assignedRoles.includes("teacher");
+
+      // Strict boundary: Kibar teacher is BLOCKED from Atfal Admin
+      if (finalRole === "admin" && isKibarTeacherUser && !assignedRoles.includes("admin")) {
+        return {
+          ok: false,
+          message: "Access Denied: Kibar teachers are authorized for Kibar Admin only.",
+        };
+      }
+
+      // Strict boundary: Atfal teacher is BLOCKED from Kibar Admin
+      if (finalRole === "kibar-admin" && isAtfalTeacherUser && !assignedRoles.includes("kibar-admin")) {
+        return {
+          ok: false,
+          message: "Access Denied: Atfal teachers are authorized for Atfal Admin only.",
+        };
+      }
+
       const targetTable = finalRole === "kibar-admin" ? "kibar_jadwal_settings" : "jadwal_settings";
       const { data: settingsData } = await supabase
         .from(targetTable)
@@ -3171,20 +3190,7 @@ async function authorizePortalAccess(user, requestedRole) {
             : settingsData.teacher_admin_access;
         } catch (_) {}
       }
-      if ((!accessList || accessList.length === 0) && finalRole === "kibar-admin") {
-        try {
-          const { data: atfalSettings } = await supabase
-            .from('jadwal_settings')
-            .select('teacher_admin_access')
-            .eq('id', 1)
-            .maybeSingle();
-          if (atfalSettings?.teacher_admin_access) {
-            accessList = typeof atfalSettings.teacher_admin_access === 'string'
-              ? JSON.parse(atfalSettings.teacher_admin_access)
-              : atfalSettings.teacher_admin_access;
-          }
-        } catch (_) {}
-      }
+
       if (Array.isArray(accessList) && accessList.some(e =>
         normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
       )) {
@@ -13140,11 +13146,19 @@ const handleDownloadAllReports = async () => {
 
   const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Online Tahfeez Tracking", "Help Management", "Global Settings", "Email Settings", "App Update"];
   const isKibarAdmin = portalRole === "kibar-admin";
-  const navPages = isKibarAdmin
-    ? ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"]
-    : ["Overview", "Quick Student Access", "Quick Access Pages", "Admin Access", "Schedule", "Result Tracking"];
+  const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Admin Access", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
+  const isSuperAdmin = user?.email?.toLowerCase() === "mh.developer53@gmail.com";
+  const isKibarTeacherUser = !isSuperAdmin && (
+    userAssignedRoles.includes("kibar-teacher") ||
+    user?.email?.toLowerCase() === "tmjiger@gmail.com" ||
+    portalAccess?.portal_role === "kibar-teacher"
+  ) && !userAssignedRoles.includes("admin");
+  const isAtfalTeacherUser = !isSuperAdmin && (
+    userAssignedRoles.includes("teacher") ||
+    portalAccess?.portal_role === "teacher"
+  ) && !userAssignedRoles.includes("kibar-admin") && !isKibarTeacherUser;
 
   const selectedStudent = selectedStudentId
     ? (students.find((student) => student.allIds.includes(String(selectedStudentId))) || null)
@@ -14117,6 +14131,10 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           }}>
             <button
               onClick={() => {
+                if (isKibarTeacherUser) {
+                  onShowAction && onShowAction("error", "Access Blocked: Atfal Admin is blocked for Kibar teachers.");
+                  return;
+                }
                 if (portalRole !== "admin") {
                   onRoleChange("admin");
                 }
@@ -14127,18 +14145,24 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 borderRadius: "6px",
                 border: "none",
                 background: portalRole === "admin" ? "var(--primary-gold)" : "transparent",
-                color: portalRole === "admin" ? "white" : "var(--soft-brown)",
+                color: portalRole === "admin" ? "white" : (isKibarTeacherUser ? "#b0b0b0" : "var(--soft-brown)"),
                 fontWeight: 700,
                 fontSize: "0.8rem",
-                cursor: "pointer",
+                cursor: isKibarTeacherUser ? "not-allowed" : "pointer",
+                opacity: isKibarTeacherUser ? 0.45 : 1,
                 transition: "all 0.2s ease",
                 boxShadow: portalRole === "admin" ? "0 2px 6px rgba(184, 148, 31, 0.3)" : "none"
               }}
+              title={isKibarTeacherUser ? "Atfal Admin is blocked for Kibar teachers" : "Switch to Atfal Admin"}
             >
-              Atfal Admin
+              {isKibarTeacherUser ? "Atfal (Blocked)" : "Atfal Admin"}
             </button>
             <button
               onClick={() => {
+                if (isAtfalTeacherUser) {
+                  onShowAction && onShowAction("error", "Access Blocked: Kibar Admin is blocked for Atfal teachers.");
+                  return;
+                }
                 if (portalRole !== "kibar-admin") {
                   onRoleChange("kibar-admin");
                 }
@@ -14149,15 +14173,17 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 borderRadius: "6px",
                 border: "none",
                 background: portalRole === "kibar-admin" ? "var(--primary-gold)" : "transparent",
-                color: portalRole === "kibar-admin" ? "white" : "var(--soft-brown)",
+                color: portalRole === "kibar-admin" ? "white" : (isAtfalTeacherUser ? "#b0b0b0" : "var(--soft-brown)"),
                 fontWeight: 700,
                 fontSize: "0.8rem",
-                cursor: "pointer",
+                cursor: isAtfalTeacherUser ? "not-allowed" : "pointer",
+                opacity: isAtfalTeacherUser ? 0.45 : 1,
                 transition: "all 0.2s ease",
                 boxShadow: portalRole === "kibar-admin" ? "0 2px 6px rgba(184, 148, 31, 0.3)" : "none"
               }}
+              title={isAtfalTeacherUser ? "Kibar Admin is blocked for Atfal teachers" : "Switch to Kibar Admin"}
             >
-              Kibar Admin
+              {isAtfalTeacherUser ? "Kibar (Blocked)" : "Kibar Admin"}
             </button>
           </div>
         </div>
@@ -14635,23 +14661,37 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             </>
           )}
 
-          {activePage === "Admin Access" && !isKibarAdmin && (
+          {activePage === "Admin Access" && (
             <div className="overview-container fade-in" style={{ marginTop: '0px' }}>
               <div className="premium-card card-appear" style={{ padding: '24px', borderRadius: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
                   <div style={{
                     width: '42px', height: '42px', borderRadius: '12px',
-                    background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.06))',
+                    background: isKibarAdmin
+                      ? 'linear-gradient(135deg, rgba(74,107,130,0.2), rgba(74,107,130,0.06))'
+                      : 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.06))',
                     display: 'grid', placeItems: 'center', flexShrink: 0,
                   }}>
-                    <ShieldCheck size={20} style={{ color: 'var(--primary-gold)' }} />
+                    <ShieldCheck size={20} style={{ color: isKibarAdmin ? '#2c4b63' : 'var(--primary-gold)' }} />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.05rem', fontWeight: 700 }}>
-                      Teacher Admin Access
-                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0, color: 'var(--deep-brown)', fontSize: '1.05rem', fontWeight: 700 }}>
+                        {isKibarAdmin ? "Kibar Teacher Admin Access" : "Teacher Admin Access"}
+                      </h3>
+                      <span style={{
+                        fontSize: '0.68rem', fontWeight: 700,
+                        background: isKibarAdmin ? 'rgba(74,107,130,0.12)' : 'rgba(212,175,55,0.12)',
+                        color: isKibarAdmin ? '#2c4b63' : 'var(--deep-brown)',
+                        padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.5px'
+                      }}>
+                        {isKibarAdmin ? "Kibar Admin Only" : "Atfal Admin Only"}
+                      </span>
+                    </div>
                     <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      Allow teachers to access the Admin Portal from their header
+                      {isKibarAdmin
+                        ? "Allow Kibar teachers to access the Kibar Admin Portal from their teacher portal"
+                        : "Allow Atfal teachers to access the Atfal Admin Portal from their teacher portal"}
                     </p>
                   </div>
                   {teacherAccessDirty && (
@@ -14666,84 +14706,135 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {(teacherProfiles || []).map(teacher => {
-                    const portalMatch = portalAccessList.find(a =>
-                      a.user_id === teacher.user_id || normalizeText(a.full_name) === normalizeText(teacher.full_name)
-                    );
-                    const teacherEmail = teacher.email || portalMatch?.email || '';
-                    const teacherUserId = teacher.user_id || portalMatch?.user_id || '';
-                    const accessKey = teacherEmail || teacherUserId;
-                    const isOn = !!(teacherEmail && teacherAdminAccessList.includes(teacherEmail)) || !!(teacherUserId && teacherAdminAccessList.includes(teacherUserId));
-                    const canToggle = !!accessKey;
-                    return (
-                      <div key={teacher.user_id || teacher.full_name} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '10px 14px', borderRadius: '10px',
-                        background: isOn ? 'rgba(212,175,55,0.05)' : 'rgba(0,0,0,0.02)',
-                        border: '1px solid',
-                        borderColor: isOn ? 'rgba(212,175,55,0.2)' : 'transparent',
-                        transition: 'all 0.2s ease',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                          <div style={{
-                            width: '34px', height: '34px', borderRadius: '10px',
-                            background: isOn ? 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.06))' : 'rgba(0,0,0,0.04)',
-                            display: 'grid', placeItems: 'center',
-                            color: isOn ? 'var(--primary-gold)' : '#bbb',
-                            fontSize: '0.8rem', fontWeight: 'bold',
-                          }}>
-                            {teacher.full_name ? teacher.full_name.charAt(0).toUpperCase() : '?'}
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{
-                              fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {teacher.full_name || 'Unknown Teacher'}
-                            </div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              {teacherEmail || (portalMatch?.portal_role ? `${portalMatch.portal_role} – no email` : 'No email')}
-                            </div>
-                          </div>
+                  {(() => {
+                    const map = new Map();
+                    (teacherProfiles || []).forEach(t => {
+                      const key = normalizeText(t.full_name || t.email || t.user_id || t.id || "");
+                      if (key) {
+                        map.set(key, {
+                          id: t.id || t.user_id,
+                          user_id: t.user_id || t.id,
+                          full_name: t.full_name || t.name,
+                          email: t.email || "",
+                        });
+                      }
+                    });
+                    (portalAccessList || []).forEach(p => {
+                      const isTarget = isKibarAdmin
+                        ? (p.portal_role === "kibar-teacher" || p.portal_role === "teacher")
+                        : (p.portal_role === "teacher");
+                      if (isTarget) {
+                        const key = normalizeText(p.full_name || p.email || p.user_id || p.id || "");
+                        if (key) {
+                          if (!map.has(key)) {
+                            map.set(key, {
+                              id: p.id || p.user_id,
+                              user_id: p.user_id || p.id,
+                              full_name: p.full_name,
+                              email: p.email || "",
+                            });
+                          } else if (!map.get(key).email && p.email) {
+                            map.get(key).email = p.email;
+                          }
+                        }
+                      }
+                    });
+                    const targetList = Array.from(map.values()).sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+
+                    if (targetList.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                          {isKibarAdmin ? "No Kibar teachers found." : "No teachers found."}
                         </div>
-                        <button
-                          onClick={() => {
-                            if (!canToggle) return;
-                            const list = isOn
-                              ? teacherAdminAccessList.filter(e => e !== teacherEmail && e !== teacherUserId)
-                              : [...teacherAdminAccessList, accessKey];
-                            setTeacherAdminAccessList(list);
-                            setTeacherAccessDirty(true);
-                          }}
-                          disabled={!canToggle}
-                          style={{
-                            width: '48px', height: '26px', borderRadius: '13px',
-                            border: 'none', cursor: canToggle ? 'pointer' : 'not-allowed',
-                            position: 'relative',
-                            background: canToggle
-                              ? isOn ? 'linear-gradient(135deg, #d4af37, #b8941f)' : 'rgba(0,0,0,0.12)'
-                              : 'rgba(0,0,0,0.04)',
-                            transition: 'all 0.25s ease', flexShrink: 0,
-                            boxShadow: isOn ? '0 2px 8px rgba(212,175,55,0.3)' : 'none',
-                          }}
-                        >
-                          <div style={{
-                            width: '20px', height: '20px', borderRadius: '50%',
-                            background: canToggle ? 'white' : '#ddd',
-                            position: 'absolute', top: '3px',
-                            left: isOn ? '25px' : '3px',
-                            transition: 'left 0.25s ease',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                          }} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                  {(!teacherProfiles || teacherProfiles.length === 0) && (
-                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      No teachers found.
-                    </div>
-                  )}
+                      );
+                    }
+
+                    return targetList.map(teacher => {
+                      const portalMatch = (portalAccessList || []).find(a =>
+                        a.user_id === teacher.user_id || normalizeText(a.full_name) === normalizeText(teacher.full_name)
+                      );
+                      const teacherEmail = teacher.email || portalMatch?.email || '';
+                      const teacherUserId = teacher.user_id || portalMatch?.user_id || '';
+                      const accessKey = teacherEmail || teacherUserId;
+                      const isOn = !!(teacherEmail && teacherAdminAccessList.includes(teacherEmail)) || !!(teacherUserId && teacherAdminAccessList.includes(teacherUserId));
+                      const canToggle = !!accessKey;
+
+                      return (
+                        <div key={teacher.user_id || teacher.full_name} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '10px 14px', borderRadius: '10px',
+                          background: isOn
+                            ? (isKibarAdmin ? 'rgba(74,107,130,0.06)' : 'rgba(212,175,55,0.05)')
+                            : 'rgba(0,0,0,0.02)',
+                          border: '1px solid',
+                          borderColor: isOn
+                            ? (isKibarAdmin ? 'rgba(74,107,130,0.25)' : 'rgba(212,175,55,0.2)')
+                            : 'transparent',
+                          transition: 'all 0.2s ease',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                            <div style={{
+                              width: '34px', height: '34px', borderRadius: '10px',
+                              background: isOn
+                                ? (isKibarAdmin ? 'linear-gradient(135deg, rgba(74,107,130,0.25), rgba(74,107,130,0.08))' : 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.06))')
+                                : 'rgba(0,0,0,0.04)',
+                              display: 'grid', placeItems: 'center',
+                              color: isOn ? (isKibarAdmin ? '#2c4b63' : 'var(--primary-gold)') : '#bbb',
+                              fontSize: '0.8rem', fontWeight: 'bold',
+                            }}>
+                              {teacher.full_name ? teacher.full_name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{
+                                fontWeight: 600, color: 'var(--deep-brown)', fontSize: '0.85rem',
+                                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                              }}>
+                                {teacher.full_name || (isKibarAdmin ? 'Unknown Kibar Teacher' : 'Unknown Teacher')}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                {teacherEmail || (portalMatch?.portal_role ? `${portalMatch.portal_role} – no email` : 'No email')}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (!canToggle) return;
+                              const list = isOn
+                                ? teacherAdminAccessList.filter(e => e !== teacherEmail && e !== teacherUserId)
+                                : [...teacherAdminAccessList, accessKey];
+                              setTeacherAdminAccessList(list);
+                              setTeacherAccessDirty(true);
+                            }}
+                            disabled={!canToggle}
+                            style={{
+                              width: '48px', height: '26px', borderRadius: '13px',
+                              border: 'none', cursor: canToggle ? 'pointer' : 'not-allowed',
+                              position: 'relative',
+                              background: canToggle
+                                ? isOn
+                                  ? (isKibarAdmin ? 'linear-gradient(135deg, #4a6b82, #2c4b63)' : 'linear-gradient(135deg, #d4af37, #b8941f)')
+                                  : 'rgba(0,0,0,0.12)'
+                                : 'rgba(0,0,0,0.04)',
+                              transition: 'all 0.25s ease', flexShrink: 0,
+                              boxShadow: isOn
+                                ? (isKibarAdmin ? '0 2px 8px rgba(74,107,130,0.3)' : '0 2px 8px rgba(212,175,55,0.3)')
+                                : 'none',
+                            }}
+                            title={isOn ? "Revoke Admin Access" : "Grant Admin Access"}
+                          >
+                            <div style={{
+                              width: '20px', height: '20px', borderRadius: '50%',
+                              background: canToggle ? 'white' : '#ddd',
+                              position: 'absolute', top: '3px',
+                              left: isOn ? '25px' : '3px',
+                              transition: 'left 0.25s ease',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                            }} />
+                          </button>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
 
                 <div style={{ marginTop: '16px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -14770,8 +14861,9 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       <button
                         onClick={async () => {
                           try {
+                            const targetTable = isKibarAdmin ? 'kibar_jadwal_settings' : 'jadwal_settings';
                             const { error } = await supabase
-                              .from('jadwal_settings')
+                              .from(targetTable)
                               .upsert({ id: 1, teacher_admin_access: JSON.stringify(teacherAdminAccessList) }, { onConflict: 'id' });
                             if (error) {
                               if (onShowAction) onShowAction('error', 'Failed to save: ' + error.message);
@@ -14781,7 +14873,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                                 if (!prev || !prev.length) return [{ id: 1, teacher_admin_access: JSON.stringify(teacherAdminAccessList) }];
                                 return prev.map(s => s.id === 1 ? { ...s, teacher_admin_access: JSON.stringify(teacherAdminAccessList) } : s);
                               });
-                              if (onShowAction) onShowAction('success', 'Teacher admin access updated');
+                              if (onShowAction) onShowAction('success', isKibarAdmin ? 'Kibar teacher admin access updated' : 'Teacher admin access updated');
                             }
                           } catch (err) {
                             if (onShowAction) onShowAction('error', 'Save failed');
@@ -14790,8 +14882,13 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         style={{
                           padding: '10px 24px', fontSize: '0.82rem', fontWeight: 700,
                           border: 'none', borderRadius: '10px', cursor: 'pointer',
-                          background: 'linear-gradient(135deg, #d4af37, #b8941f)',
-                          color: 'white', boxShadow: '0 4px 12px rgba(212,175,55,0.25)',
+                          background: isKibarAdmin
+                            ? 'linear-gradient(135deg, #4a6b82, #2c4b63)'
+                            : 'linear-gradient(135deg, #d4af37, #b8941f)',
+                          color: 'white',
+                          boxShadow: isKibarAdmin
+                            ? '0 4px 12px rgba(74,107,130,0.25)'
+                            : '0 4px 12px rgba(212,175,55,0.25)',
                         }}
                       >
                         Save Changes
@@ -21550,16 +21647,23 @@ function TeacherPortal({
         </nav>
         <div className="sidebar-footer">
           {(() => {
+            const isKibar = portalRole === 'kibar-teacher' || isKibarTeacher;
             const fromMetadata = getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'kibar-teacher' && r !== 'parents');
             const hasAdminAccess = user?.email && teacherAdminAccessList.some(e =>
               normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
             );
-            const roles = [...fromMetadata];
-            if (hasAdminAccess) {
-              if (portalRole === 'kibar-teacher') {
-                if (!roles.includes('kibar-admin')) roles.push('kibar-admin');
-              } else {
-                if (!roles.includes('admin')) roles.push('admin');
+            let roles = [...fromMetadata];
+            if (isKibar) {
+              // Strictly block Atfal admin for Kibar teacher
+              roles = roles.filter(r => r !== 'admin');
+              if (hasAdminAccess && !roles.includes('kibar-admin')) {
+                roles.push('kibar-admin');
+              }
+            } else {
+              // Strictly block Kibar admin for Atfal teacher
+              roles = roles.filter(r => r !== 'kibar-admin');
+              if (hasAdminAccess && !roles.includes('admin')) {
+                roles.push('admin');
               }
             }
             return roles.map((role) => (
@@ -27162,6 +27266,21 @@ export default function App() {
   }, [teacherData.attendances, portalAccess.salary_per_minute, portalAccess.show_salary_card, portalRole, teacherProfiles, teacherIdentity]);
 
   function storeRole(role, newActivePage = null) {
+    // Strict boundary enforcement:
+    const assigned = user ? getAssignedRoles(user) : [];
+    const isSuperAdmin = user?.email?.toLowerCase() === "mh.developer53@gmail.com";
+
+    if (!isSuperAdmin) {
+      if (role === "admin" && (assigned.includes("kibar-teacher") || user?.email?.toLowerCase() === "tmjiger@gmail.com") && !assigned.includes("admin")) {
+        showAction("error", "Access Blocked: Kibar teachers are authorized for Kibar Admin only.");
+        return;
+      }
+      if (role === "kibar-admin" && assigned.includes("teacher") && !assigned.includes("kibar-admin") && !assigned.includes("kibar-teacher")) {
+        showAction("error", "Access Blocked: Atfal teachers are authorized for Atfal Admin only.");
+        return;
+      }
+    }
+
     const targetSection = SECTION_FOR_ROLE(role);
     setPortalRole(role);
     setSectionScope(targetSection);
