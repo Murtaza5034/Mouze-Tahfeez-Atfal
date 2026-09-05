@@ -15,6 +15,7 @@ export default function TahfeezChatUI({
   allPortalStudents = [],
   isKibar = false,
   currentTeacherPhoto = null,
+  teacherId = null,
   activeChat = null,
   onSelectChat,
   searchQuery,
@@ -54,6 +55,155 @@ export default function TahfeezChatUI({
     }, (err) => console.warn("online assignments listener error:", err));
     return () => unsub();
   }, []);
+
+  // Real-time Online Presence Tracking in Tahfeez
+  const [presenceMap, setPresenceMap] = useState({});
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "tahfeez_presence"), (snap) => {
+      const map = {};
+      const now = Date.now();
+      snap.forEach(d => {
+        const data = d.data();
+        if (data) {
+          // Consider online if heartbeat was within last 45 seconds and isOnline !== false
+          const isFresh = (now - (data.lastSeen || 0)) < 45000;
+          if (data.isOnline !== false && isFresh) {
+            map[d.id] = data;
+          }
+        }
+      });
+      setPresenceMap(map);
+    }, (err) => console.warn("presence listener error:", err));
+
+    return () => unsub();
+  }, []);
+
+  // Heartbeat to report current user's presence while active in Online Tahfeez
+  useEffect(() => {
+    if (!currentUserId && !currentUserName) return;
+
+    const myId = String(currentUserId || role);
+    const myTeacherId = String(teacherId || currentUserId || role);
+    const myDocKey = role === "teacher" 
+      ? `teacher_${myId}`
+      : `user_${myId}`;
+
+    const studentIds = (studentsList || []).map(s => String(s.student_id || s.studentId || s.id || "")).filter(Boolean);
+
+    const updatePresence = (isOnline = true) => {
+      const activeStudentId = (isOnline && role === "teacher" && activeChat && !activeChat.isGroup)
+        ? String(activeChat.student_id || activeChat.studentId || activeChat.id || "")
+        : null;
+      const activeStudentName = (isOnline && role === "teacher" && activeChat && !activeChat.isGroup)
+        ? (activeChat.name || activeChat.student_name || activeChat.full_name || null)
+        : null;
+
+      const presenceData = {
+        userId: myId,
+        role: role === "teacher" ? "teacher" : "student",
+        name: currentUserName || (role === "teacher" ? "Muhaffiz" : "Student"),
+        lastSeen: Date.now(),
+        isOnline: isOnline,
+        ...(role === "teacher" ? {
+          teacherId: myTeacherId,
+          teacherName: currentUserName || "Muhaffiz",
+          activeStudentId: activeStudentId,
+          activeStudentName: activeStudentName
+        } : {
+          studentIds
+        })
+      };
+
+      setDoc(doc(db, "tahfeez_presence", myDocKey), presenceData, { merge: true }).catch(() => {});
+
+      if (role === "teacher" && myTeacherId && myTeacherId !== myId) {
+        setDoc(doc(db, "tahfeez_presence", `teacher_${myTeacherId}`), presenceData, { merge: true }).catch(() => {});
+      }
+      
+      // If student/parent, also mark individual student doc keys so teachers can find them immediately by student_id
+      if (role !== "teacher" && studentIds.length > 0) {
+        studentIds.forEach(sid => {
+          setDoc(doc(db, "tahfeez_presence", `student_${sid}`), presenceData, { merge: true }).catch(() => {});
+        });
+      }
+    };
+
+    updatePresence(true);
+
+    const interval = setInterval(() => {
+      updatePresence(true);
+    }, 18000);
+
+    const handleUnload = () => {
+      updatePresence(false);
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("beforeunload", handleUnload);
+      updatePresence(false);
+    };
+  }, [currentUserId, currentUserName, role, studentsList, activeChat, teacherId]);
+
+  // Helper to determine if the peer in chat is currently online
+  const isPeerOnline = (chat) => {
+    if (!chat) return false;
+    if (chat.isGroup) return true;
+
+    // If there is an active session in activeSessions for this room, they are live
+    const chatRoomId = getRoomId(chat);
+    if (activeSessions && activeSessions[chatRoomId]) {
+      return true;
+    }
+
+    if (isStudentOrParent) {
+      // Current user is student/parent, checking if teacher is online AND has clicked this student's chatbar
+      const tId = String(chat.teacher_id || chat.teacherId || "");
+      const tName = (chat.teacherName || chat.teacher_name || chat.name || "").trim().toLowerCase();
+      const myStudentId = String(chat.student_id || chat.studentId || chat.id || (studentsList && studentsList[0]?.student_id) || "");
+
+      // Check any record in presenceMap that has role === "teacher" and matches name or ID
+      for (const p of Object.values(presenceMap)) {
+        if (p.role === "teacher" && p.isOnline !== false) {
+          const pName = (p.name || p.teacherName || "").trim().toLowerCase();
+          const pTId = String(p.teacherId || p.userId || "");
+          const isMatch = (tId && pTId && tId === pTId) || 
+                          (tName && pName && (tName === pName || tName.includes(pName) || pName.includes(tName)));
+          if (isMatch) {
+            // Teacher is only online for THIS student if teacher specifically opened this student's chatbar!
+            if (p.activeStudentId && String(p.activeStudentId) === myStudentId) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    } else {
+      // Current user is teacher, checking if student is online
+      const sid = String(chat.student_id || chat.studentId || chat.id || "");
+      const pUserId = String(chat.parent_user_id || chat.user_id || "");
+
+      if (sid && presenceMap[`student_${sid}`]?.isOnline !== false) return true;
+      if (pUserId && presenceMap[`user_${pUserId}`]?.isOnline !== false) return true;
+
+      for (const p of Object.values(presenceMap)) {
+        if (p.role === "student" && p.isOnline !== false) {
+          if (p.studentIds && Array.isArray(p.studentIds) && p.studentIds.includes(sid)) {
+            return true;
+          }
+          const pName = (p.name || "").trim().toLowerCase();
+          const sName = (chat.name || chat.full_name || chat.student_name || "").trim().toLowerCase();
+          if (sName && pName && (sName === pName || sName.includes(pName) || pName.includes(sName))) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+  };
   
   // Audio Voice Note Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -704,6 +854,17 @@ export default function TahfeezChatUI({
           color: #ffffff !important;
           border: none !important;
         }
+        .call-btn-offline {
+          background: #f1f5f9 !important;
+          color: #64748b !important;
+          border: 1px solid #cbd5e1 !important;
+          animation: none !important;
+          box-shadow: none !important;
+        }
+        .call-btn-offline:hover {
+          background: #e2e8f0 !important;
+          color: #334155 !important;
+        }
         .call-btn-busy {
           background: #fef3c7 !important;
           color: #d97706 !important;
@@ -1109,7 +1270,7 @@ export default function TahfeezChatUI({
                         (chat.name || chat.full_name || chat.teacherName || "S")[0].toUpperCase()
                       )}
                     </div>
-                    {isRoomLive && (
+                    {(isRoomLive || isPeerOnline(chat)) && (
                       <span style={{
                         position: "absolute",
                         bottom: 0,
@@ -1117,9 +1278,9 @@ export default function TahfeezChatUI({
                         width: "12px",
                         height: "12px",
                         borderRadius: "50%",
-                        background: "#22c55e",
+                        background: isRoomLive ? "#22c55e" : (teacherBusyState.isBusy ? "#d97706" : "#22c55e"),
                         border: "2px solid var(--sidebar-bg)",
-                        boxShadow: "0 0 6px #22c55e"
+                        boxShadow: isRoomLive ? "0 0 6px #22c55e" : (teacherBusyState.isBusy ? "0 0 6px #d97706" : "0 0 6px #22c55e")
                       }} />
                     )}
                   </div>
@@ -1151,22 +1312,33 @@ export default function TahfeezChatUI({
                         </span>
                       )}
                     </div>
-                    <div style={{
-                      fontSize: "0.82rem",
-                      color: isRoomLive ? "#16a34a" : (teacherBusyState.isBusy ? "#d97706" : "var(--text-muted)"),
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      fontWeight: isRoomLive ? 600 : 400
-                    }}>
-                      {isStudentOrParent ? (
-                        teacherBusyState.isBusy 
-                          ? "• In session with another student"
-                          : (isRoomLive ? "• Live: Muhaffiz is waiting" : "• Available for class")
-                      ) : (
-                        chat.isGroup ? "Group Session" : (isRoomLive ? "• Student waiting" : (chat.subtext || "Online Tahfeez"))
-                      )}
-                    </div>
+                    {(() => {
+                      const peerOnline = isPeerOnline(chat);
+                      return (
+                        <div style={{
+                          fontSize: "0.82rem",
+                          color: isRoomLive ? "#16a34a" : (teacherBusyState.isBusy ? "#d97706" : (peerOnline ? "#16a34a" : "var(--text-muted)")),
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          fontWeight: (isRoomLive || peerOnline) ? 600 : 400
+                        }}>
+                          {isStudentOrParent ? (
+                            teacherBusyState.isBusy 
+                              ? "• In session with another student"
+                              : (isRoomLive 
+                                  ? "• Live: Muhaffiz is waiting" 
+                                  : (peerOnline ? "• Available for class" : "• Offline"))
+                          ) : (
+                            chat.isGroup 
+                              ? "Group Session" 
+                              : (isRoomLive 
+                                  ? "• Student waiting" 
+                                  : (peerOnline ? "• Online" : "• Offline"))
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -1226,33 +1398,47 @@ export default function TahfeezChatUI({
                 </div>
 
                 {/* Profile Picture */}
-                <div style={{
-                  width: "38px",
-                  height: "38px",
-                  borderRadius: "50%",
-                  background: activeChat.isGroup ? "#00a884" : "#dfe5e7",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: activeChat.isGroup ? "#fff" : "#54656f",
-                  fontWeight: "bold",
-                  fontSize: "15px",
-                  flexShrink: 0,
-                  overflow: "hidden",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.1)"
-                }}>
-                  {activeChat.isGroup ? (
-                    <Users size={19} />
-                  ) : activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo ? (
-                    <img 
-                      src={activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo} 
-                      alt={activeChat.name || "User"} 
-                      referrerPolicy="no-referrer"
-                      style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                  ) : (
-                    (activeChat.name || activeChat.full_name || activeChat.teacherName || "S")[0].toUpperCase()
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div style={{
+                    width: "38px",
+                    height: "38px",
+                    borderRadius: "50%",
+                    background: activeChat.isGroup ? "#00a884" : "#dfe5e7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: activeChat.isGroup ? "#fff" : "#54656f",
+                    fontWeight: "bold",
+                    fontSize: "15px",
+                    overflow: "hidden",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.1)"
+                  }}>
+                    {activeChat.isGroup ? (
+                      <Users size={19} />
+                    ) : activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo ? (
+                      <img 
+                        src={activeChat.photoUrl || activeChat.photo_url || activeChat.avatar_url || activeChat.photo} 
+                        alt={activeChat.name || "User"} 
+                        referrerPolicy="no-referrer"
+                        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : (
+                      (activeChat.name || activeChat.full_name || activeChat.teacherName || "S")[0].toUpperCase()
+                    )}
+                  </div>
+                  {(isOwnRoomLive || isPeerOnline(activeChat)) && (
+                    <span style={{
+                      position: "absolute",
+                      bottom: 0,
+                      right: 0,
+                      width: "11px",
+                      height: "11px",
+                      borderRadius: "50%",
+                      background: isOwnRoomLive ? "#22c55e" : (activeTeacherBusyState.isBusy ? "#d97706" : "#22c55e"),
+                      border: "2px solid #f0f2f5",
+                      boxShadow: isOwnRoomLive ? "0 0 5px #22c55e" : (activeTeacherBusyState.isBusy ? "0 0 5px #d97706" : "0 0 5px #22c55e")
+                    }} />
                   )}
                 </div>
 
@@ -1317,13 +1503,21 @@ export default function TahfeezChatUI({
                           isStudentOrParent ? (
                             activeTeacherBusyState.isBusy ? (
                               <span style={{ color: "#d97706" }}>Teacher in Session • Please wait</span>
+                            ) : isOwnRoomLive ? (
+                              <span style={{ color: "#16a34a" }}>Muhaffiz Waiting • Online</span>
+                            ) : isPeerOnline(activeChat) ? (
+                              <span style={{ color: "#16a34a" }}>Online • Ready for Class</span>
                             ) : (
-                              <span style={{ color: "#16a34a" }}>
-                                {isOwnRoomLive ? "Muhaffiz Waiting • Online" : "Online • Ready for Class"}
-                              </span>
+                              <span style={{ color: "#94a3b8" }}>Offline • Not in Classroom</span>
                             )
                           ) : (
-                            <span>{activeChat.isGroup ? "Group Session" : "Online"}</span>
+                            activeChat.isGroup ? (
+                              <span>Group Session</span>
+                            ) : isPeerOnline(activeChat) ? (
+                              <span style={{ color: "#16a34a" }}>{isOwnRoomLive ? "Student waiting • Online" : "Online"}</span>
+                            ) : (
+                              <span style={{ color: "#94a3b8" }}>Offline</span>
+                            )
                           )
                         )}
                       </div>
@@ -1356,28 +1550,33 @@ export default function TahfeezChatUI({
                       <Clock size={14} color="#d97706" />
                       <span>Busy</span>
                     </button>
-                  ) : (
-                    <button 
-                      type="button"
-                      onClick={handleCallButtonClick}
-                      className="call-btn-green-glow"
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: "18px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "5px",
-                        fontWeight: "700",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 6px rgba(0, 168, 132, 0.35)",
-                        whiteSpace: "nowrap"
-                      }}
-                    >
-                      <Video size={16} />
-                      <span>{isOwnRoomLive ? "Join" : "Join Call"}</span>
-                    </button>
-                  )
+                  ) : (() => {
+                    const isCallReady = isOwnRoomLive || isPeerOnline(activeChat);
+                    return (
+                      <button 
+                        type="button"
+                        onClick={handleCallButtonClick}
+                        className={isCallReady ? "call-btn-green-glow" : "call-btn-offline"}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: "18px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          fontWeight: "700",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          boxShadow: isCallReady ? "0 2px 6px rgba(0, 168, 132, 0.35)" : "none",
+                          whiteSpace: "nowrap",
+                          transition: "all 0.2s ease"
+                        }}
+                        title={isCallReady ? "Join Video Call" : "Muhaffiz is currently offline"}
+                      >
+                        <Video size={16} />
+                        <span>{isOwnRoomLive ? "Join" : "Join Call"}</span>
+                      </button>
+                    );
+                  })()
                 ) : (
                   <>
                     {activeChat.isOnlineAdded && (
@@ -1405,26 +1604,32 @@ export default function TahfeezChatUI({
                         <span>Release</span>
                       </button>
                     )}
-                    <button 
-                      type="button"
-                      onClick={handleCallButtonClick}
-                      className="call-btn-green-glow"
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: "18px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "5px",
-                        fontWeight: "700",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 6px rgba(0, 168, 132, 0.35)",
-                        whiteSpace: "nowrap"
-                      }}
-                    >
-                      <Video size={16} />
-                      <span>{isOwnRoomLive ? "Join" : (activeChat.isGroup ? "Start Class" : "Start Call")}</span>
-                    </button>
+                    {(() => {
+                      const isTeacherCallReady = isOwnRoomLive || isPeerOnline(activeChat) || !!activeChat.isGroup;
+                      return (
+                        <button 
+                          type="button"
+                          onClick={handleCallButtonClick}
+                          className={isTeacherCallReady ? "call-btn-green-glow" : "call-btn-offline"}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: "18px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            fontWeight: "700",
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            boxShadow: isTeacherCallReady ? "0 2px 6px rgba(0, 168, 132, 0.35)" : "none",
+                            whiteSpace: "nowrap",
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          <Video size={16} />
+                          <span>{isOwnRoomLive ? "Join" : (activeChat.isGroup ? "Start Class" : "Start Call")}</span>
+                        </button>
+                      );
+                    })()}
                   </>
                 )}
               </div>

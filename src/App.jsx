@@ -7283,6 +7283,27 @@ function ParentPortal({
     return () => unsub();
   }, []);
 
+  // Real-time Presence Tracking for Tahfeez Teachers
+  const [presenceMap, setPresenceMap] = useState({});
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "tahfeez_presence"), (snap) => {
+      const map = {};
+      const now = Date.now();
+      snap.forEach(d => {
+        const data = d.data();
+        if (data) {
+          const isFresh = (now - (data.lastSeen || 0)) < 45000;
+          if (data.isOnline !== false && isFresh) {
+            map[d.id] = data;
+          }
+        }
+      });
+      setPresenceMap(map);
+    }, (err) => console.warn("presence parent listener error:", err));
+    return () => unsub();
+  }, []);
+
   const handleParentStartCall = async (child) => {
     const studentName = child.student_name || child.studentName || child.child_name || child.childName || (child.subtext ? child.subtext.replace(/^For\s+/i, '').trim() : '') || child.name || child.full_name || "Student";
     const studentId = child.student_id || child.studentId || child.id;
@@ -7337,11 +7358,12 @@ function ParentPortal({
 
       const actualTeacherId = activeSession.teacher_id || targetTeacherId;
       if (actualTeacherId) {
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         supabase.functions.invoke('fcm-notification', {
           body: {
-            title: "Live Tahfeez Classroom",
-            body: `Student ${studentName} joined the class at ${timeStr}. Tap to join now!`,
+            title: studentName,
+            body: `Joined ${timeStr} Call`,
             targetRole: "teacher",
             targetUser: String(actualTeacherId),
             section: getSectionScope() === "kibar" ? "kibar" : "atfal",
@@ -7381,11 +7403,12 @@ function ParentPortal({
     });
 
     if (targetTeacherId) {
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       supabase.functions.invoke('fcm-notification', {
         body: {
-          title: "Live Tahfeez Classroom",
-          body: `Student ${studentName} joined the class at ${timeStr}. Tap to join now!`,
+          title: studentName,
+          body: `Joined ${timeStr} Call`,
           targetRole: "teacher",
           targetUser: String(targetTeacherId),
           section: getSectionScope() === "kibar" ? "kibar" : "atfal",
@@ -7447,20 +7470,6 @@ function ParentPortal({
             type: activeSession.type || (roomId.includes('group') ? "group" : "1-on-1"),
             group_name: activeSession.group_name || null
           });
-
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        if (activeSession.teacher_id) {
-          supabase.functions.invoke('fcm-notification', {
-            body: {
-              title: "Class Session Ended",
-              body: `Student ${activeSession.student_name || currentCall.myName || 'Student'} ended the class session at ${timeStr}.`,
-              targetRole: "teacher",
-              targetUser: String(activeSession.teacher_id),
-              section: getSectionScope() === "kibar" ? "kibar" : "atfal",
-              data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
-            }
-          }).catch(err => console.warn("FCM end class error:", err));
-        }
       }
       await supabase.from('online_tahfeez_sessions').delete().eq('id', roomId);
       const { doc, setDoc, deleteDoc } = await import("firebase/firestore");
@@ -8630,6 +8639,7 @@ function ParentPortal({
 
               {pageVisibility["Online Tahfeez"] !== false && (() => {
                 const currentChild = studentProfile || allProfiles[0] || {};
+                const currentStudentId = String(currentChild.student_id || currentChild.studentId || currentChild.id || "");
                 const tName = currentChild.teacherName || currentChild.teacher_name || "Muhaffiz";
                 const tId = String(currentChild.teacher_id || currentChild.teacherId || "");
                 const normTName = (tName || "").trim().toLowerCase();
@@ -8639,46 +8649,106 @@ function ParentPortal({
                   if (!s) return false;
                   const is1on1 = s.type === "1-on-1" || (!s.type && String(s.id).startsWith("session_"));
                   if (!is1on1) return false;
-                  if (String(s.student_id) === String(currentChild.student_id) || s.id === `session_${currentChild.student_id}`) return false;
+                  if (String(s.student_id) === currentStudentId || s.id === `session_${currentStudentId}`) return false;
                   const sTId = String(s.teacher_id || "");
                   const sTName = (s.teacher_name || "").trim().toLowerCase();
                   return (tId && sTId && tId === sTId) || (normTName && sTName && (normTName === sTName || normTName.includes(sTName) || sTName.includes(normTName)));
                 });
 
-                const isOwnSessionLive = !!activeSessions[`session_${currentChild.student_id}`];
+                const isOwnSessionLive = !!activeSessions[`session_${currentStudentId}`];
+
+                // Check teacher real-time presence and whether teacher specifically selected THIS student's chatbar
+                let isTeacherOnlineForMe = false;
+                let isTeacherInOtherChat = false;
+
+                for (const p of Object.values(presenceMap || {})) {
+                  if (p.role === "teacher" && p.isOnline !== false) {
+                    const pTId = String(p.teacherId || p.userId || "");
+                    const pName = (p.name || p.teacherName || "").trim().toLowerCase();
+                    const isMatch = (tId && pTId && tId === pTId) || 
+                                    (normTName && pName && (normTName === pName || normTName.includes(pName) || pName.includes(normTName)));
+                    if (isMatch) {
+                      if (p.activeStudentId && String(p.activeStudentId) === currentStudentId) {
+                        isTeacherOnlineForMe = true;
+                      } else if (p.activeStudentId) {
+                        isTeacherInOtherChat = true;
+                      }
+                    }
+                  }
+                }
+
+                const isAvailable = isOwnSessionLive || isTeacherOnlineForMe;
+                const isBusy = !isAvailable && (isTeacherBusyWithOther || isTeacherInOtherChat);
+                const isOffline = !isAvailable && !isBusy;
 
                 return (
                   <div style={{
                     background: "linear-gradient(135deg, #FFFCF5, #FFFDF8)",
-                    border: isTeacherBusyWithOther ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(34, 197, 94, 0.4)",
+                    border: isAvailable 
+                      ? "1px solid rgba(34, 197, 94, 0.4)" 
+                      : isBusy 
+                        ? "1px solid rgba(245, 158, 11, 0.4)" 
+                        : "1px solid rgba(148, 163, 184, 0.35)",
                     borderRadius: "16px",
                     padding: "20px 24px",
                     marginBottom: "24px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    boxShadow: isTeacherBusyWithOther ? "0 8px 24px rgba(245, 158, 11, 0.08)" : "0 8px 24px rgba(34, 197, 94, 0.12)",
+                    boxShadow: isAvailable 
+                      ? "0 8px 24px rgba(34, 197, 94, 0.12)" 
+                      : isBusy 
+                        ? "0 8px 24px rgba(245, 158, 11, 0.08)" 
+                        : "0 4px 16px rgba(0, 0, 0, 0.04)",
                     flexWrap: "wrap",
                     gap: "16px",
                     position: "relative",
                     overflow: "hidden"
                   }}>
                     {/* Subtle decorative glow */}
-                    <div style={{
-                      position: "absolute",
-                      top: "-20px", left: "-20px", width: "90px", height: "90px",
-                      background: isTeacherBusyWithOther ? "#f59e0b" : "#22c55e", 
-                      opacity: 0.08, 
-                      borderRadius: "50%", 
-                      filter: "blur(20px)"
-                    }} />
+                    {isAvailable && (
+                      <div style={{
+                        position: "absolute",
+                        top: "-20px", left: "-20px", width: "90px", height: "90px",
+                        background: "#22c55e", 
+                        opacity: 0.08, 
+                        borderRadius: "50%", 
+                        filter: "blur(20px)"
+                      }} />
+                    )}
+                    {isBusy && (
+                      <div style={{
+                        position: "absolute",
+                        top: "-20px", left: "-20px", width: "90px", height: "90px",
+                        background: "#f59e0b", 
+                        opacity: 0.08, 
+                        borderRadius: "50%", 
+                        filter: "blur(20px)"
+                      }} />
+                    )}
                     <div style={{ flex: "1 1 300px", position: "relative", zIndex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px", flexWrap: "wrap" }}>
-                        <Video size={19} style={{ color: isTeacherBusyWithOther ? "#d97706" : "#16a34a" }} />
+                        <Video size={19} style={{ color: isAvailable ? "#16a34a" : isBusy ? "#d97706" : "#64748b" }} />
                         <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800, color: "var(--deep-brown)" }}>
                           Live Online Tahfeez
                         </h2>
-                        {isTeacherBusyWithOther ? (
+                        {isAvailable ? (
+                          <span style={{
+                            background: "rgba(34, 197, 94, 0.12)",
+                            color: "#15803d",
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            padding: "3px 10px",
+                            borderRadius: "20px",
+                            border: "1px solid rgba(34, 197, 94, 0.35)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px"
+                          }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
+                            {isOwnSessionLive ? "Muhaffiz Waiting" : "Teacher Available"}
+                          </span>
+                        ) : isBusy ? (
                           <span style={{
                             background: "rgba(245, 158, 11, 0.14)",
                             color: "#b45309",
@@ -8696,35 +8766,39 @@ function ParentPortal({
                           </span>
                         ) : (
                           <span style={{
-                            background: "rgba(34, 197, 94, 0.12)",
-                            color: "#15803d",
+                            background: "rgba(100, 116, 139, 0.12)",
+                            color: "#475569",
                             fontSize: "0.72rem",
                             fontWeight: 800,
                             padding: "3px 10px",
                             borderRadius: "20px",
-                            border: "1px solid rgba(34, 197, 94, 0.35)",
+                            border: "1px solid rgba(100, 116, 139, 0.25)",
                             display: "inline-flex",
                             alignItems: "center",
                             gap: "5px"
                           }}>
-                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-                            {isOwnSessionLive ? "Muhaffiz Waiting" : "Teacher Available"}
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#94a3b8" }} />
+                            Offline
                           </span>
                         )}
                       </div>
                       <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--soft-brown)", fontWeight: 500 }}>
-                        {isTeacherBusyWithOther
-                          ? `Muhaffiz ${tName} is currently in a 1-on-1 session with another student. Will join you shortly.`
-                          : `Join Muhaffiz ${tName} for live 1-on-1 recitation.`
+                        {isAvailable
+                          ? `Join Muhaffiz ${tName} for live 1-on-1 recitation.`
+                          : isBusy
+                            ? `Muhaffiz ${tName} is currently in a 1-on-1 session with another student. Will join you shortly.`
+                            : `Muhaffiz ${tName} is currently offline. You will be notified when class starts.`
                         }
                       </p>
                     </div>
                     <button 
                       onClick={() => { setActivePage("Online Tahfeez"); setMenuOpen && setMenuOpen(false); }}
                       style={{
-                        background: isTeacherBusyWithOther 
-                          ? "linear-gradient(135deg, #d97706, #b45309)"
-                          : "linear-gradient(135deg, #10b981, #059669)",
+                        background: isAvailable
+                          ? "linear-gradient(135deg, #10b981, #059669)"
+                          : isBusy 
+                            ? "linear-gradient(135deg, #d97706, #b45309)"
+                            : "linear-gradient(135deg, #64748b, #475569)",
                         color: "#fff",
                         padding: "10px 24px",
                         borderRadius: "30px",
@@ -8735,9 +8809,11 @@ function ParentPortal({
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
-                        boxShadow: isTeacherBusyWithOther 
-                          ? "0 4px 14px rgba(217, 119, 6, 0.35)" 
-                          : "0 0 16px rgba(16, 185, 129, 0.55), 0 4px 12px rgba(16, 185, 129, 0.3)",
+                        boxShadow: isAvailable
+                          ? "0 0 16px rgba(16, 185, 129, 0.55), 0 4px 12px rgba(16, 185, 129, 0.3)"
+                          : isBusy 
+                            ? "0 4px 14px rgba(217, 119, 6, 0.35)" 
+                            : "0 2px 8px rgba(71, 85, 105, 0.2)",
                         transition: "all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
                         position: "relative",
                         zIndex: 1
@@ -19581,7 +19657,6 @@ function TeacherPortal({
     const studentId = student.student_id || student.studentId || student.id;
     const childSessionId = `session_${studentId}`;
     const teacherName = portalAccess?.full_name || user?.user_metadata?.full_name || teacherIdentity || "Muhaffiz";
-    const studentName = student.student_name || student.studentName || student.name || student.full_name || "Student";
     const teacherId = user?.id || teacherIdentity;
     const roomId = childSessionId;
     
@@ -19603,7 +19678,7 @@ function TeacherPortal({
           started_at: new Date().toISOString(),
           type: "1-on-1",
           student_id: String(studentId),
-          student_name: studentName,
+          student_name: student.student_name || student.studentName || student.name || student.full_name || "Student",
           teacher_id: String(teacherId),
           teacher_name: teacherName,
         });
@@ -19616,28 +19691,32 @@ function TeacherPortal({
         roomId,
         role: "caller",
         myName: teacherName,
-        peerName: studentName,
+        peerName: student.student_name || student.studentName || student.name || student.full_name || "Student",
         myRole: "teacher",
         startedAt: new Date().toISOString()
       });
 
-      let targetUserId = student.parent_user_id || student.user_id || student.id;
+      let targetUserId = student.parent_user_id || student.user_id;
       if (!targetUserId && studentId) {
-        const { data: stData } = await supabase.from('child_profiles').select('parent_user_id, user_id').eq('student_id', studentId).maybeSingle();
-        if (stData) targetUserId = stData.parent_user_id || stData.user_id;
+        const { data: stData } = await supabase.from('child_profiles').select('parent_user_id, user_id, parent_email').eq('student_id', String(studentId)).maybeSingle();
+        if (stData) targetUserId = stData.parent_user_id || stData.user_id || stData.parent_email;
+      }
+      if (!targetUserId && student.parent_email) {
+        targetUserId = student.parent_email;
       }
 
       if (targetUserId) {
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         supabase.functions.invoke('fcm-notification', {
           body: {
-            title: "Live Tahfeez Classroom",
-            body: `Muhaffiz ${teacherName} joined the class for ${studentName} at ${timeStr}. Tap to join now!`,
+            title: teacherName,
+            body: `Joined ${timeStr} Call`,
             targetRole: "parents",
             targetUser: String(targetUserId),
             targetStudentId: String(studentId),
             section: getSectionScope() === "kibar" ? "kibar" : "atfal",
-            data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+            data: { redirectPage: "Online Tahfeez", studentId: String(studentId), timestamp: new Date().toISOString() }
           }
         }).catch(err => console.warn("FCM join class error:", err));
       }
@@ -19648,28 +19727,32 @@ function TeacherPortal({
         roomId,
         role: isCaller ? "caller" : "callee",
         myName: teacherName,
-        peerName: studentName,
+        peerName: existing.student_name || "Student",
         myRole: "teacher",
         startedAt: existing.started_at || new Date().toISOString()
       });
 
-      let targetUserId = student.parent_user_id || student.user_id || student.id;
+      let targetUserId = student.parent_user_id || student.user_id;
       if (!targetUserId && studentId) {
-        const { data: stData } = await supabase.from('child_profiles').select('parent_user_id, user_id').eq('student_id', studentId).maybeSingle();
-        if (stData) targetUserId = stData.parent_user_id || stData.user_id;
+        const { data: stData } = await supabase.from('child_profiles').select('parent_user_id, user_id, parent_email').eq('student_id', String(studentId)).maybeSingle();
+        if (stData) targetUserId = stData.parent_user_id || stData.user_id || stData.parent_email;
+      }
+      if (!targetUserId && student.parent_email) {
+        targetUserId = student.parent_email;
       }
 
       if (targetUserId) {
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         supabase.functions.invoke('fcm-notification', {
           body: {
-            title: "Live Tahfeez Classroom",
-            body: `Muhaffiz ${teacherName} joined the class for ${studentName} at ${timeStr}. Tap to join now!`,
+            title: teacherName,
+            body: `Joined ${timeStr} Call`,
             targetRole: "parents",
             targetUser: String(targetUserId),
             targetStudentId: String(studentId),
             section: getSectionScope() === "kibar" ? "kibar" : "atfal",
-            data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
+            data: { redirectPage: "Online Tahfeez", studentId: String(studentId), timestamp: new Date().toISOString() }
           }
         }).catch(err => console.warn("FCM join class error:", err));
       }
@@ -19692,7 +19775,7 @@ function TeacherPortal({
       .maybeSingle();
 
     if (!existing) {
-      const { error } = await supabase
+      await supabase
         .from('online_tahfeez_sessions')
         .insert({
           id: roomId,
@@ -19703,19 +19786,15 @@ function TeacherPortal({
           teacher_id: String(teacherId),
           teacher_name: teacherName,
         });
-      if (error) {
-        if (onShowAction) onShowAction("error", "Failed to start group class session: " + error.message);
-        return;
-      }
     }
 
     setActiveCall({
       roomId,
       role: "caller",
       myName: teacherName,
-      peerName: `${groupName} Group`,
+      peerName: `${groupName} Group Class`,
       myRole: "teacher",
-      startedAt: new Date().toISOString()
+      startedAt: existing?.started_at || new Date().toISOString()
     });
   };
 
@@ -19739,41 +19818,6 @@ function TeacherPortal({
             type: activeSession.type || "1-on-1",
             group_name: activeSession.group_name || null
           });
-
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        let targetUserId = null;
-        if (activeSession.student_id) {
-          const { data: stData } = await supabase.from('child_profiles').select('parent_user_id, user_id').eq('student_id', activeSession.student_id).maybeSingle();
-          if (stData) targetUserId = stData.parent_user_id || stData.user_id;
-        }
-
-        if (targetUserId) {
-          supabase.functions.invoke('fcm-notification', {
-            body: {
-              title: "Class Ended",
-              body: `Muhaffiz ${activeSession.teacher_name || 'Teacher'} ended the class for ${activeSession.student_name || 'Student'} at ${timeStr}.`,
-              targetRole: "parents",
-              targetUser: String(targetUserId),
-              targetStudentId: String(activeSession.student_id || ''),
-              section: getSectionScope() === "kibar" ? "kibar" : "atfal",
-              data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
-            }
-          }).catch(err => console.warn("FCM end class error:", err));
-        }
-
-        if (activeSession.teacher_id) {
-          supabase.functions.invoke('fcm-notification', {
-            body: {
-              title: "Class Ended",
-              body: `You ended the class with ${activeSession.student_name || 'Student'} at ${timeStr}.`,
-              targetRole: "teacher",
-              targetUser: String(activeSession.teacher_id),
-              section: getSectionScope() === "kibar" ? "kibar" : "atfal",
-              data: { redirectPage: "Online Tahfeez", timestamp: new Date().toISOString() }
-            }
-          }).catch(err => console.warn("FCM end class error:", err));
-        }
       } catch (e) {
         console.error("Failed to write online tahfeez log:", e);
       }
@@ -21225,6 +21269,7 @@ function TeacherPortal({
         activeSessions={activeSessions}
         role="teacher"
         currentUserId={user?.id || user?.user_metadata?.sub}
+        teacherId={portalAccess?.its || portalAccess?.id || teacherIdentity || user?.id}
         currentUserName={portalAccess?.full_name || teacherIdentity || user?.user_metadata?.full_name || "Muhaffiz"}
         onCallAction={async (chat) => {
           if (chat.isGroup) {

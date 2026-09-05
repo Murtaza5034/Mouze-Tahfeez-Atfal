@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788588202.0159936,
-    "seen": 1788588271.13908,
-    "ast_hash": "204d6d87968e0d3a390097be11aaa3be",
+    "mtime": 1788592204.3208199,
+    "seen": 1788592272.5008874,
+    "ast_hash": "0209515e720bcd826315a7c99c4d68ff",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -10020,9 +10020,9 @@
     "semantic_hash": ""
   },
   "src/components/TahfeezChatUI.jsx": {
-    "mtime": 1788418422.372993,
-    "seen": 1788420563.9915302,
-    "ast_hash": "b79fd9a96ee63c2b9971575fba8a6446",
+    "mtime": 1788592160.354648,
+    "seen": 1788592272.5024948,
+    "ast_hash": "fdc113277922803b3029a22aaa62e7c5",
     "semantic_hash": ""
   },
   "src/utils/chatUtils.js": {
@@ -10089,12 +10089,6 @@
     "mtime": 1788589730.1252968,
     "seen": 1788589960.7020457,
     "ast_hash": "4a82cd4fb9896f74ed4585006b4b67d6",
-    "semantic_hash": ""
-  },
-  "public/assets/gems/treasure-chest-raw.jpg": {
-    "mtime": 1788589105.4372866,
-    "seen": 1788589960.7020476,
-    "ast_hash": "065df531f858c95849df23218c4a7bfa",
     "semantic_hash": ""
   }
 }

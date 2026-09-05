@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788588202.0159936,
-    "seen": 1788588271.13908,
-    "ast_hash": "204d6d87968e0d3a390097be11aaa3be",
+    "mtime": 1788591524.0047977,
+    "seen": 1788591679.527626,
+    "ast_hash": "bbd688b4e22691f8c8a0c6b408793c96",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -10020,9 +10020,9 @@
     "semantic_hash": ""
   },
   "src/components/TahfeezChatUI.jsx": {
-    "mtime": 1788418422.372993,
-    "seen": 1788420563.9915302,
-    "ast_hash": "b79fd9a96ee63c2b9971575fba8a6446",
+    "mtime": 1788591607.4773803,
+    "seen": 1788591679.5299933,
+    "ast_hash": "33fc3b4503b06712ebffcd232a1dd50b",
     "semantic_hash": ""
   },
   "src/utils/chatUtils.js": {
@@ -10038,15 +10038,15 @@
     "semantic_hash": ""
   },
   "src/components/AtfalGemLeagueCard.jsx": {
-    "mtime": 1788586029.7376502,
-    "seen": 1788586150.81569,
-    "ast_hash": "e432301edd910268a2a2b5a115856a72",
+    "mtime": 1788590379.3014429,
+    "seen": 1788590447.981146,
+    "ast_hash": "4ac1215f5abde20695d8f1e89f4da1d5",
     "semantic_hash": ""
   },
   "src/components/AtfalTeacherLeagueEntry.jsx": {
-    "mtime": 1788588919.80843,
-    "seen": 1788588993.2338169,
-    "ast_hash": "cd41c79e4286baed0f346fad523c3d24",
+    "mtime": 1788589848.1929438,
+    "seen": 1788589960.6610394,
+    "ast_hash": "7595f9c042016fdc7b2873ad319881ef",
     "semantic_hash": ""
   },
   "public/assets/gems/gem-week1-emerald.png": {
@@ -10083,6 +10083,12 @@
     "mtime": 1788588615.6546886,
     "seen": 1788588781.42747,
     "ast_hash": "d7ab1cf21422174a7fa4a9bed57416c2",
+    "semantic_hash": ""
+  },
+  "public/assets/gems/treasure-chest-3d.png": {
+    "mtime": 1788589730.1252968,
+    "seen": 1788589960.7020457,
+    "ast_hash": "4a82cd4fb9896f74ed4585006b4b67d6",
     "semantic_hash": ""
   }
 }
