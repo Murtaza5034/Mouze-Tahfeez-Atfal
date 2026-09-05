@@ -370,6 +370,16 @@
   text-shadow: 0 0 12px rgba(253, 224, 71, 0.4);
 }
 
+.monthly-header-chest-icon {
+  width: 18px;
+  height: 16px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.85));
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
 .monthly-hijri-sub {
   font-family: 'Amiri', 'Traditional Arabic', serif;
   font-size: 1.05rem;
@@ -1063,6 +1073,16 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.podium-first-place-chest-icon {
+  width: 18px;
+  height: 16px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.85));
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .monthly-podium-score {

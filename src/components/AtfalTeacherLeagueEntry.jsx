@@ -224,59 +224,36 @@ const AmberTopazGemSvg = () => (
   </svg>
 );
 
-// Treasure Chest SVG for Monthly Gems
-const MonthlyChestSvg = () => (
-  <svg className="treasure-chest-svg" viewBox="0 0 100 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="chestGold" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#fef08a" />
-        <stop offset="40%" stopColor="#f59e0b" />
-        <stop offset="80%" stopColor="#b45309" />
-        <stop offset="100%" stopColor="#78350f" />
-      </linearGradient>
-      <radialGradient id="chestGlow" cx="50%" cy="40%" r="50%">
-        <stop offset="0%" stopColor="#fef9c3" stopOpacity="0.9" />
-        <stop offset="60%" stopColor="#fbbf24" stopOpacity="0.5" />
-        <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
-      </radialGradient>
-    </defs>
-    <circle cx="50" cy="35" r="35" fill="url(#chestGlow)" />
-    <circle cx="36" cy="28" r="7" fill="#fef08a" stroke="#ca8a04" strokeWidth="1" />
-    <circle cx="48" cy="22" r="8" fill="#fde047" stroke="#eab308" strokeWidth="1" />
-    <circle cx="62" cy="26" r="7" fill="#fef08a" stroke="#ca8a04" strokeWidth="1" />
-    <polygon points="46,14 54,20 48,27 40,22" fill="#38bdf8" />
-    <polygon points="56,18 64,22 58,28" fill="#f43f5e" />
-    <polygon points="34,22 40,26 36,32" fill="#34d399" />
-    <path d="M14 36H86V70C86 73 83 76 80 76H20C17 76 14 73 14 70V36Z" fill="url(#chestGold)" stroke="#78350f" strokeWidth="2" />
-    <path d="M10 36C10 24 25 16 50 16C75 16 90 24 90 36H10Z" fill="url(#chestGold)" stroke="#78350f" strokeWidth="2" />
-    <rect x="26" y="18" width="6" height="58" fill="#fef08a" opacity="0.8" />
-    <rect x="68" y="18" width="6" height="58" fill="#fef08a" opacity="0.8" />
-    <rect x="44" y="32" width="12" height="14" rx="2" fill="#fef08a" stroke="#854d0e" strokeWidth="1.5" />
-    <circle cx="50" cy="39" r="2.5" fill="#713f12" />
-  </svg>
-);
+// 3D Animated Golden Treasure Chest with Glowing Overflowing Particles
+const AnimatedTreasureChest = ({ isYearly = false }) => (
+  <div className={`animated-3d-chest-wrapper ${isYearly ? 'yearly-chest' : 'monthly-chest'}`}>
+    {/* Background radiant aura */}
+    <div className="chest-radiance-halo" />
+    
+    {/* Golden beam rising from the treasure inside */}
+    <div className="chest-interior-light-beam" />
 
-// Yearly Grand Chest SVG
-const YearlyGrandChestSvg = () => (
-  <svg className="treasure-chest-svg yearly-chest-svg" viewBox="0 0 100 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="yearlyChestGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#fffbeb" />
-        <stop offset="25%" stopColor="#fde047" />
-        <stop offset="60%" stopColor="#d97706" />
-        <stop offset="100%" stopColor="#451a03" />
-      </linearGradient>
-    </defs>
-    <path d="M10 40H90V72C90 75 87 78 84 78H16C13 78 10 75 10 72V40Z" fill="url(#yearlyChestGrad)" stroke="#78350f" strokeWidth="2.5" />
-    <path d="M8 40C8 20 28 12 50 12C72 12 92 20 92 40H8Z" fill="url(#yearlyChestGrad)" stroke="#78350f" strokeWidth="2.5" />
-    <rect x="22" y="14" width="8" height="64" fill="#fef08a" stroke="#854d0e" strokeWidth="1" />
-    <rect x="70" y="14" width="8" height="64" fill="#fef08a" stroke="#854d0e" strokeWidth="1" />
-    <circle cx="26" cy="46" r="2" fill="#713f12" />
-    <circle cx="74" cy="46" r="2" fill="#713f12" />
-    <path d="M42 36H58V54C58 56 50 60 50 60C50 60 42 56 42 54V36Z" fill="#fef08a" stroke="#713f12" strokeWidth="2" />
-    <circle cx="50" cy="44" r="3" fill="#78350f" />
-    <polygon points="50,20 54,26 60,22 58,28 42,28 40,22 46,26" fill="#fef08a" stroke="#a16207" strokeWidth="1" />
-  </svg>
+    {/* 3D Golden Treasure Chest PNG */}
+    <div className="chest-img-container">
+      <img
+        src="/assets/gems/treasure-chest-3d.png"
+        alt="3D Golden Treasure Chest"
+        className="chest-3d-render-img"
+        loading="eager"
+      />
+    </div>
+
+    {/* Glowing golden elements coming out from inside the box */}
+    <div className="chest-particles-emitter" aria-hidden="true">
+      <span className="gold-particle gp-1">✦</span>
+      <span className="gold-particle gp-2">◆</span>
+      <span className="gold-particle gp-3">★</span>
+      <span className="gold-particle gp-4">✦</span>
+      <span className="gold-particle gp-5">●</span>
+      <span className="gold-particle gp-6">◆</span>
+      <span className="gold-particle gp-7">★</span>
+    </div>
+  </div>
 );
 
 // ---------------------------------------------------------------------------
@@ -330,6 +307,19 @@ export default function AtfalTeacherLeagueEntry({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
 
+  // Input draft buffer: prevents digit jumping/erasing while user types
+  const [rawDrafts, setRawDrafts] = useState({});
+  const activeFocusKeyRef = useRef(null);
+  const dirtyStudentsRef = useRef({}); // Tracks which students have unsaved local edits
+  const autoSaveTimerRef = useRef(null);
+  const isSavingRef = useRef(false);
+  const pendingSavePayloadRef = useRef(null);
+  const currentDocRef = useRef(null);
+  currentDocRef.current = studentLeagueDoc;
+
+  // Refs for sequential Enter-key input navigation
+  const inputRefs = useRef({});
+
   // Firestore instance
   const firestoreDb = useMemo(() => {
     try {
@@ -362,6 +352,14 @@ export default function AtfalTeacherLeagueEntry({
       try {
         const docRef = doc(firestoreDb, "atfal_gem_league", String(selectedStudentId));
         unsub = onSnapshot(docRef, (snap) => {
+          // PROTECTION AGAINST "ERASE DIGIT AGAIN SHOW" BUG:
+          // If the teacher has dirty local edits or is actively typing in a field for this student,
+          // do NOT clobber their in-memory changes with remote data!
+          if (dirtyStudentsRef.current[String(selectedStudentId)] || activeFocusKeyRef.current?.startsWith(String(selectedStudentId))) {
+            setLoadingDoc(false);
+            return;
+          }
+
           if (snap.exists()) {
             setStudentLeagueDoc(snap.data());
             setLoadingDoc(false);
@@ -369,6 +367,7 @@ export default function AtfalTeacherLeagueEntry({
             // Check if saved under child_profiles
             const cpRef = doc(firestoreDb, "child_profiles", String(selectedStudentId));
             getDoc(cpRef).then((cpSnap) => {
+              if (dirtyStudentsRef.current[String(selectedStudentId)]) return;
               if (cpSnap.exists() && cpSnap.data()?.gem_league) {
                 setStudentLeagueDoc(cpSnap.data().gem_league);
               } else {
@@ -383,23 +382,28 @@ export default function AtfalTeacherLeagueEntry({
               }
               setLoadingDoc(false);
             }).catch(() => {
-              setStudentLeagueDoc({
-                student_id: String(selectedStudentId),
-                student_name: activeStudent?.name || "",
-                teacher_id: currentUserId,
-                teacher_name: teacherIdentity,
-                year: "1448H",
-                months: {},
-              });
+              if (!dirtyStudentsRef.current[String(selectedStudentId)]) {
+                setStudentLeagueDoc({
+                  student_id: String(selectedStudentId),
+                  student_name: activeStudent?.name || "",
+                  teacher_id: currentUserId,
+                  teacher_name: teacherIdentity,
+                  year: "1448H",
+                  months: {},
+                });
+              }
               setLoadingDoc(false);
             });
           }
         }, (err) => {
           console.warn("Firestore atfal_gem_league listener note, reading child_profiles:", err);
-          // Fallback reading from child_profiles
+          if (dirtyStudentsRef.current[String(selectedStudentId)]) {
+            setLoadingDoc(false);
+            return;
+          }
           const cpRef = doc(firestoreDb, "child_profiles", String(selectedStudentId));
           getDoc(cpRef).then((cpSnap) => {
-            if (cpSnap.exists() && cpSnap.data()?.gem_league) {
+            if (cpSnap.exists() && cpSnap.data()?.gem_league && !dirtyStudentsRef.current[String(selectedStudentId)]) {
               setStudentLeagueDoc(cpSnap.data().gem_league);
             }
             setLoadingDoc(false);
@@ -417,17 +421,19 @@ export default function AtfalTeacherLeagueEntry({
         .eq("student_id", String(selectedStudentId))
         .single()
         .then(({ data, error }) => {
-          if (!error && data) {
-            setStudentLeagueDoc(data);
-          } else {
-            setStudentLeagueDoc({
-              student_id: String(selectedStudentId),
-              student_name: activeStudent?.name || "",
-              teacher_id: currentUserId,
-              teacher_name: teacherIdentity,
-              year: "1448H",
-              months: {},
-            });
+          if (!dirtyStudentsRef.current[String(selectedStudentId)]) {
+            if (!error && data) {
+              setStudentLeagueDoc(data);
+            } else {
+              setStudentLeagueDoc({
+                student_id: String(selectedStudentId),
+                student_name: activeStudent?.name || "",
+                teacher_id: currentUserId,
+                teacher_name: teacherIdentity,
+                year: "1448H",
+                months: {},
+              });
+            }
           }
           setLoadingDoc(false);
         })
@@ -450,12 +456,164 @@ export default function AtfalTeacherLeagueEntry({
     };
   }, [studentLeagueDoc, selectedMonthId]);
 
-  // 5. Handling marks input changes (0 to 60)
-  const handleScoreChange = useCallback((weekKey, field, rawValue) => {
-    let num = parseInt(rawValue, 10);
-    if (isNaN(num)) num = 0;
-    if (num < 0) num = 0;
-    if (num > 60) num = 60; // Max 60 gems per activity
+  // 5. Robust multi-place save function with concurrency queuing
+  const performSave = useCallback(async (targetDoc, targetStudentId) => {
+    if (!targetStudentId || !targetDoc) return;
+
+    // Concurrency lock: If a save is already in-flight over network, queue this payload
+    if (isSavingRef.current) {
+      pendingSavePayloadRef.current = { targetDoc, targetStudentId };
+      return;
+    }
+
+    isSavingRef.current = true;
+    setIsSaving(true);
+    setSaveError("");
+
+    const sIdStr = String(targetStudentId);
+    const matchedStudent = effectiveStudents.find(s => s.student_id === sIdStr) || activeStudent;
+
+    const payload = {
+      ...targetDoc,
+      student_id: sIdStr,
+      student_name: matchedStudent?.name || targetDoc.student_name || "Student",
+      photo_url: matchedStudent?.photo_url || matchedStudent?.photoUrl || matchedStudent?.photo || targetDoc?.photo_url || null,
+      teacher_id: currentUserId || targetDoc.teacher_id || "",
+      teacher_name: teacherIdentity || targetDoc.teacher_name || "Teacher",
+      year: "1448H",
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      if (firestoreDb) {
+        // Parallel writes to both atfal_gem_league and child_profiles
+        const docRef = doc(firestoreDb, "atfal_gem_league", sIdStr);
+        const cpRef = doc(firestoreDb, "child_profiles", sIdStr);
+
+        const [p1, p2] = await Promise.allSettled([
+          setDoc(docRef, payload, { merge: true }),
+          setDoc(cpRef, { gem_league: payload }, { merge: true }),
+        ]);
+
+        if (p1.status === "rejected" && p2.status === "rejected") {
+          throw p1.reason || p2.reason || new Error("Save to Firestore failed");
+        }
+
+        // Asynchronous mirror to Supabase for multi-database sync
+        supabase.from("atfal_gem_league").upsert(payload, { onConflict: "student_id" }).catch(() => {});
+        supabase.from("child_profiles").update({ gem_league: payload }).eq("student_id", sIdStr).catch(() => {});
+      } else {
+        await supabase
+          .from("atfal_gem_league")
+          .upsert(payload, { onConflict: "student_id" });
+        try {
+          await supabase
+            .from("child_profiles")
+            .update({ gem_league: payload })
+            .eq("student_id", sIdStr);
+        } catch (_cpErr) {}
+      }
+
+      // Mark this student as clean
+      dirtyStudentsRef.current[sIdStr] = false;
+
+      // Broadcast instant window event so AtfalGemLeagueCard & Parent Views update in 0ms!
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("atfal-gem-league-updated", {
+          detail: { studentId: sIdStr, payload }
+        }));
+      }
+
+      setIsSaving(false);
+      setSaveSuccess(true);
+      setSaveError("");
+      setTimeout(() => setSaveSuccess(false), 2500);
+    } catch (err) {
+      console.warn("Save note, attempting child_profiles fallback write:", err);
+      try {
+        if (firestoreDb) {
+          const cpRef = doc(firestoreDb, "child_profiles", sIdStr);
+          await setDoc(cpRef, { gem_league: payload }, { merge: true });
+          dirtyStudentsRef.current[sIdStr] = false;
+          setIsSaving(false);
+          setSaveSuccess(true);
+          setSaveError("");
+          setTimeout(() => setSaveSuccess(false), 2500);
+          return;
+        }
+      } catch (_fbErr) {
+        console.error("Fallback write failed:", _fbErr);
+      }
+      setIsSaving(false);
+      setSaveError(err.message || "Connection issue while saving marks.");
+    } finally {
+      isSavingRef.current = false;
+      // If another save was queued while we were saving, process it now
+      if (pendingSavePayloadRef.current) {
+        const next = pendingSavePayloadRef.current;
+        pendingSavePayloadRef.current = null;
+        performSave(next.targetDoc, next.targetStudentId);
+      }
+    }
+  }, [firestoreDb, effectiveStudents, activeStudent, currentUserId, teacherIdentity]);
+
+  // Schedule debounced auto-save (650ms after user pauses typing)
+  const scheduleAutoSave = useCallback((docToSave, studentId) => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      performSave(docToSave, studentId);
+    }, 650);
+  }, [performSave]);
+
+  // Immediate save flush (used on steppers, manual save, and student switching)
+  const flushSaveImmediate = useCallback((docToSave, studentId) => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    const targetDoc = docToSave || currentDocRef.current;
+    const targetSid = studentId || selectedStudentId;
+    if (targetDoc && targetSid) {
+      performSave(targetDoc, targetSid);
+    }
+  }, [performSave, selectedStudentId]);
+
+  // Flush on unmount if pending
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        if (currentDocRef.current && selectedStudentId) {
+          performSave(currentDocRef.current, selectedStudentId);
+        }
+      }
+    };
+  }, [performSave, selectedStudentId]);
+
+  // 6. Handling marks input changes (0 to 60) with instant UI calculation
+  const handleScoreChange = useCallback((weekKey, field, rawValue, immediateFlush = false) => {
+    const draftKey = `${selectedStudentId}_${selectedMonthId}_${weekKey}_${field}`;
+
+    // Update raw string draft so typing is smooth and never resets
+    setRawDrafts(prev => ({
+      ...prev,
+      [draftKey]: rawValue
+    }));
+
+    // Parse clean numeric score
+    const trimmed = String(rawValue).trim();
+    let num = 0;
+    if (trimmed !== "") {
+      const parsed = parseInt(trimmed, 10);
+      if (!isNaN(parsed)) {
+        num = Math.max(0, Math.min(60, parsed));
+      }
+    }
+
+    // Mark as dirty
+    dirtyStudentsRef.current[String(selectedStudentId)] = true;
 
     setStudentLeagueDoc((prev) => {
       const copy = { ...(prev || {}) };
@@ -493,76 +651,44 @@ export default function AtfalTeacherLeagueEntry({
       copy.months = months;
       copy.total_yearly_gems = yTotal;
       copy.updated_at = new Date().toISOString();
+
+      // Trigger debounced or immediate save
+      if (immediateFlush) {
+        flushSaveImmediate(copy, selectedStudentId);
+      } else {
+        scheduleAutoSave(copy, selectedStudentId);
+      }
+
       return copy;
     });
 
     setSaveSuccess(false);
-  }, [selectedMonthId]);
+  }, [selectedStudentId, selectedMonthId, scheduleAutoSave, flushSaveImmediate]);
 
-  // 6. Save Marks to Backend
-  const saveMarks = async (auto = false) => {
-    if (!selectedStudentId || !studentLeagueDoc) return;
-    setIsSaving(true);
-    setSaveError("");
-
-    const payload = {
-      ...studentLeagueDoc,
-      student_id: String(selectedStudentId),
-      student_name: activeStudent?.name || studentLeagueDoc.student_name || "Student",
-      photo_url: activeStudent?.photo_url || activeStudent?.photoUrl || activeStudent?.photo || studentLeagueDoc?.photo_url || null,
-      teacher_id: currentUserId || studentLeagueDoc.teacher_id || "",
-      teacher_name: teacherIdentity || studentLeagueDoc.teacher_name || "Teacher",
-      year: "1448H",
-      updated_at: new Date().toISOString(),
-    };
-
-    try {
-      if (firestoreDb) {
-        // Save to atfal_gem_league (now permitted by deployed rules)
-        const docRef = doc(firestoreDb, "atfal_gem_league", String(selectedStudentId));
-        await setDoc(docRef, payload, { merge: true });
-
-        // Also mirror into child_profiles for seamless parent/student retrieval
-        try {
-          const cpRef = doc(firestoreDb, "child_profiles", String(selectedStudentId));
-          await setDoc(cpRef, { gem_league: payload }, { merge: true });
-        } catch (_cpErr) {
-          console.warn("Child profiles mirror warning:", _cpErr);
-        }
+  // Safe input blur normalization
+  const handleScoreBlur = useCallback((weekKey, field) => {
+    activeFocusKeyRef.current = null;
+    const draftKey = `${selectedStudentId}_${selectedMonthId}_${weekKey}_${field}`;
+    const rawVal = rawDrafts[draftKey];
+    if (rawVal !== undefined) {
+      const trimmed = String(rawVal).trim();
+      if (trimmed === "") {
+        setRawDrafts(prev => {
+          const cp = { ...prev };
+          delete cp[draftKey];
+          return cp;
+        });
       } else {
-        await supabase
-          .from("atfal_gem_league")
-          .upsert(payload, { onConflict: "student_id" });
-        try {
-          await supabase
-            .from("child_profiles")
-            .update({ gem_league: payload })
-            .eq("student_id", String(selectedStudentId));
-        } catch (_cpErr) {}
+        const parsed = parseInt(trimmed, 10);
+        const clamped = isNaN(parsed) ? 0 : Math.max(0, Math.min(60, parsed));
+        setRawDrafts(prev => ({ ...prev, [draftKey]: String(clamped) }));
       }
-
-      setIsSaving(false);
-      setSaveSuccess(true);
-      setSaveError("");
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
-      console.warn("Error on primary collection save, writing to child_profiles fallback:", err);
-      try {
-        if (firestoreDb) {
-          const cpRef = doc(firestoreDb, "child_profiles", String(selectedStudentId));
-          await setDoc(cpRef, { gem_league: payload }, { merge: true });
-          setIsSaving(false);
-          setSaveSuccess(true);
-          setSaveError("");
-          setTimeout(() => setSaveSuccess(false), 3000);
-          return;
-        }
-      } catch (_fbErr) {
-        console.error("Fallback save failed:", _fbErr);
-      }
-      setIsSaving(false);
-      setSaveError(err.message || "Failed to save marks. Please check connection.");
     }
+  }, [selectedStudentId, selectedMonthId, rawDrafts]);
+
+  // Manual save trigger (Save Marks button)
+  const saveMarks = async (_auto = false) => {
+    flushSaveImmediate(currentDocRef.current, selectedStudentId);
   };
 
   // Calculate totals
@@ -591,8 +717,11 @@ export default function AtfalTeacherLeagueEntry({
     return sum;
   }, [studentLeagueDoc]);
 
-  // Navigation between students (Previous / Next)
+  // Navigation between students (Previous / Next) with instant flush
   const handlePrevStudent = () => {
+    if (dirtyStudentsRef.current[String(selectedStudentId)]) {
+      flushSaveImmediate(currentDocRef.current, selectedStudentId);
+    }
     const idx = effectiveStudents.findIndex(s => s.student_id === selectedStudentId);
     if (idx > 0) {
       setSelectedStudentId(effectiveStudents[idx - 1].student_id);
@@ -602,6 +731,9 @@ export default function AtfalTeacherLeagueEntry({
   };
 
   const handleNextStudent = () => {
+    if (dirtyStudentsRef.current[String(selectedStudentId)]) {
+      flushSaveImmediate(currentDocRef.current, selectedStudentId);
+    }
     const idx = effectiveStudents.findIndex(s => s.student_id === selectedStudentId);
     if (idx < effectiveStudents.length - 1) {
       setSelectedStudentId(effectiveStudents[idx + 1].student_id);
@@ -666,7 +798,13 @@ export default function AtfalTeacherLeagueEntry({
           <div className="league-select-wrap">
             <select
               value={selectedMonthId}
-              onChange={(e) => setSelectedMonthId(e.target.value)}
+              onChange={(e) => {
+                const nextMonth = e.target.value;
+                if (dirtyStudentsRef.current[String(selectedStudentId)]) {
+                  flushSaveImmediate(currentDocRef.current, selectedStudentId);
+                }
+                setSelectedMonthId(nextMonth);
+              }}
               className="league-select-input"
             >
               {MONTHS_CONFIG.map((m) => (
@@ -744,7 +882,13 @@ export default function AtfalTeacherLeagueEntry({
             <div className="student-select-field">
               <select
                 value={selectedStudentId}
-                onChange={(e) => setSelectedStudentId(e.target.value)}
+                onChange={(e) => {
+                  const nextSid = e.target.value;
+                  if (dirtyStudentsRef.current[String(selectedStudentId)]) {
+                    flushSaveImmediate(currentDocRef.current, selectedStudentId);
+                  }
+                  setSelectedStudentId(nextSid);
+                }}
                 className="league-student-select"
               >
                 {effectiveStudents.map((s, idx) => (
@@ -787,6 +931,27 @@ export default function AtfalTeacherLeagueEntry({
         </div>
 
         <div className="league-actions-right">
+          {/* Live Auto-Save Indicator */}
+          <div className="league-auto-save-pill">
+            {isSaving ? (
+              <span className="auto-save-tag saving">
+                <span className="save-pulse-dot" /> Saving...
+              </span>
+            ) : saveSuccess ? (
+              <span className="auto-save-tag saved">
+                <Check size={14} /> Saved!
+              </span>
+            ) : dirtyStudentsRef.current[String(selectedStudentId)] ? (
+              <span className="auto-save-tag unsaved">
+                <span className="save-pending-dot" /> Auto-saving...
+              </span>
+            ) : (
+              <span className="auto-save-tag idle">
+                <Check size={14} /> Auto-saved
+              </span>
+            )}
+          </div>
+
           <button
             type="button"
             className="kalam-toggle-btn"
@@ -833,9 +998,6 @@ export default function AtfalTeacherLeagueEntry({
 
           {/* Grand Header from PDF */}
           <header className="parchment-header">
-            <div className="parchment-top-crests">
-              <span className="parchment-crest-flourish">◈ ✦ ◈</span>
-            </div>
             <h1 className="hifz-league-title">HIFZ LEAGUE 1448H</h1>
             <h2 className="atfal-tahfeez-subtitle">روضة تحفيظ الأطفال - گلياکوٹ</h2>
             <div className="parchment-ornamental-line">
@@ -857,6 +1019,14 @@ export default function AtfalTeacherLeagueEntry({
               const postItScore = Number(weekData.post_it) || 0;
               const activityScore = Number(weekData.activity) || 0;
               const weekTotal = postItScore + activityScore;
+
+              const postItDraftKey = `${selectedStudentId}_${selectedMonthId}_${week.key}_post_it`;
+              const postItRaw = rawDrafts[postItDraftKey];
+              const postItDisplayVal = postItRaw !== undefined ? postItRaw : (postItScore === 0 ? "" : String(postItScore));
+
+              const actDraftKey = `${selectedStudentId}_${selectedMonthId}_${week.key}_activity`;
+              const actRaw = rawDrafts[actDraftKey];
+              const actDisplayVal = actRaw !== undefined ? actRaw : (activityScore === 0 ? "" : String(activityScore));
 
               return (
                 <div key={week.key} className="parchment-week-card">
@@ -883,11 +1053,20 @@ export default function AtfalTeacherLeagueEntry({
                       <div className="gem-input-box-wrap">
                         <div className="gem-input-row">
                           <input
+                            ref={(el) => { inputRefs.current[`${week.key}_post_it`] = el; }}
                             type="number"
                             min="0"
                             max="60"
-                            value={postItScore === 0 ? "" : postItScore}
+                            value={postItDisplayVal}
+                            onFocus={() => { activeFocusKeyRef.current = postItDraftKey; }}
+                            onBlur={() => handleScoreBlur(week.key, "post_it")}
                             onChange={(e) => handleScoreChange(week.key, "post_it", e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                inputRefs.current[`${week.key}_activity`]?.focus();
+                              }
+                            }}
                             placeholder="0"
                             className="gem-score-input"
                           />
@@ -898,14 +1077,14 @@ export default function AtfalTeacherLeagueEntry({
                         <div className="gem-stepper-btns">
                           <button
                             type="button"
-                            onClick={() => handleScoreChange(week.key, "post_it", Math.max(0, postItScore - 5))}
+                            onClick={() => handleScoreChange(week.key, "post_it", Math.max(0, postItScore - 5), true)}
                             title="-5 Gems"
                           >
                             -5
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleScoreChange(week.key, "post_it", Math.min(60, postItScore + 5))}
+                            onClick={() => handleScoreChange(week.key, "post_it", Math.min(60, postItScore + 5), true)}
                             title="+5 Gems"
                           >
                             +5
@@ -913,7 +1092,7 @@ export default function AtfalTeacherLeagueEntry({
                           <button
                             type="button"
                             className="btn-full-gems"
-                            onClick={() => handleScoreChange(week.key, "post_it", 60)}
+                            onClick={() => handleScoreChange(week.key, "post_it", 60, true)}
                             title="Full 60 Gems"
                           >
                             60
@@ -936,11 +1115,23 @@ export default function AtfalTeacherLeagueEntry({
                       <div className="gem-input-box-wrap">
                         <div className="gem-input-row">
                           <input
+                            ref={(el) => { inputRefs.current[`${week.key}_activity`] = el; }}
                             type="number"
                             min="0"
                             max="60"
-                            value={activityScore === 0 ? "" : activityScore}
+                            value={actDisplayVal}
+                            onFocus={() => { activeFocusKeyRef.current = actDraftKey; }}
+                            onBlur={() => handleScoreBlur(week.key, "activity")}
                             onChange={(e) => handleScoreChange(week.key, "activity", e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                const nextWeekNum = week.number + 1;
+                                if (nextWeekNum <= 4) {
+                                  inputRefs.current[`week${nextWeekNum}_post_it`]?.focus();
+                                }
+                              }
+                            }}
                             placeholder="0"
                             className="gem-score-input"
                           />
@@ -951,14 +1142,14 @@ export default function AtfalTeacherLeagueEntry({
                         <div className="gem-stepper-btns">
                           <button
                             type="button"
-                            onClick={() => handleScoreChange(week.key, "activity", Math.max(0, activityScore - 5))}
+                            onClick={() => handleScoreChange(week.key, "activity", Math.max(0, activityScore - 5), true)}
                             title="-5 Gems"
                           >
                             -5
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleScoreChange(week.key, "activity", Math.min(60, activityScore + 5))}
+                            onClick={() => handleScoreChange(week.key, "activity", Math.min(60, activityScore + 5), true)}
                             title="+5 Gems"
                           >
                             +5
@@ -966,7 +1157,7 @@ export default function AtfalTeacherLeagueEntry({
                           <button
                             type="button"
                             className="btn-full-gems"
-                            onClick={() => handleScoreChange(week.key, "activity", 60)}
+                            onClick={() => handleScoreChange(week.key, "activity", 60, true)}
                             title="Full 60 Gems"
                           >
                             60
@@ -985,7 +1176,7 @@ export default function AtfalTeacherLeagueEntry({
             {/* Monthly Gems Treasure Chest */}
             <div className="summary-chest-card monthly-chest-card">
               <div className="chest-graphic-wrap">
-                <MonthlyChestSvg />
+                <AnimatedTreasureChest isYearly={false} />
               </div>
               <div className="chest-text-content">
                 <span className="chest-badge-title">MONTHLY GEMS</span>
@@ -997,7 +1188,7 @@ export default function AtfalTeacherLeagueEntry({
             {/* Yearly Gems Grand Chest */}
             <div className="summary-chest-card yearly-chest-card">
               <div className="chest-graphic-wrap">
-                <YearlyGrandChestSvg />
+                <AnimatedTreasureChest isYearly={true} />
               </div>
               <div className="chest-text-content">
                 <span className="chest-badge-title">YEARLY GEMS</span>
@@ -1012,7 +1203,6 @@ export default function AtfalTeacherLeagueEntry({
             <div className="official-arabic-seal">
               <span className="seal-ar-line1">روضة تحفيظ الأطفال</span>
               <span className="seal-ar-line2">گلياکوٹ</span>
-              <span className="seal-star-flourish">✦ ◈ ✦</span>
             </div>
           </footer>
         </div>

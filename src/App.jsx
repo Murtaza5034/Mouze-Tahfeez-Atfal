@@ -110,6 +110,7 @@ import PrivacyPolicy from "./PrivacyPolicy";
 import PremiumTodaySchedule from "./PremiumTodaySchedule";
 import AtfalGemLeagueCard from "./components/AtfalGemLeagueCard";
 import AtfalTeacherLeagueEntry from "./components/AtfalTeacherLeagueEntry";
+import AtfalLeagueTop3Card from "./components/AtfalLeagueTop3Card";
 import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
@@ -1207,7 +1208,7 @@ const NAV_ICONS = {
   "Global Settings": Settings,
   "Messages": MessageCircle,
   "Email Settings": Mail,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,"Online Tahfeez Tracking": Video,"Help Management": HelpCircle,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Admin Access": ShieldCheck,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,"Online Tahfeez Tracking": Video,"Help Management": HelpCircle,
 };
 
 const emptyParentData = {
@@ -12867,7 +12868,10 @@ const handleDownloadAllReports = async () => {
   };
 
   const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Online Tahfeez Tracking", "Help Management", "Global Settings", "Email Settings", "App Update"];
-  const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"];
+  const isKibarAdmin = portalRole === "kibar-admin";
+  const navPages = isKibarAdmin
+    ? ["Overview", "Quick Student Access", "Quick Access Pages", "Schedule", "Result Tracking"]
+    : ["Overview", "Quick Student Access", "Quick Access Pages", "Admin Access", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
 
@@ -13808,8 +13812,6 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
     );
   };
 
-  const isKibarAdmin = portalRole === "kibar-admin";
-
   return (
     <div className="admin-shell">
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)}></div>}
@@ -14356,7 +14358,14 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
               })}
             </div>
 
-            <div className="overview-container fade-in" style={{ marginTop: '24px' }}>
+            {!isKibarAdmin && (
+              <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
+            )}
+            </>
+          )}
+
+          {activePage === "Admin Access" && !isKibarAdmin && (
+            <div className="overview-container fade-in" style={{ marginTop: '0px' }}>
               <div className="premium-card card-appear" style={{ padding: '24px', borderRadius: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
                   <div style={{
@@ -14521,7 +14530,6 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                 </div>
               </div>
             </div>
-            </>
           )}
 
           {activePage === "Quick Student Access" ? (
@@ -21643,6 +21651,8 @@ function TeacherPortal({
                    );
                  })()}
                </div>
+
+               <AtfalLeagueTop3Card isTeacher={true} />
 
                <div className="premium-quick-panel card-appear">
                  <div className="quick-panel-header">

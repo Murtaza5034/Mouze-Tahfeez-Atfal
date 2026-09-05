@@ -238,6 +238,30 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
     return () => unsub();
   }, [studentId]);
 
+  // 1c. Listen to local broadcast events for instant 0ms sync
+  useEffect(() => {
+    const handleLeagueUpdate = (e) => {
+      const { studentId: updatedId, payload } = e.detail || {};
+      if (!payload) return;
+      if (String(updatedId) === String(studentId)) {
+        setLiveLeagueData(payload);
+      }
+      setLeaderboardList((prev) => {
+        if (!prev || prev.length === 0) return prev;
+        const idx = prev.findIndex((item) => String(item.student_id) === String(updatedId));
+        if (idx !== -1) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...payload };
+          return next;
+        }
+        return [...prev, payload];
+      });
+    };
+
+    window.addEventListener("atfal-gem-league-updated", handleLeagueUpdate);
+    return () => window.removeEventListener("atfal-gem-league-updated", handleLeagueUpdate);
+  }, [studentId]);
+
   // 1b. Subscribe to child_profiles to resolve authentic student profile pictures for the leaderboard
   useEffect(() => {
     let unsub = () => {};
@@ -661,7 +685,12 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
             <div className="monthly-banner-title-box">
               <div className="monthly-banner-header-row">
                 <span className="monthly-lead-title">MONTHLY GEMS LEAGUE</span>
-                <SmallDiamondIcon />
+                <img
+                  src="/assets/gems/treasure-chest-3d.png"
+                  alt="Treasure Chest"
+                  className="monthly-header-chest-icon"
+                  loading="eager"
+                />
                 <span className="monthly-hijri-sub">{activeMonthConfig.hijri}</span>
               </div>
 
@@ -838,7 +867,16 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
                       )}
                     </div>
                     <div className="monthly-podium-score-row">
-                      <SmallDiamondIcon />
+                      {player.rank === 1 ? (
+                        <img
+                          src="/assets/gems/treasure-chest-3d.png"
+                          alt="1st Place Treasure Chest"
+                          className="podium-first-place-chest-icon"
+                          loading="eager"
+                        />
+                      ) : (
+                        <SmallDiamondIcon />
+                      )}
                       <span className="monthly-podium-score">{player.gems}</span>
                       <span className="monthly-score-sub">Gems</span>
                     </div>

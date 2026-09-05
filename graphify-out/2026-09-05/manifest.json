@@ -10038,15 +10038,15 @@
     "semantic_hash": ""
   },
   "src/components/AtfalGemLeagueCard.jsx": {
-    "mtime": 1788590379.3014429,
-    "seen": 1788590447.981146,
-    "ast_hash": "4ac1215f5abde20695d8f1e89f4da1d5",
+    "mtime": 1788586029.7376502,
+    "seen": 1788586150.81569,
+    "ast_hash": "e432301edd910268a2a2b5a115856a72",
     "semantic_hash": ""
   },
   "src/components/AtfalTeacherLeagueEntry.jsx": {
-    "mtime": 1788589848.1929438,
-    "seen": 1788589960.6610394,
-    "ast_hash": "7595f9c042016fdc7b2873ad319881ef",
+    "mtime": 1788588919.80843,
+    "seen": 1788588993.2338169,
+    "ast_hash": "cd41c79e4286baed0f346fad523c3d24",
     "semantic_hash": ""
   },
   "public/assets/gems/gem-week1-emerald.png": {
@@ -10083,18 +10083,6 @@
     "mtime": 1788588615.6546886,
     "seen": 1788588781.42747,
     "ast_hash": "d7ab1cf21422174a7fa4a9bed57416c2",
-    "semantic_hash": ""
-  },
-  "public/assets/gems/treasure-chest-3d.png": {
-    "mtime": 1788589730.1252968,
-    "seen": 1788589960.7020457,
-    "ast_hash": "4a82cd4fb9896f74ed4585006b4b67d6",
-    "semantic_hash": ""
-  },
-  "public/assets/gems/treasure-chest-raw.jpg": {
-    "mtime": 1788589105.4372866,
-    "seen": 1788589960.7020476,
-    "ast_hash": "065df531f858c95849df23218c4a7bfa",
     "semantic_hash": ""
   }
 }
