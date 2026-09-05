@@ -270,6 +270,16 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    // Online presence for tahfeez teachers/students (any authenticated user)
+    match /tahfeez_presence/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Supabase-realtime adapter presence collection (channel presence tracking)
+    match /_presence/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
     // -------------------------------------------------------------------------
     // KIBAR PORTAL (adult institute)
     // -------------------------------------------------------------------------
