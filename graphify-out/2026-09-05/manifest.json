@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788591524.0047977,
-    "seen": 1788591679.527626,
-    "ast_hash": "bbd688b4e22691f8c8a0c6b408793c96",
+    "mtime": 1788592204.3208199,
+    "seen": 1788592272.5008874,
+    "ast_hash": "0209515e720bcd826315a7c99c4d68ff",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -10020,9 +10020,9 @@
     "semantic_hash": ""
   },
   "src/components/TahfeezChatUI.jsx": {
-    "mtime": 1788591607.4773803,
-    "seen": 1788591679.5299933,
-    "ast_hash": "33fc3b4503b06712ebffcd232a1dd50b",
+    "mtime": 1788592160.354648,
+    "seen": 1788592272.5024948,
+    "ast_hash": "fdc113277922803b3029a22aaa62e7c5",
     "semantic_hash": ""
   },
   "src/utils/chatUtils.js": {

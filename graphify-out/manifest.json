@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1788517849.821193,
-    "seen": 1788518208.4758632,
-    "ast_hash": "f776f8062627b4d6d86767790712a6f9",
+    "mtime": 1788592674.9890673,
+    "seen": 1788593481.8416026,
+    "ast_hash": "e20c2d462bd56159638e910490ad9f4e",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1788517895.8881822,
-    "seen": 1788518208.475866,
+    "mtime": 1788593369.7883189,
+    "seen": 1788593481.8416054,
     "ast_hash": "7158d716c36a84c268c69ae529cfa853",
     "semantic_hash": "7158d716c36a84c268c69ae529cfa853"
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1788517895.8881822,
-    "seen": 1788518208.4763334,
+    "mtime": 1788593369.7883189,
+    "seen": 1788593481.8421924,
     "ast_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4",
     "semantic_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4"
   },
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1788517820.0876875,
-    "seen": 1788518208.482184,
-    "ast_hash": "20a39d2b18172909bf072788f2ff3101",
+    "mtime": 1788592663.168512,
+    "seen": 1788593481.8492658,
+    "ast_hash": "7966c29fb6d02ddb2f9466cfffe4ad79",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788592204.3208199,
-    "seen": 1788592272.5008874,
-    "ast_hash": "0209515e720bcd826315a7c99c4d68ff",
+    "mtime": 1788593328.6911755,
+    "seen": 1788593481.851601,
+    "ast_hash": "da49446c0f45f69b7e058fb6ef51a12f",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6630,9 +6630,9 @@
     "semantic_hash": "957bbea90bb141a8c66d5fe0b0321a96"
   },
   "vite.config.js": {
-    "mtime": 1788517832.1215174,
-    "seen": 1788518208.487385,
-    "ast_hash": "5152f37752569f9c641000461d50d80b",
+    "mtime": 1788592669.2395911,
+    "seen": 1788593481.8557353,
+    "ast_hash": "f78e9531c7ed7c1890ad5fc4215216db",
     "semantic_hash": ""
   },
   ".agents/rules/graphify.md": {
@@ -10020,9 +10020,9 @@
     "semantic_hash": ""
   },
   "src/components/TahfeezChatUI.jsx": {
-    "mtime": 1788592160.354648,
-    "seen": 1788592272.5024948,
-    "ast_hash": "fdc113277922803b3029a22aaa62e7c5",
+    "mtime": 1788593301.421584,
+    "seen": 1788593481.8534753,
+    "ast_hash": "aaa4b7a8dfd080bd841cc2fd5bb10f1c",
     "semantic_hash": ""
   },
   "src/utils/chatUtils.js": {

@@ -8106,6 +8106,10 @@ function ParentPortal({
       return n.includes(searchStr);
     });
 
+    const currentChild = studentProfile || allProfiles[0] || {};
+    const activeStudentId = selectedTahfeezChat ? (selectedTahfeezChat.student_id || selectedTahfeezChat.id) : (currentChild.student_id || currentChild.id);
+    const activeStudentName = selectedTahfeezChat ? (selectedTahfeezChat.student_name || selectedTahfeezChat.studentName) : (currentChild.name || currentChild.full_name);
+
     return (
       <TahfeezChatUI
         studentsList={filteredList}
@@ -8117,6 +8121,8 @@ function ParentPortal({
         role={portalRole && portalRole.includes("student") ? "student" : "parent"}
         currentUserId={user?.id || user?.user_metadata?.sub}
         currentUserName={parentData?.full_name || parentData?.name || user?.user_metadata?.full_name}
+        currentStudentId={activeStudentId}
+        currentStudentName={activeStudentName}
         onCallAction={async (chat) => {
           if (chat.isGroup) {
             handleParentJoinGroupClass(chat);
@@ -8666,7 +8672,7 @@ function ParentPortal({
                     const pTId = String(p.teacherId || p.userId || "");
                     const pName = (p.name || p.teacherName || "").trim().toLowerCase();
                     const isMatch = (tId && pTId && tId === pTId) || 
-                                    (normTName && pName && (normTName === pName || normTName.includes(pName) || pName.includes(normTName)));
+                                    (normTName && pName && (normTName === pName));
                     if (isMatch) {
                       if (p.activeStudentId && String(p.activeStudentId) === currentStudentId) {
                         isTeacherOnlineForMe = true;

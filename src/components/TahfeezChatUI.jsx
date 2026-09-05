@@ -25,7 +25,9 @@ export default function TahfeezChatUI({
   activeSessions = {},
   role = "teacher", // "teacher", "parent", or "student"
   currentUserId,
-  currentUserName
+  currentUserName,
+  currentStudentId = null,
+  currentStudentName = null
 }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -66,8 +68,8 @@ export default function TahfeezChatUI({
       snap.forEach(d => {
         const data = d.data();
         if (data) {
-          // Consider online if heartbeat was within last 45 seconds and isOnline !== false
-          const isFresh = (now - (data.lastSeen || 0)) < 45000;
+          // Consider online if heartbeat was within last 35 seconds and isOnline !== false
+          const isFresh = (now - (data.lastSeen || 0)) < 35000;
           if (data.isOnline !== false && isFresh) {
             map[d.id] = data;
           }
@@ -89,43 +91,52 @@ export default function TahfeezChatUI({
       ? `teacher_${myId}`
       : `user_${myId}`;
 
-    const studentIds = (studentsList || []).map(s => String(s.student_id || s.studentId || s.id || "")).filter(Boolean);
+    const activeSid = (role !== "teacher")
+      ? String((activeChat && (activeChat.student_id || activeChat.studentId || activeChat.id)) || currentStudentId || "")
+      : null;
+
+    const activeSName = (role !== "teacher")
+      ? ((activeChat && (activeChat.student_name || activeChat.studentName || activeChat.name)) || currentStudentName || currentUserName || "Student")
+      : null;
 
     const updatePresence = (isOnline = true) => {
-      const activeStudentId = (isOnline && role === "teacher" && activeChat && !activeChat.isGroup)
-        ? String(activeChat.student_id || activeChat.studentId || activeChat.id || "")
-        : null;
-      const activeStudentName = (isOnline && role === "teacher" && activeChat && !activeChat.isGroup)
-        ? (activeChat.name || activeChat.student_name || activeChat.full_name || null)
-        : null;
+      if (role === "teacher") {
+        const activeStudentId = (isOnline && activeChat && !activeChat.isGroup)
+          ? String(activeChat.student_id || activeChat.studentId || activeChat.id || "")
+          : null;
+        const activeStudentName = (isOnline && activeChat && !activeChat.isGroup)
+          ? (activeChat.name || activeChat.student_name || activeChat.full_name || null)
+          : null;
 
-      const presenceData = {
-        userId: myId,
-        role: role === "teacher" ? "teacher" : "student",
-        name: currentUserName || (role === "teacher" ? "Muhaffiz" : "Student"),
-        lastSeen: Date.now(),
-        isOnline: isOnline,
-        ...(role === "teacher" ? {
+        const teacherPresence = {
+          userId: myId,
           teacherId: myTeacherId,
+          role: "teacher",
+          name: currentUserName || "Muhaffiz",
           teacherName: currentUserName || "Muhaffiz",
+          lastSeen: Date.now(),
+          isOnline: isOnline,
           activeStudentId: activeStudentId,
           activeStudentName: activeStudentName
-        } : {
-          studentIds
-        })
-      };
+        };
 
-      setDoc(doc(db, "tahfeez_presence", myDocKey), presenceData, { merge: true }).catch(() => {});
-
-      if (role === "teacher" && myTeacherId && myTeacherId !== myId) {
-        setDoc(doc(db, "tahfeez_presence", `teacher_${myTeacherId}`), presenceData, { merge: true }).catch(() => {});
-      }
-      
-      // If student/parent, also mark individual student doc keys so teachers can find them immediately by student_id
-      if (role !== "teacher" && studentIds.length > 0) {
-        studentIds.forEach(sid => {
-          setDoc(doc(db, "tahfeez_presence", `student_${sid}`), presenceData, { merge: true }).catch(() => {});
-        });
+        setDoc(doc(db, "tahfeez_presence", myDocKey), teacherPresence, { merge: true }).catch(() => {});
+        if (myTeacherId && myTeacherId !== myId) {
+          setDoc(doc(db, "tahfeez_presence", `teacher_${myTeacherId}`), teacherPresence, { merge: true }).catch(() => {});
+        }
+      } else {
+        // STUDENT / PARENT: ONLY register presence for the ONE specific student who has opened Online Tahfeez
+        if (activeSid) {
+          const studentPresence = {
+            studentId: activeSid,
+            role: "student",
+            name: activeSName,
+            lastSeen: Date.now(),
+            isOnline: isOnline,
+            userId: myId
+          };
+          setDoc(doc(db, "tahfeez_presence", `student_${activeSid}`), studentPresence, { merge: true }).catch(() => {});
+        }
       }
     };
 
@@ -133,7 +144,7 @@ export default function TahfeezChatUI({
 
     const interval = setInterval(() => {
       updatePresence(true);
-    }, 18000);
+    }, 15000);
 
     const handleUnload = () => {
       updatePresence(false);
@@ -146,7 +157,7 @@ export default function TahfeezChatUI({
       window.removeEventListener("beforeunload", handleUnload);
       updatePresence(false);
     };
-  }, [currentUserId, currentUserName, role, studentsList, activeChat, teacherId]);
+  }, [currentUserId, currentUserName, role, activeChat, teacherId, currentStudentId, currentStudentName]);
 
   // Helper to determine if the peer in chat is currently online
   const isPeerOnline = (chat) => {
@@ -163,7 +174,7 @@ export default function TahfeezChatUI({
       // Current user is student/parent, checking if teacher is online AND has clicked this student's chatbar
       const tId = String(chat.teacher_id || chat.teacherId || "");
       const tName = (chat.teacherName || chat.teacher_name || chat.name || "").trim().toLowerCase();
-      const myStudentId = String(chat.student_id || chat.studentId || chat.id || (studentsList && studentsList[0]?.student_id) || "");
+      const myStudentId = String(chat.student_id || chat.studentId || chat.id || currentStudentId || "");
 
       // Check any record in presenceMap that has role === "teacher" and matches name or ID
       for (const p of Object.values(presenceMap)) {
@@ -171,7 +182,7 @@ export default function TahfeezChatUI({
           const pName = (p.name || p.teacherName || "").trim().toLowerCase();
           const pTId = String(p.teacherId || p.userId || "");
           const isMatch = (tId && pTId && tId === pTId) || 
-                          (tName && pName && (tName === pName || tName.includes(pName) || pName.includes(tName)));
+                          (tName && pName && (tName === pName));
           if (isMatch) {
             // Teacher is only online for THIS student if teacher specifically opened this student's chatbar!
             if (p.activeStudentId && String(p.activeStudentId) === myStudentId) {
@@ -184,24 +195,10 @@ export default function TahfeezChatUI({
     } else {
       // Current user is teacher, checking if student is online
       const sid = String(chat.student_id || chat.studentId || chat.id || "");
-      const pUserId = String(chat.parent_user_id || chat.user_id || "");
+      if (!sid) return false;
 
-      if (sid && presenceMap[`student_${sid}`]?.isOnline !== false) return true;
-      if (pUserId && presenceMap[`user_${pUserId}`]?.isOnline !== false) return true;
-
-      for (const p of Object.values(presenceMap)) {
-        if (p.role === "student" && p.isOnline !== false) {
-          if (p.studentIds && Array.isArray(p.studentIds) && p.studentIds.includes(sid)) {
-            return true;
-          }
-          const pName = (p.name || "").trim().toLowerCase();
-          const sName = (chat.name || chat.full_name || chat.student_name || "").trim().toLowerCase();
-          if (sName && pName && (sName === pName || sName.includes(pName) || pName.includes(sName))) {
-            return true;
-          }
-        }
-      }
-      return false;
+      const stPresence = presenceMap[`student_${sid}`];
+      return !!(stPresence && stPresence.isOnline !== false);
     }
   };
   
