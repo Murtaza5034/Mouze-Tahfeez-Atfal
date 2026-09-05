@@ -12468,7 +12468,7 @@ function AdminPortal({
   const [uploadingJadwalBg, setUploadingJadwalBg] = useState(false);
   const [teacherAdminAccessList, setTeacherAdminAccessList] = useState(() => {
     try {
-      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => String(s.id) === "1" || s.id === 1) || {};
       return JSON.parse(row.teacher_admin_access || '[]');
     } catch { return []; }
   });
@@ -12602,7 +12602,7 @@ function AdminPortal({
 
   useEffect(() => {
     try {
-      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => String(s.id) === "1" || s.id === 1) || {};
       setTeacherAdminAccessList(JSON.parse(row.teacher_admin_access || '[]'));
     } catch {}
   }, [jadwalSettings]);
@@ -14844,7 +14844,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         onClick={() => {
                           let parsed = [];
                           try {
-                            const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+                            const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => String(s.id) === "1" || s.id === 1) || {};
                             parsed = JSON.parse(row.teacher_admin_access || '[]');
                           } catch { parsed = []; }
                           setTeacherAdminAccessList(parsed);
@@ -14862,16 +14862,27 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                         onClick={async () => {
                           try {
                             const targetTable = isKibarAdmin ? 'kibar_jadwal_settings' : 'jadwal_settings';
+                            const payload = {
+                              id: 1,
+                              teacher_admin_access: JSON.stringify(teacherAdminAccessList),
+                              updated_at: new Date().toISOString()
+                            };
                             const { error } = await supabase
                               .from(targetTable)
-                              .upsert({ id: 1, teacher_admin_access: JSON.stringify(teacherAdminAccessList) }, { onConflict: 'id' });
+                              .upsert(payload, { onConflict: 'id' });
                             if (error) {
                               if (onShowAction) onShowAction('error', 'Failed to save: ' + error.message);
                             } else {
                               setTeacherAccessDirty(false);
                               setJadwalSettings(prev => {
-                                if (!prev || !prev.length) return [{ id: 1, teacher_admin_access: JSON.stringify(teacherAdminAccessList) }];
-                                return prev.map(s => s.id === 1 ? { ...s, teacher_admin_access: JSON.stringify(teacherAdminAccessList) } : s);
+                                const list = Array.isArray(prev) ? [...prev] : [];
+                                const idx = list.findIndex(s => String(s.id) === "1" || s.id === 1);
+                                if (idx !== -1) {
+                                  list[idx] = { ...list[idx], ...payload };
+                                } else {
+                                  list.push(payload);
+                                }
+                                return list;
                               });
                               if (onShowAction) onShowAction('success', isKibarAdmin ? 'Kibar teacher admin access updated' : 'Teacher admin access updated');
                             }
@@ -21649,7 +21660,14 @@ function TeacherPortal({
           {(() => {
             const isKibar = portalRole === 'kibar-teacher' || isKibarTeacher;
             const fromMetadata = getAssignedRoles(user).filter(r => r !== 'teacher' && r !== 'kibar-teacher' && r !== 'parents');
-            const hasAdminAccess = user?.email && teacherAdminAccessList.some(e =>
+            let accessList = Array.isArray(teacherAdminAccessList) ? teacherAdminAccessList : [];
+            if (accessList.length === 0 && Array.isArray(jadwalSettings)) {
+              const row = jadwalSettings.find(s => String(s.id) === "1" || s.id === 1) || {};
+              try {
+                accessList = JSON.parse(row.teacher_admin_access || '[]');
+              } catch (_) {}
+            }
+            const hasAdminAccess = user?.email && accessList.some(e =>
               normalizeText(e) === normalizeText(user.email) || normalizeText(e) === normalizeText(user.id)
             );
             let roles = [...fromMetadata];
@@ -25615,7 +25633,7 @@ export default function App() {
   const [jadwalSettings, setJadwalSettings] = useState([]);
   const teacherAdminAccessList = useMemo(() => {
     try {
-      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => s.id === 1) || {};
+      const row = (Array.isArray(jadwalSettings) ? jadwalSettings : []).find(s => String(s.id) === "1" || s.id === 1) || {};
       return JSON.parse(row.teacher_admin_access || '[]');
     } catch { return []; }
   }, [jadwalSettings]);

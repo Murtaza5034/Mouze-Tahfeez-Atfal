@@ -194,7 +194,10 @@ function sanitizeValue(value) {
 function sanitizeWrite(data) {
   const s = sanitizeValue(data);
   if (s && typeof s === "object" && !Array.isArray(s)) {
-    delete s.id;
+    // Preserve numeric id (such as singleton id: 1) so it persists in Firestore
+    if (typeof data.id !== "number") {
+      delete s.id;
+    }
   }
   return s;
 }
@@ -214,7 +217,10 @@ function convertRow(snap) {
   for (const [k, v] of Object.entries(raw)) {
     row[k] = isoFromValue(v);
   }
-  if (row.id === undefined || row.id === null) row.id = snap.id;
+  if (row.id === undefined || row.id === null) {
+    const numId = Number(snap.id);
+    row.id = (!Number.isNaN(numId) && String(numId) === snap.id) ? numId : snap.id;
+  }
   return row;
 }
 
