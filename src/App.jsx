@@ -114,6 +114,7 @@ import AtfalLeagueTop3Card from "./components/AtfalLeagueTop3Card";
 import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
+import OverviewCard, { RehalIcon, SegmentedGoldBar } from "./components/OverviewCard";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -134,19 +135,10 @@ const LottieTrophy = ({ size = 120 }) => {
   );
 };
 
-
-
-const PremiumStudentsIcon = ({ size = 48 }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-students-svg">
-    <path d="M6 20l18-9 18 9-18 9z" />
-    <path d="M6 20v5s6 3.5 18 3.5 18-3.5 18-3.5v-5" />
-    <path d="M24 11v5" />
-    <path d="M24 16l-5 2.5" />
-    <circle cx="24" cy="11" r="1.5" fill="currentColor" opacity="0.5" />
-    <path d="M14 30l1-0.7 1 0.7-0.3 1h-1.4z" fill="currentColor" opacity="0.3" />
-    <path d="M32 30l1-0.7 1 0.7-0.3 1h-1.4z" fill="currentColor" opacity="0.3" />
-  </svg>
+const PremiumStudentsIcon = ({ size = 26, color = "currentColor" }) => (
+  <RehalIcon size={size} color={color} />
 );
+
 
 const PremiumLockOpen = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="premium-lock-svg">
@@ -8569,7 +8561,7 @@ function ParentPortal({
         {activePage === "Home" ? (
           <div className="home-dashboard fade-in">
 
-            <div className="hifz-stats-premium-strip">
+            <div className="portal-stats-strip parent-stats">
               {(() => {
                 const isFemaleTeacher = (t) => {
                   if (t?.gender === 'female') return true;
@@ -8613,9 +8605,7 @@ function ParentPortal({
                 const todayStr = getToday();
                 const attDate = new Date(todayStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
                 const attStatus = (attendance?.status || '').toLowerCase();
-                const attColor = attStatus === 'present' ? '#22c55e' : attStatus === 'absent' ? '#ef4444' : attStatus === 'holiday' ? '#f59e0b' : '#5d4037';
                 const attLabel = attStatus === 'present' ? 'Present' : attStatus === 'absent' ? 'Absent' : attStatus === 'holiday' ? 'Holiday' : '-';
-                const weekDate = weeklyResult?.week_date || studentProfile?.latestResult?.week_date;
                 let weekLabel = "out of 100";
                 {
                   const wd = new Date();
@@ -8629,23 +8619,58 @@ function ParentPortal({
                   weekLabel = `${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — ${weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
                 }
                 const activeScore = weeklyResult?.total_score ?? studentProfile?.latestResult?.total_score ?? weeklyResult?.effectiveScore ?? studentProfile?.latestResult?.effectiveScore ?? weeklyResult?.score ?? studentProfile?.latestResult?.score;
+                const scoreNum = (activeScore != null && !isNaN(activeScore)) ? Number(activeScore) : null;
+                const juzVal = studentProfile?.latestResult?.wusool_juz || hifzDetails?.juz || "";
+                const parsedJuz = parseInt(String(juzVal).replace(/\D/g, '')) || 0;
+                const juzPct = parsedJuz ? Math.min(100, Math.round((parsedJuz / 30) * 100)) : 0;
+
                 const stats = [
-                  { label: "Weekly Score", val: activeScore != null ? activeScore : "--", sub: weekLabel, icon: Trophy, color: "#c5a059" },
-                  { label: "Daily Attendance", val: attLabel, sub: attDate, icon: Clock, color: attColor },
-                  { label: "Current HIFZ STATUS", val: studentProfile?.latestResult?.wusool_juz || hifzDetails?.juz || "--", sub: studentProfile?.latestResult?.wusool_surah || hifzDetails?.surat || "In progress", icon: BookOpen, color: "#8b6d31" },
-                  { label: muhaffizLabel, val: muhaffizVal, sub: muhaffizSub, icon: GraduationCap, color: "#d4af37" },
+                  { 
+                    label: "Weekly Score", 
+                    value: activeScore != null ? activeScore : "--", 
+                    sub: weekLabel, 
+                    icon: Trophy, 
+                    pct: scoreNum,
+                    showTrendBadge: scoreNum !== null,
+                    trendDirection: (scoreNum && scoreNum >= 50) ? 'up' : 'down'
+                  },
+                  { 
+                    label: "Daily Attendance", 
+                    value: attLabel, 
+                    sub: attDate, 
+                    icon: Clock, 
+                    pct: attStatus === 'present' ? 100 : 0,
+                    showTrendBadge: false
+                  },
+                  { 
+                    label: "Current HIFZ", 
+                    value: juzVal || "--", 
+                    sub: studentProfile?.latestResult?.wusool_surah || hifzDetails?.surat || "In progress", 
+                    icon: BookOpen, 
+                    pct: juzPct,
+                    showTrendBadge: false
+                  },
+                  { 
+                    label: muhaffizLabel, 
+                    value: muhaffizVal, 
+                    sub: muhaffizSub, 
+                    icon: GraduationCap, 
+                    pct: 0,
+                    showTrendBadge: false
+                  },
                 ];
-                return stats.map((stat, i) => (
-                  <div key={i} className="premium-stat-pill card-appear" style={{ animationDelay: `${i * 0.1}s` }}>
-                    <div className="pill-icon" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                      <stat.icon size={18} />
-                    </div>
-                    <div className="pill-info">
-                      <span className="pill-label">{stat.label}</span>
-                      <strong className="pill-value" style={stat.label === 'Daily Attendance' ? { color: stat.color } : {}}>{stat.val}</strong>
-                      <span className={'pill-sub' + (stat.label === 'Current HIFZ STATUS' ? ' arabic-kanz' : '')} style={stat.label === 'Current HIFZ STATUS' ? { fontSize: '1.15rem', lineHeight: '1.5', textAlign: 'right' } : {}}>{stat.sub}</span>
-                    </div>
-                  </div>
+
+                return stats.map((stat) => (
+                  <OverviewCard
+                    key={stat.label}
+                    label={stat.label}
+                    value={stat.value}
+                    sub={stat.sub}
+                    icon={stat.icon}
+                    pct={stat.pct}
+                    showTrendBadge={stat.showTrendBadge}
+                    trendDirection={stat.trendDirection}
+                  />
                 ));
               })()}
             </div>
@@ -14581,76 +14606,26 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           {activePage === "Overview" && (
             <>
             <div className="portal-stats-strip admin-stats">
-              {stats.map((stat, idx) => {
-                const Icon = stat.icon;
-                const accentColors = [
-                  { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
-                  { icon: 'var(--deep-brown)', bar: '#3d2b1f', glow: 'rgba(61, 43, 31, 0.15)' },
-                  { icon: '#b8860b', bar: '#b8860b', glow: 'rgba(184, 134, 11, 0.2)' },
-                  { icon: '#8b6d31', bar: '#8b6d31', glow: 'rgba(139, 109, 49, 0.15)' },
-                  { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
-                ];
-                const c = accentColors[idx % accentColors.length];
+              {stats.map((stat) => {
                 const isParentViews = stat.label === "Parent Views";
                 const [numStr, denStr] = isParentViews ? String(stat.value).split('/') : [];
                 const pct = isParentViews ? (parseInt(numStr) / Math.max(parseInt(denStr), 1) * 100) : null;
                 return (
-                  <div
+                  <OverviewCard
                     key={stat.label}
-                    className="infographic-card"
+                    label={stat.label}
+                    value={stat.value}
+                    sub={stat.navigateTo || 'Overview'}
+                    icon={stat.icon}
+                    pct={pct}
+                    showTrendBadge={isParentViews && pct !== null}
+                    trendDirection={pct >= 50 ? 'up' : 'down'}
                     onClick={() => {
                       if (isParentViews) setShowAdminParentViewsModal(true);
                       else if (stat.navigateTo) setActivePage(stat.navigateTo);
                     }}
-                    role={stat.navigateTo || isParentViews ? 'button' : undefined}
-                    tabIndex={stat.navigateTo || isParentViews ? 0 : undefined}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        if (isParentViews) setShowAdminParentViewsModal(true);
-                        else if (stat.navigateTo) setActivePage(stat.navigateTo);
-                      }
-                    }}
-                    style={{ cursor: stat.navigateTo || isParentViews ? 'pointer' : 'default' }}
                     title={isParentViews ? 'Click to see student report views details' : undefined}
-                  >
-                    <div className="ig-bg-pattern">
-                      {['✦', '◈', '◆', '◇', '⬟'][idx % 5]}
-                    </div>
-                    <div className="ig-top-row">
-                      <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
-                        {stat.label === "Students" ? (
-                          <PremiumStudentsIcon size={48} />
-                        ) : (
-                          <Icon size={18} />
-                        )}
-                      </div>
-                      {isParentViews && pct !== null && (
-                        <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
-                          {pct >= 50 ? '↑' : '↓'} {Math.round(pct)}%
-                        </span>
-                      )}
-                    </div>
-                    <div className="ig-value">
-                      {isParentViews ? (
-                        <>
-                          <span className="ig-count-anim">{numStr}</span>
-                          <span style={{ fontSize: '1rem', opacity: 0.4, margin: '0 2px', color: 'var(--soft-brown)' }}>/</span>
-                          <span style={{ fontSize: '1.2rem', opacity: 0.5, color: 'var(--soft-brown)' }}>{denStr}</span>
-                        </>
-                      ) : (
-                        <span className="ig-count-anim">{stat.value}</span>
-                      )}
-                    </div>
-                    <span className="ig-label">{stat.label}</span>
-                    <span className="ig-sub">
-                      {stat.navigateTo || 'Overview'}
-                    </span>
-                    {isParentViews && pct !== null && (
-                      <div className="ig-bar-track" style={{ background: `rgba(197, 160, 89, 0.12)` }}>
-                        <div className="ig-bar-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${c.bar}, ${c.bar}dd)`, boxShadow: `0 0 6px ${c.glow}` }} />
-                      </div>
-                    )}
-                  </div>
+                  />
                 );
               })}
             </div>
@@ -21780,82 +21755,43 @@ function TeacherPortal({
              <div className="portal-content fade-in">
                <div className="portal-stats-strip teacher-stats">
                  {[
-                   { label: "Students", value: overviewStudents.length, sub: "In my group", icon: 'Users', pct: 100 },
-                   { label: "Results", value: `${Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0}%`, sub: "Submitted", icon: 'FileText', pct: Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0 },
-                   { label: "Avg Score", value: overviewStudents.length > 0 ? Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: overviewStudents.length > 0 ? Math.min(Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length), 100) : 0 },
-                   { label: "Parent Views", value: `${parentViewedCount}/${overviewStudents.length || 0}`, sub: "Viewed reports", icon: 'Eye', pct: overviewStudents.length ? Math.round((parentViewedCount / overviewStudents.length) * 100) : 0 },
+                   { label: "Students", value: overviewStudents.length, sub: "In my group", icon: 'Users', pct: 0, showTrendBadge: false },
+                   { label: "Results", value: `${Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0}%`, sub: "Submitted", icon: 'FileText', pct: Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0, showTrendBadge: true, trendDirection: 'up' },
+                   { label: "Avg Score", value: overviewStudents.length > 0 ? Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: overviewStudents.length > 0 ? Math.min(Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length), 100) : 0, showTrendBadge: false },
+                   { 
+                     label: "Parent Views", 
+                     value: `${parentViewedCount}/${overviewStudents.length || 0}`, 
+                     sub: "Viewed reports", 
+                     icon: 'Eye', 
+                     pct: overviewStudents.length ? Math.round((parentViewedCount / overviewStudents.length) * 100) : 0, 
+                     showTrendBadge: true, 
+                     trendDirection: (overviewStudents.length && (parentViewedCount / overviewStudents.length) >= 0.5) ? 'up' : 'down' 
+                   },
                    ...(monthlySalary?.showCard ? [{
-                     label: "Minutes", value: `${monthlySalary.totalMinutes || "0"}`, sub: "This month", icon: 'Clock', pct: Math.min(monthlySalary.totalMinutes / 100, 100)
+                     label: "Minutes", value: `${monthlySalary.totalMinutes || "0"}`, sub: "This month", icon: 'Clock', pct: Math.min(monthlySalary.totalMinutes / 100, 100), showTrendBadge: false
                    }] : []),
-                 ].map((stat, i) => {
-                   const accentColors = [
-                     { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
-                     { icon: 'var(--deep-brown)', bar: '#3d2b1f', glow: 'rgba(61, 43, 31, 0.12)' },
-                     { icon: '#b8860b', bar: '#b8860b', glow: 'rgba(184, 134, 11, 0.18)' },
-                     { icon: '#8b6d31', bar: '#8b6d31', glow: 'rgba(197, 160, 89, 0.12)' },
-                     { icon: 'var(--primary-gold)', bar: '#c5a059', glow: 'rgba(197, 160, 89, 0.2)' },
-                   ];
-                   const c = accentColors[i % accentColors.length];
-                   const isPct = stat.label === "Results";
+                 ].map((stat) => {
                    const isFrac = stat.label === "Parent Views";
-                   const [numStr, denStr] = isFrac ? String(stat.value).split('/') : [];
                    return (
-                     <div
-                        key={stat.label}
-                        className="infographic-card"
-                        onClick={() => {
-                          if (isFrac) setShowParentViewsModal(true);
-                        }}
-                        role={isFrac ? 'button' : undefined}
-                        tabIndex={isFrac ? 0 : undefined}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && isFrac) setShowParentViewsModal(true);
-                        }}
-                        style={{ cursor: isFrac ? 'pointer' : 'default' }}
-                        title={isFrac ? 'Click to see student report views details' : undefined}
-                      >
-                       <div className="ig-bg-pattern">
-                         {['✦', '◈', '◆', '⬢', '◇'][i % 5]}
-                       </div>
-                       <div className="ig-top-row">
-                         <div className="ig-icon-wrap" style={{ background: `${c.glow}`, color: c.icon }}>
-                           {stat.label === "Students" ? (
-                             <PremiumStudentsIcon size={48} />
-                           ) : stat.icon === 'Users' && <Users size={18} />}
-                           {stat.icon === 'FileText' && <FileText size={18} />}
-                           {stat.icon === 'TrendingUp' && <TrendingUp size={18} />}
-                           {stat.icon === 'Eye' && <Eye size={18} />}
-                           {stat.icon === 'DollarSign' && <DollarSign size={18} />}
-                           {stat.icon === 'Clock' && <Clock size={18} />}
-                         </div>
-                         {(isPct || isFrac) && (
-                           <span className="ig-trend" style={{ background: `${c.glow}`, color: c.icon }}>
-                             {stat.pct >= 50 ? '↑' : '↓'} {stat.pct}%
-                           </span>
-                         )}
-                       </div>
-                       <div className="ig-value">
-                         {isFrac ? (
-                           <>
-                             <span className="ig-count-anim">{numStr}</span>
-                             <span style={{ fontSize: '1rem', opacity: 0.4, margin: '0 2px', color: 'var(--soft-brown)' }}>/</span>
-                             <span style={{ fontSize: '1.2rem', opacity: 0.5, color: 'var(--soft-brown)' }}>{denStr}</span>
-                           </>
-                         ) : (
-                           <span className="ig-count-anim">{stat.value}</span>
-                         )}
-                       </div>
-                       <span className="ig-label">{stat.label}</span>
-                       <span className="ig-sub">{stat.sub}</span>
-                       <div className="ig-bar-track" style={{ background: `rgba(197, 160, 89, 0.12)` }}>
-                         <div className="ig-bar-fill" style={{ width: `${stat.pct}%`, background: `linear-gradient(90deg, ${c.bar}, ${c.bar}dd)`, boxShadow: `0 0 6px ${c.glow}` }} />
-                       </div>
-                     </div>
+                     <OverviewCard
+                       key={stat.label}
+                       label={stat.label}
+                       value={stat.value}
+                       sub={stat.sub}
+                       icon={stat.icon}
+                       pct={stat.pct}
+                       showTrendBadge={stat.showTrendBadge}
+                       trendDirection={stat.trendDirection}
+                       onClick={() => {
+                         if (isFrac) setShowParentViewsModal(true);
+                       }}
+                       title={isFrac ? 'Click to see student report views details' : undefined}
+                     />
                    );
                  })}
                </div>
 
-               <div style={{ width: '100%', marginBottom: '24px' }}>
+               <div style={{ width: '100%', marginTop: '32px', marginBottom: '24px' }}>
                  {/* Notification Section Header */}
                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
@@ -22148,105 +22084,73 @@ function TeacherPortal({
                          )}
                        </div>
                      </div>
-                   
+                    </div>
 
-                       {shiftedBadalStudents.map(child => {
-                         // Check both t.id and t.user_id to reliably match the badal teacher profile
-                         const badalTeacher = (teacherProfiles || []).find(p =>
-                           String(p.id) === String(child.badal_teacher_id) ||
-                           String(p.user_id) === String(child.badal_teacher_id)
-                         );
-                         const badalName = badalTeacher?.full_name || "Badal Teacher";
-                         const avatarLetter = (child.name || "?").charAt(0).toUpperCase();
-                         const groupLabel = child.groupName || "";
-                         return (
-                           <div key={child.student_id} style={{
-                             margin: "10px 14px",
-                             borderRadius: "16px",
-                             background: "linear-gradient(135deg, rgba(255,255,255,0.97), rgba(255,248,240,0.92))",
-                             border: "1.5px solid rgba(231, 76, 60, 0.22)",
-                             boxShadow: "0 4px 20px rgba(231, 76, 60, 0.10), 0 1px 4px rgba(0,0,0,0.04)",
-                             overflow: "hidden",
-                             position: "relative"
-                           }}>
-                             {/* Accent gradient bar at top */}
-                             <div style={{
-                               position: "absolute", top: 0, left: 0, right: 0, height: "3px",
-                               background: "linear-gradient(90deg, #e74c3c, #f39c12, #e74c3c)"
-                             }} />
-                             <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: "13px" }}>
-                               {/* Student Avatar */}
-                               <div style={{
-                                 width: "46px", height: "46px", borderRadius: "14px",
-                                 background: "linear-gradient(135deg, #e74c3c, #c0392b)",
-                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                 color: "white", fontWeight: 800, fontSize: "1.1rem",
-                                 flexShrink: 0, boxShadow: "0 4px 12px rgba(231, 76, 60, 0.30)",
-                                 overflow: "hidden"
-                               }}>
-                                 {child.photoUrl
-                                   ? <img src={child.photoUrl} alt={child.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                   : avatarLetter}
-                               </div>
-                               {/* Info */}
-                               <div style={{ flex: 1, minWidth: 0 }}>
-                                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "4px" }}>
-                                   <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--primary-dark)" }}>
-                                     {child.name}
-                                   </span>
-                                   {groupLabel ? (
-                                     <span style={{
-                                       background: "rgba(212,175,55,0.12)", color: "#8a6d1d",
-                                       border: "1px solid rgba(212,175,55,0.35)", borderRadius: "5px",
-                                       padding: "1px 7px", fontSize: "0.65rem", fontWeight: 700
-                                     }}>{groupLabel}</span>
-                                   ) : null}
-                                 </div>
-                                 {/* Badal teacher pill */}
-                                 <div style={{
-                                   display: "inline-flex", alignItems: "center", gap: "4px",
-                                   background: "rgba(231, 76, 60, 0.08)",
-                                   border: "1px solid rgba(231, 76, 60, 0.20)",
-                                   borderRadius: "20px", padding: "2px 9px 2px 5px",
-                                   fontSize: "0.7rem", color: "#c0392b", fontWeight: 700, maxWidth: "100%"
-                                 }}>
-                                   <span style={{
-                                     width: "16px", height: "16px", borderRadius: "50%",
-                                     background: "linear-gradient(135deg, #e74c3c, #c0392b)",
-                                     color: "white", display: "flex", alignItems: "center",
-                                     justifyContent: "center", fontSize: "0.55rem", fontWeight: 800, flexShrink: 0
-                                   }}>
-                                     {badalName.charAt(0).toUpperCase()}
-                                   </span>
-                                   <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                     With: {badalName}
-                                   </span>
-                                 </div>
-                               </div>
-                               {/* Resume Button */}
-                               <button
-                                 onClick={() => handleResumeClass(child)}
-                                 style={{
-                                   flexShrink: 0,
-                                   background: "linear-gradient(135deg, #27ae60, #1e8449)",
-                                   color: "white", border: "none", padding: "9px 14px",
-                                   borderRadius: "12px", fontSize: "0.75rem", fontWeight: 800,
-                                   cursor: "pointer", boxShadow: "0 4px 14px rgba(39,174,96,0.35)",
-                                   display: "flex", alignItems: "center", gap: "5px",
-                                   whiteSpace: "nowrap", transition: "transform 0.15s, box-shadow 0.15s"
-                                 }}
-                                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(39,174,96,0.50)"; }}
-                                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(39,174,96,0.35)"; }}
-                               >
-                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M8 5v14l11-7z"/></svg>
-                                 Resume
-                               </button>
-                             </div>
-                           </div>
-                         );
-                       })}</div>
-                 </div>
-               </div>
+                    {shiftedBadalStudents.length > 0 && (
+                      <div className="badal-resume-section">
+                        {shiftedBadalStudents.map(child => {
+                          // Check both t.id and t.user_id to reliably match the badal teacher profile
+                          const badalTeacher = (teacherProfiles || []).find(p =>
+                            String(p.id) === String(child.badal_teacher_id) ||
+                            String(p.user_id) === String(child.badal_teacher_id)
+                          );
+                          const badalName = badalTeacher?.full_name || "Badal Teacher";
+                          const avatarLetter = (child.name || "?").charAt(0).toUpperCase();
+                          const groupLabel = child.groupName || "";
+                          return (
+                            <div key={child.student_id} className="badal-resume-card">
+                              {/* Accent gradient bar at top */}
+                              <div className="badal-resume-topbar" />
+                              <div className="badal-resume-content">
+                                {/* Student Info */}
+                                <div className="badal-resume-left">
+                                  <div className="badal-resume-avatar">
+                                    {child.photoUrl
+                                      ? <img src={child.photoUrl} alt={child.name} />
+                                      : avatarLetter}
+                                  </div>
+                                  <div className="badal-resume-info">
+                                    <div className="badal-resume-title-row">
+                                      <span className="badal-resume-student-name">
+                                        {child.name}
+                                      </span>
+                                      {groupLabel ? (
+                                        <span className="badal-resume-group-badge">
+                                          {groupLabel}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <div className="badal-resume-pill-row">
+                                      <div className="badal-resume-status-pill">
+                                        <span className="badal-resume-pill-avatar">
+                                          {badalName.charAt(0).toUpperCase()}
+                                        </span>
+                                        <span>
+                                          With: {badalName}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Resume Button */}
+                                <div className="badal-resume-action">
+                                  <button
+                                    type="button"
+                                    className="badal-resume-btn"
+                                    onClick={() => handleResumeClass(child)}
+                                  >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}><path d="M8 5v14l11-7z"/></svg>
+                                    Resume
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {showChildSelect && typeof document !== 'undefined' && createPortal(
                   <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={(e) => { if (e.target === e.currentTarget) setShowChildSelect(false); }}>
