@@ -90,6 +90,7 @@ import {
   Edit2,
   Book,
   Headphones,
+  Trophy,
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -1201,7 +1202,7 @@ const NAV_ICONS = {
   "Global Settings": Settings,
   "Messages": MessageCircle,
   "Email Settings": Mail,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Admin Access": ShieldCheck,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,"Online Tahfeez Tracking": Video,"Help Management": HelpCircle,
+  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Admin Access": ShieldCheck,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,"Online Tahfeez Tracking": Video,"Help Management": HelpCircle,"Hifz League Tracking": Trophy,
 };
 
 const emptyParentData = {
@@ -13099,7 +13100,7 @@ const handleDownloadAllReports = async () => {
 
   const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Online Tahfeez Tracking", "Help Management", "Global Settings", "Email Settings", "App Update"];
   const isKibarAdmin = portalRole === "kibar-admin";
-  const navPages = ["Overview", "Quick Student Access", "Quick Access Pages", "Admin Access", "Schedule", "Result Tracking"];
+  const navPages = ["Overview", "Hifz League Tracking", "Quick Student Access", "Quick Access Pages", "Admin Access", "Schedule", "Result Tracking"];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
   const isSuperAdmin = user?.email?.toLowerCase() === "mh.developer53@gmail.com";
@@ -14584,12 +14585,16 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             </div>
 
             {!isKibarAdmin && (
-              <>
-                <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
-                <AtfalLeagueAdminInfographic students={students} />
-              </>
+              <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
             )}
             </>
+          )}
+
+          {activePage === "Hifz League Tracking" && !isKibarAdmin && (
+            <div className="overview-container fade-in" style={{ marginTop: 0 }}>
+              <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
+              <AtfalLeagueAdminInfographic students={students} />
+            </div>
           )}
 
           {activePage === "Admin Access" && (
