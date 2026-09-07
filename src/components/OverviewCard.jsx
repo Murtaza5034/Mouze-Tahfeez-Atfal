@@ -3,6 +3,7 @@ import {
   Users, 
   FileText, 
   TrendingUp, 
+  TrendingDown,
   Eye, 
   Clock, 
   GraduationCap, 
@@ -11,7 +12,14 @@ import {
   ClipboardCheck, 
   Trophy, 
   BookOpen,
-  DollarSign
+  DollarSign,
+  UserCheck,
+  CalendarCheck,
+  Award,
+  Activity,
+  CheckCircle2,
+  ShieldCheck,
+  Briefcase
 } from 'lucide-react';
 
 /**
@@ -61,56 +69,105 @@ export const SegmentedGoldBar = ({ filledCount = 0 }) => {
   );
 };
 
+const ICON_MAP = {
+  Users, 
+  FileText, 
+  TrendingUp, 
+  TrendingDown,
+  Eye, 
+  Clock, 
+  GraduationCap, 
+  Calendar, 
+  MessageCircle, 
+  ClipboardCheck, 
+  Trophy, 
+  BookOpen,
+  DollarSign,
+  UserCheck,
+  CalendarCheck,
+  Award,
+  Activity,
+  CheckCircle2,
+  ShieldCheck,
+  Briefcase
+};
+
 /**
- * Resolves standard icon names or components to the appropriate icon element
+ * Resolves standard icon names, forwardRef components, or label fallbacks to a verified icon
  */
 const renderIcon = (iconProp, label) => {
-  if (!iconProp) return null;
-  const isStudentCard = label && String(label).toLowerCase().includes('student');
-  if (isStudentCard) {
+  const lbl = label ? String(label).toLowerCase() : '';
+
+  // 1. Quran / Student specific iconography
+  if (lbl.includes('student') || lbl.includes('registry')) {
     return <RehalIcon size={26} />;
   }
 
-  // If already a React element
+  // 2. If already an instantiated React JSX element
   if (React.isValidElement(iconProp)) {
-    return iconProp;
+    return React.cloneElement(iconProp, {
+      size: iconProp.props?.size || 24,
+      strokeWidth: iconProp.props?.strokeWidth || 2,
+      className: `ig-icon-svg ${iconProp.props?.className || ''}`,
+    });
   }
 
-  // If a component function
-  if (typeof iconProp === 'function') {
-    const Component = iconProp;
-    return <Component size={22} strokeWidth={2} />;
+  // 3. String name or displayName matching from predefined map
+  const iconKey = typeof iconProp === 'string' 
+    ? iconProp 
+    : (iconProp?.displayName || iconProp?.name || '');
+  if (iconKey && ICON_MAP[iconKey]) {
+    const Component = ICON_MAP[iconKey];
+    return <Component size={24} strokeWidth={2} className="ig-icon-svg" />;
   }
 
-  // If string name
-  switch (iconProp) {
-    case 'Users':
-      return <Users size={22} strokeWidth={2} />;
-    case 'FileText':
-      return <FileText size={22} strokeWidth={2} />;
-    case 'TrendingUp':
-      return <TrendingUp size={22} strokeWidth={2} />;
-    case 'Eye':
-      return <Eye size={22} strokeWidth={2} />;
-    case 'Clock':
-      return <Clock size={22} strokeWidth={2} />;
-    case 'GraduationCap':
-      return <GraduationCap size={22} strokeWidth={2} />;
-    case 'Calendar':
-      return <Calendar size={22} strokeWidth={2} />;
-    case 'MessageCircle':
-      return <MessageCircle size={22} strokeWidth={2} />;
-    case 'ClipboardCheck':
-      return <ClipboardCheck size={22} strokeWidth={2} />;
-    case 'Trophy':
-      return <Trophy size={22} strokeWidth={2} />;
-    case 'BookOpen':
-      return <BookOpen size={22} strokeWidth={2} />;
-    case 'DollarSign':
-      return <DollarSign size={22} strokeWidth={2} />;
-    default:
-      return null;
+  // 4. If a Lucide icon component (function or forwardRef object with $$typeof / render)
+  if (typeof iconProp === 'function' || (typeof iconProp === 'object' && iconProp !== null)) {
+    try {
+      const Component = iconProp;
+      return <Component size={24} strokeWidth={2} className="ig-icon-svg" />;
+    } catch (err) {
+      console.warn("Lucide component render fallback:", err);
+    }
   }
+
+  // 5. Label-based robust contextual fallbacks
+  if (lbl.includes('teacher') || lbl.includes('staff') || lbl.includes('muhaffiz') || lbl.includes('muhaffezah') || lbl.includes('faculty')) {
+    return <GraduationCap size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('schedule') || lbl.includes('timing') || lbl.includes('jadwal')) {
+    return <Calendar size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('view') || lbl.includes('parent') || lbl.includes('report')) {
+    return <Eye size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('leave') || lbl.includes('message') || lbl.includes('request')) {
+    return <MessageCircle size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('attendance') || lbl.includes('present') || lbl.includes('absent')) {
+    return <ClipboardCheck size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('score') || lbl.includes('rank') || lbl.includes('league') || lbl.includes('trophy')) {
+    return <Trophy size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('clock') || lbl.includes('minute') || lbl.includes('time') || lbl.includes('hour')) {
+    return <Clock size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('hifz') || lbl.includes('quran') || lbl.includes('juz') || lbl.includes('surat')) {
+    return <BookOpen size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('result') || lbl.includes('marks')) {
+    return <FileText size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('trend') || lbl.includes('avg')) {
+    return <TrendingUp size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+  if (lbl.includes('salary') || lbl.includes('fee') || lbl.includes('hub')) {
+    return <DollarSign size={24} strokeWidth={2} className="ig-icon-svg" />;
+  }
+
+  // 6. Universal Fallback: never leave the icon squircle empty!
+  return <Award size={24} strokeWidth={2} className="ig-icon-svg" />;
 };
 
 /**
@@ -207,12 +264,16 @@ export const OverviewCard = ({
           {renderIcon(icon, label)}
         </div>
 
-        {showTrendBadge && calculatedTrendPct !== null && (
-          <div className="ig-trend">
+        {showTrendBadge && (
+          <div className={`ig-trend ${calculatedDirection === 'up' ? 'trend-up' : 'trend-down'}`}>
             <span className="ig-trend-arrow">
-              {calculatedDirection === 'up' ? '↑' : '↓'}
+              {calculatedDirection === 'up' ? (
+                <TrendingUp size={13} strokeWidth={2.5} />
+              ) : (
+                <TrendingDown size={13} strokeWidth={2.5} />
+              )}
             </span>
-            <span className="ig-trend-val">{calculatedTrendPct}%</span>
+            {calculatedTrendPct !== null && <span className="ig-trend-val">{calculatedTrendPct}%</span>}
           </div>
         )}
       </div>

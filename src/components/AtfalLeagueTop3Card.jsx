@@ -13,16 +13,7 @@ import {
   User
 } from "lucide-react";
 import { reshapeArabic } from "../utils/arabicReshaper";
-
-// Islamic Months Configuration (Matching Hifz League Official PDF)
-const MONTHS_CONFIG = [
-  { id: "safar", nameEn: "Safar al-Muzaffar", nameAr: "شهر صفر المظفر", pageRange: "16 - 29", color: "#10b981" },
-  { id: "rabi1", nameEn: "Rabi al-Awwal", nameAr: "شهر ربيع الاول", pageRange: "1 - 30", color: "#06b6d4" },
-  { id: "rabi2", nameEn: "Rabi al-Aakhar", nameAr: "شهر ربيع الآخر", pageRange: "1 - 29", color: "#8b5cf6" },
-  { id: "jumada1", nameEn: "Jumada al-Ula", nameAr: "شهر جمادى الاولى", pageRange: "1 - 30", color: "#3b82f6" },
-  { id: "jumada2", nameEn: "Jumada al-Ukhra", nameAr: "شهر جمادى الاخرى", pageRange: "16 - 29", color: "#ec4899" },
-  { id: "rajab", nameEn: "Rajab al-Asab", nameAr: "شهر رجب الاصب", pageRange: "1 - 15", color: "#f59e0b" },
-];
+import { MONTHS_CONFIG, getMonthlyTop3, getPodiumOrder } from "../utils/atfalLeagueUtils";
 
 // Ornate Crown SVGs for Top 3 Podiums
 const RoyalCrown = ({ rank }) => {
@@ -216,66 +207,12 @@ export default function AtfalLeagueTop3Card({
   }, [selectedMonthId]);
 
   const top3Players = useMemo(() => {
-    const studentScores = [];
-
-    (leagueEntries || []).forEach((entry) => {
-      const sId = String(entry.student_id || "");
-      if (!sId) return;
-
-      const m = entry.months?.[selectedMonthId] || {};
-      const weeks = m.weeks || {};
-
-      let sum = 0;
-      ["week1", "week2", "week3", "week4"].forEach((wk) => {
-        const w = weeks[wk] || { post_it: 0, activity: 0 };
-        sum += (Number(w.post_it) || 0) + (Number(w.activity) || 0);
-      });
-
-      const totalMonthlyGems = Math.max(Number(m.monthly_total) || 0, sum);
-      const fullName = entry.student_name || "Student";
-      const cleanName = fullName.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase();
-
-      const photo =
-        (entry.photo_url && !entry.photo_url.includes("unsplash.com") ? entry.photo_url : null) ||
-        studentPhotosMap[sId] ||
-        studentPhotosMap[fullName.trim().toLowerCase()] ||
-        studentPhotosMap[cleanName] ||
-        null;
-
-      studentScores.push({
-        id: sId,
-        name: fullName,
-        group: entry.group_name || entry.group || "Atfal",
-        its: entry.its_id || entry.its || "",
-        gems: totalMonthlyGems,
-        photo: photo,
-      });
-    });
-
-    // Sort descending by gems
-    studentScores.sort((a, b) => {
-      if (b.gems !== a.gems) return b.gems - a.gems;
-      return a.name.localeCompare(b.name);
-    });
-
-    const realScored = studentScores.filter((s) => s.gems > 0);
-
-    // If real students exist with gems, take top 3
-    const result = (realScored.length >= 3 ? realScored : studentScores).slice(0, 3);
-
-    // Map into Rank 1, 2, 3
-    return result.map((item, idx) => ({
-      ...item,
-      rank: idx + 1,
-    }));
+    return getMonthlyTop3(leagueEntries, selectedMonthId, studentPhotosMap);
   }, [leagueEntries, selectedMonthId, studentPhotosMap]);
 
   // Order for podium display: [Rank 2 (Left), Rank 1 (Center), Rank 3 (Right)]
   const podiumOrder = useMemo(() => {
-    const r1 = top3Players.find((p) => p.rank === 1);
-    const r2 = top3Players.find((p) => p.rank === 2);
-    const r3 = top3Players.find((p) => p.rank === 3);
-    return [r2, r1, r3].filter(Boolean);
+    return getPodiumOrder(top3Players);
   }, [top3Players]);
 
   // 5. Download Card in Full A4 Landscape Canvas

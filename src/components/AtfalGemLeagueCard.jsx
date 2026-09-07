@@ -3,6 +3,7 @@ import './AtfalGemLeagueCard.css';
 import { supabase } from '../supabaseClient';
 import { doc, onSnapshot, getDoc, getDocs, collection, getFirestore } from 'firebase/firestore';
 import { firebaseApp } from '../firebase/config';
+import { calculateStudentMonthlyGems, getMonthlyTop3 } from '../utils/atfalLeagueUtils';
 
 // ---------------------------------------------------------------------------
 // 4 DISTINCT REAL 3D GEM ASSETS (WEEK 1-4)
@@ -450,171 +451,45 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
     };
   }, [customGemsData, liveLeagueData, studentProfile, activeMonthId]);
 
-  // 5. Dynamic Monthly Top 3 Leaderboard
+  // 5. Dynamic Monthly Top 3 Leaderboard (Strictly Real Students - Out of 480 Gems)
+  // 100% synchronized with Admin and Teacher portals: reads directly from leaderboardList (atfal_gem_league)
   const monthlyTop3 = useMemo(() => {
-    const candidateMap = new Map();
+    // Rank using the shared function out of 480 gems directly from the official league entries
+    const top3 = getMonthlyTop3(leaderboardList, activeMonthId, studentPhotosMap);
 
-    // 1. Process all entries from atfal_gem_league
-    (leaderboardList || []).forEach((entry) => {
-      const sId = String(entry.student_id || entry.id || "");
-      if (!sId) return;
-
-      const m = entry.months?.[activeMonthId] || {};
-      const w = m.weeks || {};
-      const weekSum =
-        (Number(w.week1?.post_it) || 0) +
-        (Number(w.week1?.activity) || 0) +
-        (Number(w.week2?.post_it) || 0) +
-        (Number(w.week2?.activity) || 0) +
-        (Number(w.week3?.post_it) || 0) +
-        (Number(w.week3?.activity) || 0) +
-        (Number(w.week4?.post_it) || 0) +
-        (Number(w.week4?.activity) || 0);
-      const gems = Math.max(Number(m.monthly_total) || 0, weekSum);
-
-      const sName = entry.student_name || "Student";
-      const cleanName = sName.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase();
-
-      // Resolve real profile photo
-      const rawEntryPhoto =
-        (entry.photo_url && !entry.photo_url.includes("unsplash.com") ? entry.photo_url : null) ||
-        (entry.photoUrl && !entry.photoUrl.includes("unsplash.com") ? entry.photoUrl : null) ||
-        (entry.avatar_url && !entry.avatar_url.includes("unsplash.com") ? entry.avatar_url : null) ||
-        (entry.photo && !entry.photo.includes("unsplash.com") ? entry.photo : null);
-
-      const realPhoto =
-        rawEntryPhoto ||
-        studentPhotosMap[sId] ||
-        studentPhotosMap[sName.trim().toLowerCase()] ||
-        studentPhotosMap[cleanName] ||
-        (sId === studentId && studentAvatar && !studentAvatar.includes("unsplash.com") ? studentAvatar : null) ||
-        null;
-
-      // If we resolved an authentic photo from child_profiles but atfal_gem_league lacked it, backfill
-      if (realPhoto && !rawEntryPhoto) {
-        try {
-          const db = getFirestore(firebaseApp);
-          setDoc(doc(db, "atfal_gem_league", sId), { photo_url: realPhoto }, { merge: true }).catch(() => {});
-        } catch (_e) {}
-      }
-
-      candidateMap.set(sId, {
-        id: sId,
-        name: sName,
-        gems: Math.max(0, gems),
-        avatar: realPhoto,
-        isCurrentStudent: sId === studentId,
-      });
-    });
-
-    // 2. Ensure current student's live score is up-to-date
-    if (studentId) {
-      const curScore = Number(leagueData?.monthlyScore) || 0;
-      const myCleanPhoto =
-        studentAvatar ||
-        studentPhotosMap[studentId] ||
-        studentPhotosMap[studentName?.trim().toLowerCase()] ||
-        null;
-
-      if (candidateMap.has(studentId)) {
-        const item = candidateMap.get(studentId);
-        item.gems = Math.max(item.gems, curScore);
-        if (studentName) item.name = studentName;
-        if (myCleanPhoto) item.avatar = myCleanPhoto;
-        item.isCurrentStudent = true;
-      } else {
-        candidateMap.set(studentId, {
-          id: studentId,
-          name: studentName || "Student",
-          gems: Math.max(0, curScore),
-          avatar: myCleanPhoto,
-          isCurrentStudent: true,
-        });
-      }
-    }
-
-    const candidates = Array.from(candidateMap.values());
-    const realWithGems = candidates.filter((c) => c.gems > 0);
-    const maxScore = candidates.reduce((max, c) => Math.max(max, c.gems), 0);
-
-    // 3. If fewer than 3 real students have scores > 0, provide benchmark contenders so
-    // the 3-podium layout displays prestige without 0-gem students outranking higher scores.
-    if (realWithGems.length < 3) {
-      const benchmarkContenders = [
-        {
-          id: "benchmark-husain",
-          name: "Husain",
-          gems: maxScore > 0 ? Math.round(maxScore * 0.82) : 80,
-          avatar: studentPhotosMap["benchmark-husain"] || studentPhotosMap["husain"] || null,
-          isCurrentStudent: false,
-        },
-        {
-          id: "benchmark-fatema",
-          name: "Fatema",
-          gems: maxScore > 0 ? Math.round(maxScore * 0.68) : 70,
-          avatar: studentPhotosMap["benchmark-fatema"] || studentPhotosMap["fatema"] || null,
-          isCurrentStudent: false,
-        },
-        {
-          id: "benchmark-sakina",
-          name: "Sakina",
-          gems: maxScore > 0 ? Math.round(maxScore * 0.55) : 60,
-          avatar: studentPhotosMap["benchmark-sakina"] || studentPhotosMap["sakina"] || null,
-          isCurrentStudent: false,
-        },
-      ];
-
-      for (const bench of benchmarkContenders) {
-        if (!candidates.some((c) => c.name.toLowerCase() === bench.name.toLowerCase())) {
-          candidates.push(bench);
-        }
-      }
-    }
-
-    // 4. Strict descending order by gems
-    candidates.sort((a, b) => {
-      if (b.gems !== a.gems) return b.gems - a.gems;
-      if (a.id.startsWith("benchmark-") && !b.id.startsWith("benchmark-")) return 1;
-      if (!a.id.startsWith("benchmark-") && b.id.startsWith("benchmark-")) return -1;
-      return a.name.localeCompare(b.name);
-    });
-
-    // 5. Select Top 3 and assign ranks 1, 2, 3
-    return candidates.slice(0, 3).map((item, idx) => {
-      const rank = idx + 1;
-      let photo = item.avatar;
+    // Map to podium display format
+    return top3.map((player) => {
+      const isCurrentStudent = String(player.id) === String(studentId);
+      let photo = player.photo;
       if (!photo || photo.includes("unsplash.com")) {
-        if (item.isCurrentStudent && studentAvatar && !studentAvatar.includes("unsplash.com")) {
-          photo = studentAvatar;
-        } else {
-          photo =
-            studentPhotosMap[item.id] ||
-            studentPhotosMap[item.name?.trim().toLowerCase()] ||
-            studentPhotosMap[item.name?.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase()] ||
-            null;
-        }
+        photo =
+          studentPhotosMap[player.id] ||
+          studentPhotosMap[player.name?.trim().toLowerCase()] ||
+          studentPhotosMap[player.name?.replace(/\s+(bhai|ben|kakaji)\b/gi, "").trim().toLowerCase()] ||
+          (isCurrentStudent && studentAvatar && !studentAvatar.includes("unsplash.com") ? studentAvatar : null) ||
+          null;
       }
 
       // Elegant initial medallion SVG if no uploaded photo exists
       if (!photo || photo.includes("unsplash.com")) {
-        const initial = (item.name || "S").trim().charAt(0).toUpperCase();
+        const initial = (player.name || "S").trim().charAt(0).toUpperCase();
         const bgColors = ["#1e3a8a", "#1e293b", "#431407"];
         const borderColors = ["#facc15", "#cbd5e1", "#ea580c"];
-        const bg = bgColors[idx % 3];
-        const stroke = borderColors[idx % 3];
+        const bg = bgColors[(player.rank - 1) % 3];
+        const stroke = borderColors[(player.rank - 1) % 3];
         photo = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="${encodeURIComponent(bg)}" stroke="${encodeURIComponent(stroke)}" stroke-width="4"/><text x="50%" y="55%" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="42" font-weight="900" fill="%23ffffff" text-anchor="middle" dominant-baseline="middle">${initial}</text></svg>`;
       }
 
       return {
-        rank,
-        id: item.id,
-        name: item.name,
-        gems: item.gems,
+        rank: player.rank,
+        id: player.id,
+        name: player.name,
+        gems: player.gems,
         avatar: photo,
-        isCurrentStudent: item.isCurrentStudent,
+        isCurrentStudent,
       };
     });
-  }, [leaderboardList, activeMonthId, studentId, studentName, studentAvatar, leagueData?.monthlyScore, studentPhotosMap]);
+  }, [leaderboardList, activeMonthId, studentId, studentAvatar, studentPhotosMap]);
 
   return (
     <div className="atfal-gem-league-container fade-in">

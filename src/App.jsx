@@ -102,7 +102,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import AdminHelpManagement from "./components/AdminHelpManagement";
 import PortalHelpGuidePage from "./components/PortalHelpGuidePage";
 import IOSNotificationGuideModal from "./components/IOSNotificationGuideModal";
-import FirstTimeStudentRegistryModal from "./components/FirstTimeStudentRegistryModal";
+import StudentProfileView from "./components/StudentProfileView";
 import ParentViewsModal from "./components/ParentViewsModal";
 import TahfeezAudioRecordingsModal from "./components/TahfeezAudioRecordingsModal";
 import AppUpdatePopup from "./AppUpdatePopup";
@@ -111,6 +111,7 @@ import PremiumTodaySchedule from "./PremiumTodaySchedule";
 import AtfalGemLeagueCard from "./components/AtfalGemLeagueCard";
 import AtfalTeacherLeagueEntry from "./components/AtfalTeacherLeagueEntry";
 import AtfalLeagueTop3Card from "./components/AtfalLeagueTop3Card";
+import AtfalLeagueAdminInfographic from "./components/AtfalLeagueAdminInfographic";
 import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
@@ -8629,34 +8630,37 @@ function ParentPortal({
                     label: "Weekly Score", 
                     value: activeScore != null ? activeScore : "--", 
                     sub: weekLabel, 
-                    icon: Trophy, 
-                    pct: scoreNum,
-                    showTrendBadge: scoreNum !== null,
+                    icon: 'Trophy', 
+                    pct: scoreNum !== null ? scoreNum : 100,
+                    showTrendBadge: true,
                     trendDirection: (scoreNum && scoreNum >= 50) ? 'up' : 'down'
                   },
                   { 
                     label: "Daily Attendance", 
                     value: attLabel, 
                     sub: attDate, 
-                    icon: Clock, 
+                    icon: 'Clock', 
                     pct: attStatus === 'present' ? 100 : 0,
-                    showTrendBadge: false
+                    showTrendBadge: true,
+                    trendDirection: attStatus === 'present' ? 'up' : 'down'
                   },
                   { 
                     label: "Current HIFZ", 
                     value: juzVal || "--", 
                     sub: studentProfile?.latestResult?.wusool_surah || hifzDetails?.surat || "In progress", 
-                    icon: BookOpen, 
-                    pct: juzPct,
-                    showTrendBadge: false
+                    icon: 'BookOpen', 
+                    pct: juzPct || 100,
+                    showTrendBadge: true,
+                    trendDirection: 'up'
                   },
                   { 
                     label: muhaffizLabel, 
                     value: muhaffizVal, 
                     sub: muhaffizSub, 
-                    icon: GraduationCap, 
-                    pct: 0,
-                    showTrendBadge: false
+                    icon: 'GraduationCap', 
+                    pct: 100,
+                    showTrendBadge: true,
+                    trendDirection: 'up'
                   },
                 ];
 
@@ -9175,54 +9179,18 @@ function ParentPortal({
           </div>
         ) : null}
 
-        {activePage === "Profile" && currentPage.childInfo ? (
-          <div className="child-info-card premium-profile-card fade-in card-appear">
-            <div className="card-header">
-              <div className="avatar-placeholder">
-                <User size={32} />
-              </div>
-              <div className="header-text">
-                <h3 style={{ margin: 0 }}>
-                  {currentPage.childInfo.name}
-                </h3>
-                {currentPage.childInfo.arabicName && (
-                  <div className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--primary-gold)', marginTop: '4px', fontWeight: 600 }}>
-                    {fixArabicScript(currentPage.childInfo.arabicName)}
-                  </div>
-                )}
-                <p style={{ marginTop: '8px' }}>
-                  <Hash size={12} /> ITS: {currentPage.childInfo.its}
-                </p>
-                <p style={{ marginTop: '4px', fontSize: '0.85rem', color: 'var(--soft-brown)' }}>
-                  <Mail size={12} /> {currentPage.childInfo.parentEmail}
-                </p>
-              </div>
-            </div>
-
-            <div className="info-grid-simple">
-              <div className="info-item">
-                <div className="info-icon">
-                  <BookOpen size={18} />
-                </div>
-                <div className="info-content">
-                  <span className="label">HIFZ INFORMATION</span>
-                  <span className="value">Juz {currentPage.childInfo.hifzJuz}</span>
-                  <span className="sub-value">{currentPage.childInfo.hifzSurat}</span>
-                </div>
-              </div>
-
-              <div className="info-item">
-                <div className="info-icon">
-                  <GraduationCap size={18} />
-                </div>
-                <div className="info-content">
-                  <span className="label">MUHAFFIZ NAME</span>
-                  <span className="value">{currentPage.childInfo.muhaffizName}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {activePage === "Profile" && (
+          <StudentProfileView
+            studentProfile={studentProfile}
+            currentUser={user}
+            isKibar={isKibarStudent}
+            hifzDetails={hifzDetails}
+            childInfo={currentPage?.childInfo || {}}
+            showAction={showAction}
+            loadPortalData={loadPortalData}
+            portalRole={portalRole}
+          />
+        )}
 
         {activePage === "Apply Leave" && (
           <ChildLeaveApply
@@ -10301,47 +10269,7 @@ function ParentPortal({
           </div>
         )}
 
-        {activePage === "Profile" && (
-          <div className="info-grid fade-in" style={{ marginTop: '24px' }}>
-            <section style={{ padding: '20px', background: 'linear-gradient(135deg, #fdfbf7, #f8f1e6)', border: '1px solid #e8dcc8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(139,109,49,0.08)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #d4af37, #b8942e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <MessageCircle size={20} color="#fff" />
-                </div>
-                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--deep-brown)', letterSpacing: '0.5px' }}>TEACHER NOTE</span>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-color)', lineHeight: '1.6', fontStyle: currentPage.childInfo.teacherNote ? 'normal' : 'italic' }}>
-                {currentPage.childInfo.teacherNote || "No teacher feedback yet."}
-              </p>
-            </section>
 
-            <section style={{ padding: '20px', background: 'linear-gradient(135deg, #fdfbf7, #f8f1e6)', border: '1px solid #e8dcc8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(139,109,49,0.08)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #d4af37, #b8942e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CalendarCheck size={20} color="#fff" />
-                </div>
-                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--deep-brown)', letterSpacing: '0.5px' }}>MONTHLY ATTENDANCE</span>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-color)', lineHeight: '1.6' }}>
-                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--primary-gold)' }}>{currentPage.childInfo.monthlyAttendance}</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginLeft: '6px' }}>days this month</span>
-              </p>
-            </section>
-
-            <section style={{ padding: '20px', background: 'linear-gradient(135deg, #fdfbf7, #f8f1e6)', border: '1px solid #e8dcc8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(139,109,49,0.08)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #d4af37, #b8942e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <BookOpen size={20} color="#fff" />
-                </div>
-                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--deep-brown)', letterSpacing: '0.5px' }}>MONTHLY JADEED</span>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-color)', lineHeight: '1.6' }}>
-                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--primary-gold)' }}>{currentPage.childInfo.monthlyJadeed || "0"}</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--soft-brown)', marginLeft: '6px' }}>new {currentPage.childInfo.monthlyJadeed ? 'صفحات' : 'pages'} this month</span>
-              </p>
-            </section>
-          </div>
-        )}
 
         {activePage === "Online Tahfeez" && renderOnlineTahfeezParent()}
         {activePage === "Help Videos" && <PortalHelpGuidePage portalType="parent" />}
@@ -13396,12 +13324,12 @@ const handleDownloadAllReports = async () => {
   }, [students, teacherProfiles, portalRole]);
 
   const stats = [
-    { label: "Students", value: students.length, icon: Users, navigateTo: "Student Registry" },
-    { label: "Teachers", value: teacherSummaries.length, icon: GraduationCap, navigateTo: "Staff Profiles" },
-    { label: "Schedules", value: schedule.length, icon: Calendar, navigateTo: "Schedule" },
-    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: Eye, navigateTo: "Result Tracking" },
-    { label: "Leave Management", value: `${pendingLeaveCount} Pending`, icon: MessageCircle, navigateTo: "Leave Management" },
-    { label: "Attendance Tracking", value: overviewAttLoading ? "..." : `${attNotMarkedCount} Not / ${attAllMarkedCount} All`, icon: ClipboardCheck, navigateTo: "Attendance Tracking" },
+    { label: "Students", value: students.length, icon: 'Users', navigateTo: "Student Registry", pct: 100, showTrendBadge: true, trendDirection: 'up' },
+    { label: "Teachers", value: teacherSummaries.length, icon: 'GraduationCap', navigateTo: "Staff Profiles", pct: 100, showTrendBadge: true, trendDirection: 'up' },
+    { label: "Schedules", value: schedule.length, icon: 'Calendar', navigateTo: "Schedule", pct: schedule.length > 0 ? 100 : 0, showTrendBadge: true, trendDirection: schedule.length > 0 ? 'up' : 'down' },
+    { label: "Parent Views", value: `${viewedCount}/${students.length}`, icon: 'Eye', navigateTo: "Result Tracking", showTrendBadge: true },
+    { label: "Leave Management", value: `${pendingLeaveCount} Pending`, icon: 'MessageCircle', navigateTo: "Leave Management", pct: pendingLeaveCount, showTrendBadge: true, trendDirection: pendingLeaveCount === 0 ? 'up' : 'down' },
+    { label: "Attendance Tracking", value: overviewAttLoading ? "..." : `${attNotMarkedCount} Not / ${attAllMarkedCount} All`, icon: 'ClipboardCheck', navigateTo: "Attendance Tracking", showTrendBadge: true },
   ];
 
   const sendResultLiveNotifications = async ({ manual = false } = {}) => {
@@ -14608,8 +14536,33 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             <div className="portal-stats-strip admin-stats">
               {stats.map((stat) => {
                 const isParentViews = stat.label === "Parent Views";
-                const [numStr, denStr] = isParentViews ? String(stat.value).split('/') : [];
-                const pct = isParentViews ? (parseInt(numStr) / Math.max(parseInt(denStr), 1) * 100) : null;
+                const isAttendance = stat.label === "Attendance Tracking";
+                let pct = stat.pct !== undefined ? stat.pct : null;
+                let showTrendBadge = stat.showTrendBadge !== false;
+                let trendDirection = stat.trendDirection || 'up';
+
+                if (isParentViews) {
+                  const [numStr, denStr] = String(stat.value).split('/');
+                  pct = Math.round(parseInt(numStr) / Math.max(parseInt(denStr), 1) * 100);
+                  showTrendBadge = !isNaN(pct) && pct !== null;
+                  trendDirection = pct >= 50 ? 'up' : 'down';
+                } else if (isAttendance) {
+                  const notMarked = Number(attNotMarkedCount) || 0;
+                  const allMarked = Number(attAllMarkedCount) || 0;
+                  const total = notMarked + allMarked;
+                  if (total > 0) {
+                    pct = Math.round((allMarked / total) * 100);
+                    showTrendBadge = true;
+                    trendDirection = pct >= 70 ? 'up' : 'down';
+                  } else {
+                    pct = 100;
+                    showTrendBadge = true;
+                    trendDirection = 'up';
+                  }
+                } else if (pct === null) {
+                  pct = 100;
+                }
+
                 return (
                   <OverviewCard
                     key={stat.label}
@@ -14618,8 +14571,8 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                     sub={stat.navigateTo || 'Overview'}
                     icon={stat.icon}
                     pct={pct}
-                    showTrendBadge={isParentViews && pct !== null}
-                    trendDirection={pct >= 50 ? 'up' : 'down'}
+                    showTrendBadge={showTrendBadge}
+                    trendDirection={trendDirection}
                     onClick={() => {
                       if (isParentViews) setShowAdminParentViewsModal(true);
                       else if (stat.navigateTo) setActivePage(stat.navigateTo);
@@ -14631,7 +14584,10 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             </div>
 
             {!isKibarAdmin && (
-              <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
+              <>
+                <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
+                <AtfalLeagueAdminInfographic students={students} />
+              </>
             )}
             </>
           )}
@@ -21755,9 +21711,9 @@ function TeacherPortal({
              <div className="portal-content fade-in">
                <div className="portal-stats-strip teacher-stats">
                  {[
-                   { label: "Students", value: overviewStudents.length, sub: "In my group", icon: 'Users', pct: 0, showTrendBadge: false },
+                   { label: "Students", value: overviewStudents.length, sub: "In my group", icon: 'Users', pct: 100, showTrendBadge: true, trendDirection: 'up' },
                    { label: "Results", value: `${Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0}%`, sub: "Submitted", icon: 'FileText', pct: Math.round((overviewStudents.filter(s => s.latestResult).length / Math.max(overviewStudents.length, 1)) * 100) || 0, showTrendBadge: true, trendDirection: 'up' },
-                   { label: "Avg Score", value: overviewStudents.length > 0 ? Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: overviewStudents.length > 0 ? Math.min(Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length), 100) : 0, showTrendBadge: false },
+                   { label: "Avg Score", value: overviewStudents.length > 0 ? Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length) : "--", sub: "This week", icon: 'TrendingUp', pct: overviewStudents.length > 0 ? Math.min(Math.round(overviewStudents.reduce((sum, s) => sum + (Number(s.latestResult?.total_score) || 0), 0) / overviewStudents.length), 100) : 100, showTrendBadge: true, trendDirection: 'up' },
                    { 
                      label: "Parent Views", 
                      value: `${parentViewedCount}/${overviewStudents.length || 0}`, 
@@ -21768,7 +21724,7 @@ function TeacherPortal({
                      trendDirection: (overviewStudents.length && (parentViewedCount / overviewStudents.length) >= 0.5) ? 'up' : 'down' 
                    },
                    ...(monthlySalary?.showCard ? [{
-                     label: "Minutes", value: `${monthlySalary.totalMinutes || "0"}`, sub: "This month", icon: 'Clock', pct: Math.min(monthlySalary.totalMinutes / 100, 100), showTrendBadge: false
+                     label: "Minutes", value: `${monthlySalary.totalMinutes || "0"}`, sub: "This month", icon: 'Clock', pct: Math.min(monthlySalary.totalMinutes / 100, 100), showTrendBadge: true, trendDirection: 'up'
                    }] : []),
                  ].map((stat) => {
                    const isFrac = stat.label === "Parent Views";
@@ -26556,29 +26512,19 @@ export default function App() {
 
         const isExistingAccount = localRegDone || isRegisteredInDb;
 
-        // If no profiles found:
-        // 1. If truly a brand new first-time login (not existing and never completed registration), show mandatory First-Time Registry Modal
-        // 2. If existing/returning account, create fallback profile and DO NOT prompt the registration form
+        // If no profiles found, seamlessly create fallback profile without any popup
         if (!rawProfiles || rawProfiles.length === 0) {
-          if (!isExistingAccount) {
-            console.log("[Portal] Brand new account without student profile — prompting first-time student registration.");
-            setNeedsFirstTimeRegistration(true);
-            if (!silent) setLoading(false);
-            return;
-          } else {
-            console.log("[Portal] Existing account with unlinked profile — generating portal session without modal.");
-            setNeedsFirstTimeRegistration(false);
-            rawProfiles = [{
-              id: currentUser.id,
-              user_id: currentUser.id,
-              name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || (isKibar ? "Student" : "Child"),
-              full_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || (isKibar ? "Student" : "Child"),
-              student_id: currentUser.user_metadata?.student_id || currentUser.user_metadata?.its || currentUser.id,
-              its: currentUser.user_metadata?.its || currentUser.user_metadata?.its_number || "...",
-              section: isKibar ? "kibar" : "atfal",
-              is_kibar: isKibar
-            }];
-          }
+          setNeedsFirstTimeRegistration(false);
+          rawProfiles = [{
+            id: currentUser.id,
+            user_id: currentUser.id,
+            name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || (isKibar ? "Student" : "Child"),
+            full_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || (isKibar ? "Student" : "Child"),
+            student_id: currentUser.user_metadata?.student_id || currentUser.user_metadata?.its || currentUser.id,
+            its: currentUser.user_metadata?.its || currentUser.user_metadata?.its_number || "...",
+            section: isKibar ? "kibar" : "atfal",
+            is_kibar: isKibar
+          }];
         } else {
           setNeedsFirstTimeRegistration(false);
         }
@@ -29573,19 +29519,6 @@ const handleSendCustomNotification = async (event) => {
         <PortalErrorBoundary>
         {(portalRole === "parents" || portalRole === "kibar-student") ? (
           <>
-            {needsFirstTimeRegistration && (
-              <FirstTimeStudentRegistryModal
-                user={user}
-                portalRole={portalRole}
-                onCompleted={async (newStudentProfile) => {
-                  setNeedsFirstTimeRegistration(false);
-                  setLoading(true);
-                  await loadPortalData(portalRole, user, newStudentProfile);
-                }}
-                onLogout={handleLogout}
-                showAction={showAction}
-              />
-            )}
             <ParentPortal
             activePage={activePage}
             appTheme={appTheme}

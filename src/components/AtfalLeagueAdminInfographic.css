@@ -1,0 +1,1099 @@
+/* ==========================================================================
+   ATFAL HIFZ LEAGUE ADMIN INFOGRAPHIC STYLES
+   ========================================================================== */
+
+.atfal-admin-infographic-card {
+  margin: 24px 0;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(212, 175, 55, 0.08);
+  padding: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  color: #1e293b;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.atfal-admin-infographic-card.dark-theme {
+  background: #0f172a;
+  border-color: rgba(212, 175, 55, 0.2);
+  color: #f8fafc;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+}
+
+/* --------------------------------------------------------------------------
+   GRAND HERO HEADER
+   -------------------------------------------------------------------------- */
+.infographic-hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  flex-wrap: wrap;
+}
+
+.hero-left-col {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hero-badge-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fef08a 0%, #facc15 50%, #d97706 100%);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 16px -2px rgba(217, 119, 6, 0.35);
+  flex-shrink: 0;
+}
+
+.hero-gold-trophy {
+  color: #78350f;
+}
+
+.hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hero-main-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #78350f 0%, #b45309 60%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark-theme .hero-main-title {
+  background: linear-gradient(135deg, #fef08a 0%, #facc15 60%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-year-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(212, 175, 55, 0.15);
+  color: #b45309;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.dark-theme .hero-year-tag {
+  background: rgba(250, 204, 21, 0.12);
+  color: #fef08a;
+  border-color: rgba(250, 204, 21, 0.25);
+}
+
+.hero-subtext {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.dark-theme .hero-subtext {
+  color: #94a3b8;
+}
+
+.hero-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hero-stat-pill {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 8px 14px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 90px;
+}
+
+.dark-theme .hero-stat-pill {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.stat-pill-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.04em;
+}
+
+.dark-theme .stat-pill-label {
+  color: #94a3b8;
+}
+
+.stat-pill-val {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.dark-theme .stat-pill-val {
+  color: #f8fafc;
+}
+
+.stat-pill-val.stat-green {
+  color: #10b981;
+}
+
+.stat-pill-val.stat-gold {
+  color: #d97706;
+}
+
+.dark-theme .stat-pill-val.stat-gold {
+  color: #fbbf24;
+}
+
+/* --------------------------------------------------------------------------
+   SECTION TITLE
+   -------------------------------------------------------------------------- */
+.infographic-section-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 14px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.section-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #b45309;
+}
+
+.dark-theme .section-title-left {
+  color: #facc15;
+}
+
+.section-title-text {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0f172a;
+}
+
+.dark-theme .section-title-text {
+  color: #f8fafc;
+}
+
+.section-sub-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.dark-theme .section-sub-pill {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+.active-month-reminder {
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.dark-theme .active-month-reminder {
+  color: #cbd5e1;
+}
+
+.active-month-reminder strong {
+  color: #b45309;
+}
+
+.dark-theme .active-month-reminder strong {
+  color: #facc15;
+}
+
+/* --------------------------------------------------------------------------
+   6-MONTH INTERACTIVE CARDS GRID
+   -------------------------------------------------------------------------- */
+.month-cards-infographic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.month-infographic-card {
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dark-theme .month-infographic-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.month-infographic-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.1);
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
+.month-infographic-card.selected-month {
+  border-color: #d97706;
+  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+  box-shadow: 0 10px 24px -4px rgba(217, 119, 6, 0.22);
+}
+
+.dark-theme .month-infographic-card.selected-month {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #1c2738 0%, #172233 100%);
+  box-shadow: 0 10px 24px -4px rgba(245, 158, 11, 0.25);
+}
+
+.month-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.month-gem-icon-halo {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.dark-theme .month-gem-icon-halo {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.month-3d-gem {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+.month-status-pill span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 6px;
+}
+
+.tag-completed {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.tag-in-progress {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.tag-pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.month-card-name-group {
+  margin-bottom: 10px;
+}
+
+.month-card-ar {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #94a3b8;
+  direction: rtl;
+}
+
+.month-card-en {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.dark-theme .month-card-en {
+  color: #f8fafc;
+}
+
+/* Progress Block */
+.month-progress-block {
+  margin-bottom: 10px;
+}
+
+.progress-labels-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.dark-theme .progress-labels-row {
+  color: #94a3b8;
+}
+
+.prog-ratio strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.dark-theme .prog-ratio strong {
+  color: #f8fafc;
+}
+
+.month-progress-track {
+  height: 7px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 3px;
+}
+
+.dark-theme .month-progress-track {
+  background: #334155;
+}
+
+.month-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.prog-pct-sub {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-align: right;
+  color: #475569;
+}
+
+.dark-theme .prog-pct-sub {
+  color: #cbd5e1;
+}
+
+/* Month Footer */
+.month-card-footer-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 0.68rem;
+}
+
+.dark-theme .month-card-footer-stats {
+  border-color: #334155;
+}
+
+.footer-stat-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-stat-label {
+  color: #64748b;
+}
+
+.footer-stat-val {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.dark-theme .footer-stat-val {
+  color: #f8fafc;
+}
+
+.top-scorer-col {
+  text-align: right;
+  max-width: 90px;
+}
+
+.top-scorer-col .footer-stat-val {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #b45309;
+}
+
+.dark-theme .top-scorer-col .footer-stat-val {
+  color: #facc15;
+}
+
+.month-card-selected-indicator {
+  margin-top: 10px;
+  padding: 4px 8px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dark-theme .month-card-selected-indicator {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fde68a;
+}
+
+/* --------------------------------------------------------------------------
+   DETAILED STUDENT ROSTER CONTAINER
+   -------------------------------------------------------------------------- */
+.month-details-roster-container {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.dark-theme .month-details-roster-container {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.roster-header-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dark-theme .roster-header-banner {
+  border-color: #334155;
+}
+
+.lead-ar {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #b45309;
+  direction: rtl;
+}
+
+.dark-theme .lead-ar {
+  color: #facc15;
+}
+
+.lead-en {
+  margin: 2px 0 6px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.dark-theme .lead-en {
+  color: #f8fafc;
+}
+
+.roster-meta-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 8px;
+}
+
+.filled-tag {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.avg-tag {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.total-tag {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.dark-theme .total-tag {
+  color: #facc15;
+}
+
+/* Controls */
+.roster-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.roster-search-box {
+  position: relative;
+  min-width: 210px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+
+.roster-search-input {
+  width: 100%;
+  padding: 7px 12px 7px 32px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 0.8rem;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.dark-theme .roster-search-input {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f8fafc;
+}
+
+.roster-search-input:focus {
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+.roster-status-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dark-theme .filter-pill {
+  background: #1e293b;
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+.filter-pill:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.dark-theme .filter-pill:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.filter-pill.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.dark-theme .filter-pill.active {
+  background: #d97706;
+  color: #ffffff;
+  border-color: #d97706;
+}
+
+.sort-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dark-theme .sort-toggle-btn {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f8fafc;
+}
+
+/* --------------------------------------------------------------------------
+   STUDENTS ROSTER GRID
+   -------------------------------------------------------------------------- */
+.students-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.student-roster-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.dark-theme .student-roster-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.student-roster-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px -3px rgba(0, 0, 0, 0.08);
+}
+
+.student-roster-card.top-rank-1 {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px #f59e0b, 0 6px 18px -3px rgba(245, 158, 11, 0.2);
+}
+
+.student-roster-card.top-rank-2 {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 1px #94a3b8, 0 6px 18px -3px rgba(148, 163, 184, 0.2);
+}
+
+.student-roster-card.top-rank-3 {
+  border-color: #ea580c;
+  box-shadow: 0 0 0 1px #ea580c, 0 6px 18px -3px rgba(234, 88, 12, 0.2);
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-avatar-col {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.roster-avatar-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+}
+
+.dark-theme .roster-avatar-img {
+  border-color: #475569;
+}
+
+.roster-avatar-fallback {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.rank-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.top-rank-1 .rank-badge {
+  background: #f59e0b;
+  color: #78350f;
+}
+
+.top-rank-2 .rank-badge {
+  background: #cbd5e1;
+  color: #334155;
+}
+
+.top-rank-3 .rank-badge {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+.student-info-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.student-name-text {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dark-theme .student-name-text {
+  color: #f8fafc;
+}
+
+.trophy-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.student-meta-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+
+.group-badge,
+.its-badge,
+.teacher-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.dark-theme .group-badge,
+.dark-theme .its-badge,
+.dark-theme .teacher-badge {
+  background: #334155;
+  color: #94a3b8;
+}
+
+.status-col {
+  flex-shrink: 0;
+}
+
+.badge-status-filled {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.badge-status-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* 4 Weeks Breakdown */
+.card-weeks-breakdown-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid #f1f5f9;
+}
+
+.dark-theme .card-weeks-breakdown-row {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.week-mini-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.week-mini-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.week-mini-num {
+  color: #64748b;
+}
+
+.week-mini-total {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.dark-theme .week-mini-total {
+  color: #f8fafc;
+}
+
+.week-mini-items {
+  font-size: 0.6rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.dark-theme .week-mini-items {
+  color: #94a3b8;
+}
+
+.item-sep {
+  opacity: 0.4;
+}
+
+/* Total Monthly Progress Bar */
+.card-total-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.total-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.score-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.dark-theme .score-label {
+  color: #94a3b8;
+}
+
+.gems-hero-val {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.dark-theme .gems-hero-val {
+  color: #f8fafc;
+}
+
+.top-rank-1 .gems-hero-val {
+  color: #d97706;
+}
+
+.dark-theme .top-rank-1 .gems-hero-val {
+  color: #fbbf24;
+}
+
+.denom-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-left: 3px;
+}
+
+.total-progress-track {
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dark-theme .total-progress-track {
+  background: #334155;
+}
+
+.total-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.total-progress-bar.bar-gold {
+  background: linear-gradient(90deg, #f59e0b, #fde047);
+}
+
+.total-progress-bar.bar-emerald {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.total-progress-bar.bar-pending {
+  background: linear-gradient(90deg, #94a3b8, #cbd5e1);
+}
+
+.progress-sub-percent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.star-distinction {
+  color: #d97706;
+  font-weight: 800;
+}
+
+/* Empty State */
+.roster-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 20px;
+  color: #64748b;
+}
+
+.empty-sparkle {
+  color: #d97706;
+  margin-bottom: 8px;
+}
+
+.clear-filter-btn {
+  margin-top: 12px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   RESPONSIVE LAYOUTS
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .atfal-admin-infographic-card {
+    padding: 16px;
+  }
+
+  .hero-stats-row {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .month-cards-infographic-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .students-roster-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-controls-right {
+    width: 100%;
+  }
+
+  .roster-search-box {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .month-cards-infographic-grid {
+    grid-template-columns: 1fr;
+  }
+}

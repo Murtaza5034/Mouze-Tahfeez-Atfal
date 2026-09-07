@@ -294,14 +294,14 @@ export default function FirstTimeStudentRegistryModal({
                   className={`first-time-gender-btn male ${gender === "male" ? "active" : ""}`}
                   onClick={() => setGender("male")}
                 >
-                  👦 Boy (طالب)
+                  👦 Male (طالب)
                 </button>
                 <button
                   type="button"
                   className={`first-time-gender-btn female ${gender === "female" ? "active" : ""}`}
                   onClick={() => setGender("female")}
                 >
-                  👧 Girl (طالبة)
+                  👧 Female (طالبة)
                 </button>
               </div>
             </div>
