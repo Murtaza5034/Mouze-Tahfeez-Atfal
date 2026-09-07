@@ -484,9 +484,107 @@
 }
 
 /* --------------------------------------------------------------------------
-   DETAILED STUDENT ROSTER CONTAINER
+   ROSTER PREVIEW CTA STRIP (Used on Overview Home Page)
+   -------------------------------------------------------------------------- */
+.roster-preview-cta-strip {
+  margin-top: 20px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.09), rgba(212, 175, 55, 0.02));
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dark-theme .roster-preview-cta-strip {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(15, 23, 42, 0.7));
+  border-color: rgba(212, 175, 55, 0.35);
+}
+
+.cta-strip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cta-strip-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cta-strip-ar {
+  font-family: 'Amiri', 'Traditional Arabic', serif;
+  font-size: 1.1rem;
+  color: #b45309;
+  font-weight: 700;
+  direction: rtl;
+}
+
+.dark-theme .cta-strip-ar {
+  color: #facc15;
+}
+
+.cta-strip-en {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.dark-theme .cta-strip-en {
+  color: #f8fafc;
+}
+
+.cta-strip-sub {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.dark-theme .cta-strip-sub {
+  color: #94a3b8;
+}
+
+.cta-strip-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #d4af37, #b8941f);
+  color: #ffffff;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.35);
+  flex-shrink: 0;
+}
+
+.cta-strip-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.45);
+}
+
+/* --------------------------------------------------------------------------
+   DETAILED ROSTER CONTAINER
    -------------------------------------------------------------------------- */
 .month-details-roster-container {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
@@ -693,8 +791,11 @@
    -------------------------------------------------------------------------- */
 .students-roster-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .student-roster-card {
@@ -708,6 +809,10 @@
   gap: 12px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .dark-theme .student-roster-card {
@@ -801,8 +906,9 @@
 }
 
 .student-info-col {
-  flex: 1;
+  flex: 1 1 170px;
   min-width: 0; /* prevents overflow in flex child */
+  max-width: 100%;
   overflow: hidden;
 }
 
@@ -810,6 +916,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .student-name-text {
@@ -817,9 +926,8 @@
   font-size: 0.95rem;
   font-weight: 800;
   color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
+  overflow-wrap: break-word;
   max-width: 100%;
 }
 
@@ -1129,6 +1237,17 @@
     border-radius: 14px;
   }
 
+  .roster-preview-cta-strip {
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cta-strip-action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   .month-cards-infographic-grid {
     grid-template-columns: 1fr;
   }
@@ -1151,25 +1270,50 @@
   }
 
   .student-roster-card {
-    padding: 12px;
+    padding: 10px 12px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .card-header-row {
     gap: 8px;
+    width: 100%;
   }
 
-  .student-name-text {
-    font-size: 0.85rem;
+  .student-avatar-col {
+    width: 38px;
+    height: 38px;
   }
 
-  .card-weeks-breakdown-row {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
+  .roster-avatar-img,
+  .roster-avatar-fallback {
+    width: 38px;
+    height: 38px;
+  }
+
+  .student-info-col {
+    flex: 1 1 calc(100% - 50px);
+    min-width: 0;
   }
 
   .status-col {
     width: 100%;
-    margin-top: 4px;
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 2px;
+  }
+
+  .student-name-text {
+    font-size: 0.88rem;
+    line-height: 1.25;
+  }
+
+  .card-weeks-breakdown-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+    padding: 6px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .roster-controls-right {

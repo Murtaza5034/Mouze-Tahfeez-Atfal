@@ -28,8 +28,11 @@ import {
 export default function AtfalLeagueAdminInfographic({
   students = [],
   isDarkMode = false,
+  showRoster = true,
+  onNavigateToTracking = null,
+  initialMonth = "safar",
 }) {
-  const [selectedMonthId, setSelectedMonthId] = useState("safar");
+  const [selectedMonthId, setSelectedMonthId] = useState(initialMonth || "safar");
   const [leagueEntries, setLeagueEntries] = useState([]);
   const [childProfilesMap, setChildProfilesMap] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -482,7 +485,7 @@ export default function AtfalLeagueAdminInfographic({
               {/* Active Arrow Indicator */}
               {isSelected && (
                 <div className="month-card-selected-indicator">
-                  <span>Selected Month • View Roster Below</span>
+                  <span>{showRoster ? "Selected Month • View Roster Below" : "Selected Month • Open Tracking Below"}</span>
                   <ChevronRight size={14} />
                 </div>
               )}
@@ -494,7 +497,29 @@ export default function AtfalLeagueAdminInfographic({
       {/* ----------------------------------------------------------------- */}
       {/* DETAILED STUDENT ROSTER FOR SELECTED MONTH */}
       {/* ----------------------------------------------------------------- */}
-      <div className="month-details-roster-container">
+      {!showRoster ? (
+        <div className="roster-preview-cta-strip">
+          <div className="cta-strip-info">
+            <div className="cta-strip-title">
+              <span className="cta-strip-ar">{activeMonthInfo.nameAr}</span>
+              <span className="cta-strip-en">{activeMonthInfo.nameEn} — Student Marks Roster</span>
+            </div>
+            <div className="cta-strip-sub">
+              {activeMonthInfo.filledCount} of {activeMonthInfo.totalStudentsCount} Filled • Class Avg: {activeMonthInfo.avgGems}/480 Gems • Total: {activeMonthInfo.totalGemsInMonth} Gems
+            </div>
+          </div>
+          {onNavigateToTracking && (
+            <button
+              type="button"
+              className="cta-strip-action-btn"
+              onClick={() => onNavigateToTracking(selectedMonthId)}
+            >
+              <Trophy size={16} /> Open Full Tracking & Student Marks <ChevronRight size={16} />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="month-details-roster-container">
         <div className="roster-header-banner">
           <div className="roster-header-left">
             <div className="month-lead-badge">
@@ -723,6 +748,7 @@ export default function AtfalLeagueAdminInfographic({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

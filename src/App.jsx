@@ -90,7 +90,6 @@ import {
   Edit2,
   Book,
   Headphones,
-  Trophy,
 } from "lucide-react";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import Login from "./Login";
@@ -13100,7 +13099,15 @@ const handleDownloadAllReports = async () => {
 
   const sidebarLinks = ["Rank Preview", "Student Registry", "Staff Profiles", "Assignments", "Portal Access", "Faculty", "Notifications", "User Issues", "Leave Management", "Teacher Leaves", "Event Leave", "Report Settings", "Jadwal Settings", "Jadwal Tracking", "Results Archive", "Attendance Records", "Attendance Tracking", "Online Tahfeez Tracking", "Help Management", "Global Settings", "Email Settings", "App Update"];
   const isKibarAdmin = portalRole === "kibar-admin";
-  const navPages = ["Overview", "Hifz League Tracking", "Quick Student Access", "Quick Access Pages", "Admin Access", "Schedule", "Result Tracking"];
+  const navPages = [
+    "Overview",
+    ...(!isKibarAdmin ? ["Hifz League Tracking"] : []),
+    "Quick Student Access",
+    "Quick Access Pages",
+    "Admin Access",
+    "Schedule",
+    "Result Tracking"
+  ];
 
   const userAssignedRoles = user ? getAssignedRoles(user) : [];
   const isSuperAdmin = user?.email?.toLowerCase() === "mh.developer53@gmail.com";
@@ -14585,7 +14592,16 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             </div>
 
             {!isKibarAdmin && (
-              <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
+              <>
+                <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
+                <AtfalLeagueAdminInfographic
+                  students={students}
+                  showRoster={false}
+                  onNavigateToTracking={() => {
+                    setActivePage("Hifz League Tracking");
+                  }}
+                />
+              </>
             )}
             </>
           )}
@@ -14593,7 +14609,7 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
           {activePage === "Hifz League Tracking" && !isKibarAdmin && (
             <div className="overview-container fade-in" style={{ marginTop: 0 }}>
               <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
-              <AtfalLeagueAdminInfographic students={students} />
+              <AtfalLeagueAdminInfographic students={students} showRoster={true} />
             </div>
           )}
 
