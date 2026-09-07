@@ -31,6 +31,43 @@ export function getRefreshReg() {
         return code;
       }
     },
+    // Dev proxy for /api/image-proxy — lets html2canvas download images without CORS
+    {
+      name: 'dev-image-proxy',
+      configureServer(server) {
+        server.middlewares.use('/api/image-proxy', async (req, res) => {
+          try {
+            const urlObj = new URL(req.url, 'http://localhost');
+            const targetUrl = urlObj.searchParams.get('url');
+            if (!targetUrl) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Missing url' }));
+              return;
+            }
+            const upstream = await fetch(targetUrl);
+            if (!upstream.ok) {
+              res.statusCode = upstream.status;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `Upstream HTTP ${upstream.status}` }));
+              return;
+            }
+            const arrayBuf = await upstream.arrayBuffer();
+            const buf = Buffer.from(arrayBuf);
+            const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+            const base64 = buf.toString('base64');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ dataUrl: `data:${contentType};base64,${base64}` }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+      }
+    },
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'inline',

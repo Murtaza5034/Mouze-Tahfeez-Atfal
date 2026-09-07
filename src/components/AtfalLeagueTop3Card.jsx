@@ -215,42 +215,55 @@ export default function AtfalLeagueTop3Card({
     return getPodiumOrder(top3Players);
   }, [top3Players]);
 
-  // Helper: fetch any URL as a base64 data-URL, bypassing CORS via canvas proxy
+  // Helper: fetch any URL as a base64 data-URL.
+  // Primary: uses /api/image-proxy (Vercel serverless in prod, Vite middleware in dev)
+  // which fetches the image server-side — 100% CORS-free for html2canvas.
+  // Fallbacks: direct fetch then canvas crossOrigin for same-origin images.
   const fetchAsDataURL = async (url) => {
     if (!url) return null;
-    // Already a data URL or local blob
     if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+
+    // 1. Try via our server-side image proxy (bypasses all CORS)
     try {
-      // Try fetch with cors mode first
+      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.dataUrl) return json.dataUrl;
+      }
+    } catch (_) {}
+
+    // 2. Direct fetch with CORS mode (works if server has permissive CORS)
+    try {
       const res = await fetch(url, { mode: "cors" });
-      if (!res.ok) throw new Error("fetch failed");
-      const blob = await res.blob();
-      return await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-      });
-    } catch (_) {
-      // Fallback: draw into canvas via Image with crossOrigin
-      return await new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          try {
-            const c = document.createElement("canvas");
-            c.width = img.naturalWidth || 200;
-            c.height = img.naturalHeight || 200;
-            c.getContext("2d").drawImage(img, 0, 0);
-            resolve(c.toDataURL("image/png"));
-          } catch {
-            resolve(null);
-          }
-        };
-        img.onerror = () => resolve(null);
-        // Add cache-bust to bypass CORS preflight cache
-        img.src = url.includes("?") ? url + "&_cb=" + Date.now() : url + "?_cb=" + Date.now();
-      });
-    }
+      if (res.ok) {
+        const blob = await res.blob();
+        return await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+      }
+    } catch (_) {}
+
+    // 3. Canvas crossOrigin draw (last resort)
+    return await new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const c = document.createElement("canvas");
+          c.width = img.naturalWidth || 200;
+          c.height = img.naturalHeight || 200;
+          c.getContext("2d").drawImage(img, 0, 0);
+          resolve(c.toDataURL("image/png"));
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url.includes("?") ? `${url}&_cb=${Date.now()}` : `${url}?_cb=${Date.now()}`;
+    });
   };
 
   // 5. Download Card in Full A4 Landscape Canvas (4K quality)
