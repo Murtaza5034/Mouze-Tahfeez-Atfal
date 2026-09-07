@@ -215,7 +215,45 @@ export default function AtfalLeagueTop3Card({
     return getPodiumOrder(top3Players);
   }, [top3Players]);
 
-  // 5. Download Card in Full A4 Landscape Canvas
+  // Helper: fetch any URL as a base64 data-URL, bypassing CORS via canvas proxy
+  const fetchAsDataURL = async (url) => {
+    if (!url) return null;
+    // Already a data URL or local blob
+    if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+    try {
+      // Try fetch with cors mode first
+      const res = await fetch(url, { mode: "cors" });
+      if (!res.ok) throw new Error("fetch failed");
+      const blob = await res.blob();
+      return await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (_) {
+      // Fallback: draw into canvas via Image with crossOrigin
+      return await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const c = document.createElement("canvas");
+            c.width = img.naturalWidth || 200;
+            c.height = img.naturalHeight || 200;
+            c.getContext("2d").drawImage(img, 0, 0);
+            resolve(c.toDataURL("image/png"));
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        // Add cache-bust to bypass CORS preflight cache
+        img.src = url.includes("?") ? url + "&_cb=" + Date.now() : url + "?_cb=" + Date.now();
+      });
+    }
+  };
+
+  // 5. Download Card in Full A4 Landscape Canvas (4K quality)
   const handleDownloadA4Landscape = async () => {
     if (!cardCaptureRef.current || isDownloading) return;
     setIsDownloading(true);
@@ -226,7 +264,27 @@ export default function AtfalLeagueTop3Card({
 
       const targetEl = cardCaptureRef.current;
 
-      // Ensure local/system fonts are loaded in window before capture
+      // --- PRE-FETCH ALL PROFILE IMAGES AS BASE64 ---
+      // This solves the CORS blank image problem: html2canvas can't load
+      // cross-origin Firebase Storage URLs, so we fetch them ourselves first
+      // and replace the <img> src in the live DOM temporarily.
+      const imgEls = Array.from(targetEl.querySelectorAll("img.top3-player-photo"));
+      const originalSrcs = imgEls.map((el) => el.src);
+      const base64Srcs = await Promise.all(imgEls.map((el) => fetchAsDataURL(el.src)));
+      // Swap to base64 before capture
+      imgEls.forEach((el, i) => {
+        if (base64Srcs[i]) el.src = base64Srcs[i];
+      });
+
+      // Pre-fetch gem icons too
+      const gemEls = Array.from(targetEl.querySelectorAll("img.top3-gem-icon"));
+      const origGemSrcs = gemEls.map((el) => el.src);
+      const base64GemSrcs = await Promise.all(gemEls.map((el) => fetchAsDataURL(el.src)));
+      gemEls.forEach((el, i) => {
+        if (base64GemSrcs[i]) el.src = base64GemSrcs[i];
+      });
+
+      // Ensure fonts are loaded
       try {
         await Promise.race([
           document.fonts ? document.fonts.ready : Promise.resolve(),
@@ -234,16 +292,20 @@ export default function AtfalLeagueTop3Card({
         ]);
       } catch (_) {}
 
-      // Capture options for full A4 landscape fit (297 : 210 ratio) with high DPI and zero white margins
+      // A4 landscape at 4K: 297mm × 210mm at ~144dpi → 1684×1190, scale=4 gives ~4K
+      const A4_W = 1188;
+      const A4_H = 840;
+      const SCALE = 4; // 4K output
+
       const canvas = await html2canvas(targetEl, {
-        scale: 2.0,
+        scale: SCALE,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#fcf8ef",
-        width: 1188,
-        height: 840,
-        windowWidth: 1188,
-        windowHeight: 840,
+        width: A4_W,
+        height: A4_H,
+        windowWidth: A4_W,
+        windowHeight: A4_H,
         logging: false,
         onclone: async (clonedDoc) => {
           // 1. Inject @font-face and exact A4 landscape rules into cloned document
@@ -264,23 +326,26 @@ export default function AtfalLeagueTop3Card({
               font-style: normal;
             }
             .league-top3-capture-box {
-              width: 1188px !important;
-              height: 840px !important;
-              min-height: 840px !important;
-              max-height: 840px !important;
+              width: ${A4_W}px !important;
+              height: ${A4_H}px !important;
+              min-height: ${A4_H}px !important;
+              max-height: ${A4_H}px !important;
               border-radius: 0px !important;
               box-shadow: none !important;
               margin: 0 !important;
-              padding: 24px 38px 18px !important;
+              padding: 20px 38px 14px !important;
               box-sizing: border-box !important;
               display: flex !important;
               flex-direction: column !important;
-              justify-content: space-between !important;
+              justify-content: flex-start !important;
+              align-items: stretch !important;
+              gap: 0 !important;
               background: radial-gradient(circle at 50% 18%, #ffffff 0%, #fdfaf3 45%, #f6edd9 100%) !important;
               overflow: hidden !important;
             }
             .top3-parchment-header {
-              margin-bottom: 10px !important;
+              margin-bottom: 8px !important;
+              flex-shrink: 0 !important;
             }
             .top3-arabic-title, .top3-ribbon-ar, .podium-ar-rank, .stamp-ar {
               font-family: 'Kanz al Marjaan', 'Al-Kanz', 'Amiri', serif !important;
@@ -308,8 +373,10 @@ export default function AtfalLeagueTop3Card({
               align-items: flex-end !important;
               justify-content: center !important;
               gap: 24px !important;
+              margin-top: 4px !important;
               margin-bottom: 6px !important;
               flex: 1 !important;
+              flex-shrink: 0 !important;
             }
             .top3-player-card {
               max-width: 320px !important;
@@ -317,23 +384,34 @@ export default function AtfalLeagueTop3Card({
               box-sizing: border-box !important;
             }
             .top3-player-card.rank-gold {
-              height: 440px !important;
-              min-height: 440px !important;
-              max-height: 440px !important;
+              height: 430px !important;
+              min-height: 430px !important;
+              max-height: 430px !important;
             }
             .top3-player-card.rank-silver, .top3-player-card.rank-bronze {
-              height: 405px !important;
-              min-height: 405px !important;
-              max-height: 405px !important;
+              height: 395px !important;
+              min-height: 395px !important;
+              max-height: 395px !important;
             }
             .top3-card-footer {
-              margin-top: 4px !important;
+              margin-top: 6px !important;
               padding-top: 6px !important;
+              flex-shrink: 0 !important;
             }
           `;
           clonedDoc.head.appendChild(fontStyle);
 
-          // 2. Reshape all Arabic texts for canvas rendering so ligatures are 100% connected
+          // 2. Swap profile photos to base64 in cloned doc too
+          const clonedImgEls = Array.from(clonedDoc.querySelectorAll("img.top3-player-photo"));
+          clonedImgEls.forEach((el, i) => {
+            if (base64Srcs[i]) el.src = base64Srcs[i];
+          });
+          const clonedGemEls = Array.from(clonedDoc.querySelectorAll("img.top3-gem-icon"));
+          clonedGemEls.forEach((el, i) => {
+            if (base64GemSrcs[i]) el.src = base64GemSrcs[i];
+          });
+
+          // 3. Reshape all Arabic texts for canvas rendering so ligatures are 100% connected
           const reshapeSelectors = [
             ".top3-arabic-title",
             ".top3-ribbon-ar",
@@ -348,7 +426,7 @@ export default function AtfalLeagueTop3Card({
             });
           });
 
-          // Wait for fonts to be ready in clone
+          // Wait for fonts + images to be ready in clone
           try {
             await Promise.race([
               clonedDoc.fonts ? clonedDoc.fonts.ready : Promise.resolve(),
@@ -357,6 +435,10 @@ export default function AtfalLeagueTop3Card({
           } catch (_) {}
         },
       });
+
+      // Restore original srcs in live DOM after capture
+      imgEls.forEach((el, i) => { el.src = originalSrcs[i]; });
+      gemEls.forEach((el, i) => { el.src = origGemSrcs[i]; });
 
       const imgData = canvas.toDataURL("image/png", 1.0);
       const downloadLink = document.createElement("a");
