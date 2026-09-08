@@ -8306,6 +8306,7 @@ function ParentPortal({
         searchQuery={tahfeezSearchQuery}
         onSearchChange={setTahfeezSearchQuery}
         activeSessions={activeSessions}
+        onMenuOpen={() => setMenuOpen(true)}
         role={portalRole && portalRole.includes("student") ? "student" : "parent"}
         currentUserId={user?.id || user?.user_metadata?.sub}
         currentUserName={parentData?.full_name || parentData?.name || user?.user_metadata?.full_name}
@@ -8446,7 +8447,7 @@ function ParentPortal({
         </div>
       </aside>
 
-        <header className="parent-topbar">
+        {activePage !== "Online Tahfeez" && <header className="parent-topbar">
           <div className="parent-topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button className="topbar-menu-btn" onClick={() => setMenuOpen(true)}>
               <Menu size={22} />
@@ -8520,7 +8521,7 @@ function ParentPortal({
               <Power size={22} />
             </button>
           </div>
-        </header>
+        </header>}
 
       <main className="parent-main">
         {actionMessage && (
@@ -15515,25 +15516,27 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
 
           {activePage === "Result Tracking" ? (
             <div className="overview-container fade-in">
-              <div className="card-headline headline-with-action card-appear" style={{ marginBottom: '20px', backgroundColor: 'var(--white)', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-                <div className="headline-left">
-                  <Eye size={20} style={{ color: 'var(--primary-gold)' }} />
-                  <h3 style={{ color: 'var(--deep-brown)', margin: 0 }}>Parent Report View Tracking</h3>
+              <div className="card-headline headline-with-action card-appear" style={{ marginBottom: '20px', backgroundColor: 'var(--white)', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', justifyContent: 'space-between' }}>
+                {/* Left: Icon + Title */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: '1 1 160px' }}>
+                  <Eye size={20} style={{ color: 'var(--primary-gold)', flexShrink: 0 }} />
+                  <h3 style={{ color: 'var(--deep-brown)', margin: 0, fontSize: '1rem', fontWeight: 700, lineHeight: 1.3 }}>Parent Report View Tracking</h3>
                 </div>
-                <div className="headline-right" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)' }}></div>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Viewed</span>
+                {/* Right: Legends + Button — wraps on mobile */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', flex: '1 1 auto', justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#2ec4b6', boxShadow: '0 0 8px rgba(46,196,182,0.8)', flexShrink: 0 }}></div>
+                    <span style={{ fontSize: '0.88rem', color: 'var(--soft-brown)', fontWeight: '600', whiteSpace: 'nowrap' }}>Viewed</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)' }}></div>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--soft-brown)', fontWeight: '600' }}>Not Viewed</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#e71d36', boxShadow: '0 0 8px rgba(231,29,54,0.8)', flexShrink: 0 }}></div>
+                    <span style={{ fontSize: '0.88rem', color: 'var(--soft-brown)', fontWeight: '600', whiteSpace: 'nowrap' }}>Not Viewed</span>
                   </div>
                   <button
                     type="button"
                     className="action-button premium"
                     onClick={renewParentViewCounts}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '8px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap', flexShrink: 0 }}
                     title="Reset all parent view counts so parents see the latest report card as new"
                   >
                     <RotateCw size={14} /> Renew Count
@@ -21533,6 +21536,7 @@ function TeacherPortal({
         searchQuery={tahfeezSearchQuery}
         onSearchChange={setTahfeezSearchQuery}
         activeSessions={activeSessions}
+        onMenuOpen={() => setMenuOpen(true)}
         role="teacher"
         currentUserId={user?.id || user?.user_metadata?.sub}
         teacherId={portalAccess?.its || portalAccess?.id || teacherIdentity || user?.id}
@@ -21649,7 +21653,7 @@ function TeacherPortal({
       </aside>
 
       <main className="admin-main">
-        <header className="topbar admin-topbar-dynamic">
+        {activePage !== "Online Tahfeez" && <header className="topbar admin-topbar-dynamic">
           <div className="admin-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button className="topbar-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -21683,7 +21687,7 @@ function TeacherPortal({
               <Power size={22} />
             </button>
           </div>
-        </header>
+        </header>}
 
         <section className="admin-content-pad">
           {(activePage === "My Group" || activePage === "Fill Result" || activePage === "Overview") && (

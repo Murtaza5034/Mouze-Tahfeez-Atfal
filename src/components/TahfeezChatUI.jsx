@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, Users, Phone, BarChart2, Edit2, Book, MessageCircle, 
   Video, ArrowLeft, Lock, Clock, AlertCircle, CheckCircle2, 
-  Sparkles, X, ShieldAlert, Wifi,
+  Sparkles, X, ShieldAlert, Wifi, Menu,
   Mic, Send, Smile, Paperclip, Camera, Play, Pause, Trash2, CheckCheck, Loader2,
   UserPlus, Plus, AlertTriangle, Check
 } from 'lucide-react';
@@ -22,6 +22,7 @@ export default function TahfeezChatUI({
   onSearchChange,
   onCallAction,
   onSendMessage,
+  onMenuOpen = null,
   activeSessions = {},
   role = "teacher", // "teacher", "parent", or "student"
   currentUserId,
@@ -809,10 +810,7 @@ export default function TahfeezChatUI({
   return (
     <div className={`tahfeez-chat-container fade-in ${activeChat ? 'mobile-chat-active' : ''}`} style={{
       display: "flex",
-      height: "calc(100vh - 80px)",
       background: "var(--bg-color)",
-      overflow: "hidden",
-      borderTop: "1px solid var(--border-color)",
     }}>
       <style>{`
         /* WhatsApp-styled Chat System & Dynamic Mobile Adaptation */
@@ -1107,23 +1105,24 @@ export default function TahfeezChatUI({
         .typing-dot:nth-child(1) { animation-delay: -0.32s; }
         .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
+        /* ── Full-screen fix for ALL screen sizes ── */
+        body:has(.tahfeez-chat-container) {
+          overflow: hidden !important;
+        }
+        .tahfeez-chat-container {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          height: 100vh !important;
+          width: 100vw !important;
+          z-index: 990 !important;
+          border-top: none !important;
+        }
+
         @media (max-width: 768px) {
-          body {
-            overflow: hidden !important;
-          }
-          .tahfeez-chat-container {
-            position: fixed !important;
-            top: 70px !important;
-            bottom: 95px !important;
-            left: 0 !important;
-            right: 0 !important;
-            height: auto !important;
-            width: 100% !important;
-            z-index: 990 !important;
-            border-top: none !important;
-          }
           .tahfeez-chat-container.mobile-chat-active {
-            bottom: 0 !important;
             z-index: 1100 !important;
           }
           .mobile-hide-sidebar { display: none !important; }
@@ -1144,8 +1143,57 @@ export default function TahfeezChatUI({
         position: "relative",
         zIndex: 10
       }}>
-        {/* Search Bar */}
-        <div style={{ padding: "14px 16px 10px", borderBottom: role === "teacher" ? "none" : "1px solid var(--border-color)" }}>
+        {/* Sidebar Top Header — Menu + Search */}
+        <div style={{
+          padding: "12px 14px 10px",
+          borderBottom: "1px solid var(--border-color)",
+          background: "var(--sidebar-bg)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px"
+        }}>
+          {/* Menu button row */}
+          {onMenuOpen && (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <button
+                onClick={onMenuOpen}
+                title="Open Navigation Menu"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "38px",
+                  height: "38px",
+                  minWidth: "38px",
+                  borderRadius: "12px",
+                  background: "linear-gradient(135deg, var(--primary-gold, #c5a059) 0%, var(--dark-gold, #a0823a) 100%)",
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: "0 2px 10px rgba(197,160,89,0.35), 0 1px 3px rgba(0,0,0,0.12)",
+                  transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                  flexShrink: 0
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.07)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(197,160,89,0.5)"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(197,160,89,0.35), 0 1px 3px rgba(0,0,0,0.12)"; }}
+              >
+                <Menu size={18} color="#ffffff" strokeWidth={2.2} />
+              </button>
+              <span style={{
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                color: "var(--text-color, #111b21)",
+                letterSpacing: "0.01em",
+                flex: 1,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }}>
+                {role === "teacher" ? "Online Tahfeez" : "Online Tahfeez"}
+              </span>
+            </div>
+          )}
+          {/* Search Bar */}
           <div style={{
             display: "flex",
             alignItems: "center",
