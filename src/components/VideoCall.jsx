@@ -42,15 +42,7 @@ function buildIceServers() {
   const stunUrls = [
     "stun:stun.l.google.com:19302",
     "stun:stun1.l.google.com:19302",
-    "stun:stun2.l.google.com:19302",
-    "stun:stun3.l.google.com:19302",
-    "stun:stun4.l.google.com:19302",
-    "stun:global.stun.twilio.com:3478",
     "stun:stun.cloudflare.com:3478",
-    "stun:stun.services.mozilla.com:3478",
-    "stun:stun.nextcloud.com:443",
-    "stun:stun.sipgate.net:3478",
-    "stun:stun.voipbuster.com:3478"
   ];
 
   const servers = [
@@ -60,6 +52,7 @@ function buildIceServers() {
         "turn:openrelay.metered.ca:80",
         "turn:openrelay.metered.ca:443",
         "turn:openrelay.metered.ca:443?transport=tcp",
+        "turns:openrelay.metered.ca:443?transport=tcp",
       ],
       username: "openrelay",
       credential: "openrelay"
@@ -79,7 +72,7 @@ function buildIceServers() {
 
   return {
     iceServers: servers,
-    iceCandidatePoolSize: 10,
+    iceCandidatePoolSize: 2,
   };
 }
 
@@ -93,10 +86,17 @@ function tuneSdpForVocalClarity(sdp) {
   const opusPt = rtpmapMatch[1];
   const fmtpRegex = new RegExp(`(a=fmtp:${opusPt} [^\\r\\n]*)`, "g");
 
-  return sdp.replace(fmtpRegex, (line) => {
-    if (/maxaveragebitrate=/.test(line)) return line;
-    return `${line};maxaveragebitrate=64000;stereo=0;sprop-stereo=0;useinbandfec=1;minptime=10;cng=off`;
-  });
+  if (fmtpRegex.test(sdp)) {
+    return sdp.replace(fmtpRegex, (line) => {
+      if (/maxaveragebitrate=/.test(line)) return line;
+      return `${line};maxaveragebitrate=64000;stereo=0;sprop-stereo=0;useinbandfec=1;minptime=10;cng=off`;
+    });
+  } else {
+    return sdp.replace(
+      rtpmapMatch[0],
+      `${rtpmapMatch[0]}\r\na=fmtp:${opusPt} minptime=10;useinbandfec=1;maxaveragebitrate=64000;stereo=0;sprop-stereo=0;cng=off`
+    );
+  }
 }
 
 // Hook for draggable + 4-corner drag resizing (desktop) + two-finger pinch-to-resize (mobile) portrait floating PiP
@@ -1029,9 +1029,10 @@ export default function VideoCall({ call, onClose }) {
     audioGraphReadyRef.current = true;
 
     // Use native <audio> element for reliable playback.
-    // Note: do NOT set .muted here — the JSX prop (muted={isSpectator}) controls it;
-    // imperative .muted assignment gets overridden by React on the next re-render.
     if (remoteAudioRef.current) {
+      if (remoteAudioRef.current.srcObject !== remoteStream) {
+        remoteAudioRef.current.srcObject = remoteStream;
+      }
       remoteAudioRef.current.volume = 1.0;
       remoteAudioRef.current.play().then(() => {
         setAudioBlocked(false);
@@ -1040,8 +1041,6 @@ export default function VideoCall({ call, onClose }) {
       });
     }
 
-    // Only use AudioContext for the speaking indicator (AnalyserNode).
-    // Do NOT route to ctx.destination to avoid double playback / Web Audio API silent bugs.
     try {
       const ctx = ensureAudioContext();
       if (!ctx) return;
@@ -1054,13 +1053,19 @@ export default function VideoCall({ call, onClose }) {
       remoteSrc.connect(remoteAnalyser);
       remoteAnalyserRef.current = remoteAnalyser;
 
+      // Create and configure gain node for boost
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = getTargetGain();
+      gainNodeRef.current = gainNode;
+
       ctx.onstatechange = () => {
         if (ctx.state === "suspended") setAudioBlocked(true);
+        else setAudioBlocked(false);
       };
     } catch (e) {
       console.warn("[Audio] Remote analyser setup failed:", e);
     }
-  }, [ensureAudioContext, isSpectator]);
+  }, [ensureAudioContext, getTargetGain]);
 
   // Single, continuously-running speaking-indicator loop (previously a new
   // requestAnimationFrame loop was started on every ontrack event, stacking
@@ -1526,8 +1531,6 @@ export default function VideoCall({ call, onClose }) {
                 echoCancellation: true,
                 noiseSuppression: false, // Don't clip soft recitation phonemes
                 autoGainControl: true,
-                channelCount: 1,
-                sampleRate: 48000,
               },
             });
             setCamOn(true);
@@ -1845,6 +1848,7 @@ export default function VideoCall({ call, onClose }) {
             const data = change.doc.data();
             // Accept any valid candidate from the other role created during this session
             if (data && data.senderRole !== role && data.candidate) {
+              if (data.sessionId && data.sessionId !== sessionIdRef.current) return;
               const now = Date.now();
               if (data.createdAt && (now - data.createdAt > 180000)) {
                 return; // ignore stale candidates from past calls
@@ -1930,22 +1934,32 @@ export default function VideoCall({ call, onClose }) {
         if (offerData.sdp === lastProcessedOfferSdp) return; // Ignore duplicate offers from snapshots
 
         if (pc.signalingState !== "stable") {
-          // Queue the offer; process it once we return to stable state
-          pendingOfferData = offerData;
-          const pollStable = () => {
-            if (endedRef.current || !pcRef.current) return;
-            if (pcRef.current.signalingState === "stable") {
-              const queued = pendingOfferData;
-              pendingOfferData = null;
-              if (queued && queued.sdp !== lastProcessedOfferSdp) {
-                processOffer(queued);
-              }
-            } else {
-              setTimeout(pollStable, 200);
+          // Polite peer: if we are callee and have an offer collision (glare), rollback our local offer
+          if (role === "callee" && pc.signalingState === "have-local-offer") {
+            try {
+              console.log("[WebRTC] Polite callee rolling back local offer to accept incoming offer");
+              await pc.setLocalDescription({ type: "rollback" });
+            } catch (rbErr) {
+              console.warn("[WebRTC] Rollback note:", rbErr);
             }
-          };
-          setTimeout(pollStable, 200);
-          return;
+          } else {
+            // Queue the offer; process it once we return to stable state
+            pendingOfferData = offerData;
+            const pollStable = () => {
+              if (endedRef.current || !pcRef.current) return;
+              if (pcRef.current.signalingState === "stable") {
+                const queued = pendingOfferData;
+                pendingOfferData = null;
+                if (queued && queued.sdp !== lastProcessedOfferSdp) {
+                  processOffer(queued);
+                }
+              } else {
+                setTimeout(pollStable, 200);
+              }
+            };
+            setTimeout(pollStable, 200);
+            return;
+          }
         }
 
         await processOffer(offerData);
@@ -2003,7 +2017,12 @@ export default function VideoCall({ call, onClose }) {
             if (!data || data.sessionId !== currentSessionId) return;
 
             if (data.status === "ended") {
-              handleEnd();
+              const callStartMs = call?.startedAt ? new Date(call.startedAt).getTime() : 0;
+              const endedAtMs = Number(data.ended_at) || 0;
+              if (initialNegotiationDoneRef.current || (endedAtMs > callStartMs && endedAtMs > Date.now() - 30000)) {
+                handleEnd();
+                return;
+              }
               return;
             }
 
@@ -2044,7 +2063,13 @@ export default function VideoCall({ call, onClose }) {
           if (!data) return;
 
           if (data.status === "ended") {
-            handleEnd();
+            const callStartMs = call?.startedAt ? new Date(call.startedAt).getTime() : 0;
+            const endedAtMs = Number(data.ended_at) || 0;
+            if (initialNegotiationDoneRef.current || (endedAtMs > callStartMs && endedAtMs > Date.now() - 30000)) {
+              handleEnd();
+              return;
+            }
+            // Ignore stale ended status from previous session
             return;
           }
 
@@ -2187,7 +2212,7 @@ export default function VideoCall({ call, onClose }) {
       }
       localVideoRef.current.play().catch(() => {});
     }
-  }, [quranOpen, isTeacherMinimized, layoutMode, camOn, status]);
+  }, [quranOpen, isTeacherMinimized, layoutMode, camOn, status, hasRemoteVideo, hasRemoteAudio]);
 
   if (!call) return null;
 
@@ -2203,7 +2228,14 @@ export default function VideoCall({ call, onClose }) {
     error: "Error",
   }[status] || status;
 
-  const showRemoteVideo = peerCamOn && hasRemoteVideo;
+  const hasLiveRemoteVideoTrack = Boolean(
+    hasRemoteVideo &&
+    remoteStreamRef.current &&
+    remoteStreamRef.current.getVideoTracks().some(
+      (t) => t.enabled && t.readyState === "live" && !t.muted
+    )
+  );
+  const showRemoteVideo = (peerCamOn || hasLiveRemoteVideoTrack) && hasRemoteVideo;
 
   // If teacher minimized the call into floating in-app mini player (Portrait + Movable + 4-Corner Resizable + Pinch-Resizable)
   if (isTeacher && isTeacherMinimized) {
