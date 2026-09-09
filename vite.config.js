@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => ({
   define: {
-    __APP_VERSION__: JSON.stringify("1.5.42"),
+    __APP_VERSION__: JSON.stringify("1.5.43"),
     __APP_VERSION_CODE__: JSON.stringify(86),
   },
   plugins: [
@@ -193,3 +193,4 @@ export function getRefreshReg() {
     allowedHosts: true,
   },
 }))
+

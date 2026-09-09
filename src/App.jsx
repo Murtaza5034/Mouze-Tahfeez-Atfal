@@ -116,12 +116,16 @@ import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
 import OverviewCard, { RehalIcon, SegmentedGoldBar } from "./components/OverviewCard";
+import MarhalaResultsPage from "./components/MarhalaResultsPage";
+import MarhalaMonthlyPage from "./components/MarhalaMonthlyPage";
+import { calculateMarhalaRanks, getMarhalaRankForStudent, getMarhalaOverview, getJadeedTrendForStudent, getExactMarhalaRankForStudent } from "./utils/marhalaRanking";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
 import "./admin-sidebar.css";
 import "./parent-portal.css";
 import "./premium-today-schedule.css";
+import "./marhala-results.css";
 
 const LottieTrophy = ({ size = 120 }) => {
   return (
@@ -1201,7 +1205,7 @@ const NAV_ICONS = {
   "Global Settings": Settings,
   "Messages": MessageCircle,
   "Email Settings": Mail,
-  "Rank Preview": TrendingUp,"App Update": FileArchive,"Quick Access Pages": Eye,"Admin Access": ShieldCheck,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,"Online Tahfeez Tracking": Video,"Help Management": HelpCircle,"Hifz League Tracking": Trophy,
+  "Rank Preview": TrendingUp,"Marhala Results": Trophy,"Monthly Results": Calendar,"App Update": FileArchive,"Quick Access Pages": Eye,"Admin Access": ShieldCheck,"Jadwal Tracking": Calendar,"Results Archive": FileArchive,"Attendance Records": CalendarCheck,"Attendance Tracking": ClipboardCheck,"Event Leave": CalendarX,"Online Tahfeez Tracking": Video,"Help Management": HelpCircle,"Hifz League Tracking": Trophy,
 };
 
 const emptyParentData = {
@@ -2871,6 +2875,13 @@ async function findKibarStudentProfile(userId, email = null) {
 let globalRanksCache = { data: null, fetchedAt: 0 };
 const GLOBAL_RANKS_TTL = 2 * 60 * 1000; // 2 minutes
 
+/* Full weekly_results table (live + archive) from the latest parent-portal
+   load. Parents fetch the whole table but only their own profiles — this lets
+   the Report Card compute the EXACT full-cohort Marhala rank (same as the
+   admin table) instead of a wrong family-subset rank. Never cached to
+   localStorage, never rendered. */
+let parentFullResultsCache = [];
+
 async function fetchGlobalRanks() {
   if (globalRanksCache.data && Date.now() - globalRanksCache.fetchedAt < GLOBAL_RANKS_TTL) {
     return globalRanksCache.data;
@@ -3543,9 +3554,34 @@ function ReadJadwalView({ scheduleData, mode, editHistory }) {
   );
 }
 
-function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles = []) {
+function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles = [], section = null) {
+  // ── Section isolation (atfal <-> kibar): docs carry the app's own
+  // convention flags (is_kibar / is_kibar_student / section). A Kibar doc
+  // sitting in the shared collection must never appear in Atfal portals
+  // (admin / teacher / parents) and vice versa. Unflagged legacy docs are
+  // treated as Atfal (the original dataset) on the atfal side, and kept by
+  // collection on the kibar side. section=null keeps everything (unchanged).
+  const isKibarDoc = (d) => {
+    if (!d || typeof d !== "object") return false;
+    if (d.is_kibar === true || d.is_kibar_student === true) return true;
+    return String(d.section || "").trim().toLowerCase() === "kibar";
+  };
+  const isAtfalDoc = (d) => {
+    if (!d || typeof d !== "object") return false;
+    if (isKibarDoc(d)) return false;
+    return String(d.section || "").trim().toLowerCase() === "atfal";
+  };
+  let profiles = childProfiles || [];
+  let results = weeklyResults || [];
+  if (section === "atfal") {
+    profiles = profiles.filter((p) => !isKibarDoc(p));
+    results = results.filter((r) => !isKibarDoc(r));
+  } else if (section === "kibar") {
+    profiles = profiles.filter((p) => !isAtfalDoc(p));
+    results = results.filter((r) => !isAtfalDoc(r));
+  }
   const resultsByWeek = {};
-  weeklyResults.forEach(r => {
+  results.forEach(r => {
     if (!r.week_date) return;
     if (!resultsByWeek[r.week_date]) resultsByWeek[r.week_date] = [];
     resultsByWeek[r.week_date].push(r);
@@ -3585,7 +3621,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
   });
 
   const latestResultMap = new Map();
-  const sortedByDate = [...weeklyResults].sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
+  const sortedByDate = [...results].sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
 
   sortedByDate.forEach((result) => {
     const resId = String(result.student_id || "").trim().toLowerCase();
@@ -3616,7 +3652,7 @@ function buildStudents(childProfiles = [], weeklyResults = [], teacherProfiles =
   // Deduplicate childProfiles by student_id or id or name so identical rows are unified
   const dedupedProfiles = [];
   const seenStudentKeys = new Set();
-  (childProfiles || []).forEach((profile) => {
+  (profiles || []).forEach((profile) => {
     if (!profile) return;
     const sId = profile.student_id || profile.its || profile.id;
     const sName = normalizeText(profile.full_name || profile.name || "");
@@ -3957,14 +3993,24 @@ function AttendanceCard({ count, total = 6, heading = "Attendance" }) {
   );
 }
 
-function JadeedPagesCard({ count, heading = "Jadeed Safahat", unit = "صفه" }) {
+function JadeedPagesCard({ count, heading = "Jadeed Safahat", unit = "صفه", trend = null }) {
   const unitLabel = String(unit || "").startsWith("سطر") ? "جملة سطر" : "جملة صــ";
   return (
     <div className="jadeed-pages-card card-appear">
       <div className="attendance-lighting" />
       <div className="jadeed-icon-container">
         <BookOpen size={80} className="jadeed-icon-bg" />
-        <span className="jadeed-count-overlay"><span className="kanz-font">{toArabicDigits(count || 0)}</span></span>
+        <span className="jadeed-count-overlay"><span className="kanz-font">{toArabicDigits(count || 0)}</span>
+          {/* ── Week-over-week Jadeed trend arrow (APPEND-ONLY): same CONDITION A/B
+              flow as the Marhala page Jadeed box. Inline next to the digit.
+              Rendered only when trend is up/down. ── */}
+          {trend === "up" && (
+            <ArrowUp size={30} strokeWidth={3.2} className="mrk-report-trend-arrow mrk-glow-green" title="More Jadeed than last week" />
+          )}
+          {trend === "down" && (
+            <ArrowDown size={30} strokeWidth={3.2} className="mrk-report-trend-arrow mrk-pulse-red" title="Less or same Jadeed as last week" />
+          )}
+        </span>
       </div>
       <h4 className="attendance-rating-text arabic-kanz" dir="rtl" style={{ fontFamily: "'Kanz al Marjaan', serif", fontSize: '1.6rem', marginTop: '8px', color: 'var(--deep-brown)', letterSpacing: 'normal' }}>
         {unitLabel}
@@ -3973,7 +4019,7 @@ function JadeedPagesCard({ count, heading = "Jadeed Safahat", unit = "صفه" })
   );
 }
 
-function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false, rankImproved = false, rankChange = null }) {
+function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, timerSeconds, isParentPortal = false, rankImproved = false, rankChange = null, marhalaRank = null, marhalaName = "", marhalaChange = null, jadeedTrend = null }) {
   const report = normalizeReportSettings(settings);
   const fatemi = getFatemiInfo(weeklyResult?.week_date);
   const hMain = report.main_heading;
@@ -3997,6 +4043,15 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
         backgroundRepeat: 'no-repeat',
       }
     : { position: 'relative' };
+
+  /* ── Report-Card rank source: the Marhala-wise table rank (exact same value
+     as the Marhala Results page). Falls back to the global Rank Preview rank
+     only when no Marhala rank is available. Rank Preview page untouched. ── */
+  const showMarhalaRank = marhalaRank !== null && marhalaRank !== undefined && marhalaRank !== "";
+  const displayRank = showMarhalaRank
+    ? marhalaRank
+    : (weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank || "-");
+  const displayRankChange = showMarhalaRank ? (marhalaChange || null) : rankChange;
 
   return (
     <div className="progress-overview">
@@ -4060,7 +4115,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span className="arabic-kanz" style={{ fontSize: '1.4rem', color: 'var(--deep-brown)', fontWeight: 'bold', fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}>{student?.arabic_name ? fixArabicScript(student.arabic_name) : student?.name}</span>
-                {rankImproved && (
+                {(rankImproved || (showMarhalaRank && marhalaChange === 'up')) && (
                   <lottie-player
                     src="/11eb8d74-1187-11ee-95e9-a721cfe73700.json"
                     background="transparent"
@@ -4122,19 +4177,19 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '10px 0' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#c5a059', textTransform: 'uppercase', letterSpacing: '1.5px' }} className="child-hood-font">Rank</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#c5a059', textTransform: 'uppercase', letterSpacing: '1.5px' }} className="child-hood-font">{showMarhalaRank ? "Marhala Rank" : "Rank"}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '48px', fontWeight: 900, color: '#4a3410', textShadow: '0 2px 6px rgba(0,0,0,0.12)', lineHeight: '1' }}>
-                  <span className="kanz-font">{toArabicDigits(weeklyResult?.computedRank || weeklyResult?.weeklyRank || weeklyResult?.rank || "-")}</span>
+                  <span className="kanz-font">{toArabicDigits(displayRank)}</span>
                 </span>
-                {rankChange === 'up' && (
+                {displayRankChange === 'up' && (
                   <ArrowUp
                     size={28}
                     strokeWidth={3}
                     className="rank-arrow-premium rank-arrow-up"
                   />
                 )}
-                {rankChange === 'down' && (
+                {displayRankChange === 'down' && (
                   <ArrowDown
                     size={28}
                     strokeWidth={3}
@@ -4142,7 +4197,12 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
                   />
                 )}
               </div>
-              {rankChange === 'same' && (
+              {showMarhalaRank && marhalaName ? (
+                <span style={{ fontSize: '0.8rem', color: '#8a786a', fontWeight: 600, marginTop: '2px' }}>
+                  {marhalaName}
+                </span>
+              ) : null}
+              {displayRankChange === 'same' && (
                 <span style={{ fontSize: '0.85rem', color: '#777', fontWeight: 600, marginTop: '4px' }} className="kanz-font">
                   same rank
                 </span>
@@ -4192,6 +4252,7 @@ function TahfeezReportCard({ student, weeklyResult, settings, parentViewed, time
             count={weeklyResult?.total_jadeed_pages}
             heading={report.jadeed_safahat_heading}
             unit={weeklyResult?.total_jadeed_unit}
+            trend={jadeedTrend}
           />
         </div>
 
@@ -7905,6 +7966,34 @@ function ParentPortal({
 
   const { studentProfile, allProfiles = [], hifzDetails, announcements, schedule, attendance, weeklyResult, reportSettings } = parentData || {};
 
+  /* ── Marhala rank lookup for the student Report Card (APPEND-ONLY, Task 4).
+     Read-only: ranks within Marhala from school students + weekly results
+     (Firebase Firestore via adapter). Falls back to the child's own list. ── */
+  const parentMarhalaCache = useMemo(() => {
+    const list = (schoolData?.students && schoolData.students.length > 0) ? schoolData.students : (allProfiles || []);
+    return calculateMarhalaRanks(list, parentData?.weeklyResults || schoolData?.weeklyResults || []);
+  }, [schoolData, allProfiles, parentData]);
+  const getParentMarhalaRank = useCallback((student, override = null) => {
+    // EXACT rank first: full-cohort computation from the complete results
+    // table (identical inputs/logic to the admin Marhala table). Falls back
+    // to the family-subset rank only when the full table hasn't loaded.
+    if (parentFullResultsCache.length > 0) {
+      const exact = getExactMarhalaRankForStudent(
+        student,
+        parentFullResultsCache,
+        override || student?.latestResult || null
+      );
+      if (exact) return exact;
+    }
+    const list = (schoolData?.students && schoolData.students.length > 0) ? schoolData.students : (allProfiles || []);
+    return getMarhalaRankForStudent(student, list, parentData?.weeklyResults || schoolData?.weeklyResults || [], parentMarhalaCache);
+  }, [schoolData, allProfiles, parentData, parentMarhalaCache]);
+  /* Jadeed trend arrow for the student Report Card Jadeed card (APPEND-ONLY). */
+  const getParentJadeedTrend = useCallback((student, override = null) => {
+    const list = (schoolData?.students && schoolData.students.length > 0) ? schoolData.students : (allProfiles || []);
+    return getJadeedTrendForStudent(student, list, parentData?.weeklyResults || schoolData?.weeklyResults || [], parentMarhalaCache, override);
+  }, [schoolData, allProfiles, parentData, parentMarhalaCache]);
+
   // Auto-select chat when navigating directly to Online Tahfeez (e.g. from FCM push click)
   useEffect(() => {
     if (activePage === "Online Tahfeez" && !selectedTahfeezChat && (allProfiles || []).length > 0) {
@@ -9277,6 +9366,10 @@ function ParentPortal({
                     isParentPortal={true}
                     rankImproved={rankImproved}
                     rankChange={rankChange}
+                    marhalaRank={getParentMarhalaRank(studentProfile, weeklyResult || studentProfile?.latestResult)?.rank ?? null}
+                    marhalaName={getParentMarhalaRank(studentProfile, weeklyResult || studentProfile?.latestResult)?.marhala || ""}
+                    marhalaChange={getParentMarhalaRank(studentProfile, weeklyResult || studentProfile?.latestResult)?.change || null}
+                    jadeedTrend={getParentJadeedTrend(studentProfile, weeklyResult || studentProfile?.latestResult)}
                   />
                 </>
               );
@@ -9312,6 +9405,10 @@ function ParentPortal({
                     isParentPortal={true}
                     rankImproved={rankImproved}
                     rankChange={rankChange}
+                    marhalaRank={getParentMarhalaRank(studentProfile, weeklyResult || studentProfile?.latestResult)?.rank ?? null}
+                    marhalaName={getParentMarhalaRank(studentProfile, weeklyResult || studentProfile?.latestResult)?.marhala || ""}
+                    marhalaChange={getParentMarhalaRank(studentProfile, weeklyResult || studentProfile?.latestResult)?.change || null}
+                    jadeedTrend={getParentJadeedTrend(studentProfile, weeklyResult || studentProfile?.latestResult)}
                   />
                 </div>
               )}
@@ -12412,7 +12509,29 @@ function AdminPortal({
 
 }) {
   const showAction = onShowAction;
-  const { announcements = [], customGroups = [], schedule = [], students = [], teacherAttendance = [], portalAccessList = [], teacherProfiles = [], supportTickets = [], weeklyResultsArchive = [] } = adminData || {};
+  const { announcements = [], customGroups = [], schedule = [], students = [], teacherAttendance = [], portalAccessList = [], teacherProfiles = [], supportTickets = [], weeklyResultsArchive = [], weeklyResults = [] } = adminData || {};
+
+  /* ── Marhala-wise Ranking (APPEND-ONLY, Task 1–3): derived read-only from
+     students[].latestResult + weeklyResults. Never writes to Mark Progress. ── */
+  const marhalaRankCache = useMemo(
+    () => calculateMarhalaRanks(students, [...(weeklyResults || []), ...(weeklyResultsArchive || [])]),
+    [students, weeklyResults, weeklyResultsArchive]
+  );
+  const marhalaOverview = useMemo(
+    () => getMarhalaOverview(students, [...(weeklyResults || []), ...(weeklyResultsArchive || [])]),
+    [students, weeklyResults, weeklyResultsArchive]
+  );
+  const getMarhalaRank = useCallback(
+    (student) => getMarhalaRankForStudent(student, students, [...(weeklyResults || []), ...(weeklyResultsArchive || [])], marhalaRankCache),
+    [students, weeklyResults, weeklyResultsArchive, marhalaRankCache]
+  );
+  /* Jadeed week-over-week trend for the Report Card Jadeed card arrow
+     (APPEND-ONLY): 'up' = +1 satar/safah vs last week (green glow),
+     'down' = less/same (red pulse), 'neutral' = no history (no arrow). */
+  const getMarhalaJadeedTrend = useCallback(
+    (student, override = null) => getJadeedTrendForStudent(student, students, [...(weeklyResults || []), ...(weeklyResultsArchive || [])], marhalaRankCache, override),
+    [students, weeklyResults, weeklyResultsArchive, marhalaRankCache]
+  );
 
   /* Optimistic draft so the dropdown visually changes immediately when user selects */
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
@@ -13103,6 +13222,8 @@ const handleDownloadAllReports = async () => {
   const navPages = [
     "Overview",
     ...(!isKibarAdmin ? ["Hifz League Tracking"] : []),
+    "Marhala Results",
+    "Monthly Results",
     "Quick Student Access",
     "Quick Access Pages",
     "Admin Access",
@@ -14592,6 +14713,41 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
               })}
             </div>
 
+            {/* ── Marhala Results infographic overview (APPEND-ONLY, Task 2).
+                Clickable premium card routing to the Marhala Results page. ── */}
+            <div
+              className="mrk-overview-card"
+              role="button"
+              tabIndex={0}
+              title="Open Marhala-wise Results & Rankings"
+              onClick={() => setActivePage("Marhala Results")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActivePage("Marhala Results"); }
+              }}
+            >
+              <div className="mrk-overview-top">
+                <div className="mrk-overview-icon"><Trophy size={26} /></div>
+                <div>
+                  <h3 className="mrk-overview-title">Marhala Results</h3>
+                  <p className="mrk-overview-sub">Marhala-wise ranking &amp; Jadeed tracking — tap to open</p>
+                </div>
+              </div>
+              <div className="mrk-overview-stats">
+                <div className="mrk-overview-stat"><b>{marhalaOverview.marhalaCount}</b><span>Marhalas</span></div>
+                <div className="mrk-overview-stat"><b>{marhalaOverview.totalRanked}</b><span>Ranked Students</span></div>
+              </div>
+              {Object.keys(marhalaOverview.toppers || {}).length > 0 && (
+                <div className="mrk-overview-toppers">
+                  {marhalaOverview.orderedMarhalas.slice(0, 8).map((m) => (
+                    marhalaOverview.toppers[m] ? (
+                      <span key={m} className="mrk-overview-topper">🏆 {m}: {marhalaOverview.toppers[m]}</span>
+                    ) : null
+                  ))}
+                </div>
+              )}
+              <div className="mrk-overview-cta">View full Marhala Results <ArrowRight size={15} /></div>
+            </div>
+
             {!isKibarAdmin && (
               <>
                 <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
@@ -14611,6 +14767,31 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
             <div className="overview-container fade-in" style={{ marginTop: 0 }}>
               <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
               <AtfalLeagueAdminInfographic students={students} showRoster={true} />
+            </div>
+          )}
+
+          {/* ── Marhala-wise Result page (APPEND-ONLY, Tasks 3 + 5).
+              Tabbed Marhala tables + rank arrows + Jadeed boxes + A4 PDF export.
+              Reads students/weeklyResults only — Mark Progress untouched. ── */}
+          {activePage === "Marhala Results" && (
+            <div className="overview-container fade-in" style={{ marginTop: 0 }}>
+              <MarhalaResultsPage
+                students={students}
+                weeklyResults={[...(weeklyResults || []), ...(weeklyResultsArchive || [])]}
+                onShowAction={onShowAction}
+              />
+            </div>
+          )}
+
+          {/* ── Monthly Marhala Results (APPEND-ONLY): month tabs + Marhala
+              sub-tabs, monthly totals, Jadeed-total arrows, A4 PDF + Excel. ── */}
+          {activePage === "Monthly Results" && (
+            <div className="overview-container fade-in" style={{ marginTop: 0 }}>
+              <MarhalaMonthlyPage
+                students={students}
+                weeklyResults={[...(weeklyResults || []), ...(weeklyResultsArchive || [])]}
+                onShowAction={onShowAction}
+              />
             </div>
           )}
 
@@ -14959,6 +15140,10 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                       settings={reportSettingsObject}
                       parentViewed={(parentViews || []).find(v => String(v.student_id) === String(selectedStudent.student_id))?.viewed ?? false}
                       rankChange={computeRankChange(selectedStudent, selectedStudent.latestResult)}
+                      marhalaRank={getMarhalaRank(selectedStudent)?.rank ?? null}
+                      marhalaName={getMarhalaRank(selectedStudent)?.marhala || ""}
+                      marhalaChange={getMarhalaRank(selectedStudent)?.change || null}
+                      jadeedTrend={getMarhalaJadeedTrend(selectedStudent)}
                     />
                   </div>
                 </div>
@@ -17732,6 +17917,10 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                   weeklyResult={studentToRender.latestResult}
                   settings={reportSettingsObject}
                   rankChange={computeRankChange(studentToRender, studentToRender.latestResult)}
+                  marhalaRank={getMarhalaRank(studentToRender)?.rank ?? null}
+                  marhalaName={getMarhalaRank(studentToRender)?.marhala || ""}
+                  marhalaChange={getMarhalaRank(studentToRender)?.change || null}
+                  jadeedTrend={getMarhalaJadeedTrend(studentToRender)}
                 />
               </div>
             )}
@@ -18073,6 +18262,10 @@ const saveReportSettings = async (updates, { notifyLive = false } = {}) => {
                     settings={reportSettingsDraft}
                     parentViewed={(parentViews || []).find(v => String(v.student_id) === String(previewStudent.student_id))?.viewed ?? false}
                     rankChange={computeRankChange(previewStudent, previewStudent.latestResult)}
+                    marhalaRank={getMarhalaRank(previewStudent)?.rank ?? null}
+                    marhalaName={getMarhalaRank(previewStudent)?.marhala || ""}
+                    marhalaChange={getMarhalaRank(previewStudent)?.change || null}
+                    jadeedTrend={getMarhalaJadeedTrend(previewStudent)}
                   />
                 ) : (
                   <div className="empty-state">
@@ -21288,6 +21481,21 @@ function TeacherPortal({
     return 'same';
   };
 
+  /* ── Marhala rank lookup (APPEND-ONLY, Task 4): memoized map, read-only. ── */
+  const teacherMarhalaCache = useMemo(
+    () => calculateMarhalaRanks(schoolData?.students || [], schoolData?.weeklyResults || []),
+    [schoolData]
+  );
+  const getTeacherMarhalaRank = useCallback(
+    (student) => getMarhalaRankForStudent(student, schoolData?.students || [], schoolData?.weeklyResults || [], teacherMarhalaCache),
+    [schoolData, teacherMarhalaCache]
+  );
+  /* Jadeed trend arrow for the teacher-preview Report Card Jadeed card (APPEND-ONLY). */
+  const getTeacherJadeedTrend = useCallback(
+    (student, override = null) => getJadeedTrendForStudent(student, schoolData?.students || [], schoolData?.weeklyResults || [], teacherMarhalaCache, override),
+    [schoolData, teacherMarhalaCache]
+  );
+
   const [isGeneratingTeacherPDF, setIsGeneratingTeacherPDF] = useState(false);
   const [teacherDownloadPopup, setTeacherDownloadPopup] = useState(null);
   const handleTeacherDownloadReport = async () => {
@@ -23046,6 +23254,10 @@ function TeacherPortal({
                         weeklyResult={liveResult}
                         settings={reportSettingsObject}
                         rankChange={computeRankChange(selectedStudent, liveResult)}
+                        marhalaRank={getTeacherMarhalaRank(selectedStudent)?.rank ?? null}
+                        marhalaName={getTeacherMarhalaRank(selectedStudent)?.marhala || ""}
+                        marhalaChange={getTeacherMarhalaRank(selectedStudent)?.change || null}
+                        jadeedTrend={getTeacherJadeedTrend(selectedStudent, liveResult)}
                       />
                     </div>
                   </>
@@ -23079,6 +23291,10 @@ function TeacherPortal({
                       weeklyResult={liveResult}
                       settings={reportSettingsObject}
                       rankChange={computeRankChange(selectedStudent, liveResult)}
+                      marhalaRank={getTeacherMarhalaRank(selectedStudent)?.rank ?? null}
+                      marhalaName={getTeacherMarhalaRank(selectedStudent)?.marhala || ""}
+                      marhalaChange={getTeacherMarhalaRank(selectedStudent)?.change || null}
+                      jadeedTrend={getTeacherJadeedTrend(selectedStudent, liveResult)}
                     />
                   </div>
                 )}
@@ -26691,11 +26907,13 @@ export default function App() {
             ...(resultsResponse?.data || []),
             ...(archiveResultsResponse?.data || [])
           ];
+          parentFullResultsCache = allWeeklyResults;
 
           const processedStudents = buildStudents(
             rawProfiles,
             allWeeklyResults,
-            consolidatedTeacherProfiles
+            consolidatedTeacherProfiles,
+            isKibar ? "kibar" : "atfal"
           );
 
           // If multiple students, and none selected, use first
@@ -26759,6 +26977,28 @@ export default function App() {
           nextParentState = {
             studentProfile: activeStudent,
             allProfiles: processedStudents,
+            /* Family-only result history (APPEND-ONLY): powers the Report Card
+               Jadeed trend arrow. Bounded to this parent's children so the
+               localStorage portal cache stays small. */
+            weeklyResults: (() => {
+              const familyIdSet = new Set(
+                processedStudents
+                  .flatMap((p) => [...(p.allIds || []), p.student_id, p.id, p.its])
+                  .map((x) => String(x || "").trim().toLowerCase())
+                  .filter(Boolean)
+              );
+              const familyNameSet = new Set(
+                processedStudents
+                  .flatMap((p) => [p.name, p.full_name])
+                  .map((n) => normalizeText(n || ""))
+                  .filter(Boolean)
+              );
+              return allWeeklyResults.filter((r) => {
+                if (familyIdSet.has(String(r.student_id || "").trim().toLowerCase())) return true;
+                const rn = normalizeText(r.student_name || r.name || r.full_name || "");
+                return rn && familyNameSet.has(rn);
+              });
+            })(),
             hifzDetails: {
               juz: activeStudent.juz || "--",
               surat: activeStudent.surat || "Pending",
@@ -26886,7 +27126,8 @@ export default function App() {
         const students = buildStudents(
           profilesResponse.data || [],
           resultsResponse.data || [],
-          enrichedProfiles
+          enrichedProfiles,
+          isKibarAdmin ? "kibar" : "atfal"
         );
 
         setTeacherAttendance(attendanceResponse.data || []);

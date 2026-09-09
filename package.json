@@ -1,7 +1,7 @@
 {
   "name": "mauze-tahfeez",
   "private": true,
-  "version": "1.5.42",
+  "version": "1.5.43",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -26,6 +26,7 @@
     "@rolldown/plugin-babel": "^0.2.3",
     "ai": "^7.0.16",
     "autoskills": "^0.3.6",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "firebase": "^12.13.0",
     "html2canvas": "^1.4.1",

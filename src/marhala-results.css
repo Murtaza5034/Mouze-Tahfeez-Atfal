@@ -1,0 +1,218 @@
+/* Marhala-wise Ranking & Result Tracking — APPEND-ONLY styles.
+   Does not restyle the Mark Progress system or Tahfeez Report Card. */
+
+.mrk-page { padding: 20px 0; }
+
+.mrk-page-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.mrk-title { display: flex; align-items: center; gap: 10px; margin: 0; }
+.mrk-title-icon { color: var(--primary-gold, #d4af37); }
+
+.mrk-pdf-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 18px; border-radius: 12px; cursor: pointer;
+  border: 1px solid #d4af37; color: #fff; font-weight: 700; font-size: 13px;
+  font-family: Inter, system-ui, sans-serif;
+  background: linear-gradient(135deg, #3d2b1f, #7a5c2e 55%, #d4af37);
+  box-shadow: 0 8px 22px rgba(122, 92, 46, 0.35);
+  transition: filter 0.2s, transform 0.2s;
+}
+.mrk-pdf-btn:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.mrk-pdf-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Export actions row + CSV button (append-only) */
+.mrk-actions { display: inline-flex; gap: 10px; flex-wrap: wrap; }
+.mrk-csv-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 18px; border-radius: 12px; cursor: pointer;
+  border: 1px solid #2e7d32; color: #fff; font-weight: 700; font-size: 13px;
+  font-family: Inter, system-ui, sans-serif;
+  background: linear-gradient(135deg, #1b3a1f, #2e7d32 55%, #43a047);
+  box-shadow: 0 8px 22px rgba(46, 125, 50, 0.35);
+  transition: filter 0.2s, transform 0.2s;
+}
+.mrk-csv-btn:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.mrk-csv-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Tabs */
+.mrk-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 14px; }.mrk-tab {
+  padding: 9px 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--glass-border, #e8e0d2);
+  background: #fffdf8; color: #5d4037; font-weight: 700; font-size: 0.85rem;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: all 0.2s;
+}
+.mrk-tab:hover { border-color: #d4af37; }
+.mrk-tab.active {
+  background: linear-gradient(135deg, #3d2b1f, #5d4037);
+  color: #ffe9a8; border-color: #d4af37;
+  box-shadow: 0 6px 18px rgba(61, 43, 31, 0.3);
+}
+.mrk-tab-count {
+  min-width: 24px; height: 24px; border-radius: 999px;
+  display: inline-grid; place-items: center;
+  background: rgba(212, 175, 55, 0.18); font-size: 0.75rem; padding: 0 6px;
+}
+.mrk-tab.active .mrk-tab-count { background: rgba(255, 233, 168, 0.25); }
+
+/* Second-level Marhala pills on the Monthly page (compact variant) */
+.mrk-subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+.mrk-subtabs .mrk-tab { padding: 7px 14px; font-size: 0.78rem; }
+
+/* Table card */
+.mrk-table-card {
+  background: #fff; border-radius: 16px;
+  border: 1px solid var(--glass-border, #ece4d4);
+  overflow: hidden;
+}
+.mrk-table-title {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 14px 18px; background: linear-gradient(135deg, #fbf5e6, #fff);
+  border-bottom: 1px solid #f0e8d5; color: #3d2b1f;
+}
+.mrk-table-title span { font-size: 0.8rem; color: #8a786a; }
+.mrk-table-scroll { overflow-x: auto; }
+.mrk-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 1080px; }
+.mrk-table thead tr { background: linear-gradient(135deg, #3d2b1f, #5d4037); color: #fff; }
+.mrk-table th { padding: 13px 12px; text-align: center; font-size: 0.78rem; letter-spacing: 0.3px; white-space: nowrap; }
+.mrk-table td { padding: 11px 12px; text-align: center; border-bottom: 1px solid #f0ede8; vertical-align: middle; }
+.mrk-table tr.even td { background: #fcfaf5; }
+.mrk-table tr.odd td { background: #fff; }
+.mrk-empty { padding: 28px !important; color: #999; }
+
+/* Rank */
+.mrk-rank-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.mrk-rank-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #f0ede8; color: #3d2b1f; font-weight: 900; font-size: 0.85rem;
+}
+.mrk-rank-badge.top { background: linear-gradient(135deg, #d4af37, #b88a1d); color: #fff; }
+.mrk-rank-empty { color: #bbb; }
+.mrk-rank-arrow { flex-shrink: 0; }
+.mrk-arrow-up { color: #2e7d32; filter: drop-shadow(0 0 4px rgba(46, 125, 50, 0.55)); }
+.mrk-arrow-down { color: #c62828; }
+.mrk-arrow-same { color: #aaa; }
+
+/* Score pills */
+.mrk-score-pill {
+  display: inline-flex; align-items: baseline; gap: 3px;
+  font-weight: 800; color: #3d2b1f;
+  background: #f5f0e6; border-radius: 999px; padding: 4px 10px; white-space: nowrap;
+}
+.mrk-score-pill[data-good="1"] { background: linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.12)); }
+.mrk-score-max { font-size: 0.7rem; color: #aaa; font-weight: 400; }
+
+/* Student cell */
+.mrk-student { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; }
+.mrk-student-name { font-weight: 700; color: #3d2b1f; }
+.mrk-student-ar { font-size: 0.8rem; color: #b88a1d; }
+.mrk-student-group { font-size: 0.72rem; color: #aaa; }
+
+/* Jadeed tracking box */
+.mrk-jadeed-box {
+  display: inline-flex; flex-direction: column; gap: 3px;
+  border-radius: 12px; padding: 8px 12px; min-width: 150px;
+  border: 1.5px solid #e8e0d2; background: #fffdf8;
+}
+.mrk-jadeed-box.trend-up { border-color: #2e7d32; background: linear-gradient(135deg, #e8f5e9, #f1f8e9); }
+.mrk-jadeed-box.trend-down { border-color: #e0b4b4; background: #fdf6f6; }
+.mrk-jadeed-top { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.mrk-jadeed-val { font-size: 1.25rem; font-weight: 900; color: #3d2b1f; }
+.mrk-jadeed-unit { font-size: 0.75rem; color: #8a786a; font-weight: 600; }
+.mrk-jadeed-sub { font-size: 0.7rem; color: #999; }
+.mrk-jadeed-arrow { flex-shrink: 0; }
+.mrk-glow-green {
+  color: #2e9e44;
+  filter: drop-shadow(0 0 5px rgba(46, 158, 68, 0.9)) drop-shadow(0 0 12px rgba(46, 158, 68, 0.5));
+  animation: mrkGlowPulse 1.6s ease-in-out infinite;
+}
+@keyframes mrkGlowPulse {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(46,158,68,0.9)) drop-shadow(0 0 12px rgba(46,158,68,0.45)); }
+  50% { filter: drop-shadow(0 0 9px rgba(46,158,68,1)) drop-shadow(0 0 20px rgba(46,158,68,0.65)); }
+}
+.mrk-flat-red { color: #c62828; }
+.mrk-neutral { color: #bbb; }
+
+/* Wusool / attendance */
+.mrk-wusool { display: flex; flex-direction: column; gap: 1px; font-size: 0.8rem; color: #5d4037; }
+.mrk-att { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: #3d2b1f; }
+
+.mrk-legend {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  padding: 12px 18px; font-size: 0.78rem; color: #8a786a;
+  background: #fcfaf5; border-top: 1px solid #f0e8d5;
+}
+.mrk-legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Overview dashboard card (Task 2) — premium infographic, clickable */
+.mrk-overview-card {
+  position: relative; overflow: hidden; cursor: pointer;
+  border-radius: 22px; padding: 22px 24px; margin-top: 16px;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(212,175,55,0.22), transparent 45%),
+    linear-gradient(135deg, #2e2118 0%, #4a3421 55%, #6b4d1f 100%);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  box-shadow: 0 18px 45px rgba(61, 43, 31, 0.25);
+  color: #ffe9a8; transition: transform 0.2s, box-shadow 0.2s;
+}
+.mrk-overview-card:hover { transform: translateY(-2px); box-shadow: 0 24px 60px rgba(61, 43, 31, 0.32); }
+.mrk-overview-top { display: flex; align-items: center; gap: 14px; }
+.mrk-overview-icon {
+  width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0;
+  display: grid; place-items: center; color: #3d2b1f;
+  background: linear-gradient(135deg, #f5e6a3, #d4af37);
+  box-shadow: 0 6px 16px rgba(212, 175, 55, 0.45);
+}
+.mrk-overview-title { font-size: 1.05rem; font-weight: 800; margin: 0; color: #ffe9a8; }
+.mrk-overview-sub { font-size: 0.8rem; color: rgba(255, 233, 168, 0.75); margin: 2px 0 0; }
+.mrk-overview-stats { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 14px; }
+.mrk-overview-stat { display: flex; flex-direction: column; }
+.mrk-overview-stat b { font-size: 1.5rem; color: #fff; }
+.mrk-overview-stat span { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,233,168,0.7); }
+.mrk-overview-toppers { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.mrk-overview-topper {
+  font-size: 0.75rem; background: rgba(255, 233, 168, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  padding: 4px 10px; border-radius: 999px; color: #ffe9a8;
+}
+.mrk-overview-cta { margin-top: 12px; font-size: 0.8rem; font-weight: 700; color: #f5e6a3; display: flex; align-items: center; gap: 6px; }
+
+/* Marhala badge injected into Tahfeez Report Card (Task 4 — additive only) */
+.mrk-report-marhala {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 2px auto 0; padding: 6px 14px; width: fit-content;
+  border-radius: 999px; font-size: 0.82rem; font-weight: 700;
+  color: #6b4d1f; background: linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.08));
+  border: 1px solid rgba(212, 175, 55, 0.45);
+}
+.mrk-report-marhala b { font-size: 1rem; }
+
+/* Jadeed trend arrow on the Tahfeez Report Card Jadeed (Jumla Satar/Safah)
+   square — same CONDITION A/B flow as the Marhala page Jadeed box.
+   Additive only: digit is slightly bigger, arrow flows inline right next
+   to the digit with a clean gap. Mobile compact sizes from style.css
+   (!important) still apply there — arrow stays inline at every size. */
+.jadeed-pages-card .jadeed-count-overlay {
+  font-size: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  white-space: nowrap;
+}
+.mrk-report-trend-arrow {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.85); border-radius: 50%; padding: 2px;
+}
+.mrk-pulse-red {
+  color: #c62828;
+  filter: drop-shadow(0 0 5px rgba(198, 40, 40, 0.9)) drop-shadow(0 0 12px rgba(198, 40, 40, 0.5));
+  animation: mrkRedPulse 1.6s ease-in-out infinite;
+}
+@keyframes mrkRedPulse {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(198,40,40,0.9)) drop-shadow(0 0 12px rgba(198,40,40,0.45)); }
+  50% { filter: drop-shadow(0 0 9px rgba(198,40,40,1)) drop-shadow(0 0 20px rgba(198,40,40,0.65)); }
+}
