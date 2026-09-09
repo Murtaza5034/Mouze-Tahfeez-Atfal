@@ -209,7 +209,7 @@ function normalizeArabic(text) {
     // Normalize Hamza variants (ؤ, ئ)
     .replace(/[ؤئ]/g, "ء")
     // Remove punctuation, brackets, numbers, slashes, dots, commas, tatweel, and non-Arabic characters
-    .replace(/[،؛؟.,;:!?"'()[\]{}۞۝0-9\u0660-\u0669/\\_—–-ـ]/g, " ")
+    .replace(/[،؛؟.,;:!?"'()[\]{}۞۝0-9\u0660-\u0669/\\_—–ـ\-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -226,7 +226,7 @@ function splitAyahIntoWords(ayahText) {
   const cleaned = ayahText
     .replace(/۞|۝/g, "")
     // Treat slashes, backslashes, dots, commas, dashes, colons, semicolons, question marks, and Arabic punctuation as word delimiters
-    .replace(/[/\\.,،؛؟:!?"'()[\]{}—–_ـ]/g, " ")
+    .replace(/[/\\.,،؛؟:!?"'()[\]{}—–_ـ\-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   return cleaned.split(/\s+/).filter((w) => w.length > 0);
