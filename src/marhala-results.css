@@ -192,20 +192,63 @@
 
 /* Jadeed trend arrow on the Tahfeez Report Card Jadeed (Jumla Satar/Safah)
    square — same CONDITION A/B flow as the Marhala page Jadeed box.
-   Additive only: digit is slightly bigger, arrow flows inline right next
-   to the digit with a clean gap. Mobile compact sizes from style.css
-   (!important) still apply there — arrow stays inline at every size. */
+   Additive only: digit is big and properly balanced, arrow flows inline
+   right next to the digit with a clean maintained gap. */
 .jadeed-pages-card .jadeed-count-overlay {
-  font-size: 2.1rem;
+  font-size: 2.7rem;
+  line-height: 1;
+  font-weight: 900;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 14px;
   white-space: nowrap;
+  max-width: 100%;
+}
+.jadeed-pages-card .jadeed-count-overlay .kanz-font {
+  font-size: inherit;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: normal;
 }
 .mrk-report-trend-arrow {
   flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  align-self: center;
   background: rgba(255, 255, 255, 0.85); border-radius: 50%; padding: 2px;
+}
+/* Keep the big digit + digit-arrow gap intact on compact report-card
+   sizes (style.css shrinks this overlay with !important there). */
+@media (max-width: 640px) {
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-count-overlay {
+    font-size: 1.9rem !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    white-space: nowrap !important;
+  }
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .mrk-report-trend-arrow {
+    width: 24px !important;
+    height: 24px !important;
+  }
+}
+@media (max-width: 480px) {
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .jadeed-count-overlay {
+    font-size: 1.7rem !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    white-space: nowrap !important;
+  }
+  .progress-overview:not(#parent-capture-zone *):not(#bulk-capture-hidden-zone *) .mrk-report-trend-arrow {
+    width: 22px !important;
+    height: 22px !important;
+  }
 }
 .mrk-pulse-red {
   color: #c62828;

@@ -266,7 +266,15 @@ Shukran!`;
                 >
                   <div className="pvm-student-info">
                     {student.photo_url ? (
-                      <img src={student.photo_url} alt={studentName} className="pvm-avatar" />
+                      <img
+                        src={student.photo_url}
+                        alt={studentName}
+                        className="pvm-avatar"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "/logo.png";
+                        }}
+                      />
                     ) : (
                       <div className="pvm-avatar-placeholder">{initials}</div>
                     )}

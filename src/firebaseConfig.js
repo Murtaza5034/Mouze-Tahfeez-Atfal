@@ -110,7 +110,16 @@ export const getFCMToken = async (retries = 3) => {
         return null;
       }
       // Handle 403 Forbidden errors (token deletion failed, stale registration)
-      if (error.message && (error.message.includes('403') || error.message.includes('Forbidden') || error.message.includes('token-unsubscribe-failed') || error.message.includes('caller does not have permission'))) {
+      const isUnsubscribeErr =
+        error?.code === 'messaging/token-unsubscribe-failed' ||
+        String(error?.code || '').includes('token-unsubscribe-failed') ||
+        (error?.message &&
+          (error.message.includes('403') ||
+            error.message.includes('Forbidden') ||
+            error.message.includes('token-unsubscribe-failed') ||
+            error.message.includes('caller does not have permission')));
+
+      if (isUnsubscribeErr) {
         console.warn('[FCM] Stale FCM token detected, clearing IndexedDB databases...');
         try {
           if (typeof window !== 'undefined' && window.indexedDB) {

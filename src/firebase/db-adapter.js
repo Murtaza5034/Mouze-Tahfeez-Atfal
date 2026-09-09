@@ -247,12 +247,115 @@ async function rpc(name, args = {}) {
 // `functions.invoke(name, { body })` -> httpsCallable
 // ---------------------------------------------------------------------------
 
+// Local rank calculation engine for getGlobalRank / get-global-rank to eliminate
+// remote 503 errors and eliminate redundant network load.
+async function computeGlobalRankLocally(body = {}) {
+  try {
+    const section = body.section || getSectionScope();
+    const table = section === "kibar" ? "kibar_weekly_results" : "weekly_results";
+
+    let q = from(table).select("*");
+    if (body.week_date) {
+      q = q.eq("week_date", body.week_date);
+    }
+    const { data: results, error } = await q.limit(10000);
+    if (error && (!results || results.length === 0)) {
+      return { data: { rank: null, ranks: {} }, error: null };
+    }
+
+    const map = new Map();
+    (results || []).forEach((r) => {
+      const sid = String(r.student_id || "").trim();
+      if (sid) map.set(sid, { ...r });
+    });
+
+    if (body.student_id && body.preview) {
+      const targetSid = String(body.student_id).trim();
+      const existing = map.get(targetSid) || { student_id: targetSid };
+      map.set(targetSid, {
+        ...existing,
+        ...body.preview,
+        student_id: targetSid,
+      });
+    }
+
+    const withScores = Array.from(map.values()).map((r) => {
+      const eff =
+        (Number(r.murajazah) || 0) +
+        (Number(r.juz_hali) || 0) +
+        (Number(r.takhteet) || 0) +
+        (Number(r.jadeed) || 0);
+      const j = Number(r.jadeed) || 0;
+      const jp =
+        Number(String(r.total_jadeed_pages ?? "").replace(/[^0-9.]/g, "")) || 0;
+      const att = Number(r.attendance_count) || 0;
+      return {
+        student_id: String(r.student_id || "").trim(),
+        _effScore:
+          r.total_score !== undefined &&
+          r.total_score !== null &&
+          r.total_score !== ""
+            ? Number(r.total_score)
+            : eff,
+        _jadeed: j,
+        _jadeedPages: jp,
+        _attendance: att,
+      };
+    });
+
+    withScores.sort((a, b) => {
+      const scoreDiff = b._effScore - a._effScore;
+      if (scoreDiff !== 0) return scoreDiff;
+      const jadeedDiff = b._jadeed - a._jadeed;
+      if (jadeedDiff !== 0) return jadeedDiff;
+      const jpDiff = b._jadeedPages - a._jadeedPages;
+      if (jpDiff !== 0) return jpDiff;
+      return b._attendance - a._attendance;
+    });
+
+    const ranks = {};
+    let prevRank = 1;
+    withScores.forEach((s, idx) => {
+      let currentRank = idx + 1;
+      if (idx > 0) {
+        const prev = withScores[idx - 1];
+        if (
+          prev._effScore === s._effScore &&
+          prev._jadeed === s._jadeed &&
+          prev._jadeedPages === s._jadeedPages &&
+          prev._attendance === s._attendance
+        ) {
+          currentRank = prevRank;
+        }
+      }
+      prevRank = currentRank;
+      ranks[s.student_id] = currentRank;
+      ranks[s.student_id.toLowerCase()] = currentRank;
+    });
+
+    const targetSid = body.student_id ? String(body.student_id).trim() : null;
+    const rank = targetSid
+      ? ranks[targetSid] || ranks[targetSid.toLowerCase()] || null
+      : null;
+
+    return { data: { ranks, rank }, error: null };
+  } catch (_e) {
+    return { data: { rank: null, ranks: {} }, error: null };
+  }
+}
+
 async function invokeFunction(name, options = {}) {
   const callableName = FUNCTION_NAMES[name] || name;
   const body = options.body || {};
   if (body.section === undefined) {
     body.section = getSectionScope();
   }
+
+  // Fast local resolution for getGlobalRank / get-global-rank
+  if (callableName === "getGlobalRank" || name === "get-global-rank") {
+    return computeGlobalRankLocally(body);
+  }
+
   return callFunction(callableName, body);
 }
 

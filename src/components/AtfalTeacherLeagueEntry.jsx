@@ -916,7 +916,14 @@ export default function AtfalTeacherLeagueEntry({
         <div className="league-student-info-strip">
           <div className="student-badge-avatar">
             {activeStudent?.photo_url ? (
-              <img src={activeStudent.photo_url} alt={activeStudent.name} />
+              <img
+                src={activeStudent.photo_url}
+                alt={activeStudent.name}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/logo.png";
+                }}
+              />
             ) : (
               <User size={24} />
             )}

@@ -507,7 +507,15 @@ export default function StudentProfileView({
                 <span className="sp-avatar-pending-badge">Reviewing</span>
               </>
             ) : activePhotoUrl ? (
-              <img src={activePhotoUrl} alt={displayName} className="sp-avatar-img" />
+              <img
+                src={activePhotoUrl}
+                alt={displayName}
+                className="sp-avatar-img"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/logo.png";
+                }}
+              />
             ) : (
               <div className="sp-avatar-placeholder">
                 <User size={44} strokeWidth={1.8} />
@@ -775,7 +783,15 @@ export default function StudentProfileView({
                     {pendingPhoto?.url ? (
                       <img src={pendingPhoto.url} alt="Preview" className="sp-photo-preview-img" />
                     ) : activePhotoUrl ? (
-                      <img src={activePhotoUrl} alt="Preview" className="sp-photo-preview-img" />
+                      <img
+                        src={activePhotoUrl}
+                        alt="Preview"
+                        className="sp-photo-preview-img"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "/logo.png";
+                        }}
+                      />
                     ) : (
                       <User size={36} color="#8c735d" />
                     )}

@@ -127,6 +127,22 @@
         { "fieldPath": "student_id", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "scheduled_notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "is_active", "order": "ASCENDING" },
+        { "fieldPath": "next_send_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kibar_scheduled_notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "is_active", "order": "ASCENDING" },
+        { "fieldPath": "next_send_at", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

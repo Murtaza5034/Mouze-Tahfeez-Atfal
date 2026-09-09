@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1788985443.5405939,
-    "seen": 1788985639.4304013,
-    "ast_hash": "7471f0a381e7aab3e26508b2fb6fe546",
+    "mtime": 1788592674.9890673,
+    "seen": 1788593481.8416026,
+    "ast_hash": "e20c2d462bd56159638e910490ad9f4e",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1788985486.1036346,
-    "seen": 1788985639.4304042,
+    "mtime": 1788593369.7883189,
+    "seen": 1788593481.8416054,
     "ast_hash": "7158d716c36a84c268c69ae529cfa853",
     "semantic_hash": "7158d716c36a84c268c69ae529cfa853"
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1788985486.1036346,
-    "seen": 1788985639.4308915,
+    "mtime": 1788593369.7883189,
+    "seen": 1788593481.8421924,
     "ast_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4",
     "semantic_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4"
   },
@@ -6054,10 +6054,10 @@
     "semantic_hash": "a09514be09184ce90eec314f6542c0f5"
   },
   "firebase/firestore.indexes.json": {
-    "mtime": 1788960811.7893722,
-    "seen": 1788961107.5394745,
-    "ast_hash": "47aa90c1cabbb1cd0ba17ff1f3c0e244",
-    "semantic_hash": ""
+    "mtime": 1786615701.965375,
+    "seen": 1787510537.2114544,
+    "ast_hash": "fceab780baa3ef0c7f197ce882b92275",
+    "semantic_hash": "fceab780baa3ef0c7f197ce882b92275"
   },
   "firebase/functions/.eslintrc.json": {
     "mtime": 1786171017.0395994,
@@ -6078,8 +6078,8 @@
     "semantic_hash": "ae370a9d9ec75c557dccd4b902e37fdb"
   },
   "firebase/functions/src/index.ts": {
-    "mtime": 1788960756.1998882,
-    "seen": 1788961107.5396824,
+    "mtime": 1787981512.584529,
+    "seen": 1787982941.2202659,
     "ast_hash": "4754a9fb60746f9f345d1c77dbb73b95",
     "semantic_hash": ""
   },
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1788985435.1681495,
-    "seen": 1788985639.4369342,
-    "ast_hash": "fd9df7df2ad3439c696f3b359026e20d",
+    "mtime": 1788592663.168512,
+    "seen": 1788593481.8492658,
+    "ast_hash": "7966c29fb6d02ddb2f9466cfffe4ad79",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788984703.7673168,
-    "seen": 1788985035.0864813,
-    "ast_hash": "ddfe74e896bd869c5d3127fb46e9909c",
+    "mtime": 1788763192.3410609,
+    "seen": 1788763289.7976615,
+    "ast_hash": "3155559c1f40dd7a15d10c02cc249eed",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6480,9 +6480,9 @@
     "semantic_hash": "74fd7d2d9c40c67c3de485cffe325e75"
   },
   "src/components/VideoCall.jsx": {
-    "mtime": 1788863514.5056932,
-    "seen": 1788864222.7947178,
-    "ast_hash": "5fd19e68583778e36605ff7984ca6ff6",
+    "mtime": 1788420489.9243464,
+    "seen": 1788420563.9915318,
+    "ast_hash": "d42c59c0bc45f83ce8fcac493a5fe6b4",
     "semantic_hash": ""
   },
   "src/downloadUtils.js": {
@@ -6504,9 +6504,9 @@
     "semantic_hash": ""
   },
   "src/firebaseConfig.js": {
-    "mtime": 1788960833.2279823,
-    "seen": 1788961107.5452702,
-    "ast_hash": "d0dd18810722e85a888a1a781268f9d4",
+    "mtime": 1787981500.6616223,
+    "seen": 1787982941.224685,
+    "ast_hash": "116188932dd33cec45e00ff1bf19befc",
     "semantic_hash": ""
   },
   "src/firebase/auth.js": {
@@ -6522,15 +6522,15 @@
     "semantic_hash": "b1ff6c07321681890d3b9aeb4b0866ee"
   },
   "src/firebase/db-adapter.js": {
-    "mtime": 1788960598.6405108,
-    "seen": 1788961107.5454109,
-    "ast_hash": "e08259c46192335b9020297a562522ae",
-    "semantic_hash": ""
+    "mtime": 1787221956.7961707,
+    "seen": 1787510537.2115202,
+    "ast_hash": "ae40b216f49b4caf65da9db6516f23cd",
+    "semantic_hash": "ae40b216f49b4caf65da9db6516f23cd"
   },
   "src/firebase/db.js": {
-    "mtime": 1788960821.8599825,
-    "seen": 1788961107.5454123,
-    "ast_hash": "6c17fd4bc0b8ee2eb54b9fa3a8ffb898",
+    "mtime": 1788616584.9539785,
+    "seen": 1788616823.5890138,
+    "ast_hash": "a996d7a3d5176df18592e938aa875e86",
     "semantic_hash": ""
   },
   "src/firebase/realtime.js": {
@@ -6630,9 +6630,9 @@
     "semantic_hash": "957bbea90bb141a8c66d5fe0b0321a96"
   },
   "vite.config.js": {
-    "mtime": 1788985439.165943,
-    "seen": 1788985639.4433672,
-    "ast_hash": "264ea31662d5cc6327bffd312a37b6f4",
+    "mtime": 1788592669.2395911,
+    "seen": 1788593481.8557353,
+    "ast_hash": "f78e9531c7ed7c1890ad5fc4215216db",
     "semantic_hash": ""
   },
   ".agents/rules/graphify.md": {
@@ -10008,9 +10008,9 @@
     "semantic_hash": ""
   },
   "src/components/ParentViewsModal.jsx": {
-    "mtime": 1788960894.453095,
-    "seen": 1788961107.54469,
-    "ast_hash": "a2d626be7f23bcd91c4aa2dfc8850c38",
+    "mtime": 1787741105.1589282,
+    "seen": 1787741253.5003579,
+    "ast_hash": "d331e356774255dff8b49828d9efe6de",
     "semantic_hash": ""
   },
   "src/components/MisriQuranViewer.jsx": {
@@ -10020,9 +10020,9 @@
     "semantic_hash": ""
   },
   "src/components/TahfeezChatUI.jsx": {
-    "mtime": 1788851268.480136,
-    "seen": 1788864222.7947164,
-    "ast_hash": "c9f201e44c7c935c5419c0069fa8fe88",
+    "mtime": 1788593301.421584,
+    "seen": 1788593481.8534753,
+    "ast_hash": "aaa4b7a8dfd080bd841cc2fd5bb10f1c",
     "semantic_hash": ""
   },
   "src/utils/chatUtils.js": {
@@ -10044,9 +10044,9 @@
     "semantic_hash": ""
   },
   "src/components/AtfalTeacherLeagueEntry.jsx": {
-    "mtime": 1788960886.4474618,
-    "seen": 1788961107.5443103,
-    "ast_hash": "fcaa18d881c4623ee3bc97546c02a604",
+    "mtime": 1788589848.1929438,
+    "seen": 1788589960.6610394,
+    "ast_hash": "7595f9c042016fdc7b2873ad319881ef",
     "semantic_hash": ""
   },
   "public/assets/gems/gem-week1-emerald.png": {
@@ -10074,9 +10074,9 @@
     "semantic_hash": ""
   },
   "src/components/AtfalLeagueTop3Card.jsx": {
-    "mtime": 1788786743.99344,
-    "seen": 1788864222.7940998,
-    "ast_hash": "7213cfae80d25c49f26b5d5473b35aeb",
+    "mtime": 1788762994.232102,
+    "seen": 1788763137.5524738,
+    "ast_hash": "de19c48c4b3ae9de234260974efc01fd",
     "semantic_hash": ""
   },
   "src/utils/arabicReshaper.js": {
@@ -10098,153 +10098,21 @@
     "semantic_hash": ""
   },
   "src/components/StudentProfileView.jsx": {
-    "mtime": 1788960876.6944683,
-    "seen": 1788961107.5448937,
-    "ast_hash": "75d0eb2e48fe1d2f9b3f50c99f71f904",
+    "mtime": 1788775215.6781237,
+    "seen": 1788776895.8248198,
+    "ast_hash": "6f1cb60c25d7a1a8273b36e845af2f3b",
     "semantic_hash": ""
   },
   "src/components/AtfalLeagueAdminInfographic.jsx": {
-    "mtime": 1788789149.8884332,
-    "seen": 1788864222.794098,
-    "ast_hash": "57c8bf5a14488c89f7f43f30e6866f67",
+    "mtime": 1788763217.1687715,
+    "seen": 1788763289.7987845,
+    "ast_hash": "a26218108088a796b315d36a72edd0d6",
     "semantic_hash": ""
   },
   "src/utils/atfalLeagueUtils.js": {
     "mtime": 1788762917.261491,
     "seen": 1788763137.5549731,
     "ast_hash": "7fca20776f40c5342000647f254ae6ee",
-    "semantic_hash": ""
-  },
-  "api/image-proxy.js": {
-    "mtime": 1788786640.8531537,
-    "seen": 1788864222.7899876,
-    "ast_hash": "cc27f1156fe365d1dbb50c67e1a6e785",
-    "semantic_hash": ""
-  },
-  "add_whatsapp_integration.sql": {
-    "mtime": 1781174838.5880673,
-    "seen": 1788936963.5518627,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "fix_supabase_issues.sql": {
-    "mtime": 1781174838.6410646,
-    "seen": 1788936963.55197,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "report_progress_card_theme_supabase.sql": {
-    "mtime": 1781174838.6835709,
-    "seen": 1788936963.5519862,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "run_marhala_migrations.sql": {
-    "mtime": 1784790501.7295077,
-    "seen": 1788936963.5519876,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "setup_child_profiles.sql": {
-    "mtime": 1781174838.6845717,
-    "seen": 1788936963.5520213,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "setup_parent_notes.sql": {
-    "mtime": 1781174838.685572,
-    "seen": 1788936963.5520222,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "setup_progress_card_controls.sql": {
-    "mtime": 1781174838.685572,
-    "seen": 1788936963.5520234,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "setup_progress_card_tracking.sql": {
-    "mtime": 1781174838.685572,
-    "seen": 1788936963.5520244,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "setup_support_tickets.sql": {
-    "mtime": 1781174838.6865723,
-    "seen": 1788936963.552025,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "setup_weekly_results_connection.sql": {
-    "mtime": 1781174838.6865723,
-    "seen": 1788936963.552026,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "src/components/MarhalaMonthlyPage.jsx": {
-    "mtime": 1788934987.4326904,
-    "seen": 1788936963.5520575,
-    "ast_hash": "c3da9917a200f86eb3e36675e079b2ed",
-    "semantic_hash": ""
-  },
-  "src/components/MarhalaResultsPage.jsx": {
-    "mtime": 1788934907.2966123,
-    "seen": 1788936963.5520594,
-    "ast_hash": "f0e791ee238e261f04315f52fbd695f1",
-    "semantic_hash": ""
-  },
-  "src/utils/marhalaMonthly.js": {
-    "mtime": 1788934652.0676627,
-    "seen": 1788936963.5520945,
-    "ast_hash": "5b7bc9ae3f2aa4433c56baba1b09ca32",
-    "semantic_hash": ""
-  },
-  "src/utils/marhalaRanking.js": {
-    "mtime": 1788936176.1525235,
-    "seen": 1788936963.5520952,
-    "ast_hash": "cc32605f9d92ead000c9df97269960b5",
-    "semantic_hash": ""
-  },
-  "src/utils/marhalaRankingBackend.js": {
-    "mtime": 1788932027.956954,
-    "seen": 1788936963.552096,
-    "ast_hash": "4f70695cd45af315e4f13a3875e5d552",
-    "semantic_hash": ""
-  },
-  "update_notifications_policies.sql": {
-    "mtime": 1781174838.7135704,
-    "seen": 1788936963.5521002,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "update_report_settings.sql": {
-    "mtime": 1781174838.7135704,
-    "seen": 1788936963.5521011,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
-  "src/components/IkhtebarMushaf.jsx": {
-    "mtime": 1788984207.0276053,
-    "seen": 1788984336.7547882,
-    "ast_hash": "74898d14701014b907dfb554d9918390",
-    "semantic_hash": ""
-  },
-  "src/components/StaffProfilePermissionsManager.jsx": {
-    "mtime": 1788984569.8185663,
-    "seen": 1788985035.0887182,
-    "ast_hash": "f3c87de762cc003eb65622b7fbfb5c61",
-    "semantic_hash": ""
-  },
-  "src/components/TeacherProfileView.jsx": {
-    "mtime": 1788984613.7785568,
-    "seen": 1788985035.0889268,
-    "ast_hash": "770b5d898b419ec8067c40c9e1cf1429",
-    "semantic_hash": ""
-  },
-  "src/utils/teacherProfilePermissions.js": {
-    "mtime": 1788984542.781139,
-    "seen": 1788985035.0906937,
-    "ast_hash": "9b07bab350ec18ef8fe614d8d1db10e7",
     "semantic_hash": ""
   }
 }

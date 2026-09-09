@@ -441,11 +441,12 @@ function sortRows(rows, clauses) {
 
 function isIndexError(e) {
   if (!e) return false;
-  const code = e.code || "";
-  const msg = e.message || "";
+  const code = String(e.code || "").toLowerCase();
+  const msg = String(e.message || "");
   return (
-    code === "FAILED_PRECONDITION" ||
-    /failed-prede|index|cannot be used|requires an index/i.test(msg)
+    code === "failed_precondition" ||
+    code === "failed-precondition" ||
+    /failed-precondition|failed_precondition|failed-prede|index|cannot be used|requires an index/i.test(msg)
   );
 }
 
