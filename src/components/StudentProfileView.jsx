@@ -200,12 +200,20 @@ export default function StudentProfileView({
       setWhatsappNumber(studentProfile.whatsapp_number || "");
       setJuz(studentProfile.juz || hifzDetails?.juz || "");
       setSurat(studentProfile.surat || hifzDetails?.surat || "");
-      setActivePhotoUrl(
+      const cached =
+        (typeof localStorage !== "undefined" &&
+          (localStorage.getItem(`mauze_student_photo_${studentKey}`) ||
+            localStorage.getItem(`mauze_photo_${studentProfile.student_id}`) ||
+            localStorage.getItem(`mauze_photo_${studentProfile.id}`) ||
+            localStorage.getItem(`mauze_photo_${studentProfile.its}`))) ||
+        "";
+      const resolved =
         studentProfile.photo_url ||
         studentProfile.photoUrl ||
         studentProfile.avatar_url ||
-        ""
-      );
+        cached ||
+        "";
+      setActivePhotoUrl(resolved);
     }
   }, [studentProfile, hifzDetails]);
 
@@ -247,33 +255,87 @@ export default function StudentProfileView({
   }, [pendingPhoto]);
 
   // Finalize / Promote verified photo to database instantly
+  // Finalize / Promote verified photo to database instantly
   const finalizePhotoUpdate = async (photoUrlToCommit) => {
+    if (!photoUrlToCommit) return;
     try {
       localStorage.removeItem(`mauze_pending_photo_${studentKey}`);
       setPendingPhoto(null);
       setTimeLeftStr("");
 
-      // Update in Supabase
-      const sid = studentProfile?.student_id || studentProfile?.id;
-      if (sid) {
-        await supabase
-          .from(targetTable)
-          .update({
-            photo_url: photoUrlToCommit,
-            updated_at: new Date().toISOString(),
-          })
-          .or(`student_id.eq.${sid},id.eq.${sid}`);
+      // Collect all candidate IDs for this student
+      const candidateIds = [
+        studentProfile?.student_id,
+        studentProfile?.id,
+        studentProfile?.its,
+        ...(studentProfile?.allIds || []),
+        studentKey,
+        currentUser?.id,
+      ]
+        .filter(Boolean)
+        .map(String);
+
+      // Save to localStorage immediately so it never disappears on re-render
+      try {
+        localStorage.setItem(`mauze_student_photo_${studentKey}`, photoUrlToCommit);
+        candidateIds.forEach((cid) => {
+          localStorage.setItem(`mauze_photo_${cid}`, photoUrlToCommit);
+        });
+        localStorage.setItem("activeChildPhoto", photoUrlToCommit);
+      } catch (_) {}
+
+      // Update in Supabase across all potential identifier columns
+      const conditions = [];
+      candidateIds.forEach((cid) => {
+        conditions.push(`student_id.eq.${cid}`);
+        conditions.push(`id.eq.${cid}`);
+        conditions.push(`its.eq.${cid}`);
+      });
+
+      if (conditions.length > 0) {
+        try {
+          await supabase
+            .from(targetTable)
+            .update({
+              photo_url: photoUrlToCommit,
+              avatar_url: photoUrlToCommit,
+              updated_at: new Date().toISOString(),
+            })
+            .or(conditions.join(","));
+        } catch (sbErr) {
+          console.warn("Supabase photo update note:", sbErr);
+        }
       }
 
-      // Also mirror to Firestore if possible
+      // Also mirror to Firestore across candidate IDs
       try {
         const { doc, setDoc } = await import("firebase/firestore");
         const { db } = await import("../firebase/db.js");
-        const ref = doc(db, targetTable, String(sid));
-        await setDoc(ref, { photo_url: photoUrlToCommit }, { merge: true });
+        for (const cid of candidateIds) {
+          try {
+            const ref = doc(db, targetTable, String(cid));
+            await setDoc(ref, { photo_url: photoUrlToCommit, avatar_url: photoUrlToCommit }, { merge: true });
+          } catch (_) {}
+        }
       } catch (_) {}
 
       setActivePhotoUrl(photoUrlToCommit);
+
+      if (studentProfile) {
+        studentProfile.photo_url = photoUrlToCommit;
+        studentProfile.photoUrl = photoUrlToCommit;
+        studentProfile.avatar_url = photoUrlToCommit;
+      }
+
+      if (onProfileUpdated) {
+        onProfileUpdated({
+          ...studentProfile,
+          photo_url: photoUrlToCommit,
+          photoUrl: photoUrlToCommit,
+          avatar_url: photoUrlToCommit,
+        });
+      }
+
       if (showAction) {
         showAction("success", "✨ Profile photo 100% verified and updated successfully!");
       }
@@ -377,7 +439,7 @@ export default function StudentProfileView({
       setPhotoErrorDetails(null);
       setPhotoReviewResult(review);
 
-      // 2. Upload to Supabase Storage
+      // 2. Upload to Supabase / Firebase Storage
       try {
         const fileExt = file.name.split(".").pop() || "jpg";
         const fileName = `student_${studentKey}_${Date.now()}.${fileExt}`;
@@ -389,11 +451,21 @@ export default function StudentProfileView({
 
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage
+        // getPublicUrl is async in the Firebase storage adapter! Must be awaited!
+        const { data: urlData } = await supabase.storage
           .from("child profile pictures")
           .getPublicUrl(filePath);
 
-        const uploadedUrl = urlData?.publicUrl || tempUrl;
+        const uploadedUrl = urlData?.publicUrl;
+
+        // Clean up temporary blob URL
+        try {
+          URL.revokeObjectURL(tempUrl);
+        } catch (_) {}
+
+        if (!uploadedUrl) {
+          throw new Error("Could not retrieve public photo URL from storage.");
+        }
 
         // 3. INSTANT AUTO-UPDATE: 100% matched photo is updated instantly!
         await finalizePhotoUpdate(uploadedUrl);
@@ -408,6 +480,9 @@ export default function StudentProfileView({
     };
 
     img.onerror = () => {
+      try {
+        URL.revokeObjectURL(tempUrl);
+      } catch (_) {}
       setUploadingPhoto(false);
       if (showAction) showAction("error", "Failed to process image file.");
     };
@@ -423,8 +498,29 @@ export default function StudentProfileView({
 
     setSaving(true);
     try {
-      const sid = studentProfile?.student_id || studentProfile?.id || currentUser?.id;
+      const candidateIds = [
+        studentProfile?.student_id,
+        studentProfile?.id,
+        studentProfile?.its,
+        ...(studentProfile?.allIds || []),
+        studentKey,
+        currentUser?.id,
+      ]
+        .filter(Boolean)
+        .map(String);
+
       const numericIts = its && !isNaN(its) ? Number(its) : its;
+
+      const photoToPersist =
+        activePhotoUrl ||
+        studentProfile?.photo_url ||
+        studentProfile?.photoUrl ||
+        studentProfile?.avatar_url ||
+        (typeof localStorage !== "undefined"
+          ? localStorage.getItem(`mauze_student_photo_${studentKey}`) ||
+            localStorage.getItem(`mauze_photo_${studentProfile?.student_id}`) ||
+            null
+          : null);
 
       const updatePayload = {
         full_name: fullName.trim(),
@@ -435,28 +531,57 @@ export default function StudentProfileView({
         whatsapp_number: whatsappNumber ? String(whatsappNumber).trim() : null,
         juz: juz ? String(juz).trim() : null,
         surat: surat ? String(surat).trim() : null,
+        photo_url: photoToPersist,
+        photoUrl: photoToPersist,
+        avatar_url: photoToPersist,
         updated_at: new Date().toISOString(),
       };
 
       // NOTE: parent_email and group_name are purposefully OMITTED so user cannot overwrite them!
 
-      // 1. Supabase update
-      if (sid) {
-        const { error: sbError } = await supabase
-          .from(targetTable)
-          .update(updatePayload)
-          .or(`student_id.eq.${sid},id.eq.${sid}`);
+      // 1. Supabase update across all matching identifier columns
+      const conditions = [];
+      candidateIds.forEach((cid) => {
+        conditions.push(`student_id.eq.${cid}`);
+        conditions.push(`id.eq.${cid}`);
+        conditions.push(`its.eq.${cid}`);
+      });
 
-        if (sbError) throw sbError;
+      if (conditions.length > 0) {
+        try {
+          const { error: sbError } = await supabase
+            .from(targetTable)
+            .update(updatePayload)
+            .or(conditions.join(","));
+
+          if (sbError) console.warn("Supabase profile update note:", sbError);
+        } catch (sbErr) {
+          console.warn("Supabase update error:", sbErr);
+        }
       }
 
       // 2. Firestore parallel mirror
       try {
         const { doc, setDoc } = await import("firebase/firestore");
         const { db } = await import("../firebase/db.js");
-        const ref = doc(db, targetTable, String(sid));
-        await setDoc(ref, updatePayload, { merge: true });
+        for (const cid of candidateIds) {
+          try {
+            const ref = doc(db, targetTable, String(cid));
+            await setDoc(ref, updatePayload, { merge: true });
+          } catch (_) {}
+        }
       } catch (_) {}
+
+      // Cache updated photo in localStorage
+      if (photoToPersist && typeof localStorage !== "undefined") {
+        try {
+          localStorage.setItem(`mauze_student_photo_${studentKey}`, photoToPersist);
+          candidateIds.forEach((cid) => {
+            localStorage.setItem(`mauze_photo_${cid}`, photoToPersist);
+          });
+          localStorage.setItem("activeChildPhoto", photoToPersist);
+        } catch (_) {}
+      }
 
       // Update local storage reg flag
       if (currentUser?.id) {
@@ -469,11 +594,16 @@ export default function StudentProfileView({
 
       setIsEditOpen(false);
 
-      if (loadPortalData) {
-        await loadPortalData(portalRole, currentUser, null, { silent: true });
+      if (studentProfile) {
+        Object.assign(studentProfile, updatePayload);
       }
+
       if (onProfileUpdated) {
         onProfileUpdated({ ...studentProfile, ...updatePayload });
+      }
+
+      if (loadPortalData) {
+        await loadPortalData(portalRole, currentUser, null, { silent: true });
       }
     } catch (err) {
       console.error("Save profile error:", err);

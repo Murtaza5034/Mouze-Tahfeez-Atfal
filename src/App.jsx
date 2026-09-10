@@ -147,6 +147,7 @@ import OverviewCard, {
 import MarhalaResultsPage from "./components/MarhalaResultsPage";
 import MarhalaMonthlyPage from "./components/MarhalaMonthlyPage";
 import IkhtebarMushaf from "./components/IkhtebarMushaf";
+import QuranDirectAccessCard from "./components/QuranDirectAccessCard";
 import {
   calculateMarhalaRanks,
   getMarhalaRankForStudent,
@@ -1468,6 +1469,7 @@ const DEAD_PHOTO_HOSTS = ["xmlmfijikkptvwbkkoil.supabase.co"];
 function cleanPhotoUrl(url) {
   if (!url) return "";
   try {
+    if (typeof url === "string" && (url.startsWith("data:") || url.startsWith("blob:"))) return url;
     const host = new URL(url).hostname;
     if (DEAD_PHOTO_HOSTS.includes(host)) return "";
   } catch (_) {
@@ -10580,6 +10582,8 @@ const resolveRedirectPage = (page, role) => {
       "Self Jadwal": "Self Jadwal",
       "Help Videos": "Help Videos",
       "Online Tahfeez": "Online Tahfeez",
+      "Quran Ikhtebar": "Quran Ikhtebar",
+      Quran: "Quran Ikhtebar",
       Home: "Home",
     };
     return parentMap[target] || "Home";
@@ -10598,6 +10602,7 @@ const resolveRedirectPage = (page, role) => {
       Jadwal: "Jadwal",
       "Self Jadwal": "Self Jadwal",
       "Quran Ikhtebar": "Quran Ikhtebar",
+      Quran: "Quran Ikhtebar",
       Settings: "Settings",
       "Attendance History": "Attendance History",
       "Apply Leave": "Apply Leave",
@@ -10665,6 +10670,7 @@ function ParentPortal({
   onAppLockToggle,
   pendingChatLeaveId,
   onPendingChatLeaveConsumed,
+  onProfileUpdated,
 }) {
   const reportSettingsObject = normalizeReportSettings(propReportSettings);
   // Profile photo of the Admin Support contact shown in the leave-chat header.
@@ -11957,9 +11963,16 @@ function ParentPortal({
       <aside className={`parent-drawer ${menuOpen ? "open" : ""}`}>
         <SidebarHeader
           photoUrl={
-            studentProfile?.photoUrl ||
-            studentProfile?.photo_url ||
-            studentProfile?.avatar_url ||
+            cleanPhotoUrl(
+              studentProfile?.photoUrl ||
+              studentProfile?.photo_url ||
+              studentProfile?.avatar_url ||
+              (typeof localStorage !== "undefined" && (studentProfile?.student_id || studentProfile?.id || studentProfile?.its)
+                ? localStorage.getItem(`mauze_student_photo_${studentProfile.student_id || studentProfile.id || studentProfile.its}`) ||
+                  localStorage.getItem(`mauze_photo_${studentProfile.student_id || studentProfile.id || studentProfile.its}`)
+                : "") ||
+              ""
+            ) ||
             (isKibarStudent ? "/kibar-logo.png" : "/logo.png")
           }
           name={studentProfile?.name || "Student"}
@@ -12004,6 +12017,17 @@ function ParentPortal({
               }}
             >
               <Home size={18} /> Home
+            </button>
+          )}
+          {pageVisibility["Quran Ikhtebar"] !== false && (
+            <button
+              className={`drawer-link ${activePage === "Quran Ikhtebar" ? "active" : ""}`}
+              onClick={() => {
+                setActivePage("Quran Ikhtebar");
+                setMenuOpen(false);
+              }}
+            >
+              <BookOpen size={18} /> Quran
             </button>
           )}
           {pageVisibility["Inbox"] !== false && (
@@ -12123,17 +12147,6 @@ function ParentPortal({
               <Video size={18} /> Online Tahfeez
             </button>
           )}
-          {pageVisibility["Quran Ikhtebar"] !== false && (
-            <button
-              className={`drawer-link ${activePage === "Quran Ikhtebar" ? "active" : ""}`}
-              onClick={() => {
-                setActivePage("Quran Ikhtebar");
-                setMenuOpen(false);
-              }}
-            >
-              <BookOpen size={18} /> Quran
-            </button>
-          )}
           {pageVisibility["Help Videos"] !== false && (
             <button
               className={`drawer-link ${activePage === "Help Videos" ? "active" : ""}`}
@@ -12191,11 +12204,16 @@ function ParentPortal({
               <Menu size={22} />
             </button>
             {(() => {
+              const sKey = studentProfile?.student_id || studentProfile?.id || studentProfile?.its || "";
+              const localPhoto = typeof localStorage !== "undefined" && sKey
+                ? (localStorage.getItem(`mauze_student_photo_${sKey}`) || localStorage.getItem(`mauze_photo_${sKey}`) || "")
+                : "";
               const photo = cleanPhotoUrl(
                 studentProfile?.photoUrl ||
                   studentProfile?.photo_url ||
                   studentProfile?.avatar_url ||
                   studentProfile?.photo ||
+                  localPhoto ||
                   "",
               );
               if (photo) {
@@ -13018,6 +13036,18 @@ function ParentPortal({
               })()}
             </div>
 
+            {/* Direct Access Quran Premium Card */}
+            {pageVisibility["Quran Ikhtebar"] !== false && (
+              <div style={{ gridColumn: "1 / -1", width: "100%" }}>
+                <QuranDirectAccessCard
+                  onOpen={() => {
+                    setActivePage("Quran Ikhtebar");
+                    setMenuOpen && setMenuOpen(false);
+                  }}
+                />
+              </div>
+            )}
+
             {!isKibarStudent && (
               <div
                 className="atfal-gem-league-grid-wrapper"
@@ -13626,6 +13656,7 @@ function ParentPortal({
             showAction={showAction}
             loadPortalData={loadPortalData}
             portalRole={portalRole}
+            onProfileUpdated={onProfileUpdated}
           />
         )}
 
@@ -22152,7 +22183,7 @@ function AdminPortal({
                     textOverflow: "ellipsis",
                   }}
                 >
-                  {activePage}
+                  {activePage === "Quran Ikhtebar" ? "Quran" : activePage}
                 </h2>
               )}
             </div>
@@ -36190,6 +36221,7 @@ function TeacherPortal({
           <p className="sidebar-category management-cat">Workplace</p>
           {[
             { id: "Home", label: "Home", icon: Sparkles },
+            { id: "Quran Ikhtebar", label: "Quran", icon: BookOpen },
             { id: "Profile", label: "My Profile", icon: UserCheck },
             { id: "My Group", label: "Students", icon: Users },
             { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
@@ -36209,7 +36241,6 @@ function TeacherPortal({
             },
             { id: "Apply Leave", label: "Apply Leave", icon: CalendarX },
             { id: "Online Tahfeez", label: "Online Tahfeez", icon: Video },
-            { id: "Quran Ikhtebar", label: "Quran", icon: BookOpen },
             {
               id: "Help Videos",
               label: "Help & Video Guides",
@@ -36316,13 +36347,15 @@ function TeacherPortal({
                     </span>
                     <span className="topbar-sub topbar-sub-kibar">
                       {activePage && activePage !== "Home"
-                        ? activePage
+                        ? activePage === "Quran Ikhtebar"
+                          ? "Quran"
+                          : activePage
                         : "Teacher Portal"}
                     </span>
                   </>
                 ) : (
                   <h2 className="page-title" style={{ margin: 0 }}>
-                    {activePage}
+                    {activePage === "Quran Ikhtebar" ? "Quran" : activePage}
                   </h2>
                 )}
               </div>
@@ -36990,6 +37023,16 @@ function TeacherPortal({
                   );
                 })()}
               </div>
+
+              {/* Direct Access Quran Premium Card */}
+              {pageVisibility["Quran Ikhtebar"] !== false && (
+                <QuranDirectAccessCard
+                  onOpen={() => {
+                    setActivePage("Quran Ikhtebar");
+                    setMenuOpen && setMenuOpen(false);
+                  }}
+                />
+              )}
 
               {!isKibarTeacher && <AtfalLeagueTop3Card isTeacher={true} />}
 
@@ -43805,6 +43848,63 @@ export default function App() {
     return () => clearInterval(interval);
   }, [portalRole]);
 
+  const handleStudentProfileUpdated = useCallback((updatedProfile) => {
+    if (!updatedProfile) return;
+    setParentData((prev) => {
+      if (!prev) return prev;
+      const targetId = String(updatedProfile.student_id || updatedProfile.id || updatedProfile.its || "");
+      const photo = cleanPhotoUrl(
+        updatedProfile.photo_url ||
+        updatedProfile.photoUrl ||
+        updatedProfile.avatar_url ||
+        ""
+      );
+      const newAllProfiles = (prev.allProfiles || []).map((p) => {
+        const pId = String(p.student_id || p.id || p.its || "");
+        if (pId === targetId || (updatedProfile.its && String(p.its) === String(updatedProfile.its))) {
+          return {
+            ...p,
+            ...updatedProfile,
+            photoUrl: photo || p.photoUrl,
+            photo_url: photo || p.photo_url,
+          };
+        }
+        return p;
+      });
+      const curId = String(prev.studentProfile?.student_id || prev.studentProfile?.id || prev.studentProfile?.its || "");
+      const isCurrentMatch =
+        curId === targetId ||
+        (updatedProfile.its && String(prev.studentProfile?.its) === String(updatedProfile.its));
+      const newCurrent = isCurrentMatch
+        ? {
+            ...prev.studentProfile,
+            ...updatedProfile,
+            photoUrl: photo || prev.studentProfile?.photoUrl,
+            photo_url: photo || prev.studentProfile?.photo_url,
+          }
+        : prev.studentProfile;
+
+      const nextState = {
+        ...prev,
+        studentProfile: newCurrent,
+        allProfiles: newAllProfiles,
+      };
+
+      try {
+        const raw = localStorage.getItem("mauze_portal_cache");
+        if (raw) {
+          const cache = JSON.parse(raw);
+          if (cache && cache.role === "parents") {
+            cache.parentData = nextState;
+            localStorage.setItem("mauze_portal_cache", JSON.stringify(cache));
+          }
+        }
+      } catch (_) {}
+
+      return nextState;
+    });
+  }, []);
+
   useEffect(() => {
     if (!user || !portalRole) return;
     let isCurrent = true;
@@ -49057,6 +49157,7 @@ export default function App() {
                 onAppLockToggle={handleAppLockToggle}
                 pendingChatLeaveId={pendingChatLeaveId}
                 onPendingChatLeaveConsumed={() => setPendingChatLeaveId(null)}
+                onProfileUpdated={handleStudentProfileUpdated}
               />
             </>
           ) : portalRole === "admin" || portalRole === "kibar-admin" ? (

@@ -38,7 +38,24 @@ import {
   Trash2,
   Layers,
   Calendar,
+  Bookmark,
+  Edit3,
+  Eye,
+  EyeOff,
+  Highlighter,
 } from "lucide-react";
+import {
+  HifzDuaModal,
+  TilawatNishaniModal,
+  TilawatMistakePopover,
+  TilawatMistakesDrawer,
+  NISHANI_COLORS,
+  MISTAKE_TYPES,
+  snapToNearestLine,
+  fetchQuranPageWords,
+  detectWordOrAyahAt,
+  detectMultiWordPhrase,
+} from "./TilawatQuranEnhancements";
 import {
   getJuzStartPage,
   getJuzFromPage,
@@ -1027,17 +1044,59 @@ export function HistoryCardsModal({ isOpen, onClose, historyList = [], onDelete,
    ═══════════════════════════════════════════════════════════════════ */
 
 function TilawatView({ onBack }) {
-  const [currentPage, setCurrentPage] = useState(1);
+  // 1. Initial Page with Auto-Resume from localStorage
+  const [currentPage, setCurrentPage] = useState(() => {
+    try {
+      const savedPage = localStorage.getItem("quran_tilawat_last_page");
+      if (savedPage) {
+        const p = parseInt(savedPage, 10);
+        if (!isNaN(p) && p >= 1 && p <= TOTAL_PAGES) return p;
+      }
+    } catch {}
+    return 1;
+  });
+
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragDistance, setDragDistance] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [urlIndex, setUrlIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showJuzPicker, setShowJuzPicker] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+
+  // 2. Hifz ul Quran Dua Modal (Opens first on Tilawat entry, or via center header tab)
+  const [showDuaModal, setShowDuaModal] = useState(true);
+
+  // 3. Nishani (Bookmark) State
+  const [bookmark, setBookmark] = useState(() => {
+    try {
+      const saved = localStorage.getItem("quran_tilawat_nishani");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [showNishaniModal, setShowNishaniModal] = useState(false);
+
+  // 4. Hifz Mistakes State
+  const [mistakesMap, setMistakesMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem("quran_tilawat_mistakes");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [isMarkMode, setIsMarkMode] = useState(false);
+  const [showMistakesOverlay, setShowMistakesOverlay] = useState(true);
+  const [activeMistakePrompt, setActiveMistakePrompt] = useState(null);
+  const [showMistakesDrawer, setShowMistakesDrawer] = useState(false);
+  const [activePinDetail, setActivePinDetail] = useState(null);
+
   const containerRef = useRef(null);
   const imageRef = useRef(null);
   const lastTouchX = useRef(null);
@@ -1047,12 +1106,25 @@ function TilawatView({ onBack }) {
   const surahInfo = useMemo(() => getSurahByPage(currentPage), [currentPage]);
   const juzNum = useMemo(() => getJuzFromPage(currentPage), [currentPage]);
 
+  // Current page's mistakes
+  const pageMistakes = useMemo(() => {
+    return mistakesMap[currentPage] || [];
+  }, [mistakesMap, currentPage]);
+
+  // Auto-save last page visited
+  useEffect(() => {
+    try {
+      localStorage.setItem("quran_tilawat_last_page", String(currentPage));
+    } catch {}
+  }, [currentPage]);
+
   useEffect(() => {
     setImageLoaded(false);
     setImageError(false);
     setUrlIndex(0);
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setActivePinDetail(null);
   }, [currentPage]);
 
   const handleImageLoad = () => setImageLoaded(true);
@@ -1071,16 +1143,157 @@ function TilawatView({ onBack }) {
 
   const handleZoomIn = () => setZoom((z) => Math.min(3, z + 0.2));
   const handleZoomOut = () => setZoom((z) => Math.max(0.5, z - 0.2));
-  const handleZoomReset = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+  const handleZoomReset = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
 
-  // Mouse drag for panning when zoomed
-  const handleMouseDown = (e) => { if (zoom <= 1) return; setIsDragging(true); setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y }); };
-  const handleMouseMove = (e) => { if (!isDragging || zoom <= 1) return; setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); };
-  const handleMouseUp = () => setIsDragging(false);
+  // Page Words & Ayahs detection data for the current page
+  const [pageWordsData, setPageWordsData] = useState(null);
+  const pageContainerRef = useRef(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchQuranPageWords(currentPage).then((data) => {
+      if (isMounted) setPageWordsData(data);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [currentPage]);
+
+  // Pointer & Drag Handlers for Panning (when zoomed) OR Selecting Words/Ayahs (when in Mark Mode)
+  const [markDragStart, setMarkDragStart] = useState(null);
+  const [markDragPreview, setMarkDragPreview] = useState(null);
+
+  const handleMouseDown = (e) => {
+    if (zoom <= 1) return;
+    setIsDragging(true);
+    setDragDistance(0);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y, rawX: e.clientX, rawY: e.clientY });
+  };
+  const handleMouseMove = (e) => {
+    if (!isDragging || zoom <= 1) return;
+    const dist = Math.hypot(e.clientX - (dragStart.rawX || e.clientX), e.clientY - (dragStart.rawY || e.clientY));
+    setDragDistance(dist);
+    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handlePagePointerDown = (e) => {
+    if (!isMarkMode) return;
+    const targetElement = pageContainerRef.current || imageRef.current || e.currentTarget;
+    const rect = targetElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const pctX = ((e.clientX - rect.left) / rect.width) * 100;
+    const pctY = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const detected = detectWordOrAyahAt(pctX, pctY, pageWordsData);
+    setMarkDragStart({
+      x: pctX,
+      y: pctY,
+      rawX: e.clientX,
+      rawY: e.clientY,
+      detected,
+    });
+    setMarkDragPreview(null);
+  };
+
+  const handlePagePointerMove = (e) => {
+    if (!isMarkMode || !markDragStart) return;
+    const targetElement = pageContainerRef.current || imageRef.current || e.currentTarget;
+    const rect = targetElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const currentPctX = ((e.clientX - rect.left) / rect.width) * 100;
+    const dist = Math.abs(e.clientX - markDragStart.rawX);
+
+    if (dist > 10) {
+      const phrase = detectMultiWordPhrase(
+        markDragStart.x,
+        currentPctX,
+        markDragStart.y,
+        pageWordsData
+      );
+      setMarkDragPreview({
+        x: phrase.x,
+        y: phrase.y - 2.1,
+        width: phrase.width,
+        height: 4.3,
+        phrase,
+      });
+    }
+  };
+
+  const handlePagePointerUp = (e) => {
+    if (!isMarkMode || !markDragStart) return;
+    const targetElement = pageContainerRef.current || imageRef.current || e.currentTarget;
+    const rect = targetElement.getBoundingClientRect();
+    const currentPctX = rect.width
+      ? ((e.clientX - rect.left) / rect.width) * 100
+      : markDragStart.x;
+    const dist = Math.abs(e.clientX - markDragStart.rawX);
+
+    if (dist > 14) {
+      // User dragged across multiple words on the line
+      const phrase = detectMultiWordPhrase(
+        markDragStart.x,
+        currentPctX,
+        markDragStart.y,
+        pageWordsData
+      );
+      setActiveMistakePrompt({
+        x: phrase.x,
+        y: phrase.y,
+        width: phrase.width,
+        selectedText: phrase.selectedText,
+        verseKey: phrase.verseKey,
+        scope: phrase.scope,
+      });
+    } else {
+      // User tapped on word or ayah stop circle
+      const detected =
+        markDragStart.detected ||
+        detectWordOrAyahAt(markDragStart.x, markDragStart.y, pageWordsData);
+      setActiveMistakePrompt({
+        x: detected.x,
+        y: detected.y,
+        width: detected.width,
+        selectedText: detected.selectedText,
+        verseKey: detected.verseKey,
+        scope: detected.scope,
+      });
+    }
+    setMarkDragStart(null);
+    setMarkDragPreview(null);
+  };
+
+  const handleResizeMistake = (mistakeId, delta) => {
+    setMistakesMap((prev) => {
+      const list = prev[currentPage] || [];
+      const updated = list.map((m) => {
+        if (m.id === mistakeId) {
+          const newW = Math.max(8, Math.min(78, (m.width || 14) + delta));
+          return { ...m, width: newW };
+        }
+        return m;
+      });
+      const res = { ...prev, [currentPage]: updated };
+      try {
+        localStorage.setItem("quran_tilawat_mistakes", JSON.stringify(res));
+      } catch {}
+      return res;
+    });
+  };
 
   // Swipe to navigate
-  const handleTouchStart = (e) => { if (e.touches.length === 1) lastTouchX.current = e.touches[0].clientX; };
+  const handleTouchStart = (e) => {
+    if (isMarkMode) return;
+    if (e.touches.length === 1) lastTouchX.current = e.touches[0].clientX;
+  };
   const handleTouchEnd = (e) => {
+    if (isMarkMode) return;
     if (lastTouchX.current === null) return;
     const endX = e.changedTouches[0].clientX;
     const diff = endX - lastTouchX.current;
@@ -1112,7 +1325,74 @@ function TilawatView({ onBack }) {
     setIsFullscreen((f) => !f);
   }, [isFullscreen]);
 
+  // Bookmark Handlers
+  const handleSetBookmark = (bmarkData) => {
+    setBookmark(bmarkData);
+    try {
+      localStorage.setItem("quran_tilawat_nishani", JSON.stringify(bmarkData));
+    } catch {}
+  };
+
+  const handleRemoveBookmark = () => {
+    setBookmark(null);
+    try {
+      localStorage.removeItem("quran_tilawat_nishani");
+    } catch {}
+  };
+
+  const handleJumpToBookmark = (targetPage) => {
+    if (targetPage >= 1 && targetPage <= TOTAL_PAGES) {
+      setCurrentPage(targetPage);
+    }
+  };
+
+  // Mistakes Handlers
+  const handleSaveMistake = (mistakeData) => {
+    setMistakesMap((prev) => {
+      const currentList = prev[currentPage] || [];
+      const updated = {
+        ...prev,
+        [currentPage]: [...currentList, mistakeData],
+      };
+      try {
+        localStorage.setItem("quran_tilawat_mistakes", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setActiveMistakePrompt(null);
+  };
+
+  const handleDeleteMistake = (mistakeId) => {
+    setMistakesMap((prev) => {
+      const currentList = prev[currentPage] || [];
+      const updated = {
+        ...prev,
+        [currentPage]: currentList.filter((m) => m.id !== mistakeId),
+      };
+      try {
+        localStorage.setItem("quran_tilawat_mistakes", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    if (activePinDetail?.id === mistakeId) {
+      setActivePinDetail(null);
+    }
+  };
+
+  const handleClearAllPageMistakes = () => {
+    setMistakesMap((prev) => {
+      const updated = { ...prev };
+      delete updated[currentPage];
+      try {
+        localStorage.setItem("quran_tilawat_mistakes", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setActivePinDetail(null);
+  };
+
   const pad = String(currentPage).padStart(3, "0");
+  const isPageBookmarked = bookmark && bookmark.page === currentPage;
 
   return (
     <div
@@ -1123,7 +1403,9 @@ function TilawatView({ onBack }) {
       {!isFullscreen && (
         <div className="ikhtebar-header">
           <div className="header-left">
-            <button className="back-btn" onClick={onBack} title="Back"><ArrowLeft size={24} /></button>
+            <button className="back-btn" onClick={onBack} title="Back">
+              <ArrowLeft size={24} />
+            </button>
             <div>
               <h1 className="arabic-kanz">تلاوة القرآن</h1>
               <p className="header-subtitle">Tilawat — Read & Memorize the Quran</p>
@@ -1148,7 +1430,10 @@ function TilawatView({ onBack }) {
       )}
 
       {/* Main Content */}
-      <div className="ikhtebar-main" style={{ padding: isFullscreen ? 0 : undefined, gap: isFullscreen ? 0 : undefined }}>
+      <div
+        className="ikhtebar-main"
+        style={{ padding: isFullscreen ? 0 : undefined, gap: isFullscreen ? 0 : undefined }}
+      >
         <div className={`ikhtebar-blank-page-viewer ${isFullscreen ? "fullscreen" : ""}`}>
           {/* Page header — hidden in fullscreen */}
           {!isFullscreen && (
@@ -1158,70 +1443,518 @@ function TilawatView({ onBack }) {
                 <span className="page-num">صفحة {currentPage}</span>
                 <span className="juz-num">الجزء {juzNum}</span>
               </div>
-              <div className="zoom-controls">
-                <button className="zoom-btn" onClick={handleZoomOut} disabled={zoom <= 0.5}><ZoomOut size={16} /></button>
-                <span className="zoom-level">{Math.round(zoom * 100)}%</span>
-                <button className="zoom-btn" onClick={handleZoomIn} disabled={zoom >= 3}><ZoomIn size={16} /></button>
-                <button className="zoom-btn reset" onClick={handleZoomReset}><RotateCcw size={16} /></button>
-                <button className="zoom-btn" onClick={toggleFullscreen} title="Fullscreen"><Maximize size={16} /></button>
+
+              {/* CENTER TAB: Hifz ul Quran Dua */}
+              <div className="blank-page-header-center">
+                <button
+                  type="button"
+                  className="hifz-dua-header-tab"
+                  onClick={() => setShowDuaModal(true)}
+                  title="دعاء حفظ القرآن الكريم"
+                >
+                  <span className="arabic-kanz hifz-dua-text">دعاء حفظ القرآن الكريم</span>
+                </button>
               </div>
+
+              <div className="zoom-controls">
+                {/* Nishani / Bookmark Button */}
+                <button
+                  type="button"
+                  className={`zoom-btn nishani-header-btn ${isPageBookmarked ? "marked" : ""}`}
+                  style={
+                    isPageBookmarked
+                      ? {
+                          borderColor: bookmark.color,
+                          color: bookmark.color,
+                          boxShadow: `0 0 10px ${bookmark.color}40`,
+                        }
+                      : {}
+                  }
+                  onClick={() => setShowNishaniModal(true)}
+                  title={
+                    isPageBookmarked
+                      ? `علامة التوقف محفوظة (صفحة ${currentPage})`
+                      : "وضع علامة المصحف (Nishani)"
+                  }
+                >
+                  <Bookmark
+                    size={16}
+                    fill={isPageBookmarked ? bookmark.color : "none"}
+                    color={isPageBookmarked ? bookmark.color : "#5d4037"}
+                  />
+                </button>
+
+                {/* Select & Highlight Mode Button */}
+                <button
+                  type="button"
+                  className={`zoom-btn mark-mode-btn ${isMarkMode ? "active-marking" : ""}`}
+                  onClick={() => setIsMarkMode(!isMarkMode)}
+                  title={
+                    isMarkMode
+                      ? "إيقاف وضع التحديد والتظليل"
+                      : "تحديد وتظليل أخطاء التلاوة والحفظ (كلمة أو آية)"
+                  }
+                >
+                  <Highlighter size={16} />
+                  {pageMistakes.length > 0 && (
+                    <span className="mistakes-badge-count">{pageMistakes.length}</span>
+                  )}
+                </button>
+
+                {/* Mistakes Eye Toggle */}
+                {pageMistakes.length > 0 && (
+                  <button
+                    type="button"
+                    className="zoom-btn eye-toggle-btn"
+                    onClick={() => setShowMistakesOverlay(!showMistakesOverlay)}
+                    title={showMistakesOverlay ? "إخفاء أخطاء الصفحة" : "إظهار أخطاء الصفحة"}
+                  >
+                    {showMistakesOverlay ? <Eye size={16} /> : <EyeOff size={16} />}
+                  </button>
+                )}
+
+                <button className="zoom-btn" onClick={handleZoomOut} disabled={zoom <= 0.5}>
+                  <ZoomOut size={16} />
+                </button>
+                <span className="zoom-level">{Math.round(zoom * 100)}%</span>
+                <button className="zoom-btn" onClick={handleZoomIn} disabled={zoom >= 3}>
+                  <ZoomIn size={16} />
+                </button>
+                <button className="zoom-btn reset" onClick={handleZoomReset}>
+                  <RotateCcw size={16} />
+                </button>
+                <button className="zoom-btn" onClick={toggleFullscreen} title="Fullscreen">
+                  <Maximize size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Select & Mark Mode Banner */}
+          {!isFullscreen && isMarkMode && (
+            <div className="tilawat-mark-mode-banner">
+              <div className="banner-left">
+                <Highlighter size={16} className="pulse-pencil" />
+                <span className="arabic-kanz">
+                  وضع التحديد والتظليل مُفعّل • انقر لتحديد كلمة أو اسحب لتحديد كلمات، أو انقر على رقم/رمز الآية ۝ لتحديد الآية كاملة
+                </span>
+              </div>
+              <button
+                type="button"
+                className="banner-exit-btn"
+                onClick={() => setIsMarkMode(false)}
+              >
+                إنهاء التحديد
+              </button>
+            </div>
+          )}
+
+          {/* Saved Bookmark Jump Banner (if marked on another page) */}
+          {!isFullscreen && !isMarkMode && bookmark && bookmark.page !== currentPage && (
+            <div
+              className="tilawat-resume-banner"
+              onClick={() => handleJumpToBookmark(bookmark.page)}
+            >
+              <div className="resume-left">
+                <Bookmark
+                  size={15}
+                  color={bookmark.color || "#10b981"}
+                  fill={bookmark.color || "#10b981"}
+                />
+                <span className="arabic-kanz">
+                  لديك علامة توقف محفوظة في <strong>صفحة {bookmark.page}</strong> (
+                  {bookmark.surahName || `الجزء ${bookmark.juz}`})
+                </span>
+              </div>
+              <button type="button" className="resume-jump-action">
+                الانتقال إليها
+              </button>
             </div>
           )}
 
           {/* Canvas */}
           <div
-            className="blank-page-canvas"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            className={`blank-page-canvas ${isMarkMode ? "mark-cursor" : ""}`}
+            onMouseDown={!isMarkMode ? handleMouseDown : undefined}
+            onMouseMove={!isMarkMode ? handleMouseMove : undefined}
+            onMouseUp={!isMarkMode ? handleMouseUp : undefined}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            style={{ cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : "default" }}
+            style={{
+              cursor: isMarkMode
+                ? "crosshair"
+                : zoom > 1
+                ? isDragging
+                  ? "grabbing"
+                  : "grab"
+                : "default",
+            }}
           >
             {!imageLoaded && !imageError && (
-              <div className="blank-page-loading"><div className="spinner" /><span>Loading Page {currentPage}…</span></div>
+              <div className="blank-page-loading">
+                <div className="spinner" />
+                <span>Loading Page {currentPage}…</span>
+              </div>
             )}
             {imageError && (
               <div className="blank-page-error">
                 <BookOpen size={48} />
                 <h4>Unable to load Page {currentPage}</h4>
                 <p className="arabic-kanz">{surahInfo.nameAr} — صفحة {currentPage}</p>
-                <button className="retry-btn" onClick={() => { setImageError(false); setImageLoaded(false); setUrlIndex(0); }}><RotateCcw size={16} /> Retry</button>
+                <button
+                  className="retry-btn"
+                  onClick={() => {
+                    setImageError(false);
+                    setImageLoaded(false);
+                    setUrlIndex(0);
+                  }}
+                >
+                  <RotateCcw size={16} /> Retry
+                </button>
               </div>
             )}
 
             <div
               className={`blank-page-image-wrapper ${imageLoaded ? "loaded" : ""}`}
-              style={{ transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`, transformOrigin: "top center" }}
+              style={{
+                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                transformOrigin: "top center",
+              }}
             >
-              <img
-                ref={imageRef}
-                src={activeImageUrl}
-                alt={`Quran Page ${currentPage}`}
-                className="blank-page-image"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-                draggable={false}
-              />
+              {/* Tightly bound container matching EXACT rendered image bounds */}
+              <div
+                ref={pageContainerRef}
+                className={`mushaf-rendered-page-container ${isMarkMode ? "select-mode-active" : ""}`}
+                onPointerDown={handlePagePointerDown}
+                onPointerMove={handlePagePointerMove}
+                onPointerUp={handlePagePointerUp}
+              >
+                <img
+                  ref={imageRef}
+                  src={activeImageUrl}
+                  alt={`Quran Page ${currentPage}`}
+                  className="blank-page-image"
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  draggable={false}
+                />
+
+                {/* Silk Bookmark Ribbon (Nishani) hanging over the page */}
+                {isPageBookmarked && (
+                  <div
+                    className="mushaf-hanging-ribbon"
+                    style={{ "--ribbon-color": bookmark.color || "#10b981" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowNishaniModal(true);
+                    }}
+                    title={`علامة القراءة • صفحة ${currentPage}`}
+                  >
+                    <div className="ribbon-tail">
+                      <span className="ribbon-star">۞</span>
+                      <span className="ribbon-text arabic-kanz">علامة</span>
+                      <span className="ribbon-page-num arabic-kanz">{currentPage}</span>
+                    </div>
+                    <div className="ribbon-chevron" />
+                  </div>
+                )}
+
+                {/* Live Drawing Preview when dragging with marker pen */}
+                {markDragPreview && (
+                  <div
+                    className="mushaf-highlighter-preview"
+                    style={{
+                      left: `${markDragPreview.x}%`,
+                      top: `${markDragPreview.y}%`,
+                      width: `${markDragPreview.width}%`,
+                      height: `${markDragPreview.height}%`,
+                    }}
+                  >
+                    <div className="preview-pencil-tip">✏️</div>
+                  </div>
+                )}
+
+                {/* Interactive Translucent Highlighter Markers on the Quran Page */}
+                {showMistakesOverlay &&
+                  pageMistakes.map((m) => {
+                    const typesList =
+                      Array.isArray(m.types) && m.types.length > 0
+                        ? m.types
+                        : [m.type || "Talqeen"];
+                    const typeObjs = typesList.map(
+                      (tId) =>
+                        MISTAKE_TYPES.find((t) => t.id === tId) || MISTAKE_TYPES[0]
+                    );
+                    const primaryType = typeObjs[0];
+                    const isSelected = activePinDetail?.id === m.id;
+                    const w = m.width || (m.scope === "ayah" ? 75 : 14);
+                    const h = m.height || 4.3;
+                    const x = Math.max(10, Math.min(90 - w, m.x));
+                    const y = Math.max(5, Math.min(92, m.y));
+                    const bubbleAlignClass =
+                      x < 28 ? "align-left" : x > 65 ? "align-right" : "align-center";
+
+                    // Multi-tone or single pastel wash
+                    const tintBackground =
+                      typeObjs.length > 1
+                        ? `linear-gradient(90deg, ${typeObjs
+                            .map((t) => t.hlBg)
+                            .join(", ")})`
+                        : primaryType.hlBg;
+                    const borderBottomColor = primaryType.color;
+
+                    return (
+                      <div
+                        key={m.id}
+                        className={`mushaf-highlighter-marker ${isSelected ? "hl-selected" : ""}`}
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}%`,
+                          width: `${w}%`,
+                          height: `${h}%`,
+                          "--hl-color": tintBackground,
+                          "--hl-border": borderBottomColor,
+                          "--hl-glow": primaryType.hlGlow,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivePinDetail(isSelected ? null : m);
+                        }}
+                        title={`${typeObjs.map((t) => t.labelAr).join(" • ")}${
+                          m.harf ? ` (حرف: ${m.harf})` : ""
+                        } (${
+                          m.scope === "word"
+                            ? "كلمة"
+                            : m.scope === "phrase"
+                            ? "كلمات"
+                            : "آية كاملة"
+                        })${m.selectedText ? ": " + m.selectedText : ""}${
+                          m.note ? " • " + m.note : ""
+                        }`}
+                      >
+                        {/* Translucent Tint Layer with multiply blend mode over the Quran text */}
+                        <div
+                          className="hl-marker-tint"
+                          style={{
+                            background: tintBackground,
+                            borderBottomColor: borderBottomColor,
+                          }}
+                        />
+
+                        {/* Animated Sweep Highlighter Stroke */}
+                        <div className="hl-stroke" />
+
+                        {/* Floating Tag Badges Row above the highlighted word */}
+                        <div
+                          className="hl-tag-badges-row"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePinDetail(isSelected ? null : m);
+                          }}
+                        >
+                          {typeObjs.map((tObj) => (
+                            <span
+                              key={tObj.id}
+                              className="hl-tag-badge"
+                              style={{ backgroundColor: tObj.color }}
+                            >
+                              <span className="hl-tag-icon">{tObj.icon}</span>
+                              <span className="hl-tag-name arabic-kanz">
+                                {tObj.labelAr}
+                              </span>
+                            </span>
+                          ))}
+                          {m.harf && (
+                            <span className="hl-tag-badge harf-tag-badge arabic-kanz">
+                              حرف: {m.harf}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Detail Bubble Popover when clicked */}
+                        {isSelected && (
+                          <div
+                            className={`hl-detail-bubble ${bubbleAlignClass}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="bubble-head-types">
+                              {typeObjs.map((tObj) => (
+                                <span
+                                  key={tObj.id}
+                                  className="bubble-type-pill arabic-kanz"
+                                  style={{
+                                    backgroundColor: tObj.color,
+                                    color: "#ffffff",
+                                  }}
+                                >
+                                  {tObj.icon} {tObj.labelAr}
+                                </span>
+                              ))}
+                              <span className="bubble-scope">
+                                {m.scope === "word"
+                                  ? "تظليل كلمة"
+                                  : m.scope === "phrase"
+                                  ? "تظليل كلمات"
+                                  : "تظليل آية كاملة"}
+                              </span>
+                            </div>
+
+                            {/* Exact selected word or ayah text */}
+                            {m.selectedText && (
+                              <div className="bubble-selected-text arabic-kanz">
+                                «{m.selectedText}»
+                              </div>
+                            )}
+
+                            {/* Specified Letter / Harf */}
+                            {m.harf && (
+                              <div className="bubble-harf-row arabic-kanz">
+                                <span className="bubble-harf-label">
+                                  الحرف المعني:
+                                </span>
+                                <span className="bubble-harf-tag">
+                                  {m.harf}
+                                </span>
+                              </div>
+                            )}
+
+                            {m.verseKey && (
+                              <div className="bubble-verse-key arabic-kanz">
+                                {m.verseKey}
+                              </div>
+                            )}
+
+                            {m.note && (
+                              <p className="bubble-note arabic-kanz">{m.note}</p>
+                            )}
+
+                            {/* Quick resize handles */}
+                            <div className="bubble-resize-bar">
+                              <span className="resize-lbl">عرض التظليل:</span>
+                              <button
+                                type="button"
+                                className="resize-btn"
+                                onClick={() => handleResizeMistake(m.id, -4)}
+                                title="تقصير التظليل"
+                              >
+                                -
+                              </button>
+                              <span className="resize-val">{Math.round(w)}%</span>
+                              <button
+                                type="button"
+                                className="resize-btn"
+                                onClick={() => handleResizeMistake(m.id, 4)}
+                                title="توسيع التظليل"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            <div className="bubble-footer">
+                              <button
+                                type="button"
+                                className="bubble-del-btn"
+                                onClick={() => handleDeleteMistake(m.id)}
+                              >
+                                <Trash2 size={13} /> حذف التظليل
+                              </button>
+                              <button
+                                type="button"
+                                className="bubble-close-btn"
+                                onClick={() => setActivePinDetail(null)}
+                              >
+                                إغلاق
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
 
             {/* Navigation arrows */}
-            <button className="fs-nav-btn fs-prev" onClick={goPrev} disabled={currentPage <= 1}><ChevronLeft size={32} /></button>
-            <button className="fs-nav-btn fs-next" onClick={goNext} disabled={currentPage >= TOTAL_PAGES}><ChevronRight size={32} /></button>
+            <button
+              className="fs-nav-btn fs-prev"
+              onClick={goPrev}
+              disabled={currentPage <= 1}
+            >
+              <ChevronLeft size={32} />
+            </button>
+            <button
+              className="fs-nav-btn fs-next"
+              onClick={goNext}
+              disabled={currentPage >= TOTAL_PAGES}
+            >
+              <ChevronRight size={32} />
+            </button>
           </div>
 
-          {/* Bottom bar — page number input & fullscreen */}
+          {/* Bottom bar — page number input, bookmark, mistakes, & fullscreen */}
           {!isFullscreen && (
             <div className="tilawat-bottom-bar">
-              <button className="tilawat-page-btn" onClick={goPrev} disabled={currentPage <= 1}><ArrowLeft size={18} /></button>
+              <button
+                className="tilawat-page-btn"
+                onClick={goPrev}
+                disabled={currentPage <= 1}
+              >
+                <ArrowLeft size={18} />
+              </button>
               <div className="tilawat-page-display">
                 <span className="tilawat-page-label">صفحة</span>
                 <span className="tilawat-page-num arabic-kanz">{currentPage}</span>
                 <span className="tilawat-page-of">/ {TOTAL_PAGES}</span>
               </div>
-              <button className="tilawat-page-btn" onClick={goNext} disabled={currentPage >= TOTAL_PAGES}><ArrowRight size={18} /></button>
-              <button className="tilawat-page-btn fullscreen-btn" onClick={toggleFullscreen} title="Fullscreen Mode"><Maximize size={18} /></button>
+              <button
+                className="tilawat-page-btn"
+                onClick={goNext}
+                disabled={currentPage >= TOTAL_PAGES}
+              >
+                <ArrowRight size={18} />
+              </button>
+
+              {/* Quick Nishani button */}
+              <button
+                type="button"
+                className={`tilawat-bottom-tool-btn ${isPageBookmarked ? "marked" : ""}`}
+                style={
+                  isPageBookmarked
+                    ? { borderColor: bookmark.color, color: bookmark.color }
+                    : {}
+                }
+                onClick={() => setShowNishaniModal(true)}
+                title="علامة المصحف (Nishani)"
+              >
+                <Bookmark
+                  size={16}
+                  fill={isPageBookmarked ? bookmark.color : "none"}
+                  color={isPageBookmarked ? bookmark.color : "currentColor"}
+                />
+                <span className="arabic-kanz">العلامة</span>
+              </button>
+
+              {/* Quick Mistakes button */}
+              <button
+                type="button"
+                className={`tilawat-bottom-tool-btn ${pageMistakes.length > 0 ? "has-mistakes" : ""}`}
+                onClick={() => setShowMistakesDrawer(true)}
+                title="أخطاء الحفظ والتلاوة"
+              >
+                <Edit3 size={16} />
+                <span className="arabic-kanz">الأخطاء</span>
+                {pageMistakes.length > 0 && (
+                  <span className="bottom-mistakes-badge">{pageMistakes.length}</span>
+                )}
+              </button>
+
+              <button
+                className="tilawat-page-btn fullscreen-btn"
+                onClick={toggleFullscreen}
+                title="Fullscreen Mode"
+              >
+                <Maximize size={18} />
+              </button>
             </div>
           )}
         </div>
@@ -1231,14 +1964,19 @@ function TilawatView({ onBack }) {
           <div className="tilawat-juz-picker">
             <div className="juz-picker-header">
               <span>Jump to Juz</span>
-              <button className="icon-btn" onClick={() => setShowJuzPicker(false)}><X size={18} /></button>
+              <button className="icon-btn" onClick={() => setShowJuzPicker(false)}>
+                <X size={18} />
+              </button>
             </div>
             <div className="juz-grid">
               {Array.from({ length: 30 }, (_, i) => i + 1).map((j) => (
                 <button
                   key={j}
                   className={`juz-btn ${juzNum === j ? "selected" : ""}`}
-                  onClick={() => { setCurrentPage(getJuzStartPage(j)); setShowJuzPicker(false); }}
+                  onClick={() => {
+                    setCurrentPage(getJuzStartPage(j));
+                    setShowJuzPicker(false);
+                  }}
                 >
                   <span className="juz-num-ar arabic-kanz">الجزء</span>
                   <span className="juz-num arabic-kanz">{j}</span>
@@ -1252,14 +1990,37 @@ function TilawatView({ onBack }) {
         {/* Quick actions when not fullscreen */}
         {!isFullscreen && (
           <div className="tilawat-quick-actions">
-            <button className="tilawat-action-btn search-action" onClick={() => setShowSearchModal(true)}>
-              <Search size={18} /><span>البحث في السور والأجزاء</span>
+            <button
+              className="tilawat-action-btn search-action"
+              onClick={() => setShowSearchModal(true)}
+            >
+              <Search size={18} />
+              <span>البحث في السور والأجزاء</span>
             </button>
-            <button className="tilawat-action-btn" onClick={() => setShowJuzPicker(!showJuzPicker)}>
-              <BookMarked size={18} /><span>قائمة الأجزاء</span>
+            <button
+              className="tilawat-action-btn"
+              onClick={() => setShowJuzPicker(!showJuzPicker)}
+            >
+              <BookMarked size={18} />
+              <span>قائمة الأجزاء</span>
+            </button>
+            <button
+              className="tilawat-action-btn"
+              onClick={() => setShowNishaniModal(true)}
+            >
+              <Bookmark size={18} />
+              <span>علامة المصحف (Nishani)</span>
+            </button>
+            <button
+              className="tilawat-action-btn"
+              onClick={() => setShowMistakesDrawer(true)}
+            >
+              <Edit3 size={18} />
+              <span>سجل الأخطاء ({pageMistakes.length})</span>
             </button>
             <button className="tilawat-action-btn" onClick={toggleFullscreen}>
-              <Maximize size={18} /><span>ملء الشاشة</span>
+              <Maximize size={18} />
+              <span>ملء الشاشة</span>
             </button>
           </div>
         )}
@@ -1268,13 +2029,71 @@ function TilawatView({ onBack }) {
       {/* Fullscreen floating controls */}
       {isFullscreen && (
         <div className="fs-floating-controls">
-          <button className="fs-ctrl-btn" onClick={onBack}><ArrowLeft size={20} /> Back</button>
-          <span className="fs-page-info arabic-kanz">{surahInfo.nameAr} — صفحة {currentPage}</span>
-          <button className="fs-ctrl-btn" onClick={toggleFullscreen}><Minimize size={20} /> Exit Full</button>
+          <button className="fs-ctrl-btn" onClick={onBack}>
+            <ArrowLeft size={20} /> Back
+          </button>
+          <span className="fs-page-info arabic-kanz">
+            {surahInfo.nameAr} — صفحة {currentPage}
+          </span>
+          <button
+            className="fs-ctrl-btn"
+            onClick={() => setShowDuaModal(true)}
+            title="دعاء حفظ القرآن الكريم"
+          >
+            <BookOpen size={18} /> دعاء حفظ القرآن الكريم
+          </button>
+          <button
+            className="fs-ctrl-btn"
+            onClick={() => setShowNishaniModal(true)}
+            title="علامة المصحف"
+          >
+            <Bookmark size={18} /> العلامة
+          </button>
+          <button className="fs-ctrl-btn" onClick={toggleFullscreen}>
+            <Minimize size={20} /> Exit Full
+          </button>
         </div>
       )}
 
-      {/* Search Modal */}
+      {/* 1. Hifz ul Quran Dua Modal */}
+      <HifzDuaModal
+        isOpen={showDuaModal}
+        onClose={() => setShowDuaModal(false)}
+      />
+
+      {/* 2. Nishani / Bookmark Modal */}
+      <TilawatNishaniModal
+        isOpen={showNishaniModal}
+        onClose={() => setShowNishaniModal(false)}
+        currentPage={currentPage}
+        surahName={surahInfo.nameAr}
+        juzNum={juzNum}
+        currentBookmark={bookmark}
+        onSetBookmark={handleSetBookmark}
+        onRemoveBookmark={handleRemoveBookmark}
+        onJumpToBookmark={handleJumpToBookmark}
+      />
+
+      {/* 3. Mark Mistake Popover (When clicking the page in Mark Mode) */}
+      <TilawatMistakePopover
+        promptPos={activeMistakePrompt}
+        currentPage={currentPage}
+        onSave={handleSaveMistake}
+        onCancel={() => setActiveMistakePrompt(null)}
+      />
+
+      {/* 4. Page Mistakes Drawer */}
+      <TilawatMistakesDrawer
+        isOpen={showMistakesDrawer}
+        onClose={() => setShowMistakesDrawer(false)}
+        currentPage={currentPage}
+        mistakes={pageMistakes}
+        onDeleteMistake={handleDeleteMistake}
+        onClearAllPageMistakes={handleClearAllPageMistakes}
+        onSelectMistake={(m) => setActivePinDetail(m)}
+      />
+
+      {/* 5. Search Modal */}
       <TilawatSearchModal
         isOpen={showSearchModal}
         onClose={() => setShowSearchModal(false)}
