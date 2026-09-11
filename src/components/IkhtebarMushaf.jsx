@@ -52,6 +52,7 @@ import {
   NISHANI_COLORS,
   MISTAKE_TYPES,
   snapToNearestLine,
+  findNearestLine,
   fetchQuranPageWords,
   detectWordOrAyahAt,
   detectMultiWordPhrase,
