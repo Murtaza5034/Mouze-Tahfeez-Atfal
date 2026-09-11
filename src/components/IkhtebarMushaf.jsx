@@ -1111,6 +1111,7 @@ function TilawatView({ onBack }) {
     return mistakesMap[currentPage] || [];
   }, [mistakesMap, currentPage]);
 
+
   // Auto-save last page visited
   useEffect(() => {
     try {
@@ -1185,20 +1186,34 @@ function TilawatView({ onBack }) {
   const handlePagePointerDown = (e) => {
     if (!isMarkMode) return;
     const targetElement = pageContainerRef.current || imageRef.current || e.currentTarget;
+    try {
+      if (targetElement.setPointerCapture && e.pointerId) {
+        targetElement.setPointerCapture(e.pointerId);
+      }
+    } catch {}
     const rect = targetElement.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const pctX = ((e.clientX - rect.left) / rect.width) * 100;
     const pctY = ((e.clientY - rect.top) / rect.height) * 100;
 
     const detected = detectWordOrAyahAt(pctX, pctY, pageWordsData);
+    const lineObj = findNearestLine(pctY);
+    const h = 5.4;
+
     setMarkDragStart({
       x: pctX,
       y: pctY,
       rawX: e.clientX,
       rawY: e.clientY,
       detected,
+      lineObj,
     });
-    setMarkDragPreview(null);
+    setMarkDragPreview({
+      x: detected.x,
+      y: lineObj.y - h / 2,
+      width: detected.width,
+      height: h,
+    });
   };
 
   const handlePagePointerMove = (e) => {
@@ -1208,8 +1223,10 @@ function TilawatView({ onBack }) {
     if (!rect.width || !rect.height) return;
     const currentPctX = ((e.clientX - rect.left) / rect.width) * 100;
     const dist = Math.abs(e.clientX - markDragStart.rawX);
+    const lineObj = markDragStart.lineObj || findNearestLine(markDragStart.y);
+    const h = 5.4;
 
-    if (dist > 10) {
+    if (dist > 6) {
       const phrase = detectMultiWordPhrase(
         markDragStart.x,
         currentPctX,
@@ -1218,9 +1235,9 @@ function TilawatView({ onBack }) {
       );
       setMarkDragPreview({
         x: phrase.x,
-        y: phrase.y - 2.1,
+        y: lineObj.y - h / 2,
         width: phrase.width,
-        height: 4.3,
+        height: h,
         phrase,
       });
     }
@@ -1229,13 +1246,20 @@ function TilawatView({ onBack }) {
   const handlePagePointerUp = (e) => {
     if (!isMarkMode || !markDragStart) return;
     const targetElement = pageContainerRef.current || imageRef.current || e.currentTarget;
+    try {
+      if (targetElement.releasePointerCapture && e.pointerId) {
+        targetElement.releasePointerCapture(e.pointerId);
+      }
+    } catch {}
     const rect = targetElement.getBoundingClientRect();
     const currentPctX = rect.width
       ? ((e.clientX - rect.left) / rect.width) * 100
       : markDragStart.x;
     const dist = Math.abs(e.clientX - markDragStart.rawX);
+    const lineObj = markDragStart.lineObj || findNearestLine(markDragStart.y);
+    const h = 5.4;
 
-    if (dist > 14) {
+    if (dist > 10) {
       // User dragged across multiple words on the line
       const phrase = detectMultiWordPhrase(
         markDragStart.x,
@@ -1245,8 +1269,9 @@ function TilawatView({ onBack }) {
       );
       setActiveMistakePrompt({
         x: phrase.x,
-        y: phrase.y,
+        y: lineObj.y - h / 2,
         width: phrase.width,
+        height: h,
         selectedText: phrase.selectedText,
         verseKey: phrase.verseKey,
         scope: phrase.scope,
@@ -1258,8 +1283,9 @@ function TilawatView({ onBack }) {
         detectWordOrAyahAt(markDragStart.x, markDragStart.y, pageWordsData);
       setActiveMistakePrompt({
         x: detected.x,
-        y: detected.y,
+        y: lineObj.y - h / 2,
         width: detected.width,
+        height: h,
         selectedText: detected.selectedText,
         verseKey: detected.verseKey,
         scope: detected.scope,
@@ -1687,10 +1713,10 @@ function TilawatView({ onBack }) {
                     );
                     const primaryType = typeObjs[0];
                     const isSelected = activePinDetail?.id === m.id;
-                    const w = m.width || (m.scope === "ayah" ? 75 : 14);
-                    const h = m.height || 4.3;
+                    const w = m.width || (m.scope === "ayah" ? 76 : 12);
+                    const h = m.height || 5.4;
                     const x = Math.max(10, Math.min(90 - w, m.x));
-                    const y = Math.max(5, Math.min(92, m.y));
+                    const y = Math.max(4, Math.min(93 - h, m.y));
                     const bubbleAlignClass =
                       x < 28 ? "align-left" : x > 65 ? "align-right" : "align-center";
 

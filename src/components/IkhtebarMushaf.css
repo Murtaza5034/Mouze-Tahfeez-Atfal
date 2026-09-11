@@ -4305,8 +4305,8 @@ button[class*="primary"] *,
 /* ── 8. Live Highlighter Drag Preview ── */
 .mushaf-highlighter-preview {
   position: absolute;
-  border: 2px dashed #f59e0b;
-  background: rgba(245, 158, 11, 0.22);
+  border: 1.5px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.40);
   border-radius: 4px;
   pointer-events: none;
   z-index: 40;
@@ -4314,8 +4314,8 @@ button[class*="primary"] *,
   align-items: center;
   justify-content: flex-end;
   padding-right: 4px;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
-  animation: pulsePreviewBorder 1s infinite alternate;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
+  transition: width 0.05s ease, left 0.05s ease;
 }
 
 .preview-pencil-tip {
@@ -4324,44 +4324,35 @@ button[class*="primary"] *,
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
 }
 
-@keyframes pulsePreviewBorder {
-  0% { opacity: 0.7; }
-  100% { opacity: 1; }
-}
-
 /* ── 9. Translucent Highlighter Markers on the Quran Page ── */
 .mushaf-highlighter-marker {
   position: absolute;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   z-index: 25;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
   pointer-events: auto;
+  transition: opacity 0.15s ease;
 }
 
-/* Pure translucent tint layer: multiplies softly over Arabic letters & harakat (Matching Quran workbook photo) */
+/* Translucent 40% Opacity Tint Layer (Exact Quran workbook photo match) */
 .mushaf-highlighter-marker .hl-marker-tint {
   position: absolute;
   inset: 0;
-  border-radius: 6px;
-  background: var(--hl-color, rgba(239, 68, 68, 0.18));
-  border: 1.5px solid var(--hl-border, #ef4444);
-  box-shadow: 0 0 6px var(--hl-glow, rgba(239, 68, 68, 0.12));
+  border-radius: 4px;
+  background: var(--hl-color, rgba(239, 68, 68, 0.40));
+  border: 1px solid var(--hl-border, #ef4444);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
   mix-blend-mode: multiply;
   pointer-events: none;
-  transition: all 0.2s ease;
+  transition: opacity 0.15s ease;
 }
 
-.mushaf-highlighter-marker:hover .hl-marker-tint,
 .mushaf-highlighter-marker.hl-selected .hl-marker-tint {
-  box-shadow: 0 0 12px var(--hl-border, #ef4444);
-  border-width: 2px;
+  box-shadow: 0 0 0 1.5px var(--hl-border, #ef4444), 0 2px 8px rgba(0, 0, 0, 0.20);
 }
 
-.mushaf-highlighter-marker:hover,
 .mushaf-highlighter-marker.hl-selected {
-  transform: scaleY(1.05);
   z-index: 45;
 }
 
@@ -4371,7 +4362,7 @@ button[class*="primary"] *,
   inset: 0;
   border-radius: inherit;
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
-  animation: sweepRTL 0.4s ease-out;
+  animation: sweepRTL 0.3s ease-out;
   pointer-events: none;
 }
 
@@ -4398,6 +4389,13 @@ button[class*="primary"] *,
   cursor: pointer;
   z-index: 30;
   flex-wrap: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.mushaf-highlighter-marker:hover .hl-tag-badges-row,
+.mushaf-highlighter-marker.hl-selected .hl-tag-badges-row {
+  opacity: 1;
 }
 
 .hl-tag-badge {
@@ -4413,11 +4411,6 @@ button[class*="primary"] *,
   white-space: nowrap;
   pointer-events: auto;
   cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.hl-tag-badge:hover {
-  transform: scale(1.08);
 }
 
 .hl-tag-badge.harf-tag-badge {
@@ -4730,13 +4723,15 @@ button[class*="primary"] *,
 .mistake-popover-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(18, 14, 10, 0.7);
+  background: rgba(18, 14, 10, 0.75);
   backdrop-filter: blur(6px);
   z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 16px 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   animation: fadeInModal 0.2s ease-out;
 }
 
@@ -4746,16 +4741,22 @@ button[class*="primary"] *,
   border-radius: 18px;
   width: 100%;
   max-width: 520px;
-  box-shadow: 0 25px 60px rgba(0,0,0,0.45);
+  max-height: 90vh;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   animation: scaleUpModal 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  margin: auto;
 }
 
 .mistake-popover-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 12px 16px;
   background: linear-gradient(135deg, #fbf5e6 0%, #fff 100%);
   border-bottom: 1px solid #e8dec8;
 }
@@ -4776,8 +4777,8 @@ button[class*="primary"] *,
   width: 13px;
   height: 13px;
   border-radius: 50%;
-  box-shadow: 0 0 5px rgba(0,0,0,0.25);
-  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .mistake-header-left h4 {
@@ -4802,10 +4803,15 @@ button[class*="primary"] *,
 }
 
 .mistake-popover-form {
-  padding: 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  flex: 1 1 auto;
+  max-height: calc(90dvh - 75px);
 }
 
 .mistake-scope-toggle {
@@ -5095,6 +5101,38 @@ button[class*="primary"] *,
   font-size: 0.88rem;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+@media (max-width: 600px) {
+  .mistake-popover-backdrop {
+    padding: 8px 6px;
+    align-items: flex-end;
+  }
+  .mistake-popover-card {
+    max-height: 90dvh;
+    border-radius: 20px 20px 10px 10px;
+  }
+  .mistake-popover-form {
+    max-height: calc(90dvh - 60px);
+    padding: 12px 10px;
+    gap: 10px;
+  }
+  .mistake-types-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+  .mistake-type-btn {
+    padding: 7px 8px !important;
+  }
+  .type-name {
+    font-size: 0.82rem !important;
+  }
+  .type-desc {
+    display: none !important;
+  }
+  .preview-arabic-text {
+    font-size: 1.15rem !important;
+  }
 }
 
 /* ── 10. Mistakes Drawer / List Modal ── */

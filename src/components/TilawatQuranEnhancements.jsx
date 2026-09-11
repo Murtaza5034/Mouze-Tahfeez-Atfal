@@ -73,9 +73,9 @@ export const MISTAKE_TYPES = [
     subEn: "Prompting / Forgetting",
     descAr: "نسيان الكلمة أو التلقين من الشيخ",
     color: "#ef4444",
-    hlBg: "rgba(239, 68, 68, 0.17)", // Ultra-light pastel wash so Arabic text & harakat remain 100% visible
+    hlBg: "rgba(239, 68, 68, 0.40)", // 40% opacity clean pastel tint
     hlBorder: "#ef4444",
-    hlGlow: "rgba(239, 68, 68, 0.10)",
+    hlGlow: "rgba(239, 68, 68, 0.20)",
     initial: "ل",
     icon: "💡",
   },
@@ -86,9 +86,9 @@ export const MISTAKE_TYPES = [
     subEn: "Hesitation / Alert",
     descAr: "تردد أو تعثر أو تنبيه من الشيخ",
     color: "#f59e0b",
-    hlBg: "rgba(245, 158, 11, 0.17)",
+    hlBg: "rgba(245, 158, 11, 0.40)", // 40% opacity clean pastel tint
     hlBorder: "#f59e0b",
-    hlGlow: "rgba(245, 158, 11, 0.10)",
+    hlGlow: "rgba(245, 158, 11, 0.20)",
     initial: "ت",
     icon: "⚠️",
   },
@@ -99,9 +99,9 @@ export const MISTAKE_TYPES = [
     subEn: "Diacritics / Harkat",
     descAr: "خطأ في حركات التشكيل (فتح، ضم، كسر، سكون)",
     color: "#3b82f6",
-    hlBg: "rgba(59, 130, 246, 0.17)",
+    hlBg: "rgba(59, 130, 246, 0.40)", // 40% opacity clean pastel tint
     hlBorder: "#3b82f6",
-    hlGlow: "rgba(59, 130, 246, 0.10)",
+    hlGlow: "rgba(59, 130, 246, 0.20)",
     initial: "ع",
     icon: "✍️",
   },
@@ -112,9 +112,9 @@ export const MISTAKE_TYPES = [
     subEn: "Tajweed Rules",
     descAr: "حكم تجويد (غنة، مد، إخفاء، إدغام، قلقلة)",
     color: "#8b5cf6",
-    hlBg: "rgba(139, 92, 246, 0.17)",
+    hlBg: "rgba(139, 92, 246, 0.40)", // 40% opacity clean pastel tint
     hlBorder: "#8b5cf6",
-    hlGlow: "rgba(139, 92, 246, 0.10)",
+    hlGlow: "rgba(139, 92, 246, 0.20)",
     initial: "ح",
     icon: "📜",
   },
@@ -125,9 +125,9 @@ export const MISTAKE_TYPES = [
     subEn: "Articulation",
     descAr: "مخرج الحرف ونطقه الصحيح (ض، ص، ط، ظ، ع)",
     color: "#10b981",
-    hlBg: "rgba(16, 185, 129, 0.17)",
+    hlBg: "rgba(16, 185, 129, 0.40)", // 40% opacity clean pastel tint
     hlBorder: "#10b981",
-    hlGlow: "rgba(16, 185, 129, 0.10)",
+    hlGlow: "rgba(16, 185, 129, 0.20)",
     initial: "م",
     icon: "🗣️",
   },
@@ -236,14 +236,17 @@ export async function fetchQuranPageWords(pageNum) {
 
 export function computeLineWordsLayout(words) {
   if (!words || words.length === 0) return [];
-  const textLeft = 12.5;
-  const textRight = 87.5;
+  const textLeft = 12.0;
+  const textRight = 88.0;
   const totalWidth = textRight - textLeft;
 
   const weights = words.map((w) => {
     if (w.charType === "end") return 4.5;
-    const base = (w.text || "").replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "");
-    return Math.max(3.5, base.length * 1.6);
+    const base = (w.text || "").replace(
+      /[\u064B-\u065F\u0670\u06D6-\u06ED\u0610-\u061A]/g,
+      ""
+    );
+    return Math.max(3.0, base.length * 1.5);
   });
   const totalWeight = weights.reduce((a, b) => a + b, 0);
 
@@ -264,16 +267,44 @@ export function computeLineWordsLayout(words) {
 }
 
 /**
+ * Finds the specific word on a line closest to or containing the given x percentage
+ */
+export function findWordAtX(xPct, lineWords) {
+  if (!lineWords || lineWords.length === 0) return null;
+  // 1. Direct containment check
+  for (let i = 0; i < lineWords.length; i++) {
+    const w = lineWords[i];
+    if (xPct >= w.left && xPct <= w.right) {
+      return w;
+    }
+  }
+  // 2. Closest center distance check
+  let closest = lineWords[0];
+  let minDiff = 999;
+  for (let i = 0; i < lineWords.length; i++) {
+    const w = lineWords[i];
+    const center = (w.left + w.right) / 2;
+    const diff = Math.abs(xPct - center);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = w;
+    }
+  }
+  return closest;
+}
+
+/**
  * Given click/tap at xPct, yPct on the Quran page image,
- * returns the detected word or full ayah (if tapping on ayah stop mark).
+ * returns the detected word or full ayah (if tapping on ayah stop mark ۝).
  */
 export function detectWordOrAyahAt(xPct, yPct, pageData) {
   const lineObj = findNearestLine(yPct);
   const lineWords = pageData?.lines?.[lineObj.line] || [];
+  const h = 5.4;
 
   if (lineWords.length === 0) {
-    const w = 14;
-    const left = Math.max(12.5, Math.min(87.5 - w, xPct - w / 2));
+    const w = 12;
+    const left = Math.max(12.0, Math.min(88.0 - w, xPct - w / 2));
     return {
       scope: "word",
       selectedText: "الكلمة المحددة",
@@ -281,35 +312,22 @@ export function detectWordOrAyahAt(xPct, yPct, pageData) {
       x: Math.round(left * 10) / 10,
       y: lineObj.y,
       width: w,
+      height: h,
       line: lineObj.line,
     };
   }
 
-  let matchedWord = lineWords[0];
-  let minDistance = 999;
-
-  for (let i = 0; i < lineWords.length; i++) {
-    const w = lineWords[i];
-    if (xPct >= w.left && xPct <= w.right) {
-      matchedWord = w;
-      minDistance = 0;
-      break;
-    }
-    const dist = Math.abs(xPct - (w.left + w.right) / 2);
-    if (dist < minDistance) {
-      minDistance = dist;
-      matchedWord = w;
-    }
-  }
+  const matchedWord = findWordAtX(xPct, lineWords);
 
   if (matchedWord.charType === "end") {
     return {
       scope: "ayah",
       selectedText: matchedWord.fullAyahText,
       verseKey: `آية ${matchedWord.verseNumber}`,
-      x: 12.5,
+      x: 12.0,
       y: lineObj.y,
-      width: 75,
+      width: 76.0,
+      height: h,
       line: lineObj.line,
       isAyahEnd: true,
     };
@@ -321,7 +339,8 @@ export function detectWordOrAyahAt(xPct, yPct, pageData) {
     verseKey: `آية ${matchedWord.verseNumber}`,
     x: matchedWord.left,
     y: lineObj.y,
-    width: Math.max(7, matchedWord.width),
+    width: Math.max(5.5, matchedWord.width),
+    height: h,
     line: lineObj.line,
     wordIndex: matchedWord.indexInLine,
   };
@@ -329,57 +348,61 @@ export function detectWordOrAyahAt(xPct, yPct, pageData) {
 
 /**
  * Given drag start and drag end on the same line,
- * returns the multi-word phrase selection.
+ * returns the multi-word phrase selection snapping cleanly to whole words.
  */
 export function detectMultiWordPhrase(startX, endX, yPct, pageData) {
   const lineObj = findNearestLine(yPct);
   const lineWords = pageData?.lines?.[lineObj.line] || [];
+  const h = 5.4;
 
   if (lineWords.length === 0) {
-    const minX = Math.max(12.5, Math.min(startX, endX));
-    const maxX = Math.min(87.5, Math.max(startX, endX));
+    const minX = Math.max(12.0, Math.min(startX, endX));
+    const maxX = Math.min(88.0, Math.max(startX, endX));
     return {
       scope: "phrase",
       selectedText: "الكلمات المحددة",
       verseKey: `سطر ${lineObj.line}`,
       x: Math.round(minX * 10) / 10,
       y: lineObj.y,
-      width: Math.round((maxX - minX) * 10) / 10,
+      width: Math.max(6, Math.round((maxX - minX) * 10) / 10),
+      height: h,
       line: lineObj.line,
     };
   }
 
-  const minX = Math.min(startX, endX);
-  const maxX = Math.max(startX, endX);
+  const wordStart = findWordAtX(startX, lineWords);
+  const wordEnd = findWordAtX(endX, lineWords);
 
-  const overlappingWords = lineWords.filter(
-    (w) => w.right >= minX && w.left <= maxX && w.charType !== "end"
-  );
+  const idx1 = Math.min(wordStart.indexInLine, wordEnd.indexInLine);
+  const idx2 = Math.max(wordStart.indexInLine, wordEnd.indexInLine);
 
-  if (overlappingWords.length === 0) {
-    return detectWordOrAyahAt((startX + endX) / 2, yPct, pageData);
-  }
+  const selectedWords = lineWords.slice(idx1, idx2 + 1);
 
-  if (overlappingWords.length === 1) {
-    const w = overlappingWords[0];
+  if (selectedWords.length === 1) {
+    const w = selectedWords[0];
     return {
-      scope: "word",
-      selectedText: w.text,
+      scope: w.charType === "end" ? "ayah" : "word",
+      selectedText: w.charType === "end" ? w.fullAyahText : w.text,
       verseKey: `آية ${w.verseNumber}`,
-      x: w.left,
+      x: w.charType === "end" ? 12.0 : w.left,
       y: lineObj.y,
-      width: Math.max(7, w.width),
+      width: w.charType === "end" ? 76.0 : Math.max(5.5, w.width),
+      height: h,
       line: lineObj.line,
+      isAyahEnd: w.charType === "end",
     };
   }
 
-  overlappingWords.sort((a, b) => b.right - a.right);
+  const right = Math.max(...selectedWords.map((w) => w.right));
+  const left = Math.min(...selectedWords.map((w) => w.left));
+  const phraseText = selectedWords
+    .filter((w) => w.charType !== "end")
+    .map((w) => w.text)
+    .join(" ");
 
-  const left = Math.min(...overlappingWords.map((w) => w.left));
-  const right = Math.max(...overlappingWords.map((w) => w.right));
-  const phraseText = overlappingWords.map((w) => w.text).join(" ");
-  const verseKey = overlappingWords[0]?.verseNumber
-    ? `آية ${overlappingWords[0].verseNumber}`
+  const firstWithVerse = selectedWords.find((w) => w.verseNumber);
+  const verseKey = firstWithVerse
+    ? `آية ${firstWithVerse.verseNumber}`
     : `سطر ${lineObj.line}`;
 
   return {
@@ -389,6 +412,7 @@ export function detectMultiWordPhrase(startX, endX, yPct, pageData) {
     x: Math.round(left * 10) / 10,
     y: lineObj.y,
     width: Math.round((right - left) * 10) / 10,
+    height: h,
     line: lineObj.line,
   };
 }
@@ -768,9 +792,9 @@ export function TilawatMistakePopover({
   const primaryTypeObj = selectedTypeObjs[0] || MISTAKE_TYPES[0];
 
   const getSelectedWidth = () => {
-    if (spanLength === "line") return 75;
-    if (spanLength === "phrase") return Math.max(24, promptPos.width || 26);
-    return Math.max(8, promptPos.width || 14);
+    if (spanLength === "line") return 76.0;
+    if (spanLength === "phrase") return Math.max(16.0, promptPos.width || 24.0);
+    return Math.max(5.5, promptPos.width || 10.0);
   };
 
   const handleSubmit = (e) => {
@@ -778,10 +802,13 @@ export function TilawatMistakePopover({
     const width = getSelectedWidth();
     let left = promptPos.x;
     if (spanLength === "line") {
-      left = 12.5;
+      left = 12.0;
     } else {
-      left = Math.max(12, Math.min(88 - width, promptPos.x));
+      left = Math.max(12.0, Math.min(88.0 - width, promptPos.x));
     }
+
+    const h = promptPos.height || 5.4;
+    const y = promptPos.y;
 
     onSave({
       id: "mistake_" + Date.now(),
@@ -800,9 +827,9 @@ export function TilawatMistakePopover({
       harf: selectedHarf.trim(),
       note: note.trim(),
       x: Math.round(left * 10) / 10,
-      y: Math.max(6, Math.min(92, promptPos.y - 2.1)),
+      y: Math.round(y * 10) / 10,
       width: Math.round(width * 10) / 10,
-      height: 4.3,
+      height: h,
       createdAt: Date.now(),
     });
   };

@@ -5502,8 +5502,8 @@
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1788985486.1036346,
-    "seen": 1788985639.4304042,
+    "mtime": 1788986041.9286666,
+    "seen": 1789039180.8297818,
     "ast_hash": "7158d716c36a84c268c69ae529cfa853",
     "semantic_hash": "7158d716c36a84c268c69ae529cfa853"
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1788985486.1036346,
-    "seen": 1788985639.4308915,
+    "mtime": 1788986041.9276648,
+    "seen": 1789039180.8305225,
     "ast_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4",
     "semantic_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4"
   },
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1788984703.7673168,
-    "seen": 1788985035.0864813,
-    "ast_hash": "ddfe74e896bd869c5d3127fb46e9909c",
+    "mtime": 1789018646.7625685,
+    "seen": 1789039180.8395236,
+    "ast_hash": "46054e22cd7c193e99a2d21192fe77bf",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -10224,9 +10224,9 @@
     "semantic_hash": ""
   },
   "src/components/IkhtebarMushaf.jsx": {
-    "mtime": 1788984207.0276053,
-    "seen": 1788984336.7547882,
-    "ast_hash": "74898d14701014b907dfb554d9918390",
+    "mtime": 1789038258.0109065,
+    "seen": 1789039180.840964,
+    "ast_hash": "a8d6d4b75116bbeb03474ad63b12c8aa",
     "semantic_hash": ""
   },
   "src/components/StaffProfilePermissionsManager.jsx": {
@@ -10245,6 +10245,24 @@
     "mtime": 1788984542.781139,
     "seen": 1788985035.0906937,
     "ast_hash": "9b07bab350ec18ef8fe614d8d1db10e7",
+    "semantic_hash": ""
+  },
+  "src/components/QuranDirectAccessCard.jsx": {
+    "mtime": 1789017107.0895731,
+    "seen": 1789039180.8414657,
+    "ast_hash": "5423ff5810715479d9456d6c1662adea",
+    "semantic_hash": ""
+  },
+  "src/components/TilawatQuranEnhancements.jsx": {
+    "mtime": 1789038366.9506667,
+    "seen": 1789039180.841777,
+    "ast_hash": "549db8600e0186cd895b14f35fd90fc5",
+    "semantic_hash": ""
+  },
+  "src/assets/hifz_dua.jpg": {
+    "mtime": 1789017693.0063233,
+    "seen": 1789039180.882268,
+    "ast_hash": "a24ab5c948b4a31fd01a2ac11b4b2ca6",
     "semantic_hash": ""
   }
 }
