@@ -47,12 +47,17 @@ if (isNativeAndroid()) {
   })();
 }
 
-// Listen for notification-click messages from the background Service Worker
+// Listen for notification-click and foreground messages from the Service Worker
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event?.data?.type === 'mauze:notification-click') {
       const data = event.data.data || {};
       stashNotificationTap(data);
+    } else if (event?.data?.type === 'mauze:fcm-foreground-message') {
+      const payload = event.data.payload;
+      if (payload && typeof fcmService !== 'undefined') {
+        fcmService.showNotification(payload);
+      }
     }
   });
 }
@@ -464,9 +469,11 @@ class FCMService {
         .from('user_fcm_tokens')
         .upsert({
           user_id: user.id,
+          email: user.email ? String(user.email).trim().toLowerCase() : '',
           user_role: userRole,
           fcm_token: token,
-          device_info: deviceInfo
+          device_info: deviceInfo,
+          updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,fcm_token'
         });

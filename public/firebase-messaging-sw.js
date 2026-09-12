@@ -3,8 +3,8 @@
 // Handles background push notifications when the app/site is closed or in background
 // ---------------------------------------------------------------------------
 
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
 if (!firebase.apps.length) {
   firebase.initializeApp({
@@ -34,7 +34,7 @@ const CANONICAL_PROD_URL = "https://mouze-tahfeez-atfal.vercel.app";
 // In-Memory Deduplication Cache (Prevents duplicate push popups)
 // ---------------------------------------------------------------------------
 const _recentPushCache = new Map();
-const DEDUP_WINDOW_MS = 15000; // 15 seconds
+const DEDUP_WINDOW_MS = 6000; // 6 seconds
 
 function isRecentlyShown(key) {
   if (!key) return false;
@@ -112,17 +112,16 @@ function parsePushPayload(payload) {
 
 function getDedupKey(info) {
   const d = info.data || {};
-  return d.notification_id || d.id || d.tag || `${info.title}:::${info.body}`;
+  const id = d.notification_id || d.id || (d.tag && !d.tag.startsWith("mauze-tahfeez-notification") ? d.tag : "");
+  return id ? `id:${id}` : `${info.title}:::${info.body}:::${d.timestamp || ""}`;
 }
 
 function makeDeterministicTag(info) {
   const d = info.data || {};
-  if (d.tag) return d.tag;
-  if (d.notification_id) return d.notification_id;
-  if (d.id) return d.id;
-  // Deterministic clean slug tag without timestamps
-  const slug = (info.title || "mauze").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
-  return `mauze-${slug}`;
+  if (d.tag && d.tag !== "mauze-tahfeez-notification") return d.tag;
+  if (d.notification_id) return `mauze-${d.notification_id}`;
+  if (d.id) return `mauze-${d.id}`;
+  return `mauze-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 function buildNotificationOptions(info) {
@@ -137,7 +136,7 @@ function buildNotificationOptions(info) {
       timestamp: new Date().toISOString()
     },
     tag: makeDeterministicTag(info),
-    renotify: false,
+    renotify: true,
     requireInteraction: true,
     silent: false,
     dir: 'ltr',
@@ -159,21 +158,36 @@ function buildNotificationOptions(info) {
 }
 
 // Unified push display function with deduplication protection
-function displayPushNotification(payload) {
+async function displayPushNotification(payload) {
   try {
     const info = parsePushPayload(payload);
     const dedupKey = getDedupKey(info);
 
     if (isRecentlyShown(dedupKey)) {
       console.log('[SW] Skipping duplicate push notification:', dedupKey);
-      return Promise.resolve();
+      return;
+    }
+
+    // Check if there is an active, focused client window
+    const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const hasFocusedClient = windowClients.some(c => c.focused);
+
+    // If website is open and in foreground, broadcast to client and avoid duplicate OS banner
+    if (hasFocusedClient) {
+      windowClients.forEach(c => {
+        c.postMessage({
+          type: 'mauze:fcm-foreground-message',
+          payload: payload
+        });
+      });
+      console.log('[SW] Client is open in foreground, dispatched in-app message.');
+      return;
     }
 
     console.log('[SW] Displaying background notification:', info.title);
     return self.registration.showNotification(info.title, buildNotificationOptions(info));
   } catch (err) {
     console.error('[SW] Error showing push notification:', err);
-    return Promise.resolve();
   }
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import "./TeacherProfileView.css";
+import { compressImageToDataUrl } from "../utils/imageUtils.js";
 import { supabase } from "../supabaseClient.js";
 import { doc, setDoc, getFirestore } from "firebase/firestore";
 import { firebaseApp } from "../firebase/config.js";
@@ -34,6 +35,34 @@ import {
   ChevronRight,
   HelpCircle,
 } from "lucide-react";
+
+function resolveTeacherPhoto(url) {
+  if (!url || typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("./")
+  ) {
+    return trimmed;
+  }
+  const storagePatterns = [
+    "child profile pictures/",
+    "child_profile_pictures/",
+    "profiles/",
+    "student-photos/",
+    "student_photos/",
+    "teacher_photos/",
+    "teacher-photos/",
+  ];
+  if (storagePatterns.some((pattern) => trimmed.startsWith(pattern))) {
+    const encodedPath = encodeURIComponent(trimmed);
+    return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
+  }
+  return trimmed;
+}
 
 export default function TeacherProfileView({
   currentUser,
@@ -139,22 +168,42 @@ export default function TeacherProfileView({
   // Populate form with matched data
   useEffect(() => {
     if (matchedTeacher) {
-      setFormData({
-        full_name: matchedTeacher.full_name || "",
-        phone_number: matchedTeacher.phone_number || "",
-        whatsapp_number: matchedTeacher.whatsapp_number || "",
-        email: matchedTeacher.email || currentUser?.email || "",
-        photo_url: matchedTeacher.photo_url || "",
-        bio: matchedTeacher.bio || matchedTeacher.about || "",
+      const uId = String(currentUser?.id || matchedTeacher.user_id || matchedTeacher.id || "");
+      const cachedPhoto =
+        typeof localStorage !== "undefined" && uId
+          ? localStorage.getItem(`mauze_teacher_photo_${uId}`) || ""
+          : "";
+      const rawPhoto =
+        matchedTeacher.photo_url ||
+        matchedTeacher.avatar_url ||
+        matchedTeacher.photo ||
+        matchedTeacher.photoUrl ||
+        portalAccess?.photo_url ||
+        portalAccess?.avatar_url ||
+        currentUser?.user_metadata?.avatar_url ||
+        currentUser?.user_metadata?.photo_url ||
+        cachedPhoto ||
+        "";
+      const resolvedPhoto = resolveTeacherPhoto(rawPhoto) || cachedPhoto || "";
+
+      setFormData((prev) => ({
+        ...prev,
+        full_name: matchedTeacher.full_name || prev.full_name || "",
+        phone_number: matchedTeacher.phone_number || prev.phone_number || "",
+        whatsapp_number: matchedTeacher.whatsapp_number || prev.whatsapp_number || "",
+        email: matchedTeacher.email || currentUser?.email || prev.email || "",
+        photo_url: resolvedPhoto || prev.photo_url || "",
+        bio: matchedTeacher.bio || matchedTeacher.about || prev.bio || "",
         qualification:
           matchedTeacher.qualification ||
           matchedTeacher.qualifications ||
+          prev.qualification ||
           "",
-        address: matchedTeacher.address || "",
-        emergency_contact: matchedTeacher.emergency_contact || "",
-      });
+        address: matchedTeacher.address || prev.address || "",
+        emergency_contact: matchedTeacher.emergency_contact || prev.emergency_contact || "",
+      }));
     }
-  }, [matchedTeacher, currentUser]);
+  }, [matchedTeacher, currentUser, portalAccess]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -195,32 +244,65 @@ export default function TeacherProfileView({
 
     setUploadingPhoto(true);
     try {
-      const fileExt = (file.name.split(".").pop() || "jpg")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "");
-      const fileName = `teacher_${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `teacher-photos/${fileName}`;
+      // 1. Fast, high-fidelity client compression
+      const compressedDataUrl = await compressImageToDataUrl(file, 380, 0.82);
+      let publicUrl = compressedDataUrl;
 
-      const { data, error } = await supabase.storage
-        .from("teacher_photos")
-        .upload(filePath, file, { contentType: file.type, upsert: true });
+      // 2. Try cloud storage upload
+      try {
+        const fileExt = (file.name.split(".").pop() || "jpg")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+        const fileName = `teacher_${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `teacher-photos/${fileName}`;
 
-      let publicUrl = "";
-      if (!error && data) {
-        const { data: urlData } = supabase.storage
+        const { data, error } = await supabase.storage
           .from("teacher_photos")
-          .getPublicUrl(filePath);
-        publicUrl = urlData?.publicUrl || "";
-      }
+          .upload(filePath, file, { contentType: file.type, upsert: true });
 
-      if (!publicUrl) {
-        // Fallback to direct object URL
-        publicUrl = URL.createObjectURL(file);
+        if (!error && data?.publicUrl) {
+          publicUrl = data.publicUrl;
+        }
+      } catch (cloudErr) {
+        console.warn("Storage upload notice, using compressed avatar:", cloudErr);
       }
 
       setFormData((prev) => ({ ...prev, photo_url: publicUrl }));
+
+      // 3. Immediately persist to database and local cache so it appears everywhere
+      try {
+        const targetTable = isKibarTeacher
+          ? "kibar_teacher_profiles"
+          : "teacher_profiles";
+        const targetId =
+          matchedTeacher?.id ||
+          matchedTeacher?.user_id ||
+          currentUser?.id;
+
+        if (targetId) {
+          await supabase
+            .from(targetTable)
+            .update({ photo_url: publicUrl })
+            .eq("id", targetId);
+          if (matchedTeacher?.user_id) {
+            await supabase
+              .from(targetTable)
+              .update({ photo_url: publicUrl })
+              .eq("user_id", matchedTeacher.user_id);
+          }
+        }
+        if (currentUser?.id) {
+          localStorage.setItem(`mauze_teacher_photo_${currentUser.id}`, publicUrl);
+        }
+        if (typeof loadPortalData === "function") {
+          loadPortalData(portalRole, currentUser, null, { silent: true });
+        }
+      } catch (saveErr) {
+        console.warn("Immediate photo update notice:", saveErr);
+      }
+
       if (onShowAction) {
-        onShowAction("success", "Photo uploaded! Remember to click Save Changes.");
+        onShowAction("success", "Profile photo uploaded and saved successfully!");
       }
     } catch (err) {
       console.warn("Upload warning:", err);
@@ -347,7 +429,13 @@ export default function TeacherProfileView({
                 className="teacher-pv-avatar"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/logo.png";
+                  const uId = String(currentUser?.id || matchedTeacher?.user_id || matchedTeacher?.id || "");
+                  const cached = typeof localStorage !== "undefined" && uId ? localStorage.getItem(`mauze_teacher_photo_${uId}`) : "";
+                  if (cached && e.currentTarget.src !== cached) {
+                    e.currentTarget.src = cached;
+                  } else {
+                    e.currentTarget.src = isKibarTeacher ? "/kibar-logo.png" : "/logo.png";
+                  }
                 }}
               />
             ) : (

@@ -46798,49 +46798,29 @@ export default function App() {
                   }
                   return unique;
                 });
-                // Show OS push notification via service worker
-                if (
-                  typeof Notification !== "undefined" &&
-                  Notification.permission === "granted" &&
-                  "serviceWorker" in navigator
-                ) {
-                  navigator.serviceWorker.ready
-                    .then((reg) => {
-                      const notifTitle =
-                        newNotif.title || "Mauze Tahfeez Update";
-                      const notifBody = newNotif.body || "";
-                      const redirectPath = newNotif.redirect_page || "";
-                      reg.showNotification(notifTitle, {
-                        body: notifBody,
-                        icon: "/LOGO ATFAAL.png",
-                        badge: "/LOGO ATFAAL.png",
-                        vibrate: [200, 100, 200],
+                // Safely show notification with deduplication so FCM and DB listener never double-prompt
+                import("./fcmService.js")
+                  .then((mod) => {
+                    const fcm = mod.default;
+                    const notifId = String(newNotif.id || newNotif.title || "");
+                    if (notifId && !fcm._isDuplicate(notifId)) {
+                      fcm.showNotification({
+                        notification: {
+                          title: newNotif.title || "Mauze Tahfeez Update",
+                          body: newNotif.body || "",
+                        },
                         data: {
-                          redirectPage: redirectPath,
-                          notification_id: newNotif.id,
-                          url: redirectPath
-                            ? "/?redirectPage=" +
-                              encodeURIComponent(redirectPath)
+                          notification_id: notifId,
+                          id: notifId,
+                          redirectPage: newNotif.redirect_page || "",
+                          url: newNotif.redirect_page
+                            ? "/?redirectPage=" + encodeURIComponent(newNotif.redirect_page)
                             : "/",
                         },
-                        tag: `mauze-${newNotif.id}`,
-                        renotify: true,
-                        requireInteraction: true,
-                        actions: [
-                          {
-                            action: "open",
-                            title: "Open Portal",
-                            icon: "/LOGO ATFAAL.png",
-                          },
-                          { action: "dismiss", title: "Dismiss" },
-                        ],
                       });
-                    })
-                    .catch(() => {});
-                  import("./fcmService.js")
-                    .then((mod) => mod.default.playPremiumChime())
-                    .catch(() => {});
-                }
+                    }
+                  })
+                  .catch(() => {});
               }
             },
           )

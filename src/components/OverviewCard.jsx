@@ -197,6 +197,12 @@ export const OverviewCard = ({
     denStr = parts[1];
   }
 
+  const valStr = String(value ?? '');
+  const valLen = valStr.length;
+  const isLongVal = valLen > 10;
+  const isMedVal = valLen > 5 && valLen <= 10;
+  const valSizeClass = isLongVal ? 'ig-val-long' : isMedVal ? 'ig-val-med' : '';
+
   // Calculate filled segments (0 to 5)
   let filledCount = 0;
   const isStudentCard = String(label).toLowerCase().includes('student');
@@ -279,7 +285,7 @@ export const OverviewCard = ({
       </div>
 
       {/* Metric Value */}
-      <div className="ig-value">
+      <div className={`ig-value ${valSizeClass}`}>
         {isFraction ? (
           <>
             <span className="ig-count-anim">{numStr}</span>

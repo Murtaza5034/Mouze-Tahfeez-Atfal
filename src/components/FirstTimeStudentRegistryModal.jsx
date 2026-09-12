@@ -17,6 +17,7 @@ import {
   Hash,
 } from "lucide-react";
 import "./FirstTimeStudentRegistryModal.css";
+import { compressImageToDataUrl } from "../utils/imageUtils.js";
 
 export default function FirstTimeStudentRegistryModal({
   user,
@@ -65,27 +66,30 @@ export default function FirstTimeStudentRegistryModal({
 
     setUploadingPhoto(true);
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `student_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${fileExt}`;
-      const filePath = `profiles/${fileName}`;
+      const compressedDataUrl = await compressImageToDataUrl(file, 380, 0.82);
+      let uploadedUrl = compressedDataUrl;
 
-      const { data, error } = await supabase.storage
-        .from("child profile pictures")
-        .upload(filePath, file, {
-          contentType: file.type,
-          upsert: true,
-        });
+      try {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `student_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${fileExt}`;
+        const filePath = `profiles/${fileName}`;
 
-      if (error) throw error;
+        const { data, error } = await supabase.storage
+          .from("child profile pictures")
+          .upload(filePath, file, {
+            contentType: file.type,
+            upsert: true,
+          });
 
-      const { data: urlData } = await supabase.storage
-        .from("child profile pictures")
-        .getPublicUrl(filePath);
-
-      if (urlData?.publicUrl) {
-        setPhotoUrl(urlData.publicUrl);
-        if (showAction) showAction("success", "Photo uploaded successfully!");
+        if (!error && data?.publicUrl) {
+          uploadedUrl = data.publicUrl;
+        }
+      } catch (stErr) {
+        console.warn("Storage upload notice, using compressed avatar:", stErr);
       }
+
+      setPhotoUrl(uploadedUrl);
+      if (showAction) showAction("success", "Photo uploaded successfully!");
     } catch (err) {
       console.error("Photo upload error:", err);
       if (showAction) showAction("error", "Failed to upload photo: " + err.message);

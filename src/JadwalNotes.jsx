@@ -103,6 +103,7 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
                 body: notifBody,
                 targetRole: "teacher",
                 targetUser: String(teacherTarget),
+                skipInbox: true,
                 section: getSectionScope() === "kibar" ? "kibar" : "atfal",
                 data: {
                   redirectPage: `Jadwal:${studentId}`,

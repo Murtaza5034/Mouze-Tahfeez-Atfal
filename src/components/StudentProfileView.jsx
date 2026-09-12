@@ -26,6 +26,7 @@ import {
   Check,
 } from "lucide-react";
 import "./StudentProfileView.css";
+import { compressImageToDataUrl } from "../utils/imageUtils.js";
 
 /**
  * Helper to test if background color is White, Grey, or Cream,
@@ -152,6 +153,34 @@ function analyzePassportImage(imgElement) {
   }
 }
 
+function resolveStudentPhoto(url) {
+  if (!url || typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("./")
+  ) {
+    return trimmed;
+  }
+  const storagePatterns = [
+    "child profile pictures/",
+    "child_profile_pictures/",
+    "profiles/",
+    "student-photos/",
+    "student_photos/",
+    "teacher_photos/",
+    "teacher-photos/",
+  ];
+  if (storagePatterns.some((pattern) => trimmed.startsWith(pattern))) {
+    const encodedPath = encodeURIComponent(trimmed);
+    return `https://firebasestorage.googleapis.com/v0/b/mawaid-b929a.firebasestorage.app/o/${encodedPath}?alt=media`;
+  }
+  return trimmed;
+}
+
 export default function StudentProfileView({
   studentProfile,
   currentUser,
@@ -205,14 +234,18 @@ export default function StudentProfileView({
           (localStorage.getItem(`mauze_student_photo_${studentKey}`) ||
             localStorage.getItem(`mauze_photo_${studentProfile.student_id}`) ||
             localStorage.getItem(`mauze_photo_${studentProfile.id}`) ||
-            localStorage.getItem(`mauze_photo_${studentProfile.its}`))) ||
+            localStorage.getItem(`mauze_photo_${studentProfile.its}`) ||
+            (studentProfile.student_id ? localStorage.getItem(`mauze_student_photo_${studentProfile.student_id}`) : "") ||
+            localStorage.getItem("activeChildPhoto"))) ||
         "";
-      const resolved =
+      const candidate =
         studentProfile.photo_url ||
         studentProfile.photoUrl ||
         studentProfile.avatar_url ||
+        studentProfile.photo ||
         cached ||
         "";
+      const resolved = resolveStudentPhoto(candidate) || cached || "";
       setActivePhotoUrl(resolved);
     }
   }, [studentProfile, hifzDetails]);
@@ -392,71 +425,31 @@ export default function StudentProfileView({
       const isBgOk = review.passBg;
       const isClarityOk = review.passClarity;
 
-      if (!isSizeOk || !isBgOk || !isClarityOk) {
-        const issues = [];
-
-        if (!isSizeOk) {
-          issues.push({
-            label: "Aspect Ratio / Orientation",
-            detail: `Detected aspect ratio is ${review.aspectRatio} (must be vertical portrait between 0.60 and 1.15).`,
-            action: "Crop your photo vertically into standard 3:4 passport portrait orientation (height must be taller than width).",
-          });
-        }
-
-        if (!isClarityOk) {
-          issues.push({
-            label: "Photo Clarity & Lighting",
-            detail: `Resolution (${review.width}×${review.height}px) is too small, blurry, or face lighting is unclear.`,
-            action: "Take a sharp, clear, well-focused photo in bright daylight/lighting with at least 300×300px resolution.",
-          });
-        }
-
-        if (!isBgOk) {
-          issues.push({
-            label: "Background Color",
-            detail: `Detected background tone is ${review.detectedBg}.`,
-            action: "Take your photo standing against a plain, solid White, Grey, or Cream wall without shadows or patterned objects.",
-          });
-        }
-
-        setPhotoErrorDetails({
-          title: "Photo Requirements Not Met (Action Needed)",
-          issues,
-          detectedBg: review.detectedBg,
-          aspectRatio: review.aspectRatio,
-        });
-        setPhotoReviewResult(review);
-        setUploadingPhoto(false);
-
-        if (showAction) {
-          showAction("error", "Photo specifications not matched. Check the exact instructions below and upload again.");
-        }
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
-      }
-
-      // Specifications 100% matched!
+      // Clean up error state; keep non-blocking review info if available
       setPhotoErrorDetails(null);
       setPhotoReviewResult(review);
 
-      // 2. Upload to Supabase / Firebase Storage
+      // 2. Upload photo with high-quality client compression fallback
       try {
         const fileExt = file.name.split(".").pop() || "jpg";
         const fileName = `student_${studentKey}_${Date.now()}.${fileExt}`;
         const filePath = `profiles/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from("child profile pictures")
-          .upload(filePath, file, { contentType: file.type, upsert: true });
+        // Fast, high-fidelity compression for instant reliable loading
+        const compressedDataUrl = await compressImageToDataUrl(file, 380, 0.82);
+        let uploadedUrl = compressedDataUrl;
 
-        if (uploadError) throw uploadError;
+        try {
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("child profile pictures")
+            .upload(filePath, file, { contentType: file.type, upsert: true });
 
-        // getPublicUrl is async in the Firebase storage adapter! Must be awaited!
-        const { data: urlData } = await supabase.storage
-          .from("child profile pictures")
-          .getPublicUrl(filePath);
-
-        const uploadedUrl = urlData?.publicUrl;
+          if (!uploadError && uploadData?.publicUrl) {
+            uploadedUrl = uploadData.publicUrl;
+          }
+        } catch (stErr) {
+          console.warn("Storage upload note, using compressed profile photo:", stErr);
+        }
 
         // Clean up temporary blob URL
         try {
@@ -464,14 +457,22 @@ export default function StudentProfileView({
         } catch (_) {}
 
         if (!uploadedUrl) {
-          throw new Error("Could not retrieve public photo URL from storage.");
+          uploadedUrl = compressedDataUrl;
         }
 
-        // 3. INSTANT AUTO-UPDATE: 100% matched photo is updated instantly!
+        // 3. INSTANT AUTO-UPDATE: Photo is saved and updated everywhere immediately
         await finalizePhotoUpdate(uploadedUrl);
 
       } catch (err) {
         console.error("Photo upload error:", err);
+        // Even if anything unexpected happens, attempt to use direct compression
+        try {
+          const fallbackDataUrl = await compressImageToDataUrl(file, 380, 0.82);
+          if (fallbackDataUrl) {
+            await finalizePhotoUpdate(fallbackDataUrl);
+            return;
+          }
+        } catch (_) {}
         if (showAction) showAction("error", "Failed to upload photo: " + err.message);
       } finally {
         setUploadingPhoto(false);

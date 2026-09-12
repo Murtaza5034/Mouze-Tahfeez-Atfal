@@ -96,15 +96,76 @@ function notificationUrl(dataMap?: Record<string, string>, fallback = "/"): stri
   return `${base}/`;
 }
 
+// In-memory sliding window deduplication to prevent double-clicks
+const _recentSends = new Map<string, number>();
+function isDuplicateSend(key: string, windowMs = 4000): boolean {
+  if (!key) return false;
+  const now = Date.now();
+  const last = _recentSends.get(key);
+  if (last && now - last < windowMs) {
+    return true;
+  }
+  _recentSends.set(key, now);
+  if (_recentSends.size > 500) {
+    for (const [k, t] of _recentSends.entries()) {
+      if (now - t > 30000) _recentSends.delete(k);
+    }
+  }
+  return false;
+}
+
 async function tokensForUser(userId?: string, section: "atfal" | "kibar" = "atfal"): Promise<string[]> {
   if (!userId) return [];
   const out: string[] = [];
   const col = "user_fcm_tokens";
-  const snap = await db.collection(col).where("user_id", "==", String(userId)).limit(200).get();
+  const rawId = String(userId).trim();
+
+  // 1. Direct query by user_id
+  const snap = await db.collection(col).where("user_id", "==", rawId).limit(200).get();
   snap.docs.forEach((d) => {
     const t = d.data().fcm_token;
     if (t) out.push(String(t));
   });
+
+  // 2. If identifier looks like an email, match by email field and resolve UID
+  if (rawId.includes("@")) {
+    const emailNorm = normalizeEmail(rawId);
+    const snapEmail = await db.collection(col).where("email", "==", emailNorm).limit(200).get();
+    snapEmail.docs.forEach((d) => {
+      const t = d.data().fcm_token;
+      if (t) out.push(String(t));
+    });
+
+    const accessCol = section === "kibar" ? "kibar_user_portal_access" : "user_portal_access";
+    const accSnap = await db.collection(accessCol).where("email", "==", emailNorm).limit(1).get();
+    if (!accSnap.empty) {
+      const resolvedUid = String(accSnap.docs[0].data().user_id || "");
+      if (resolvedUid && resolvedUid !== rawId) {
+        const snapUid = await db.collection(col).where("user_id", "==", resolvedUid).limit(200).get();
+        snapUid.docs.forEach((d) => {
+          const t = d.data().fcm_token;
+          if (t) out.push(String(t));
+        });
+      }
+    }
+  }
+
+  // 3. If identifier might be a student_id / ITS, resolve parent_user_id
+  try {
+    const childCol = section === "kibar" ? "kibar_child_profiles" : "child_profiles";
+    const childDoc = await db.collection(childCol).doc(rawId.toLowerCase()).get();
+    if (childDoc.exists && childDoc.data()?.parent_user_id) {
+      const pid = String(childDoc.data()!.parent_user_id);
+      const snapParent = await db.collection(col).where("user_id", "==", pid).limit(200).get();
+      snapParent.docs.forEach((d) => {
+        const t = d.data().fcm_token;
+        if (t) out.push(String(t));
+      });
+    }
+  } catch (_) {
+    // ignore lookup errors
+  }
+
   return [...new Set(out)];
 }
 
@@ -112,7 +173,7 @@ async function tokensForUser(userId?: string, section: "atfal" | "kibar" = "atfa
 // every kibar role so a kibar broadcast never leaks into the atfal institute.
 function kibarRolesFor(role?: string): string[] {
   if (!role || role === "all" || role === "user") return ["kibar-admin", "kibar-teacher", "kibar-student"];
-  if (role === "parents") return ["kibar-student"];
+  if (role === "parents" || role === "parent") return ["kibar-student"];
   if (role === "teacher") return ["kibar-teacher"];
   if (role === "admin") return ["kibar-admin"];
   if (role.startsWith("kibar-")) return [role];
@@ -123,20 +184,31 @@ async function tokensForRole(role?: string, section: "atfal" | "kibar" = "atfal"
   const out: string[] = [];
   const col = "user_fcm_tokens";
   const all = await allDocs(col);
+  const target = String(role || "all").toLowerCase().trim();
+
   for (const { data } of all) {
-    const r = String(data.user_role || "");
+    const r = String(data.user_role || "").toLowerCase().trim();
     const t = data.fcm_token;
     if (!t) continue;
     const isKibarToken = r.startsWith("kibar-");
     if (section === "kibar" ? !isKibarToken : isKibarToken) continue;
-    if (!role || role === "all" || role === "user") {
+
+    if (!role || target === "all" || target === "user") {
       out.push(String(t));
       continue;
     }
+
     if (section === "kibar") {
-      if (kibarRolesFor(role).includes(r)) out.push(String(t));
-    } else if (r === role) {
-      out.push(String(t));
+      if (kibarRolesFor(target).includes(r)) out.push(String(t));
+    } else {
+      if (
+        r === target ||
+        ((target === "parents" || target === "parent") && (r === "parents" || r === "parent")) ||
+        (target === "admin" && (r === "admin" || r === "superadmin")) ||
+        (target === "teacher" && r === "teacher")
+      ) {
+        out.push(String(t));
+      }
     }
   }
   return [...new Set(out)];
@@ -186,18 +258,27 @@ async function sendFcmInner(
   title: string,
   body: string,
   dataMap: Record<string, string> = {},
-  tag = "mauze-tahfeez-notification",
+  tag = "",
   section: "atfal" | "kibar" = "atfal"
 ): Promise<{ total: number; delivered: number; stale: number; failed: number }> {
   const uniq = [...new Set(tokens.filter(Boolean))];
   if (!uniq.length) return { total: 0, delivered: 0, stale: 0, failed: 0 };
-  const notifTag = dataMap.notification_id || dataMap.id || dataMap.tag || tag || "mauze-tahfeez-notification";
+
+  // Generate unique, distinct tag so individual notifications don't overwrite each other
+  const notifTag =
+    dataMap.notification_id ||
+    dataMap.id ||
+    (dataMap.tag && dataMap.tag !== "mauze-tahfeez-notification" ? dataMap.tag : "") ||
+    (tag && tag !== "mauze-tahfeez-notification" ? tag : "") ||
+    `mauze-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
   const data: Record<string, string> = {
     ...dataMap,
     title,
     body,
     tag: notifTag,
-    url: notificationUrl(dataMap)
+    url: notificationUrl(dataMap),
+    section,
   };
   let delivered = 0;
   let stale = 0;
@@ -222,7 +303,7 @@ async function sendFcmInner(
           icon: "/LOGO ATFAAL-192.png",
           badge: "/LOGO ATFAAL-192.png",
           tag: notifTag,
-          renotify: false,
+          renotify: true,
           requireInteraction: true,
           data: { ...data, click_action: data.url, tag: notifTag },
         },
@@ -283,7 +364,7 @@ async function sendFcmInner(
 // getGlobalRank
 // ---------------------------------------------------------------------------
 
-export const getGlobalRank = onCall(async (request) => {
+export const getGlobalRank = onCall({ cors: true }, async (request) => {
   const input = (request.data || {}) as {
     student_id?: string;
     return_all?: boolean;
@@ -369,7 +450,7 @@ export const getGlobalRank = onCall(async (request) => {
 // sendFcm
 // ---------------------------------------------------------------------------
 
-export const sendFcm = onCall(async (request) => {
+export const sendFcm = onCall({ cors: true }, async (request) => {
   const input = (request.data || {}) as {
     title?: string;
     body?: string;
@@ -377,12 +458,20 @@ export const sendFcm = onCall(async (request) => {
     targetUser?: string;
     data?: Record<string, string>;
     section?: string;
+    skipInbox?: boolean;
   };
-  const title = String(input.title || "");
-  const body = String(input.body || "");
+  const title = String(input.title || "").trim();
+  const body = String(input.body || "").trim();
   if (!title || !body) throw new HttpsError("invalid-argument", "Missing title or body in request");
 
   const section: "atfal" | "kibar" = input.section === "kibar" ? "kibar" : "atfal";
+
+  // Prevent immediate double-clicks (within 3 seconds) from firing duplicate push broadcasts
+  const dedupKey = `${section}:${title}:${body}:${input.targetRole || "all"}:${input.targetUser || "all"}`;
+  if (isDuplicateSend(dedupKey, 3000)) {
+    console.log(`[sendFcm] Rapid duplicate send detected (${dedupKey}), skipping repeat push.`);
+    return { success: true, message: "DUPLICATE_SKIPPED" };
+  }
 
   let targetUser = input.targetUser;
   if (targetUser && targetUser.includes("@")) {
@@ -392,27 +481,47 @@ export const sendFcm = onCall(async (request) => {
     if (!snap.empty) targetUser = String(snap.docs[0].data().user_id || "");
   }
 
+  // Write to Inbox if not already inserted by client
+  if (!input.skipInbox) {
+    const alreadyInInbox = await dupeInLast30s(title, body, section);
+    if (!alreadyInInbox) {
+      await writeInbox({
+        title,
+        body,
+        target_role: input.targetRole || null,
+        target_user: targetUser || null,
+        redirect_page: input.data?.redirectPage || notificationUrl(input.data) || "/",
+      }, section);
+    }
+  }
+
+  // Resolve tokens for target user / role
   const tokens = await tokensForTarget(targetUser, input.targetRole || "all", section);
-  await writeInbox({
+  if (!tokens.length) {
+    console.warn(`[sendFcm] No tokens found for targetUser=${targetUser}, targetRole=${input.targetRole}`);
+    return {
+      success: true,
+      message: "NO_TOKENS_FOUND",
+      summary: { total: 0, delivered: 0, stale: 0, failures: 0 },
+    };
+  }
+
+  const res = await sendFcmInner(
+    tokens,
     title,
     body,
-    target_role: input.targetRole || null,
-    target_user: targetUser || null,
-    redirect_page: input.data?.redirectPage || notificationUrl(input.data) || "/",
-  }, section);
+    input.data || {},
+    input.data?.tag || "",
+    section
+  );
 
-  const isDupe = await dupeInLast30s(title, body, section);
-  if (isDupe) return { success: true, message: "DUPLICATE_SKIPPED" };
-  if (!tokens.length) return { success: true, message: "NO_TOKENS_FOUND" };
-
-  const res = await sendFcmInner(tokens, title, body, input.data || {}, "mauze-tahfeez-notification", section);
   return {
-    success: res.failed === 0,
+    success: res.delivered > 0 || res.failed === 0,
     message:
       res.delivered > 0
-        ? "Notification process complete"
+        ? `Notification delivered to ${res.delivered} device(s)`
         : res.stale > 0 && res.failed === 0
-        ? "No active tokens; stale tokens cleaned up"
+        ? "No active devices; stale tokens cleaned up"
         : "Notification delivery failed",
     summary: { total: res.total, delivered: res.delivered, stale: res.stale, failures: res.failed },
   };
@@ -597,7 +706,7 @@ export const notifyKibarLeaveChatMessages = onDocumentUpdated(
 // sendWhatsapp
 // ---------------------------------------------------------------------------
 
-export const sendWhatsapp = onCall(async (request) => {
+export const sendWhatsapp = onCall({ cors: true }, async (request) => {
   const input = (request.data || {}) as { phone?: string; message?: string; studentName?: string; section?: string };
   const phone = String(input.phone || "").replace(/\D/g, "");
   const message = String(input.message || "").trim();
@@ -701,7 +810,7 @@ export const sendWhatsapp = onCall(async (request) => {
 // sendEmail
 // ---------------------------------------------------------------------------
 
-export const sendEmail = onCall(async (request) => {
+export const sendEmail = onCall({ cors: true }, async (request) => {
   const input = (request.data || {}) as {
     to?: string;
     subject?: string;
@@ -779,7 +888,7 @@ export const sendEmail = onCall(async (request) => {
 // Auth admin callables
 // ---------------------------------------------------------------------------
 
-export const provisionUser = onCall(async (request) => {
+export const provisionUser = onCall({ cors: true }, async (request) => {
   const input = (request.data || {}) as { email?: string; password?: string; data?: Row };
   const email = normalizeEmail(input.email);
   const password = String(input.password || "");
@@ -847,7 +956,7 @@ export const provisionUser = onCall(async (request) => {
   }
 });
 
-export const getUserByEmail = onCall(async (request) => {
+export const getUserByEmail = onCall({ cors: true }, async (request) => {
   const input = (request.data || {}) as { target_email?: string };
   const email = normalizeEmail(input.target_email);
   if (!email) throw new HttpsError("invalid-argument", "target_email required");
@@ -860,7 +969,7 @@ export const getUserByEmail = onCall(async (request) => {
   }
 });
 
-export const resetUserPassword = onCall(async (request) => {
+export const resetUserPassword = onCall({ cors: true }, async (request) => {
   const input = (request.data || {}) as {
     target_email?: string;
     target_user_id?: string;
@@ -922,7 +1031,7 @@ const CLEAR_FIELDS = [
   "total_score",
 ];
 
-export const clearAllMarks = onCall(async (request) => {
+export const clearAllMarks = onCall({ cors: true }, async (request) => {
   const input = (request?.data || {}) as { section?: string };
   const section = input.section === "kibar" ? "kibar" : "atfal";
   const resultsCol = section === "kibar" ? "kibar_weekly_results" : "weekly_results";
@@ -1088,7 +1197,7 @@ async function runResultLiveNotifierInner(section: "atfal" | "kibar" = "atfal", 
   };
 }
 
-export const sendResultLiveNotifier = onCall(async (request) => {
+export const sendResultLiveNotifier = onCall({ cors: true }, async (request) => {
   const input = request.data || {};
   const section: "atfal" | "kibar" = input.section === "kibar" ? "kibar" : "atfal";
   const manual = Boolean(input.manual);

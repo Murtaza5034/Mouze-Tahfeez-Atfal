@@ -259,3 +259,348 @@
   0%, 100% { filter: drop-shadow(0 0 5px rgba(198,40,40,0.9)) drop-shadow(0 0 12px rgba(198,40,40,0.45)); }
   50% { filter: drop-shadow(0 0 9px rgba(198,40,40,1)) drop-shadow(0 0 20px rgba(198,40,40,0.65)); }
 }
+
+/* ── Title & Active Month Badges ── */
+.mrk-title-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mrk-month-active-badge {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(184, 138, 29, 0.28));
+  color: #8c6814;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  font-weight: 800;
+  font-size: 0.82rem;
+  padding: 4px 12px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+.mrk-excel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(135deg, #107c41, #0c5e31);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 15px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 124, 65, 0.25);
+  transition: all 0.2s ease;
+}
+.mrk-excel-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 124, 65, 0.35);
+}
+.mrk-excel-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── 'All Atfal (Overall)' Tab Accent ── */
+.mrk-tab-all {
+  background: linear-gradient(135deg, #fbf7ee, #f4ecd6) !important;
+  border-color: #d4af37 !important;
+  color: #5d431f !important;
+  font-weight: 800 !important;
+}
+.mrk-tab-all.active {
+  background: linear-gradient(135deg, #3d2b1f, #5d4037) !important;
+  color: #ffe9a8 !important;
+  border-color: #d4af37 !important;
+  box-shadow: 0 6px 20px rgba(61, 43, 31, 0.35) !important;
+}
+
+/* ── Overall Quick Stats Ribbon ── */
+.mrk-overall-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.mrk-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #ece4d4;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(61, 43, 31, 0.04);
+}
+.mrk-stat-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.mrk-stat-card.gold .mrk-stat-icon { background: rgba(212, 175, 55, 0.16); color: #b8860b; }
+.mrk-stat-card.emerald .mrk-stat-icon { background: rgba(46, 125, 50, 0.15); color: #2e7d32; }
+.mrk-stat-card.purple .mrk-stat-icon { background: rgba(142, 68, 173, 0.15); color: #8e44ad; }
+.mrk-stat-card.blue .mrk-stat-icon { background: rgba(41, 128, 185, 0.15); color: #2980b9; }
+.mrk-stat-label {
+  display: block;
+  font-size: 0.72rem;
+  color: #8c735d;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+.mrk-stat-val {
+  display: block;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #3d2b1f;
+}
+
+/* ── Search & Sorting Toolbar ── */
+.mrk-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.mrk-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+}
+.mrk-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9c8a78;
+  pointer-events: none;
+}
+.mrk-search-input {
+  width: 100%;
+  padding: 9px 14px 9px 36px;
+  border-radius: 10px;
+  border: 1px solid #e2d8c5;
+  background: #fff;
+  font-size: 0.85rem;
+  color: #3d2b1f;
+  outline: none;
+  transition: all 0.2s;
+}
+.mrk-search-input:focus {
+  border-color: #d4af37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+}
+.mrk-sort-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mrk-sort-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #8c735d;
+}
+.mrk-sort-select {
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid #e2d8c5;
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #3d2b1f;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ── Student Cell with Photo Avatar ── */
+.mrk-student-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  min-width: 180px;
+}
+.mrk-student-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e5dcce;
+  background: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+.mrk-student-avatar-fallback {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0e6d2, #d8c29d);
+  color: #5d4037;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.mrk-student-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mrk-student-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mrk-student-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.mrk-student-its {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #8c735d;
+  background: #f7f3eb;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.mrk-marhala-pill {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f4eee2;
+  color: #6b4e23;
+  border: 1px solid #e0d5c0;
+  white-space: nowrap;
+}
+
+/* ── 4-Week Column Styles & Premium Table Headers ── */
+.mrk-table thead tr {
+  background: linear-gradient(135deg, #24160c 0%, #3a2314 45%, #4a2e1c 100%) !important;
+}
+.mrk-table th {
+  padding: 13px 12px;
+  text-align: center;
+  font-size: 0.80rem;
+  font-weight: 800 !important;
+  letter-spacing: 0.35px;
+  white-space: nowrap;
+  color: #ffffff !important;
+  border-bottom: 2px solid #d4af37;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.mrk-th-week {
+  background: linear-gradient(135deg, #2d1a0e 0%, #422716 100%) !important;
+  border-left: 1px solid rgba(212, 175, 55, 0.3) !important;
+  border-right: 1px solid rgba(212, 175, 55, 0.3) !important;
+  min-width: 82px;
+}
+.mrk-th-highlight {
+  background: linear-gradient(135deg, #704b0d 0%, #946413 50%, #b8860b 100%) !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  font-size: 0.83rem !important;
+  border-left: 1.5px solid #e5c158 !important;
+  border-right: 1.5px solid #e5c158 !important;
+  box-shadow: inset 0 0 12px rgba(255, 233, 168, 0.25);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+.mrk-td-highlight {
+  background: rgba(212, 175, 55, 0.11) !important;
+}
+.mrk-td-highlight .mrk-score-pill {
+  background: linear-gradient(135deg, #fffbf0, #fff3d1);
+  border: 1.5px solid #d4af37;
+  color: #6b4700;
+  font-weight: 900;
+  box-shadow: 0 2px 6px rgba(212, 175, 55, 0.2);
+}
+.mrk-week-cell {
+  padding: 7px 6px !important;
+}
+.mrk-week-cell.empty {
+  color: #ccc;
+}
+.mrk-week-cell.scored .mrk-week-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: #fbf8f2;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid #e8decb;
+}
+.mrk-week-cell.scored .mrk-score-pill {
+  background: #ffffff;
+  border: 1px solid #d4af37;
+  color: #2b180d;
+  font-weight: 800;
+}
+.mrk-week-meta {
+  font-size: 0.70rem;
+  font-weight: 700;
+  color: #6d4e28;
+}
+.mrk-week-dash {
+  font-weight: 700;
+  color: #bbb;
+  font-size: 1.1rem;
+}
+.mrk-score-dash {
+  color: #bbb;
+  font-weight: 700;
+}
+.mrk-table-title-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mrk-table-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #efe7d6;
+  color: #5d431f;
+}
+.mrk-table-sub {
+  font-size: 0.78rem;
+  color: #8c735d;
+}
+.mrk-att-val {
+  font-weight: 800;
+  color: #3d2b1f;
+  font-size: 0.85rem;
+}
+
+.mrk-th-week-title {
+  font-weight: 900 !important;
+  font-size: 0.85rem !important;
+  color: #ffffff !important;
+  letter-spacing: 0.4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+.mrk-th-week-sub {
+  font-size: 0.70rem !important;
+  font-weight: 700 !important;
+  color: #ffe699 !important;
+  margin-top: 3px;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+
