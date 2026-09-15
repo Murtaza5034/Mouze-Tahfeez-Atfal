@@ -308,13 +308,15 @@ export default function StudentProfileView({
         .filter(Boolean)
         .map(String);
 
-      // Save to localStorage immediately so it never disappears on re-render
+      // Save to localStorage immediately if not an oversized base64 string
       try {
-        localStorage.setItem(`mauze_student_photo_${studentKey}`, photoUrlToCommit);
-        candidateIds.forEach((cid) => {
-          localStorage.setItem(`mauze_photo_${cid}`, photoUrlToCommit);
-        });
-        localStorage.setItem("activeChildPhoto", photoUrlToCommit);
+        if (photoUrlToCommit && (!photoUrlToCommit.startsWith("data:") || photoUrlToCommit.length < 50000)) {
+          localStorage.setItem(`mauze_student_photo_${studentKey}`, photoUrlToCommit);
+          candidateIds.forEach((cid) => {
+            localStorage.setItem(`mauze_photo_${cid}`, photoUrlToCommit);
+          });
+          localStorage.setItem("activeChildPhoto", photoUrlToCommit);
+        }
       } catch (_) {}
 
       // Update in Supabase across all potential identifier columns
@@ -573,14 +575,16 @@ export default function StudentProfileView({
         }
       } catch (_) {}
 
-      // Cache updated photo in localStorage
+      // Cache updated photo in localStorage if safe in size
       if (photoToPersist && typeof localStorage !== "undefined") {
         try {
-          localStorage.setItem(`mauze_student_photo_${studentKey}`, photoToPersist);
-          candidateIds.forEach((cid) => {
-            localStorage.setItem(`mauze_photo_${cid}`, photoToPersist);
-          });
-          localStorage.setItem("activeChildPhoto", photoToPersist);
+          if (!photoToPersist.startsWith("data:") || photoToPersist.length < 50000) {
+            localStorage.setItem(`mauze_student_photo_${studentKey}`, photoToPersist);
+            candidateIds.forEach((cid) => {
+              localStorage.setItem(`mauze_photo_${cid}`, photoToPersist);
+            });
+            localStorage.setItem("activeChildPhoto", photoToPersist);
+          }
         } catch (_) {}
       }
 

@@ -3,6 +3,7 @@ import {
   getFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  persistentSingleTabManager,
   collection,
   doc,
   getDocs,
@@ -42,20 +43,38 @@ import { firebaseApp } from "./config.js";
 // migrate.ts writes docs using exactly this scheme.
 // ---------------------------------------------------------------------------
 
-// Enable IndexedDB offline persistence + multi-tab cache. Once data is cached
-// locally, repeat page loads render instantly (no network round-trip) and the
-// realtime onSnapshot listeners keep the cache fresh in the background.
-// Falls back to plain in-memory Firestore if IndexedDB is unavailable (e.g.
-// private/incognito browsing) so the app never breaks.
+// Enable IndexedDB offline persistence.
+// Falls back to single-tab or plain in-memory Firestore if multi-tab or IndexedDB
+// is unavailable or restricted so the app never breaks.
 let db;
 try {
+  // Purge any stale firestore zombie entries from localStorage to free quota
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      for (let i = window.localStorage.length - 1; i >= 0; i--) {
+        const k = window.localStorage.key(i);
+        if (k && (k.startsWith("firestore_zombie_") || k.startsWith("firestore_targets_"))) {
+          window.localStorage.removeItem(k);
+        }
+      }
+    }
+  } catch (_) {}
+
   db = initializeFirestore(firebaseApp, {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
     }),
   });
 } catch (_e) {
-  db = getFirestore(firebaseApp);
+  try {
+    db = initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({
+        tabManager: persistentSingleTabManager(),
+      }),
+    });
+  } catch (_e2) {
+    db = getFirestore(firebaseApp);
+  }
 }
 
 export { db };
@@ -142,6 +161,7 @@ const DOC_ID_BY = {
   whatsapp_config: (d) => String(d.id ?? 1),
   jadawal: (d) => d.student_id || d.id,
   app_lock_settings: (d) => d.user_id || d.id,
+  users: (d) => d.id || d.user_id,
 };
 
 function deriveDocId(collectionName, data) {
@@ -836,6 +856,14 @@ function createBuilder(collectionName) {
 
   builder.then = function (onFulfilled, onRejected) {
     return this.execute().then(onFulfilled, onRejected);
+  };
+
+  builder.catch = function (onRejected) {
+    return this.execute().catch(onRejected);
+  };
+
+  builder.finally = function (onFinally) {
+    return this.execute().finally(onFinally);
   };
 
   return builder;

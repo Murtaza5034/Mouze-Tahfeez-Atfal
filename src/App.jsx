@@ -3770,11 +3770,29 @@ async function detectUserAllowedPortal(user) {
 
   // 3. Check kibar_user_portal_access table
   try {
-    const { data: kibarAccess } = await supabase
+    let kibarAccess = null;
+    const { data: byId } = await supabase
       .from("kibar_user_portal_access")
       .select("*")
       .eq("id", user.id)
       .maybeSingle();
+    if (byId) kibarAccess = byId;
+    else {
+      const { data: byUid } = await supabase
+        .from("kibar_user_portal_access")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (byUid) kibarAccess = byUid;
+      else if (user.email) {
+        const { data: byEmail } = await supabase
+          .from("kibar_user_portal_access")
+          .select("*")
+          .eq("email", user.email.toLowerCase().trim())
+          .maybeSingle();
+        if (byEmail) kibarAccess = byEmail;
+      }
+    }
 
     if (kibarAccess?.is_active && kibarAccess.portal_role) {
       const r = kibarAccess.portal_role;
@@ -4194,6 +4212,7 @@ async function authorizePortalAccess(user, requestedRole) {
       if (!parentProfiles || parentProfiles.length === 0) {
         if (
           assignedRoles.includes("kibar-student") ||
+          tableAccess?.portal_role === "kibar-student" ||
           user?.user_metadata?.portal_role === "kibar-student" ||
           user?.user_metadata?.role === "kibar-student"
         ) {
@@ -14028,133 +14047,72 @@ function ParentPortal({
         )}
 
         {activePage === "Jadwal" ? (
-          <div className="premium-jadwal-page fade-in">
-            <div className="pj-header">
-              <div className="pj-header-left">
-                <Calendar size={24} style={{ color: "var(--primary-gold)" }} />
-                <div>
-                  <h2>Read Jadwal</h2>
-                  <p className="pj-subtitle">
-                    Self Jadwal Schedule —{" "}
-                    {studentProfile?.name ||
-                      studentProfile?.full_name ||
-                      "Student"}
-                  </p>
-                </div>
-              </div>
-              <div className="pj-days-track">
-                {readJadwalUnseen && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      color: "#4ade80",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      fontFamily: "Inter,sans-serif",
-                      background: "rgba(74,222,128,0.1)",
-                      padding: "6px 14px",
-                      borderRadius: "20px",
-                      border: "1px solid rgba(74,222,128,0.3)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: "#4ade80",
-                        boxShadow: "0 0 8px #4ade80",
-                        animation: "pulse 2s infinite",
-                      }}
-                    />
-                    Updated
-                  </div>
-                )}
-                <span className="pj-days-count">
-                  {readJadwalData
-                    ? [
-                        "SATURDAY",
-                        "SUNDAY",
-                        "MONDAY",
-                        "TUESDAY",
-                        "WEDNESDAY",
-                        "THURSDAY",
-                        "FRIDAY",
-                      ].filter((d) => {
-                        const r = readJadwalData[d];
-                        return (
-                          r &&
-                          (r.juz1 ||
-                            r.juz2 ||
-                            r.juz3 ||
-                            r.juz4 ||
-                            r.murajah ||
-                            r.jadeed ||
-                            r.juzhali)
-                        );
-                      }).length
-                    : 0}
-                </span>
-                <span className="pj-days-label">Active Days</span>
-              </div>
-            </div>
-            <div className="pj-content">
-              {readJadwalLoading ? (
+          <Suspense
+            fallback={
+              <div
+                className="jadwal-container parent-view"
+                style={{ padding: "40px", textAlign: "center" }}
+              >
                 <div
-                  className="pj-loading"
+                  className="skeleton-el"
                   style={{
-                    padding: "40px",
-                    textAlign: "center",
-                    fontFamily: "Inter, sans-serif",
-                    color: "#999",
+                    height: "36px",
+                    width: "280px",
+                    margin: "0 auto 16px",
+                    borderRadius: "8px",
+                  }}
+                />
+                <div
+                  className="skeleton-el"
+                  style={{
+                    height: "100px",
+                    width: "100%",
+                    borderRadius: "12px",
+                    marginBottom: "20px",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                    gap: "16px",
                   }}
                 >
-                  Loading Self Jadwal...
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="skeleton-el"
+                      style={{ height: "140px", borderRadius: "14px" }}
+                    />
+                  ))}
                 </div>
-              ) : !readJadwalData ? (
-                <div
-                  className="pj-loading"
-                  style={{ padding: "60px 40px", textAlign: "center" }}
-                >
-                  <Calendar
-                    size={48}
-                    style={{
-                      color: "#d4af37",
-                      marginBottom: "16px",
-                      opacity: 0.6,
-                    }}
-                  />
-                  <p
-                    style={{
-                      fontFamily: "Inter, sans-serif",
-                      fontSize: "16px",
-                      color: "#888",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    No Self Jadwal data yet
-                  </p>
-                  <p
-                    style={{
-                      fontFamily: "Inter, sans-serif",
-                      fontSize: "13px",
-                      color: "#aaa",
-                    }}
-                  >
-                    Go to Self Jadwal page to create your schedule
-                  </p>
-                </div>
-              ) : (
-                <ReadJadwalView
-                  scheduleData={readJadwalData}
-                  mode={readJadwalMode}
-                  editHistory={readJadwalEditHistory}
-                />
-              )}
-            </div>
-          </div>
+              </div>
+            }
+          >
+            <LazyJadwalParentView
+              studentId={
+                studentProfile?.student_id ||
+                selectedStudentId ||
+                studentProfile?.id
+              }
+              studentName={
+                studentProfile?.name ||
+                studentProfile?.full_name ||
+                studentProfile?.child_name
+              }
+              teacherName={
+                studentProfile?.teacher_name ||
+                studentProfile?.teacherName
+              }
+              teacherId={
+                studentProfile?.teacher_id ||
+                studentProfile?.teacherId
+              }
+              teacherProfiles={teacherProfiles}
+              showAction={showAction}
+              jadwalSettings={propJadwalSettings}
+            />
+          </Suspense>
         ) : null}
 
         {activePage === "Self Jadwal" ? (
@@ -19098,7 +19056,13 @@ function PortalAccessSuccessModal({ payload, onClose }) {
       ? "Teacher Portal"
       : payload.portal_role === "admin"
         ? "Admin Portal"
-        : "Parents Portal";
+        : payload.portal_role === "kibar-teacher"
+          ? "Kibar Teacher Portal"
+          : payload.portal_role === "kibar-student"
+            ? "Kibar Student Portal"
+            : payload.portal_role === "kibar-admin"
+              ? "Kibar Admin Portal"
+              : "Parents Portal";
 
   return (
     <div
@@ -27819,18 +27783,21 @@ function AdminPortal({
                           const options = [];
 
                           (portalAccessList || [])
-                            .filter(
-                              (a) =>
-                                normalizeText(a.portal_role || "").includes(
-                                  "teacher",
-                                ) ||
-                                normalizeText(a.portal_role || "").includes(
-                                  "muhaffiz",
-                                ) ||
-                                normalizeText(a.portal_role || "").includes(
-                                  "kibar",
-                                ),
-                            )
+                            .filter((a) => {
+                              const r = (a.portal_role || "").toLowerCase();
+                              if (isKibarAdmin) {
+                                return (
+                                  r === "kibar-teacher" ||
+                                  (r.includes("teacher") && !r.includes("student")) ||
+                                  r.includes("muhaffiz")
+                                );
+                              }
+                              return (
+                                (r.includes("teacher") || r.includes("muhaffiz")) &&
+                                !r.includes("kibar-student") &&
+                                !r.includes("student")
+                              );
+                            })
                             .forEach((p) => {
                               const val =
                                 p.user_id || p.id || p.email || p.full_name;
@@ -27839,12 +27806,14 @@ function AdminPortal({
                               );
                               if (!renderedKeys.has(key)) {
                                 renderedKeys.add(key);
+                                const displayName = p.full_name || p.name || p.email;
+                                const displayEmail = p.email ? ` (${p.email})` : "";
                                 options.push(
                                   <option
                                     key={`portal-${p.id || val}`}
                                     value={val}
                                   >
-                                    {p.full_name || p.email}
+                                    {displayName}{displayEmail}
                                   </option>,
                                 );
                               }
@@ -27858,12 +27827,14 @@ function AdminPortal({
                               renderedKeys.add(key);
                               const val =
                                 tp.user_id || tp.id || tp.email || tp.full_name;
+                              const displayName = tp.full_name || tp.name || tp.email;
+                              const displayEmail = tp.email ? ` (${tp.email})` : "";
                               options.push(
                                 <option
                                   key={`profile-${tp.id || val}`}
                                   value={val}
                                 >
-                                  {tp.full_name}
+                                  {displayName}{displayEmail}
                                 </option>,
                               );
                             }
@@ -27882,31 +27853,48 @@ function AdminPortal({
                     </label>
 
                     <label>
-                      <span>Parent / Guardian</span>
+                      <span>{isKibarAdmin ? "Student Portal Account (User)" : "Parent / Guardian"}</span>
                       <select name="parent_id" className="premium-select">
-                        <option value="">-- No Parent (Unlinked) --</option>
+                        <option value="">{isKibarAdmin ? "-- No User (Unlinked) --" : "-- No Parent (Unlinked) --"}</option>
                         {portalAccessList && portalAccessList.length > 0 ? (
                           portalAccessList
                             .filter((p) => {
                               const r = (p.portal_role || "").toLowerCase();
+                              if (isKibarAdmin) {
+                                return (
+                                  r === "kibar-student" ||
+                                  r.includes("student") ||
+                                  r.includes("parent") ||
+                                  r === ""
+                                );
+                              }
                               return (
-                                r.includes("parent") ||
-                                r === "" ||
-                                r === "parents"
+                                (r.includes("parent") ||
+                                  r === "" ||
+                                  r === "parents") &&
+                                !r.includes("kibar")
                               );
                             })
-                            .map((p) => (
-                              <option
-                                key={`parent-${p.id}`}
-                                value={p.user_id || p.email}
-                              >
-                                {p.full_name || p.email} (
-                                {p.portal_role || "No Role"})
-                              </option>
-                            ))
+                            .map((p) => {
+                              const displayName =
+                                p.full_name ||
+                                p.name ||
+                                p.displayName ||
+                                (p.email ? p.email.split("@")[0] : "User");
+                              const emailPart = p.email ? ` (${p.email})` : "";
+                              const rolePart = p.portal_role ? ` - [${p.portal_role}]` : "";
+                              return (
+                                <option
+                                  key={`parent-${p.id || p.user_id}`}
+                                  value={p.user_id || p.id || p.email}
+                                >
+                                  {displayName}{emailPart}{rolePart}
+                                </option>
+                              );
+                            })
                         ) : (
                           <option value="" disabled>
-                            No portal users found
+                            {isKibarAdmin ? "No kibar portal users found" : "No portal users found"}
                           </option>
                         )}
                       </select>
@@ -28004,7 +27992,8 @@ function AdminPortal({
                   {students.filter(isStudentAssigned).map((student) => {
                     const parent = portalAccessList.find(
                       (a) =>
-                        (student.user_id && a.user_id === student.user_id) ||
+                        (student.user_id && (a.user_id === student.user_id || a.id === student.user_id)) ||
+                        (student.parent_user_id && (a.user_id === student.parent_user_id || a.id === student.parent_user_id)) ||
                         (student.parent_email &&
                           a.email &&
                           normalizeText(a.email) ===
@@ -28065,18 +28054,21 @@ function AdminPortal({
                                 const options = [];
 
                                 (portalAccessList || [])
-                                  .filter(
-                                    (a) =>
-                                      normalizeText(
-                                        a.portal_role || "",
-                                      ).includes("teacher") ||
-                                      normalizeText(
-                                        a.portal_role || "",
-                                      ).includes("muhaffiz") ||
-                                      normalizeText(
-                                        a.portal_role || "",
-                                      ).includes("kibar"),
-                                  )
+                                  .filter((a) => {
+                                    const r = (a.portal_role || "").toLowerCase();
+                                    if (isKibarAdmin) {
+                                      return (
+                                        r === "kibar-teacher" ||
+                                        (r.includes("teacher") && !r.includes("student")) ||
+                                        r.includes("muhaffiz")
+                                      );
+                                    }
+                                    return (
+                                      (r.includes("teacher") || r.includes("muhaffiz")) &&
+                                      !r.includes("kibar-student") &&
+                                      !r.includes("student")
+                                    );
+                                  })
                                   .forEach((p) => {
                                     const val =
                                       p.user_id ||
@@ -28130,7 +28122,7 @@ function AdminPortal({
                           </div>
 
                           <div className="detail-item">
-                            <span className="detail-label">Parent:</span>
+                            <span className="detail-label">{isKibarAdmin ? "Student Account:" : "Parent:"}</span>
                             <span className="detail-value">
                               {parent?.full_name ||
                                 student.parent_email ||
@@ -28918,7 +28910,13 @@ function AdminPortal({
                       <span>Portal Role</span>
                       <select
                         name="portal_role"
-                        value={adminForms.portalAccess.portal_role}
+                        value={
+                          isKibarAdmin &&
+                          (!adminForms.portalAccess.portal_role ||
+                            !adminForms.portalAccess.portal_role.startsWith("kibar-"))
+                            ? "kibar-student"
+                            : adminForms.portalAccess.portal_role
+                        }
                         onChange={onAdminFormChange("portalAccess")}
                         required
                       >
@@ -28977,7 +28975,7 @@ function AdminPortal({
                   </div>
                   <div className="form-grid">
                     <label>
-                      <span>Link to Student (Parents only)</span>
+                      <span>{isKibarAdmin ? "Link to Student (Kibar Student)" : "Link to Student (Parents only)"}</span>
                       <SearchableSelect
                         name="student_id"
                         options={students.map((s) => ({
@@ -29026,7 +29024,7 @@ function AdminPortal({
               >
                 <div className="card-headline">
                   <ShieldCheck size={18} />
-                  <h3>System Portal Audit ({portalAccessList?.length || 0})</h3>
+                  <h3>{isKibarAdmin ? "Kibar Portal Users Audit" : "System Portal Audit"} ({portalAccessList?.length || 0})</h3>
                 </div>
                 <div className="portal-access-responsive-container">
                   <div className="portal-audit-grid header-row hide-mobile">
@@ -29038,46 +29036,59 @@ function AdminPortal({
                   </div>
                   <div className="portal-audit-list">
                     {portalAccessList &&
-                      portalAccessList.map((access, idx) => (
-                        <div
-                          key={access.id || idx}
-                          className="portal-audit-item card-appear"
-                        >
-                          <div className="audit-col name-col">
-                            <span className="mobile-label">Name:</span>
-                            <strong>{access.full_name}</strong>
+                      portalAccessList.map((access, idx) => {
+                        const nameDisplay =
+                          access.full_name ||
+                          access.name ||
+                          access.displayName ||
+                          (access.email ? access.email.split("@")[0] : "") ||
+                          "No Name";
+                        const emailDisplay = access.email || access.user_email || "No Email";
+                        const roleDisplay = access.portal_role || (isKibarAdmin ? "kibar-student" : "No Role");
+                        const idDisplay = access.user_id || access.id || "NOT LINKED";
+                        const deleteId = access.id || access.user_id;
+
+                        return (
+                          <div
+                            key={deleteId || idx}
+                            className="portal-audit-item card-appear"
+                          >
+                            <div className="audit-col name-col">
+                              <span className="mobile-label">Name:</span>
+                              <strong>{nameDisplay}</strong>
+                            </div>
+                            <div className="audit-col">
+                              <span className="mobile-label">Email:</span>
+                              {emailDisplay}
+                            </div>
+                            <div className="audit-col">
+                              <span className="mobile-label">Role:</span>
+                              <span className={`badge ${roleDisplay}`}>
+                                {roleDisplay}
+                              </span>
+                            </div>
+                            <div className="audit-col uuid-col">
+                              <span className="mobile-label">UUID:</span>
+                              <code>{idDisplay}</code>
+                            </div>
+                            <div className="audit-col action-col">
+                              <button
+                                className="btn-text-only red"
+                                onClick={() =>
+                                  onDeleteRecord(
+                                    isKibarAdmin
+                                      ? "kibar_user_portal_access"
+                                      : "user_portal_access",
+                                    "id",
+                                  )(deleteId)
+                                }
+                              >
+                                Remove Access
+                              </button>
+                            </div>
                           </div>
-                          <div className="audit-col">
-                            <span className="mobile-label">Email:</span>
-                            {access.email}
-                          </div>
-                          <div className="audit-col">
-                            <span className="mobile-label">Role:</span>
-                            <span className={`badge ${access.portal_role}`}>
-                              {access.portal_role}
-                            </span>
-                          </div>
-                          <div className="audit-col uuid-col">
-                            <span className="mobile-label">UUID:</span>
-                            <code>{access.user_id || "NOT LINKED"}</code>
-                          </div>
-                          <div className="audit-col action-col">
-                            <button
-                              className="btn-text-only red"
-                              onClick={() =>
-                                onDeleteRecord(
-                                  isKibarAdmin
-                                    ? "kibar_user_portal_access"
-                                    : "user_portal_access",
-                                  "id",
-                                )(access.id)
-                              }
-                            >
-                              Remove Access
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     {(!portalAccessList || portalAccessList.length === 0) && (
                       <div className="empty-state">
                         No access records found in the database. Try "Grant
@@ -43989,7 +44000,7 @@ export default function App() {
 
   useEffect(() => {
     if (!portalAccessSuccess) return;
-    const timer = setTimeout(() => setPortalAccessSuccess(null), 5000);
+    const timer = setTimeout(() => setPortalAccessSuccess(null), 15000);
     return () => clearTimeout(timer);
   }, [portalAccessSuccess]);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -45758,28 +45769,71 @@ export default function App() {
           // Fall back to buildStudents ranks
         }
 
+        let resolvedPortalAccess = portalAccessResponse.data || [];
+        if (isKibarAdmin) {
+          try {
+            const { data: allUsers } = await supabase
+              .from("users")
+              .select("*")
+              .limit(5000);
+            if (Array.isArray(allUsers)) {
+              const byKey = new Map();
+              resolvedPortalAccess.forEach((r) => {
+                const key = String(r.user_id || r.id || r.email || "").trim().toLowerCase();
+                if (key) byKey.set(key, { ...r });
+              });
+              allUsers
+                .filter((u) => u && (u.section === "kibar" || String(u.portal_role || "").startsWith("kibar-")))
+                .forEach((u) => {
+                  const key = String(u.id || u.user_id || u.email || "").trim().toLowerCase();
+                  const existing = byKey.get(key);
+                  if (existing) {
+                    existing.full_name = existing.full_name || u.full_name || u.name || "";
+                    existing.email = existing.email || u.email || "";
+                    existing.portal_role = existing.portal_role || u.portal_role || "kibar-student";
+                    existing.user_id = existing.user_id || u.id || u.user_id || "";
+                  } else {
+                    const entry = {
+                      id: u.id,
+                      user_id: u.id,
+                      email: u.email || "",
+                      full_name: u.full_name || u.name || (u.email ? u.email.split("@")[0] : "User"),
+                      portal_role: u.portal_role || "kibar-student",
+                      is_active: u.is_active ?? true,
+                      created_at: u.created_at || new Date().toISOString(),
+                    };
+                    byKey.set(key, entry);
+                  }
+                });
+              resolvedPortalAccess = Array.from(byKey.values());
+            }
+          } catch (_e) {}
+        }
+
         setSchoolData({
           students,
           weeklyResults: resultsResponse.data || [],
           announcements: eventsResponse.data || [],
           schedule: scheduleResponse.data || [],
-          portalAccessList: portalAccessResponse.data || [],
+          portalAccessList: resolvedPortalAccess,
           teacherProfiles: enrichedProfiles,
           weeklyResultsArchive: archiveData,
         });
         try {
+          // Store lightweight schoolData metadata in localStorage; large result/schedule
+          // datasets are already indexed and persisted in IndexedDB by Firestore.
           localStorage.setItem(
             "mauze_portal_cache",
             JSON.stringify({
               role,
               schoolData: {
-                students,
-                weeklyResults: resultsResponse.data || [],
-                announcements: eventsResponse.data || [],
-                schedule: scheduleResponse.data || [],
-                portalAccessList: portalAccessResponse.data || [],
-                teacherProfiles: enrichedProfiles,
-                weeklyResultsArchive: archiveData,
+                students: (students || []).slice(0, 100),
+                weeklyResults: [],
+                announcements: (eventsResponse.data || []).slice(0, 20),
+                schedule: [],
+                portalAccessList: (resolvedPortalAccess || []).slice(0, 100),
+                teacherProfiles: enrichedProfiles || [],
+                weeklyResultsArchive: [],
               },
               parentData: null,
               _t: Date.now(),
@@ -46482,9 +46536,9 @@ export default function App() {
 
     let targetRole = payload.portal_role;
     if (isKibar) {
-      if (targetRole === "teacher") targetRole = "kibar-teacher";
-      if (targetRole === "admin") targetRole = "kibar-admin";
-      if (targetRole === "parents") targetRole = "kibar-student";
+      if (!targetRole || targetRole === "parents") targetRole = "kibar-student";
+      else if (targetRole === "teacher") targetRole = "kibar-teacher";
+      else if (targetRole === "admin") targetRole = "kibar-admin";
     }
     const targetAccessTable = isKibar
       ? "kibar_user_portal_access"
@@ -46511,10 +46565,14 @@ export default function App() {
         },
       });
 
-    if (
+    const isAlreadyRegistered =
       authError &&
-      !authError.message.toLowerCase().includes("already registered")
-    ) {
+      (authError.message.toLowerCase().includes("already registered") ||
+        authError.message.toLowerCase().includes("already in use") ||
+        authError.message.toLowerCase().includes("already-in-use") ||
+        authError.code === "auth/email-already-in-use");
+
+    if (authError && !isAlreadyRegistered) {
       showAction("error", `Auth Error: ${authError.message}`);
       return;
     }
@@ -46526,6 +46584,21 @@ export default function App() {
         target_email: targetEmail,
       });
       if (lookupData) createdUserId = lookupData;
+    }
+
+    if (!createdUserId) {
+      const { data: existingAccess } = await supabase
+        .from(targetAccessTable)
+        .select("*")
+        .eq("email", targetEmail)
+        .maybeSingle();
+      if (existingAccess?.user_id || existingAccess?.id) {
+        createdUserId = existingAccess.user_id || existingAccess.id;
+      }
+    }
+
+    if (!createdUserId) {
+      createdUserId = `${isKibar ? "kibar" : "portal"}_usr_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     }
 
     let accessRecord = null;
@@ -46562,6 +46635,24 @@ export default function App() {
               email: targetEmail,
               full_name: payload.full_name,
               teacher_role: "muhaffiz",
+              is_active: true,
+            },
+            { onConflict: "id" },
+          )
+          .catch(() => {});
+      } else if (targetRole === "kibar-student") {
+        await supabase
+          .from("kibar_student_profiles")
+          .upsert(
+            {
+              id: createdUserId,
+              user_id: createdUserId,
+              email: targetEmail,
+              parent_email: targetEmail,
+              name: payload.full_name,
+              full_name: payload.full_name,
+              student_id: payload.student_id || createdUserId,
+              section: "kibar",
               is_active: true,
             },
             { onConflict: "id" },
@@ -46638,8 +46729,32 @@ export default function App() {
     ) {
       await supabase
         .from(isKibar ? "kibar_child_profiles" : "child_profiles")
-        .update({ parent_user_id: finalUserId })
+        .update({
+          parent_user_id: finalUserId,
+          user_id: finalUserId,
+          parent_email: targetEmail,
+        })
         .eq("student_id", payload.student_id);
+
+      if (isKibar) {
+        await supabase
+          .from("kibar_student_profiles")
+          .upsert(
+            {
+              id: finalUserId,
+              user_id: finalUserId,
+              student_id: payload.student_id,
+              name: payload.full_name,
+              full_name: payload.full_name,
+              email: targetEmail,
+              parent_email: targetEmail,
+              section: "kibar",
+              is_active: true,
+            },
+            { onConflict: "id" },
+          )
+          .catch(() => {});
+      }
     }
 
     const { data: freshList, error: refreshError } = await supabase
@@ -46652,10 +46767,18 @@ export default function App() {
     }
 
     if (freshList) {
-      setSchoolData((current) => ({
-        ...current,
-        portalAccessList: freshList,
-      }));
+      setSchoolData((current) => {
+        const freshKeys = new Set(
+          freshList.map((f) => String(f.user_id || f.id || f.email || "").toLowerCase())
+        );
+        const retained = (current?.portalAccessList || []).filter(
+          (u) => !freshKeys.has(String(u.user_id || u.id || u.email || "").toLowerCase())
+        );
+        return {
+          ...current,
+          portalAccessList: [...freshList, ...retained],
+        };
+      });
     }
 
     setAdminForms((current) => ({
@@ -46663,7 +46786,7 @@ export default function App() {
       portalAccess: {
         email: "",
         full_name: "",
-        portal_role: isKibar ? "kibar-teacher" : "parents",
+        portal_role: isKibar ? "kibar-student" : "parents",
         password: "",
         student_id: "",
       },
@@ -47427,6 +47550,7 @@ export default function App() {
             schedule_day: scheduleDay,
             is_active: editingSchedule.is_active,
             next_send_at: initialNextSend,
+            fire_at: initialNextSend,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingSchedule.id);
@@ -47458,6 +47582,7 @@ export default function App() {
               schedule_day: scheduleDay,
               is_active: true,
               next_send_at: initialNextSend,
+              fire_at: initialNextSend,
             },
           ]);
 
@@ -48025,6 +48150,9 @@ export default function App() {
         ? parentRecord.email
         : (parent_id?.includes("@") ? parent_id : null) || null,
     };
+    if (isKibar) {
+      updatePayload.user_id = updatePayload.parent_user_id;
+    }
 
     // Editable profile fields: apply them whenever they come from the form
     const editableFields = {
@@ -48074,6 +48202,26 @@ export default function App() {
       .from(targetTable)
       .update(updatePayload)
       .eq("id", String(student_id));
+
+    if (isKibar && updatePayload.parent_user_id) {
+      await supabase
+        .from("kibar_student_profiles")
+        .upsert(
+          {
+            id: updatePayload.parent_user_id,
+            user_id: updatePayload.parent_user_id,
+            student_id: numericStudentId,
+            name: studentName,
+            full_name: studentName,
+            email: updatePayload.parent_email,
+            parent_email: updatePayload.parent_email,
+            section: "kibar",
+            is_active: true,
+          },
+          { onConflict: "id" },
+        )
+        .catch(() => {});
+    }
 
     if (profileError && upsertErr) {
       console.error("Link update error:", profileError);

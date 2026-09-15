@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from './supabaseClient';
-import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator, Info } from 'lucide-react';
+import { Download, Save, Loader2, ChevronLeft, ChevronRight, Calendar, BookOpen, Sparkles, Repeat, Calculator, Info, Layers3, User, Clock } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { JadwalNotes } from "./JadwalNotes";
@@ -1048,11 +1048,24 @@ const JadwalTableStyle = ({ mode, scheduleData, onCellChange, readOnly, dayDates
             const day = dayObj.dayName;
             const dataKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
             const row = scheduleData[dataKey] || scheduleData[day] || {};
+            const todayIso = new Date().toISOString().split('T')[0];
+            const isToday = customDays
+              ? dayObj?.date === todayIso
+              : (dayDates && dayDates[idx] && dayDates[idx] === todayIso) || DAYS[new Date().getDay()] === day;
+            const gregorianDateStr = dayObj?.date
+              ? new Date(dayObj.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              : (dayDates && dayDates[idx] ? dayDates[idx] : '');
             return (
-            <tr key={`${day}-${idx}`}>
+            <tr key={`${day}-${idx}`} className={isToday ? 'jadwal-today-row' : ''}>
               <td className="day-cell">
                 <div className="day-cell-content">
                   <span className="day-cell-name">{day}</span>
+                  {gregorianDateStr && (
+                    <span className="day-gregorian-badge">{gregorianDateStr}</span>
+                  )}
+                  {isToday && (
+                    <span className="jadwal-today-pill">Today</span>
+                  )}
                    {dayObj.miqaats && dayObj.miqaats.length > 0 && (
                      <span className="miqaat-badge" data-tooltip={dayObj.miqaatSummary?.summary || dayObj.miqaats.map(e => e.name).join(', ')}
                        onClick={(e) => { e.stopPropagation(); onMiqaatClick && onMiqaatClick(dayObj); }}>
@@ -1241,16 +1254,20 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
     const dayKey = customDays && idx >= 6 ? `${day}_${idx}` : day;
     const row = scheduleData[dayKey] || scheduleData[day] || {};
     const dateStr = customDays
-      ? dateObj?.date || ''
-      : dateObj?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const isToday = customDays ? false : dateObj?.toDateString() === new Date().toDateString();
+      ? (dayObj?.date ? new Date(dayObj.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : (dateObj?.date || ''))
+      : (dateObj instanceof Date ? dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : (dateObj?.date || ''));
+    const todayIso = new Date().toISOString().split('T')[0];
+    const isToday = customDays
+      ? (dayObj?.date === todayIso || dateObj?.date === todayIso)
+      : (dateObj instanceof Date ? dateObj.toDateString() === new Date().toDateString() : DAYS[new Date().getDay()] === day);
     const fatemi = customFatemi || (customDays ? '' : fatemiDates[DAYS.indexOf(day)]);
 
     return (
       <div key={`${day}-${idx}`} className={`jadwal-calendar-card ${isToday ? 'today' : ''}`}>
         <div className="jadwal-calendar-card-header">
-          <span className="jadwal-calendar-day-name">
-            {day}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span className="jadwal-calendar-day-name">{day}</span>
+            {isToday && <span className="jadwal-today-pill" style={{ fontSize: '10px', padding: '2px 7px' }}>Today</span>}
             {dayObj && dayObj.miqaats && dayObj.miqaats.length > 0 && (
               <span className="miqaat-badge miqaat-badge-inline" data-tooltip={dayObj.miqaatSummary?.summary || dayObj.miqaats.map(e => e.name).join(', ')}
                 onClick={(e) => { e.stopPropagation(); onMiqaatClick && onMiqaatClick(dayObj); }}>
@@ -1258,7 +1275,7 @@ const JadwalCalendarStyle = ({ mode, scheduleData, onCellChange, readOnly, compa
                 <span className="miqaat-text">Miqaat</span>
               </span>
             )}
-          </span>
+          </div>
           {dateStr ? <span className="jadwal-calendar-date">{dateStr}</span> : null}
         </div>
         {fatemi ? (
@@ -1420,7 +1437,12 @@ const JadwalSingleDayCardStyle = ({ mode, scheduleData, onCellChange, readOnly, 
   const daysList = customDays || DAYS.map((day, idx) => ({ dayName: day, date: '', fatemiDate: dayDates?.[idx] || '' }));
   const maxIdx = daysList.length - 1;
   const [currentDayIndex, setCurrentDayIndex] = useState(() => {
-    if (customDays) return 0;
+    if (customDays && Array.isArray(customDays)) {
+      const todayIso = new Date().toISOString().split('T')[0];
+      const matchIdx = customDays.findIndex(d => d.date === todayIso);
+      if (matchIdx >= 0) return matchIdx;
+      return 0;
+    }
     const today = new Date().getDay();
     return today === 0 ? 6 : today - 1;
   });
@@ -2035,34 +2057,109 @@ onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, teacher
   );
 };
 
-export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherProfiles, showAction, jadwalSettings, onDownloadComplete }) => {
-  const settings = Array.isArray(jadwalSettings) ? jadwalSettings[0] : jadwalSettings;
+export const JadwalParentView = ({
+  studentId,
+  studentName: propStudentName,
+  teacherName,
+  teacherId,
+  teacherProfiles,
+  showAction,
+  jadwalSettings: propJadwalSettings,
+  onDownloadComplete,
+}) => {
+  const [liveSettings, setLiveSettings] = useState(() => {
+    const s = Array.isArray(propJadwalSettings) ? propJadwalSettings[0] : propJadwalSettings;
+    return s || null;
+  });
+
   const [scheduleData, setScheduleData] = useState(DEFAULT_SCHEDULE);
-  const [studentName, setStudentName] = useState('Student');
+  const [studentName, setStudentName] = useState(propStudentName || 'Student');
   const [mode, setMode] = useState('juz-wise');
   const [loading, setLoading] = useState(true);
   const [miqaatPopup, setMiqaatPopup] = useState(null);
 
-  const displayStyle = settings?.jadwal_style || 'table';
+  // Sync prop settings if updated
+  useEffect(() => {
+    const s = Array.isArray(propJadwalSettings) ? propJadwalSettings[0] : propJadwalSettings;
+    if (s && Object.keys(s).length > 0) {
+      setLiveSettings(s);
+    }
+  }, [propJadwalSettings]);
+
+  // Fetch live settings directly from jadwal_settings table & subscribe to real-time changes
+  useEffect(() => {
+    const fetchLatestSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('jadwal_settings')
+          .select('*')
+          .eq('id', 1)
+          .maybeSingle();
+        if (data && !error) {
+          setLiveSettings(data);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch live jadwal_settings:", e);
+      }
+    };
+
+    fetchLatestSettings();
+
+    const channel = supabase
+      .channel('jadwal-parent-settings-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'jadwal_settings', filter: 'id=eq.1' },
+        (payload) => {
+          if (payload.new) {
+            setLiveSettings(payload.new);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const settings = liveSettings || (Array.isArray(propJadwalSettings) ? propJadwalSettings[0] : propJadwalSettings) || {};
+  const defaultDisplayStyle = settings?.jadwal_style || 'table';
+  const [activeStyle, setActiveStyle] = useState(defaultDisplayStyle);
+
+  // Keep activeStyle synced if admin setting changes
+  useEffect(() => {
+    if (settings?.jadwal_style) {
+      setActiveStyle(settings.jadwal_style);
+    }
+  }, [settings?.jadwal_style]);
+
   const theme = getJadwalThemeFromSettings(settings);
-  const weekRange = theme.jadwalType === 'weekly' ? getCurrentWeekRange() : null;
+  const weekRange = useMemo(() => theme.jadwalType === 'weekly' ? getCurrentWeekRange() : null, [theme.jadwalType]);
   const dayDates = weekRange ? DAYS.map((_, idx) => getDayDate(weekRange.weekStart, idx)) : (theme.weekStart ? DAYS.map((_, idx) => getDayDate(theme.weekStart, idx)) : []);
-  const customDays = theme.jadwalType === 'miqaat' ? getDaysFromRange(theme.weekStart, theme.weekEnd)
-    : theme.jadwalType === 'weekly' && weekRange ? getDaysFromRange(weekRange.weekStart, weekRange.weekEnd)
-    : null;
+  
+  // Exact days from miqaat date range or weekly range
+  const customDays = useMemo(() => {
+    if (theme.jadwalType === 'miqaat') {
+      return getDaysFromRange(theme.weekStart, theme.weekEnd);
+    }
+    if (theme.jadwalType === 'weekly' && weekRange) {
+      return getDaysFromRange(weekRange.weekStart, weekRange.weekEnd);
+    }
+    return null;
+  }, [theme.jadwalType, theme.weekStart, theme.weekEnd, weekRange]);
 
   // Fatemi calendar & miqaat API
   const apiWeekStart = theme.jadwalType === 'miqaat' ? theme.weekStart : (weekRange?.weekStart || null);
   const apiWeekEnd = theme.jadwalType === 'miqaat' ? theme.weekEnd : (weekRange?.weekEnd || null);
   const { loading: fatemiLoading, fatemiData } = useFatemiCalendar(apiWeekStart, apiWeekEnd);
+
   // Compute enriched days directly from fatemiData using useMemo
   const enrichedDays = useMemo(() => {
     if (!customDays || !fatemiData || Object.keys(fatemiData).length === 0) {
-      console.log('\u{1F50D} JadwalTeacherView: useMemo skipping (no data)');
       return null;
     }
-    console.log('\u{1F50D} JadwalTeacherView: useMemo enriching', { daysCount: customDays.length });
-    const enriched = customDays.map(day => {
+    return customDays.map(day => {
       const apiData = fatemiData[day.date];
       if (apiData && apiData.hijri) {
         return {
@@ -2074,51 +2171,83 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
       }
       return { ...day, miqaats: [], miqaatSummary: null };
     });
-    const miqaatDays = enriched.filter(d => d.miqaats && d.miqaats.length > 0);
-    console.log('\u{1F50D} JadwalTeacherView: useMemo done', enriched.length, 'days,', miqaatDays.length, 'with miqaats');
-    return enriched;
   }, [customDays, fatemiData]);
 
-  useEffect(() => {
-    if (studentId) {
-      fetchJadwal();
+  const fetchJadwal = useCallback(async () => {
+    if (!studentId) {
+      setLoading(false);
+      return;
     }
-  }, [studentId]);
-
-  const fetchJadwal = async () => {
     setLoading(true);
 
     try {
-      const { data: studentData } = await supabase
-        .from('child_profiles')
-        .select('full_name')
-        .eq('student_id', studentId)
-        .single();
+      if (!propStudentName) {
+        const { data: studentData } = await supabase
+          .from('child_profiles')
+          .select('full_name, student_id')
+          .or(`student_id.eq.${studentId},id.eq.${studentId}`)
+          .maybeSingle();
 
-      if (studentData) {
-        setStudentName(studentData.full_name);
+        if (studentData?.full_name) {
+          setStudentName(studentData.full_name);
+        }
+      } else {
+        setStudentName(propStudentName);
       }
     } catch (e) {
       console.warn("Failed to fetch student name:", e);
     }
 
-    const { data, error } = await supabase
-      .from('jadawal')
-      .select('schedule_data')
-      .eq('student_id', studentId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('jadawal')
+        .select('schedule_data')
+        .eq('student_id', studentId)
+        .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error(error);
-    } else if (data && data.schedule_data) {
-      const savedMode = data.schedule_data._mode || 'juz-wise';
-      setMode(savedMode);
-      setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
-    } else {
-      setScheduleData(DEFAULT_SCHEDULE);
+      if (error && error.code !== 'PGRST116') {
+        console.error("Failed to fetch Jadwal:", error);
+      } else if (data && data.schedule_data) {
+        const savedMode = data.schedule_data._mode || 'juz-wise';
+        setMode(savedMode);
+        setScheduleData({ ...DEFAULT_SCHEDULE, ...data.schedule_data, _mode: savedMode });
+      } else {
+        setScheduleData(DEFAULT_SCHEDULE);
+      }
+    } catch (err) {
+      console.warn("fetchJadwal error:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [studentId, propStudentName]);
+
+  useEffect(() => {
+    fetchJadwal();
+  }, [fetchJadwal]);
+
+  // Realtime subscription on jadawal table so updates by the teacher reflect immediately
+  useEffect(() => {
+    if (!studentId) return;
+    const channel = supabase
+      .channel(`parent-jadwal-live-${studentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'jadawal',
+          filter: `student_id=eq.${studentId}`,
+        },
+        () => {
+          fetchJadwal();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [studentId, fetchJadwal]);
 
   const handleMiqaatClick = (dayObj) => {
     setMiqaatPopup({
@@ -2128,10 +2257,40 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
     });
   };
 
+  // Compute banner range details
+  const dateRangeDisplay = useMemo(() => {
+    if (theme.jadwalType === 'miqaat' && theme.weekStart && theme.weekEnd) {
+      const s = new Date(theme.weekStart + 'T00:00:00');
+      const e = new Date(theme.weekEnd + 'T00:00:00');
+      const startStr = s.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+      const endStr = e.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+      const daysCount = customDays ? customDays.length : Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1);
+      return {
+        isMiqaat: true,
+        gregorian: `${startStr} – ${endStr}`,
+        fatemi: `من ${getFatemiDateStr(theme.weekStart)} إلى ${getFatemiDateStr(theme.weekEnd)}`,
+        daysCount,
+      };
+    }
+    if (weekRange) {
+      const s = new Date(weekRange.weekStart + 'T00:00:00');
+      const e = new Date(weekRange.weekEnd + 'T00:00:00');
+      const startStr = s.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+      const endStr = e.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+      return {
+        isMiqaat: false,
+        gregorian: `${startStr} – ${endStr}`,
+        fatemi: `من ${getFatemiDateStr(weekRange.weekStart)} إلى ${getFatemiDateStr(weekRange.weekEnd)}`,
+        daysCount: 7,
+      };
+    }
+    return null;
+  }, [theme.jadwalType, theme.weekStart, theme.weekEnd, weekRange, customDays]);
+
   const renderJadwalContent = () => {
     const noop = () => {};
     const days = enrichedDays || customDays;
-    switch (displayStyle) {
+    switch (activeStyle) {
       case 'calendar':
         return (
           <JadwalCalendarStyle
@@ -2172,43 +2331,104 @@ export const JadwalParentView = ({ studentId, teacherName, teacherId, teacherPro
     }
   };
 
-  if (loading) return (
-    <div className="jadwal-container parent-view">
-      <div className="jadwal-header">
-        <div className="skeleton-el" style={{ height: '32px', width: '280px', borderRadius: '8px' }} />
-        <div className="skeleton-el" style={{ height: '40px', width: '100%', borderRadius: '10px', marginTop: '12px' }} />
+  if (loading) {
+    return (
+      <div className="jadwal-container parent-view">
+        <div className="jadwal-header">
+          <div className="skeleton-el" style={{ height: '32px', width: '280px', borderRadius: '8px' }} />
+          <div className="skeleton-el" style={{ height: '40px', width: '160px', borderRadius: '10px' }} />
+        </div>
+        <div className="skeleton-el" style={{ height: '90px', width: '100%', borderRadius: '14px', marginBottom: '16px' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', padding: '16px 0' }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="skeleton-el" style={{ height: '140px', borderRadius: '14px' }} />
+          ))}
+        </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px', padding: '20px 0' }}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="skeleton-el" style={{ height: '120px', borderRadius: '12px' }} />
-        ))}
-      </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="jadwal-container parent-view">
-      <div className="jadwal-header">
-        <h2>{theme.jadwalType === 'miqaat' ? "Miqaāt Jadwal Schedule" : "Weekly Jadwal Schedule"}</h2>
-        <button
-          className="jadwal-save-btn"
-          onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, displayStyle, dayDates, onDownloadComplete)}
-        >
-          <Download size={16} /> Download PDF
-        </button>
-      </div>
-      {weekRange && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(212,175,55,0.02))',
-          border: '1px solid rgba(212,175,55,0.25)', borderRadius: '12px',
-          padding: '12px 20px', marginBottom: '16px', textAlign: 'center',
-          fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif", direction: 'rtl'
-        }}>
-          <span style={{ fontSize: '15px', color: '#8b6d31', fontWeight: 600 }}>
-            من {getFatemiDateStr(weekRange.weekStart)} إلى {getFatemiDateStr(weekRange.weekEnd)}
-          </span>
+      <div className="jadwal-parent-hero">
+        <div className="jadwal-header">
+          <div>
+            <div className="jadwal-title-badge-row">
+              <h2>{theme.jadwalType === 'miqaat' ? "Miqaāt Jadwal Schedule" : "Weekly Quran Jadwal"}</h2>
+              <span className={`jadwal-period-tag ${theme.jadwalType === 'miqaat' ? 'miqaat' : 'weekly'}`}>
+                <Sparkles size={13} />
+                {theme.jadwalType === 'miqaat' ? 'Miqaāt Period' : 'Weekly'}
+              </span>
+            </div>
+            <p className="jadwal-parent-subtext">
+              <span>Student: <strong>{studentName}</strong></span>
+              {teacherName && <span> • Teacher: <strong>{teacherName}</strong></span>}
+            </p>
+          </div>
+
+          <div className="jadwal-parent-top-actions">
+            <button
+              type="button"
+              className="jadwal-save-btn download-btn"
+              onClick={() => handleDownloadPDF(studentName, scheduleData, mode, theme, activeStyle, dayDates, onDownloadComplete)}
+            >
+              <Download size={16} />
+              <span>Download PDF</span>
+            </button>
+          </div>
         </div>
-      )}
+
+        {dateRangeDisplay && (
+          <div className={`jadwal-premium-banner ${dateRangeDisplay.isMiqaat ? 'is-miqaat' : 'is-weekly'}`}>
+            <div className="jpb-content">
+              <div className="jpb-badge-row">
+                <span className="jpb-type-badge">
+                  <Sparkles size={12} />
+                  {dateRangeDisplay.isMiqaat ? 'Miqaāt Active Schedule' : 'Regular Weekly Cycle'}
+                </span>
+                <span className="jpb-count-badge">
+                  <Calendar size={12} />
+                  {dateRangeDisplay.daysCount} Days
+                </span>
+              </div>
+              <div className="jpb-dates-main">
+                <span className="jpb-gregorian">{dateRangeDisplay.gregorian}</span>
+                <span className="jpb-fatemi">{dateRangeDisplay.fatemi}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="jadwal-parent-controls-bar">
+          <div className="jadwal-style-switcher">
+            <button
+              type="button"
+              className={`jadwal-style-pill ${activeStyle === 'table' ? 'active' : ''}`}
+              onClick={() => setActiveStyle('table')}
+            >
+              <Layers3 size={15} />
+              <span>Table View</span>
+            </button>
+            <button
+              type="button"
+              className={`jadwal-style-pill ${activeStyle === 'calendar' ? 'active' : ''}`}
+              onClick={() => setActiveStyle('calendar')}
+            >
+              <Calendar size={15} />
+              <span>Calendar Cards</span>
+            </button>
+            <button
+              type="button"
+              className={`jadwal-style-pill ${activeStyle === 'single_day_card' ? 'active' : ''}`}
+              onClick={() => setActiveStyle('single_day_card')}
+            >
+              <BookOpen size={15} />
+              <span>Day by Day</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {renderJadwalContent()}
 
       {miqaatPopup && (

@@ -2296,3 +2296,451 @@
     height: 8px;
   }
 }
+
+/* ==========================================================================
+   PARENT / STUDENT JADWAL PORTAL STYLES (PREMIUM & RESPONSIVE)
+   ========================================================================== */
+
+.jadwal-container.parent-view {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, rgba(212, 175, 55, 0.2));
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  margin-top: 16px;
+  animation: fadeIn 0.35s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.jadwal-container.parent-view::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #b8860b, #d4af37, #f3e5ab, #d4af37, #b8860b);
+  border-radius: 20px 20px 0 0;
+}
+
+.jadwal-parent-hero {
+  margin-bottom: 24px;
+}
+
+.jadwal-title-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.jadwal-title-badge-row h2 {
+  font-size: 1.85rem;
+  color: var(--primary-dark, #3e2723);
+  margin: 0;
+  font-family: 'Cinzel', serif;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.jadwal-period-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.jadwal-period-tag.miqaat {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(184, 134, 11, 0.25) 100%);
+  color: #855800;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+}
+
+.jadwal-period-tag.weekly {
+  background: rgba(33, 150, 243, 0.1);
+  color: #1565c0;
+  border: 1px solid rgba(33, 150, 243, 0.25);
+}
+
+.jadwal-parent-subtext {
+  margin: 6px 0 0 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  color: #666;
+}
+
+.jadwal-parent-subtext strong {
+  color: var(--primary-dark, #3e2723);
+  font-weight: 600;
+}
+
+.jadwal-parent-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.jadwal-save-btn.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+  color: #ffffff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(184, 134, 11, 0.25);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.jadwal-save-btn.download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(184, 134, 11, 0.35);
+  filter: brightness(1.05);
+}
+
+.jadwal-save-btn.download-btn:active {
+  transform: translateY(0);
+}
+
+/* ===== PREMIUM MIQAAT / DATE BANNER ===== */
+.jadwal-premium-banner {
+  margin-top: 18px;
+  margin-bottom: 20px;
+  padding: 16px 22px;
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.08);
+  transition: all 0.3s ease;
+}
+
+.jadwal-premium-banner.is-miqaat {
+  background: linear-gradient(135deg, rgba(254, 250, 240, 0.95) 0%, rgba(253, 246, 227, 0.8) 100%);
+}
+
+.jadwal-premium-banner.is-weekly {
+  background: linear-gradient(135deg, rgba(248, 249, 252, 0.95) 0%, rgba(243, 246, 253, 0.8) 100%);
+  border-color: rgba(66, 133, 244, 0.25);
+}
+
+.jpb-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jpb-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jpb-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #855800;
+  background: rgba(212, 175, 55, 0.15);
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+}
+
+.jpb-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+}
+
+.jpb-dates-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(212, 175, 55, 0.25);
+}
+
+.jpb-gregorian {
+  font-family: 'Inter', sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--primary-dark, #3e2723);
+  letter-spacing: 0.2px;
+}
+
+.jpb-fatemi {
+  font-family: 'Al-Kanz', 'Kanz al Marjaan', serif;
+  font-size: 15.5px;
+  color: #8b6d31;
+  font-weight: 700;
+  direction: rtl;
+  letter-spacing: 0.2px;
+}
+
+/* ===== CONTROLS BAR & STYLE SWITCHER ===== */
+.jadwal-parent-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.jadwal-style-switcher {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  gap: 4px;
+}
+
+.jadwal-style-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.jadwal-style-pill:hover {
+  color: var(--primary-dark, #3e2723);
+}
+
+.jadwal-style-pill.active {
+  background: #ffffff;
+  color: var(--primary-dark, #3e2723);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(212, 175, 55, 0.35);
+  font-weight: 700;
+}
+
+/* ===== TODAY HIGHLIGHTS & BADGES ===== */
+.jadwal-today-row {
+  background: rgba(212, 175, 55, 0.07) !important;
+  border-left: 4px solid var(--primary-gold, #d4af37) !important;
+}
+
+.jadwal-today-row td {
+  background: transparent !important;
+}
+
+.day-gregorian-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: #666;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.jadwal-today-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+  padding: 2px 8px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(184, 134, 11, 0.3);
+  animation: todayGlow 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes todayGlow {
+  0% { box-shadow: 0 2px 6px rgba(184, 134, 11, 0.3); }
+  100% { box-shadow: 0 2px 10px rgba(212, 175, 55, 0.6); }
+}
+
+/* ===== DARK MODE COMPATIBILITY ===== */
+.dark-mode .jadwal-container.parent-view {
+  background: var(--card-bg, #1a1a1a);
+  border-color: rgba(212, 175, 55, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .jadwal-title-badge-row h2 {
+  color: #f5f5f5;
+}
+
+.dark-mode .jadwal-parent-subtext {
+  color: #aaa;
+}
+
+.dark-mode .jadwal-parent-subtext strong {
+  color: #f0e6d2;
+}
+
+.dark-mode .jadwal-premium-banner.is-miqaat {
+  background: linear-gradient(135deg, rgba(35, 30, 20, 0.95) 0%, rgba(28, 24, 16, 0.9) 100%);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.dark-mode .jadwal-premium-banner.is-weekly {
+  background: linear-gradient(135deg, rgba(20, 26, 38, 0.95) 0%, rgba(16, 20, 30, 0.9) 100%);
+  border-color: rgba(66, 133, 244, 0.3);
+}
+
+.dark-mode .jpb-gregorian {
+  color: #e5e5e5;
+}
+
+.dark-mode .jpb-fatemi {
+  color: #e8c872;
+}
+
+.dark-mode .jpb-count-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: #bbb;
+}
+
+.dark-mode .jadwal-style-switcher {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .jadwal-style-pill {
+  color: #aaa;
+}
+
+.dark-mode .jadwal-style-pill:hover {
+  color: #fff;
+}
+
+.dark-mode .jadwal-style-pill.active {
+  background: #2a2a2a;
+  color: #f0e6d2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(212, 175, 55, 0.4);
+}
+
+.dark-mode .day-gregorian-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: #bbb;
+}
+
+.dark-mode .jadwal-today-row {
+  background: rgba(212, 175, 55, 0.12) !important;
+}
+
+/* ===== RESPONSIVE MEDIA QUERIES ===== */
+@media (max-width: 768px) {
+  .jadwal-container.parent-view {
+    padding: 18px 14px;
+    border-radius: 16px;
+    margin-top: 12px;
+  }
+
+  .jadwal-title-badge-row h2 {
+    font-size: 1.45rem;
+  }
+
+  .jadwal-parent-hero .jadwal-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .jadwal-parent-top-actions {
+    width: 100%;
+  }
+
+  .jadwal-save-btn.download-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .jadwal-premium-banner {
+    padding: 14px 16px;
+  }
+
+  .jpb-dates-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .jadwal-parent-controls-bar {
+    width: 100%;
+  }
+
+  .jadwal-style-switcher {
+    width: 100%;
+    display: flex;
+  }
+
+  .jadwal-style-pill {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 11.5px;
+  }
+
+  .jadwal-calendar-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .jadwal-container.parent-view {
+    padding: 14px 10px;
+    border-radius: 14px;
+  }
+
+  .jadwal-title-badge-row h2 {
+    font-size: 1.25rem;
+  }
+
+  .jadwal-style-pill span {
+    font-size: 11px;
+  }
+
+  .day-cell-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+

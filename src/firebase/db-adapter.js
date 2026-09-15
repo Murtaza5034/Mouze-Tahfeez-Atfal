@@ -1,5 +1,12 @@
+import { initializeApp, deleteApp } from "firebase/app";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { firebaseApp } from "./config.js";
+import { firebaseApp, firebaseConfig } from "./config.js";
 import { from, getSectionScope } from "./db.js";
 import authApi from "./auth.js";
 import storageApi from "./storage.js";
@@ -128,13 +135,31 @@ async function rpcGetUserIdByEmail({ target_email } = {}) {
   const { data, error } = await from("user_portal_access").select("*").limit(100000);
   if (!error && Array.isArray(data)) {
     const hit = data.find((r) => String(r.email || "").trim().toLowerCase() === email);
-    if (hit && hit.user_id) return { data: hit.user_id, error: null };
+    if (hit && (hit.user_id || hit.id)) return { data: hit.user_id || hit.id, error: null };
+  }
+  // Check kibar_user_portal_access
+  const { data: kData, error: kErr } = await from("kibar_user_portal_access").select("*").limit(100000);
+  if (!kErr && Array.isArray(kData)) {
+    const hit = kData.find((r) => String(r.email || "").trim().toLowerCase() === email);
+    if (hit && (hit.user_id || hit.id)) return { data: hit.user_id || hit.id, error: null };
   }
   // Also check the `users` collection (Firebase auth users).
   const { data: users, error: uErr } = await from("users").select("*").limit(100000);
   if (!uErr && Array.isArray(users)) {
     const hit = users.find((r) => String(r.email || "").trim().toLowerCase() === email);
-    if (hit && hit.id) return { data: hit.id, error: null };
+    if (hit && (hit.id || hit.user_id)) return { data: hit.id || hit.user_id, error: null };
+  }
+  // Also check kibar_student_profiles
+  const { data: ksData, error: ksErr } = await from("kibar_student_profiles").select("*").limit(100000);
+  if (!ksErr && Array.isArray(ksData)) {
+    const hit = ksData.find((r) => String(r.email || r.parent_email || "").trim().toLowerCase() === email);
+    if (hit && (hit.user_id || hit.id)) return { data: hit.user_id || hit.id, error: null };
+  }
+  // Also check kibar_teacher_profiles
+  const { data: ktData, error: ktErr } = await from("kibar_teacher_profiles").select("*").limit(100000);
+  if (!ktErr && Array.isArray(ktData)) {
+    const hit = ktData.find((r) => String(r.email || "").trim().toLowerCase() === email);
+    if (hit && (hit.user_id || hit.id)) return { data: hit.user_id || hit.id, error: null };
   }
   return { data: null, error: null };
 }
@@ -370,20 +395,120 @@ function createClient(url, key, options = {}) {
   return {
     auth: {
       signUp: async ({ email, password, options: signUpOptions }) => {
-        try {
-          const res = await callFunction("provisionUser", {
-            email,
-            password,
-            data: signUpOptions && signUpOptions.data,
-          });
-          const user = (res.data && res.data.user) || null;
-          return { data: { user }, error: null };
-        } catch (err) {
+        const normEmail = String(email || "").trim().toLowerCase();
+        const rawPassword = String(password || "");
+        const fullName = String(signUpOptions?.data?.full_name || "").trim();
+
+        if (!normEmail) {
           return {
             data: { user: null, session: null },
-            error: { message: err.message || String(err) },
+            error: { message: "Email is required" },
           };
         }
+        if (!rawPassword || rawPassword.length < 6) {
+          return {
+            data: { user: null, session: null },
+            error: { message: "Password must be at least 6 characters" },
+          };
+        }
+
+        let secondaryApp = null;
+        let createdUserId = null;
+        let authErr = null;
+
+        try {
+          // Provision via isolated secondary Firebase App instance.
+          // This keeps the primary admin session untouched while safely creating
+          // the user in Firebase Auth directly (works without Cloud Functions or GCP billing).
+          const tempAppName = `TempProvision_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          secondaryApp = initializeApp(firebaseConfig, tempAppName);
+          const secondaryAuth = getAuth(secondaryApp);
+
+          try {
+            const cred = await createUserWithEmailAndPassword(
+              secondaryAuth,
+              normEmail,
+              rawPassword
+            );
+            if (cred?.user?.uid) {
+              createdUserId = cred.user.uid;
+              if (fullName) {
+                try {
+                  await updateProfile(cred.user, { displayName: fullName });
+                } catch (_) {}
+              }
+            }
+          } catch (createErr) {
+            const code = createErr?.code || "";
+            const msg = createErr?.message || String(createErr);
+
+            if (
+              code === "auth/email-already-in-use" ||
+              msg.toLowerCase().includes("email-already-in-use") ||
+              msg.toLowerCase().includes("already registered")
+            ) {
+              // User already exists in Firebase Auth. Try signing in on secondary app to get UID.
+              try {
+                const signInCred = await signInWithEmailAndPassword(
+                  secondaryAuth,
+                  normEmail,
+                  rawPassword
+                );
+                if (signInCred?.user?.uid) {
+                  createdUserId = signInCred.user.uid;
+                }
+              } catch (_) {
+                // Ignore sign-in error (different password)
+              }
+              authErr = {
+                message: "User already registered",
+                code: "auth/email-already-in-use",
+              };
+            } else {
+              authErr = {
+                message: msg,
+                code: code || "auth/unknown",
+              };
+            }
+          }
+        } catch (initErr) {
+          authErr = {
+            message: initErr?.message || String(initErr),
+            code: "init_failed",
+          };
+        } finally {
+          if (secondaryApp) {
+            try {
+              await deleteApp(secondaryApp);
+            } catch (_) {}
+          }
+        }
+
+        if (createdUserId) {
+          return {
+            data: { user: { id: createdUserId, email: normEmail } },
+            error: null,
+          };
+        }
+
+        if (
+          authErr &&
+          (authErr.code === "auth/email-already-in-use" ||
+            authErr.message.toLowerCase().includes("already registered"))
+        ) {
+          const { data: existingId } = await rpcGetUserIdByEmail({
+            target_email: normEmail,
+          });
+          return {
+            data: { user: existingId ? { id: existingId, email: normEmail } : null },
+            error: authErr,
+          };
+        }
+
+        return {
+          data: { user: null, session: null },
+          error: authErr || { message: "Failed to provision user" },
+        };
       },
       getUser: authApi.getUser,
       signInWithPassword: authApi.signInWithPassword,

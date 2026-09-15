@@ -96,3 +96,4 @@ try {
 }
 
 export const firebaseApp = app;
+export { firebaseConfig };

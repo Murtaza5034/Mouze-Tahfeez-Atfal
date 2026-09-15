@@ -257,7 +257,6 @@ class FCMService {
         description: "Leave chat & portal notifications",
         importance: 5, // IMPORTANCE_HIGH
         visibility: 1, // VISIBILITY_PUBLIC
-        sound: "",
         vibration: true,
         lights: true
       });

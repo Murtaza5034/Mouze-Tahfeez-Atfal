@@ -311,13 +311,20 @@ async function sendFcmInner(
       },
       android: {
         priority: "high",
+        ttl: 86400 * 1000,
         notification: {
-          sound: "default",
-          channel_id: "mauze-tahfeez-notifications",
+          title,
+          body,
+          channelId: "mauze-tahfeez-notifications",
           icon: "ic_notification",
           color: "#C5A059",
+          priority: "max",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          defaultLightSettings: true,
           visibility: "public",
           tag: notifTag,
+          clickAction: "FCM_PLUGIN_ACTIVITY",
         },
       },
       apns: {
@@ -1065,26 +1072,157 @@ export const clearAllMarks = onCall({ cors: true }, async (request) => {
 // Scheduled: scheduled notifications
 // ---------------------------------------------------------------------------
 
-export const sendScheduleNotifications = onSchedule("every 5 minutes", async () => {
+function computeNextSendTimeIST(
+  scheduleType?: string,
+  scheduleTime?: string,
+  scheduleDay?: number | string
+): string | null {
+  if (!scheduleType || scheduleType === "once") return null;
+
+  const now = new Date();
+  const timeStr = String(scheduleTime || "09:00").substring(0, 5);
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const validHours = isNaN(hours) ? 9 : hours;
+  const validMinutes = isNaN(minutes) ? 0 : minutes;
+
+  const getISTParts = (date: Date) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const get = (type: string) =>
+      Number(parts.find((part) => part.type === type)?.value);
+    return { year: get("year"), month: get("month"), day: get("day") };
+  };
+
+  const addISTDays = (
+    { year, month, day }: { year: number; month: number; day: number },
+    days: number
+  ) => {
+    const date = new Date(Date.UTC(year, month - 1, day + days));
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth() + 1,
+      day: date.getUTCDate(),
+    };
+  };
+
+  const getISTWeekday = ({ year, month, day }: { year: number; month: number; day: number }) =>
+    new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+
+  const makeDateFromIST = ({ year, month, day }: { year: number; month: number; day: number }) =>
+    new Date(Date.UTC(year, month - 1, day, validHours - 5, validMinutes - 30, 0, 0));
+
+  let candidateParts = getISTParts(now);
+
+  if (scheduleType === "weekly") {
+    const targetDay = parseInt(String(scheduleDay ?? "0"), 10);
+    while (getISTWeekday(candidateParts) !== targetDay) {
+      candidateParts = addISTDays(candidateParts, 1);
+    }
+  } else if (scheduleType === "monthly") {
+    const targetDate = Math.min(parseInt(String(scheduleDay ?? "1"), 10), 28);
+    while (candidateParts.day !== targetDate) {
+      candidateParts = addISTDays(candidateParts, 1);
+    }
+  }
+
+  let candidate = makeDateFromIST(candidateParts);
+
+  if (candidate <= now) {
+    if (scheduleType === "daily") {
+      candidateParts = addISTDays(candidateParts, 1);
+    } else if (scheduleType === "weekly") {
+      candidateParts = addISTDays(candidateParts, 7);
+    } else if (scheduleType === "monthly") {
+      candidateParts = addISTDays({ ...candidateParts, day: 1 }, 32);
+      candidateParts = {
+        ...candidateParts,
+        day: Math.min(parseInt(String(scheduleDay ?? "1"), 10), 28),
+      };
+    }
+    candidate = makeDateFromIST(candidateParts);
+  }
+
+  return candidate.toISOString();
+}
+
+async function processScheduledNotificationsInner(): Promise<{ processed: number; delivered: number }> {
   const nowIso = new Date().toISOString();
   const sections: Array<"atfal" | "kibar"> = ["atfal", "kibar"];
+  let processed = 0;
+  let delivered = 0;
+
   for (const section of sections) {
     const col = section === "kibar" ? "kibar_scheduled_notifications" : "scheduled_notifications";
     const rows = await allDocs(col);
-    const due = rows.filter(
-      ({ data }) => data.is_active === true && data.fire_at && String(data.fire_at) <= nowIso && !data.processed_at
-    );
+    const due = rows.filter(({ data }) => {
+      if (data.is_active !== true) return false;
+      const sendAt = data.next_send_at || data.fire_at;
+      if (!sendAt) return false;
+      return String(sendAt) <= nowIso;
+    });
+
     for (const item of due) {
       const data = item.data;
+      const title = String(data.title || "Notification").trim();
+      const body = String(data.body || "").trim();
       const tokens = await tokensForTarget(data.target_user, data.target_role || "all", section);
-      if (tokens.length) {
-        await sendFcmInner(tokens, String(data.title || "Notification"), String(data.body || ""), {
-          url: data.redirect_page || "/",
-        }, "scheduled");
+
+      if (tokens.length && title && body) {
+        const res = await sendFcmInner(
+          tokens,
+          title,
+          body,
+          {
+            url: data.redirect_page || "/",
+            redirectPage: data.redirect_page || "Inbox",
+            fileUrl: data.file_url || "",
+          },
+          `scheduled-${item.id}-${Date.now()}`,
+          section
+        );
+        delivered += res.delivered;
       }
-      await db.collection(col).doc(item.id).update({ processed_at: nowIso, last_sent_at: nowIso });
+
+      processed++;
+
+      const nextSend = computeNextSendTimeIST(
+        data.schedule_type,
+        data.schedule_time,
+        data.schedule_day
+      );
+
+      if (nextSend) {
+        await db.collection(col).doc(item.id).update({
+          last_sent_at: nowIso,
+          next_send_at: nextSend,
+          fire_at: nextSend,
+          updated_at: nowIso,
+        }).catch((e) => console.warn(`Failed to update recurring schedule ${item.id}`, (e as Error).message));
+      } else {
+        await db.collection(col).doc(item.id).update({
+          is_active: false,
+          processed_at: nowIso,
+          last_sent_at: nowIso,
+          updated_at: nowIso,
+        }).catch((e) => console.warn(`Failed to mark schedule ${item.id} processed`, (e as Error).message));
+      }
     }
   }
+
+  return { processed, delivered };
+}
+
+export const sendScheduleNotifications = onSchedule("every 1 minutes", async () => {
+  await processScheduledNotificationsInner();
+});
+
+export const processScheduledNotifications = onCall({ cors: true }, async () => {
+  const result = await processScheduledNotificationsInner();
+  return { success: true, ...result };
 });
 
 async function runResultLiveNotifierInner(section: "atfal" | "kibar" = "atfal", manual = false) {

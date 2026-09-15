@@ -110,7 +110,13 @@ function parsePushPayload(payload) {
   };
 }
 
-function getDedupKey(info) {
+function getDedupKey(info, payload) {
+  const msgId =
+    payload?.fcmMessageId ||
+    payload?.messageId ||
+    payload?.["google.message_id"] ||
+    payload?.data?.["google.message_id"];
+  if (msgId) return `fcm:${msgId}`;
   const d = info.data || {};
   const id = d.notification_id || d.id || (d.tag && !d.tag.startsWith("mauze-tahfeez-notification") ? d.tag : "");
   return id ? `id:${id}` : `${info.title}:::${info.body}:::${d.timestamp || ""}`;
@@ -129,7 +135,7 @@ function buildNotificationOptions(info) {
     body: info.body,
     icon: '/LOGO ATFAAL-192.png',
     badge: '/LOGO ATFAAL-192.png',
-    vibrate: [200, 100, 200],
+    vibrate: [200, 100, 200, 100, 200],
     data: {
       ...info.data,
       url: info.url,
@@ -161,7 +167,7 @@ function buildNotificationOptions(info) {
 async function displayPushNotification(payload) {
   try {
     const info = parsePushPayload(payload);
-    const dedupKey = getDedupKey(info);
+    const dedupKey = getDedupKey(info, payload);
 
     if (isRecentlyShown(dedupKey)) {
       console.log('[SW] Skipping duplicate push notification:', dedupKey);
