@@ -6213,6 +6213,265 @@ body {
   background: rgba(212,175,55,0.06);
 }
 
+/* ── Badal Tab Attendance Pill ── */
+.badal-tab-att-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: normal;
+}
+.badal-tab-att-tag.present {
+  background: rgba(16, 185, 129, 0.16);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.badal-tab-att-tag.absent {
+  background: rgba(239, 68, 68, 0.16);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.badal-tab-att-tag.uzur {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+/* ── Badal Popup Attendance Banner ── */
+.badal-popup-att-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 24px 14px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(253, 248, 240, 0.98) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  box-shadow: 0 4px 16px rgba(141, 110, 83, 0.06);
+}
+.badal-popup-att-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.badal-att-banner-label {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #5d4037;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.badal-popup-att-by {
+  display: flex;
+  align-items: center;
+}
+.badal-att-by-badge {
+  font-size: 0.75rem;
+  color: #8d6e53;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.badal-att-by-badge strong {
+  color: #b8860b;
+}
+
+/* ── Badal Attendance Pills (Banner & Table) ── */
+.badal-att-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: normal;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+.badal-att-pill.present {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #065f46;
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+.badal-att-pill.absent {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  color: #991b1b;
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+}
+.badal-att-pill.uzur {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #92400e;
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+}
+.badal-att-pill.unrecorded {
+  background: #f5efe6;
+  color: #8d6e53;
+  border-color: #e0d5c7;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badal-att-pill-en {
+  font-size: 0.65rem;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+/* ── Interactive Badal Attendance Buttons ── */
+.badal-popup-att-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.badal-att-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: #f5efe6;
+  color: #5d4037;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.badal-att-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+.badal-att-action-btn.present {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.08);
+  color: #065f46;
+}
+.badal-att-action-btn.present:hover,
+.badal-att-action-btn.present.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border-color: #059669;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+.badal-att-action-btn.absent {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: #991b1b;
+}
+.badal-att-action-btn.absent:hover,
+.badal-att-action-btn.absent.active {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  border-color: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+.badal-att-action-btn.uzur {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.08);
+  color: #92400e;
+}
+.badal-att-action-btn.uzur:hover,
+.badal-att-action-btn.uzur.active {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  border-color: #d97706;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+/* ── Table Cell Attendance Badge ── */
+.badal-table-att-cell {
+  white-space: nowrap;
+}
+.badal-table-att-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+.badal-table-att-badge.present {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.badal-table-att-badge.absent {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.badal-table-att-badge.uzur {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.badal-table-att-badge .badal-att-sub {
+  font-size: 0.65rem;
+  opacity: 0.75;
+  margin-left: 2px;
+}
+.badal-table-att-none {
+  color: var(--text-muted, #a89f91);
+  font-size: 0.85rem;
+}
+
+/* ── Table Row Mini Quick Actions ── */
+.badal-att-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badal-att-row-btn {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+}
+.badal-att-row-btn.present {
+  background: rgba(16, 185, 129, 0.1);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.badal-att-row-btn.present:hover {
+  background: #10b981;
+  color: #ffffff;
+}
+.badal-att-row-btn.absent {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.badal-att-row-btn.absent:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+
 @media (max-width: 768px) {
   .badal-premium-popup {
     max-width: 100%;

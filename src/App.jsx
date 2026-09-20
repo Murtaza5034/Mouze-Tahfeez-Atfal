@@ -34419,6 +34419,9 @@ function TeacherPortal({
   const [selectedBadalHistory, setSelectedBadalHistory] = useState(null);
   const [badalStudentHistory, setBadalStudentHistory] = useState([]);
   const [badalTabProgress, setBadalTabProgress] = useState([]);
+  const [badalTabAttendance, setBadalTabAttendance] = useState({});
+  const [badalTabsAttendance, setBadalTabsAttendance] = useState({});
+  const [badalHistoryAttendance, setBadalHistoryAttendance] = useState({});
   const [badalTabLoading, setBadalTabLoading] = useState(false);
   const [allSchoolStudents, setAllSchoolStudents] = useState([]);
   const universalStudents =
@@ -35127,7 +35130,25 @@ function TeacherPortal({
   }, [fetchBadalData]);
 
   useEffect(() => {
-    if (activePage === "Badal" || activePage === "BadalEntry") fetchBadalData();
+    if (activePage !== "Badal" && activePage !== "BadalEntry") return;
+    fetchBadalData();
+    const today = new Date().toISOString().slice(0, 10);
+    supabase
+      .from("student_daily_attendance")
+      .select("*")
+      .eq("attendance_date", today)
+      .then(({ data }) => {
+        if (data) {
+          const map = {};
+          data.forEach((r) => {
+            map[String(r.student_id).trim().toLowerCase()] = {
+              status: r.status,
+              teacher_id: r.teacher_id,
+            };
+          });
+          setBadalTabsAttendance(map);
+        }
+      });
   }, [activePage, fetchBadalData]);
 
   useEffect(() => {
@@ -35168,11 +35189,9 @@ function TeacherPortal({
     const sidStr = String(studentId);
     const juzPayload =
       Array.isArray(raw.juz) && raw.juz.some((s) => s && s.value)
-        ? raw.juz
-        : raw.juz && raw.juz.value
-          ? raw.juz
-          : null;
-    let jadeedPayload = raw.jadeed || null;
+        ? raw.juz.filter((s) => s && s.value)
+        : null;
+    let jadeedPayload = raw.jadeed;
     if (
       jadeedPayload &&
       jadeedPayload.surah &&
@@ -35185,6 +35204,11 @@ function TeacherPortal({
       );
       jadeedPayload = { ...jadeedPayload, type: "surah_ayat", page };
     }
+    const attKey = String(studentId).trim().toLowerCase();
+    const todayAtt =
+      studentAttendance[attKey]?.[weekDate] ||
+      badalTabsAttendance[attKey]?.status ||
+      null;
     const payload = {
       student_id: sidStr,
       teacher_id: String(teacherId),
@@ -35193,6 +35217,7 @@ function TeacherPortal({
       juz_hali: raw.juzHali ? JSON.stringify(raw.juzHali) : null,
       jadeed_surah_ayat: jadeedPayload ? JSON.stringify(jadeedPayload) : null,
       notes: raw.notes || null,
+      ...(todayAtt ? { attendance: todayAtt } : {}),
     };
     const { data: existing } = await supabase
       .from("badal_progress")
@@ -35559,7 +35584,18 @@ function TeacherPortal({
     const map = {};
     if (data) {
       data.forEach((p) => {
-        if (p.page_key) map[p.page_key] = p.visible;
+        if (p.page_key) {
+          map[p.page_key] = p.visible;
+          if (
+            p.page_key === "Quran Ikhtebar" ||
+            p.page_key === "Quran" ||
+            p.page_key === "Quran Page"
+          ) {
+            map["Quran Ikhtebar"] = p.visible;
+            map["Quran"] = p.visible;
+            map["Quran Page"] = p.visible;
+          }
+        }
       });
     }
     setPageVisibility(map);
@@ -39877,6 +39913,7 @@ function TeacherPortal({
                               onClick={() => {
                                 if (historyOpen) {
                                   setSelectedBadalHistory(null);
+                                  setBadalHistoryAttendance({});
                                 } else {
                                   setSelectedBadalHistory(sid);
                                   supabase
@@ -39887,6 +39924,22 @@ function TeacherPortal({
                                     .order("week_date", { ascending: false })
                                     .then(({ data }) => {
                                       if (data) setBadalStudentHistory(data);
+                                    });
+                                  supabase
+                                    .from("student_daily_attendance")
+                                    .select("*")
+                                    .eq("student_id", String(sid))
+                                    .then(({ data: attData }) => {
+                                      if (attData) {
+                                        const map = {};
+                                        attData.forEach((r) => {
+                                          map[r.attendance_date] = {
+                                            status: r.status,
+                                            teacher_id: r.teacher_id,
+                                          };
+                                        });
+                                        setBadalHistoryAttendance(map);
+                                      }
                                     });
                                 }
                               }}
@@ -40009,6 +40062,10 @@ function TeacherPortal({
                                             <span className="th-icon">📅</span>{" "}
                                             التاريخ
                                           </th>
+                                          <th className="kanz-font badal-th-att">
+                                            <span className="th-icon">📋</span>{" "}
+                                            الحضور
+                                          </th>
                                           <th className="kanz-font">
                                             <span className="th-icon">📖</span>{" "}
                                             الجزء
@@ -40036,6 +40093,20 @@ function TeacherPortal({
                                           const jadeed = safeParse(
                                             entry.jadeed_surah_ayat,
                                           );
+                                          const entryDate =
+                                            entry.week_date ||
+                                            (entry.created_at
+                                              ? entry.created_at.slice(0, 10)
+                                              : "");
+                                          const attRec =
+                                            badalHistoryAttendance[entryDate];
+                                          const attStatus =
+                                            entry.attendance ||
+                                            attRec?.status ||
+                                            studentAttendance[
+                                              String(sid).trim().toLowerCase()
+                                            ]?.[entryDate] ||
+                                            null;
                                           const dateStr = new Date(
                                             entry.created_at || entry.week_date,
                                           ).toLocaleDateString("en-GB", {
@@ -40059,6 +40130,52 @@ function TeacherPortal({
                                                 <span className="date-ar kanz-font">
                                                   {arabicDate}
                                                 </span>
+                                              </td>
+                                              <td className="badal-table-cell badal-table-att-cell">
+                                                {attStatus === "present" ? (
+                                                  <div
+                                                    className="badal-table-att-badge present"
+                                                    title="Present"
+                                                  >
+                                                    <CheckCircle size={13} />
+                                                    <span className="kanz-font">
+                                                      حاضر
+                                                    </span>
+                                                    <span className="badal-att-sub">
+                                                      Present
+                                                    </span>
+                                                  </div>
+                                                ) : attStatus === "absent" ? (
+                                                  <div
+                                                    className="badal-table-att-badge absent"
+                                                    title="Absent"
+                                                  >
+                                                    <XCircle size={13} />
+                                                    <span className="kanz-font">
+                                                      غائب
+                                                    </span>
+                                                    <span className="badal-att-sub">
+                                                      Absent
+                                                    </span>
+                                                  </div>
+                                                ) : attStatus === "uzur" ? (
+                                                  <div
+                                                    className="badal-table-att-badge uzur"
+                                                    title="Excused"
+                                                  >
+                                                    <Clock size={13} />
+                                                    <span className="kanz-font">
+                                                      عذر
+                                                    </span>
+                                                    <span className="badal-att-sub">
+                                                      Uzur
+                                                    </span>
+                                                  </div>
+                                                ) : (
+                                                  <span className="badal-table-att-none">
+                                                    —
+                                                  </span>
+                                                )}
                                               </td>
                                               <td className="badal-table-cell">
                                                 {badalFormatJuz(juz) || "—"}
@@ -40261,12 +40378,18 @@ function TeacherPortal({
                               const isSelected = selectedBadalOriginal === sid;
                               const isGreen =
                                 type === "badal" && filledTodayByMe(sid);
+                              const tabSidKey = sid.trim().toLowerCase();
+                              const tabTodayAtt =
+                                badalTabsAttendance[tabSidKey]?.status ||
+                                studentAttendance[tabSidKey]?.[today] ||
+                                null;
                               return (
                                 <button
                                   key={`tab-${sid}`}
                                   onClick={() => {
                                     if (isSelected) {
                                       setSelectedBadalOriginal(null);
+                                      setBadalTabAttendance({});
                                     } else {
                                       setSelectedBadalOriginal(sid);
                                       setBadalTabLoading(true);
@@ -40280,6 +40403,22 @@ function TeacherPortal({
                                         .then(({ data }) => {
                                           setBadalTabLoading(false);
                                           if (data) setBadalTabProgress(data);
+                                        });
+                                      supabase
+                                        .from("student_daily_attendance")
+                                        .select("*")
+                                        .eq("student_id", String(sid))
+                                        .then(({ data: attData }) => {
+                                          if (attData) {
+                                            const map = {};
+                                            attData.forEach((r) => {
+                                              map[r.attendance_date] = {
+                                                status: r.status,
+                                                teacher_id: r.teacher_id,
+                                              };
+                                            });
+                                            setBadalTabAttendance(map);
+                                          }
                                         });
                                     }
                                   }}
@@ -40302,6 +40441,18 @@ function TeacherPortal({
                                       ضمان
                                     </span>
                                   )}
+                                  {tabTodayAtt && (
+                                    <span
+                                      className={`badal-tab-att-tag ${tabTodayAtt}`}
+                                      title={`Today: ${tabTodayAtt}`}
+                                    >
+                                      {tabTodayAtt === "present"
+                                        ? "✓ حاضر"
+                                        : tabTodayAtt === "absent"
+                                          ? "✕ غائب"
+                                          : "⏱ عذر"}
+                                    </span>
+                                  )}
                                   {isGreen && (
                                     <span className="badal-tab-dot" />
                                   )}
@@ -40314,6 +40465,7 @@ function TeacherPortal({
                           ? (() => {
                               const sid = String(selectedItem.student_id);
                               const student = selectedItem.student;
+                              const sidKey = sid.trim().toLowerCase();
                               const displayData =
                                 badalTabProgress.length > 0 &&
                                 String(badalTabProgress[0]?.student_id) ===
@@ -40335,6 +40487,9 @@ function TeacherPortal({
                                 return base || student;
                               };
                               const studentInfo = getStudentInfo();
+                              const isGirl =
+                                String(student?.gender || "").toLowerCase() ===
+                                "female";
                               const originalTeacherName =
                                 selectedItem.original_teacher_id
                                   ? teacherProfiles.find(
@@ -40362,12 +40517,56 @@ function TeacherPortal({
                                       p.created_at.slice(0, 10) ===
                                         currentWeek)),
                               );
+
+                              const todayAttRec =
+                                badalTabAttendance[today] ||
+                                badalTabsAttendance[sidKey];
+                              const todayAttStatus =
+                                todayAttRec?.status ||
+                                studentAttendance[sidKey]?.[today] ||
+                                null;
+
+                              const markBadalTabAttendance = async (
+                                status,
+                                targetDate = today,
+                              ) => {
+                                const targetSid =
+                                  selectedItem.student?.student_id || sid;
+                                await handleMarkAttendance(
+                                  targetSid,
+                                  targetDate,
+                                  status,
+                                );
+                                setBadalTabAttendance((prev) => ({
+                                  ...prev,
+                                  [targetDate]: {
+                                    status,
+                                    teacher_id: user?.id || teacherIdentity,
+                                  },
+                                }));
+                                setBadalTabsAttendance((prev) => ({
+                                  ...prev,
+                                  [sidKey]: {
+                                    status,
+                                    teacher_id: user?.id || teacherIdentity,
+                                  },
+                                }));
+                                if (onShowAction) {
+                                  onShowAction(
+                                    "success",
+                                    `${student?.name || "Student"} marked ${status === "present" ? "Present" : status === "absent" ? "Absent" : "Uzur (Excused)"} on ${targetDate}`,
+                                  );
+                                }
+                              };
+
                               return (
                                 <div
                                   className="badal-premium-popup-overlay"
                                   onClick={(e) => {
-                                    if (e.target === e.currentTarget)
+                                    if (e.target === e.currentTarget) {
                                       setSelectedBadalOriginal(null);
+                                      setBadalTabAttendance({});
+                                    }
                                   }}
                                 >
                                   <div className="badal-premium-popup">
@@ -40459,13 +40658,113 @@ function TeacherPortal({
                                       </div>
                                       <button
                                         className="badal-popup-close"
-                                        onClick={() =>
-                                          setSelectedBadalOriginal(null)
-                                        }
+                                        onClick={() => {
+                                          setSelectedBadalOriginal(null);
+                                          setBadalTabAttendance({});
+                                        }}
                                       >
                                         <X size={18} />
                                       </button>
                                     </div>
+
+                                    {/* ── Today Attendance Status & Controls Banner ── */}
+                                    <div
+                                      className={`badal-popup-att-banner${selectedItem.type === "badal" ? " is-badal-teacher" : ""}`}
+                                    >
+                                      <div className="badal-popup-att-status">
+                                        <span className="badal-att-banner-label kanz-font">
+                                          <Calendar size={14} /> حضور اليوم (
+                                          {today}):
+                                        </span>
+                                        {todayAttStatus === "present" ? (
+                                          <span className="badal-att-pill present">
+                                            <CheckCircle size={14} />
+                                            <span className="kanz-font">
+                                              حاضر
+                                            </span>
+                                            <span className="badal-att-pill-en">
+                                              Present
+                                            </span>
+                                          </span>
+                                        ) : todayAttStatus === "absent" ? (
+                                          <span className="badal-att-pill absent">
+                                            <XCircle size={14} />
+                                            <span className="kanz-font">
+                                              غائب
+                                            </span>
+                                            <span className="badal-att-pill-en">
+                                              Absent
+                                            </span>
+                                          </span>
+                                        ) : todayAttStatus === "uzur" ? (
+                                          <span className="badal-att-pill uzur">
+                                            <Clock size={14} />
+                                            <span className="kanz-font">
+                                              عذر
+                                            </span>
+                                            <span className="badal-att-pill-en">
+                                              Excused
+                                            </span>
+                                          </span>
+                                        ) : (
+                                          <span className="badal-att-pill unrecorded kanz-font">
+                                            {selectedItem.type === "original"
+                                              ? "لم يسجل بعد اليوم من قبل أستاذ البدل"
+                                              : "لم يسجل بعد اليوم"}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {selectedItem.type === "badal" ? (
+                                        <div className="badal-popup-att-actions">
+                                          <button
+                                            type="button"
+                                            className={`badal-att-action-btn present${todayAttStatus === "present" ? " active" : ""}`}
+                                            onClick={() =>
+                                              markBadalTabAttendance("present")
+                                            }
+                                            title="Mark Present"
+                                          >
+                                            <CheckCircle size={14} /> حاضر
+                                            Present
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={`badal-att-action-btn absent${todayAttStatus === "absent" ? " active" : ""}`}
+                                            onClick={() =>
+                                              markBadalTabAttendance("absent")
+                                            }
+                                            title="Mark Absent"
+                                          >
+                                            <XCircle size={14} /> غائب Absent
+                                          </button>
+                                          {isGirl && (
+                                            <button
+                                              type="button"
+                                              className={`badal-att-action-btn uzur${todayAttStatus === "uzur" ? " active" : ""}`}
+                                              onClick={() =>
+                                                markBadalTabAttendance("uzur")
+                                              }
+                                              title="Mark Uzur"
+                                            >
+                                              <Clock size={14} /> عذر
+                                            </button>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        badalTeacherName &&
+                                        badalTeacherName !== "—" && (
+                                          <div className="badal-popup-att-by">
+                                            <span className="badal-att-by-badge kanz-font">
+                                              ⚡ بواسطة أستاذ البدل:{" "}
+                                              <strong>
+                                                {badalTeacherName}
+                                              </strong>
+                                            </span>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+
                                     {badalTabLoading ? (
                                       <div className="badal-popup-loading">
                                         <div className="badal-loader" />
@@ -40505,6 +40804,12 @@ function TeacherPortal({
                                                 </span>{" "}
                                                 التاريخ
                                               </th>
+                                              <th className="kanz-font badal-th-att">
+                                                <span className="th-icon">
+                                                  📋
+                                                </span>{" "}
+                                                الحضور
+                                              </th>
                                               <th className="kanz-font">
                                                 <span className="th-icon">
                                                   📖
@@ -40543,6 +40848,23 @@ function TeacherPortal({
                                               const jadeed = safeParse(
                                                 entry.jadeed_surah_ayat,
                                               );
+                                              const entryDate =
+                                                entry.week_date ||
+                                                (entry.created_at
+                                                  ? entry.created_at.slice(
+                                                      0,
+                                                      10,
+                                                    )
+                                                  : "");
+                                              const attRec =
+                                                badalTabAttendance[entryDate];
+                                              const attStatus =
+                                                entry.attendance ||
+                                                attRec?.status ||
+                                                studentAttendance[sidKey]?.[
+                                                  entryDate
+                                                ] ||
+                                                null;
                                               const dateStr = new Date(
                                                 entry.created_at ||
                                                   entry.week_date,
@@ -40584,6 +40906,89 @@ function TeacherPortal({
                                                     <span className="date-ar kanz-font">
                                                       {arabicDate}
                                                     </span>
+                                                  </td>
+                                                  <td className="badal-table-cell badal-table-att-cell">
+                                                    {attStatus === "present" ? (
+                                                      <div
+                                                        className="badal-table-att-badge present"
+                                                        title="Present"
+                                                      >
+                                                        <CheckCircle
+                                                          size={13}
+                                                        />
+                                                        <span className="kanz-font">
+                                                          حاضر
+                                                        </span>
+                                                        <span className="badal-att-sub">
+                                                          Present
+                                                        </span>
+                                                      </div>
+                                                    ) : attStatus ===
+                                                      "absent" ? (
+                                                      <div
+                                                        className="badal-table-att-badge absent"
+                                                        title="Absent"
+                                                      >
+                                                        <XCircle size={13} />
+                                                        <span className="kanz-font">
+                                                          غائب
+                                                        </span>
+                                                        <span className="badal-att-sub">
+                                                          Absent
+                                                        </span>
+                                                      </div>
+                                                    ) : attStatus === "uzur" ? (
+                                                      <div
+                                                        className="badal-table-att-badge uzur"
+                                                        title="Excused"
+                                                      >
+                                                        <Clock size={13} />
+                                                        <span className="kanz-font">
+                                                          عذر
+                                                        </span>
+                                                        <span className="badal-att-sub">
+                                                          Uzur
+                                                        </span>
+                                                      </div>
+                                                    ) : selectedItem.type ===
+                                                      "badal" ? (
+                                                      <div className="badal-att-row-actions">
+                                                        <button
+                                                          type="button"
+                                                          className="badal-att-row-btn present"
+                                                          onClick={() =>
+                                                            markBadalTabAttendance(
+                                                              "present",
+                                                              entryDate,
+                                                            )
+                                                          }
+                                                          title="Mark Present on this date"
+                                                        >
+                                                          <CheckCircle
+                                                            size={11}
+                                                          />{" "}
+                                                          حاضر
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          className="badal-att-row-btn absent"
+                                                          onClick={() =>
+                                                            markBadalTabAttendance(
+                                                              "absent",
+                                                              entryDate,
+                                                            )
+                                                          }
+                                                          title="Mark Absent on this date"
+                                                        >
+                                                          <XCircle size={11} />{" "}
+                                                          غائب
+                                                        </button>
+                                                      </div>
+                                                    ) : (
+                                                      <span className="badal-table-att-none">
+                                                        —
+                                                      </span>
+                                                    )}
                                                   </td>
                                                   <td className="badal-table-cell">
                                                     {badalFormatJuz(juz) || "—"}
@@ -42756,11 +43161,22 @@ function TeacherPortal({
           ) : activePage === "Online Tahfeez" ? (
             renderOnlineTahfeezTeacher()
           ) : activePage === "Quran Ikhtebar" ? (
-            <IkhtebarMushaf
-              questionsUrl="https://docs.google.com/spreadsheets/d/15iZ4bl15gOcfnOhWc3oSKhf7k3qsE8avPc3Z7Eeh5sI/export?format=csv&gid=0"
-              pollingInterval={60000}
-              onClose={() => setActivePage("Home")}
-            />
+            pageVisibility["Quran Ikhtebar"] === false ? (
+              <div
+                className="overview-container fade-in"
+                style={{ padding: 40, textAlign: "center" }}
+              >
+                <p style={{ color: "var(--text-muted)", fontSize: "1rem" }}>
+                  This page has been disabled by the administrator.
+                </p>
+              </div>
+            ) : (
+              <IkhtebarMushaf
+                questionsUrl="https://docs.google.com/spreadsheets/d/15iZ4bl15gOcfnOhWc3oSKhf7k3qsE8avPc3Z7Eeh5sI/export?format=csv&gid=0"
+                pollingInterval={60000}
+                onClose={() => setActivePage("Home")}
+              />
+            )
           ) : activePage === "Help Videos" ? (
             <PortalHelpGuidePage portalType="teacher" />
           ) : null}
@@ -49657,6 +50073,7 @@ const PAGE_VISIBILITY_DEFAULTS = [
   { page_key: "Settings", role: "parents", label: "Settings" },
   // ===== TEACHER PORTAL PAGES =====
   { page_key: "Home", role: "teacher", label: "Home" },
+  { page_key: "Quran Ikhtebar", role: "teacher", label: "Quran Page" },
   { page_key: "My Group", role: "teacher", label: "Students" },
   { page_key: "Fill Result", role: "teacher", label: "Mark Progress" },
   { page_key: "Overview", role: "teacher", label: "Performance" },
@@ -49700,8 +50117,17 @@ function QuickAccessPagesUI({ supabase: sb }) {
     for (const d of PAGE_VISIBILITY_DEFAULTS) {
       const k = `${d.role}:${d.page_key}`;
       seen.add(k);
+      const existing =
+        byKey[k] ||
+        (d.page_key === "Quran Ikhtebar"
+          ? byKey[`${d.role}:Quran`] || byKey[`${d.role}:Quran Page`]
+          : null);
+      if (d.page_key === "Quran Ikhtebar") {
+        seen.add(`${d.role}:Quran`);
+        seen.add(`${d.role}:Quran Page`);
+      }
       merged.push(
-        byKey[k] || {
+        existing || {
           page_key: d.page_key,
           role: d.role,
           label: d.label,
