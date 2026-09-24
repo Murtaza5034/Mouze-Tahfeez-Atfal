@@ -5,19 +5,19 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-// Embedded fallback service account credentials for al-mawaid-1ihvq0 (project: mawaid-b929a)
+// Embedded fallback service account credentials for project: mawaid-b929a (mauze-tahfeez-592)
 // Ensures notifications NEVER fail even if environment variables are not configured in Vercel
 const FALLBACK_SA = {
   type: "service_account",
-  project_id: "al-mawaid-1ihvq0",
-  private_key_id: "553461cfc5e2287b61e08875acead285099cb52d",
-  private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC5WZDSOZRK7Hk3\n32Wvw3LWcBYVNn4dXYPrBs4Lcn594NFzahnLlq+zDSRMLnfozt8ehadxjXOdt+Ha\n1XMo70aIOXtKtIZF+6xvlAsIjeeJ3mAIaISBErStgVdkbv05l22AVZyR8+b4+09K\nCHpCYgAlgKCRY0EKchn9z/LKvCJ6T0Mcx1rcKXIwZk/0+ZvmMgTEhKSh1s6nJSr/\nLnoLaB72PddlSfA9rtpcVTlaRY+FiLGJ2PztooDuqBW+75VE865gyGZjx1Jwsio8\n/gpXQOs6Ga+1gRo0tmXKN7LwMg5NAqaJvfi55PeTM/OZ108AgV9tSG7nzUVaBWfD\nKQEGKu/bAgMBAAECggEAAaQiPP7bzrYGdL7Do3J8cPbG0iL6Pb/AOdg7lIgU/zaf\nP5PLfz9qCJCvy5csmTNnJuwIm82ki5Jj0CLMRWHyIsoUE/awGIhAhJ2LPuUAevqa\nhDiK+qq9Kar8X2VIwmztrdqmfa6hwKMyKNFeZgwS86/FTnsbXAm/LAa56Qx+i/GK\nIw/7bGFKHpe9Dhuh7QoxR6j93FJEpn68GtXPbAl0FRgdelHlxAw8F5leR2W67+2c\n1flIE2ePO+3mAEZWporpZyB3lOorYyVrm/1dFmLj6Wl8psy/Gwj8XqTyZckTVi4i\nxzoGl4g5x9LDqL5PiEkzc0QHUnpxwWFm+OqmIT79MQKBgQDtjtIctSzRdnSLD3am\nXahobsLzeS+LSdDm36jrBBHlsDsXjC+pzO7cXP0IrmgWwvL/0W3+dU4Vkd/VhvJq\nkCp9M+JQEju/TrZzXaSTWuFryEY7ExUEzFSPo6HA1XP9ehVfpQhQgFqSkohPiSs3\nAOpUv/GAPBnRt/JANP29o/lmDwKBgQDHvSw8myObnEKYF4Ar0JVxq5mx1wtrXNgZ\nFDcLYLIPDveoNiX1qzw2SZJZ7ciGxqCzipyCI0iKmGgbtwUT4Zlx0fNjOjXbJ61b\nv8lsQZUP4ucXO9WAA2D29bqrcpO5LAWvajdQD7Xuf1vUbpcMZBp/kXYO947LkIxB\nYVZp378FdQKBgQDn1Zfr+EwS5z15cM/kMEboFCAhqETj9Ffw2JlrMf+dXs1sf50M\nYzlAyWcPj9V5USwAyIxF5okbt87v/dCaerNcmMPmTMUOQG0CTYMNY4XWwA76G/dJ\nRXfI7nIvVKDr4Lb3LoHcvkamAGcS59TKyxPlPaUb9otkBdZfHtf6uQnttQKBgBWT\n8jt55xbggrE7mLUjC4IEL85ulOU8WnwbGvc3swS9cTPS5bbskMyslgrxDUDCJIpA\n5zeH6EZQwK59zyaesJ0DOW/20eqjFq9awL/ZNelJcf2okSALPWZwlYIAFsViZBrX\nNrKHf/gL+jew2tCT3+j4JfDn/Z0wOHa3tUYqzdAhAoGANI7OBs21Yynjv4jk4bhF\n/m54savDUHYB2R0KBmNi4+dXGO64HPbtpB9wAfAPuUsfRcxqAkleU3x4KxGoew8W\nHphjVTZ0IZvfVyCUsOA75c2CjITve0unyuOnraLCDCb9X2XiXYV6H0NpsX450AlD\nswakaPhFoqTmJbS4IAq4+l0=\n-----END PRIVATE KEY-----\n",
-  client_email: "firebase-adminsdk-fbsvc@al-mawaid-1ihvq0.iam.gserviceaccount.com",
-  client_id: "106371802283934637802",
+  project_id: "mawaid-b929a",
+  private_key_id: "d7380d0a557b5d54dd660ed6d8e66d38096158bd",
+  private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCxD80HG/JO2fbC\nMhrM5Jh8NZzzeOc7qhJBdzE0kGBMaFyTzhd5l1+tA/chu4Q5ug46Y+VaP0DYk8xA\nsjoeVZ40UFoQj93YlEGYnOKYeXqFSVq/93RGLE2dfDBioPKq9F/ha9rXk7JpwMrA\nfKA6u4NPe9GLyJJupqrTzk/9hqDA2makDD5MFom8vtNB8QAi/i5fOAtIu+d1HHPB\nR4E3ndewrS8DR42EZOqi8hMwWNf8CY0mNmu5t3++ZQHs/oo3aTMwCo5+PSljJB8n\nkoA2kNDuRx42+hWQCr1QvdNJ0IMoRwUTItPh1KlfCanWtFHBT6RENkz2WIPIUzEM\nJX1C8HVnAgMBAAECggEALq973+P+f8v4xDtx1ZRwoE+Ckq/OSG0PYzOKRdHLklny\nDwbIKcc/8t6YyswmkRH9rmeokaMb9f8CXAyiRl1M2X5WQQet9u0gXpz/IjTlmT8+\nLl+QyO/lhyC3oUnOskS9AzLtAOpwoHG1BAvYM6Q9ezeqiLDZ61MGt9IuRSq6OB7t\nZ1tlj4rl5frDrKCs+MtwhjJbupwRjcehDDtQisRdLROQHe224Axqsy7aHaJqbXzo\nf943QxDsp5v4MytnU/3wJpEAKPJrEY3lkr0XxbNhkGr7dAV9HGQQ+NufM109j9Gv\nhGyRNwVK1YSGGkPxqGtaMjBZTs2eFtm8OYOB7kugAQKBgQDkEG176HDGGR7ocol/\nEqxaareaPRidn9h7I1Jke9rqVvgV5loge97YuJRHvTBfOO2zbRd0DpHdlByvpYpn\nsgE2fkLkgxosPHI4wceh0Lm21ie71gaqHsTrs+zOmGoTy8OBoEkVTRXos/57o2Xg\nPWoi3Au8rdZMXEYOo+WWrB66IQKBgQDGwA2AVLUXTNv7SxK9Xi4iY93OPvWY24eL\nSSbwFJPgSsNcpX4vMyRAYXRab2q5ACfZxVjvlx1XX0BD1SX+gB0Fopeuz7h/7855\n00OaFvqMw40xkFgkxxAM6toktT7WCr9BsuiYILzULpvWg8ALZ/huAZwrysbEJ+ff\nwG5tb76OhwKBgARYr815u5R67BTgAfDTCUfb2s3stihi4HxQSwSxO5XVvHqmXjda\nRP/6XJEVcPOPoTAXNyg2Et+XMAjE7eNWCCHivCGgwgHv0Pl17/kMgk2SvUUeKhhZ\n58TaM/wn+XWRH5O720i1pGI/8+ylS46/fONXMD4TTg88fvVOeFSryRYhAoGARBCJ\njyVzTyN3QrwXEtsqGYTx9SwCl/K2nLDUsOubKPjxpszWRfvRsmqtmjsF5Y10GFRJ\nfOPXnJB2RcS9WkctqTxhjfB9UvMhVv9O63prG8HsnMi+Jvo1OPdE9cVMW6kajrli\nhpbPlCrSG8jLABz/K01J2oV7RLoV4r7YEopuTAkCgYEA09xPGq/rMy4NGoWH6kvk\nHfssacZjp8d8GtiyUB/Lhdpwncu8ojaoyWvobMDfT0s/tpGrUQfh4YO9RaPPSG8r\nL0YJhS0ELiXRCnI8Hm1De/uQa0ghJPd6Z9YKswlgMf7x7sndUfE9j9SEhrg/CGor\nmc3Evj91L2C/7cQLX31YorU=\n-----END PRIVATE KEY-----\n",
+  client_email: "mauze-tahfeez-592@mawaid-b929a.iam.gserviceaccount.com",
+  client_id: "108581398070585913551",
   auth_uri: "https://accounts.google.com/o/oauth2/auth",
   token_uri: "https://oauth2.googleapis.com/token",
   auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40al-mawaid-1ihvq0.iam.gserviceaccount.com"
+  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/mauze-tahfeez-592%40mawaid-b929a.iam.gserviceaccount.com"
 };
 
 // Initialize Firebase Admin once using modular API
@@ -37,13 +37,14 @@ if (!getApps().length) {
 
   if (!credential) {
     const candidates = [
-      resolve(process.cwd(), 'al-mawaid-1ihvq0-firebase-adminsdk-fbsvc-553461cfc5.json'),
-      resolve(process.cwd(), '../al-mawaid-1ihvq0-firebase-adminsdk-fbsvc-553461cfc5.json'),
+      resolve(process.cwd(), 'keys/mawaid-b929a-d7380d0a557b.json'),
+      resolve(process.cwd(), 'mawaid-b929a-d7380d0a557b.json'),
+      resolve(process.cwd(), '../keys/mawaid-b929a-d7380d0a557b.json'),
     ];
     try {
       const currentDir = dirname(fileURLToPath(import.meta.url));
-      candidates.push(resolve(currentDir, 'al-mawaid-1ihvq0-firebase-adminsdk-fbsvc-553461cfc5.json'));
-      candidates.push(resolve(currentDir, '../al-mawaid-1ihvq0-firebase-adminsdk-fbsvc-553461cfc5.json'));
+      candidates.push(resolve(currentDir, 'keys/mawaid-b929a-d7380d0a557b.json'));
+      candidates.push(resolve(currentDir, '../keys/mawaid-b929a-d7380d0a557b.json'));
     } catch (_) {}
 
     for (const p of candidates) {
@@ -495,13 +496,30 @@ export default async function handler(req, res) {
     const targetRole = body.targetRole || null;
     const dataMap = body.data || {};
 
-    // 1. Resolve tokens
+    // 1. Resolve tokens (support direct tokens in body for instant 0-latency delivery)
     let tokens = [];
-    if (targetUser && targetUser !== 'all') {
-      tokens = await tokensForUser(targetUser, section);
-    } else {
-      tokens = await tokensForRole(targetRole, section);
+    if (body.token) {
+      tokens.push(String(body.token).trim());
     }
+    if (Array.isArray(body.tokens)) {
+      body.tokens.forEach((t) => {
+        if (t) tokens.push(String(t).trim());
+      });
+    }
+
+    try {
+      if (targetUser && targetUser !== 'all') {
+        const uTokens = await tokensForUser(targetUser, section);
+        tokens.push(...uTokens);
+      } else if (targetRole) {
+        const rTokens = await tokensForRole(targetRole, section);
+        tokens.push(...rTokens);
+      }
+    } catch (lookupErr) {
+      console.warn('Token lookup warning:', lookupErr.message);
+    }
+
+    tokens = [...new Set(tokens.filter(Boolean))];
 
     // 2. Write to Inbox if requested
     if (!body.skipInbox) {
@@ -613,11 +631,8 @@ export default async function handler(req, res) {
           const code = r.error?.code || '';
           if (/not-registered|unregistered|registration-token-not-registered/i.test(code)) {
             stale++;
-            db.collection(col)
-              .where('fcm_token', '==', chunk[idx])
-              .get()
-              .then((snap) => snap.docs.forEach((d) => d.ref.delete()))
-              .catch(() => {});
+            // Delete directly by document ID (which is the fcm_token) without read queries
+            db.collection(col).doc(chunk[idx]).delete().catch(() => {});
           } else {
             failed++;
           }

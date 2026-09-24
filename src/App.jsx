@@ -1144,6 +1144,14 @@ const NotificationStatus = ({ role }) => {
                 if (!user)
                   return alert("Please login first to test notifications.");
 
+                let currentFcmToken = null;
+                try {
+                  currentFcmToken = await fcmService.getToken();
+                } catch (_) {}
+                if (!currentFcmToken && typeof localStorage !== 'undefined') {
+                  currentFcmToken = localStorage.getItem('mauze_previous_fcm_token');
+                }
+
                 const { data, error } = await supabase.functions.invoke(
                   "fcm-notification",
                   {
@@ -1151,6 +1159,8 @@ const NotificationStatus = ({ role }) => {
                       title: "Test Alert",
                       body: "Your device is correctly linked to Mauze Tahfeez notifications!",
                       targetUser: user?.id,
+                      token: currentFcmToken || undefined,
+                      tokens: currentFcmToken ? [currentFcmToken] : undefined,
                     },
                   },
                 );
