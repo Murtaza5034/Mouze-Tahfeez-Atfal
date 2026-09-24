@@ -135,7 +135,7 @@ export default function TeacherProfileView({
         photo_url:
           portalAccess?.photo_url ||
           currentUser?.user_metadata?.avatar_url ||
-          "/logo.png",
+          "",
         teacher_role: portalAccess?.portal_role || "muhaffiz",
         user_id: currentUserId,
       }
@@ -422,7 +422,7 @@ export default function TeacherProfileView({
         <div className="teacher-pv-hero-banner" />
         <div className="teacher-pv-hero-body">
           <div className="teacher-pv-avatar-wrap">
-            {formData.photo_url ? (
+            {formData.photo_url && formData.photo_url !== "/logo.png" ? (
               <img
                 src={formData.photo_url}
                 alt={formData.full_name}
@@ -434,15 +434,19 @@ export default function TeacherProfileView({
                   if (cached && e.currentTarget.src !== cached) {
                     e.currentTarget.src = cached;
                   } else {
-                    e.currentTarget.src = isKibarTeacher ? "/kibar-logo.png" : "/logo.png";
+                    e.currentTarget.style.display = "none";
+                    const fb = e.currentTarget.parentElement?.querySelector(".teacher-pv-avatar-placeholder");
+                    if (fb) fb.style.display = "flex";
                   }
                 }}
               />
-            ) : (
-              <div className="teacher-pv-avatar-placeholder">
-                {(formData.full_name || "T").charAt(0).toUpperCase()}
-              </div>
-            )}
+            ) : null}
+            <div
+              className="teacher-pv-avatar-placeholder"
+              style={{ display: formData.photo_url && formData.photo_url !== "/logo.png" ? "none" : "flex" }}
+            >
+              <User size={48} />
+            </div>
 
             {/* Photo upload action or lock badge */}
             {effectivePermissions.photo_url ? (
@@ -942,15 +946,31 @@ export default function TeacherProfileView({
                   key={student.student_id || student.id}
                   className="teacher-pv-student-card"
                 >
-                  <img
-                    src={student.photoUrl || student.photo_url || "/logo.png"}
-                    alt={student.name || student.full_name}
-                    className="teacher-pv-student-avatar"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = "/logo.png";
+                  {student.photoUrl || student.photo_url ? (
+                    <img
+                      src={student.photoUrl || student.photo_url}
+                      alt={student.name || student.full_name}
+                      className="teacher-pv-student-avatar"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.style.display = "none";
+                        const fb = e.currentTarget.parentElement?.querySelector(".teacher-pv-student-fallback");
+                        if (fb) fb.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className="teacher-pv-student-avatar teacher-pv-student-fallback"
+                    style={{
+                      display: student.photoUrl || student.photo_url ? "none" : "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(197, 160, 89, 0.15)",
+                      color: "var(--primary-gold, #c5a059)",
                     }}
-                  />
+                  >
+                    <User size={18} />
+                  </div>
                   <div className="teacher-pv-student-info">
                     <h5 className="teacher-pv-student-name">
                       {student.name || student.full_name}

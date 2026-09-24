@@ -648,14 +648,15 @@ export default function StudentProfileView({
                 className="sp-avatar-img"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/logo.png";
+                  e.currentTarget.style.display = "none";
+                  const fb = e.currentTarget.parentElement?.querySelector(".sp-avatar-placeholder");
+                  if (fb) fb.style.display = "flex";
                 }}
               />
-            ) : (
-              <div className="sp-avatar-placeholder">
-                <User size={44} strokeWidth={1.8} />
-              </div>
-            )}
+            ) : null}
+            <div className="sp-avatar-placeholder" style={{ display: activePhotoUrl ? "none" : "flex" }}>
+              <User size={44} strokeWidth={1.8} />
+            </div>
           </div>
 
           <div className="sp-hero-info">
@@ -924,12 +925,18 @@ export default function StudentProfileView({
                         className="sp-photo-preview-img"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
-                          e.currentTarget.src = "/logo.png";
+                          e.currentTarget.style.display = "none";
+                          const fb = e.currentTarget.parentElement?.querySelector(".sp-photo-preview-placeholder");
+                          if (fb) fb.style.display = "flex";
                         }}
                       />
-                    ) : (
+                    ) : null}
+                    <div
+                      className="sp-photo-preview-placeholder"
+                      style={{ display: activePhotoUrl ? "none" : "flex", alignItems: "center", justifyContent: "center" }}
+                    >
                       <User size={36} color="#8c735d" />
-                    )}
+                    </div>
                   </div>
 
                   <div>

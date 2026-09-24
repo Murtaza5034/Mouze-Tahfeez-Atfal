@@ -272,12 +272,18 @@ Shukran!`;
                         className="pvm-avatar"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
-                          e.currentTarget.src = "/logo.png";
+                          e.currentTarget.style.display = "none";
+                          const fb = e.currentTarget.parentElement?.querySelector(".pvm-avatar-placeholder");
+                          if (fb) fb.style.display = "flex";
                         }}
                       />
-                    ) : (
-                      <div className="pvm-avatar-placeholder">{initials}</div>
-                    )}
+                    ) : null}
+                    <div
+                      className="pvm-avatar-placeholder"
+                      style={{ display: student.photo_url ? "none" : "flex" }}
+                    >
+                      {initials}
+                    </div>
                     <div className="pvm-student-names">
                       <h4 className="pvm-student-name">{studentName}</h4>
                       {student.arabic_name && (

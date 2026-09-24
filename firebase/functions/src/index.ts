@@ -119,6 +119,7 @@ async function tokensForUser(userId?: string, section: "atfal" | "kibar" = "atfa
   const out: string[] = [];
   const col = "user_fcm_tokens";
   const rawId = String(userId).trim();
+  const rawIdLower = rawId.toLowerCase();
 
   // 1. Direct query by user_id
   const snap = await db.collection(col).where("user_id", "==", rawId).limit(200).get();
@@ -127,7 +128,7 @@ async function tokensForUser(userId?: string, section: "atfal" | "kibar" = "atfa
     if (t) out.push(String(t));
   });
 
-  // 2. If identifier looks like an email, match by email field and resolve UID
+  // 2. Direct query by email field
   if (rawId.includes("@")) {
     const emailNorm = normalizeEmail(rawId);
     const snapEmail = await db.collection(col).where("email", "==", emailNorm).limit(200).get();
@@ -136,34 +137,157 @@ async function tokensForUser(userId?: string, section: "atfal" | "kibar" = "atfa
       if (t) out.push(String(t));
     });
 
-    const accessCol = section === "kibar" ? "kibar_user_portal_access" : "user_portal_access";
-    const accSnap = await db.collection(accessCol).where("email", "==", emailNorm).limit(1).get();
-    if (!accSnap.empty) {
-      const resolvedUid = String(accSnap.docs[0].data().user_id || "");
-      if (resolvedUid && resolvedUid !== rawId) {
-        const snapUid = await db.collection(col).where("user_id", "==", resolvedUid).limit(200).get();
-        snapUid.docs.forEach((d) => {
-          const t = d.data().fcm_token;
-          if (t) out.push(String(t));
-        });
+    for (const accessCol of ["user_portal_access", "kibar_user_portal_access"]) {
+      try {
+        const accSnap = await db.collection(accessCol).where("email", "==", emailNorm).limit(5).get();
+        for (const ad of accSnap.docs) {
+          const resolvedUid = String(ad.data().user_id || "");
+          if (resolvedUid && resolvedUid !== rawId) {
+            const snapUid = await db.collection(col).where("user_id", "==", resolvedUid).limit(200).get();
+            snapUid.docs.forEach((d) => {
+              const t = d.data().fcm_token;
+              if (t) out.push(String(t));
+            });
+          }
+        }
+      } catch (_e) {
+        // ignore access lookup errors
       }
     }
   }
 
-  // 3. If identifier might be a student_id / ITS, resolve parent_user_id
-  try {
-    const childCol = section === "kibar" ? "kibar_child_profiles" : "child_profiles";
-    const childDoc = await db.collection(childCol).doc(rawId.toLowerCase()).get();
-    if (childDoc.exists && childDoc.data()?.parent_user_id) {
-      const pid = String(childDoc.data()!.parent_user_id);
-      const snapParent = await db.collection(col).where("user_id", "==", pid).limit(200).get();
-      snapParent.docs.forEach((d) => {
-        const t = d.data().fcm_token;
-        if (t) out.push(String(t));
-      });
+  // 3. User Portal Access query by ITS or user_id (resolves parent/teacher account)
+  for (const accessCol of ["user_portal_access", "kibar_user_portal_access"]) {
+    try {
+      const accSnap = await db.collection(accessCol).where("its", "==", rawId).limit(5).get();
+      for (const ad of accSnap.docs) {
+        const uid = String(ad.data().user_id || "");
+        const em = ad.data().email ? normalizeEmail(String(ad.data().email)) : "";
+        if (uid) {
+          const su = await db.collection(col).where("user_id", "==", uid).limit(200).get();
+          su.docs.forEach((d) => { if (d.data().fcm_token) out.push(String(d.data().fcm_token)); });
+        }
+        if (em) {
+          const se = await db.collection(col).where("email", "==", em).limit(200).get();
+          se.docs.forEach((d) => { if (d.data().fcm_token) out.push(String(d.data().fcm_token)); });
+        }
+      }
+    } catch (_e) {
+      // ignore portal access errors
     }
-  } catch (_) {
-    // ignore lookup errors
+  }
+
+  // 4. Student lookup in child_profiles & kibar_child_profiles (by doc id, student_id, its, id)
+  for (const childCol of ["child_profiles", "kibar_child_profiles"]) {
+    try {
+      const pids: string[] = [];
+      const pemails: string[] = [];
+
+      // Check doc ID matches
+      const d1 = await db.collection(childCol).doc(rawId).get();
+      if (d1.exists) {
+        if (d1.data()?.parent_user_id) pids.push(String(d1.data()!.parent_user_id));
+        if (d1.data()?.parent_email) pemails.push(String(d1.data()!.parent_email));
+      }
+      if (rawIdLower !== rawId) {
+        const d2 = await db.collection(childCol).doc(rawIdLower).get();
+        if (d2.exists) {
+          if (d2.data()?.parent_user_id) pids.push(String(d2.data()!.parent_user_id));
+          if (d2.data()?.parent_email) pemails.push(String(d2.data()!.parent_email));
+        }
+      }
+
+      const rawNum = Number(rawId);
+      const isNum = !isNaN(rawNum);
+
+      // Check by student_id field (string and numeric)
+      const sidQueries = [
+        db.collection(childCol).where("student_id", "==", rawId).limit(5).get(),
+        db.collection(childCol).where("its", "==", rawId).limit(5).get(),
+        db.collection(childCol).where("id", "==", rawId).limit(5).get(),
+      ];
+      if (isNum) {
+        sidQueries.push(db.collection(childCol).where("student_id", "==", rawNum).limit(5).get());
+        sidQueries.push(db.collection(childCol).where("its", "==", rawNum).limit(5).get());
+        sidQueries.push(db.collection(childCol).where("id", "==", rawNum).limit(5).get());
+      }
+      const childResults = await Promise.all(sidQueries);
+      for (const q of childResults) {
+        q.docs.forEach((d) => {
+          if (d.data()?.parent_user_id) pids.push(String(d.data()!.parent_user_id));
+          if (d.data()?.parent_email) pemails.push(String(d.data()!.parent_email));
+          if (d.data()?.user_id) pids.push(String(d.data()!.user_id));
+        });
+      }
+
+      for (const pid of [...new Set(pids)]) {
+        const snapPid = await db.collection(col).where("user_id", "==", pid).limit(200).get();
+        snapPid.docs.forEach((d) => { if (d.data().fcm_token) out.push(String(d.data().fcm_token)); });
+      }
+
+      for (const pem of [...new Set(pemails)]) {
+        const pemNorm = normalizeEmail(pem);
+        const snapPem = await db.collection(col).where("email", "==", pemNorm).limit(200).get();
+        snapPem.docs.forEach((d) => { if (d.data().fcm_token) out.push(String(d.data().fcm_token)); });
+
+        // Also resolve parent_user_id from user_portal_access if linked by email
+        for (const accessCol of ["user_portal_access", "kibar_user_portal_access"]) {
+          try {
+            const accSnap = await db.collection(accessCol).where("email", "==", pemNorm).limit(2).get();
+            for (const ad of accSnap.docs) {
+              const resUid = String(ad.data().user_id || "");
+              if (resUid) {
+                const sRes = await db.collection(col).where("user_id", "==", resUid).limit(200).get();
+                sRes.docs.forEach((d) => { if (d.data().fcm_token) out.push(String(d.data().fcm_token)); });
+              }
+            }
+          } catch (_e) {
+            // ignore access lookup error
+          }
+        }
+      }
+    } catch (_err) {
+      // ignore child lookup errors
+    }
+  }
+
+  // 5. Teacher lookup in teacher_profiles & kibar_teacher_profiles
+  for (const teacherCol of ["teacher_profiles", "kibar_teacher_profiles"]) {
+    try {
+      const teacherUids: string[] = [];
+      const teacherEmails: string[] = [];
+
+      const td = await db.collection(teacherCol).doc(rawId).get();
+      if (td.exists) {
+        if (td.data()?.user_id) teacherUids.push(String(td.data()!.user_id));
+        if (td.data()?.email) teacherEmails.push(String(td.data()!.email));
+      }
+
+      const qTeacher = await db.collection(teacherCol).where("teacher_id", "==", rawId).limit(5).get();
+      qTeacher.docs.forEach((d) => {
+        if (d.data()?.user_id) teacherUids.push(String(d.data()!.user_id));
+        if (d.data()?.email) teacherEmails.push(String(d.data()!.email));
+      });
+
+      const qTeacherUid = await db.collection(teacherCol).where("user_id", "==", rawId).limit(5).get();
+      qTeacherUid.docs.forEach((d) => {
+        if (d.data()?.user_id) teacherUids.push(String(d.data()!.user_id));
+        if (d.data()?.email) teacherEmails.push(String(d.data()!.email));
+      });
+
+      for (const tuid of [...new Set(teacherUids)]) {
+        const st = await db.collection(col).where("user_id", "==", tuid).limit(200).get();
+        st.docs.forEach((d) => { if (d.data().fcm_token) out.push(String(d.data().fcm_token)); });
+      }
+
+      for (const tem of [...new Set(teacherEmails)]) {
+        const temNorm = normalizeEmail(tem);
+        const ste = await db.collection(col).where("email", "==", temNorm).limit(200).get();
+        ste.docs.forEach((d) => { if (d.data().fcm_token) out.push(String(d.data().fcm_token)); });
+      }
+    } catch (_err) {
+      // ignore teacher lookup error
+    }
   }
 
   return [...new Set(out)];
@@ -1170,6 +1294,15 @@ async function processScheduledNotificationsInner(): Promise<{ processed: number
       const title = String(data.title || "Notification").trim();
       const body = String(data.body || "").trim();
       const tokens = await tokensForTarget(data.target_user, data.target_role || "all", section);
+
+      // Write to Inbox so user also sees it inside their portal inbox
+      await writeInbox({
+        title,
+        body,
+        target_role: data.target_role || null,
+        target_user: data.target_user || null,
+        redirect_page: data.redirect_page || "/",
+      }, section);
 
       if (tokens.length && title && body) {
         const res = await sendFcmInner(

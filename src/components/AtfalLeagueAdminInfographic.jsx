@@ -650,14 +650,18 @@ export default function AtfalLeagueAdminInfographic({
                           className="roster-avatar-img"
                           onError={(e) => {
                             e.target.onerror = null;
-                            e.target.src = "/logo.png";
+                            e.target.style.display = "none";
+                            const fb = e.target.parentElement?.querySelector(".roster-avatar-fallback");
+                            if (fb) fb.style.display = "flex";
                           }}
                         />
-                      ) : (
-                        <div className="roster-avatar-fallback">
-                          {child.name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                      ) : null}
+                      <div
+                        className="roster-avatar-fallback"
+                        style={{ display: child.photo ? "none" : "flex" }}
+                      >
+                        {child.name.charAt(0).toUpperCase()}
+                      </div>
                       <span className={`rank-badge rank-${rank}`}>
                         #{rank}
                       </span>

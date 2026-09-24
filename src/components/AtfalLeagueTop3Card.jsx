@@ -592,14 +592,18 @@ export default function AtfalLeagueTop3Card({
                         className="top3-player-photo"
                         onError={(e) => {
                           e.target.onerror = null;
-                          e.target.src = "/logo.png";
+                          e.target.style.display = "none";
+                          const fb = e.target.parentElement?.querySelector(".top3-photo-fallback");
+                          if (fb) fb.style.display = "flex";
                         }}
                       />
-                    ) : (
-                      <div className="top3-photo-fallback">
-                        <User size={38} />
-                      </div>
-                    )}
+                    ) : null}
+                    <div
+                      className="top3-photo-fallback"
+                      style={{ display: student.photo ? "none" : "flex" }}
+                    >
+                      <User size={38} />
+                    </div>
                     <span className="top3-rank-pill">#{student.rank}</span>
                   </div>
 

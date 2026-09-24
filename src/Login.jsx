@@ -274,7 +274,7 @@ export default function Login({ onLoginSuccess }) {
         <div className="login-card-accent" />
 
         <div className="login-logo">
-          <img src={selectedRole === "parents" ? "/atfal-student-logo.png" : String(selectedRole || "").startsWith("kibar") ? "/kibar-logo.png" : "/logo.png"} alt="Mauze Tahfeez" className="login-logo-img" />
+          <span className="login-logo-text">Mauze Tahfeez</span>
         </div>
 
         <div className="portal-picker">

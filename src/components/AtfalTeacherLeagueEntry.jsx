@@ -921,12 +921,18 @@ export default function AtfalTeacherLeagueEntry({
                 alt={activeStudent.name}
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/logo.png";
+                  e.currentTarget.style.display = "none";
+                  const fb = e.currentTarget.parentElement?.querySelector(".student-badge-fallback");
+                  if (fb) fb.style.display = "flex";
                 }}
               />
-            ) : (
+            ) : null}
+            <div
+              className="student-badge-fallback"
+              style={{ display: activeStudent?.photo_url ? "none" : "flex", alignItems: "center", justifyContent: "center" }}
+            >
               <User size={24} />
-            )}
+            </div>
           </div>
           <div className="student-badge-text">
             <h3 className="student-badge-name">{activeStudent?.name || "Select Student"}</h3>

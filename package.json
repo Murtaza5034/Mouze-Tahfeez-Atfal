@@ -1,7 +1,7 @@
 {
   "name": "mauze-tahfeez",
   "private": true,
-  "version": "1.5.47",
+  "version": "1.5.48",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -29,6 +29,7 @@
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "firebase": "^12.13.0",
+    "firebase-admin": "^14.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",

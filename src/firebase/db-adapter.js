@@ -31,7 +31,60 @@ import {
 const functions = getFunctions(firebaseApp, undefined);
 
 const callableCache = new Map();
-function callFunction(name, data) {
+async function callFunction(name, data) {
+  // Direct Vercel Serverless route for FCM push notifications to bypass any Cloud Run billing suspensions
+  if (
+    name === "sendFcm" ||
+    name === "fcm-notification" ||
+    name === "result-live-notifier" ||
+    name === "sendResultLiveNotifier"
+  ) {
+    try {
+      const isResultLive =
+        name === "result-live-notifier" || name === "sendResultLiveNotifier";
+      const payload = isResultLive
+        ? { action: "result-live-notifier", ...(data || {}) }
+        : data || {};
+
+      const endpoints = [
+        "https://mouze-tahfeez-atfal.vercel.app/api/send-fcm",
+      ];
+      if (
+        typeof window !== "undefined" &&
+        window.location &&
+        window.location.origin
+      ) {
+        const origin = window.location.origin;
+        if (
+          !origin.includes("localhost") &&
+          !origin.startsWith("capacitor://") &&
+          !origin.startsWith("ionic://") &&
+          !origin.startsWith("file://")
+        ) {
+          endpoints.unshift(`${origin}/api/send-fcm`);
+        }
+      }
+
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            return { data: json, error: null };
+          }
+        } catch (fetchErr) {
+          console.warn(`[FCM] Fetch note for ${endpoint}:`, fetchErr);
+        }
+      }
+    } catch (routeErr) {
+      console.warn("[FCM] Serverless route error, trying callable fallback:", routeErr);
+    }
+  }
+
   if (!callableCache.has(name)) {
     callableCache.set(name, httpsCallable(functions, name));
   }

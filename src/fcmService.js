@@ -172,9 +172,12 @@ class FCMService {
   async _initNative(userRole) {
     const { PushNotifications } = await import('@capacitor/push-notifications');
 
-    // Attach the token listener BEFORE register() so the native token event
-    // is never missed. Previously the listener was added after register(),
-    // which could miss the event and leave native push unregistered.
+    // Seed token from cache if available so we never block on cold start
+    const cachedToken = typeof localStorage !== 'undefined' ? localStorage.getItem('mauze_current_fcm_token') : null;
+    if (cachedToken && !this.token) {
+      this.token = cachedToken;
+    }
+
     let resolveToken = null;
     let tokenTimer = null;
     const tokenReady = new Promise((resolve) => {
@@ -186,93 +189,121 @@ class FCMService {
       if (resolveToken) { resolveToken(value); resolveToken = null; }
     };
 
+    // Remove any previous listener before attaching to prevent duplicates
+    try {
+      await PushNotifications.removeAllListeners();
+    } catch (_) {}
+
     await PushNotifications.addListener('registration', async (data) => {
       if (data?.value) {
-        console.log('Capacitor FCM Token:', data.value.substring(0, 20) + '...');
+        console.log('[FCM Native] Received Token:', data.value.substring(0, 20) + '...');
         this.token = data.value;
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('mauze_current_fcm_token', data.value);
+          }
+        } catch (_) {}
         settleToken(this.token);
         try {
           await this.storeToken(data.value, userRole);
         } catch (err) {
-          console.warn('FCM: Failed to store token on registration event:', err);
+          console.warn('[FCM Native] Failed to store token on registration event:', err);
         }
       }
     });
 
-    PushNotifications.addListener('registrationError', (err) => {
-      console.error('Capacitor Push registration error:', err);
-      settleToken(null);
+    await PushNotifications.addListener('registrationError', (err) => {
+      console.error('[FCM Native] Push registration error:', err);
+      settleToken(this.token || null);
     });
 
-    // Request permission (Android 13+)
+    // Request permission (Android 13+ POST_NOTIFICATIONS)
     try {
-      const permResult = await PushNotifications.requestPermissions();
-      console.log('Capacitor PushNotifications permission:', permResult);
-      if (permResult?.receive === 'denied') {
-        console.error('Push notification permission not granted');
-        return false;
+      const checkResult = await PushNotifications.checkPermissions();
+      console.log('[FCM Native] Check permissions:', checkResult);
+      if (checkResult?.receive !== 'granted') {
+        const permResult = await PushNotifications.requestPermissions();
+        console.log('[FCM Native] Request permissions result:', permResult);
+        if (permResult?.receive === 'denied') {
+          console.warn('[FCM Native] Push notification permission denied by user');
+        }
       }
     } catch (permErr) {
-      // On some devices requestPermissions may already be granted; continue.
-      console.warn('Push permission request issue (continuing):', permErr);
+      console.warn('[FCM Native] Push permission check/request issue:', permErr);
     }
 
-    // Register for push
-    await PushNotifications.register();
-    console.log('Capacitor PushNotifications registered');
-
-    // Wait up to 30s for the first native token without failing the whole init flow on timeout
-    tokenTimer = setTimeout(() => {
-      console.warn('Push registration timed out waiting for token event, continuing in background');
-      settleToken(null);
-    }, 30000);
-
-    this.token = await tokenReady;
-
-    this.isNative = true;
-
-    // Store token in database
-    if (this.token) {
-      const stored = await this.storeToken(this.token, userRole);
-      if (!stored) {
-        await new Promise(r => setTimeout(r, 1000));
-        await this.storeToken(this.token, userRole);
-      }
-    }
-
-    // Listen for incoming notifications (foreground)
-    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('Capacitor foreground notification:', notification);
-      this.playPremiumChime();
-      // Background/terminated notifications are displayed by the OS automatically
-    });
-
-    // Ensure the premium notification channel exists (Android 8+). The Firebase
-    // SDK auto-creates it from the payload channel_id, but creating it here
-    // explicitly gives it HIGH importance + sound + vibration for a premium feel.
+    // Ensure the premium notification channel exists (Android 8+)
     try {
       await PushNotifications.createChannel({
         id: "mauze-tahfeez-notifications",
-        name: "Mauze Tahfeez",
-        description: "Leave chat & portal notifications",
+        name: "Mauze Tahfeez Notifications",
+        description: "Leave, attendance, result, and schedule notifications",
         importance: 5, // IMPORTANCE_HIGH
         visibility: 1, // VISIBILITY_PUBLIC
+        sound: "default",
         vibration: true,
-        lights: true
+        lights: true,
       });
+      console.log('[FCM Native] Notification channel verified');
     } catch (channelErr) {
-      console.warn('Could not create premium notification channel:', channelErr);
+      console.warn('[FCM Native] Could not create notification channel:', channelErr);
     }
 
-    // Notification taps are handled by the module-level listener (registered at
-    // import time) which stashes the payload for the portal to deep-link to the
-    // exact page. Cold-start taps are recovered from the native MauzeNotifBridge.
+    // Register with FCM
+    try {
+      await PushNotifications.register();
+      console.log('[FCM Native] PushNotifications.register() dispatched');
+    } catch (regErr) {
+      console.warn('[FCM Native] PushNotifications.register() error:', regErr);
+    }
+
+    // If we already have a cached token, resolve quickly (2s timeout), otherwise wait up to 10s
+    tokenTimer = setTimeout(() => {
+      console.log('[FCM Native] Token wait resolved with current token state');
+      settleToken(this.token || null);
+    }, this.token ? 2000 : 10000);
+
+    const freshToken = await tokenReady;
+    if (freshToken) {
+      this.token = freshToken;
+    }
 
     this.isNative = true;
     this.isSupported = true;
     this.initialized = true;
 
-    // Start periodic token refresh (re-register native push)
+    // Store token in database if available
+    if (this.token) {
+      this.storeToken(this.token, userRole).catch((err) => {
+        console.warn('[FCM Native] Background storeToken note:', err);
+      });
+    }
+
+    // Listen for incoming notifications in FOREGROUND
+    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      console.log('[FCM Native] Foreground notification received:', notification);
+      this.playPremiumChime();
+
+      // Dispatch event to show in-app banner toast
+      try {
+        window.dispatchEvent(
+          new CustomEvent('mauze:notification-foreground', {
+            detail: {
+              title: notification?.title || notification?.data?.title || 'Mauze Tahfeez',
+              body: notification?.body || notification?.data?.body || '',
+              data: notification?.data || {},
+            }
+          })
+        );
+      } catch (_) {}
+
+      // Refresh inbox in real-time
+      try {
+        window.dispatchEvent(new CustomEvent('mauze:inbox-refresh'));
+      } catch (_) {}
+    });
+
+    // Start periodic token refresh
     this.startTokenRefresh(userRole);
 
     return true;
@@ -423,18 +454,36 @@ class FCMService {
 
   // Store FCM token in database
   async storeToken(token, userRole) {
+    if (!token) return false;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('mauze_current_fcm_token', token);
+      }
+    } catch (_) {}
+
+    try {
+      let user = null;
+      // Retry fetching user up to 4 times (e.g. while auth session restores on app startup)
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user) {
+          user = data.user;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 600));
+      }
+
       if (!user) {
-        console.warn('[FCM] No authenticated user yet - skipping token storage');
+        console.warn('[FCM] No authenticated user detected yet; token cached locally for post-login sync');
         return false;
       }
 
+      const normEmail = user.email ? String(user.email).trim().toLowerCase() : '';
       console.log('[FCM] Storing token for user:', user.id, 'with role:', userRole);
 
       // Prune previous token for this device/browser if changed
       try {
-        const previousToken = typeof localStorage !== 'undefined' ? localStorage.getItem('mauze_current_fcm_token') : null;
+        const previousToken = typeof localStorage !== 'undefined' ? localStorage.getItem('mauze_previous_fcm_token') : null;
         if (previousToken && previousToken !== token) {
           await supabase
             .from('user_fcm_tokens')
@@ -442,34 +491,31 @@ class FCMService {
             .eq('fcm_token', previousToken);
           console.log('[FCM] Pruned old stale token from database');
         }
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('mauze_previous_fcm_token', token);
+        }
       } catch (pruneErr) {
         console.warn('[FCM] Note on pruning previous token:', pruneErr);
       }
 
-      try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('mauze_current_fcm_token', token);
-        }
-      } catch (_) {}
-
       const devInfo = getDeviceInfo();
       const deviceInfo = {
         userAgent: navigator.userAgent,
-        platform: devInfo.isIOS ? (devInfo.isStandalone ? 'iOS PWA' : 'iOS Web') : (navigator.platform || (isCapacitor() ? window.Capacitor.getPlatform() : 'unknown')),
-        language: navigator.language,
+        platform: isNativeAndroid() ? 'Android Native App' : (devInfo.isIOS ? (devInfo.isStandalone ? 'iOS PWA' : 'iOS Web') : (navigator.platform || 'web')),
         deviceType: this.isNative ? 'native' : (devInfo.isStandalone ? 'pwa' : 'web'),
+        isNative: this.isNative,
         isIOS: devInfo.isIOS,
         isStandalone: devInfo.isStandalone,
         timestamp: new Date().toISOString()
       };
 
-      // Upsert token
+      // 1. Primary write: client-side Firestore upsert
       const { error } = await supabase
         .from('user_fcm_tokens')
         .upsert({
           user_id: user.id,
-          email: user.email ? String(user.email).trim().toLowerCase() : '',
-          user_role: userRole,
+          email: normEmail,
+          user_role: userRole || 'parents',
           fcm_token: token,
           device_info: deviceInfo,
           updated_at: new Date().toISOString()
@@ -477,8 +523,35 @@ class FCMService {
           onConflict: 'user_id,fcm_token'
         });
 
+      // 2. Secondary backup: Vercel serverless Admin SDK store-token
+      try {
+        const endpoints = [
+          "https://mouze-tahfeez-atfal.vercel.app/api/send-fcm",
+        ];
+        if (typeof window !== "undefined" && window.location?.origin && !window.location.origin.includes("localhost") && !window.location.origin.startsWith("capacitor://")) {
+          endpoints.unshift(`${window.location.origin}/api/send-fcm`);
+        }
+        for (const ep of endpoints) {
+          try {
+            await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "store-token",
+                token,
+                userId: user.id,
+                email: normEmail,
+                role: userRole || 'parents',
+                deviceInfo
+              })
+            });
+            break;
+          } catch (_) {}
+        }
+      } catch (_) {}
+
       if (error) {
-        console.error('[FCM] Error storing token:', error);
+        console.warn('[FCM] Primary token upsert note:', error.message);
         return false;
       } else {
         console.log('[FCM] Token stored successfully for user:', user.id);
@@ -671,5 +744,35 @@ class FCMService {
 
 // Create singleton instance
 const fcmService = new FCMService();
+
+// Auto-sync token on auth state changes (e.g. login, session refresh)
+if (typeof window !== "undefined") {
+  try {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED"
+      ) {
+        const cachedToken =
+          fcmService.getToken() ||
+          (typeof localStorage !== "undefined"
+            ? localStorage.getItem("mauze_current_fcm_token")
+            : null);
+        if (cachedToken && session?.user) {
+          const cachedRole =
+            (typeof localStorage !== "undefined"
+              ? localStorage.getItem("portal_role") ||
+                localStorage.getItem("mauze_user_role")
+              : null) || "parents";
+          console.log("[FCM] Auth state change:", event, "— syncing token to database");
+          await fcmService.storeToken(cachedToken, cachedRole);
+        }
+      }
+    });
+  } catch (authListenerErr) {
+    console.warn("[FCM] Note on auth state listener:", authListenerErr);
+  }
+}
 
 export default fcmService;

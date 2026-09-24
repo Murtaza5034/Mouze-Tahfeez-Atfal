@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1789501797.409999,
-    "seen": 1789875521.8436801,
-    "ast_hash": "ffd99e9b536fb11e25d8023384deae5b",
+    "mtime": 1789876319.4241652,
+    "seen": 1789879939.9336276,
+    "ast_hash": "62d490266ed0b0b88e98e1b504abe093",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1789501976.807761,
-    "seen": 1789875521.843683,
+    "mtime": 1789876392.4068344,
+    "seen": 1789879939.9336343,
     "ast_hash": "7158d716c36a84c268c69ae529cfa853",
     "semantic_hash": "7158d716c36a84c268c69ae529cfa853"
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1789501976.8067608,
-    "seen": 1789875521.8445513,
+    "mtime": 1789876392.4068344,
+    "seen": 1789879939.9344761,
     "ast_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4",
     "semantic_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4"
   },
@@ -6048,10 +6048,10 @@
     "semantic_hash": "0706d6d851f6b8fca514f85580a575b4"
   },
   "firebase/firebase.json": {
-    "mtime": 1786168334.5161698,
-    "seen": 1787510537.2114534,
-    "ast_hash": "a09514be09184ce90eec314f6542c0f5",
-    "semantic_hash": "a09514be09184ce90eec314f6542c0f5"
+    "mtime": 1790052136.9183989,
+    "seen": 1790234586.7253451,
+    "ast_hash": "1e9a57a2012fe301ed7b6db925c28443",
+    "semantic_hash": ""
   },
   "firebase/firestore.indexes.json": {
     "mtime": 1788960811.7893722,
@@ -6078,9 +6078,9 @@
     "semantic_hash": "ae370a9d9ec75c557dccd4b902e37fdb"
   },
   "firebase/functions/src/index.ts": {
-    "mtime": 1789468417.4067757,
-    "seen": 1789472461.174955,
-    "ast_hash": "16bec9b073fa93502685a1ae9438738a",
+    "mtime": 1790053280.8763714,
+    "seen": 1790234586.7256448,
+    "ast_hash": "8f2a1d8c6771102484e13764303621f1",
     "semantic_hash": ""
   },
   "firebase/functions/tsconfig.json": {
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1789501788.2955706,
-    "seen": 1789875521.8508277,
-    "ast_hash": "19a8d0c32c5d05b8fbce6e0d25f233b6",
+    "mtime": 1790052351.379466,
+    "seen": 1790234586.7262092,
+    "ast_hash": "c47bb186be7b62349ef55042d013f1fa",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1789875768.3897161,
-    "seen": 1789875842.3194647,
-    "ast_hash": "a97c55b4a49ba15db943b2c68c1ee399",
+    "mtime": 1790235384.4243002,
+    "seen": 1790235719.4963934,
+    "ast_hash": "9e3542251ff70ff4fcf9fb271af71e56",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6402,9 +6402,9 @@
     "semantic_hash": ""
   },
   "src/Login.jsx": {
-    "mtime": 1788614059.0698016,
-    "seen": 1788614547.3003788,
-    "ast_hash": "1555292c1f31e3185bc7b2e2c19b1086",
+    "mtime": 1790234432.6822112,
+    "seen": 1790234586.7289107,
+    "ast_hash": "5aff703767307c212a1e5be0464bc9ef",
     "semantic_hash": ""
   },
   "src/MiqaatPopup.jsx": {
@@ -6420,10 +6420,10 @@
     "semantic_hash": "51f1a2b9577a72662eaaccbbf654db6d"
   },
   "src/PrivacyPolicy.jsx": {
-    "mtime": 1784790501.7355914,
-    "seen": 1787510537.2115061,
-    "ast_hash": "5a46b38ed04e6e493abfea44afb96544",
-    "semantic_hash": "5a46b38ed04e6e493abfea44afb96544"
+    "mtime": 1790234963.458503,
+    "seen": 1790235719.4968617,
+    "ast_hash": "48058cfe1b34c1e8a5d96de147c56a0c",
+    "semantic_hash": ""
   },
   "src/SearchableSelect.jsx": {
     "mtime": 1787308031.5978765,
@@ -6450,9 +6450,9 @@
     "semantic_hash": "f7d62b058d1dd9d3aa0e555a0786b8f9"
   },
   "src/TeacherLeaveApprovalPanel.jsx": {
-    "mtime": 1788251514.7373037,
-    "seen": 1788252228.7930171,
-    "ast_hash": "50adcda16187ac322d4a6f630f18233d",
+    "mtime": 1789881815.2806058,
+    "seen": 1789881998.072237,
+    "ast_hash": "c7a7b3a4b909aacf8d84ad6e2a3597f8",
     "semantic_hash": ""
   },
   "src/api/progress.ts": {
@@ -6480,9 +6480,9 @@
     "semantic_hash": "74fd7d2d9c40c67c3de485cffe325e75"
   },
   "src/components/VideoCall.jsx": {
-    "mtime": 1788863514.5056932,
-    "seen": 1788864222.7947178,
-    "ast_hash": "5fd19e68583778e36605ff7984ca6ff6",
+    "mtime": 1790235086.415576,
+    "seen": 1790235719.4984822,
+    "ast_hash": "233912a49ac3393cd1046e5716595ee9",
     "semantic_hash": ""
   },
   "src/downloadUtils.js": {
@@ -6522,9 +6522,9 @@
     "semantic_hash": ""
   },
   "src/firebase/db-adapter.js": {
-    "mtime": 1789366741.9701264,
-    "seen": 1789368250.6798446,
-    "ast_hash": "77c10e4af9cf030a4a9d4e40f5b341ea",
+    "mtime": 1790052379.6295018,
+    "seen": 1790234586.7314744,
+    "ast_hash": "c6c291cf5da1676bb00c4dde36e3584f",
     "semantic_hash": ""
   },
   "src/firebase/db.js": {
@@ -10008,9 +10008,9 @@
     "semantic_hash": ""
   },
   "src/components/ParentViewsModal.jsx": {
-    "mtime": 1788960894.453095,
-    "seen": 1788961107.54469,
-    "ast_hash": "a2d626be7f23bcd91c4aa2dfc8850c38",
+    "mtime": 1790235176.7966738,
+    "seen": 1790235719.4980066,
+    "ast_hash": "3652aa3771ff83972a3bb1bc2ff45d53",
     "semantic_hash": ""
   },
   "src/components/MisriQuranViewer.jsx": {
@@ -10038,15 +10038,15 @@
     "semantic_hash": ""
   },
   "src/components/AtfalGemLeagueCard.jsx": {
-    "mtime": 1788764139.3998523,
-    "seen": 1788768170.4062886,
-    "ast_hash": "7c168cd161f5334385773e2e794c7aff",
+    "mtime": 1790235267.893521,
+    "seen": 1790235719.4974031,
+    "ast_hash": "977ba96cda104f4db4773e410756e7c2",
     "semantic_hash": ""
   },
   "src/components/AtfalTeacherLeagueEntry.jsx": {
-    "mtime": 1788960886.4474618,
-    "seen": 1788961107.5443103,
-    "ast_hash": "fcaa18d881c4623ee3bc97546c02a604",
+    "mtime": 1790235211.4913692,
+    "seen": 1790235719.4974072,
+    "ast_hash": "1627eaf4e545a3be410af230d804590f",
     "semantic_hash": ""
   },
   "public/assets/gems/gem-week1-emerald.png": {
@@ -10074,9 +10074,9 @@
     "semantic_hash": ""
   },
   "src/components/AtfalLeagueTop3Card.jsx": {
-    "mtime": 1788786743.99344,
-    "seen": 1788864222.7940998,
-    "ast_hash": "7213cfae80d25c49f26b5d5473b35aeb",
+    "mtime": 1790235231.1422813,
+    "seen": 1790235719.4974062,
+    "ast_hash": "f2e8eabc82538c6455dc965fcbc65eb5",
     "semantic_hash": ""
   },
   "src/utils/arabicReshaper.js": {
@@ -10098,15 +10098,15 @@
     "semantic_hash": ""
   },
   "src/components/StudentProfileView.jsx": {
-    "mtime": 1789365889.649166,
-    "seen": 1789366108.0187492,
-    "ast_hash": "6f44f6ffe313b1973a2d7b6f07ab64f2",
+    "mtime": 1790235440.7185576,
+    "seen": 1790235719.4983025,
+    "ast_hash": "1b13fea582ea7a572b4bfa0fb13cb9b6",
     "semantic_hash": ""
   },
   "src/components/AtfalLeagueAdminInfographic.jsx": {
-    "mtime": 1788789149.8884332,
-    "seen": 1788864222.794098,
-    "ast_hash": "57c8bf5a14488c89f7f43f30e6866f67",
+    "mtime": 1790235249.7463708,
+    "seen": 1790235719.4974048,
+    "ast_hash": "d146d2dc7dc237a2e626a5fc3e5a8279",
     "semantic_hash": ""
   },
   "src/utils/atfalLeagueUtils.js": {
@@ -10182,9 +10182,9 @@
     "semantic_hash": ""
   },
   "src/components/MarhalaMonthlyPage.jsx": {
-    "mtime": 1789200905.0176904,
-    "seen": 1789200963.5334163,
-    "ast_hash": "a4563e6f7f0b1e94e1e7e7893221a8d0",
+    "mtime": 1790235449.0126488,
+    "seen": 1790235719.497585,
+    "ast_hash": "5b34e8f3f7088a02fbe0c8c30d5d6b19",
     "semantic_hash": ""
   },
   "src/components/MarhalaResultsPage.jsx": {
@@ -10236,9 +10236,9 @@
     "semantic_hash": ""
   },
   "src/components/TeacherProfileView.jsx": {
-    "mtime": 1789195285.101247,
-    "seen": 1789195395.417751,
-    "ast_hash": "48a4c1f6cfa2bb417fc1a43a29f5c046",
+    "mtime": 1790235136.406965,
+    "seen": 1790235719.4984229,
+    "ast_hash": "b0b05fc2248fc7f373a5adb881cf6788",
     "semantic_hash": ""
   },
   "src/utils/teacherProfilePermissions.js": {
@@ -10269,6 +10269,24 @@
     "mtime": 1789150487.4258041,
     "seen": 1789191478.3225799,
     "ast_hash": "b7ce76c991c0bd3707c633bf26f13577",
+    "semantic_hash": ""
+  },
+  "src/components/AsbaaqAttendanceHistoryCard.jsx": {
+    "mtime": 1790050962.1569166,
+    "seen": 1790051073.387437,
+    "ast_hash": "6f4ab712f31b42a10ca4a1463b9d618a",
+    "semantic_hash": ""
+  },
+  "api/send-fcm.js": {
+    "mtime": 1790052755.807227,
+    "seen": 1790234586.72523,
+    "ast_hash": "18b226c2a4c6691dd0b7fd77badb555b",
+    "semantic_hash": ""
+  },
+  "public/M tahfeez logo.png": {
+    "mtime": 1790233913.4762397,
+    "seen": 1790234586.775311,
+    "ast_hash": "37d8f1bd30f930c9f900fe18faf4ff75",
     "semantic_hash": ""
   }
 }

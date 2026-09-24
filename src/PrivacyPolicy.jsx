@@ -86,12 +86,6 @@ export default function PrivacyPolicy({ onBack }) {
         >
           <ArrowLeft size={18} /> Back
         </button>
-        <img
-          src="/logo.png"
-          alt="Mauze Tahfeez"
-          style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}
-          onError={(e) => { e.target.style.display = 'none'; }}
-        />
         <div>
           <h1 style={{ margin: 0, color: '#d4af37', fontSize: '1.2rem', fontWeight: 700 }}>
             Mauze Tahfeez

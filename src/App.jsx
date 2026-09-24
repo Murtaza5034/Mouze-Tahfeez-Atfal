@@ -137,6 +137,7 @@ import AtfalGemLeagueCard from "./components/AtfalGemLeagueCard";
 import AtfalTeacherLeagueEntry from "./components/AtfalTeacherLeagueEntry";
 import AtfalLeagueTop3Card from "./components/AtfalLeagueTop3Card";
 import AtfalLeagueAdminInfographic from "./components/AtfalLeagueAdminInfographic";
+import AsbaaqAttendanceHistoryCard from "./components/AsbaaqAttendanceHistoryCard";
 import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
@@ -504,7 +505,7 @@ function SECTION_FOR_ROLE(role) {
 }
 
 const ASSETS = {
-  LOGO: "/logo.png",
+  LOGO: "",
 };
 
 const PREMIUM_NOTIFICATION_CSS = `
@@ -1242,22 +1243,42 @@ function SidebarHeader({ photoUrl, name, arabicName, tag }) {
     photoUrl &&
     photoUrl !== "" &&
     photoUrl !== "null" &&
-    photoUrl !== "undefined"
+    photoUrl !== "undefined" &&
+    photoUrl !== "/logo.png"
       ? photoUrl
-      : "/logo.png";
+      : "";
 
   return (
     <div className="sidebar-profile-centered">
       <div className="avatar-vessel-centered">
-        <img
-          src={finalPhoto}
-          alt="Profile"
-          className="sidebar-avatar-img"
-          onError={(e) => {
-            e.target.src = "/logo.png";
+        {finalPhoto ? (
+          <img
+            src={finalPhoto}
+            alt="Profile"
+            className="sidebar-avatar-img"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+              const fb = e.currentTarget.parentElement?.querySelector(".sidebar-avatar-fallback");
+              if (fb) fb.style.display = "flex";
+            }}
+            loading="eager"
+          />
+        ) : null}
+        <div
+          className="sidebar-avatar-fallback"
+          style={{
+            display: finalPhoto ? "none" : "flex",
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05))",
+            color: "var(--primary-gold, #c5a059)",
           }}
-          loading="eager"
-        />
+        >
+          <User size={38} />
+        </div>
         <div className="avatar-ring"></div>
       </div>
       <div className="profile-info-centered">
@@ -1526,10 +1547,36 @@ const broadcastNotification = async (
   targetRole = "all",
   targetUser = null,
   redirectPage = "Inbox",
-  skipInbox = false,
-  fileUrl = null,
+  skipInboxOrOptions = false,
+  fileUrlOrSection = null,
   skipWhatsApp = false,
 ) => {
+  let skipInbox = false;
+  let fileUrl = null;
+  let extraData = {};
+  let explicitSection = null;
+
+  if (typeof skipInboxOrOptions === "object" && skipInboxOrOptions !== null) {
+    if (skipInboxOrOptions.redirectPage) redirectPage = skipInboxOrOptions.redirectPage;
+    if (skipInboxOrOptions.fileUrl) fileUrl = skipInboxOrOptions.fileUrl;
+    if (skipInboxOrOptions.section) explicitSection = skipInboxOrOptions.section;
+    if (skipInboxOrOptions.skipInbox !== undefined) skipInbox = !!skipInboxOrOptions.skipInbox;
+    if (skipInboxOrOptions.skipWhatsApp !== undefined) skipWhatsApp = !!skipInboxOrOptions.skipWhatsApp;
+    extraData = { ...skipInboxOrOptions };
+  } else {
+    skipInbox = !!skipInboxOrOptions;
+    if (typeof fileUrlOrSection === "string") {
+      if (fileUrlOrSection === "kibar" || fileUrlOrSection === "atfal") {
+        explicitSection = fileUrlOrSection;
+      } else {
+        fileUrl = fileUrlOrSection;
+      }
+    }
+  }
+
+  const currentSection = explicitSection || (getSectionScope() === "kibar" ? "kibar" : "atfal");
+  const notificationsTable = currentSection === "kibar" ? "kibar_system_notifications" : "system_notifications";
+
   const dbPayload = {
     title,
     body,
@@ -1546,7 +1593,7 @@ const broadcastNotification = async (
   // Store in database first (Inbox)
   if (!skipInbox) {
     const { error } = await supabase
-      .from("system_notifications")
+      .from(notificationsTable)
       .insert([dbPayload]);
     if (error) {
       inboxError = error;
@@ -1554,7 +1601,7 @@ const broadcastNotification = async (
     }
   }
 
-  // Send FCM notification via Edge Function
+  // Send FCM push notification via Edge Function / Cloud Functions
   try {
     const { data, error } = await supabase.functions.invoke(
       "fcm-notification",
@@ -1564,7 +1611,10 @@ const broadcastNotification = async (
           body,
           targetRole: targetRole === "user" ? null : targetRole,
           targetUser: targetUser,
+          section: currentSection,
+          skipInbox: true,
           data: {
+            ...extraData,
             redirectPage,
             fileUrl: fileUrl || "",
             timestamp: new Date().toISOString(),
@@ -5288,12 +5338,8 @@ function LoadingScreen({ message, onComplete }) {
             style={{ animation: "splashTrace 0.4s ease-out 0.55s forwards" }}
           />
         </svg>
-        <div className="splash-logo-inner">
-          <img
-            src="/atfal logo splash.png"
-            alt=""
-            className="splash-logo-img visible"
-          />
+        <div className="splash-logo-inner" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <BookOpen size={46} color="#d4af37" className="visible" />
         </div>
       </div>
       <h1 className="splash-title visible">روضة الأطفال</h1>
@@ -5630,9 +5676,6 @@ function TahfeezReportCard({
             justifyContent: "center",
           }}
         >
-          <div className="school-logo" style={{ marginBottom: "12px" }}>
-            <img src="/logo.png" alt="Logo" />
-          </div>
           <div className="school-info" style={{ textAlign: "center" }}>
             <h2
               className="qilka-bold-font"
@@ -5695,7 +5738,8 @@ function TahfeezReportCard({
                     }}
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src = "/logo.png";
+                      e.currentTarget.style.display = "none";
+                      if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = "flex";
                     }}
                   />
                 ) : (
@@ -6460,7 +6504,8 @@ function RankPreview({ students }) {
                             }}
                             onError={(e) => {
                               e.currentTarget.onerror = null;
-                              e.currentTarget.src = "/logo.png";
+                              e.currentTarget.style.display = "none";
+                              if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = "flex";
                             }}
                           />
                         ) : (
@@ -7427,11 +7472,6 @@ function SettingsPage({
             {activeTab === "About" && (
               <div className="settings-tab-pane about-pane">
                 <div className="about-header">
-                  <img
-                    src="/logo.png"
-                    alt="Mauze Tahfeez"
-                    className="about-logo"
-                  />
                   <h3>Mauze Tahfeez Atfal</h3>
                   <p>v2.4.0</p>
                 </div>
@@ -9436,10 +9476,62 @@ function ChildLeaveApply({
         .eq("id", chatLeave.id);
       if (error) throw error;
 
-      // Push notifications for chat messages are now sent SERVER-SIDE by the
-      // notifyLeaveChatMessages Firestore trigger, so they arrive reliably even
-      // when the recipient's app is closed or the sender goes offline right
-      // after sending.
+      // Broadcast instant notification to admin and teacher for leave chat message
+      try {
+        const sName =
+          chatLeave.student_name ||
+          chatLeave.name ||
+          studentProfile?.name ||
+          studentProfile?.full_name ||
+          "Student";
+        const targetAdminRole = sectionKibar ? "kibar-admin" : "admin";
+        const targetSection = sectionKibar ? "kibar" : "atfal";
+        const leaveIdStr = String(chatLeave.id || "");
+        const studentIdStr = String(
+          chatLeave.student_id || studentProfile?.student_id || "",
+        );
+
+        broadcastNotification(
+          `💬 Leave Message: ${sName}`,
+          textToSend.slice(0, 160),
+          targetAdminRole,
+          null,
+          "Leave Management",
+          {
+            redirectPage: "Leave Management",
+            leaveId: leaveIdStr,
+            studentId: studentIdStr,
+            section: targetSection,
+            type: "leave_chat_message",
+          },
+          targetSection,
+        ).catch((e) => console.warn("Parent chat notif error:", e));
+
+        const teacherTarget =
+          chatLeave.teacher_id ||
+          chatLeave.teacher_user_id ||
+          studentProfile?.muhaffiz_id ||
+          studentProfile?.teacher_id;
+        if (teacherTarget) {
+          broadcastNotification(
+            `💬 Leave Message: ${sName}`,
+            textToSend.slice(0, 160),
+            sectionKibar ? "kibar-teacher" : "teacher",
+            String(teacherTarget),
+            "Leave Management",
+            {
+              redirectPage: "Leave Management",
+              leaveId: leaveIdStr,
+              studentId: studentIdStr,
+              section: targetSection,
+              type: "leave_chat_message",
+            },
+            targetSection,
+          ).catch((e) => console.warn("Teacher chat notif error:", e));
+        }
+      } catch (chatNotifErr) {
+        console.warn("Leave chat parent notification note:", chatNotifErr);
+      }
     } catch (err) {
       console.error("Failed to send parent reply:", err);
       showAction(
@@ -11991,8 +12083,7 @@ function ParentPortal({
                   localStorage.getItem(`mauze_photo_${studentProfile.student_id || studentProfile.id || studentProfile.its}`)
                 : "") ||
               ""
-            ) ||
-            (isKibarStudent ? "/kibar-logo.png" : "/logo.png")
+            )
           }
           name={studentProfile?.name || "Student"}
           arabicName={studentProfile?.arabic_name}
@@ -12237,60 +12328,72 @@ function ParentPortal({
               );
               if (photo) {
                 return (
-                  <img
-                    src={photo}
-                    alt={
-                      studentProfile?.name ||
-                      studentProfile?.full_name ||
-                      "Student"
-                    }
-                    className="topbar-logo parent-topbar-dp"
+                  <div
                     style={{
+                      position: "relative",
                       width: "44px",
                       height: "44px",
-                      borderRadius: "50%",
-                      objectFit: "cover",
+                      flexShrink: 0,
                     }}
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = isKibarStudent
-                        ? "/kibar-logo.png"
-                        : "/logo.png";
-                    }}
-                  />
-                );
-              }
-              if (isKibarStudent) {
-                return (
-                  <img
-                    src="/kibar-logo.png"
-                    alt="Tahfeez al Kibar"
-                    className="topbar-logo parent-topbar-dp"
-                    style={{
-                      width: "44px",
-                      height: "44px",
-                      borderRadius: "50%",
-                      objectFit: "cover",
-                    }}
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = "/logo.png";
-                    }}
-                  />
+                  >
+                    <img
+                      src={photo}
+                      alt={
+                        studentProfile?.name ||
+                        studentProfile?.full_name ||
+                        "Student"
+                      }
+                      className="topbar-logo parent-topbar-dp"
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        const fb = e.currentTarget.parentElement?.querySelector(".parent-topbar-fallback");
+                        if (fb) fb.style.display = "flex";
+                      }}
+                    />
+                    <div
+                      className="topbar-logo parent-topbar-dp parent-topbar-fallback"
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "50%",
+                        display: "none",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background:
+                          "linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05))",
+                        color: "var(--primary-gold, #c5a059)",
+                      }}
+                    >
+                      <User size={22} />
+                    </div>
+                  </div>
                 );
               }
               return (
-                <img
-                  src="/logo.png"
-                  alt="Rawdat Tahfeez"
+                <div
                   className="topbar-logo parent-topbar-dp"
                   style={{
                     width: "44px",
                     height: "44px",
                     borderRadius: "50%",
-                    objectFit: "cover",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background:
+                      "linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05))",
+                    color: "var(--primary-gold, #c5a059)",
+                    flexShrink: 0,
                   }}
-                />
+                >
+                  <User size={22} />
+                </div>
               );
             })()}
             <div
@@ -12602,6 +12705,13 @@ function ParentPortal({
                 ));
               })()}
             </div>
+
+            {/* Asbaaq Attendance History Info Card (Weekly) */}
+            <AsbaaqAttendanceHistoryCard
+              studentProfile={studentProfile || allProfiles[0]}
+              isKibar={isKibarStudent}
+              allAttendance={parentData?.allAttendance || []}
+            />
 
             {pageVisibility["Apply Leave"] !== false && (
               <MonthlyLeaveCountCard
@@ -14294,7 +14404,7 @@ function ParentPortal({
                     gender: studentProfile?.teacher_gender || null,
                     phone_number: studentProfile?.teacher_phone || null,
                     whatsapp_number: studentProfile?.teacher_whatsapp || null,
-                    photo_url: studentProfile?.teacher_photo_url || ASSETS.LOGO,
+                    photo_url: studentProfile?.teacher_photo_url || "",
                   };
                 }
 
@@ -14500,7 +14610,7 @@ function ParentPortal({
                         const photo =
                           t.photo_url ||
                           matchedProfile?.photo_url ||
-                          ASSETS.LOGO;
+                          "";
                         const tagText = getTeacherTag(t);
                         const female = isFemaleTeacher(t);
                         return (
@@ -14512,15 +14622,30 @@ function ParentPortal({
                               <Sparkles size={12} /> {tagText}
                             </div>
                             <div className="teacher-card-inner">
-                              <img
-                                src={photo}
-                                alt={t.full_name}
-                                className="teacher-photo-square"
-                                onError={(e) => {
-                                  e.currentTarget.onerror = null;
-                                  e.currentTarget.src = ASSETS.LOGO;
+                              {photo ? (
+                                <img
+                                  src={photo}
+                                  alt={t.full_name}
+                                  className="teacher-photo-square"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                    const fb = e.currentTarget.parentElement?.querySelector(".teacher-photo-fallback");
+                                    if (fb) fb.style.display = "flex";
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className="teacher-photo-square teacher-photo-fallback"
+                                style={{
+                                  display: photo ? "none" : "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  background: "rgba(212, 175, 55, 0.15)",
+                                  color: "var(--primary-gold, #c5a059)",
                                 }}
-                              />
+                              >
+                                <User size={36} />
+                              </div>
                               <div className="teacher-details">
                                 <h3>{t.full_name}</h3>
                                 <p className="teacher-specialty">
@@ -14600,22 +14725,37 @@ function ParentPortal({
                             .filter((c) => "0123456789".includes(c))
                             .join("");
                           const phone = t.phone_number || rawWa || "";
-                          const photo = t.photo_url || ASSETS.LOGO;
+                          const photo = t.photo_url || "";
                           return (
                             <article
                               key={t.id || t.full_name}
                               className="premium-card teacher-profile-card"
                             >
                               <div className="teacher-card-inner">
-                                <img
-                                  src={photo}
-                                  alt={t.full_name}
-                                  className="teacher-photo-square"
-                                  onError={(e) => {
-                                    e.currentTarget.onerror = null;
-                                    e.currentTarget.src = ASSETS.LOGO;
+                                {photo ? (
+                                  <img
+                                    src={photo}
+                                    alt={t.full_name}
+                                    className="teacher-photo-square"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = "none";
+                                      const fb = e.currentTarget.parentElement?.querySelector(".teacher-photo-fallback");
+                                      if (fb) fb.style.display = "flex";
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className="teacher-photo-square teacher-photo-fallback"
+                                  style={{
+                                    display: photo ? "none" : "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    background: "rgba(212, 175, 55, 0.15)",
+                                    color: "var(--primary-gold, #c5a059)",
                                   }}
-                                />
+                                >
+                                  <User size={36} />
+                                </div>
                                 <div className="teacher-details">
                                   <h3>{t.full_name}</h3>
                                   <p className="teacher-specialty">
@@ -16684,10 +16824,58 @@ function AdminLeaveManagement({
         } catch (_) {}
       }
 
-      // Push notifications for chat messages are now sent SERVER-SIDE by the
-      // notifyLeaveChatMessages Firestore trigger, so they arrive reliably even
-      // when the recipient's app is closed or the sender goes offline right
-      // after sending.
+      // Broadcast instant notification to parent for admin's leave message
+      try {
+        const sName =
+          chatModal.student_name ||
+          chatModal.name ||
+          "Student";
+        const parentTarget =
+          chatModal.parent_id ||
+          chatModal.parent_user_id ||
+          chatModal.student_id;
+        const targetSection = sectionKibar ? "kibar" : "atfal";
+        const leaveIdStr = String(chatModal.id || "");
+        const studentIdStr = String(chatModal.student_id || "");
+
+        if (parentTarget) {
+          broadcastNotification(
+            `📝 Leave Message for ${sName}`,
+            textToSend.slice(0, 160),
+            sectionKibar ? "kibar-student" : "parents",
+            String(parentTarget),
+            "Apply Leave",
+            {
+              redirectPage: "Apply Leave",
+              leaveId: leaveIdStr,
+              studentId: studentIdStr,
+              section: targetSection,
+              type: "leave_chat_message",
+            },
+            targetSection,
+          ).catch((e) => console.warn("Admin chat notif error:", e));
+        }
+
+        if (chatModal.teacher_id) {
+          broadcastNotification(
+            `📝 Leave Clarification: ${sName}`,
+            textToSend.slice(0, 160),
+            sectionKibar ? "kibar-teacher" : "teacher",
+            String(chatModal.teacher_id),
+            "Leave Management",
+            {
+              redirectPage: "Leave Management",
+              leaveId: leaveIdStr,
+              studentId: studentIdStr,
+              section: targetSection,
+              type: "leave_chat_message",
+            },
+            targetSection,
+          ).catch((e) => console.warn("Admin-teacher chat notif error:", e));
+        }
+      } catch (adminNotifErr) {
+        console.warn("Admin leave chat message notification note:", adminNotifErr);
+      }
     } catch (err) {
       console.error("Failed to send admin message:", err);
       onShowAction(
@@ -19803,34 +19991,7 @@ function AdminPortal({
     }
   }, [students.length, weeklyResultsArchive.length]);
 
-  /* Auto-restore expired teacher leave badals on any admin page load */
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    supabase
-      .from("teacher_leave_badals")
-      .select("*")
-      .eq("active", true)
-      .lte("to_date", today)
-      .then(({ data: expired }) => {
-        if (expired && expired.length > 0) {
-          expired.forEach((b) => {
-            const sid = String(b.student_id);
-            const sidNum = Number(b.student_id);
-            const sidVal = isNaN(sidNum) ? sid : sidNum;
-            supabase
-              .from("child_profiles")
-              .update({ badal_teacher_id: null })
-              .eq("student_id", sidVal)
-              .then(() => {
-                supabase
-                  .from("teacher_leave_badals")
-                  .update({ active: false })
-                  .eq("id", b.id);
-              });
-          });
-        }
-      });
-  }, []);
+  /* Badal students remain active until teacher explicitly resumes class */
 
   const computeRankChange = (student, wr) => {
     const currentRank = wr?.computedRank || wr?.weeklyRank || wr?.rank;
@@ -21845,7 +22006,7 @@ function AdminPortal({
               adminProfile?.photo_url ||
               portalAccess?.photo_url ||
               user?.user_metadata?.avatar_url ||
-              "/logo.png";
+              "";
 
             return (
               <SidebarHeader
@@ -28542,15 +28703,31 @@ function AdminPortal({
                     return (
                       <div className="preview-card">
                         <div className="preview-card-header">
-                          <img
-                            src={sel.photo_url || "/logo.png"}
-                            alt=""
-                            className="preview-avatar"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = "/logo.png";
+                          {sel.photo_url ? (
+                            <img
+                              src={sel.photo_url}
+                              alt=""
+                              className="preview-avatar"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.style.display = "none";
+                                const fb = e.currentTarget.parentElement?.querySelector(".preview-avatar-fallback");
+                                if (fb) fb.style.display = "flex";
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className="preview-avatar preview-avatar-fallback"
+                            style={{
+                              display: sel.photo_url ? "none" : "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              background: "rgba(197, 160, 89, 0.15)",
+                              color: "var(--primary-gold, #c5a059)",
                             }}
-                          />
+                          >
+                            <User size={18} />
+                          </div>
                           <div className="preview-info">
                             <strong>{sel.full_name}</strong>
                             {access && (
@@ -28614,15 +28791,31 @@ function AdminPortal({
                       className="record-card flex-row-card"
                     >
                       <div className="profile-identity-row">
-                        <img
-                          src={profile.photo_url || "/logo.png"}
-                          alt=""
-                          className="user-dp-badge"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = "/logo.png";
+                        {profile.photo_url ? (
+                          <img
+                            src={profile.photo_url}
+                            alt=""
+                            className="user-dp-badge"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.style.display = "none";
+                              const fb = e.currentTarget.parentElement?.querySelector(".user-dp-badge-fallback");
+                              if (fb) fb.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className="user-dp-badge user-dp-badge-fallback"
+                          style={{
+                            display: profile.photo_url ? "none" : "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "rgba(197, 160, 89, 0.15)",
+                            color: "var(--primary-gold, #c5a059)",
                           }}
-                        />
+                        >
+                          <User size={18} />
+                        </div>
                         <div>
                           <strong>{profile.full_name}</strong>
                           <p
@@ -28748,14 +28941,18 @@ function AdminPortal({
                                       className="p-faculty-img"
                                       onError={(e) => {
                                         e.currentTarget.onerror = null;
-                                        e.currentTarget.src = "/logo.png";
+                                        e.currentTarget.style.display = "none";
+                                        const fb = e.currentTarget.parentElement?.querySelector(".p-faculty-avatar-fallback");
+                                        if (fb) fb.style.display = "flex";
                                       }}
                                     />
-                                  ) : (
-                                    <div className="p-faculty-avatar-fallback">
-                                      {profile.full_name.charAt(0)}
-                                    </div>
-                                  )}
+                                  ) : null}
+                                  <div
+                                    className="p-faculty-avatar-fallback"
+                                    style={{ display: profile.photo_url ? "none" : "flex" }}
+                                  >
+                                    {profile.full_name.charAt(0)}
+                                  </div>
                                 </div>
                                 <div className="p-faculty-meta">
                                   <div className="name-row">
@@ -34737,13 +34934,14 @@ function TeacherPortal({
   const currentTeacherIds = useMemo(() => {
     const rawId = user?.id || teacherIdentity;
     const ids = [];
-    if (rawId) ids.push(String(rawId));
+    if (rawId) ids.push(String(rawId).trim());
     if (
       user?.id &&
       teacherIdentity &&
-      String(user.id) !== String(teacherIdentity)
+      String(user.id).trim() !== String(teacherIdentity).trim()
     )
-      ids.push(String(teacherIdentity));
+      ids.push(String(teacherIdentity).trim());
+    if (user?.email) ids.push(String(user.email).trim().toLowerCase());
     (Array.isArray(schoolData?.portalAccessList)
       ? schoolData.portalAccessList
       : []
@@ -34751,29 +34949,36 @@ function TeacherPortal({
       .filter((a) => {
         const m =
           String(a.user_id) === String(rawId) ||
+          String(a.id) === String(rawId) ||
           (a.full_name &&
             teacherIdentity &&
             normalizeText(a.full_name) === normalizeText(teacherIdentity));
-        return m && a.user_id;
+        return m;
       })
       .forEach((a) => {
-        if (!ids.includes(String(a.user_id))) ids.push(String(a.user_id));
+        if (a.user_id && !ids.includes(String(a.user_id).trim())) ids.push(String(a.user_id).trim());
+        if (a.id && !ids.includes(String(a.id).trim())) ids.push(String(a.id).trim());
+        if (a.full_name && !ids.includes(String(a.full_name).trim())) ids.push(String(a.full_name).trim());
       });
     (Array.isArray(teacherProfiles) ? teacherProfiles : [])
       .filter((p) => {
         const m =
           String(p.user_id) === String(rawId) ||
+          String(p.id) === String(rawId) ||
           (p.full_name &&
             teacherIdentity &&
             normalizeText(p.full_name) === normalizeText(teacherIdentity));
-        return m && p.user_id;
+        return m;
       })
       .forEach((p) => {
-        if (!ids.includes(String(p.user_id))) ids.push(String(p.user_id));
+        if (p.user_id && !ids.includes(String(p.user_id).trim())) ids.push(String(p.user_id).trim());
+        if (p.id && !ids.includes(String(p.id).trim())) ids.push(String(p.id).trim());
+        if (p.full_name && !ids.includes(String(p.full_name).trim())) ids.push(String(p.full_name).trim());
       });
     return ids;
   }, [
     user?.id,
+    user?.email,
     teacherIdentity,
     schoolData?.portalAccessList,
     teacherProfiles,
@@ -34785,7 +34990,7 @@ function TeacherPortal({
         const isOriginal = currentTeacherIds.some(
           (uid) =>
             String(
-              student.original_teacher_id || student.muhaffiz_id,
+              student.original_teacher_id || student.muhaffiz_id || student.teacher_id,
             ).trim() === uid.trim(),
         );
         const isBadal = currentTeacherIds.some(
@@ -34803,19 +35008,138 @@ function TeacherPortal({
 
   const shiftedBadalStudents = useMemo(() => {
     const allSchoolStudents = schoolData?.students || [];
-    return allSchoolStudents.filter((s) => {
-      const isMyOriginal = currentTeacherIds.some(
-        (uid) =>
-          String(s.original_teacher_id || s.muhaffiz_id).trim() === uid.trim(),
+    const studentsMap = new Map();
+
+    const isMatchTeacher = (tid, tname) => {
+      const idStr = String(tid || "").trim().toLowerCase();
+      if (
+        idStr &&
+        currentTeacherIds.some(
+          (uid) => String(uid).trim().toLowerCase() === idStr,
+        )
+      ) {
+        return true;
+      }
+      if (
+        (tname &&
+          teacherIdentity &&
+          normalizeText(tname) === normalizeText(teacherIdentity)) ||
+        (idStr &&
+          teacherIdentity &&
+          normalizeText(idStr) === normalizeText(teacherIdentity))
+      ) {
+        return true;
+      }
+      if (
+        idStr &&
+        (teacherProfiles || []).some(
+          (tp) =>
+            currentTeacherIds.some(
+              (cid) =>
+                String(cid).trim().toLowerCase() ===
+                String(tp.user_id || tp.id || "").trim().toLowerCase(),
+            ) && normalizeText(tp.full_name || "") === normalizeText(idStr),
+        )
+      ) {
+        return true;
+      }
+      return false;
+    };
+
+    const isDifferentTeacher = (badalId) => {
+      const bStr = String(badalId || "").trim().toLowerCase();
+      if (!bStr || bStr === "null" || bStr === "undefined") return false;
+      return !currentTeacherIds.some(
+        (uid) => String(uid).trim().toLowerCase() === bStr,
       );
-      const isShiftedToOther =
-        s.badal_teacher_id &&
-        !currentTeacherIds.some(
-          (uid) => String(s.badal_teacher_id).trim() === uid.trim(),
-        );
-      return isMyOriginal && isShiftedToOther;
+    };
+
+    // 0. From filteredStudents (teacher's own students loaded in teacherData)
+    (filteredStudents || []).forEach((s) => {
+      if (s && s.badal_teacher_id && isDifferentTeacher(s.badal_teacher_id)) {
+        studentsMap.set(String(s.student_id), s);
+      }
     });
-  }, [schoolData?.students, currentTeacherIds]);
+
+    // 1. From all school students
+    allSchoolStudents.forEach((s) => {
+      const isMyOriginal =
+        isMatchTeacher(s.original_teacher_id) ||
+        isMatchTeacher(s.muhaffiz_id) ||
+        isMatchTeacher(s.teacher_id) ||
+        isMatchTeacher(null, s.muhaffiz) ||
+        isMatchTeacher(null, s.teacherName) ||
+        isMatchTeacher(null, s.teacher_name) ||
+        isMatchTeacher(null, s.muhaffiz_name);
+
+      const isShiftedToOther = isDifferentTeacher(s.badal_teacher_id);
+
+      if (isMyOriginal && isShiftedToOther) {
+        studentsMap.set(String(s.student_id), s);
+      }
+    });
+
+    // 2. From badal assignments (active badals)
+    (badalAssignments || []).forEach((a) => {
+      if (a.status !== "inactive" && a.student_id) {
+        const sid = String(a.student_id);
+        const isMyOriginal =
+          isMatchTeacher(a.original_teacher_id, a.original_teacher_name) ||
+          isMatchTeacher(a.teacher_id_original) ||
+          isMatchTeacher(a.original_teacher);
+        const isShiftedToOther = isDifferentTeacher(
+          a.teacher_id || a.badal_teacher_id,
+        );
+        if (isMyOriginal && isShiftedToOther && !studentsMap.has(sid)) {
+          const studentObj =
+            allSchoolStudents.find((s) => String(s.student_id) === sid) ||
+            (badalStudentProfiles || []).find(
+              (s) => String(s.student_id) === sid,
+            ) || {
+              student_id: a.student_id,
+              name: a.student_name || "Student",
+              badal_teacher_id: a.teacher_id || a.badal_teacher_id,
+              original_teacher_id: a.original_teacher_id,
+            };
+          studentsMap.set(sid, {
+            ...studentObj,
+            badal_teacher_id: a.teacher_id || a.badal_teacher_id,
+          });
+        }
+      }
+    });
+
+    // 3. From badalStudentProfiles (loaded directly from child_profiles by fetchBadalData)
+    (badalStudentProfiles || []).forEach((s) => {
+      const sid = String(s.student_id);
+      if (!studentsMap.has(sid)) {
+        const isMyOriginal =
+          isMatchTeacher(s.original_teacher_id) ||
+          isMatchTeacher(s.muhaffiz_id) ||
+          isMatchTeacher(s.teacher_id) ||
+          isMatchTeacher(null, s.teacher_name) ||
+          isMatchTeacher(null, s.muhaffiz_name) ||
+          isMatchTeacher(null, s.muhaffiz);
+        const isShiftedToOther = isDifferentTeacher(s.badal_teacher_id);
+        if (isMyOriginal && isShiftedToOther) {
+          studentsMap.set(sid, s);
+        }
+      }
+    });
+
+    return Array.from(studentsMap.values());
+  }, [
+    filteredStudents,
+    schoolData?.students,
+    currentTeacherIds,
+    teacherIdentity,
+    badalAssignments,
+    badalStudentProfiles,
+  ]);
+
+  const [showBadalResumeModal, setShowBadalResumeModal] = useState(false);
+  const [resumingStudentId, setResumingStudentId] = useState(null);
+  const [badalResumeToast, setBadalResumeToast] = useState(null);
 
   useEffect(() => {
     const teacherId = user?.id || teacherIdentity;
@@ -34927,203 +35251,254 @@ function TeacherPortal({
       });
   }, [activePage]);
 
-  useEffect(() => {
-    if (!teacherIdForLeave) return;
-    const today = new Date().toISOString().slice(0, 10);
-    supabase
-      .from(TEACHER_LEAVE_BADALS_TABLE)
-      .select("*")
-      .eq("original_teacher_id", String(teacherIdForLeave))
-      .eq("active", true)
-      .lte("to_date", today)
-      .then(({ data: endedBadals }) => {
-        if (endedBadals && endedBadals.length > 0) {
-          endedBadals.forEach((b) => {
-            const sid = String(b.student_id);
-            const sidNum = Number(b.student_id);
-            const sidVal = isNaN(sidNum) ? sid : sidNum;
-            const CHILD_PROFILES_TABLE = sectionKibar
-              ? "kibar_child_profiles"
-              : "child_profiles";
-            supabase
-              .from(CHILD_PROFILES_TABLE)
-              .update({ badal_teacher_id: null })
-              .eq("student_id", sidVal)
-              .then(() => {
-                supabase
-                  .from(TEACHER_LEAVE_BADALS_TABLE)
-                  .update({ active: false })
-                  .eq("id", b.id);
-              });
-          });
-        }
-      });
-  }, [teacherIdForLeave, sectionKibar]);
-
   /*
    * BADAL FLOW - fetchBadalData
-   * Fetches badal-related data for the current teacher from two sources:
-   *   1. badal_assignments table (legacy, for backward compatibility)
-   *   2. child_profiles.badal_teacher_id (new model - direct field on child record)
+   * Fetches badal-related data for the current teacher from all sources:
+   *   1. badal_assignments table (status = active)
+   *   2. child_profiles.badal_teacher_id / kibar_child_profiles.badal_teacher_id
+   *   3. teacher_leave_badals / kibar_teacher_leave_badals (active = true)
    *
-   * The progress data (badal_progress) is used by both the Badal teacher (editing)
-   * and the Original teacher (viewing).
+   * Badal students remain active until the teacher explicitly clicks "Resume Class".
    */
   const fetchBadalData = useCallback(() => {
     const rawId = user?.id || teacherIdentity;
     const idMatches = [];
-    if (rawId) idMatches.push(String(rawId));
+    if (rawId) idMatches.push(String(rawId).trim());
     if (
       user?.id &&
       teacherIdentity &&
-      String(user.id) !== String(teacherIdentity)
+      String(user.id).trim() !== String(teacherIdentity).trim()
     )
-      idMatches.push(String(teacherIdentity));
+      idMatches.push(String(teacherIdentity).trim());
+    (Array.isArray(teacherProfiles) ? teacherProfiles : [])
+      .filter((p) => {
+        const m =
+          String(p.user_id) === String(rawId) ||
+          String(p.id) === String(rawId) ||
+          (p.full_name &&
+            teacherIdentity &&
+            normalizeText(p.full_name) === normalizeText(teacherIdentity));
+        return m;
+      })
+      .forEach((p) => {
+        if (p.user_id && !idMatches.includes(String(p.user_id).trim()))
+          idMatches.push(String(p.user_id).trim());
+        if (p.id && !idMatches.includes(String(p.id).trim()))
+          idMatches.push(String(p.id).trim());
+      });
+
     const teacherIdFilter = idMatches.length > 0 ? idMatches : [""];
 
-    const badalProfileQuery = teacherIdFilter[0]
-      ? supabase
-          .from("child_profiles")
-          .select(
-            "student_id, full_name, original_teacher_id, badal_teacher_id",
+    const CHILD_PROFILES_TABLE = sectionKibar
+      ? "kibar_child_profiles"
+      : "child_profiles";
+    const LEAVE_BADALS_TABLE = sectionKibar
+      ? "kibar_teacher_leave_badals"
+      : "teacher_leave_badals";
+
+    const isMatch = (val) => {
+      if (!val) return false;
+      const s = String(val).trim().toLowerCase();
+      return teacherIdFilter.some(
+        (tid) => String(tid).trim().toLowerCase() === s,
+      );
+    };
+
+    // 1. badal_assignments
+    const assignmentsQuery = supabase
+      .from("badal_assignments")
+      .select("*")
+      .neq("status", "inactive")
+      .then((r) => ({ data: r?.data || [] }))
+      .catch(() => ({ data: [] }));
+
+    // 2. child_profiles (both substitute and original)
+    const childProfilesQuery = supabase
+      .from(CHILD_PROFILES_TABLE)
+      .select(
+        "student_id, full_name, name, original_teacher_id, teacher_id, muhaffiz_id, badal_teacher_id, teacher_name, muhaffiz_name",
+      )
+      .not("badal_teacher_id", "is", null)
+      .then((r) => ({ data: r?.data || [] }))
+      .catch(() =>
+        supabase
+          .rpc(
+            sectionKibar
+              ? "get_all_kibar_child_profiles"
+              : "get_all_child_profiles",
           )
-          .or(
-            teacherIdFilter.map((id) => `badal_teacher_id.eq.${id}`).join(","),
-          )
-      : Promise.resolve({ data: null });
-    /* Also fetch original-teacher students (current teacher is original, someone else is badal) */
-    const originalProfileQuery = teacherIdFilter[0]
-      ? supabase
-          .rpc("get_all_child_profiles")
-          .then(({ data, error }) => {
-            if (error || !data) {
-              /* Fallback to direct query if RPC not deployed */
-              return supabase
-                .from("child_profiles")
-                .select(
-                  "student_id, full_name, original_teacher_id, badal_teacher_id",
-                )
-                .or(
-                  teacherIdFilter
-                    .map((id) => `original_teacher_id.eq.${id}`)
-                    .join(","),
-                );
-            }
-            return {
-              data: data.filter(
-                (cp) =>
-                  cp.original_teacher_id &&
-                  teacherIdFilter.some(
-                    (tid) =>
-                      String(cp.original_teacher_id || "") === String(tid),
-                  ),
-              ),
-              error: null,
-            };
-          })
-          .catch(() => {
-            /* RPC call failed completely, fallback to direct query */
-            const id = teacherIdFilter[0];
-            return supabase
-              .from("child_profiles")
-              .select(
-                "student_id, full_name, original_teacher_id, badal_teacher_id",
-              )
-              .or(
-                teacherIdFilter
-                  .map((tid) => `original_teacher_id.eq.${tid}`)
-                  .join(","),
-              );
-          })
-      : Promise.resolve({ data: null });
+          .then((r) => ({
+            data: (r?.data || []).filter((cp) => cp.badal_teacher_id),
+          }))
+          .catch(() => ({ data: [] })),
+      );
+
+    // 3. teacher_leave_badals
+    const leavesQuery = supabase
+      .from(LEAVE_BADALS_TABLE)
+      .select("*")
+      .then((r) => {
+        const rows = r?.data || [];
+        return {
+          data: rows.filter(
+            (lb) =>
+              lb.active === true ||
+              (lb.active !== false && !lb.resumed && !lb.resumed_at),
+          ),
+        };
+      })
+      .catch(() => ({ data: [] }));
+
+    // 4. badal_progress (recent entries)
+    const badalProgressQuery = supabase
+      .from("badal_progress")
+      .select("*")
+      .order("week_date", { ascending: false })
+      .limit(100)
+      .then((r) => ({ data: r?.data || [] }))
+      .catch(() => ({ data: [] }));
+
     Promise.all([
-      supabase.from("badal_assignments").select("*").eq("status", "active"),
-      badalProfileQuery,
-      originalProfileQuery,
+      assignmentsQuery,
+      childProfilesQuery,
+      leavesQuery,
+      badalProgressQuery,
     ])
-      .then(([assignmentsRes, childProfilesRes, originalProfilesRes]) => {
+      .then(async ([assignmentsRes, childProfilesRes, leavesRes, progressRes]) => {
         let combined = [];
-        if (assignmentsRes.data) {
-          combined = assignmentsRes.data.map((a) => ({
-            ...a,
-            _source: "badal_assignments",
-          }));
-        }
-        if (childProfilesRes.data) {
-          const fromProfiles = childProfilesRes.data
-            .filter(
-              (cp) =>
-                cp.badal_teacher_id &&
-                teacherIdFilter.some(
-                  (tid) => String(cp.badal_teacher_id) === String(tid),
-                ),
-            )
-            .map((cp) => ({
-              student_id: String(cp.student_id),
+        const seen = new Set();
+
+        const addRecord = (rec) => {
+          const sid = String(rec.student_id);
+          if (sid && !seen.has(sid)) {
+            combined.push(rec);
+            seen.add(sid);
+          }
+        };
+
+        // Add from badal_assignments
+        (assignmentsRes.data || []).forEach((a) => {
+          if (a.student_id) {
+            addRecord({
+              ...a,
+              student_id: String(a.student_id),
+              _source: "badal_assignments",
+            });
+          }
+        });
+
+        // Add from child_profiles
+        (childProfilesRes.data || []).forEach((cp) => {
+          const sid = String(cp.student_id);
+          const isMyOriginal =
+            isMatch(cp.original_teacher_id) ||
+            isMatch(cp.teacher_id) ||
+            isMatch(cp.muhaffiz_id) ||
+            (teacherIdentity &&
+              cp.teacher_name &&
+              normalizeText(cp.teacher_name) ===
+                normalizeText(teacherIdentity)) ||
+            (teacherIdentity &&
+              cp.muhaffiz_name &&
+              normalizeText(cp.muhaffiz_name) ===
+                normalizeText(teacherIdentity));
+
+          const isSub = isMatch(cp.badal_teacher_id);
+
+          if (isSub) {
+            addRecord({
+              student_id: sid,
               teacher_id: cp.badal_teacher_id,
-              original_teacher_id: cp.original_teacher_id,
+              original_teacher_id:
+                cp.original_teacher_id || cp.teacher_id || cp.muhaffiz_id,
+              student_name: cp.full_name || cp.name,
               status: "active",
-              _source: "child_profiles",
-            }));
-          const seen = new Set(combined.map((a) => String(a.student_id)));
-          fromProfiles.forEach((fp) => {
-            if (!seen.has(String(fp.student_id))) {
-              combined.push(fp);
-              seen.add(String(fp.student_id));
+              _source: "child_profiles_substitute",
+            });
+          } else if (isMyOriginal && cp.badal_teacher_id) {
+            addRecord({
+              student_id: sid,
+              teacher_id: cp.badal_teacher_id,
+              original_teacher_id:
+                cp.original_teacher_id || cp.teacher_id || cp.muhaffiz_id,
+              student_name: cp.full_name || cp.name,
+              status: "active",
+              _source: "child_profiles_original",
+            });
+          }
+        });
+
+        // Add from teacher_leave_badals
+        (leavesRes.data || []).forEach((lb) => {
+          const sid = String(lb.student_id);
+          const isMyOrig =
+            isMatch(lb.original_teacher_id) || isMatch(lb.teacher_id);
+          const isMyBadal = isMatch(lb.badal_teacher_id);
+          if (isMyOrig || isMyBadal) {
+            addRecord({
+              student_id: sid,
+              teacher_id: lb.badal_teacher_id,
+              original_teacher_id: lb.original_teacher_id || lb.teacher_id,
+              student_name: lb.student_name || "Student",
+              status: "active",
+              _source: "teacher_leave_badals",
+            });
+
+            // Self-healing: if child_profiles.badal_teacher_id was wiped, restore it in child_profiles!
+            const profile = (childProfilesRes.data || []).find(
+              (c) => String(c.student_id) === sid,
+            );
+            if (profile && !profile.badal_teacher_id && lb.badal_teacher_id) {
+              supabase
+                .from(CHILD_PROFILES_TABLE)
+                .update({ badal_teacher_id: lb.badal_teacher_id })
+                .eq("student_id", sid)
+                .catch(() => {});
             }
-          });
-        }
+          }
+        });
+
+        // Store active badal assignments
         setBadalAssignments(combined);
 
-        /* Collect all student IDs that need progress shown: badal students + original-teacher students with badal */
-        const allProgressIds = new Set(
-          combined.map((a) => {
-            const n = Number(a.student_id);
-            return isNaN(n) ? String(a.student_id) : n;
-          }),
-        );
-        if (originalProfilesRes.data) {
-          originalProfilesRes.data.forEach((cp) => {
-            const n = Number(cp.student_id);
-            const sid = isNaN(n) ? String(cp.student_id) : n;
-            allProgressIds.add(sid);
-          });
-        }
-        const studentIds = [...allProgressIds];
+        // Fetch detailed profiles and progress for all these badal students
+        const studentIds = Array.from(seen);
         if (studentIds.length > 0) {
+          if (progressRes.data && progressRes.data.length > 0) {
+            setBadalProgress(progressRes.data);
+          } else {
+            supabase
+              .from("badal_progress")
+              .select("*")
+              .in("student_id", studentIds)
+              .order("week_date", { ascending: false })
+              .then(({ data: pData }) => {
+                if (pData) setBadalProgress(pData);
+              })
+              .catch(() => {});
+          }
+
           supabase
-            .from("badal_progress")
-            .select("*")
-            .in(
-              "student_id",
-              studentIds.map((s) => String(s)),
-            )
-            .order("week_date", { ascending: false })
-            .then(({ data: pData }) => {
-              if (pData) setBadalProgress(pData);
-            });
-          supabase
-            .from("child_profiles")
+            .from(CHILD_PROFILES_TABLE)
             .select("*")
             .in("student_id", studentIds)
             .then(({ data: cData }) => {
-              if (cData)
+              if (cData) {
                 setBadalStudentProfiles(
                   cData.map((c) => ({
                     ...c,
                     name: c.full_name || c.name || "",
                   })),
                 );
-            });
-        } else {
-          setBadalStudentProfiles([]);
+              }
+            })
+            .catch(() => {});
         }
       })
-      .catch(() => {
-        setBadalAssignments([]);
-        setBadalStudentProfiles([]);
+      .catch((err) => {
+        console.warn("fetchBadalData error:", err);
       });
-  }, [user?.id, teacherIdentity]);
+  }, [user?.id, teacherIdentity, teacherProfiles, sectionKibar]);
 
   useEffect(() => {
     fetchBadalData();
@@ -35260,10 +35635,19 @@ function TeacherPortal({
             studentCheck.original_teacher_id || studentCheck.muhaffiz_id || "",
           ) === currentTeacherId;
         if (!isAlreadyBadal && !isOriginal) {
+          const CHILD_TABLE = sectionKibar
+            ? "kibar_child_profiles"
+            : "child_profiles";
           await supabase
-            .from("child_profiles")
+            .from(CHILD_TABLE)
             .update({ badal_teacher_id: currentTeacherId })
             .eq("student_id", sid);
+          if (sectionKibar) {
+            await supabase
+              .from("child_profiles")
+              .update({ badal_teacher_id: currentTeacherId })
+              .eq("student_id", sid);
+          }
         }
       } catch (_) {}
       if (onShowAction) onShowAction("success", "Badal progress saved!");
@@ -35316,6 +35700,23 @@ function TeacherPortal({
               data: { type: "badal_progress_update", studentId: sid },
             },
           });
+
+          // Notify parent of badal progress
+          const parentTarget = student?.parent_user_id || student?.parent_email || sid;
+          if (parentTarget) {
+            broadcastNotification(
+              `Badal Progress: ${childName}`,
+              `${badalTeacherName} updated today's tahfeez progress for ${childName}.`,
+              "parents",
+              String(parentTarget),
+              "Attendance",
+              {
+                redirectPage: "Attendance",
+                studentId: sid,
+                type: "badal_progress_update",
+              },
+            ).catch((e) => console.warn("Badal parent notif error:", e));
+          }
         }
       } catch (fcmErr) {
         console.error("Badal progress FCM error:", fcmErr);
@@ -35329,41 +35730,111 @@ function TeacherPortal({
     if (!child?.student_id) return;
     const sid = String(child.student_id);
     const originalTeacherId = user?.id || teacherIdentity;
+    setResumingStudentId(sid);
     if (onShowAction)
-      onShowAction("info", `Resuming class for ${child.name}...`);
+      onShowAction("info", `Resuming class for ${child.name || "student"}...`);
     try {
+      const CHILD_TABLE = sectionKibar
+        ? "kibar_child_profiles"
+        : "child_profiles";
+      const LEAVE_TABLE = sectionKibar
+        ? "kibar_teacher_leave_badals"
+        : "teacher_leave_badals";
+
       await supabase
-        .from("child_profiles")
+        .from(CHILD_TABLE)
         .update({ badal_teacher_id: null })
         .eq("student_id", sid);
+      if (sectionKibar) {
+        await supabase
+          .from("child_profiles")
+          .update({ badal_teacher_id: null })
+          .eq("student_id", sid);
+      }
       await supabase
-        .from("teacher_leave_badals")
+        .from(LEAVE_TABLE)
         .update({ active: false })
         .eq("student_id", sid)
         .eq("active", true);
+      if (sectionKibar) {
+        await supabase
+          .from("teacher_leave_badals")
+          .update({ active: false })
+          .eq("student_id", sid)
+          .eq("active", true);
+      }
       await supabase
         .from("badal_assignments")
         .update({ status: "inactive" })
         .eq("student_id", sid);
+
+      // Optimistically update local state so UI reflects resume instantly
+      setBadalAssignments((prev) =>
+        (prev || []).filter((a) => String(a.student_id) !== sid),
+      );
+      setBadalStudentProfiles((prev) =>
+        (prev || []).map((s) =>
+          String(s.student_id) === sid ? { ...s, badal_teacher_id: null } : s,
+        ),
+      );
+      setSchoolData((current) => ({
+        ...current,
+        students: (current.students || []).map((s) =>
+          String(s.student_id) === sid ? { ...s, badal_teacher_id: null } : s,
+        ),
+      }));
+
       if (child.badal_teacher_id) {
         const originalTeacherName =
-          teacherProfiles.find((p) => p.user_id === originalTeacherId)
-            ?.full_name || "Original Teacher";
+          (teacherProfiles || []).find(
+            (p) =>
+              String(p.user_id) === String(originalTeacherId) ||
+              String(p.id) === String(originalTeacherId),
+          )?.full_name || "Original Teacher";
         await supabase.functions.invoke("fcm-notification", {
           body: {
             title: "Class Resumed",
-            body: `${originalTeacherName} has resumed class for ${child.name}.`,
+            body: `${originalTeacherName} has resumed class for ${child.name || "student"}.`,
             targetUser: child.badal_teacher_id,
             data: { type: "badal_class_resumed", studentId: sid },
           },
         });
       }
+      setBadalResumeToast({
+        title: "Class Resumed Successfully!",
+        message: `${child.name || "Student"} has been returned to your active class. Badal teacher notified.`,
+      });
+      setTimeout(() => setBadalResumeToast(null), 3800);
       if (onShowAction)
-        onShowAction("success", `Class resumed for ${child.name}!`);
+        onShowAction("success", `Class resumed for ${child.name || "student"}!`);
       loadPortalData(portalRole, user, null, { silent: true });
+      fetchBadalData();
     } catch (e) {
       if (onShowAction)
         onShowAction("error", "Failed to resume class: " + e.message);
+    } finally {
+      setResumingStudentId(null);
+    }
+  };
+
+  const handleResumeAllBadalStudents = async () => {
+    if (!shiftedBadalStudents.length) return;
+    setResumingStudentId("ALL");
+    try {
+      for (const child of shiftedBadalStudents) {
+        await handleResumeClass(child);
+      }
+      setBadalResumeToast({
+        title: "All Classes Resumed!",
+        message: `Successfully returned ${shiftedBadalStudents.length} students back to your regular class.`,
+      });
+      setTimeout(() => setBadalResumeToast(null), 4000);
+      setShowBadalResumeModal(false);
+    } catch (e) {
+      if (onShowAction)
+        onShowAction("error", "Failed to resume all students: " + e.message);
+    } finally {
+      setResumingStudentId(null);
     }
   };
 
@@ -35374,10 +35845,20 @@ function TeacherPortal({
 
     if (existing === status) return;
 
+    const nowTime = new Date().toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const nowIso = new Date().toISOString();
+    try {
+      localStorage.setItem(`mauze_att_time_${studentId}_${date}`, nowTime);
+    } catch (_) {}
+
     if (existing) {
       const { error } = await supabase
         .from("student_daily_attendance")
-        .update({ status })
+        .update({ status, marked_at: nowIso, time: nowTime })
         .eq("student_id", String(studentId))
         .eq("attendance_date", date);
       if (error) {
@@ -35393,6 +35874,9 @@ function TeacherPortal({
             teacher_id: String(teacherId),
             attendance_date: date,
             status,
+            created_at: nowIso,
+            marked_at: nowIso,
+            time: nowTime,
           },
           { onConflict: "student_id,attendance_date" },
         );
@@ -35430,21 +35914,33 @@ function TeacherPortal({
         }));
       }
     }
-    const attStudent = overviewStudents.find(
-      (s) => String(s.student_id) === studentId,
-    );
-    if (attStudent) {
-      // Notify parent — only if a valid target exists (prevents FCM falling through to ALL users)
-      const parentTarget = attStudent.parent_user_id || attStudent.parent_email;
-      if (parentTarget) {
-        broadcastNotification(
-          "Attendance Updated",
-          `${attStudent.name || "Your child"} was marked ${status} on ${date}.`,
-          "user",
-          parentTarget,
-          "Attendance",
-        );
-      }
+    const attStudent =
+      (overviewStudents || []).find((s) => String(s.student_id) === String(studentId)) ||
+      (schoolData?.students || []).find((s) => String(s.student_id) === String(studentId));
+    const parentTarget = attStudent?.parent_user_id || attStudent?.parent_email || studentId;
+    const sName = attStudent?.name || attStudent?.full_name || "Your child";
+    const statusLabel =
+      status === "present"
+        ? "Present"
+        : status === "absent"
+          ? "Absent"
+          : status === "leave" || status === "uzur"
+            ? "Excused (Leave)"
+            : String(status).toUpperCase();
+
+    broadcastNotification(
+      `Attendance Marked: ${sName}`,
+      `${sName} was marked ${statusLabel} today (${date}) at ${nowTime}.`,
+      "parents",
+      String(parentTarget),
+      "Attendance",
+      {
+        redirectPage: "Attendance",
+        studentId: String(studentId),
+        status,
+        date,
+      },
+    ).catch((err) => console.warn("Attendance notification note:", err));
       // Also notify the child's own teacher (if different from current user)
       const teacherIdField =
         attStudent.muhaffiz_id || attStudent.original_teacher_id;
@@ -35472,7 +35968,6 @@ function TeacherPortal({
           );
         }
       }
-    }
   };
 
   const handleMarkAllAttendance = async (date, status) => {
@@ -36110,6 +36605,29 @@ function TeacherPortal({
     } catch (_e) {
       // Final rank notification check failed silently
     }
+
+    // Live result notification to parents
+    try {
+      const targetStudent = (schoolData?.students || []).find(
+        (s) => String(s.student_id) === String(numericId) || (s.allIds && s.allIds.includes(String(numericId)))
+      );
+      const studentName = targetStudent?.name || targetStudent?.full_name || "Your child";
+      const currentWeekDate = data?.week_date || payload?.week_date || "";
+      const parentTarget = targetStudent?.parent_user_id || targetStudent?.parent_email || numericId;
+
+      broadcastNotification(
+        `Weekly Result Live: ${studentName}`,
+        `${studentName}'s weekly marks and tahfeez progress are now live. Tap to view report card.`,
+        "parents",
+        String(parentTarget),
+        "Report Card",
+        {
+          redirectPage: "Report Card",
+          studentId: String(numericId),
+          weekDate: currentWeekDate,
+        }
+      ).catch((err) => console.warn("Live result notification note:", err));
+    } catch (_liveErr) {}
   }, [
     canTeacherFillProgress,
     reportSettingsObject,
@@ -36378,6 +36896,92 @@ function TeacherPortal({
               >
                 {menuOpen ? <X size={22} /> : <Menu size={22} />}
               </button>
+              {(() => {
+                const matchedTeacher = teacherProfiles.find(
+                  (p) =>
+                    normalizeText(p.full_name) === normalizeText(teacherIdentity),
+                );
+                const uId = String(
+                  user?.id ||
+                    matchedTeacher?.user_id ||
+                    matchedTeacher?.id ||
+                    "",
+                );
+                const cachedPhoto =
+                  typeof localStorage !== "undefined" && uId
+                    ? localStorage.getItem(`mauze_teacher_photo_${uId}`) || ""
+                    : "";
+                const photo = cleanPhotoUrl(
+                  cachedPhoto ||
+                    matchedTeacher?.photo_url ||
+                    portalAccess?.photo_url ||
+                    user?.user_metadata?.avatar_url ||
+                    user?.user_metadata?.photo_url ||
+                    "",
+                );
+                const teacherName =
+                  portalAccess?.full_name ||
+                  teacherIdentity ||
+                  user?.user_metadata?.full_name ||
+                  "Teacher";
+                const initial = (teacherName || "T").charAt(0).toUpperCase();
+
+                return (
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "44px",
+                      height: "44px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {photo ? (
+                      <img
+                        src={photo}
+                        alt={teacherName}
+                        className="topbar-logo parent-topbar-dp"
+                        style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          cursor: "pointer",
+                          display: "block",
+                        }}
+                        onClick={() => setActivePage("Profile")}
+                        title="My Profile"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          const fb = e.currentTarget.parentElement?.querySelector(".topbar-avatar-fallback");
+                          if (fb) fb.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className="topbar-logo parent-topbar-dp topbar-avatar-fallback"
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "50%",
+                        cursor: "pointer",
+                        display: photo ? "none" : "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background:
+                          "linear-gradient(135deg, var(--primary-gold, #c5a059), #8c6d37)",
+                        color: "#fff",
+                        fontWeight: 700,
+                        fontSize: "18px",
+                        userSelect: "none",
+                      }}
+                      onClick={() => setActivePage("Profile")}
+                      title="My Profile"
+                    >
+                      {initial}
+                    </div>
+                  </div>
+                );
+              })()}
               <div
                 className="parent-topbar-brand-wrap"
                 style={{
@@ -36409,14 +37013,6 @@ function TeacherPortal({
             </div>
 
             <div className="topbar-actions-group">
-              <button
-                className={`topbar-refresh-btn ${activePage === "Profile" ? "active" : ""}`}
-                onClick={() => setActivePage("Profile")}
-                title="My Profile"
-                aria-label="My Profile"
-              >
-                <User size={20} />
-              </button>
               <button
                 className={`topbar-refresh-btn ${isRefreshing ? "refreshing" : ""}`}
                 onClick={onRefresh}
@@ -37071,6 +37667,424 @@ function TeacherPortal({
                 })()}
               </div>
 
+              {/* Badal Resume & Class Status Card — Permanently anchored after Active Notification Card */}
+              <div
+                className={`badal-home-banner card-appear ${
+                  shiftedBadalStudents.length === 0 ? "status-regular" : ""
+                }`}
+              >
+                <div
+                  className={`badal-home-banner-topbar ${
+                    shiftedBadalStudents.length === 0 ? "topbar-regular" : ""
+                  }`}
+                />
+                <div className="badal-home-banner-body">
+                  <div className="badal-home-banner-left">
+                    <div
+                      className={`badal-home-icon-box ${
+                        shiftedBadalStudents.length === 0 ? "icon-regular" : ""
+                      }`}
+                    >
+                      {shiftedBadalStudents.length > 0 ? (
+                        <>
+                          <RotateCw size={22} className="spin-slow-subtle" />
+                          <span className="badal-badge-count">
+                            {shiftedBadalStudents.length}
+                          </span>
+                        </>
+                      ) : (
+                        <ShieldCheck size={23} />
+                      )}
+                    </div>
+                    <div className="badal-home-text-group">
+                      <div className="badal-home-title-row">
+                        <h4 className="badal-home-title">
+                          {shiftedBadalStudents.length > 0
+                            ? "Badal Active — Resume Students"
+                            : "Class Status — Regular Class Active"}
+                        </h4>
+                        <span
+                          className={`badal-home-pill ${
+                            shiftedBadalStudents.length === 0
+                              ? "pill-regular"
+                              : ""
+                          }`}
+                        >
+                          {shiftedBadalStudents.length > 0 ? (
+                            `${shiftedBadalStudents.length} ${
+                              shiftedBadalStudents.length === 1
+                                ? "Student Shifted"
+                                : "Students Shifted"
+                            }`
+                          ) : (
+                            <>
+                              <CheckCircle
+                                size={12}
+                                style={{ marginRight: "4px" }}
+                              />
+                              All {overviewStudents.length || 5} Students Regular
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      <p className="badal-home-desc">
+                        {shiftedBadalStudents.length > 0
+                          ? shiftedBadalStudents.length === 1
+                            ? `${shiftedBadalStudents[0].name} is currently with a substitute teacher. Tap to review and resume.`
+                            : `${shiftedBadalStudents.length} students are currently with substitute teachers. Tap to review and resume.`
+                          : `All ${
+                              overviewStudents.length || 5
+                            } students are attending your regular class. No substitute shifts currently active.`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`badal-home-action-btn ${
+                      shiftedBadalStudents.length === 0 ? "btn-regular" : ""
+                    }`}
+                    onClick={() => setShowBadalResumeModal(true)}
+                  >
+                    {shiftedBadalStudents.length > 0 ? (
+                      <>
+                        <span>Review & Resume</span>
+                        <ChevronRight size={16} />
+                      </>
+                    ) : (
+                      <>
+                        <Users size={15} />
+                        <span>Badal Overview</span>
+                        <ChevronRight size={14} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Popup for Resuming Badal Students & Reviewing Class Status */}
+              {showBadalResumeModal && (
+                <div
+                  className="badal-modal-overlay"
+                  onClick={() => setShowBadalResumeModal(false)}
+                >
+                  <div
+                    className="badal-modal-dialog"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div
+                      className={`badal-home-banner-topbar ${
+                        shiftedBadalStudents.length === 0 ? "topbar-regular" : ""
+                      }`}
+                    />
+                    <div className="badal-modal-header">
+                      <div className="badal-modal-header-left">
+                        <div
+                          className={`badal-modal-icon-bubble ${
+                            shiftedBadalStudents.length === 0
+                              ? "bubble-regular"
+                              : ""
+                          }`}
+                        >
+                          {shiftedBadalStudents.length > 0 ? (
+                            <Users size={20} />
+                          ) : (
+                            <ShieldCheck size={20} />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="badal-modal-title">
+                            {shiftedBadalStudents.length > 0
+                              ? "Resume Students from Badal"
+                              : "Class Status & Badal Overview"}
+                          </h3>
+                          <span
+                            style={{
+                              fontSize: "0.72rem",
+                              color: "var(--soft-brown)",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {shiftedBadalStudents.length > 0
+                              ? `${shiftedBadalStudents.length} ${
+                                  shiftedBadalStudents.length === 1
+                                    ? "Student"
+                                    : "Students"
+                                } with Badal teachers`
+                              : `All ${
+                                  overviewStudents.length || 5
+                                } Students in Regular Class`}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="badal-modal-close-btn"
+                        onClick={() => setShowBadalResumeModal(false)}
+                        title="Close"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="badal-modal-body">
+                      {shiftedBadalStudents.length > 0 ? (
+                        <>
+                          <div className="badal-modal-tip">
+                            <AlertCircle
+                              size={15}
+                              style={{ color: "#d4af37", flexShrink: 0 }}
+                            />
+                            <span>
+                              Resuming will return students back to your regular
+                              attendance & progress register and notify their Badal
+                              teacher.
+                            </span>
+                          </div>
+
+                          {shiftedBadalStudents.map((child) => {
+                            const badalTeacher = (teacherProfiles || []).find(
+                              (p) =>
+                                String(p.id) ===
+                                  String(child.badal_teacher_id) ||
+                                String(p.user_id) ===
+                                  String(child.badal_teacher_id),
+                            );
+                            const badalName =
+                              badalTeacher?.full_name || "Badal Teacher";
+                            const isGirl =
+                              String(child.gender || "").toLowerCase() ===
+                              "female";
+                            const isResumingThis =
+                              resumingStudentId === String(child.student_id) ||
+                              resumingStudentId === "ALL";
+
+                            return (
+                              <div
+                                key={child.student_id}
+                                className="badal-modal-card"
+                              >
+                                <div className="badal-modal-card-left">
+                                  <div
+                                    className="badal-modal-avatar"
+                                    style={{
+                                      background: isGirl
+                                        ? "linear-gradient(135deg, #e91e63, #c2185b)"
+                                        : "linear-gradient(135deg, #e67e22, #d35400)",
+                                    }}
+                                  >
+                                    {child.photoUrl ? (
+                                      <img
+                                        src={child.photoUrl}
+                                        alt={child.name}
+                                      />
+                                    ) : (
+                                      (child.name || "?")
+                                        .charAt(0)
+                                        .toUpperCase()
+                                    )}
+                                  </div>
+                                  <div className="badal-modal-card-info">
+                                    <span className="badal-modal-name">
+                                      {child.name}
+                                      {child.arabic_name
+                                        ? ` (${child.arabic_name})`
+                                        : ""}
+                                    </span>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "6px",
+                                        flexWrap: "wrap",
+                                      }}
+                                    >
+                                      {child.groupName && (
+                                        <span className="badal-resume-group-badge">
+                                          {child.groupName}
+                                        </span>
+                                      )}
+                                      <span className="badal-modal-with-tag">
+                                        <UserCheck size={11} /> With: {badalName}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  className="badal-modal-resume-btn"
+                                  disabled={isResumingThis}
+                                  onClick={() => handleResumeClass(child)}
+                                >
+                                  {isResumingThis ? (
+                                    <>
+                                      <RotateCw
+                                        size={13}
+                                        className="spin-fast"
+                                      />{" "}
+                                      Resuming...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle size={13} /> Resume Class
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </>
+                      ) : (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                            padding: "8px 0",
+                          }}
+                        >
+                          <div
+                            style={{
+                              background: "rgba(16, 185, 129, 0.08)",
+                              border: "1px solid rgba(16, 185, 129, 0.25)",
+                              borderRadius: "12px",
+                              padding: "12px 14px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                            }}
+                          >
+                            <CheckCircle
+                              size={22}
+                              style={{ color: "#10b981", flexShrink: 0 }}
+                            />
+                            <div style={{ fontSize: "0.82rem", lineHeight: 1.4 }}>
+                              <strong
+                                style={{
+                                  display: "block",
+                                  color: "var(--primary-dark)",
+                                  marginBottom: "2px",
+                                }}
+                              >
+                                All Regular Class Active
+                              </strong>
+                              <span style={{ color: "var(--soft-brown)" }}>
+                                All {overviewStudents.length || 5} students in
+                                your group are attending regular classes under
+                                your direct instruction. No substitute shifts are
+                                active.
+                              </span>
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: "8px",
+                              marginTop: "4px",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="action-button secondary-btn"
+                              style={{
+                                padding: "10px 12px",
+                                borderRadius: "10px",
+                                fontSize: "0.8rem",
+                                fontWeight: 700,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "6px",
+                              }}
+                              onClick={() => {
+                                setShowBadalResumeModal(false);
+                                setActivePage("BadalEntry");
+                              }}
+                            >
+                              <BookOpen size={14} /> Badal Entry
+                            </button>
+                            <button
+                              type="button"
+                              className="action-button secondary-btn"
+                              style={{
+                                padding: "10px 12px",
+                                borderRadius: "10px",
+                                fontSize: "0.8rem",
+                                fontWeight: 700,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "6px",
+                              }}
+                              onClick={() => {
+                                setShowBadalResumeModal(false);
+                                setActivePage("Apply Leave");
+                              }}
+                            >
+                              <Calendar size={14} /> Apply Leave
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="badal-modal-footer">
+                      {shiftedBadalStudents.length > 1 && (
+                        <button
+                          type="button"
+                          className="badal-modal-bulk-btn"
+                          disabled={resumingStudentId !== null}
+                          onClick={handleResumeAllBadalStudents}
+                        >
+                          {resumingStudentId === "ALL" ? (
+                            <>
+                              <RotateCw size={14} className="spin-fast" />{" "}
+                              Resuming All...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle size={14} /> Resume All (
+                              {shiftedBadalStudents.length})
+                            </>
+                          )}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="action-button secondary-btn"
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "10px",
+                          fontSize: "0.82rem",
+                        }}
+                        onClick={() => setShowBadalResumeModal(false)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Premium Confirmation Toast */}
+              {badalResumeToast && (
+                <div className="badal-confirm-toast">
+                  <div className="badal-confirm-toast-icon">
+                    <CheckCircle size={20} />
+                  </div>
+                  <div className="badal-confirm-toast-text">
+                    <span className="badal-confirm-toast-title">
+                      {badalResumeToast.title}
+                    </span>
+                    <span className="badal-confirm-toast-sub">
+                      {badalResumeToast.message}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Direct Access Quran Premium Card */}
               {pageVisibility["Quran Ikhtebar"] !== false && (
                 <QuranDirectAccessCard
@@ -37307,89 +38321,6 @@ function TeacherPortal({
                       </div>
                     </div>
                   </div>
-
-                  {shiftedBadalStudents.length > 0 && (
-                    <div className="badal-resume-section">
-                      {shiftedBadalStudents.map((child) => {
-                        // Check both t.id and t.user_id to reliably match the badal teacher profile
-                        const badalTeacher = (teacherProfiles || []).find(
-                          (p) =>
-                            String(p.id) === String(child.badal_teacher_id) ||
-                            String(p.user_id) ===
-                              String(child.badal_teacher_id),
-                        );
-                        const badalName =
-                          badalTeacher?.full_name || "Badal Teacher";
-                        const avatarLetter = (child.name || "?")
-                          .charAt(0)
-                          .toUpperCase();
-                        const groupLabel = child.groupName || "";
-                        return (
-                          <div
-                            key={child.student_id}
-                            className="badal-resume-card"
-                          >
-                            {/* Accent gradient bar at top */}
-                            <div className="badal-resume-topbar" />
-                            <div className="badal-resume-content">
-                              {/* Student Info */}
-                              <div className="badal-resume-left">
-                                <div className="badal-resume-avatar">
-                                  {child.photoUrl ? (
-                                    <img
-                                      src={child.photoUrl}
-                                      alt={child.name}
-                                    />
-                                  ) : (
-                                    avatarLetter
-                                  )}
-                                </div>
-                                <div className="badal-resume-info">
-                                  <div className="badal-resume-title-row">
-                                    <span className="badal-resume-student-name">
-                                      {child.name}
-                                    </span>
-                                    {groupLabel ? (
-                                      <span className="badal-resume-group-badge">
-                                        {groupLabel}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <div className="badal-resume-pill-row">
-                                    <div className="badal-resume-status-pill">
-                                      <span className="badal-resume-pill-avatar">
-                                        {badalName.charAt(0).toUpperCase()}
-                                      </span>
-                                      <span>With: {badalName}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              {/* Resume Button */}
-                              <div className="badal-resume-action">
-                                <button
-                                  type="button"
-                                  className="badal-resume-btn"
-                                  onClick={() => handleResumeClass(child)}
-                                >
-                                  <svg
-                                    width="12"
-                                    height="12"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    style={{ flexShrink: 0 }}
-                                  >
-                                    <path d="M8 5v14l11-7z" />
-                                  </svg>
-                                  Resume
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -41057,11 +41988,21 @@ function TeacherPortal({
 
                   if (existing === status) return;
 
+                  const nowTime = new Date().toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                  });
+                  const nowIso = new Date().toISOString();
+                  try {
+                    localStorage.setItem(`mauze_att_time_${histStudentId}_${date}`, nowTime);
+                  } catch (_) {}
+
                   try {
                     if (existing) {
                       await supabase
                         .from("student_daily_attendance")
-                        .update({ status })
+                        .update({ status, marked_at: nowIso, time: nowTime })
                         .eq("student_id", String(histStudentId))
                         .eq("attendance_date", date);
                     } else {
@@ -41073,6 +42014,9 @@ function TeacherPortal({
                             teacher_id: String(teacherId),
                             attendance_date: date,
                             status,
+                            created_at: nowIso,
+                            marked_at: nowIso,
+                            time: nowTime,
                           },
                           { onConflict: "student_id,attendance_date" },
                         );
@@ -41088,6 +42032,36 @@ function TeacherPortal({
 
                   setHistRecords((prev) => ({ ...prev, [date]: status }));
                   setHistStatus(status);
+
+                  // Send FCM push notification to parents
+                  try {
+                    const studentObj =
+                      (overviewStudents || []).find((s) => String(s.student_id) === String(histStudentId)) ||
+                      (schoolData?.students || []).find((s) => String(s.student_id) === String(histStudentId));
+                    const sName = studentObj?.name || studentObj?.full_name || "Your child";
+                    const statusLabel =
+                      status === "present"
+                        ? "Present"
+                        : status === "absent"
+                          ? "Absent"
+                          : status === "leave" || status === "uzur"
+                            ? "Excused (Leave)"
+                            : String(status).toUpperCase();
+                    broadcastNotification(
+                      `Attendance Marked: ${sName}`,
+                      `${sName} was marked ${statusLabel} on ${date} at ${nowTime}.`,
+                      "parents",
+                      String(studentObj?.parent_user_id || studentObj?.parent_email || histStudentId),
+                      "Attendance",
+                      {
+                        redirectPage: "Attendance",
+                        studentId: String(histStudentId),
+                        status,
+                        date,
+                      },
+                    ).catch((err) => console.warn("Attendance hist notification note:", err));
+                  } catch (_) {}
+
                   if (onShowAction)
                     onShowAction(
                       "success",
@@ -41144,63 +42118,38 @@ function TeacherPortal({
                 }
 
                 return (
-                  <section
-                    className="form-card card-appear"
-                    style={{ width: "100%" }}
-                  >
-                    <div
-                      className="card-headline headline-with-action"
-                      style={{ marginBottom: "24px" }}
-                    >
-                      <div className="headline-left">
+                  <section className="att-history-panel card-appear">
+                    {/* Header */}
+                    <div className="att-history-header">
+                      <div className="att-history-title-group">
                         <CalendarCheck
-                          size={22}
+                          size={24}
                           style={{ color: "var(--primary-gold)" }}
                         />
                         <h3>
-                          Attendance History{" "}
-                          <span
-                            style={{
-                              fontSize: "0.65rem",
-                              background: "var(--primary-gold)",
-                              color: "#fff",
-                              padding: "2px 8px",
-                              borderRadius: "4px",
-                              marginLeft: "8px",
-                              fontWeight: 700,
-                              verticalAlign: "middle",
-                            }}
-                          >
+                          Attendance History
+                          <span className="att-history-premium-badge">
                             PREMIUM
                           </span>
                         </h3>
                       </div>
                     </div>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "16px",
-                        flexWrap: "wrap",
-                        marginBottom: "20px",
-                      }}
-                    >
-                      <label style={{ flex: "1", minWidth: "200px" }}>
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            color: "var(--deep-brown)",
-                            fontSize: "0.85rem",
-                            display: "block",
-                            marginBottom: "4px",
-                          }}
-                        >
+                    {/* Selectors */}
+                    <div className="att-history-selectors">
+                      <div className="att-filter-col">
+                        <label className="att-filter-label">
+                          <Users
+                            size={14}
+                            style={{ color: "var(--primary-gold)" }}
+                          />
                           Select Student
-                        </span>
+                        </label>
                         <SearchableSelect
                           options={histStudents.map((s) => ({
                             value: String(s.student_id),
-                            label: s.name || s.full_name,
+                            label: `${s.name || s.full_name}${s.arabic_name ? ` (${s.arabic_name})` : ""}`,
+                            sub: s.groupName || "",
                           }))}
                           value={histStudentId || ""}
                           onChange={(v) => {
@@ -41212,22 +42161,20 @@ function TeacherPortal({
                           emptyValue="Select student…"
                           searchPlaceholder="Search student by name…"
                         />
-                      </label>
-                      <label style={{ flex: "1", minWidth: "200px" }}>
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            color: "var(--deep-brown)",
-                            fontSize: "0.85rem",
-                            display: "block",
-                            marginBottom: "4px",
-                          }}
-                        >
+                      </div>
+
+                      <div className="att-filter-col">
+                        <label className="att-filter-label">
+                          <Calendar
+                            size={14}
+                            style={{ color: "var(--primary-gold)" }}
+                          />
                           Select Date
-                        </span>
+                        </label>
                         <input
                           type="date"
                           className="premium-input"
+                          style={{ width: "100%", boxSizing: "border-box" }}
                           value={histDate}
                           max={new Date().toISOString().slice(0, 10)}
                           onChange={(e) => {
@@ -41235,39 +42182,38 @@ function TeacherPortal({
                             setHistStatus(null);
                           }}
                         />
-                      </label>
+                      </div>
                     </div>
 
+                    {/* Selected Student Banner */}
                     {selStudent && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "16px",
-                          marginBottom: "20px",
-                          padding: "14px",
-                          borderRadius: "10px",
-                          background: "#f9f6f0",
-                        }}
-                      >
+                      <div className="att-student-banner">
                         <StudentAvatar student={selStudent} />
-                        <div>
-                          <h4 style={{ margin: 0, color: "var(--deep-brown)" }}>
-                            {selStudent.name || selStudent.full_name}
-                          </h4>
-                          <p
-                            style={{
-                              margin: "2px 0 0",
-                              fontSize: "0.8rem",
-                              color: "var(--soft-brown)",
-                            }}
-                          >
-                            {selStudent.groupName || ""} · {histDate}
-                          </p>
+                        <div className="att-student-info">
+                          <h4>{selStudent.name || selStudent.full_name}</h4>
+                          <div className="att-student-meta">
+                            {selStudent.groupName && (
+                              <span className="badal-resume-group-badge">
+                                {selStudent.groupName}
+                              </span>
+                            )}
+                            <span>•</span>
+                            <span>
+                              Selected:{" "}
+                              {new Date(
+                                histDate + "T00:00:00",
+                              ).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
 
+                    {/* Monthly Stats Ribbon */}
                     {(() => {
                       const tPresent = Object.values(histRecords).filter(
                         (v) => v === "present",
@@ -41281,230 +42227,89 @@ function TeacherPortal({
                       const tTotal = tPresent + tAbsent + tHoliday;
                       if (!tTotal) return null;
                       return (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "16px",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            padding: "18px 20px",
-                            borderRadius: "12px",
-                            marginBottom: "20px",
-                            background:
-                              "linear-gradient(135deg, #fcf8f0, #f5edd9)",
-                            border: "1px solid #d4c9b0",
-                            boxShadow: "0 2px 12px rgba(212,175,55,0.08)",
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "0.65rem",
-                              fontWeight: 700,
-                              color: "var(--primary-gold)",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginRight: "8px",
-                            }}
-                          >
-                            Monthly
+                        <div className="att-stats-ribbon">
+                          <div className="att-stat-label-col">Monthly</div>
+                          <div className="att-stat-item att-stat-present">
+                            <span className="att-stat-name">Present</span>
+                            <span className="att-stat-val">{tPresent}</span>
                           </div>
-                          <div
-                            style={{
-                              width: "1px",
-                              height: "32px",
-                              background: "#d4c9b0",
-                            }}
-                          />
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              gap: "2px",
-                              minWidth: "50px",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "0.6rem",
-                                fontWeight: 700,
-                                color: "#155724",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.3px",
-                              }}
-                            >
-                              Present
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "1.4rem",
-                                fontWeight: 800,
-                                color: "#155724",
-                              }}
-                            >
-                              {tPresent}
-                            </span>
+                          <div className="att-stat-item att-stat-absent">
+                            <span className="att-stat-name">Absent</span>
+                            <span className="att-stat-val">{tAbsent}</span>
                           </div>
-                          <div
-                            style={{
-                              width: "1px",
-                              height: "32px",
-                              background: "#d4c9b0",
-                            }}
-                          />
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              gap: "2px",
-                              minWidth: "50px",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "0.6rem",
-                                fontWeight: 700,
-                                color: "#721c24",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.3px",
-                              }}
-                            >
-                              Absent
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "1.4rem",
-                                fontWeight: 800,
-                                color: "#721c24",
-                              }}
-                            >
-                              {tAbsent}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              width: "1px",
-                              height: "32px",
-                              background: "#d4c9b0",
-                            }}
-                          />
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              gap: "2px",
-                              minWidth: "50px",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "0.6rem",
-                                fontWeight: 700,
-                                color: "#856404",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.3px",
-                              }}
-                            >
-                              Holiday
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "1.4rem",
-                                fontWeight: 800,
-                                color: "#856404",
-                              }}
-                            >
-                              {tHoliday}
-                            </span>
+                          <div className="att-stat-item att-stat-holiday">
+                            <span className="att-stat-name">Holiday</span>
+                            <span className="att-stat-val">{tHoliday}</span>
                           </div>
                         </div>
                       );
                     })()}
 
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "10px",
-                        marginBottom: "24px",
-                      }}
-                    >
-                      {["present", "absent", "holiday"].map((status) => {
+                    {/* Action Mark Buttons for Selected Date */}
+                    <div className="att-actions-container">
+                      {[
+                        {
+                          status: "present",
+                          icon: "✓",
+                          label: "Present",
+                          activeClass: "active-present",
+                        },
+                        {
+                          status: "absent",
+                          icon: "✕",
+                          label: "Absent",
+                          activeClass: "active-absent",
+                        },
+                        {
+                          status: "holiday",
+                          icon: "☾",
+                          label: "Holiday",
+                          activeClass: "active-holiday",
+                        },
+                      ].map((item) => {
                         const currentStatus = histRecords[histDate];
-                        const isActive = currentStatus === status;
-                        const colors = {
-                          present: {
-                            bg: "#d4edda",
-                            text: "#155724",
-                            border: "#c3e6cb",
-                            icon: "✓",
-                            label: "Present",
-                          },
-                          absent: {
-                            bg: "#f8d7da",
-                            text: "#721c24",
-                            border: "#f5c6cb",
-                            icon: "✕",
-                            label: "Absent",
-                          },
-                          holiday: {
-                            bg: "#fff3cd",
-                            text: "#856404",
-                            border: "#ffeeba",
-                            icon: "☾",
-                            label: "Holiday",
-                          },
-                        };
-                        const c = colors[status];
+                        const isActive = currentStatus === item.status;
                         return (
                           <button
-                            key={status}
+                            key={item.status}
+                            type="button"
                             onClick={() =>
-                              !histLoading && handleHistMark(histDate, status)
+                              !histLoading &&
+                              handleHistMark(histDate, item.status)
                             }
                             disabled={histLoading}
-                            style={{
-                              flex: 1,
-                              padding: "12px 20px",
-                              borderRadius: "10px",
-                              border: `2px solid ${isActive ? c.border : "#e0d8cc"}`,
-                              cursor: "pointer",
-                              fontWeight: 700,
-                              fontSize: "0.95rem",
-                              transition: "all 0.2s",
-                              background: isActive ? c.bg : "#faf8f5",
-                              color: isActive ? c.text : "var(--text-muted)",
-                              boxShadow: isActive
-                                ? `0 2px 12px ${c.border}`
-                                : "none",
-                            }}
+                            className={`att-action-mark-btn ${isActive ? item.activeClass : ""}`}
                           >
-                            {c.icon} {c.label}
+                            <span>{item.icon}</span>
+                            <span>{item.label}</span>
                           </button>
                         );
                       })}
                     </div>
 
-                    <div style={{ marginTop: "20px" }}>
-                      <h4
-                        style={{
-                          color: "var(--deep-brown)",
-                          marginBottom: "12px",
-                          fontSize: "0.95rem",
-                        }}
-                      >
+                    {/* Last 4 Weeks Overview with Perfectly Aligned Dates Grid */}
+                    <div className="att-overview-section">
+                      <h4>
+                        <Calendar
+                          size={18}
+                          style={{ color: "var(--primary-gold)" }}
+                        />
                         Last 4 Weeks Overview
                       </h4>
+
                       {histLoading ? (
                         <div
                           style={{
                             textAlign: "center",
-                            padding: "20px",
+                            padding: "36px 20px",
                             color: "var(--text-muted)",
                           }}
                         >
-                          Loading...
+                          <div
+                            className="spinner"
+                            style={{ margin: "0 auto 10px" }}
+                          />
+                          <span>Loading attendance history...</span>
                         </div>
                       ) : (
                         (() => {
@@ -41545,136 +42350,69 @@ function TeacherPortal({
                             }
                             weeks.push({ start: weekStart, days });
                           }
-                          return weeks.map((week, wi) => (
-                            <div
-                              key={wi}
-                              style={{
-                                marginBottom: "16px",
-                                padding: "14px",
-                                borderRadius: "10px",
-                                background: "#faf8f5",
-                                border: "1px solid #eee",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "0.75rem",
-                                  fontWeight: 700,
-                                  color: "var(--soft-brown)",
-                                  marginBottom: "8px",
-                                  textTransform: "uppercase",
-                                }}
-                              >
-                                {week.start.toLocaleDateString("en-GB")} —{" "}
-                                {new Date(
-                                  week.start.getTime() + 6 * 86400000,
-                                ).toLocaleDateString("en-GB")}
-                              </div>
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "repeat(7, 1fr)",
-                                  gap: "6px",
-                                }}
-                              >
-                                {week.days.map((day, di) => {
-                                  const sc = {
-                                    present: {
-                                      bg: "#d4edda",
-                                      text: "#155724",
-                                      icon: "✓",
-                                      label: "Present",
-                                    },
-                                    absent: {
-                                      bg: "#f8d7da",
-                                      text: "#721c24",
-                                      icon: "✕",
-                                      label: "Absent",
-                                    },
-                                    holiday: {
-                                      bg: "#fff3cd",
-                                      text: "#856404",
-                                      icon: "☾",
-                                      label: "Holiday",
-                                    },
-                                    null: {
-                                      bg: "#f0f0f0",
-                                      text: "#aaa",
-                                      icon: "—",
-                                      label: "",
-                                    },
-                                  };
-                                  const s = sc[day.status] || sc.null;
-                                  const isSelected = day.dateStr === histDate;
-                                  return (
-                                    <button
-                                      key={di}
-                                      onClick={() => {
-                                        setHistDate(day.dateStr);
-                                        setHistStatus(null);
-                                      }}
-                                      style={{
-                                        padding: "8px 4px",
-                                        borderRadius: "8px",
-                                        border: isSelected
-                                          ? "2px solid var(--primary-gold)"
-                                          : "1px solid #e0d8cc",
-                                        cursor: "pointer",
-                                        textAlign: "center",
-                                        background: isSelected
-                                          ? "#fff8e7"
-                                          : sc.null.bg,
-                                        transition: "all 0.15s",
-                                        opacity: day.isPast ? 1 : 0.5,
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          fontSize: "0.6rem",
-                                          fontWeight: 700,
-                                          color: "var(--soft-brown)",
-                                          textTransform: "uppercase",
+
+                          return weeks.map((week, wi) => {
+                            const endDate = new Date(
+                              week.start.getTime() + 6 * 86400000,
+                            );
+                            const rangeText = `${week.start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — ${endDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+
+                            return (
+                              <div key={wi} className="att-week-card">
+                                <div className="att-week-card-header">
+                                  <span className="att-week-pill">
+                                    {wi === 0
+                                      ? "Week 1 (Current)"
+                                      : `Week ${wi + 1}`}
+                                  </span>
+                                  <span className="att-week-dates-text">
+                                    {rangeText}
+                                  </span>
+                                </div>
+
+                                <div className="att-days-grid">
+                                  {week.days.map((day, di) => {
+                                    const isSelected = day.dateStr === histDate;
+                                    const statusClass = day.status || "empty";
+                                    const iconChar =
+                                      day.status === "present"
+                                        ? "✓"
+                                        : day.status === "absent"
+                                          ? "✕"
+                                          : day.status === "holiday"
+                                            ? "☾"
+                                            : "—";
+
+                                    return (
+                                      <button
+                                        key={di}
+                                        type="button"
+                                        onClick={() => {
+                                          setHistDate(day.dateStr);
+                                          setHistStatus(null);
                                         }}
+                                        disabled={!day.isPast}
+                                        className={`att-day-card ${isSelected ? "selected" : ""} ${!day.isPast ? "disabled-day" : ""}`}
+                                        title={`${day.dayName}, ${day.dateStr}: ${day.status || "Not recorded"}`}
                                       >
-                                        {day.dayName}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "0.85rem",
-                                          fontWeight: 600,
-                                          color: "var(--deep-brown)",
-                                        }}
-                                      >
-                                        {day.dayNum}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "0.85rem",
-                                          color: s.text,
-                                          fontWeight: 700,
-                                        }}
-                                      >
-                                        {s.icon}
-                                      </div>
-                                      {s.label && (
+                                        <span className="att-day-name">
+                                          {day.dayName}
+                                        </span>
+                                        <span className="att-day-num">
+                                          {day.dayNum}
+                                        </span>
                                         <div
-                                          style={{
-                                            fontSize: "0.55rem",
-                                            color: s.text,
-                                            fontWeight: 600,
-                                            marginTop: "2px",
-                                            lineHeight: 1.2,
-                                          }}
+                                          className={`att-day-status-chip ${statusClass}`}
                                         >
-                                          {s.label}
+                                          {iconChar}
                                         </div>
-                                      )}
-                                    </button>
-                                  );
-                                })}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          ));
+                            );
+                          });
                         })()
                       )}
                     </div>
@@ -45894,6 +46632,7 @@ export default function App() {
             announcements: announcementResponse.data || [],
             schedule: activeSchedule,
             attendance: activeAttendance || null,
+            allAttendance: attendanceResponse.data || [],
             weeklyResult: activeResult || null,
             teacherProfiles: consolidatedTeacherProfiles,
             reportSettings: reportSettingsResponse.data || [],
@@ -49433,17 +50172,29 @@ export default function App() {
         }
       });
 
-    // Notify parents in background - DISABLED per user request
-    // const targetStudent = schoolData.students.find(s => s.allIds.includes(String(numericId)));
-    // if (targetStudent) {
-    //   broadcastNotification(
-    //     "Tahfeez Report Submitted",
-    //     `A new progress report has been saved for ${targetStudent?.name || "the student"}.`,
-    //     "parents",
-    //     targetStudent?.parent_user_id || targetStudent?.parent_email,
-    //     "Progress"
-    //   ).catch(err => console.error("Notification broadcast error:", err));
-    // }
+    // Notify parents in background when weekly result is saved
+    try {
+      const targetStudent = (schoolData?.students || []).find(
+        (s) => String(s.student_id) === String(numericId) || (s.allIds && s.allIds.includes(String(numericId)))
+      );
+      if (targetStudent) {
+        const studentName = targetStudent?.name || targetStudent?.full_name || "Your child";
+        const currentWeekDate = payload?.week_date || "";
+        const parentTarget = targetStudent?.parent_user_id || targetStudent?.parent_email || numericId;
+        broadcastNotification(
+          `Weekly Result Live: ${studentName}`,
+          `${studentName}'s weekly marks and progress report are now live. Tap to view report card.`,
+          "parents",
+          String(parentTarget),
+          "Report Card",
+          {
+            redirectPage: "Report Card",
+            studentId: String(numericId),
+            weekDate: currentWeekDate,
+          },
+        ).catch((err) => console.warn("Notification broadcast error:", err));
+      }
+    } catch (_) {}
   };
 
   // Mobile Back Navigation & Edge Gesture Controller
@@ -49621,13 +50372,12 @@ export default function App() {
                 border: "2px solid #d4af37",
                 width: 54,
                 height: 54,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <img
-                src="/logo.png"
-                alt="Logo"
-                style={{ width: 38, height: 38, objectFit: "contain" }}
-              />
+              <Sparkles size={26} color="#d4af37" />
             </div>
           </div>
           <h2 className="premium-loader-title">Mauze Tahfeez</h2>

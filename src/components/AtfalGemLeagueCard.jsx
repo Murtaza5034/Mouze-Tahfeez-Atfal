@@ -520,14 +520,18 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
                   className="gem-student-img"
                   onError={(e) => {
                     e.target.onerror = null;
-                    e.target.src = '/logo.png';
+                    e.target.style.display = "none";
+                    const fb = e.target.parentElement?.querySelector(".gem-student-avatar-fallback");
+                    if (fb) fb.style.display = "flex";
                   }}
                 />
-              ) : (
-                <div className="gem-student-avatar-fallback">
-                  {studentName.charAt(0).toUpperCase()}
-                </div>
-              )}
+              ) : null}
+              <div
+                className="gem-student-avatar-fallback"
+                style={{ display: studentAvatar ? "none" : "flex" }}
+              >
+                {studentName.charAt(0).toUpperCase()}
+              </div>
               <span className="avatar-sparkle-badge">✦</span>
             </div>
             <div className="gem-student-meta">
@@ -721,15 +725,35 @@ export default function AtfalGemLeagueCard({ studentProfile, weeklyResult, custo
                     <CrownIcon rank={player.rank} />
                   </div>
                   <div className="podium-avatar-wrapper">
-                    <img
-                      src={player.avatar}
-                      alt={player.name}
-                      className="monthly-podium-avatar"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = '/logo.png';
+                    {player.avatar ? (
+                      <img
+                        src={player.avatar}
+                        alt={player.name}
+                        className="monthly-podium-avatar"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.style.display = "none";
+                          const fb = e.target.parentElement?.querySelector(".monthly-podium-avatar-fallback");
+                          if (fb) fb.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className="monthly-podium-avatar-fallback"
+                      style={{
+                        display: player.avatar ? "none" : "flex",
+                        width: "100%",
+                        height: "100%",
+                        borderRadius: "50%",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "rgba(212, 175, 55, 0.2)",
+                        color: "var(--primary-gold, #c5a059)",
+                        fontWeight: "bold",
                       }}
-                    />
+                    >
+                      {(player.name || "S").charAt(0).toUpperCase()}
+                    </div>
                     <span className={`podium-rank-tag tag-rank-${player.rank}`}>#{player.rank}</span>
                   </div>
                   <div className="monthly-podium-info">

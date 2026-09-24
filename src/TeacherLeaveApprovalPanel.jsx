@@ -33,7 +33,11 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
 
   // Store in database first (Inbox)
   if (!skipInbox) {
-    const { error } = await supabase.from("system_notifications").insert([dbPayload]);
+    const notificationsTable =
+      getSectionScope() === "kibar"
+        ? "kibar_system_notifications"
+        : "system_notifications";
+    const { error } = await supabase.from(notificationsTable).insert([dbPayload]);
     if (error) {
       inboxError = error;
       console.error('Inbox notification error:', error);
@@ -190,22 +194,7 @@ export default function TeacherLeaveApprovalPanel({
     fetchTlLeaves(initialLeaves.length > 0); 
   }, [sectionKibar]);
 
-  /* Auto-restore expired leaves on load */
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    supabase.from(TEACHER_LEAVE_BADALS_TABLE).select("*").eq("active", true).lte("to_date", today).then(({ data: expired }) => {
-      if (expired && expired.length > 0) {
-        expired.forEach(b => {
-          const sid = String(b.student_id);
-          const sidNum = Number(b.student_id);
-          const sidVal = isNaN(sidNum) ? sid : sidNum;
-          supabase.from(CHILD_PROFILES_TABLE).update({ badal_teacher_id: null }).eq("student_id", sidVal).then(() => {
-            supabase.from(TEACHER_LEAVE_BADALS_TABLE).update({ active: false }).eq("id", b.id);
-          });
-        });
-      }
-    });
-  }, [sectionKibar]);
+  /* Note: Badal students remain active until explicitly resumed by teacher */
 
   const handleTlApprove = async (lv) => {
     if (!tlComment.trim()) {

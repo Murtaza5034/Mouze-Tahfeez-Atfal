@@ -1,0 +1,504 @@
+/* ==========================================================================
+   ASBAAQ ATTENDANCE HISTORY CARD
+   Exact pixel-perfect reproduction of the user reference card
+   Full dynamic responsiveness for all mobile screen sizes (320px - 768px+)
+   ========================================================================== */
+
+.asbaaq-history-card-container {
+  width: 100%;
+  max-width: 580px;
+  margin: 0 auto 20px auto;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(7, 35, 68, 0.08);
+  overflow: hidden;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Header Section */
+.asbaaq-history-header {
+  position: relative;
+  background: linear-gradient(135deg, #051e38 0%, #072545 50%, #0b345e 100%);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(245, 192, 66, 0.18);
+}
+
+/* Arabesque filigree watermark on header right */
+.asbaaq-header-watermark {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  bottom: -10px;
+  width: 220px;
+  height: calc(100% + 20px);
+  pointer-events: none;
+  opacity: 0.22;
+  z-index: 1;
+}
+
+.asbaaq-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+}
+
+.asbaaq-att-icon-wrap {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(245, 192, 66, 0.22) 0%, rgba(245, 192, 66, 0.08) 100%);
+  border: 1px solid rgba(245, 192, 66, 0.45);
+  border-radius: 9px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  color: #f5c042;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  animation: iconPulse 3.5s ease-in-out infinite alternate;
+}
+
+@keyframes iconPulse {
+  0% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 0 0 0 rgba(245, 192, 66, 0);
+  }
+  100% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 0 8px 1.5px rgba(245, 192, 66, 0.35);
+  }
+}
+
+.asbaaq-att-icon {
+  color: #f5c042;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.asbaaq-header-title-single {
+  font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: clamp(0.82rem, 2.8vw, 1.05rem);
+  font-weight: 700;
+  color: #f5c042;
+  letter-spacing: 0.25px;
+  line-height: 1.2;
+  text-transform: none !important;
+  margin: 0;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #fff2cc 0%, #f5c042 50%, #df9c1a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: titleFadeIn 0.5s ease both;
+}
+
+@keyframes titleFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Header Right: Premium Segmented Week Nav Tab */
+.asbaaq-header-nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(3, 17, 33, 0.7);
+  border: 1px solid rgba(245, 192, 66, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+.asbaaq-nav-btn {
+  background: transparent;
+  border: none;
+  color: #f5c042;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.asbaaq-nav-btn:hover:not(:disabled) {
+  background: rgba(245, 192, 66, 0.22);
+  transform: scale(1.06);
+}
+
+.asbaaq-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.asbaaq-week-tab-label {
+  font-size: clamp(0.58rem, 1.8vw, 0.68rem);
+  font-weight: 700;
+  color: #f5c042;
+  background: rgba(245, 192, 66, 0.14);
+  border: 1px solid rgba(245, 192, 66, 0.25);
+  padding: 3px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
+  transition: background 0.15s ease;
+}
+
+.asbaaq-week-tab-label:hover {
+  background: rgba(245, 192, 66, 0.26);
+}
+
+/* Grid Body */
+.asbaaq-grid-body {
+  padding: 16px 14px 18px 14px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.asbaaq-days-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px 8px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Each column stack */
+.asbaaq-day-col {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+/* Top Date Box */
+.asbaaq-date-box {
+  background: #faf8f4;
+  border: 1px solid #dcd8cf;
+  border-radius: 9px;
+  padding: 7px 3px;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.asbaaq-date-box.is-today {
+  border-color: #f5c042;
+  box-shadow: 0 0 0 1px rgba(245, 192, 66, 0.3);
+  background: #fbf6ec;
+}
+
+.asbaaq-day-indicator {
+  font-size: clamp(0.55rem, 1.8vw, 0.62rem);
+  font-weight: 700;
+  color: #8c8270;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.asbaaq-date-line-1 {
+  font-size: clamp(0.70rem, 2.3vw, 0.82rem);
+  font-weight: 600;
+  color: #2b3a4a;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.asbaaq-date-line-2 {
+  font-size: clamp(0.70rem, 2.3vw, 0.82rem);
+  font-weight: 600;
+  color: #2b3a4a;
+  line-height: 1.2;
+}
+
+/* Bottom Status Box */
+.asbaaq-status-box {
+  background: #ffffff;
+  border: 1px solid #dcd8cf;
+  border-radius: 9px;
+  padding: 8px 3px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Status variants */
+.asbaaq-status-text {
+  font-size: clamp(0.66rem, 2.1vw, 0.76rem);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.asbaaq-status-present .asbaaq-status-text {
+  color: #27ae60;
+}
+
+.asbaaq-status-holiday .asbaaq-status-text {
+  color: #d97706;
+}
+
+.asbaaq-status-absent .asbaaq-status-text {
+  color: #dc2626;
+}
+
+.asbaaq-time-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: clamp(0.58rem, 1.8vw, 0.68rem);
+  font-weight: 600;
+  color: #1e293b;
+  background: #f1f5f9;
+  padding: 1.5px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  margin: 3px 0 2px 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  animation: timeFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes timeFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.asbaaq-method-text {
+  font-size: clamp(0.55rem, 1.7vw, 0.64rem);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.asbaaq-method-text.asbaaq-marked {
+  color: #059669;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  padding: 1px 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  animation: markedBadgeIn 0.4s ease both;
+}
+
+@keyframes markedBadgeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.asbaaq-method-text.asbaaq-not-marked {
+  color: #94a3b8;
+  font-weight: 500;
+  background: rgba(241, 245, 249, 0.7);
+  border: 1px dashed rgba(203, 213, 225, 0.9);
+  padding: 1px 5px;
+  border-radius: 999px;
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Empty / Dash variant */
+.asbaaq-status-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.asbaaq-dash-text {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #94a3b8;
+  line-height: 1;
+}
+
+/* Slot 8 Summary styling */
+.asbaaq-date-box.asbaaq-summary-box {
+  background: #f7f3ea;
+  border-color: #d1c7b4;
+}
+
+.asbaaq-summary-title {
+  font-size: clamp(0.66rem, 2.1vw, 0.76rem);
+  font-weight: 700;
+  color: #6d5b3d;
+  letter-spacing: 0.6px;
+  line-height: 1.2;
+}
+
+.asbaaq-summary-sub {
+  font-size: clamp(0.62rem, 1.9vw, 0.72rem);
+  font-weight: 600;
+  color: #8c7b5a;
+  letter-spacing: 0.4px;
+  line-height: 1.2;
+}
+
+/* Compact Mobile Screen Optimizations (<= 380px) */
+@media (max-width: 380px) {
+  .asbaaq-history-card-container {
+    border-radius: 14px;
+    margin-bottom: 16px;
+  }
+
+  .asbaaq-history-header {
+    padding: 10px 10px;
+    gap: 6px;
+  }
+
+  .asbaaq-header-left {
+    gap: 6px;
+  }
+
+  .asbaaq-att-icon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  .asbaaq-att-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .asbaaq-header-title-single {
+    font-size: clamp(0.70rem, 2.7vw, 0.85rem);
+    letter-spacing: 0.2px;
+  }
+
+  .asbaaq-header-nav-tab {
+    padding: 1.5px;
+    gap: 1px;
+  }
+
+  .asbaaq-nav-btn {
+    width: 20px;
+    height: 20px;
+  }
+
+  .asbaaq-week-tab-label {
+    padding: 2px 5px;
+    font-size: 0.58rem;
+  }
+
+  .asbaaq-grid-body {
+    padding: 10px 6px 12px 6px;
+  }
+
+  .asbaaq-days-grid {
+    gap: 6px 4px;
+  }
+
+  .asbaaq-day-col {
+    gap: 5px;
+  }
+
+  .asbaaq-date-box {
+    padding: 5px 2px;
+    min-height: 48px;
+    border-radius: 7px;
+  }
+
+  .asbaaq-status-box {
+    padding: 6px 2px;
+    min-height: 58px;
+    border-radius: 7px;
+  }
+}
+
+@media (max-width: 340px) {
+  .asbaaq-history-header {
+    padding: 8px 6px;
+    gap: 4px;
+  }
+
+  .asbaaq-header-left {
+    gap: 4px;
+  }
+
+  .asbaaq-att-icon-wrap {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+  }
+
+  .asbaaq-att-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .asbaaq-header-title-single {
+    font-size: 0.58rem;
+    letter-spacing: 0.2px;
+  }
+
+  .asbaaq-nav-btn {
+    width: 18px;
+    height: 18px;
+  }
+
+  .asbaaq-week-tab-label {
+    padding: 2px 4px;
+    font-size: 0.52rem;
+  }
+}
+

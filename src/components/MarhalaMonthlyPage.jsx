@@ -1136,15 +1136,19 @@ export default function MarhalaMonthlyPage({ students = [], weeklyResults = [], 
                               if (cached && e.currentTarget.src !== cached) {
                                 e.currentTarget.src = cached;
                               } else {
-                                e.currentTarget.src = "/logo.png";
+                                e.currentTarget.style.display = "none";
+                                const fb = e.currentTarget.parentElement?.querySelector(".mrk-student-avatar-fallback");
+                                if (fb) fb.style.display = "flex";
                               }
                             }}
                           />
-                        ) : (
-                          <div className="mrk-student-avatar-fallback">
-                            {(s.name || "S").charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                        ) : null}
+                        <div
+                          className="mrk-student-avatar-fallback"
+                          style={{ display: s.photoUrl || s.photo_url ? "none" : "flex" }}
+                        >
+                          {(s.name || "S").charAt(0).toUpperCase()}
+                        </div>
                         <div className="mrk-student-meta">
                           <div className="mrk-student-name-row">
                             <span className="mrk-student-name">{s.name}</span>
