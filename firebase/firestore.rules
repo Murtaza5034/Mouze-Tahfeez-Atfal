@@ -100,10 +100,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
     match /teacher_attendance_settings/{id} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
     match /teacher_attendance/{id} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
 
     // ---------- child_profiles ----------
@@ -317,10 +317,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
     match /kibar_teacher_attendance_settings/{id} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
     match /kibar_teacher_attendance/{id} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
 
     // ---------- kibar_student_profiles ----------

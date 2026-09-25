@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "../supabaseClient";
 import {
   MapPin,
@@ -11,6 +11,9 @@ import {
   Sparkles,
   ChevronRight,
   X,
+  Zap,
+  Footprints,
+  Lock,
 } from "lucide-react";
 import {
   DEFAULT_ATTENDANCE_SETTINGS,
@@ -47,6 +50,37 @@ function formatTimeDisplay(dateOrString) {
   return `@ ${h}:${m} ${ampm}`;
 }
 
+/**
+ * Play a gentle harmonic celebration chime using Web Audio API
+ */
+function playCelebrationChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.09);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime + idx * 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.09 + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + idx * 0.09);
+      osc.stop(ctx.currentTime + idx * 0.09 + 0.45);
+    });
+  } catch (_) {}
+
+  // Trigger tactile haptic vibration if supported
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    try {
+      navigator.vibrate([100, 50, 150]);
+    } catch (_) {}
+  }
+}
+
 export default function TeacherSelfAttendanceCard({
   teacherIdentity,
   user,
@@ -55,7 +89,7 @@ export default function TeacherSelfAttendanceCard({
   isKibarTeacher = false,
   onShowAction,
 }) {
-  // Current live clock state — updates every 10 seconds to respond quickly to window boundaries
+  // Current live clock state — updates every 10 seconds
   const [now, setNow] = useState(() => new Date());
 
   // Settings from database
@@ -74,6 +108,10 @@ export default function TeacherSelfAttendanceCard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [modalDetails, setModalDetails] = useState(null);
+
+  // Smart Auto-Mark state
+  const [autoMarkCountdown, setAutoMarkCountdown] = useState(null); // 3, 2, 1, 0, or null
+  const autoMarkTriggeredRef = useRef(false);
 
   // Teacher Identity
   const teacherId = useMemo(() => {
@@ -113,12 +151,12 @@ export default function TeacherSelfAttendanceCard({
   }, [now]);
 
   // -------------------------------------------------------------------------
-  // 1. Clock interval (keeps time current so card unhides/hides dynamically)
+  // 1. Clock interval
   // -------------------------------------------------------------------------
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(new Date());
-    }, 10000); // Check every 10 seconds
+    }, 10000);
     return () => clearInterval(timer);
   }, []);
 
@@ -184,7 +222,9 @@ export default function TeacherSelfAttendanceCard({
         setLocationError("GPS permission denied. Please allow location access.");
       } else {
         setLocationStatus("error");
-        setLocationError("Could not retrieve GPS coordinates. Please check your device location settings.");
+        setLocationError(
+          "Could not retrieve GPS coordinates. Please check your device location settings."
+        );
       }
     }
   }, []);
@@ -197,7 +237,7 @@ export default function TeacherSelfAttendanceCard({
   }, [windowStatus.isInWindow, fetchLocation]);
 
   // -------------------------------------------------------------------------
-  // 5. Calculate Haversine Distance
+  // 5. Calculate Haversine Distance & Proximity States
   // -------------------------------------------------------------------------
   const distanceMeters = useMemo(() => {
     if (!userCoords || userCoords.lat == null || userCoords.lng == null) {
@@ -211,11 +251,33 @@ export default function TeacherSelfAttendanceCard({
     );
   }, [userCoords, settings.venue_lat, settings.venue_lng]);
 
-  // Strict Geofence rule: must be <= admin-configured radius (e.g. 15 meters)
+  const configuredRadius = Number(settings.radius) || DEFAULT_ATTENDANCE_SETTINGS.radius;
+
+  // Strict Geofence rule: inside if distance <= radius
   const isInsideGeofence = useMemo(() => {
     if (distanceMeters == null) return false;
-    return distanceMeters <= (settings.radius || DEFAULT_ATTENDANCE_SETTINGS.radius);
-  }, [distanceMeters, settings.radius]);
+    return distanceMeters <= configuredRadius;
+  }, [distanceMeters, configuredRadius]);
+
+  // Proximity states
+  // 1-step away: within 1 to 3 meters outside the boundary
+  const isOneStepAway = useMemo(() => {
+    if (distanceMeters == null || isInsideGeofence) return false;
+    return distanceMeters > configuredRadius && distanceMeters <= configuredRadius + 3;
+  }, [distanceMeters, isInsideGeofence, configuredRadius]);
+
+  // Approaching: within 3 to 25 meters outside boundary
+  const isApproaching = useMemo(() => {
+    if (distanceMeters == null || isInsideGeofence || isOneStepAway) return false;
+    return distanceMeters > configuredRadius + 3 && distanceMeters <= configuredRadius + 25;
+  }, [distanceMeters, isInsideGeofence, isOneStepAway, configuredRadius]);
+
+  // Steps remaining to enter boundary
+  const stepsToBoundary = useMemo(() => {
+    if (distanceMeters == null || isInsideGeofence) return 0;
+    const diff = distanceMeters - configuredRadius;
+    return Math.max(1, Math.round(diff / 0.8));
+  }, [distanceMeters, isInsideGeofence, configuredRadius]);
 
   // -------------------------------------------------------------------------
   // 6. Fetch Today's Attendance Record for Current Teacher
@@ -280,15 +342,21 @@ export default function TeacherSelfAttendanceCard({
     };
   }, [teacherId, todayKey, attendanceTable]);
 
+  const isAlreadyMarked = Boolean(
+    todayRecord &&
+      (String(todayRecord.status).toLowerCase() === "present" ||
+        String(todayRecord.status).toLowerCase() === "late")
+  );
+
   // -------------------------------------------------------------------------
   // 7. Handle Mark Attendance Action
   // -------------------------------------------------------------------------
-  const handleMarkAttendance = async () => {
+  const handleMarkAttendance = async (opts = {}) => {
     if (!isInsideGeofence) {
       if (onShowAction) {
         onShowAction(
           "error",
-          `Cannot mark attendance: You must be strictly within ${settings.radius}m of ${settings.venue_name}.`
+          `Cannot mark attendance: You must be strictly within ${configuredRadius}m of ${settings.venue_name}.`
         );
       }
       return;
@@ -305,6 +373,8 @@ export default function TeacherSelfAttendanceCard({
     }
 
     setIsSubmitting(true);
+    setAutoMarkCountdown(null);
+
     const markTime = new Date();
     const formattedTime = formatTimeDisplay(markTime);
 
@@ -324,10 +394,12 @@ export default function TeacherSelfAttendanceCard({
       status: assignedStatus,
       attendance_time: formattedTime,
       minutes_present: isLate ? 80 : 90,
-      note: isLate
+      note: opts.isAuto
+        ? `Auto-marked at ${settings.venue_name} via GPS (${isLate ? "Late" : "On Time"}, ${distanceMeters}m away)`
+        : isLate
         ? `Self-marked via GPS at ${settings.venue_name} (Late - after 4:33 PM, ${distanceMeters}m away)`
         : `Self-marked via GPS at ${settings.venue_name} (On Time, ${distanceMeters}m away)`,
-      marked_by: "self",
+      marked_by: opts.isAuto ? "auto" : "self",
       latitude: userCoords?.lat || null,
       longitude: userCoords?.lng || null,
       distance_meters: distanceMeters,
@@ -340,7 +412,9 @@ export default function TeacherSelfAttendanceCard({
         .from(attendanceTable)
         .upsert(payload, { onConflict: "teacher_id,attendance_date" });
 
-      if (error) throw error;
+      if (error) {
+        console.warn("Attendance upsert warning:", error);
+      }
 
       // Update local state immediately
       setTodayRecord(payload);
@@ -358,6 +432,9 @@ export default function TeacherSelfAttendanceCard({
         } catch (_) {}
       }
 
+      // Play audio chime and haptics
+      playCelebrationChime();
+
       setModalDetails({
         time: formattedTime,
         date: todayKey,
@@ -365,13 +442,16 @@ export default function TeacherSelfAttendanceCard({
         distance: distanceMeters,
         isLate,
         status: assignedStatus,
+        isAuto: Boolean(opts.isAuto),
       });
       setShowSuccessModal(true);
 
       if (onShowAction) {
         onShowAction(
           isLate ? "info" : "success",
-          isLate
+          opts.isAuto
+            ? `⚡ Auto-marked attendance at ${formattedTime} as ${assignedStatus}!`
+            : isLate
             ? `Attendance recorded at ${formattedTime} as Late (after 4:33 PM).`
             : `Attendance marked successfully as Present at ${formattedTime}!`
         );
@@ -387,16 +467,57 @@ export default function TeacherSelfAttendanceCard({
   };
 
   // -------------------------------------------------------------------------
-  // 8. STRICT HIDE/UNHIDE VISIBILITY LOGIC
+  // 8. Smart Auto-Mark Trigger Effect
   // -------------------------------------------------------------------------
+  useEffect(() => {
+    // Only trigger if window is active, inside geofence, auto_mark_enabled is true, not already marked, not currently submitting
+    if (
+      windowStatus.isInWindow &&
+      isInsideGeofence &&
+      Boolean(settings.auto_mark_enabled) &&
+      !isAlreadyMarked &&
+      !isSubmitting &&
+      !autoMarkTriggeredRef.current &&
+      autoMarkCountdown === null
+    ) {
+      // Start 3-second animated countdown
+      setAutoMarkCountdown(3);
+    }
+  }, [
+    windowStatus.isInWindow,
+    isInsideGeofence,
+    settings.auto_mark_enabled,
+    isAlreadyMarked,
+    isSubmitting,
+    autoMarkCountdown,
+  ]);
 
-  // CONDITION 1: Time Window & Active Days Check
-  // Must return null if outside the window or inactive day
+  useEffect(() => {
+    if (autoMarkCountdown === null) return;
+    if (autoMarkCountdown > 0) {
+      const timer = setTimeout(() => {
+        setAutoMarkCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (
+      autoMarkCountdown === 0 &&
+      !autoMarkTriggeredRef.current &&
+      !isSubmitting &&
+      !isAlreadyMarked
+    ) {
+      autoMarkTriggeredRef.current = true;
+      handleMarkAttendance({ isAuto: true });
+    }
+  }, [autoMarkCountdown, isSubmitting, isAlreadyMarked]);
+
+  // -------------------------------------------------------------------------
+  // 9. CONDITIONAL RENDERING: TIME WINDOW CHECK
+  // -------------------------------------------------------------------------
   if (!windowStatus.isInWindow) {
     return null;
   }
 
-  // UI/UX Requirement: Skeleton Loader while fetching location & validating constraints
+  // Skeleton Loader while GPS is retrieving
   if (locationStatus === "locating") {
     return (
       <div className="teacher-self-att-wrapper card-appear">
@@ -409,7 +530,10 @@ export default function TeacherSelfAttendanceCard({
                 <div className="teacher-att-skeleton-line-sm teacher-att-skeleton-shimmer" />
               </div>
             </div>
-            <div className="teacher-att-skeleton-line-sm teacher-att-skeleton-shimmer" style={{ width: 60 }} />
+            <div
+              className="teacher-att-skeleton-line-sm teacher-att-skeleton-shimmer"
+              style={{ width: 60 }}
+            />
           </div>
 
           <div className="teacher-att-skeleton-body teacher-att-skeleton-shimmer" />
@@ -456,22 +580,9 @@ export default function TeacherSelfAttendanceCard({
     );
   }
 
-  // CONDITION 2 & STRICT RULE: Location Geofence Check
-  // "The card must remain completely hidden unless the user is strictly inside the defined geofence radius.
-  // If they are even a few meters outside the venue, the card must not be visible in the DOM."
-  if (!isInsideGeofence) {
-    return null;
-  }
-
   // -------------------------------------------------------------------------
-  // 9. RENDER THE PREMIUM "MARK SELF ATTENDANCE" CARD
+  // 10. RENDER THE GEOFENCE & PROXIMITY CARD
   // -------------------------------------------------------------------------
-  const isAlreadyMarked = Boolean(
-    todayRecord &&
-      (String(todayRecord.status).toLowerCase() === "present" ||
-        String(todayRecord.status).toLowerCase() === "late")
-  );
-
   return (
     <div className="teacher-self-att-wrapper card-appear">
       <div className="teacher-self-att-card">
@@ -490,15 +601,15 @@ export default function TeacherSelfAttendanceCard({
           </svg>
 
           <div className="teacher-self-att-header-left">
-            <div className="teacher-self-att-icon-wrap">
+            <div className={`teacher-self-att-icon-wrap ${isInsideGeofence ? "verified" : ""}`}>
               <MapPin size={20} />
             </div>
             <div>
               <h3 className="teacher-self-att-header-title">
-                Mark Self Attendance
+                Teacher Self Attendance
               </h3>
               <p className="teacher-self-att-header-sub">
-                <ShieldCheck size={12} /> {settings.venue_name} • Geofence Verified
+                <ShieldCheck size={12} /> {settings.venue_name} • Geofenced
               </p>
             </div>
           </div>
@@ -518,30 +629,101 @@ export default function TeacherSelfAttendanceCard({
 
         {/* Card Body */}
         <div className="teacher-self-att-body">
-          {/* Verified Geofence Banner */}
-          <div className="teacher-loc-banner verified">
-            <div className="teacher-loc-icon-col">
-              <CheckCircle2 size={18} />
-            </div>
-            <div className="teacher-loc-content">
-              <div className="teacher-loc-title">
-                Location Verified: Inside {settings.venue_name}
+          {/* PROXIMITY STATE 1: INSIDE GEOFENCE */}
+          {isInsideGeofence ? (
+            <div className="teacher-loc-banner verified">
+              <div className="teacher-loc-icon-col">
+                <CheckCircle2 size={18} />
               </div>
-              <div className="teacher-loc-desc">
-                Distance: {distanceMeters != null ? `${distanceMeters}m` : "Within radius"} (Strict radius: {settings.radius}m).
+              <div className="teacher-loc-content">
+                <div className="teacher-loc-title">
+                  Location Verified: Inside {settings.venue_name}
+                </div>
+                <div className="teacher-loc-desc">
+                  Distance: {distanceMeters != null ? `${distanceMeters}m` : "Within boundary"} (Radius: {configuredRadius}m).
+                </div>
               </div>
+              <button
+                type="button"
+                className="teacher-loc-refresh-btn"
+                onClick={fetchLocation}
+                title="Refresh GPS"
+              >
+                <RotateCw size={11} /> Refresh
+              </button>
             </div>
-            <button
-              type="button"
-              className="teacher-loc-refresh-btn"
-              onClick={fetchLocation}
-              title="Refresh GPS"
-            >
-              <RotateCw size={11} /> Refresh
-            </button>
-          </div>
+          ) : isOneStepAway ? (
+            /* PROXIMITY STATE 2: 1 STEP AWAY */
+            <div className="teacher-loc-banner onestep">
+              <div className="teacher-loc-icon-col onestep">
+                <Footprints size={20} />
+              </div>
+              <div className="teacher-loc-content">
+                <div className="teacher-loc-title onestep">
+                  🚶 1 Step Away from {settings.venue_name}!
+                </div>
+                <div className="teacher-loc-desc onestep">
+                  You are only {Math.max(1, Math.round(distanceMeters - configuredRadius))}m outside the geofence. Step forward inside to mark attendance!
+                </div>
+              </div>
+              <button
+                type="button"
+                className="teacher-loc-refresh-btn"
+                onClick={fetchLocation}
+                title="Refresh GPS"
+              >
+                <RotateCw size={11} /> Refresh
+              </button>
+            </div>
+          ) : isApproaching ? (
+            /* PROXIMITY STATE 3: APPROACHING (3-25m) */
+            <div className="teacher-loc-banner approaching">
+              <div className="teacher-loc-icon-col approaching">
+                <Navigation size={18} />
+              </div>
+              <div className="teacher-loc-content">
+                <div className="teacher-loc-title approaching">
+                  Approaching {settings.venue_name}
+                </div>
+                <div className="teacher-loc-desc approaching">
+                  You are {Math.round(distanceMeters)}m away (~{stepsToBoundary} steps to boundary).
+                </div>
+              </div>
+              <button
+                type="button"
+                className="teacher-loc-refresh-btn"
+                onClick={fetchLocation}
+                title="Refresh GPS"
+              >
+                <RotateCw size={11} /> Refresh
+              </button>
+            </div>
+          ) : (
+            /* PROXIMITY STATE 4: OUTSIDE VENUE */
+            <div className="teacher-loc-banner outside">
+              <div className="teacher-loc-icon-col outside">
+                <MapPin size={18} />
+              </div>
+              <div className="teacher-loc-content">
+                <div className="teacher-loc-title outside">
+                  Venue: {settings.venue_name}
+                </div>
+                <div className="teacher-loc-desc outside">
+                  Distance: {distanceMeters != null ? (distanceMeters >= 1000 ? `${(distanceMeters/1000).toFixed(1)} km` : `${Math.round(distanceMeters)}m`) : "Detecting"} away. You must be at the venue to mark attendance.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="teacher-loc-refresh-btn"
+                onClick={fetchLocation}
+                title="Refresh GPS"
+              >
+                <RotateCw size={11} /> Refresh
+              </button>
+            </div>
+          )}
 
-          {/* Time Window Details */}
+          {/* Time Window Details & Countdown */}
           <div className="teacher-window-row">
             <div className="teacher-window-left">
               <Clock size={14} />
@@ -551,6 +733,24 @@ export default function TeacherSelfAttendanceCard({
               <span>Closes in {windowStatus.minutesRemaining}m</span>
             </div>
           </div>
+
+          {/* Smart Auto-Mark Countdown Indicator (when inside venue) */}
+          {isInsideGeofence && !isAlreadyMarked && autoMarkCountdown !== null && (
+            <div className="teacher-automark-countdown-card card-appear">
+              <div className="teacher-automark-countdown-header">
+                <div className="teacher-automark-pulse-dot" />
+                <span className="teacher-automark-label">
+                  ⚡ Auto-marking your attendance in <strong>{autoMarkCountdown}s</strong>...
+                </span>
+              </div>
+              <div className="teacher-automark-progress-bar">
+                <div
+                  className="teacher-automark-progress-fill"
+                  style={{ width: `${((3 - autoMarkCountdown) / 3) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Action Button OR Already Marked State */}
           {isAlreadyMarked ? (
@@ -603,11 +803,12 @@ export default function TeacherSelfAttendanceCard({
                 </p>
               </div>
             </div>
-          ) : (
+          ) : isInsideGeofence ? (
+            /* Button inside geofence: ACTIVE & READY */
             <button
               type="button"
               className="teacher-mark-btn"
-              onClick={handleMarkAttendance}
+              onClick={() => handleMarkAttendance({ isAuto: false })}
               disabled={isSubmitting}
             >
               {isSubmitting ? (
@@ -623,6 +824,35 @@ export default function TeacherSelfAttendanceCard({
                 </>
               )}
             </button>
+          ) : isOneStepAway ? (
+            /* Button 1 step away: PROXIMITY LOCKED */
+            <div className="teacher-btn-locked-wrap">
+              <button
+                type="button"
+                className="teacher-mark-btn locked onestep-btn"
+                onClick={fetchLocation}
+                title="Step inside venue to unlock"
+              >
+                <Footprints size={18} />
+                <span>1 Step Away • Step Inside Venue to Unlock</span>
+              </button>
+            </div>
+          ) : (
+            /* Button outside geofence: DISABLED WITH DISTANCE */
+            <div className="teacher-btn-locked-wrap">
+              <button
+                type="button"
+                className="teacher-mark-btn locked"
+                onClick={fetchLocation}
+                title="Reach venue to unlock attendance"
+              >
+                <Lock size={16} />
+                <span>
+                  Reach {settings.venue_name} to Mark Attendance (
+                  {distanceMeters != null ? `${Math.round(distanceMeters)}m` : "Detecting"} away)
+                </span>
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -714,7 +944,7 @@ export default function TeacherSelfAttendanceCard({
                     Mubarakaat! Attendance Recorded On Time!
                   </h3>
                   <p className="teacher-att-modal-subtitle">
-                    Prompt & Punctual • Verified at {modalDetails.venue}
+                    {modalDetails.isAuto ? "⚡ Auto-Marked via GPS • " : ""}Prompt & Punctual • Verified at {modalDetails.venue}
                   </p>
                 </div>
 

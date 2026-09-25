@@ -359,6 +359,156 @@
   background: rgba(39, 174, 96, 0.22);
 }
 
+/* Proximity Banner Variations */
+.teacher-loc-banner.onestep {
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.12), rgba(245, 158, 11, 0.05));
+  border: 1.5px solid rgba(234, 88, 12, 0.45);
+  color: #c2410c;
+  animation: att-pulse-border 2s infinite;
+}
+
+@keyframes att-pulse-border {
+  0%, 100% { border-color: rgba(234, 88, 12, 0.45); }
+  50% { border-color: rgba(234, 88, 12, 0.85); box-shadow: 0 0 12px rgba(234, 88, 12, 0.25); }
+}
+
+.teacher-loc-icon-col.onestep {
+  color: #ea580c;
+}
+
+.teacher-loc-title.onestep {
+  color: #9a3412;
+  font-weight: 800;
+}
+
+.teacher-loc-desc.onestep {
+  color: #c2410c;
+  font-weight: 600;
+}
+
+.teacher-loc-banner.approaching {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.04));
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: #854d0e;
+}
+
+.teacher-loc-icon-col.approaching {
+  color: #d4af37;
+}
+
+.teacher-loc-title.approaching {
+  color: #713f12;
+  font-weight: 800;
+}
+
+.teacher-loc-desc.approaching {
+  color: #854d0e;
+}
+
+.teacher-loc-banner.outside {
+  background: linear-gradient(135deg, rgba(100, 116, 139, 0.08), rgba(100, 116, 139, 0.03));
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  color: #475569;
+}
+
+.teacher-loc-icon-col.outside {
+  color: #64748b;
+}
+
+.teacher-loc-title.outside {
+  color: #334155;
+  font-weight: 800;
+}
+
+.teacher-loc-desc.outside {
+  color: #64748b;
+}
+
+/* Smart Auto-Mark Countdown Indicator */
+.teacher-automark-countdown-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.06));
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.teacher-automark-countdown-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-automark-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+  animation: att-pulse-dot 1s infinite alternate;
+}
+
+@keyframes att-pulse-dot {
+  from { opacity: 0.5; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+
+.teacher-automark-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #065f46;
+}
+
+.teacher-automark-progress-bar {
+  width: 100%;
+  height: 5px;
+  background: rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.teacher-automark-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  transition: width 0.3s ease;
+}
+
+/* Locked & Proximity Button States */
+.teacher-btn-locked-wrap {
+  width: 100%;
+}
+
+.teacher-mark-btn.locked {
+  background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+  color: #475569;
+  box-shadow: none;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+}
+
+.teacher-mark-btn.locked:hover {
+  background: linear-gradient(135deg, #cbd5e1, #94a3b8);
+  color: #1e293b;
+  transform: none;
+}
+
+.teacher-mark-btn.locked.onestep-btn {
+  background: linear-gradient(135deg, #ffedd5, #fed7aa);
+  color: #9a3412;
+  border: 1.5px solid #fb923c;
+  box-shadow: 0 4px 14px rgba(251, 146, 60, 0.25);
+  animation: att-shake-subtle 4s infinite;
+}
+
+@keyframes att-shake-subtle {
+  0%, 90%, 100% { transform: none; }
+  92%, 96% { transform: translateX(-2px); }
+  94%, 98% { transform: translateX(2px); }
+}
+
+
 /* Time Window Row */
 .teacher-window-row {
   display: flex;

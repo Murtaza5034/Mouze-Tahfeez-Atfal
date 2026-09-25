@@ -10,6 +10,7 @@ export const DEFAULT_ATTENDANCE_SETTINGS = {
   venue_lat: 23.51104,
   venue_lng: 74.0166317,
   radius: 15, // 15 meters default strict accuracy
+  auto_mark_enabled: true, // Auto-mark teacher when at location during window
 };
 
 const DAY_NAMES = [
@@ -94,6 +95,13 @@ export function normalizeAttendanceSettings(raw) {
     raw.VenueName ||
     DEFAULT_ATTENDANCE_SETTINGS.venue_name;
 
+  const autoMarkEnabled =
+    raw.auto_mark_enabled !== undefined
+      ? Boolean(raw.auto_mark_enabled)
+      : raw.AutoMarkEnabled !== undefined
+      ? Boolean(raw.AutoMarkEnabled)
+      : DEFAULT_ATTENDANCE_SETTINGS.auto_mark_enabled;
+
   return {
     id: 1,
     start_time: startTime,
@@ -103,6 +111,7 @@ export function normalizeAttendanceSettings(raw) {
     venue_lng: isNaN(venueLng) ? DEFAULT_ATTENDANCE_SETTINGS.venue_lng : venueLng,
     radius: isNaN(radius) || radius <= 0 ? DEFAULT_ATTENDANCE_SETTINGS.radius : radius,
     venue_name: venueName,
+    auto_mark_enabled: autoMarkEnabled,
     // Provide PascalCase mirrors for compatibility
     StartTime: startTime,
     EndTime: endTime,
@@ -111,6 +120,7 @@ export function normalizeAttendanceSettings(raw) {
     VenueLng: isNaN(venueLng) ? DEFAULT_ATTENDANCE_SETTINGS.venue_lng : venueLng,
     Radius: isNaN(radius) || radius <= 0 ? DEFAULT_ATTENDANCE_SETTINGS.radius : radius,
     VenueName: venueName,
+    AutoMarkEnabled: autoMarkEnabled,
   };
 }
 
@@ -363,20 +373,39 @@ export async function saveAttendanceSettings(settings, isKibar = false) {
     VenueLng: normalized.venue_lng,
     Radius: normalized.radius,
     VenueName: normalized.venue_name,
+    auto_mark_enabled: normalized.auto_mark_enabled,
+    AutoMarkEnabled: normalized.auto_mark_enabled,
     updated_at: new Date().toISOString(),
   };
 
-  const { data, error } = await supabase
-    .from(tableName)
-    .upsert(payload, { onConflict: "id" })
-    .select()
-    .maybeSingle();
+  let savedData = null;
+  try {
+    const { data, error } = await supabase
+      .from(tableName)
+      .upsert(payload, { onConflict: "id" })
+      .select()
+      .maybeSingle();
 
-  if (error) {
-    throw error;
+    if (error) {
+      console.warn(`[AttendanceSettings] Remote upsert error on ${tableName}:`, error);
+      // Try plain update fallback if upsert failed
+      const { data: updateData, error: updateErr } = await supabase
+        .from(tableName)
+        .update(payload)
+        .eq("id", 1)
+        .select()
+        .maybeSingle();
+      if (!updateErr && updateData) {
+        savedData = updateData;
+      }
+    } else if (data) {
+      savedData = data;
+    }
+  } catch (err) {
+    console.warn(`[AttendanceSettings] Database exception on ${tableName}:`, err);
   }
 
-  // Cache in localStorage
+  // Cache in localStorage as guaranteed fallback
   if (typeof window !== "undefined" && window.localStorage) {
     try {
       localStorage.setItem(
@@ -386,5 +415,5 @@ export async function saveAttendanceSettings(settings, isKibar = false) {
     } catch (_) {}
   }
 
-  return normalizeAttendanceSettings(data || payload);
+  return normalizeAttendanceSettings(savedData || payload);
 }

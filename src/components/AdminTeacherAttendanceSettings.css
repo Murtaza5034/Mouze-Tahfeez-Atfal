@@ -485,3 +485,517 @@
   color: #b8941f;
   font-size: 14px;
 }
+
+/* ==========================================================================
+   NEW ENHANCEMENTS: Search Bar, Map Layers, Proximity Steps & Auto-Mark
+   ========================================================================== */
+
+.att-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.att-badge-gold {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(212, 175, 55, 0.16);
+  color: #b8941f;
+  letter-spacing: 0.04em;
+}
+
+.att-label-with-presets {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Smart Auto-Mark Card */
+.att-card-automark {
+  background: linear-gradient(135deg, #ffffff 0%, #faf8f3 100%);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.08);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.att-automark-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.att-automark-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.att-automark-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.25), rgba(212, 175, 55, 0.1));
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: #d4af37;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.att-automark-title {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #2c2518;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.att-automark-subtitle {
+  margin: 4px 0 0 0;
+  font-size: 0.78rem;
+  color: #6d6352;
+  line-height: 1.45;
+}
+
+/* Premium iOS/Material Toggle Switch */
+.att-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.att-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.att-toggle-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #d1c7b7;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 34px;
+}
+
+.att-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+}
+
+.att-toggle-switch input:checked + .att-toggle-slider {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.att-toggle-switch input:checked + .att-toggle-slider:before {
+  transform: translateX(22px);
+}
+
+.att-automark-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.att-pill {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.att-pill.pill-active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.att-pill.pill-inactive {
+  background: rgba(107, 114, 128, 0.12);
+  color: #4b5563;
+  border: 1px solid rgba(107, 114, 128, 0.25);
+}
+
+.att-automark-note {
+  font-size: 0.74rem;
+  color: #5d5343;
+  line-height: 1.35;
+}
+
+/* Map Location Search Box */
+.att-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.att-search-icon {
+  position: absolute;
+  left: 14px;
+  color: #8c806d;
+  pointer-events: none;
+}
+
+.att-search-input {
+  width: 100%;
+  padding: 11px 40px 11px 38px;
+  border: 1.5px solid #d4af37;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 0.85rem;
+  color: #2c2518;
+  box-shadow: 0 2px 10px rgba(212, 175, 55, 0.08);
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.att-search-input:focus {
+  border-color: #b8941f;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
+}
+
+.att-search-clear-btn {
+  position: absolute;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.att-search-clear-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.att-search-clear {
+  position: absolute;
+  right: 12px;
+  color: #b8941f;
+}
+
+/* Autocomplete Dropdown */
+.att-search-results-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  background: #ffffff;
+  border: 1px solid #d9d2c5;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.att-search-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f3eee6;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.att-search-result-item:last-child {
+  border-bottom: none;
+}
+
+.att-search-result-item:hover {
+  background: #fdfaf3;
+}
+
+.att-result-icon {
+  color: #b8941f;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.att-result-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.att-result-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #2c2518;
+}
+
+.att-result-address {
+  font-size: 0.72rem;
+  color: #7d7261;
+  white-space: normal;
+  line-height: 1.3;
+}
+
+/* Map Layer Switcher */
+.att-map-layer-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.att-layer-pills-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #6d6352;
+}
+
+.att-layer-pills-group {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.att-layer-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: transparent;
+  color: #5c5344;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.att-layer-pill.active {
+  background: #ffffff;
+  color: #1a160f;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.att-map-wrapper {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1.5px solid #d4af37;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.att-map-container {
+  height: 320px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.att-map-overlay-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 500;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #524736;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+/* Proximity & Step Presets Section */
+.att-radius-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fcfbfa;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #ebdcc5;
+}
+
+.att-step-info-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(212, 175, 55, 0.15);
+  color: #b8941f;
+}
+
+.att-step-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 6px;
+}
+
+.att-step-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1.5px solid #e2dbce;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.att-step-chip:hover {
+  border-color: #d4af37;
+  transform: translateY(-1px);
+}
+
+.att-step-chip.active {
+  background: linear-gradient(135deg, #d4af37, #b8941f);
+  border-color: #9f7d12;
+  box-shadow: 0 3px 10px rgba(184, 148, 31, 0.3);
+}
+
+.att-step-chip-top {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #2c2518;
+}
+
+.att-step-chip.active .att-step-chip-top {
+  color: #ffffff;
+}
+
+.att-step-chip-sub {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #7d7261;
+}
+
+.att-step-chip.active .att-step-chip-sub {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.att-radius-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.att-input-unit {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #7d7261;
+  margin-right: 10px;
+}
+
+.att-step-counter-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #d4af37;
+  font-size: 0.78rem;
+  color: #3b3223;
+  white-space: nowrap;
+}
+
+.att-footprint-icon {
+  color: #b8941f;
+}
+
+.att-radius-explanation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: #615645;
+  line-height: 1.45;
+}
+
+.att-explanation-bullet {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .att-settings-container {
+    padding: 0 10px 30px 10px;
+  }
+  .att-settings-header {
+    padding: 14px 16px;
+  }
+  .att-card-header {
+    padding: 14px 16px;
+  }
+  .att-card-body {
+    padding: 14px 16px;
+  }
+  .att-map-container {
+    height: 260px;
+  }
+  .att-step-presets-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .att-radius-custom-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .att-footer-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .att-btn-save {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
