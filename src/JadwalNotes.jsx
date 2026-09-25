@@ -91,9 +91,15 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
             created_at: new Date().toISOString()
           };
 
-          const { error: dbErr } = await supabase.from("system_notifications").insert([notifPayload]);
+          let createdInboxId = null;
+          const { data: insertedRows, error: dbErr } = await supabase
+            .from("system_notifications")
+            .insert([notifPayload])
+            .select();
           if (dbErr) {
             console.error("Failed to insert parent note notification into DB:", dbErr);
+          } else if (insertedRows && insertedRows[0]?.id) {
+            createdInboxId = String(insertedRows[0].id);
           }
 
           try {
@@ -106,6 +112,9 @@ export const JadwalNotes = ({ role, studentId, studentName, teacherName, teacher
                 skipInbox: true,
                 section: getSectionScope() === "kibar" ? "kibar" : "atfal",
                 data: {
+                  inbox_item_id: createdInboxId || "",
+                  id: createdInboxId || "",
+                  notification_id: createdInboxId || "",
                   redirectPage: `Jadwal:${studentId}`,
                   timestamp: new Date().toISOString()
                 }

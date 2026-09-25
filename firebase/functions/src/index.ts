@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { GoogleAuth } from "google-auth-library";
 
 admin.initializeApp();
@@ -371,6 +371,8 @@ async function writeInbox(doc: Row, section: "atfal" | "kibar" = "atfal") {
       redirect_page: doc.redirect_page || "/",
       created_at: new Date().toISOString(),
       is_read: false,
+      skip_push: true, // Internal writes already dispatched push
+      fcm_sent: true,
     });
   } catch (e) {
     console.warn("inbox write failed", (e as Error).message);
@@ -475,7 +477,12 @@ async function sendFcmInner(
         delivered++;
       } else {
         const code = r.error?.code || "";
-        if (/not-registered|unregistered|registration-token-not-registered/i.test(code)) {
+        const msg = r.error?.message || "";
+        if (
+          /not-registered|unregistered|registration-token-not-registered|invalid-registration-token|invalid-argument/i.test(
+            code + " " + msg
+          )
+        ) {
           stale++;
           db.collection(col)
             .where("fcm_token", "==", chunk[idx])
@@ -657,6 +664,181 @@ export const sendFcm = onCall({ cors: true }, async (request) => {
     summary: { total: res.total, delivered: res.delivered, stale: res.stale, failures: res.failed },
   };
 });
+
+// ---------------------------------------------------------------------------
+// Real-time Firestore Triggers: Inbox Push Notifications
+//
+// Automatically dispatches FCM push notifications to users/roles whenever a new
+// notification document is created in `system_notifications` or
+// `kibar_system_notifications`. Runs on trusted Google Cloud Functions, so push
+// delivery happens immediately even if the sender or recipient app is closed.
+// ---------------------------------------------------------------------------
+
+export const onSystemNotificationCreated = onDocumentCreated(
+  "system_notifications/{notifId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = (snap.data() || {}) as Row;
+    const notifId = event.params.notifId;
+
+    // Skip if explicitly marked or already sent
+    if (data.skip_push === true || data.fcm_sent === true) {
+      return;
+    }
+
+    const title = String(data.title || "Mauze Tahfeez").trim();
+    const body = String(data.body || "").trim();
+    if (!title && !body) return;
+
+    // Prevent immediate duplicate broadcast
+    const dedupKey = `inbox:atfal:${notifId}:${title}:${body}`;
+    if (isDuplicateSend(dedupKey, 10000)) {
+      console.log(`[onSystemNotificationCreated] Duplicate send skipped for ${notifId}`);
+      return;
+    }
+
+    const targetUser = data.target_user || null;
+    const targetRole = data.target_role || null;
+    const redirectPage = data.redirect_page || "/";
+    const section = "atfal";
+
+    const tokens = await tokensForTarget(targetUser, targetRole || "all", section);
+    if (!tokens.length) {
+      console.log(
+        `[onSystemNotificationCreated] No active FCM tokens for targetUser=${targetUser}, targetRole=${targetRole}`
+      );
+      await snap.ref
+        .update({
+          fcm_sent: true,
+          fcm_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+          fcm_tokens_count: 0,
+          fcm_delivered: 0,
+        })
+        .catch(() => {});
+      return;
+    }
+
+    const dataPayload: Record<string, string> = {
+      inbox_item_id: String(notifId),
+      id: String(notifId),
+      notification_id: String(notifId),
+      title,
+      body,
+      redirect_page: String(redirectPage),
+      redirectPage: String(redirectPage),
+      target_role: String(targetRole || ""),
+      target_user: String(targetUser || ""),
+      section,
+      url: notificationUrl({ redirectPage, id: notifId, inbox_item_id: notifId }),
+    };
+
+    const res = await sendFcmInner(
+      tokens,
+      title,
+      body,
+      dataPayload,
+      `inbox-${notifId}`,
+      section
+    );
+
+    console.log(
+      `[onSystemNotificationCreated] Dispatched push for inbox ${notifId}: delivered=${res.delivered}, stale=${res.stale}, failed=${res.failed}`
+    );
+
+    await snap.ref
+      .update({
+        fcm_sent: true,
+        fcm_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+        fcm_tokens_count: tokens.length,
+        fcm_delivered: res.delivered,
+        fcm_failed: res.failed,
+      })
+      .catch(() => {});
+  }
+);
+
+export const onKibarSystemNotificationCreated = onDocumentCreated(
+  "kibar_system_notifications/{notifId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = (snap.data() || {}) as Row;
+    const notifId = event.params.notifId;
+
+    if (data.skip_push === true || data.fcm_sent === true) {
+      return;
+    }
+
+    const title = String(data.title || "Tahfeez al Kibar").trim();
+    const body = String(data.body || "").trim();
+    if (!title && !body) return;
+
+    const dedupKey = `inbox:kibar:${notifId}:${title}:${body}`;
+    if (isDuplicateSend(dedupKey, 10000)) {
+      console.log(`[onKibarSystemNotificationCreated] Duplicate send skipped for ${notifId}`);
+      return;
+    }
+
+    const targetUser = data.target_user || null;
+    const targetRole = data.target_role || null;
+    const redirectPage = data.redirect_page || "/";
+    const section = "kibar";
+
+    const tokens = await tokensForTarget(targetUser, targetRole || "all", section);
+    if (!tokens.length) {
+      console.log(
+        `[onKibarSystemNotificationCreated] No active FCM tokens for targetUser=${targetUser}, targetRole=${targetRole}`
+      );
+      await snap.ref
+        .update({
+          fcm_sent: true,
+          fcm_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+          fcm_tokens_count: 0,
+          fcm_delivered: 0,
+        })
+        .catch(() => {});
+      return;
+    }
+
+    const dataPayload: Record<string, string> = {
+      inbox_item_id: String(notifId),
+      id: String(notifId),
+      notification_id: String(notifId),
+      title,
+      body,
+      redirect_page: String(redirectPage),
+      redirectPage: String(redirectPage),
+      target_role: String(targetRole || ""),
+      target_user: String(targetUser || ""),
+      section,
+      url: notificationUrl({ redirectPage, id: notifId, inbox_item_id: notifId }),
+    };
+
+    const res = await sendFcmInner(
+      tokens,
+      title,
+      body,
+      dataPayload,
+      `inbox-${notifId}`,
+      section
+    );
+
+    console.log(
+      `[onKibarSystemNotificationCreated] Dispatched push for kibar inbox ${notifId}: delivered=${res.delivered}, stale=${res.stale}, failed=${res.failed}`
+    );
+
+    await snap.ref
+      .update({
+        fcm_sent: true,
+        fcm_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+        fcm_tokens_count: tokens.length,
+        fcm_delivered: res.delivered,
+        fcm_failed: res.failed,
+      })
+      .catch(() => {});
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Firestore trigger: Leave chat (WhatsApp-style chatbar) notifications

@@ -1,0 +1,334 @@
+endpoints:
+  getGlobalRank:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: getGlobalRank
+  sendFcm:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: sendFcm
+  onSystemNotificationCreated:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    eventTrigger:
+      eventType: google.cloud.firestore.document.v1.created
+      eventFilters:
+        database: (default)
+        namespace: (default)
+      eventFilterPathPatterns:
+        document: system_notifications/{notifId}
+      retry: false
+    entryPoint: onSystemNotificationCreated
+  onKibarSystemNotificationCreated:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    eventTrigger:
+      eventType: google.cloud.firestore.document.v1.created
+      eventFilters:
+        database: (default)
+        namespace: (default)
+      eventFilterPathPatterns:
+        document: kibar_system_notifications/{notifId}
+      retry: false
+    entryPoint: onKibarSystemNotificationCreated
+  notifyLeaveChatMessages:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    eventTrigger:
+      eventType: google.cloud.firestore.document.v1.updated
+      eventFilters:
+        database: (default)
+        namespace: (default)
+      eventFilterPathPatterns:
+        document: student_leaves/{leaveId}
+      retry: false
+    entryPoint: notifyLeaveChatMessages
+  notifyKibarLeaveChatMessages:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    eventTrigger:
+      eventType: google.cloud.firestore.document.v1.updated
+      eventFilters:
+        database: (default)
+        namespace: (default)
+      eventFilterPathPatterns:
+        document: kibar_student_leaves/{leaveId}
+      retry: false
+    entryPoint: notifyKibarLeaveChatMessages
+  sendWhatsapp:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: sendWhatsapp
+  sendEmail:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: sendEmail
+  provisionUser:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: provisionUser
+  getUserByEmail:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: getUserByEmail
+  resetUserPassword:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: resetUserPassword
+  clearAllMarks:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: clearAllMarks
+  sendScheduleNotifications:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    scheduleTrigger:
+      schedule: every 1 minutes
+      retryConfig:
+        retryCount: null
+        maxDoublings: null
+        maxRetrySeconds: null
+        minBackoffSeconds: null
+        maxBackoffSeconds: null
+      timeZone: null
+    entryPoint: sendScheduleNotifications
+  processScheduledNotifications:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: processScheduledNotifications
+  sendResultLiveNotifier:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: sendResultLiveNotifier
+  scheduledSendResultLiveNotifier:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    scheduleTrigger:
+      schedule: every 2 minutes
+      retryConfig:
+        retryCount: null
+        maxDoublings: null
+        maxRetrySeconds: null
+        minBackoffSeconds: null
+        maxBackoffSeconds: null
+      timeZone: null
+    entryPoint: scheduledSendResultLiveNotifier
+  sendKibarResultLiveNotifier:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    scheduleTrigger:
+      schedule: every 2 minutes
+      retryConfig:
+        retryCount: null
+        maxDoublings: null
+        maxRetrySeconds: null
+        minBackoffSeconds: null
+        maxBackoffSeconds: null
+      timeZone: null
+    entryPoint: sendKibarResultLiveNotifier
+  sendJadwalReminder:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    scheduleTrigger:
+      schedule: every 1 minutes
+      retryConfig:
+        retryCount: null
+        maxDoublings: null
+        maxRetrySeconds: null
+        minBackoffSeconds: null
+        maxBackoffSeconds: null
+      timeZone: null
+    entryPoint: sendJadwalReminder
+  autoClearProgress:
+    availableMemoryMb: null
+    timeoutSeconds: null
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    scheduleTrigger:
+      schedule: every 30 minutes
+      retryConfig:
+        retryCount: null
+        maxDoublings: null
+        maxRetrySeconds: null
+        minBackoffSeconds: null
+        maxBackoffSeconds: null
+      timeZone: null
+    entryPoint: autoClearProgress
+  deployAndroidApp:
+    availableMemoryMb: null
+    timeoutSeconds: 300
+    minInstances: null
+    maxInstances: null
+    ingressSettings: null
+    concurrency: null
+    serviceAccountEmail: null
+    vpc: null
+    platform: gcfv2
+    labels: {}
+    callableTrigger: {}
+    entryPoint: deployAndroidApp
+specVersion: v1alpha1
+requiredAPIs:
+  - api: cloudscheduler.googleapis.com
+    reason: Needed for scheduled functions.
+extensions: {}

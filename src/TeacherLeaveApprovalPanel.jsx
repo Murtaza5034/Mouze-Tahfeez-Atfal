@@ -32,15 +32,21 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
   let waSent = 0;
 
   // Store in database first (Inbox)
+  let createdInboxId = null;
   if (!skipInbox) {
     const notificationsTable =
       getSectionScope() === "kibar"
         ? "kibar_system_notifications"
         : "system_notifications";
-    const { error } = await supabase.from(notificationsTable).insert([dbPayload]);
+    const { data: insertedRows, error } = await supabase
+      .from(notificationsTable)
+      .insert([dbPayload])
+      .select();
     if (error) {
       inboxError = error;
       console.error('Inbox notification error:', error);
+    } else if (insertedRows && insertedRows[0]?.id) {
+      createdInboxId = String(insertedRows[0].id);
     }
   }
 
@@ -54,6 +60,9 @@ const broadcastNotification = async (title, body, targetRole = "all", targetUser
         targetUser: targetUser,
         section: getSectionScope() === "kibar" ? "kibar" : "atfal",
         data: {
+          inbox_item_id: createdInboxId || "",
+          id: createdInboxId || "",
+          notification_id: createdInboxId || "",
           redirectPage,
           fileUrl: fileUrl || "",
           timestamp: new Date().toISOString()

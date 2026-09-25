@@ -522,17 +522,27 @@ export default async function handler(req, res) {
     tokens = [...new Set(tokens.filter(Boolean))];
 
     // 2. Write to Inbox if requested
+    let createdInboxId = String(dataMap.inbox_item_id || dataMap.id || dataMap.notification_id || '');
     if (!body.skipInbox) {
       const inboxCol = section === 'kibar' ? 'kibar_system_notifications' : 'system_notifications';
-      await db.collection(inboxCol).add({
-        title,
-        body: messageBody,
-        target_role: targetRole || null,
-        target_user: targetUser || null,
-        redirect_page: dataMap.redirectPage || notificationUrl(dataMap),
-        created_at: new Date().toISOString(),
-        is_read: false,
-      }).catch((e) => console.warn('Inbox write note:', e.message));
+      try {
+        const inboxRef = await db.collection(inboxCol).add({
+          title,
+          body: messageBody,
+          target_role: targetRole || null,
+          target_user: targetUser || null,
+          redirect_page: dataMap.redirectPage || notificationUrl(dataMap),
+          created_at: new Date().toISOString(),
+          is_read: false,
+          skip_push: true,
+          fcm_sent: true,
+        });
+        if (inboxRef && inboxRef.id) {
+          createdInboxId = inboxRef.id;
+        }
+      } catch (inboxErr) {
+        console.warn('Inbox write note:', inboxErr.message);
+      }
     }
 
     if (!tokens.length) {
@@ -549,6 +559,9 @@ export default async function handler(req, res) {
 
     // Ensure all data fields are pure strings for FCM compatibility
     const fcmData = {
+      inbox_item_id: createdInboxId,
+      id: createdInboxId,
+      notification_id: createdInboxId,
       title,
       body: messageBody,
       tag: notifTag,
@@ -629,10 +642,15 @@ export default async function handler(req, res) {
           delivered++;
         } else {
           const code = r.error?.code || '';
-          if (/not-registered|unregistered|registration-token-not-registered/i.test(code)) {
+          const msg = r.error?.message || '';
+          if (/not-registered|unregistered|registration-token-not-registered|invalid-registration-token|invalid-argument/i.test(code + ' ' + msg)) {
             stale++;
-            // Delete directly by document ID (which is the fcm_token) without read queries
-            db.collection(col).doc(chunk[idx]).delete().catch(() => {});
+            const tkn = chunk[idx];
+            // Prune both doc where doc ID is token AND where fcm_token field matches
+            db.collection(col).doc(tkn).delete().catch(() => {});
+            db.collection(col).where('fcm_token', '==', tkn).get().then((sn) => {
+              sn.docs.forEach((d) => d.ref.delete().catch(() => {}));
+            }).catch(() => {});
           } else {
             failed++;
           }

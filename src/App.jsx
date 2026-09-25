@@ -1606,14 +1606,20 @@ const broadcastNotification = async (
   let fcmError = null;
   let fcmData = null;
 
+  let createdInboxId =
+    extraData?.inbox_item_id || extraData?.id || extraData?.notification_id || null;
+
   // Store in database first (Inbox)
   if (!skipInbox) {
-    const { error } = await supabase
+    const { data: insertedRows, error } = await supabase
       .from(notificationsTable)
-      .insert([dbPayload]);
+      .insert([dbPayload])
+      .select();
     if (error) {
       inboxError = error;
       console.error("Inbox notification error:", error);
+    } else if (insertedRows && insertedRows[0]?.id) {
+      createdInboxId = String(insertedRows[0].id);
     }
   }
 
@@ -1631,6 +1637,9 @@ const broadcastNotification = async (
           skipInbox: true,
           data: {
             ...extraData,
+            inbox_item_id: createdInboxId || "",
+            id: createdInboxId || "",
+            notification_id: createdInboxId || "",
             redirectPage,
             fileUrl: fileUrl || "",
             timestamp: new Date().toISOString(),
@@ -45532,6 +45541,27 @@ export default function App() {
           );
         } catch (_) {}
       }
+
+      const inboxId =
+        tap.inbox_item_id || tap.notification_id || tap.id || tap.item_id;
+      if (inboxId) {
+        if (!targetPage || targetPage === "/" || targetPage === "null") {
+          targetPage =
+            portalRole === "admin" || portalRole === "kibar-admin"
+              ? "Notifications"
+              : "Inbox";
+        }
+        const notifObj = {
+          id: inboxId,
+          title: tap.title || "Notification",
+          body: tap.body || "",
+          created_at: tap.created_at || new Date().toISOString(),
+          target_role: tap.target_role || "all",
+          file_url: tap.file_url || tap.fileUrl || "",
+        };
+        setSelectedAnnouncement(notifObj);
+      }
+
       if (!targetPage || targetPage === "/" || targetPage === "null") return;
       if (String(targetPage).startsWith("Jadwal:")) {
         const parts = String(targetPage).split(":");
