@@ -99,6 +99,12 @@ service cloud.firestore {
     match /whatsapp_config/{id} {
       allow read, write: if isSignedIn();
     }
+    match /teacher_attendance_settings/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /teacher_attendance/{id} {
+      allow read, write: if isSignedIn();
+    }
 
     // ---------- child_profiles ----------
     match /child_profiles/{studentId} {
@@ -308,6 +314,12 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
     match /kibar_whatsapp_config/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /kibar_teacher_attendance_settings/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /kibar_teacher_attendance/{id} {
       allow read, write: if isSignedIn();
     }
 

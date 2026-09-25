@@ -37745,7 +37745,7 @@ function TeacherPortal({
 
               {/* Badal Resume & Class Status Card — Permanently anchored after Active Notification Card */}
               <div
-                className={`badal-home-banner card-appear ${
+                className={`badal-home-banner ${
                   shiftedBadalStudents.length === 0 ? "status-regular" : ""
                 }`}
               >

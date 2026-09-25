@@ -14753,7 +14753,9 @@ button:not(.rp-btn-gold):not(.support-bot-send):not(.quick-action-btn):not(.side
   box-shadow: 0 4px 20px rgba(230, 126, 34, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   box-sizing: border-box;
-  animation: cardAppear 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 1 !important;
+  visibility: visible !important;
+  animation: cardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .badal-home-banner.status-regular {
