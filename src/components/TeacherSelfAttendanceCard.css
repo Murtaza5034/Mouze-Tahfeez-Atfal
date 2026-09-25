@@ -1,0 +1,787 @@
+/* ==========================================================================
+   TEACHER SELF ATTENDANCE & GEOFENCING CARD
+   Ultra-Premium Responsive Card UI (Mobile to Desktop)
+   Theme: Royal Islamic Navy & Gold Typography with Emerald Accents
+   ========================================================================== */
+
+.teacher-self-att-wrapper {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto 20px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+/* --- Skeleton Loader --- */
+.teacher-att-skeleton-card {
+  position: relative;
+  width: 100%;
+  background: var(--surface-card, #ffffff);
+  border-radius: 20px;
+  border: 1px solid var(--border-color, rgba(212, 175, 55, 0.22));
+  box-shadow: 0 4px 24px rgba(7, 35, 68, 0.08);
+  padding: clamp(14px, 2vw, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.teacher-att-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(220, 215, 205, 0.25) 25%,
+    rgba(240, 235, 225, 0.6) 50%,
+    rgba(220, 215, 205, 0.25) 75%
+  );
+  background-size: 200% 100%;
+  animation: att-skeleton-wave 1.5s infinite;
+  border-radius: 10px;
+}
+
+@keyframes att-skeleton-wave {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.teacher-att-skeleton-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teacher-att-skeleton-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.teacher-att-skeleton-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.teacher-att-skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.teacher-att-skeleton-line-sm {
+  width: 90px;
+  height: 12px;
+}
+
+.teacher-att-skeleton-line-lg {
+  width: 180px;
+  height: 18px;
+}
+
+.teacher-att-skeleton-body {
+  height: 52px;
+  width: 100%;
+  border-radius: 12px;
+}
+
+.teacher-att-skeleton-btn {
+  height: 50px;
+  width: 100%;
+  border-radius: 12px;
+}
+
+.teacher-att-skeleton-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #8c806c;
+}
+
+/* --- Permission Request Card --- */
+.teacher-permission-card {
+  position: relative;
+  width: 100%;
+  background: var(--surface-card, #ffffff);
+  border-radius: 20px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 4px 24px rgba(184, 148, 31, 0.12);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.teacher-permission-header {
+  background: linear-gradient(135deg, #1e1911 0%, #3a311f 100%);
+  padding: clamp(12px, 1.8vw, 16px) clamp(14px, 2.2vw, 20px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.teacher-permission-header-title {
+  color: #f5c042;
+  font-size: clamp(0.9rem, 2vw, 1.05rem);
+  font-weight: 800;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-permission-body {
+  padding: clamp(16px, 2vw, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.teacher-permission-text {
+  font-size: clamp(0.82rem, 1.8vw, 0.92rem);
+  color: #4a4336;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.teacher-permission-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 22px;
+  background: linear-gradient(135deg, #d4af37, #b8941f);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(184, 148, 31, 0.35);
+  transition: all 0.2s ease;
+}
+
+.teacher-permission-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(184, 148, 31, 0.45);
+}
+
+/* --- Live Self-Attendance Action Card --- */
+.teacher-self-att-card {
+  position: relative;
+  width: 100%;
+  background: var(--surface-card, #ffffff);
+  border-radius: 20px;
+  border: 1px solid rgba(212, 175, 55, 0.24);
+  box-shadow: 0 4px 24px rgba(7, 35, 68, 0.08), 0 1px 3px rgba(212, 175, 55, 0.12);
+  overflow: hidden;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.teacher-self-att-card:hover {
+  box-shadow: 0 8px 32px rgba(7, 35, 68, 0.12), 0 2px 6px rgba(212, 175, 55, 0.2);
+}
+
+/* Header */
+.teacher-self-att-header {
+  position: relative;
+  background: linear-gradient(135deg, #04182d 0%, #072545 50%, #0b3764 100%);
+  padding: clamp(12px, 1.8vw, 16px) clamp(14px, 2.2vw, 22px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(245, 192, 66, 0.25);
+}
+
+.teacher-self-att-header-watermark {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  bottom: -10px;
+  width: 240px;
+  height: calc(100% + 20px);
+  pointer-events: none;
+  opacity: 0.2;
+  z-index: 1;
+}
+
+.teacher-self-att-header-left {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.5vw, 14px);
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  flex: 1;
+}
+
+.teacher-self-att-icon-wrap {
+  width: clamp(36px, 4.2vw, 42px);
+  height: clamp(36px, 4.2vw, 42px);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(245, 192, 66, 0.28) 0%, rgba(245, 192, 66, 0.08) 100%);
+  border: 1px solid rgba(245, 192, 66, 0.5);
+  border-radius: 11px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  color: #f5c042;
+}
+
+.teacher-self-att-header-title {
+  margin: 0;
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  background: linear-gradient(135deg, #fff5d6 0%, #f5c042 50%, #df9c1a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teacher-self-att-header-sub {
+  margin: 2px 0 0 0;
+  font-size: clamp(0.72rem, 1.5vw, 0.8rem);
+  color: rgba(255, 255, 255, 0.88);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.teacher-self-att-time-pill {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(3, 17, 33, 0.8);
+  border: 1px solid rgba(245, 192, 66, 0.4);
+  border-radius: 9px;
+  padding: 5px 12px;
+  color: #f5c042;
+  font-size: clamp(0.72rem, 1.6vw, 0.82rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Card Body */
+.teacher-self-att-body {
+  padding: clamp(14px, 2vw, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface-card, #ffffff);
+}
+
+/* Location Status Banner */
+.teacher-loc-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: clamp(12px, 1.6vw, 16px);
+  border-radius: 14px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.teacher-loc-banner.verified {
+  background: linear-gradient(135deg, rgba(39, 174, 96, 0.1), rgba(39, 174, 96, 0.04));
+  border: 1px solid rgba(39, 174, 96, 0.35);
+  color: #1e7e34;
+}
+
+.teacher-loc-icon-col {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.teacher-loc-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.teacher-loc-title {
+  font-weight: 800;
+  font-size: clamp(0.82rem, 1.8vw, 0.95rem);
+  margin-bottom: 2px;
+}
+
+.teacher-loc-desc {
+  font-size: clamp(0.72rem, 1.5vw, 0.82rem);
+  opacity: 0.92;
+}
+
+.teacher-loc-refresh-btn {
+  background: rgba(39, 174, 96, 0.12);
+  border: 1px solid rgba(39, 174, 96, 0.4);
+  color: #1b5e20;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.teacher-loc-refresh-btn:hover {
+  background: rgba(39, 174, 96, 0.22);
+}
+
+/* Time Window Row */
+.teacher-window-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  font-size: clamp(0.76rem, 1.6vw, 0.85rem);
+  gap: 10px;
+}
+
+.teacher-window-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.teacher-window-countdown {
+  font-weight: 800;
+  font-size: clamp(0.72rem, 1.5vw, 0.8rem);
+  color: #947414;
+  background: rgba(212, 175, 55, 0.14);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 8px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Main Action Button */
+.teacher-mark-btn {
+  width: 100%;
+  padding: clamp(13px, 1.8vw, 16px) clamp(16px, 2.5vw, 24px);
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #d4af37 0%, #b8941f 50%, #947414 100%);
+  color: #ffffff;
+  font-size: clamp(0.92rem, 2vw, 1.05rem);
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(184, 148, 31, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.teacher-mark-btn::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 20%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.35);
+  transform: rotate(30deg);
+  transition: none;
+  animation: att-btn-shine 3.5s infinite;
+}
+
+@keyframes att-btn-shine {
+  0% { left: -60%; }
+  30% { left: 140%; }
+  100% { left: 140%; }
+}
+
+.teacher-mark-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(184, 148, 31, 0.52);
+}
+
+.teacher-mark-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.teacher-mark-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Already Marked Today Banner */
+.teacher-already-marked-box {
+  border-radius: 16px;
+  padding: clamp(14px, 2vw, 18px);
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 16px);
+  box-sizing: border-box;
+}
+
+.teacher-already-marked-box.present {
+  background: linear-gradient(135deg, rgba(39, 174, 96, 0.12), rgba(39, 174, 96, 0.05));
+  border: 1px solid rgba(39, 174, 96, 0.38);
+}
+
+.teacher-already-marked-box.late {
+  background: linear-gradient(135deg, rgba(230, 126, 34, 0.12), rgba(230, 126, 34, 0.05));
+  border: 1px solid rgba(230, 126, 34, 0.38);
+}
+
+.teacher-already-icon {
+  width: clamp(42px, 5vw, 48px);
+  height: clamp(42px, 5vw, 48px);
+  border-radius: 12px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.teacher-already-icon.present {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  box-shadow: 0 4px 14px rgba(39, 174, 96, 0.35);
+}
+
+.teacher-already-icon.late {
+  background: linear-gradient(135deg, #e67e22, #f39c12);
+  box-shadow: 0 4px 14px rgba(230, 126, 34, 0.35);
+}
+
+.teacher-already-title {
+  margin: 0;
+  font-size: clamp(0.92rem, 2vw, 1.05rem);
+  font-weight: 800;
+}
+
+.teacher-already-title.present {
+  color: #1b5e20;
+}
+
+.teacher-already-title.late {
+  color: #934106;
+}
+
+.teacher-already-sub {
+  margin: 4px 0 0 0;
+  font-size: clamp(0.76rem, 1.6vw, 0.85rem);
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Modal Popup */
+.teacher-att-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 14, 28, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.teacher-att-modal-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface-card, #ffffff);
+  border-radius: 22px;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+  animation: att-modal-pop 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-sizing: border-box;
+}
+
+@keyframes att-modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.teacher-att-modal-header {
+  padding: 26px 20px 22px 20px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.teacher-att-modal-header.ontime {
+  background: linear-gradient(135deg, #052e22 0%, #065f46 60%, #047857 100%);
+  border-bottom: 2px solid rgba(212, 175, 55, 0.4);
+}
+
+.teacher-att-modal-header.late {
+  background: linear-gradient(135deg, #451a03 0%, #9a3412 60%, #c2410c 100%);
+  border-bottom: 2px solid rgba(251, 146, 60, 0.4);
+}
+
+.teacher-att-modal-check-icon {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px auto;
+  position: relative;
+}
+
+.teacher-att-modal-check-icon.ontime {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  color: #ffffff;
+  box-shadow: 0 4px 22px rgba(46, 204, 113, 0.5), 0 0 0 5px rgba(212, 175, 55, 0.35);
+  animation: ontime-burst 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.teacher-att-modal-check-icon.late {
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  color: #ffffff;
+  box-shadow: 0 4px 22px rgba(234, 88, 12, 0.5), 0 0 0 5px rgba(251, 146, 60, 0.35);
+  animation: late-pulse 1.8s infinite;
+}
+
+@keyframes ontime-burst {
+  0% { transform: scale(0.6) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1.15) rotate(8deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes late-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 20px rgba(234, 88, 12, 0.5), 0 0 0 4px rgba(251, 146, 60, 0.35); }
+  50% { transform: scale(1.05); box-shadow: 0 6px 26px rgba(234, 88, 12, 0.7), 0 0 0 7px rgba(251, 146, 60, 0.5); }
+}
+
+.teacher-att-modal-sparkle-halo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px dashed rgba(245, 192, 66, 0.6);
+  animation: halo-rotate 10s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes halo-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.teacher-att-modal-title {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.5vw, 1.25rem);
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.teacher-att-modal-title.ontime {
+  color: #fef08a;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.teacher-att-modal-title.late {
+  color: #ffedd5;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.teacher-att-modal-subtitle {
+  margin: 6px 0 0 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+/* Professional Message / Alert Box */
+.teacher-att-message-box {
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.teacher-att-message-box.ontime {
+  background: linear-gradient(135deg, rgba(39, 174, 96, 0.12), rgba(212, 175, 55, 0.1));
+  border: 1px solid rgba(39, 174, 96, 0.35);
+  color: #14532d;
+}
+
+.teacher-att-message-box.late {
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.12), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(234, 88, 12, 0.35);
+  color: #7c2d12;
+}
+
+.teacher-att-message-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.teacher-att-message-icon.ontime {
+  color: #16a34a;
+}
+
+.teacher-att-message-icon.late {
+  color: #ea580c;
+}
+
+.teacher-att-message-text {
+  font-weight: 600;
+  margin: 0;
+}
+
+.teacher-att-modal-body {
+  padding: clamp(16px, 2vw, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teacher-att-modal-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-radius: 10px;
+  font-size: 0.84rem;
+}
+
+.teacher-att-modal-detail-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.teacher-att-modal-detail-val {
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.teacher-att-modal-done-btn {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #d4af37, #b8941f);
+  color: #ffffff;
+  font-size: 0.94rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(184, 148, 31, 0.38);
+  margin-top: 6px;
+  transition: all 0.2s ease;
+}
+
+.teacher-att-modal-done-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(184, 148, 31, 0.48);
+}
+
+/* Dark Mode Overrides */
+[data-theme='dark'] .teacher-self-att-card,
+body.dark-mode .teacher-self-att-card,
+.dark .teacher-self-att-card,
+[data-theme='dark'] .teacher-att-skeleton-card,
+body.dark-mode .teacher-att-skeleton-card,
+[data-theme='dark'] .teacher-permission-card,
+body.dark-mode .teacher-permission-card {
+  background: #0f1d2f !important;
+  border-color: rgba(245, 192, 66, 0.24) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme='dark'] .teacher-self-att-body,
+body.dark-mode .teacher-self-att-body,
+[data-theme='dark'] .teacher-permission-body,
+body.dark-mode .teacher-permission-body {
+  background: #0f1d2f !important;
+}
+
+[data-theme='dark'] .teacher-window-row,
+body.dark-mode .teacher-window-row {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(245, 192, 66, 0.18) !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .teacher-permission-text,
+body.dark-mode .teacher-permission-text {
+  color: #cbd5e1 !important;
+}
+
+[data-theme='dark'] .teacher-already-sub,
+body.dark-mode .teacher-already-sub {
+  color: #94a3b8 !important;
+}
+
+[data-theme='dark'] .teacher-att-modal-card,
+body.dark-mode .teacher-att-modal-card {
+  background: #0a1626 !important;
+  border-color: rgba(245, 192, 66, 0.35) !important;
+}
+
+[data-theme='dark'] .teacher-att-modal-detail-row,
+body.dark-mode .teacher-att-modal-detail-row {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme='dark'] .teacher-att-modal-detail-val,
+body.dark-mode .teacher-att-modal-detail-val {
+  color: #f1f5f9 !important;
+}

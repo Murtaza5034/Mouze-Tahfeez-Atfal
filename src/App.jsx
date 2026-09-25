@@ -97,6 +97,7 @@ import {
   LogIn,
   Fingerprint,
   Smartphone,
+  MapPin,
   BookMarked,
   Edit3,
   Star,
@@ -138,6 +139,10 @@ import AtfalTeacherLeagueEntry from "./components/AtfalTeacherLeagueEntry";
 import AtfalLeagueTop3Card from "./components/AtfalLeagueTop3Card";
 import AtfalLeagueAdminInfographic from "./components/AtfalLeagueAdminInfographic";
 import AsbaaqAttendanceHistoryCard from "./components/AsbaaqAttendanceHistoryCard";
+import TeacherSelfAttendanceCard from "./components/TeacherSelfAttendanceCard";
+import TeacherAttendanceHistoryCard from "./components/TeacherAttendanceHistoryCard";
+import AdminTeacherAttendanceManager from "./components/AdminTeacherAttendanceManager";
+import AdminTeacherAttendanceSettings from "./components/AdminTeacherAttendanceSettings";
 import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
@@ -1433,6 +1438,7 @@ const NAV_ICONS = {
   "User Issues": LifeBuoy,
   "Leave Management": CalendarX,
   "Report Settings": Palette,
+  "Teacher Attendance Settings": MapPin,
   "Jadwal Settings": Calendar,
   "Global Settings": Settings,
   Messages: MessageCircle,
@@ -20473,6 +20479,7 @@ function AdminPortal({
     "Assignments",
     "Portal Access",
     "Faculty",
+    "Teacher Attendance Settings",
     "Notifications",
     "User Issues",
     "Leave Management",
@@ -28910,7 +28917,16 @@ function AdminPortal({
         ) : null}
 
           {activePage === "Faculty" ? (
-            <div className="management-grid">
+            <div className="management-grid" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              <AdminTeacherAttendanceManager
+                teacherProfiles={teacherProfiles}
+                portalAccessList={portalAccessList}
+                teacherAttendance={teacherAttendance}
+                isKibarAdmin={portalRole === "kibar-admin"}
+                onShowAction={showAction || onShowAction}
+                onRefresh={() => loadPortalData && loadPortalData(portalRole, user, null, { silent: true })}
+                onNavigateSettings={() => setActivePage("Teacher Attendance Settings")}
+              />
               <section className="data-card card-appear">
                 <div className="card-headline headline-with-action">
                   <div className="headline-left">
@@ -29078,6 +29094,17 @@ function AdminPortal({
                 </div>
               </section>
             </div>
+          ) : null}
+
+          {activePage === "Teacher Attendance Settings" ? (
+            <AdminTeacherAttendanceSettings
+              isKibarAdmin={portalRole === "kibar-admin"}
+              onShowAction={showAction || onShowAction}
+              onRefresh={() =>
+                loadPortalData &&
+                loadPortalData(portalRole, user, null, { silent: true })
+              }
+            />
           ) : null}
 
           {activePage === "Portal Access" ? (
@@ -37706,6 +37733,16 @@ function TeacherPortal({
                 })()}
               </div>
 
+              {/* Teacher Geofenced Self Attendance & Weekly History Card (Burhani Masjid, Galiakot) */}
+              <TeacherSelfAttendanceCard
+                teacherIdentity={teacherIdentity}
+                user={user}
+                portalAccess={portalAccess}
+                teacherProfiles={teacherProfiles}
+                isKibarTeacher={isKibarTeacher}
+                onShowAction={onShowAction}
+              />
+
               {/* Badal Resume & Class Status Card — Permanently anchored after Active Notification Card */}
               <div
                 className={`badal-home-banner card-appear ${
@@ -38135,6 +38172,15 @@ function TeacherPortal({
               )}
 
               {!isKibarTeacher && <AtfalLeagueTop3Card isTeacher={true} />}
+
+              {/* Teacher Attendance Weekly History Card (Grid UI matching Asbaaq Attendance History Card) */}
+              <TeacherAttendanceHistoryCard
+                teacherIdentity={teacherIdentity}
+                user={user}
+                portalAccess={portalAccess}
+                teacherProfiles={teacherProfiles}
+                isKibarTeacher={isKibarTeacher}
+              />
 
               <div className="premium-quick-panel card-appear">
                 <div className="quick-panel-header">

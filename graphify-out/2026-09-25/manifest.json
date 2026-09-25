@@ -5496,16 +5496,16 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1790324249.1899288,
-    "seen": 1790324698.97907,
-    "ast_hash": "b44a07677cdb66629b73029e152ab622",
+    "mtime": 1790265106.2015734,
+    "seen": 1790322842.3336046,
+    "ast_hash": "421b3012376fe483ee3b7fdaa96272dd",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1790324330.3334508,
-    "seen": 1790324698.9790733,
-    "ast_hash": "f3c1db3e5a1641513a1e5a6bff1ee565",
-    "semantic_hash": ""
+    "mtime": 1790312768.652368,
+    "seen": 1790322842.3336067,
+    "ast_hash": "7158d716c36a84c268c69ae529cfa853",
+    "semantic_hash": "7158d716c36a84c268c69ae529cfa853"
   },
   "android/app/google-services.json": {
     "mtime": 1786278390.6328454,
@@ -5550,10 +5550,10 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1790324330.3324513,
-    "seen": 1790324698.9796102,
-    "ast_hash": "4d3b13b87f1d8abf11219d4ea2d0fef1",
-    "semantic_hash": ""
+    "mtime": 1790312768.652368,
+    "seen": 1790322842.334054,
+    "ast_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4",
+    "semantic_hash": "a251a6a8a4ec7f96ed027cbe1e2a8aa4"
   },
   "android/gradlew": {
     "mtime": 1781174838.6040595,
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1790324230.1262429,
-    "seen": 1790324698.986208,
-    "ast_hash": "ca8ce442cc00bb75792b7a8be5964d84",
+    "mtime": 1790321204.4449413,
+    "seen": 1790322842.339745,
+    "ast_hash": "f44e91442074b64b8a536849ea8a937d",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1790323475.1915772,
-    "seen": 1790323554.8325384,
-    "ast_hash": "44e2eaec91db640b4e25d5aa68f5f3f9",
+    "mtime": 1790321571.69154,
+    "seen": 1790322842.3417242,
+    "ast_hash": "8a2da21c37dccf64832db4c54f437b77",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -10302,21 +10302,15 @@
     "semantic_hash": ""
   },
   "src/components/TeacherSelfAttendanceCard.jsx": {
-    "mtime": 1790323739.761696,
-    "seen": 1790323800.4183867,
-    "ast_hash": "5d82c7875239758ecbf62141eea60d11",
+    "mtime": 1790321380.5103755,
+    "seen": 1790322842.3437684,
+    "ast_hash": "f1219f46b889f1d0a09e29dc5c9f8532",
     "semantic_hash": ""
   },
   "src/utils/attendanceSettingsHelper.js": {
     "mtime": 1790321274.4200473,
     "seen": 1790322842.3447614,
     "ast_hash": "81e0e5cd5a604641e8dc5a3eae72a3b1",
-    "semantic_hash": ""
-  },
-  "src/components/TeacherAttendanceHistoryCard.jsx": {
-    "mtime": 1790323446.3951967,
-    "seen": 1790323554.8348665,
-    "ast_hash": "fd097cd2b89c2826097a79df28abf410",
     "semantic_hash": ""
   }
 }

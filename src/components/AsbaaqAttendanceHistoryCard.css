@@ -1,36 +1,40 @@
 /* ==========================================================================
-   ASBAAQ ATTENDANCE HISTORY CARD
-   Exact pixel-perfect reproduction of the user reference card
-   Full dynamic responsiveness for all mobile screen sizes (320px - 768px+)
+   ASBAAQ & TEACHER ATTENDANCE HISTORY CARD
+   Ultra-Premium Responsive Grid UI (320px Mobile to 4K Desktop)
+   Theme: Luxury Navy & Islamic Gold Typography with Emerald Accents
    ========================================================================== */
 
 .asbaaq-history-card-container {
   width: 100%;
-  max-width: 580px;
+  max-width: 100%;
   margin: 0 auto 20px auto;
-  background: #ffffff;
+  background: var(--surface-card, #ffffff);
   border-radius: 20px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 20px rgba(7, 35, 68, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  box-shadow: 0 4px 24px rgba(7, 35, 68, 0.08), 0 1px 3px rgba(212, 175, 55, 0.12);
   overflow: hidden;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.asbaaq-history-card-container:hover {
+  box-shadow: 0 8px 32px rgba(7, 35, 68, 0.12), 0 2px 6px rgba(212, 175, 55, 0.2);
 }
 
 /* Header Section */
 .asbaaq-history-header {
   position: relative;
-  background: linear-gradient(135deg, #051e38 0%, #072545 50%, #0b345e 100%);
-  padding: 12px 16px;
+  background: linear-gradient(135deg, #04182d 0%, #072545 50%, #0b3764 100%);
+  padding: clamp(10px, 1.8vw, 16px) clamp(12px, 2.2vw, 20px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: nowrap;
   overflow: hidden;
   box-sizing: border-box;
-  border-bottom: 1px solid rgba(245, 192, 66, 0.18);
+  border-bottom: 1px solid rgba(245, 192, 66, 0.25);
 }
 
 /* Arabesque filigree watermark on header right */
@@ -39,7 +43,7 @@
   right: -10px;
   top: -10px;
   bottom: -10px;
-  width: 220px;
+  width: 240px;
   height: calc(100% + 20px);
   pointer-events: none;
   opacity: 0.22;
@@ -49,7 +53,7 @@
 .asbaaq-header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(8px, 1.5vw, 12px);
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
@@ -58,18 +62,18 @@
 }
 
 .asbaaq-att-icon-wrap {
-  width: 36px;
-  height: 36px;
+  width: clamp(34px, 4vw, 40px);
+  height: clamp(34px, 4vw, 40px);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(245, 192, 66, 0.22) 0%, rgba(245, 192, 66, 0.08) 100%);
-  border: 1px solid rgba(245, 192, 66, 0.45);
-  border-radius: 9px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, rgba(245, 192, 66, 0.25) 0%, rgba(245, 192, 66, 0.08) 100%);
+  border: 1px solid rgba(245, 192, 66, 0.5);
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.3);
   color: #f5c042;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   animation: iconPulse 3.5s ease-in-out infinite alternate;
 }
 
@@ -78,7 +82,7 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 0 0 0 rgba(245, 192, 66, 0);
   }
   100% {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 0 8px 1.5px rgba(245, 192, 66, 0.35);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 0 10px 2px rgba(245, 192, 66, 0.4);
   }
 }
 
@@ -89,68 +93,55 @@
 
 .asbaaq-header-title-single {
   font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  font-size: clamp(0.82rem, 2.8vw, 1.05rem);
-  font-weight: 700;
+  font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+  font-weight: 800;
   color: #f5c042;
-  letter-spacing: 0.25px;
+  letter-spacing: 0.3px;
   line-height: 1.2;
   text-transform: none !important;
   margin: 0;
   white-space: nowrap;
-  background: linear-gradient(135deg, #fff2cc 0%, #f5c042 50%, #df9c1a 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(135deg, #fff5d6 0%, #f5c042 50%, #df9c1a 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  animation: titleFadeIn 0.5s ease both;
 }
 
-@keyframes titleFadeIn {
-  0% {
-    opacity: 0;
-    transform: translateX(-4px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Header Right: Premium Segmented Week Nav Tab */
+/* Header Navigation Tab */
 .asbaaq-header-nav-tab {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px;
-  background: rgba(3, 17, 33, 0.7);
+  background: rgba(3, 18, 36, 0.75);
   border: 1px solid rgba(245, 192, 66, 0.35);
-  border-radius: 8px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
-  flex-shrink: 0;
+  border-radius: 10px;
+  padding: 3px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
   position: relative;
   z-index: 2;
-  backdrop-filter: blur(4px);
+  flex-shrink: 0;
 }
 
 .asbaaq-nav-btn {
   background: transparent;
   border: none;
   color: #f5c042;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  padding: 0;
   transition: all 0.15s ease;
+  padding: 0;
 }
 
 .asbaaq-nav-btn:hover:not(:disabled) {
-  background: rgba(245, 192, 66, 0.22);
-  transform: scale(1.06);
+  background: rgba(245, 192, 66, 0.2);
+  color: #ffffff;
 }
 
 .asbaaq-nav-btn:disabled {
@@ -159,45 +150,55 @@
 }
 
 .asbaaq-week-tab-label {
-  font-size: clamp(0.58rem, 1.8vw, 0.68rem);
-  font-weight: 700;
+  background: transparent;
+  border: none;
   color: #f5c042;
-  background: rgba(245, 192, 66, 0.14);
-  border: 1px solid rgba(245, 192, 66, 0.25);
-  padding: 3px 7px;
-  border-radius: 6px;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
+  font-size: clamp(0.68rem, 1.8vw, 0.78rem);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
   cursor: pointer;
   white-space: nowrap;
-  line-height: 1.2;
-  transition: background 0.15s ease;
+  font-family: inherit;
+  transition: color 0.15s ease;
 }
 
 .asbaaq-week-tab-label:hover {
-  background: rgba(245, 192, 66, 0.26);
+  color: #fff2cc;
 }
 
 /* Grid Body */
 .asbaaq-grid-body {
-  padding: 16px 14px 18px 14px;
-  background: #ffffff;
+  padding: clamp(12px, 2vw, 20px) clamp(10px, 1.8vw, 18px);
+  background: var(--surface-card, #ffffff);
   box-sizing: border-box;
 }
 
+/* 
+   DYNAMIC FLUID GRID:
+   - Mobile (< 900px): 4 Columns x 2 Rows
+   - Desktop (>= 900px): 8 Columns in a single executive week row!
+*/
 .asbaaq-days-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(8px, 1.2vw, 12px) clamp(6px, 1vw, 10px);
   box-sizing: border-box;
   width: 100%;
 }
 
-/* Each column stack */
+@media (min-width: 900px) {
+  .asbaaq-days-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+/* Column Stack */
 .asbaaq-day-col {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: clamp(5px, 0.8vw, 8px);
   min-width: 0;
 }
 
@@ -205,27 +206,32 @@
 .asbaaq-date-box {
   background: #faf8f4;
   border: 1px solid #dcd8cf;
-  border-radius: 9px;
-  padding: 7px 3px;
-  min-height: 52px;
+  border-radius: 10px;
+  padding: clamp(6px, 1vw, 10px) 4px;
+  min-height: clamp(48px, 6vw, 56px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   box-sizing: border-box;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: all 0.18s ease;
+}
+
+.asbaaq-date-box:hover {
+  border-color: #bdae95;
+  background: #f6f1e7;
 }
 
 .asbaaq-date-box.is-today {
   border-color: #f5c042;
-  box-shadow: 0 0 0 1px rgba(245, 192, 66, 0.3);
-  background: #fbf6ec;
+  box-shadow: 0 0 0 1.5px rgba(245, 192, 66, 0.45);
+  background: linear-gradient(180deg, #fef9ee 0%, #fbf4e2 100%);
 }
 
 .asbaaq-day-indicator {
-  font-size: clamp(0.55rem, 1.8vw, 0.62rem);
-  font-weight: 700;
+  font-size: clamp(0.55rem, 1.4vw, 0.65rem);
+  font-weight: 800;
   color: #8c8270;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -233,17 +239,21 @@
   margin-bottom: 2px;
 }
 
+.asbaaq-date-box.is-today .asbaaq-day-indicator {
+  color: #b8941f;
+}
+
 .asbaaq-date-line-1 {
-  font-size: clamp(0.70rem, 2.3vw, 0.82rem);
-  font-weight: 600;
+  font-size: clamp(0.72rem, 1.8vw, 0.85rem);
+  font-weight: 700;
   color: #2b3a4a;
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .asbaaq-date-line-2 {
-  font-size: clamp(0.70rem, 2.3vw, 0.82rem);
-  font-weight: 600;
+  font-size: clamp(0.72rem, 1.8vw, 0.85rem);
+  font-weight: 700;
   color: #2b3a4a;
   line-height: 1.2;
 }
@@ -252,28 +262,38 @@
 .asbaaq-status-box {
   background: #ffffff;
   border: 1px solid #dcd8cf;
-  border-radius: 9px;
-  padding: 8px 3px;
-  min-height: 64px;
+  border-radius: 10px;
+  padding: clamp(6px, 1vw, 10px) 4px;
+  min-height: clamp(60px, 7.5vw, 70px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   box-sizing: border-box;
+  transition: all 0.18s ease;
+}
+
+.asbaaq-status-box:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
 }
 
 /* Status variants */
 .asbaaq-status-text {
-  font-size: clamp(0.66rem, 2.1vw, 0.76rem);
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-size: clamp(0.66rem, 1.6vw, 0.78rem);
+  font-weight: 800;
+  letter-spacing: 0.4px;
   line-height: 1.2;
   text-transform: uppercase;
 }
 
 .asbaaq-status-present .asbaaq-status-text {
   color: #27ae60;
+}
+
+.asbaaq-status-late .asbaaq-status-text {
+  color: #e67e22;
 }
 
 .asbaaq-status-holiday .asbaaq-status-text {
@@ -289,216 +309,193 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  font-size: clamp(0.58rem, 1.8vw, 0.68rem);
-  font-weight: 600;
+  font-size: clamp(0.56rem, 1.4vw, 0.68rem);
+  font-weight: 700;
   color: #1e293b;
   background: #f1f5f9;
-  padding: 1.5px 6px;
+  padding: 2px 6px;
   border-radius: 999px;
-  border: 1px solid rgba(203, 213, 225, 0.7);
+  border: 1px solid rgba(203, 213, 225, 0.8);
   margin: 3px 0 2px 0;
   line-height: 1.2;
   white-space: nowrap;
-  animation: timeFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes timeFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.asbaaq-status-present .asbaaq-time-text {
+  background: rgba(39, 174, 96, 0.1);
+  border-color: rgba(39, 174, 96, 0.28);
+  color: #1b5e20;
+}
+
+.asbaaq-status-late .asbaaq-time-text {
+  background: rgba(230, 126, 34, 0.1);
+  border-color: rgba(230, 126, 34, 0.3);
+  color: #934106;
 }
 
 .asbaaq-method-text {
-  font-size: clamp(0.55rem, 1.7vw, 0.64rem);
-  font-weight: 600;
+  font-size: clamp(0.52rem, 1.3vw, 0.64rem);
+  font-weight: 700;
   letter-spacing: 0.3px;
   line-height: 1.2;
-  white-space: nowrap;
 }
 
-.asbaaq-method-text.asbaaq-marked {
-  color: #059669;
+.asbaaq-status-present .asbaaq-method-text {
+  color: #27ae60;
+}
+
+.asbaaq-status-late .asbaaq-method-text {
+  color: #e67e22;
+}
+
+.asbaaq-status-holiday .asbaaq-method-text {
+  color: #d97706;
+}
+
+.asbaaq-status-absent .asbaaq-method-text {
+  color: #dc2626;
+}
+
+.asbaaq-dash-text {
+  font-size: 1.1rem;
   font-weight: 700;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  padding: 1px 6px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  animation: markedBadgeIn 0.4s ease both;
-}
-
-@keyframes markedBadgeIn {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.asbaaq-method-text.asbaaq-not-marked {
   color: #94a3b8;
-  font-weight: 500;
-  background: rgba(241, 245, 249, 0.7);
-  border: 1px dashed rgba(203, 213, 225, 0.9);
-  padding: 1px 5px;
-  border-radius: 999px;
-  margin-top: 4px;
-  display: inline-flex;
-  align-items: center;
+  line-height: 1;
+  margin-bottom: 2px;
 }
 
-/* Empty / Dash variant */
-.asbaaq-status-empty {
+.asbaaq-not-marked {
+  color: #94a3b8 !important;
+}
+
+/* Slot 8: Summary Box */
+.asbaaq-summary-col {
+  min-width: 0;
+}
+
+.asbaaq-summary-box {
+  background: linear-gradient(135deg, #072545 0%, #0d3862 100%);
+  border: 1px solid rgba(245, 192, 66, 0.4);
+  border-radius: 10px;
+  padding: clamp(8px, 1.2vw, 12px) 4px;
+  height: 100%;
+  min-height: clamp(116px, 14vw, 134px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  box-shadow: 0 3px 12px rgba(7, 35, 68, 0.2);
+  transition: transform 0.2s ease;
 }
 
-.asbaaq-dash-text {
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: #94a3b8;
-  line-height: 1;
+.asbaaq-summary-box:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 16px rgba(7, 35, 68, 0.3);
 }
 
-/* Slot 8 Summary styling */
-.asbaaq-date-box.asbaaq-summary-box {
-  background: #f7f3ea;
-  border-color: #d1c7b4;
+.asbaaq-summary-header-label {
+  font-size: clamp(0.55rem, 1.4vw, 0.65rem);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #f5c042;
+  text-transform: uppercase;
+  margin-bottom: clamp(4px, 0.8vw, 8px);
 }
 
-.asbaaq-summary-title {
-  font-size: clamp(0.66rem, 2.1vw, 0.76rem);
-  font-weight: 700;
-  color: #6d5b3d;
-  letter-spacing: 0.6px;
-  line-height: 1.2;
+.asbaaq-summary-circle {
+  width: clamp(40px, 5.5vw, 52px);
+  height: clamp(40px, 5.5vw, 52px);
+  border-radius: 50%;
+  border: 3px solid #27ae60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 17, 33, 0.6);
+  margin-bottom: clamp(4px, 0.8vw, 8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.asbaaq-summary-pct {
+  font-size: clamp(0.72rem, 1.8vw, 0.88rem);
+  font-weight: 800;
+  color: #ffffff;
 }
 
 .asbaaq-summary-sub {
-  font-size: clamp(0.62rem, 1.9vw, 0.72rem);
-  font-weight: 600;
-  color: #8c7b5a;
-  letter-spacing: 0.4px;
+  font-size: clamp(0.52rem, 1.3vw, 0.64rem);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
   line-height: 1.2;
 }
 
-/* Compact Mobile Screen Optimizations (<= 380px) */
-@media (max-width: 380px) {
-  .asbaaq-history-card-container {
-    border-radius: 14px;
-    margin-bottom: 16px;
-  }
-
+/* Small mobile optimizations (< 360px) */
+@media (max-width: 360px) {
   .asbaaq-history-header {
-    padding: 10px 10px;
-    gap: 6px;
+    padding: 8px 10px;
   }
-
-  .asbaaq-header-left {
-    gap: 6px;
-  }
-
-  .asbaaq-att-icon-wrap {
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-  }
-
-  .asbaaq-att-icon {
-    width: 16px;
-    height: 16px;
-  }
-
-  .asbaaq-header-title-single {
-    font-size: clamp(0.70rem, 2.7vw, 0.85rem);
-    letter-spacing: 0.2px;
-  }
-
-  .asbaaq-header-nav-tab {
-    padding: 1.5px;
-    gap: 1px;
-  }
-
-  .asbaaq-nav-btn {
-    width: 20px;
-    height: 20px;
-  }
-
-  .asbaaq-week-tab-label {
-    padding: 2px 5px;
-    font-size: 0.58rem;
-  }
-
   .asbaaq-grid-body {
-    padding: 10px 6px 12px 6px;
+    padding: 10px 6px;
   }
-
   .asbaaq-days-grid {
     gap: 6px 4px;
   }
-
-  .asbaaq-day-col {
-    gap: 5px;
-  }
-
   .asbaaq-date-box {
-    padding: 5px 2px;
-    min-height: 48px;
-    border-radius: 7px;
+    padding: 4px 2px;
+    min-height: 44px;
   }
-
   .asbaaq-status-box {
-    padding: 6px 2px;
-    min-height: 58px;
-    border-radius: 7px;
+    padding: 4px 2px;
+    min-height: 56px;
   }
 }
 
-@media (max-width: 340px) {
-  .asbaaq-history-header {
-    padding: 8px 6px;
-    gap: 4px;
-  }
-
-  .asbaaq-header-left {
-    gap: 4px;
-  }
-
-  .asbaaq-att-icon-wrap {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-  }
-
-  .asbaaq-att-icon {
-    width: 14px;
-    height: 14px;
-  }
-
-  .asbaaq-header-title-single {
-    font-size: 0.58rem;
-    letter-spacing: 0.2px;
-  }
-
-  .asbaaq-nav-btn {
-    width: 18px;
-    height: 18px;
-  }
-
-  .asbaaq-week-tab-label {
-    padding: 2px 4px;
-    font-size: 0.52rem;
-  }
+/* Dark Mode Overrides */
+[data-theme='dark'] .asbaaq-history-card-container,
+body.dark-mode .asbaaq-history-card-container,
+.dark .asbaaq-history-card-container {
+  background: #0f1d2f !important;
+  border-color: rgba(245, 192, 66, 0.25) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
 }
 
+[data-theme='dark'] .asbaaq-grid-body,
+body.dark-mode .asbaaq-grid-body,
+.dark .asbaaq-grid-body {
+  background: #0f1d2f !important;
+}
+
+[data-theme='dark'] .asbaaq-date-box,
+body.dark-mode .asbaaq-date-box,
+.dark .asbaaq-date-box {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme='dark'] .asbaaq-date-box.is-today,
+body.dark-mode .asbaaq-date-box.is-today {
+  background: rgba(245, 192, 66, 0.08) !important;
+  border-color: #f5c042 !important;
+}
+
+[data-theme='dark'] .asbaaq-date-line-1,
+[data-theme='dark'] .asbaaq-date-line-2,
+body.dark-mode .asbaaq-date-line-1,
+body.dark-mode .asbaaq-date-line-2 {
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .asbaaq-status-box,
+body.dark-mode .asbaaq-status-box,
+.dark .asbaaq-status-box {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme='dark'] .asbaaq-time-text,
+body.dark-mode .asbaaq-time-text {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #f1f5f9 !important;
+}
