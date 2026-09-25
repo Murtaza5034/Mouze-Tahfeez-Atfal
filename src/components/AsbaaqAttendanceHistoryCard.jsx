@@ -7,74 +7,119 @@ import './AsbaaqAttendanceHistoryCard.css';
  * Formats a record's tracked marked time (e.g. "@ 8:14 AM" or "@ 9:30 AM")
  * Tracks exact teacher mark time, never hardcoding a default 8:00 AM.
  */
+/**
+ * Formats a record's tracked marked time (e.g. "@ 8:14 AM" or "@ 9:30 AM")
+ * Tracks exact teacher mark time, never showing synthetic demo times.
+ */
+function extractDateOrTimeString(val) {
+  if (!val) return null;
+  // Firestore Timestamp with toDate() method
+  if (typeof val?.toDate === 'function') {
+    try {
+      const d = val.toDate();
+      if (d instanceof Date && !isNaN(d.getTime())) return d;
+    } catch (_) {}
+  }
+  // Firestore Timestamp { seconds, nanoseconds }
+  if (typeof val === 'object' && typeof val.seconds === 'number') {
+    const d = new Date(val.seconds * 1000 + (val.nanoseconds ? Math.floor(val.nanoseconds / 1000000) : 0));
+    if (!isNaN(d.getTime())) return d;
+  }
+  // Numeric timestamp (seconds or milliseconds)
+  if (typeof val === 'number') {
+    const d = new Date(val > 1e11 ? val : val * 1000);
+    if (!isNaN(d.getTime())) return d;
+  }
+  // String timestamp or already formatted time string
+  if (typeof val === 'string') {
+    const clean = val.trim();
+    if (!clean) return null;
+    // Check if it's already a 12-hour or 24-hour time string like "8:15 AM", "09:20 AM", "@ 8:14 AM", or "14:30"
+    const tm = clean.match(/^@?\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+    if (tm) {
+      let h = parseInt(tm[1], 10);
+      const m = tm[2];
+      const ampm = tm[3] ? tm[3].toUpperCase() : null;
+      if (ampm) {
+        return `@ ${h}:${m} ${ampm}`;
+      } else {
+        const period = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `@ ${h}:${m} ${period}`;
+      }
+    }
+    const d = new Date(clean);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function formatTimeFromDate(d) {
+  if (!d || !(d instanceof Date) || isNaN(d.getTime())) return '';
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `@ ${hours}:${minutes} ${ampm}`;
+}
+
 function formatAttendanceTime(record, studentId, dateKey) {
   if (!record) return '';
 
-  // 1. Check direct time string (e.g. "8:15 AM", "09:20 AM")
-  if (record.time) {
-    const clean = String(record.time).trim();
+  // 1. Check direct time string property (e.g. record.time = "8:15 AM")
+  const directTime = record.time || record.attendance_time || record.mark_time;
+  if (directTime) {
+    const parsed = extractDateOrTimeString(directTime);
+    if (typeof parsed === 'string') return parsed;
+    if (parsed instanceof Date) return formatTimeFromDate(parsed);
+    const clean = String(directTime).trim();
     if (clean) return clean.startsWith('@') ? clean : `@ ${clean}`;
   }
 
-  // 2. Check marked_at or updated_at ISO timestamps
-  const tsCandidate = record.marked_at || record.updated_at;
-  if (tsCandidate) {
-    try {
-      const d = new Date(tsCandidate);
-      if (!isNaN(d.getTime())) {
-        let hours = d.getHours();
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? hours : 12;
-        return `@ ${hours}:${minutes} ${ampm}`;
-      }
-    } catch (_) {}
-  }
+  // 2. Check marked_at or updated_at timestamps (exact moment teacher marked)
+  const markCandidates = [
+    record.marked_at,
+    record.updated_at,
+    record.timestamp,
+    record.recorded_at,
+    record.created_at,
+  ];
 
-  // 3. Check localStorage cache for recorded mark time
-  if (typeof window !== 'undefined' && window.localStorage && studentId && dateKey) {
-    try {
-      const localTime = localStorage.getItem(`mauze_att_time_${studentId}_${dateKey}`);
-      if (localTime) {
-        const clean = String(localTime).trim();
-        return clean.startsWith('@') ? clean : `@ ${clean}`;
-      }
-    } catch (_) {}
-  }
-
-  // 4. Check created_at timestamp
-  if (record.created_at) {
-    try {
-      const d = new Date(record.created_at);
-      if (!isNaN(d.getTime())) {
-        const hours = d.getHours();
-        const minutes = d.getMinutes();
-        if (!(hours === 0 && minutes === 0)) {
-          let h = hours % 12;
-          h = h ? h : 12;
-          const m = String(minutes).padStart(2, '0');
-          const ampm = hours >= 12 ? 'PM' : 'AM';
-          return `@ ${h}:${m} ${ampm}`;
+  for (const cand of markCandidates) {
+    if (cand) {
+      const parsed = extractDateOrTimeString(cand);
+      if (typeof parsed === 'string') return parsed;
+      if (parsed instanceof Date) {
+        const h = parsed.getHours();
+        const m = parsed.getMinutes();
+        const s = parsed.getSeconds();
+        // If it contains a real time of day (not date-only midnight 00:00:00)
+        if (h !== 0 || m !== 0 || s !== 0) {
+          return formatTimeFromDate(parsed);
         }
       }
-    } catch (_) {}
-  }
-
-  // 5. If marked present but legacy database record lacks explicit time column:
-  // Generate a realistic, distinct attendance mark time per date & student (e.g. @ 8:08 AM, @ 8:16 AM, @ 8:22 AM)
-  const statusStr = String(record.status || '').toLowerCase();
-  if (statusStr === 'present') {
-    let hash = 0;
-    const str = `${studentId || 'std'}_${dateKey || 'date'}`;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash * 31 + str.charCodeAt(i)) & 0xffffffff;
     }
-    const minute = 5 + (Math.abs(hash) % 22); // between 8:05 AM and 8:26 AM
-    const minStr = String(minute).padStart(2, '0');
-    return `@ 8:${minStr} AM`;
   }
 
+  // 3. Check localStorage cache for recorded mark time across candidate IDs
+  if (typeof window !== 'undefined' && window.localStorage && dateKey) {
+    const idsToCheck = [studentId, record.student_id].filter(Boolean);
+    for (const sid of idsToCheck) {
+      try {
+        const localTime = localStorage.getItem(`mauze_att_time_${sid}_${dateKey}`);
+        if (localTime) {
+          const parsed = extractDateOrTimeString(localTime);
+          if (typeof parsed === 'string') return parsed;
+          if (parsed instanceof Date) return formatTimeFromDate(parsed);
+          const clean = String(localTime).trim();
+          if (clean) return clean.startsWith('@') ? clean : `@ ${clean}`;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // 4. If record exists without any explicit timestamp, return empty string.
+  // NEVER show synthetic demo times (like @ 8:20 AM).
   return '';
 }
 
@@ -350,15 +395,16 @@ export default function AsbaaqAttendanceHistoryCard({
 
             if (rec) {
               const s = String(rec.status || '').trim().toLowerCase();
+              const targetStudentId = rec.student_id || studentProfile?.student_id || studentProfile?.id;
               if (s === 'present') {
                 statusType = 'present';
                 statusLabel = 'PRESENT';
-                timeText = formatAttendanceTime(rec, studentProfile?.student_id, day.dateKey);
+                timeText = formatAttendanceTime(rec, targetStudentId, day.dateKey);
                 methodText = 'Marked';
               } else if (s === 'absent') {
                 statusType = 'absent';
                 statusLabel = 'ABSENT';
-                timeText = formatAttendanceTime(rec, studentProfile?.student_id, day.dateKey) || '@ Absent';
+                timeText = formatAttendanceTime(rec, targetStudentId, day.dateKey);
                 methodText = 'Marked';
               } else if (s === 'holiday') {
                 statusType = 'holiday';

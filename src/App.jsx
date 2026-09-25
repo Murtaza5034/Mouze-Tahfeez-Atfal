@@ -35863,12 +35863,17 @@ function TeacherPortal({
     const nowIso = new Date().toISOString();
     try {
       localStorage.setItem(`mauze_att_time_${studentId}_${date}`, nowTime);
+      localStorage.setItem(`mauze_att_time_${sid}_${date}`, nowTime);
     } catch (_) {}
+
+    const attTableName = sectionKibar
+      ? "kibar_student_daily_attendance"
+      : "student_daily_attendance";
 
     if (existing) {
       const { error } = await supabase
-        .from("student_daily_attendance")
-        .update({ status, marked_at: nowIso, time: nowTime })
+        .from(attTableName)
+        .update({ status, marked_at: nowIso, time: nowTime, updated_at: nowIso })
         .eq("student_id", String(studentId))
         .eq("attendance_date", date);
       if (error) {
@@ -35877,7 +35882,7 @@ function TeacherPortal({
       }
     } else {
       const { error } = await supabase
-        .from("student_daily_attendance")
+        .from(attTableName)
         .upsert(
           {
             student_id: String(studentId),
@@ -35887,6 +35892,7 @@ function TeacherPortal({
             created_at: nowIso,
             marked_at: nowIso,
             time: nowTime,
+            updated_at: nowIso,
           },
           { onConflict: "student_id,attendance_date" },
         );
@@ -35984,14 +35990,37 @@ function TeacherPortal({
     if (!date || overviewStudents.length === 0) return;
     const teacherId = user?.id || teacherIdentity;
     setAttendanceLoading(true);
+
+    const nowTime = new Date().toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const nowIso = new Date().toISOString();
+    try {
+      overviewStudents.forEach((s) => {
+        const sid = String(s.student_id).trim().toLowerCase();
+        localStorage.setItem(`mauze_att_time_${s.student_id}_${date}`, nowTime);
+        localStorage.setItem(`mauze_att_time_${sid}_${date}`, nowTime);
+      });
+    } catch (_) {}
+
+    const attTableName = sectionKibar
+      ? "kibar_student_daily_attendance"
+      : "student_daily_attendance";
+
     const records = overviewStudents.map((s) => ({
       student_id: String(s.student_id),
       teacher_id: String(teacherId),
       attendance_date: date,
       status,
+      time: nowTime,
+      marked_at: nowIso,
+      created_at: nowIso,
+      updated_at: nowIso,
     }));
     const { error } = await supabase
-      .from("student_daily_attendance")
+      .from(attTableName)
       .upsert(records, { onConflict: "student_id,attendance_date" });
     if (error) {
       if (onShowAction) onShowAction("error", error.message);
