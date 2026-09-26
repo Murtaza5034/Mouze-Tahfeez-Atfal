@@ -14,7 +14,9 @@ import {
   Copy,
   Check,
   ExternalLink,
-  X
+  X,
+  MessageCircle,
+  Send
 } from "lucide-react";
 import { calculateMarhalaRanks, effectiveScore, parseJadeed } from "../utils/marhalaRanking";
 import {
@@ -22,7 +24,8 @@ import {
   setGoogleSheetsWebhookUrl,
   testGoogleSheetsConnection,
   clearGoogleSheetsDemoData,
-  syncAllStudentsToGoogleSheets
+  syncAllStudentsToGoogleSheets,
+  sendWhatsAppResultImagesViaSheets
 } from "../utils/googleSheetsSync";
 
 /**
@@ -114,6 +117,8 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
   const [lastSyncInfo, setLastSyncInfo] = useState(() => {
     return (typeof window !== "undefined" && window.localStorage?.getItem("mauze_sheets_last_sync_info")) || null;
   });
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const [whatsAppStatus, setWhatsAppStatus] = useState(null);
 
   // Keep webhookInput updated if reportSettings loads later
   useEffect(() => {
@@ -226,6 +231,45 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
     } catch (err) {
       setIsSyncingSheets(false);
       showAction("error", "Sync error: " + err.message);
+    }
+  };
+
+  const handleSendWhatsAppResultImages = async () => {
+    const url = webhookInput || getGoogleSheetsWebhookUrl(reportSettings);
+    if (!url) {
+      showAction("error", "Please configure and save your Google Apps Script Webhook URL first.");
+      return;
+    }
+
+    setIsSendingWhatsApp(true);
+    setWhatsAppStatus(null);
+    showAction("info", "Dispatching weekly result images to parents via WhatsApp bot (+91 81079 25353)...");
+
+    try {
+      const res = await sendWhatsAppResultImagesViaSheets({
+        webhookUrl: url,
+        reportSettings,
+        category: "atfal",
+        onlyUpdated: true
+      });
+
+      setIsSendingWhatsApp(false);
+      if (res && res.success) {
+        const msg = res.sent !== undefined
+          ? `Dispatched! Sent: ${res.sent}, Skipped: ${res.skipped || 0}, Failed: ${res.failed || 0}`
+          : (res.message || "Command sent to WhatsApp Bot successfully!");
+        setWhatsAppStatus({ success: true, message: `✅ ${msg}` });
+        showAction("success", `WhatsApp Bot: ${msg}`);
+      } else {
+        const errMsg = res?.error || "Could not dispatch WhatsApp messages";
+        setWhatsAppStatus({ success: false, message: `❌ ${errMsg}` });
+        showAction("error", errMsg);
+      }
+    } catch (waErr) {
+      setIsSendingWhatsApp(false);
+      const errTxt = waErr.message || "WhatsApp dispatch error";
+      setWhatsAppStatus({ success: false, message: `❌ ${errTxt}` });
+      showAction("error", errTxt);
     }
   };
 
@@ -817,6 +861,33 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
                   <strong>Replace test/demo dummy data with real students:</strong> Cleans out dummy test rows (Husain Yusuf, Taher Shabbir, etc.) and writes a fresh, 100% real student roster into all 8 Marhala sheets and the parents email tab.
                 </span>
               </label>
+
+              {/* WhatsApp Result Image Dispatch via OpenWA Bot */}
+              <div className="mrk-whatsapp-dispatch-card">
+                <div className="mrk-wa-header">
+                  <div className="mrk-wa-title">
+                    <MessageCircle size={20} style={{ color: "#25D366", flexShrink: 0 }} />
+                    <div>
+                      <strong>WhatsApp Result Images (OpenWA Bot)</strong>
+                      <span className="mrk-wa-sub">Helpline: +91 81079 25353 • Sends summary image card to parents</span>
+                    </div>
+                  </div>
+                  <button
+                    className="mrk-btn-whatsapp"
+                    onClick={handleSendWhatsAppResultImages}
+                    disabled={isSendingWhatsApp || !webhookInput}
+                    title="Send weekly result images to all parents via WhatsApp helpline bot"
+                  >
+                    <Send size={14} className={isSendingWhatsApp ? "mrk-spin" : ""} />
+                    <span>{isSendingWhatsApp ? "Sending Images…" : "Send Result Images via WhatsApp"}</span>
+                  </button>
+                </div>
+                {whatsAppStatus && (
+                  <div className={`mrk-wa-status ${whatsAppStatus.success ? "success" : "info"}`}>
+                    {whatsAppStatus.message}
+                  </div>
+                )}
+              </div>
 
               {/* Last Sync Info */}
               {lastSyncInfo && (

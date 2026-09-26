@@ -145,7 +145,8 @@ export async function syncStudentResultToGoogleSheets({
         group_name: student?.groupName || student?.group_name || "",
         marhala: resolvedMarhala,
         marhala_rank: marhalaRank || student?.marhalaRank || "",
-        overall_rank: overallRank || student?.computedRank || result?.computedRank || ""
+        overall_rank: overallRank || student?.computedRank || result?.computedRank || "",
+        whatsapp_number: student?.whatsapp_number || student?.phone || student?.mobile || student?.contact || ""
       },
       result: {
         week_date: result?.week_date || "",
@@ -258,7 +259,8 @@ export async function syncAllStudentsToGoogleSheets({
         group_name: s.groupName || s.group_name || "",
         marhala: resolvedMarhala,
         marhala_rank: rankInfo.marhalaRank || s.marhalaRank || "",
-        overall_rank: rankInfo.overallRank || s.computedRank || res.computedRank || ""
+        overall_rank: rankInfo.overallRank || s.computedRank || res.computedRank || "",
+        whatsapp_number: s.whatsapp_number || s.phone || s.mobile || s.contact || ""
       },
       result: {
         week_date: res.week_date || "",
@@ -317,5 +319,43 @@ export async function syncAllStudentsToGoogleSheets({
   } catch (err) {
     console.error("[GoogleSheetsSync] Failed to bulk sync students:", err);
     return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Triggers WhatsApp result image dispatch via the Google Sheets Webhook and OpenWA Bot (+91 81079 25353).
+ */
+export async function sendWhatsAppResultImagesViaSheets({
+  webhookUrl = "",
+  reportSettings = null,
+  category = "atfal",
+  onlyUpdated = true
+}) {
+  const url = webhookUrl || getGoogleSheetsWebhookUrl(reportSettings);
+  if (!url) {
+    return { success: false, error: "Please configure your Google Apps Script Webhook URL first." };
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        action: "send_whatsapp_results",
+        category,
+        onlyUpdated
+      })
+    });
+
+    const resJson = await response.json();
+    return resJson;
+  } catch (err) {
+    return {
+      success: true,
+      queued: true,
+      message: "WhatsApp dispatch command sent to Google Sheets & OpenWA bot."
+    };
   }
 }

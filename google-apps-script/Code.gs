@@ -93,7 +93,14 @@ const CONFIG = {
   COLOR_YES_BG: "#b7e1cd",    // Emerald Green Background
   COLOR_YES_TEXT: "#0d652d",  // Dark Green Text
   COLOR_NO_BG: "#f4c7c3",     // Soft Red Background
-  COLOR_NO_TEXT: "#c5221f"    // Dark Red Text
+  COLOR_NO_TEXT: "#c5221f",   // Dark Red Text
+
+  // OpenWA WhatsApp Gateway Configuration (Mauze Tahfeez Helpline: +91 81079 25353)
+  OPENWA_API_URL: "http://localhost:2785", 
+  OPENWA_API_KEY: "",
+  OPENWA_SESSION_ID: "mauze-helpline-8107925353",
+  HELPLINE_NUMBER: "+91 81079 25353",
+  HELPLINE_NAME: "Mauze Tahfeez Helpline"
 };
 
 // ============================================================================
@@ -317,6 +324,24 @@ function doPost(e) {
     if (payload.action === "bulk_sync" && Array.isArray(payload.students)) {
       const bulkResult = processBulkSync(payload);
       return jsonResponse(bulkResult, 200);
+    }
+
+    // Send WhatsApp result images to parents via OpenWA Bot (+91 81079 25353)
+    if (payload.action === "send_whatsapp_results") {
+      const waResult = processSendWhatsAppResults(payload);
+      return jsonResponse(waResult, 200);
+    }
+
+    // Test OpenWA Bot connection
+    if (payload.action === "test_openwa") {
+      const testResult = testOpenWaConnection(payload.config || CONFIG);
+      return jsonResponse(testResult, 200);
+    }
+
+    // Generate base64 result image for preview
+    if (payload.action === "generate_result_image" && payload.studentData) {
+      const imgBase64 = generateMarhalaResultImageBase64(payload.studentData);
+      return jsonResponse({ success: true, base64: imgBase64 }, 200);
     }
 
     // Single student weekly mark progress sync (teacher filling progress)
@@ -740,7 +765,8 @@ const PARENTS_EMAIL_HEADERS = [
   "total Jadeed",
   "marhala rank",
   "over all rank",
-  "data update for latest week"
+  "data update for latest week",
+  "whatsapp number"
 ];
 
 function getOrCreateParentsEmailSheet(spreadsheet) {
@@ -786,6 +812,9 @@ function buildParentsEmailRowValues(student, result) {
   // If result has scores, status is "Yes", otherwise default to "No"
   const latestWeekStatus = (weeklyScore !== "" && weeklyScore !== null) ? "Yes" : "No";
 
+  // WhatsApp number
+  const whatsappNumber = String(student.whatsapp_number || student.phone || student.mobile || student.contact || "").trim();
+
   return [
     displayEmail,
     name,
@@ -795,7 +824,8 @@ function buildParentsEmailRowValues(student, result) {
     totalJadeed,
     marhalaRank,
     overallRank,
-    latestWeekStatus
+    latestWeekStatus,
+    whatsappNumber
   ];
 }
 
@@ -818,7 +848,7 @@ function syncParentsEmailSheetRow(sheet, student, result) {
   }
 
   if (matchRowIndex > 0) {
-    sheet.getRange(matchRowIndex, 1, 1, 9).setValues([rowValues]);
+    sheet.getRange(matchRowIndex, 1, 1, PARENTS_EMAIL_HEADERS.length).setValues([rowValues]);
     applyValidationToCell(sheet.getRange(matchRowIndex, 9));
     return { action: "updated", row: matchRowIndex, email: email || name };
   } else {
@@ -928,4 +958,632 @@ function setupParentsEmailValidationAndFormatting(sheet) {
   filteredRules.push(yesRule);
   filteredRules.push(noRule);
   sheet.setConditionalFormatRules(filteredRules);
+}
+
+// ============================================================================
+// 7. OPENWA WHATSAPP BOT INTEGRATION & RESULT IMAGE GENERATOR
+//    Helpline Number: +91 81079 25353
+// ============================================================================
+
+/**
+ * Automatically creates custom menu in Google Sheets UI when opened.
+ */
+function onOpen() {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu("📱 Mauze WhatsApp Bot")
+      .addItem("✨ Send All Result Images to Parents via WhatsApp", "sendAllParentsWhatsAppResultImages")
+      .addItem("👤 Send Result Image for Selected Student Row", "sendSelectedStudentWhatsAppResultImage")
+      .addItem("🖼️ Preview Result Image for Selected Student", "previewSelectedStudentResultImage")
+      .addSeparator()
+      .addItem("⚙️ Test OpenWA Bot Connection (+91 81079 25353)", "testOpenWaBotConnection")
+      .addItem("🔄 Re-initialize Sheets & WhatsApp Columns", "testSetup")
+      .addToUi();
+  } catch (_e) {}
+}
+
+/**
+ * Sanitizes phone numbers into international WhatsApp format (e.g. 918107925353).
+ */
+function cleanWhatsAppPhone(rawPhone) {
+  if (!rawPhone) return "";
+  let digits = String(rawPhone).replace(/\D/g, "");
+  if (digits.length === 10) {
+    digits = "91" + digits; // Standard 10-digit Indian mobile -> +91
+  } else if (digits.length === 11 && digits.startsWith("0")) {
+    digits = "91" + digits.substring(1);
+  }
+  return digits;
+}
+
+/**
+ * Escapes XML/SVG special characters safely.
+ */
+function escapeXml(unsafe) {
+  if (unsafe === null || unsafe === undefined) return "";
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
+ * Generates an ultra-premium vector SVG card for the weekly Marhala result.
+ * Contains: School Emblem, Student Name, Week Date Range, Weekly Score,
+ * Total Jadeed, Marhala Rank, Overall Rank, and Helpline Number.
+ */
+function generateMarhalaResultSvg(data) {
+  const name = String(data.name || "Student Name").trim();
+  const fromDate = String(data.fromDate || "—").trim();
+  const tillDate = String(data.tillDate || "—").trim();
+  const score = (data.weeklyScore !== undefined && data.weeklyScore !== "" && data.weeklyScore !== null) ? String(data.weeklyScore) : "—";
+  const jadeed = String(data.totalJadeed || "—").trim();
+  const marhalaRank = String(data.marhalaRank || "—").trim();
+  const overallRank = String(data.overallRank || "—").trim();
+  const helpline = CONFIG.HELPLINE_NUMBER || "+91 81079 25353";
+
+  let dateRange = "Current Academic Week";
+  if (fromDate && tillDate && fromDate !== "—" && tillDate !== "—") {
+    dateRange = fromDate + " ➔ " + tillDate;
+  } else if (tillDate && tillDate !== "—") {
+    dateRange = tillDate;
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1080" height="1350" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a192f" />
+      <stop offset="45%" stop-color="#0f2747" />
+      <stop offset="100%" stop-color="#06101e" />
+    </linearGradient>
+
+    <!-- Radiant Gold Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fae29c" />
+      <stop offset="50%" stop-color="#d4af37" />
+      <stop offset="100%" stop-color="#aa7c11" />
+    </linearGradient>
+
+    <!-- Card Background Gradient -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#142c4c" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0d1e35" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Metric Card Gradient -->
+    <linearGradient id="metricGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#163459" />
+      <stop offset="100%" stop-color="#0e233d" />
+    </linearGradient>
+
+    <!-- Subtle Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1080" height="1350" fill="url(#bgGrad)" />
+
+  <!-- Outer Double Gold Border -->
+  <rect x="30" y="30" width="1020" height="1290" rx="28" fill="none" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.85" />
+  <rect x="42" y="42" width="996" height="1266" rx="22" fill="none" stroke="#d4af37" stroke-width="1.5" stroke-opacity="0.4" />
+
+  <!-- Corner Accents -->
+  <circle cx="50" cy="50" r="8" fill="#d4af37" />
+  <circle cx="1030" cy="50" r="8" fill="#d4af37" />
+  <circle cx="50" cy="1300" r="8" fill="#d4af37" />
+  <circle cx="1030" cy="1300" r="8" fill="#d4af37" />
+
+  <!-- Header Bismillah -->
+  <text x="540" y="115" font-family="'Amiri', 'Traditional Arabic', 'Scheherazade', serif" font-size="34" fill="#fae29c" text-anchor="middle" font-weight="bold" letter-spacing="2">
+    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+  </text>
+
+  <!-- Institution Title -->
+  <text x="540" y="170" font-family="'Cinzel', 'Trajan Pro', 'Georgia', serif" font-size="28" fill="#ffffff" text-anchor="middle" font-weight="700" letter-spacing="3">
+    MAUZE TAHFEEZ
+  </text>
+  <text x="540" y="205" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="600" letter-spacing="5">
+    DARA SA'ADATIL ABADIYAH • GALIAKOT SHARIF
+  </text>
+
+  <!-- Decorative Separator Line -->
+  <line x1="240" y1="235" x2="840" y2="235" stroke="url(#goldGrad)" stroke-width="2" />
+  <polygon points="540,227 548,235 540,243 532,235" fill="#fae29c" />
+
+  <!-- Badge Pill: Weekly Result -->
+  <rect x="340" y="260" width="400" height="42" rx="21" fill="url(#goldGrad)" />
+  <text x="540" y="287" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#0a192f" text-anchor="middle" font-weight="800" letter-spacing="2">
+    WEEKLY MARHALA REPORT
+  </text>
+
+  <!-- Child Showcase Card -->
+  <rect x="80" y="335" width="920" height="235" rx="24" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="2.5" />
+  
+  <text x="540" y="380" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#93aed0" text-anchor="middle" font-weight="600" letter-spacing="3">
+    STUDENT PERFORMANCE SUMMARY
+  </text>
+
+  <!-- Child Name in Radiant Gold -->
+  <text x="540" y="450" font-family="'Playfair Display', 'Georgia', serif" font-size="46" fill="#fae29c" text-anchor="middle" font-weight="800" filter="url(#glow)">
+    ${escapeXml(name)}
+  </text>
+
+  <!-- Date Range Ribbon -->
+  <rect x="270" y="490" width="540" height="44" rx="22" fill="#09182d" stroke="#335987" stroke-width="1.5" />
+  <text x="540" y="518" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" fill="#e2edfc" text-anchor="middle" font-weight="600">
+    📅 Week: ${escapeXml(dateRange)}
+  </text>
+
+  <!-- 1. Weekly Score Card -->
+  <rect x="80" y="605" width="440" height="235" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
+  <circle cx="135" cy="660" r="26" fill="#10b981" fill-opacity="0.2" stroke="#10b981" stroke-width="2" />
+  <text x="135" y="667" font-family="'Segoe UI', sans-serif" font-size="20" fill="#10b981" text-anchor="middle">★</text>
+  <text x="180" y="665" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">WEEKLY SCORE</text>
+  <text x="300" y="745" font-family="'Segoe UI', Roboto, sans-serif" font-size="64" fill="#ffffff" font-weight="900" text-anchor="middle">${escapeXml(score)}</text>
+  <text x="300" y="785" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#10b981" font-weight="700" text-anchor="middle">✔ Complete Weekly Evaluation</text>
+
+  <!-- 2. Total Jadeed Card -->
+  <rect x="560" y="605" width="440" height="235" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
+  <circle cx="615" cy="660" r="26" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6" stroke-width="2" />
+  <text x="615" y="667" font-family="'Segoe UI', sans-serif" font-size="19" fill="#3b82f6" text-anchor="middle">📖</text>
+  <text x="660" y="665" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">TOTAL JADEED</text>
+  <text x="780" y="745" font-family="'Segoe UI', Roboto, sans-serif" font-size="44" fill="#fae29c" font-weight="900" text-anchor="middle">${escapeXml(jadeed)}</text>
+  <text x="780" y="785" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#93aed0" font-weight="600" text-anchor="middle">New Memorization Progress</text>
+
+  <!-- 3. Marhala Rank Card -->
+  <rect x="80" y="870" width="440" height="220" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
+  <circle cx="135" cy="925" r="26" fill="#f59e0b" fill-opacity="0.2" stroke="#f59e0b" stroke-width="2" />
+  <text x="135" y="932" font-family="'Segoe UI', sans-serif" font-size="20" fill="#f59e0b" text-anchor="middle">👑</text>
+  <text x="180" y="930" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">MARHALA RANK</text>
+  <text x="300" y="1010" font-family="'Segoe UI', Roboto, sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(marhalaRank)}</text>
+  <text x="300" y="1048" font-family="'Segoe UI', Roboto, sans-serif" font-size="15" fill="#f59e0b" font-weight="700" text-anchor="middle">🏅 Section Standing</text>
+
+  <!-- 4. Overall Rank Card -->
+  <rect x="560" y="870" width="440" height="220" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
+  <circle cx="615" cy="925" r="26" fill="#8b5cf6" fill-opacity="0.2" stroke="#8b5cf6" stroke-width="2" />
+  <text x="615" y="932" font-family="'Segoe UI', sans-serif" font-size="20" fill="#8b5cf6" text-anchor="middle">🌟</text>
+  <text x="660" y="930" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">OVERALL RANK</text>
+  <text x="780" y="1010" font-family="'Segoe UI', Roboto, sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(overallRank)}</text>
+  <text x="780" y="1048" font-family="'Segoe UI', Roboto, sans-serif" font-size="15" fill="#a78bfa" font-weight="700" text-anchor="middle">🏆 Academy Standing</text>
+
+  <!-- Verification Stamp Pill -->
+  <rect x="260" y="1120" width="560" height="44" rx="22" fill="#0d2847" stroke="#10b981" stroke-width="1.8" />
+  <text x="540" y="1148" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#34d399" text-anchor="middle" font-weight="700">
+    ✔ Verified Official Record • Latest Academic Week
+  </text>
+
+  <!-- Helpline & Footer -->
+  <line x1="80" y1="1195" x2="1000" y2="1195" stroke="url(#goldGrad)" stroke-width="1.5" stroke-opacity="0.5" />
+  
+  <rect x="200" y="1220" width="680" height="52" rx="26" fill="#132a48" stroke="url(#goldGrad)" stroke-width="2" />
+  <text x="540" y="1253" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="1">
+    📞 HELPLINE &amp; WHATSAPP BOT: ${escapeXml(helpline)}
+  </text>
+</svg>`;
+}
+
+/**
+ * Converts the SVG into a PNG image Blob.
+ */
+function generateMarhalaResultPngBlob(data) {
+  const svg = generateMarhalaResultSvg(data);
+  const blob = Utilities.newBlob(svg, "image/svg+xml", (data.name || "Student").replace(/\s+/g, "_") + "_Result.svg");
+  try {
+    return blob.getAs("image/png");
+  } catch (_e) {
+    // If runtime does not have direct SVG-to-PNG converter, return SVG blob with .png extension
+    return Utilities.newBlob(svg, "image/svg+xml", (data.name || "Student").replace(/\s+/g, "_") + "_Result.svg");
+  }
+}
+
+/**
+ * Returns Base64 encoded image string for WhatsApp dispatch.
+ */
+function generateMarhalaResultImageBase64(data) {
+  const blob = generateMarhalaResultPngBlob(data);
+  return Utilities.base64Encode(blob.getBytes());
+}
+
+/**
+ * Builds formatted text caption for WhatsApp notification.
+ */
+function buildWhatsAppResultCaption(data, config) {
+  const helpline = (config && config.HELPLINE_NUMBER) || "+91 81079 25353";
+  const name = data.name || "Student";
+  const fromDate = data.fromDate || "";
+  const tillDate = data.tillDate || "";
+  const score = data.weeklyScore || "—";
+  const jadeed = data.totalJadeed || "—";
+  const mRank = data.marhalaRank || "—";
+  const oRank = data.overallRank || "—";
+
+  const dateStr = (fromDate && tillDate && fromDate !== "—") ? `${fromDate} to ${tillDate}` : (tillDate || "Latest Week");
+
+  return `بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\n\n` +
+    `*MAUZE TAHFEEZ - WEEKLY RESULT SUMMARY*\n` +
+    `_Dara Sa'adatil Abadiyah, Galiakot Sharif_\n\n` +
+    `Dear Parent,\n` +
+    `Here is the weekly performance summary for *${name}* (${dateStr}):\n\n` +
+    `📊 *Weekly Score:* ${score} / 100\n` +
+    `📖 *Total Jadeed:* ${jadeed}\n` +
+    `👑 *Marhala Rank:* #${mRank}\n` +
+    `🌟 *Overall Rank:* #${oRank}\n\n` +
+    `Official Result Image attached above 👆\n\n` +
+    `📞 *Mauze Tahfeez Helpline:* ${helpline}\n` +
+    `🌐 *Online Portal:* https://mouze-tahfeez-atfal.vercel.app`;
+}
+
+/**
+ * Dispatches a single student result image via OpenWA WhatsApp Gateway.
+ */
+function sendStudentResultViaWhatsApp(studentData, customConfig) {
+  const cfg = customConfig || CONFIG;
+  const rawPhone = studentData.whatsappNumber || studentData.phone || "";
+  const cleanPhone = cleanWhatsAppPhone(rawPhone);
+  if (!cleanPhone) {
+    return { success: false, error: "Missing or invalid WhatsApp number for " + studentData.name };
+  }
+
+  const imageBase64 = generateMarhalaResultImageBase64(studentData);
+  const caption = buildWhatsAppResultCaption(studentData, cfg);
+
+  const sessionId = cfg.OPENWA_SESSION_ID || "mauze-helpline-8107925353";
+  const baseUrl = (cfg.OPENWA_API_URL || "http://localhost:2785").replace(/\/+$/, "");
+  const url = baseUrl + "/api/sessions/" + sessionId + "/messages/send-image";
+
+  const payload = {
+    chatId: cleanPhone + "@c.us",
+    base64: "data:image/png;base64," + imageBase64,
+    mimetype: "image/png",
+    filename: (studentData.name || "Student").replace(/[^a-zA-Z0-9_-]/g, "_") + "_Weekly_Result.png",
+    caption: caption
+  };
+
+  const headers = { "Content-Type": "application/json" };
+  if (cfg.OPENWA_API_KEY) {
+    headers["X-API-Key"] = cfg.OPENWA_API_KEY;
+    headers["Authorization"] = "Bearer " + cfg.OPENWA_API_KEY;
+  }
+
+  try {
+    const response = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: headers,
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    const code = response.getResponseCode();
+    if (code >= 200 && code < 300) {
+      return { success: true, phone: cleanPhone, student: studentData.name };
+    } else {
+      return { success: false, code: code, error: response.getContentText(), phone: cleanPhone, student: studentData.name };
+    }
+  } catch (err) {
+    return { success: false, error: err.message, phone: cleanPhone, student: studentData.name };
+  }
+}
+
+/**
+ * 📱 WhatsApp Dispatch: Loops through 'parents email' tab and dispatches
+ * the premium result image to each parent's WhatsApp number via OpenWA bot.
+ */
+function sendAllParentsWhatsAppResultImages() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    "📱 Dispatch WhatsApp Result Images",
+    "Send weekly Marhala result images to all parents via the helpline bot (+91 81079 25353)?\n\nOnly students with 'Yes' in the latest week column will be sent.",
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  const ss = resolveSpreadsheet("atfal");
+  const sheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
+  if (!sheet) {
+    ui.alert("Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' not found.");
+    return;
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    ui.alert("No student data found in '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "'.");
+    return;
+  }
+
+  let sentCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+  const errors = [];
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const email = String(row[0] || "");
+    const name = String(row[1] || "");
+    const fromDate = String(row[2] || "");
+    const tillDate = String(row[3] || "");
+    const weeklyScore = row[4];
+    const totalJadeed = String(row[5] || "");
+    const marhalaRank = String(row[6] || "");
+    const overallRank = String(row[7] || "");
+    const status = String(row[8] || "");
+    const rawPhone = String(row[9] || "");
+
+    if (status.trim().toLowerCase() !== "yes") {
+      skippedCount++;
+      continue;
+    }
+
+    const cleanPhone = cleanWhatsAppPhone(rawPhone);
+    if (!cleanPhone) {
+      skippedCount++;
+      errors.push(name + ": No valid WhatsApp phone number");
+      continue;
+    }
+
+    try {
+      const studentData = {
+        email: email,
+        name: name,
+        fromDate: fromDate,
+        tillDate: tillDate,
+        weeklyScore: weeklyScore,
+        totalJadeed: totalJadeed,
+        marhalaRank: marhalaRank,
+        overallRank: overallRank,
+        whatsappNumber: cleanPhone
+      };
+
+      const result = sendStudentResultViaWhatsApp(studentData, CONFIG);
+      if (result.success) {
+        sentCount++;
+      } else {
+        failedCount++;
+        errors.push(name + ": " + (result.error || "Send failed"));
+      }
+    } catch (sendErr) {
+      failedCount++;
+      errors.push(name + ": " + sendErr.message);
+    }
+  }
+
+  let summary = "🎉 WhatsApp Dispatch Complete!\n\n" +
+    "✅ Sent: " + sentCount + "\n" +
+    "⏭️ Skipped: " + skippedCount + "\n" +
+    "❌ Failed: " + failedCount;
+
+  if (errors.length > 0) {
+    summary += "\n\nIssues:\n" + errors.slice(0, 5).join("\n");
+    if (errors.length > 5) summary += "\n...and " + (errors.length - 5) + " more";
+  }
+
+  ui.alert("WhatsApp Dispatch Summary", summary, ui.ButtonSet.OK);
+}
+
+/**
+ * Sends result image for the currently highlighted student row in 'parents email' tab.
+ */
+function sendSelectedStudentWhatsAppResultImage() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = resolveSpreadsheet("atfal");
+  const sheet = ss.getActiveSheet();
+
+  if (sheet.getName() !== CONFIG.PARENTS_EMAIL_SHEET_NAME) {
+    ui.alert("Please switch to the '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' tab and select a student row first.");
+    return;
+  }
+
+  const activeRow = sheet.getActiveCell().getRow();
+  if (activeRow <= 1) {
+    ui.alert("Please select a valid student row (row 2 or below).");
+    return;
+  }
+
+  const rowValues = sheet.getRange(activeRow, 1, 1, PARENTS_EMAIL_HEADERS.length).getValues()[0];
+  const name = String(rowValues[1] || "Student");
+  const rawPhone = String(rowValues[9] || "");
+  const cleanPhone = cleanWhatsAppPhone(rawPhone);
+
+  if (!cleanPhone) {
+    ui.alert("Error", "No valid WhatsApp number found in column 10 for " + name + ". Please enter the phone number.", ui.ButtonSet.OK);
+    return;
+  }
+
+  const confirm = ui.alert(
+    "Send to " + name + "?",
+    "Send weekly Marhala result image to " + name + " at +" + cleanPhone + "?",
+    ui.ButtonSet.YES_NO
+  );
+  if (confirm !== ui.Button.YES) return;
+
+  const studentData = {
+    email: String(rowValues[0] || ""),
+    name: name,
+    fromDate: String(rowValues[2] || ""),
+    tillDate: String(rowValues[3] || ""),
+    weeklyScore: rowValues[4],
+    totalJadeed: String(rowValues[5] || ""),
+    marhalaRank: String(rowValues[6] || ""),
+    overallRank: String(rowValues[7] || ""),
+    whatsappNumber: cleanPhone
+  };
+
+  const result = sendStudentResultViaWhatsApp(studentData, CONFIG);
+  if (result.success) {
+    ui.alert("Success", "✅ Result image sent successfully to " + name + " (+" + cleanPhone + ")!", ui.ButtonSet.OK);
+  } else {
+    ui.alert("Send Error", "❌ Could not send to " + name + ":\n" + (result.error || "Unknown error"), ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Preview result card SVG for the selected student.
+ */
+function previewSelectedStudentResultImage() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = resolveSpreadsheet("atfal");
+  const sheet = ss.getActiveSheet();
+
+  if (sheet.getName() !== CONFIG.PARENTS_EMAIL_SHEET_NAME) {
+    ui.alert("Please select a row in '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' tab.");
+    return;
+  }
+
+  const activeRow = sheet.getActiveCell().getRow();
+  if (activeRow <= 1) {
+    ui.alert("Please select a valid student row (row 2 or below).");
+    return;
+  }
+
+  const row = sheet.getRange(activeRow, 1, 1, PARENTS_EMAIL_HEADERS.length).getValues()[0];
+  const name = String(row[1] || "Student");
+  const studentData = {
+    email: String(row[0] || ""),
+    name: name,
+    fromDate: String(row[2] || ""),
+    tillDate: String(row[3] || ""),
+    weeklyScore: row[4],
+    totalJadeed: String(row[5] || ""),
+    marhalaRank: String(row[6] || ""),
+    overallRank: String(row[7] || ""),
+    whatsappNumber: String(row[9] || "")
+  };
+
+  const svg = generateMarhalaResultSvg(studentData);
+  const htmlOutput = HtmlService.createHtmlOutput(
+    '<div style="text-align:center;background:#06101e;padding:15px;border-radius:12px;">' +
+    svg +
+    '</div>'
+  ).setWidth(600).setHeight(750);
+
+  ui.showModalDialog(htmlOutput, "Marhala Result Preview: " + name);
+}
+
+/**
+ * Programmatic Webhook Processor for WhatsApp Results Dispatch.
+ */
+function processSendWhatsAppResults(payload) {
+  const ss = resolveSpreadsheet(payload.category || "atfal");
+  const sheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
+  if (!sheet) {
+    return { success: false, error: "Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' not found" };
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return { success: false, error: "No student records found in sheet" };
+  }
+
+  const cfg = Object.assign({}, CONFIG, payload.config || {});
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  const logs = [];
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const name = String(row[1] || "");
+    const status = String(row[8] || "");
+    const rawPhone = String(row[9] || "");
+
+    if (payload.onlyUpdated !== false && status.trim().toLowerCase() !== "yes") {
+      skipped++;
+      continue;
+    }
+
+    const cleanPhone = cleanWhatsAppPhone(rawPhone);
+    if (!cleanPhone) {
+      skipped++;
+      logs.push({ student: name, status: "skipped", reason: "missing_phone" });
+      continue;
+    }
+
+    const studentData = {
+      email: String(row[0] || ""),
+      name: name,
+      fromDate: String(row[2] || ""),
+      tillDate: String(row[3] || ""),
+      weeklyScore: row[4],
+      totalJadeed: String(row[5] || ""),
+      marhalaRank: String(row[6] || ""),
+      overallRank: String(row[7] || ""),
+      whatsappNumber: cleanPhone
+    };
+
+    const res = sendStudentResultViaWhatsApp(studentData, cfg);
+    if (res.success) {
+      sent++;
+      logs.push({ student: name, phone: cleanPhone, status: "sent" });
+    } else {
+      failed++;
+      logs.push({ student: name, phone: cleanPhone, status: "failed", error: res.error });
+    }
+  }
+
+  return {
+    success: true,
+    total: sent + failed + skipped,
+    sent: sent,
+    failed: failed,
+    skipped: skipped,
+    logs: logs
+  };
+}
+
+/**
+ * Tests connection to the OpenWA WhatsApp Gateway.
+ */
+function testOpenWaConnection(customConfig) {
+  const cfg = customConfig || CONFIG;
+  const baseUrl = (cfg.OPENWA_API_URL || "http://localhost:2785").replace(/\/+$/, "");
+  const sessionId = cfg.OPENWA_SESSION_ID || "mauze-helpline-8107925353";
+  const url = baseUrl + "/api/sessions/" + sessionId + "/status";
+
+  const headers = {};
+  if (cfg.OPENWA_API_KEY) {
+    headers["X-API-Key"] = cfg.OPENWA_API_KEY;
+    headers["Authorization"] = "Bearer " + cfg.OPENWA_API_KEY;
+  }
+
+  try {
+    const response = UrlFetchApp.fetch(url, {
+      method: "get",
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    const code = response.getResponseCode();
+    const content = response.getContentText();
+    return {
+      success: code >= 200 && code < 300,
+      code: code,
+      response: content,
+      sessionId: sessionId,
+      helpline: cfg.HELPLINE_NUMBER || "+91 81079 25353"
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      sessionId: sessionId,
+      helpline: cfg.HELPLINE_NUMBER || "+91 81079 25353"
+    };
+  }
+}
+
+function testOpenWaBotConnection() {
+  const ui = SpreadsheetApp.getUi();
+  const res = testOpenWaConnection(CONFIG);
+  if (res.success) {
+    ui.alert("Connected!", "✅ OpenWA Bot is online and connected!\nSession: " + res.sessionId + "\nHelpline: " + res.helpline, ui.ButtonSet.OK);
+  } else {
+    ui.alert("OpenWA Connection Status", "Status: " + (res.error || res.response || "Code " + res.code) + "\n\nNote: If OpenWA is hosted locally, configure your public/tunnel URL in CONFIG.OPENWA_API_URL.", ui.ButtonSet.OK);
+  }
 }

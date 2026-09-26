@@ -1030,4 +1030,88 @@
   margin-top: -4px;
 }
 
+/* WhatsApp Result Dispatch Section */
+.mrk-whatsapp-dispatch-card {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04));
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mrk-wa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mrk-wa-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mrk-wa-title strong {
+  display: block;
+  font-size: 0.88rem;
+  color: #065f46;
+}
+
+.mrk-wa-sub {
+  display: block;
+  font-size: 0.74rem;
+  color: #047857;
+  opacity: 0.85;
+}
+
+.mrk-btn-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 3px 10px rgba(37, 211, 102, 0.3);
+}
+
+.mrk-btn-whatsapp:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.mrk-btn-whatsapp:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mrk-wa-status {
+  font-size: 0.78rem;
+  padding: 8px 12px;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.mrk-wa-status.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #065f46;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.mrk-wa-status.info {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1e40af;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
 
