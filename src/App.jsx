@@ -351,6 +351,14 @@ const isReportVisibleNow = (settings, now = new Date()) => {
 const createTeacherResultDraft = (overrides = {}) => ({
   student_id: "",
   week_date: getToday(),
+  from_date: "",
+  till_date: "",
+  to_date: "",
+  fatemi_from_date: "",
+  fatemi_from_month: "",
+  fatemi_till_date: "",
+  fatemi_till_month: "",
+  fatemi_till_month_name: "",
   murajazah: "",
   juz_hali: "",
   takhteet: "",
@@ -5574,7 +5582,40 @@ function TahfeezReportCard({
   jadeedTrend = null,
 }) {
   const report = normalizeReportSettings(settings);
-  const fatemi = getFatemiInfo(weeklyResult?.week_date);
+  const resolvedTillDate =
+    weeklyResult?.till_date ||
+    weeklyResult?.to_date ||
+    weeklyResult?.week_date ||
+    getToday();
+  const tillFatemi = getFatemiInfo(resolvedTillDate);
+
+  let resolvedFromDate = weeklyResult?.from_date;
+  if (!resolvedFromDate && resolvedTillDate) {
+    try {
+      const dPrev = new Date(resolvedTillDate + "T12:00:00Z");
+      dPrev.setUTCDate(dPrev.getUTCDate() - 5);
+      resolvedFromDate = dPrev.toISOString().slice(0, 10);
+    } catch (_) {
+      resolvedFromDate = resolvedTillDate;
+    }
+  }
+  const fromFatemi = resolvedFromDate ? getFatemiInfo(resolvedFromDate) : tillFatemi;
+
+  const displayFromDate =
+    weeklyResult?.fatemi_from_date != null && weeklyResult?.fatemi_from_date !== ""
+      ? weeklyResult.fatemi_from_date
+      : fromFatemi.date;
+
+  const displayTillDate =
+    weeklyResult?.fatemi_till_date != null && weeklyResult?.fatemi_till_date !== ""
+      ? weeklyResult.fatemi_till_date
+      : tillFatemi.date;
+
+  const displayMonthName =
+    weeklyResult?.fatemi_till_month_name ||
+    (fromFatemi.month === tillFatemi.month
+      ? tillFatemi.monthName
+      : `${fromFatemi.monthName} / ${tillFatemi.monthName}`);
   const hMain = report.main_heading;
   const hSub = report.sub_heading;
   const hWusool = report.wusool_heading;
@@ -5814,12 +5855,12 @@ function TahfeezReportCard({
         <div className="result-week-meta">
           <div className="week-meta-grid">
             <div className="meta-col">
-              <span className="meta-label child-hood-font">Week:</span>
-              <span className="meta-val kanz-font">{fatemi.week}</span>
+              <span className="meta-label child-hood-font">From:</span>
+              <span className="meta-val kanz-font">{displayFromDate}</span>
             </div>
             <div className="meta-col">
-              <span className="meta-label child-hood-font">Date:</span>
-              <span className="meta-val kanz-font">{fatemi.date}</span>
+              <span className="meta-label child-hood-font">Till:</span>
+              <span className="meta-val kanz-font">{displayTillDate}</span>
             </div>
             <div className="meta-col">
               <span className="meta-label child-hood-font">Month:</span>
@@ -5827,7 +5868,7 @@ function TahfeezReportCard({
                 className="meta-val arabic-kanz"
                 style={{ fontFamily: "'Al-Kanz', 'Kanz al Marjaan', serif" }}
               >
-                {fatemi.monthName}
+                {displayMonthName}
               </span>
             </div>
           </div>
@@ -8160,6 +8201,11 @@ const FATEMI_MONTHS_1448 = [
   { m: 5, en: "Jumad al Ula", ar: "جمادى الأولى" },
   { m: 6, en: "Jumad al Ukhra", ar: "جمادى الآخرى" },
   { m: 7, en: "Rajab ul Asab", ar: "رجب الأصب" },
+  { m: 8, en: "Shaban al Karim", ar: "شعبان الكريم" },
+  { m: 9, en: "Shehre Ramadan al Moazzam", ar: "رمضان المعظم" },
+  { m: 10, en: "Shawwal al Mukarram", ar: "شوال المكرم" },
+  { m: 11, en: "Zilqadah al Haram", ar: "ذي القعدة الحرام" },
+  { m: 12, en: "Zilhijjah al Haram", ar: "ذي الحجة الحرام" },
 ];
 
 let fatemiCalCache = null;
@@ -8168,7 +8214,7 @@ function getFatemiCalendarMap() {
   const empty = {
     hijriToGreg: {},
     gregToHijri: {},
-    daysInMonth: { 1: 30, 2: 30, 3: 30, 4: 30, 5: 30, 6: 30, 7: 30 },
+    daysInMonth: { 1: 30, 2: 30, 3: 30, 4: 30, 5: 30, 6: 30, 7: 30, 8: 30, 9: 30, 10: 30, 11: 30, 12: 30 },
   };
   try {
     const fmt = new Intl.DateTimeFormat("en-u-ca-islamic-tbla-nu-latn", {
@@ -8181,7 +8227,7 @@ function getFatemiCalendarMap() {
     const gregToHijri = {};
     const daysInMonth = {};
     const start = new Date("2026-01-01T00:00:00Z");
-    const end = new Date("2027-06-01T00:00:00Z");
+    const end = new Date("2027-07-01T00:00:00Z");
     for (let t = new Date(start); t <= end; t.setUTCDate(t.getUTCDate() + 1)) {
       const g = t.toISOString().slice(0, 10);
       // Fatemi (Misri) calendar runs 1 day ahead of the standard Islamic tabular calendar
@@ -8190,7 +8236,7 @@ function getFatemiCalendarMap() {
       const y = +p.find((x) => x.type === "year").value;
       const m = +p.find((x) => x.type === "month").value;
       const d = +p.find((x) => x.type === "day").value;
-      if (y === FATEMI_YEAR_1448 && m >= 1 && m <= 7) {
+      if (y === FATEMI_YEAR_1448 && m >= 1 && m <= 12) {
         hijriToGreg[`${m}-${d}`] = g;
         gregToHijri[g] = { m, d };
         if (!daysInMonth[m] || d > daysInMonth[m]) daysInMonth[m] = d;
@@ -34162,6 +34208,255 @@ function TeacherPortal({
   const { availableGroups, filteredStudents, selectedGroup, teacherIdentity } =
     teacherData;
   const backdropMouseDownRef = useRef(false);
+  const isKibarTeacher =
+    portalRole === "kibar-teacher" ||
+    portalRole === "kibar_teacher" ||
+    getSectionScope() === "kibar" ||
+    user?.email?.toLowerCase() === "tmjiger@gmail.com" ||
+    user?.user_metadata?.portal_role === "kibar-teacher" ||
+    user?.user_metadata?.role === "kibar-teacher" ||
+    getAssignedRoles(user).includes("kibar-teacher") ||
+    (typeof window !== "undefined" && window.location?.href?.includes("kibar"));
+
+  const [showFatemiCalPicker, setShowFatemiCalPicker] = useState(false);
+  const fatemiCal = useMemo(() => getFatemiCalendarMap(), []);
+
+  // ── Fatemi Hijri Date Range & 6th-Day Auto Calculation ──
+  const currentWeekDate = teacherForms.result.week_date || getToday();
+  const currentTillGreg = teacherForms.result.till_date || currentWeekDate;
+  const currentTillInfo = useMemo(() => {
+    return fatemiCal.gregToHijri[currentTillGreg] || getFatemiInfo(currentTillGreg);
+  }, [currentTillGreg, fatemiCal]);
+
+  const currentFromGreg = useMemo(() => {
+    if (teacherForms.result.from_date) return teacherForms.result.from_date;
+    try {
+      const dP = new Date(currentTillGreg + "T12:00:00Z");
+      dP.setUTCDate(dP.getUTCDate() - 5);
+      return dP.toISOString().slice(0, 10);
+    } catch (_) {
+      return currentTillGreg;
+    }
+  }, [teacherForms.result.from_date, currentTillGreg]);
+
+  const currentFromInfo = useMemo(() => {
+    return fatemiCal.gregToHijri[currentFromGreg] || getFatemiInfo(currentFromGreg);
+  }, [currentFromGreg, fatemiCal]);
+
+  const selectedFromM = Number(
+    teacherForms.result.fatemi_from_month ||
+      currentFromInfo.m ||
+      currentFromInfo.month ||
+      1
+  );
+  const selectedFromD = Number(
+    teacherForms.result.fatemi_from_date ||
+      currentFromInfo.d ||
+      currentFromInfo.date ||
+      1
+  );
+  const selectedTillM = Number(
+    teacherForms.result.fatemi_till_month ||
+      currentTillInfo.m ||
+      currentTillInfo.month ||
+      selectedFromM
+  );
+  const selectedTillD = Number(
+    teacherForms.result.fatemi_till_date ||
+      currentTillInfo.d ||
+      currentTillInfo.date ||
+      Math.min(selectedFromD + 5, 30)
+  );
+
+  // Auto-sync initial Fatemi date values into teacherForms.result if not yet present
+  useEffect(() => {
+    if (
+      !teacherForms.result.fatemi_from_date ||
+      !teacherForms.result.fatemi_till_date ||
+      !teacherForms.result.from_date ||
+      !teacherForms.result.till_date
+    ) {
+      setTeacherForms((curr) => ({
+        ...curr,
+        result: {
+          ...curr.result,
+          from_date: curr.result.from_date || currentFromGreg,
+          till_date: curr.result.till_date || currentTillGreg,
+          to_date: curr.result.to_date || currentTillGreg,
+          week_date: curr.result.week_date || currentTillGreg,
+          fatemi_from_date: curr.result.fatemi_from_date || selectedFromD,
+          fatemi_from_month: curr.result.fatemi_from_month || selectedFromM,
+          fatemi_till_date: curr.result.fatemi_till_date || selectedTillD,
+          fatemi_till_month: curr.result.fatemi_till_month || selectedTillM,
+          fatemi_till_month_name:
+            curr.result.fatemi_till_month_name ||
+            ARABIC_MONTHS[selectedTillM - 1] ||
+            "",
+        },
+      }));
+    }
+  }, [
+    teacherForms.result.fatemi_from_date,
+    teacherForms.result.fatemi_till_date,
+    teacherForms.result.from_date,
+    teacherForms.result.till_date,
+    currentFromGreg,
+    currentTillGreg,
+    selectedFromD,
+    selectedFromM,
+    selectedTillD,
+    selectedTillM,
+    setTeacherForms,
+  ]);
+
+  const handleFatemiFromSelect = useCallback(
+    (newM, newD) => {
+      const fM = Number(newM);
+      const fD = Number(newD);
+      const fromGreg = fatemiCal.hijriToGreg[`${fM}-${fD}`] || getToday();
+
+      // 6th day calculation (1st day + 5 days = 6th day)
+      let tillGreg = fromGreg;
+      let tM = fM;
+      let tD = Math.min(fD + 5, 30);
+      try {
+        const d6 = new Date(fromGreg + "T12:00:00Z");
+        d6.setUTCDate(d6.getUTCDate() + 5);
+        tillGreg = d6.toISOString().slice(0, 10);
+        const tInfo = fatemiCal.gregToHijri[tillGreg] || getFatemiInfo(tillGreg);
+        tM = Number(tInfo.m || tInfo.month || fM);
+        tD = Number(tInfo.d || tInfo.date || (fD + 5));
+      } catch (_) {}
+
+      const tillMonthName = ARABIC_MONTHS[tM - 1] || "";
+      const sId = teacherForms.result.student_id;
+      const existing = sId
+        ? (schoolData?.weeklyResults || []).find(
+            (r) =>
+              String(r.student_id) === String(sId) &&
+              String(r.week_date) === String(tillGreg),
+          )
+        : null;
+
+      if (existing) {
+        setTeacherForms((curr) => ({
+          ...curr,
+          result: {
+            ...curr.result,
+            ...existing,
+            from_date: fromGreg,
+            till_date: tillGreg,
+            to_date: tillGreg,
+            week_date: tillGreg,
+            fatemi_from_date: fD,
+            fatemi_from_month: fM,
+            fatemi_till_date: tD,
+            fatemi_till_month: tM,
+            fatemi_till_month_name: tillMonthName,
+            student_id: sId,
+          },
+        }));
+      } else {
+        setTeacherForms((curr) => ({
+          ...curr,
+          result: {
+            ...createTeacherResultDraft({ student_id: sId }),
+            from_date: fromGreg,
+            till_date: tillGreg,
+            to_date: tillGreg,
+            week_date: tillGreg,
+            fatemi_from_date: fD,
+            fatemi_from_month: fM,
+            fatemi_till_date: tD,
+            fatemi_till_month: tM,
+            fatemi_till_month_name: tillMonthName,
+            student_id: sId,
+          },
+        }));
+      }
+      setSaveStatus("");
+      setSaveErrorDetails("");
+    },
+    [
+      fatemiCal,
+      schoolData?.weeklyResults,
+      teacherForms.result.student_id,
+      setTeacherForms,
+      setSaveStatus,
+      setSaveErrorDetails,
+    ],
+  );
+
+  const handleFatemiTillSelect = useCallback(
+    (newM, newD) => {
+      const tM = Number(newM);
+      const tD = Number(newD);
+      const tillGreg = fatemiCal.hijriToGreg[`${tM}-${tD}`] || getToday();
+      const tillMonthName = ARABIC_MONTHS[tM - 1] || "";
+
+      let fromGreg = teacherForms.result.from_date;
+      if (!fromGreg) {
+        fromGreg =
+          fatemiCal.hijriToGreg[`${selectedFromM}-${selectedFromD}`] || tillGreg;
+      }
+
+      const sId = teacherForms.result.student_id;
+      const existing = sId
+        ? (schoolData?.weeklyResults || []).find(
+            (r) =>
+              String(r.student_id) === String(sId) &&
+              String(r.week_date) === String(tillGreg),
+          )
+        : null;
+
+      if (existing) {
+        setTeacherForms((curr) => ({
+          ...curr,
+          result: {
+            ...curr.result,
+            ...existing,
+            from_date: fromGreg,
+            till_date: tillGreg,
+            to_date: tillGreg,
+            week_date: tillGreg,
+            fatemi_from_date: selectedFromD,
+            fatemi_from_month: selectedFromM,
+            fatemi_till_date: tD,
+            fatemi_till_month: tM,
+            fatemi_till_month_name: tillMonthName,
+            student_id: sId,
+          },
+        }));
+      } else {
+        setTeacherForms((curr) => ({
+          ...curr,
+          result: {
+            ...curr.result,
+            till_date: tillGreg,
+            to_date: tillGreg,
+            week_date: tillGreg,
+            fatemi_till_date: tD,
+            fatemi_till_month: tM,
+            fatemi_till_month_name: tillMonthName,
+          },
+        }));
+      }
+      setSaveStatus("");
+      setSaveErrorDetails("");
+    },
+    [
+      fatemiCal,
+      schoolData?.weeklyResults,
+      selectedFromD,
+      selectedFromM,
+      teacherForms.result.from_date,
+      teacherForms.result.student_id,
+      setTeacherForms,
+      setSaveStatus,
+      setSaveErrorDetails,
+    ],
+  );
+
   const [selectedTahfeezChat, setSelectedTahfeezChat] = useState(null);
   const [tahfeezSearchQuery, setTahfeezSearchQuery] = useState("");
   const [activeCall, setActiveCall] = useState(null);
@@ -36506,6 +36801,14 @@ function TeacherPortal({
     const sJadeed = toNumber(f.jadeed);
     const payload = {
       week_date: f.week_date || getToday(),
+      from_date: f.from_date || null,
+      till_date: f.till_date || f.week_date || getToday(),
+      to_date: f.to_date || f.till_date || f.week_date || getToday(),
+      fatemi_from_date: f.fatemi_from_date || null,
+      fatemi_from_month: f.fatemi_from_month || null,
+      fatemi_till_date: f.fatemi_till_date || null,
+      fatemi_till_month: f.fatemi_till_month || null,
+      fatemi_till_month_name: f.fatemi_till_month_name || null,
       student_id: numericId,
       attendance_count: toNumber(f.attendance_count),
       total_jadeed_pages: f.total_jadeed_pages ?? null,
@@ -36532,10 +36835,13 @@ function TeacherPortal({
 
     setSaveStatus("saving");
 
+    const resultsTable = isKibarTeacher
+      ? "kibar_weekly_results"
+      : "weekly_results";
     let data, error;
     try {
       ({ data, error } = await supabase
-        .from("weekly_results")
+        .from(resultsTable)
         .upsert([payload], { onConflict: "student_id,week_date" })
         .select()
         .single());
@@ -36806,15 +37112,6 @@ function TeacherPortal({
       />
     );
   };
-
-  const isKibarTeacher =
-    portalRole === "kibar-teacher" ||
-    getSectionScope() === "kibar" ||
-    user?.email?.toLowerCase() === "tmjiger@gmail.com" ||
-    user?.user_metadata?.portal_role === "kibar-teacher" ||
-    user?.user_metadata?.role === "kibar-teacher" ||
-    getAssignedRoles(user).includes("kibar-teacher") ||
-    (typeof window !== "undefined" && window.location?.href?.includes("kibar"));
 
   return (
     <div className="admin-shell">
@@ -50163,6 +50460,14 @@ export default function App() {
     const f = teacherForms.result;
     const payload = {
       week_date: f.week_date || getToday(),
+      from_date: f.from_date || null,
+      till_date: f.till_date || f.week_date || getToday(),
+      to_date: f.to_date || f.till_date || f.week_date || getToday(),
+      fatemi_from_date: f.fatemi_from_date || null,
+      fatemi_from_month: f.fatemi_from_month || null,
+      fatemi_till_date: f.fatemi_till_date || null,
+      fatemi_till_month: f.fatemi_till_month || null,
+      fatemi_till_month_name: f.fatemi_till_month_name || null,
       student_id: numericId,
       attendance_count: toNumber(f.attendance_count),
       total_jadeed_pages: f.total_jadeed_pages || null,
@@ -50247,8 +50552,10 @@ export default function App() {
     }
 
     // Perform database write in background
+    const isKibar = portalRole === "kibar-teacher" || getSectionScope() === "kibar";
+    const targetResultsTable = isKibar ? "kibar_weekly_results" : "weekly_results";
     supabase
-      .from("weekly_results")
+      .from(targetResultsTable)
       .upsert([payload], { onConflict: "student_id,week_date" })
       .select()
       .single()
