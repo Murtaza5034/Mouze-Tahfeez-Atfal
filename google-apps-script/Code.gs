@@ -3,139 +3,163 @@
  * MAUZE TAHFEEZ - GOOGLE SHEETS LIVE SYNC AUTOMATION
  * ============================================================================
  * 
- * Instructions:
- * 1. Put your Google Sheet ID(s) in CONFIG below.
- * 2. In the toolbar function dropdown, select "testSetup" and click "Run".
- * 3. Deploy as Web App: Deploy > New deployment > Web app > Execute as: Me > Who has access: Anyone.
+ * 1. Categorization: Routes to Atfal or Kibar spreadsheets.
+ * 2. ALL 8 Marhala Tabs: Marhala 1, Marhala 2, Marhala 3, Marhala 4,
+ *    Marhala 5, Marhala 6, Marhala 7, and Marhala 8 created in one single sheet.
+ * 3. Parents Email Tab: Automatically updates the "parents email" tab with:
+ *    email, name, from date, till date, wekly score, total Jadeed,
+ *    marhala rank, over all rank, and data update for latest week ("Yes" / "No").
+ * 4. Conditional Formatting & Validation:
+ *    - Column 9 dropdown with "Yes" and "No".
+ *    - Green background for "Yes", Red background for "No".
+ * 5. Bulk Sync: Seamlessly receives and lists ALL students from the app into
+ *    their respective Marhala tabs and the "parents email" tab.
  */
 
 // ============================================================================
-// CONFIGURATION: Set your Google Spreadsheet IDs here
+// CONFIGURATION
 // ============================================================================
 const CONFIG = {
-  // If this script is created inside your Atfal Sheet (Extensions > Apps Script),
-  // leave ATFAL_SPREADSHEET_ID as "" and it will auto-detect the active sheet.
-  // Otherwise, paste the 44-character Sheet ID from your Google Sheet URL:
-  // (e.g. https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit)
+  // If created inside your Atfal Sheet (Extensions > Apps Script), leave as ""
+  // Otherwise, paste the 44-character Sheet ID from URL:
   ATFAL_SPREADSHEET_ID: "", 
   KIBAR_SPREADSHEET_ID: "", 
   
   PARENTS_EMAIL_SHEET_NAME: "parents email",
   
-  // Status dropdown options for Column 9
-  STATUS_OPTIONS: ["Yes", "No"],
+  // ALL 8 Canonical Marhalas
+  ALL_MARHALAS: [
+    "Marhala 1",
+    "Marhala 2",
+    "Marhala 3",
+    "Marhala 4",
+    "Marhala 5",
+    "Marhala 6",
+    "Marhala 7",
+    "Marhala 8"
+  ],
   
-  // Colors for Conditional Formatting (Green for Yes, Red for No)
-  COLOR_YES_BG: "#b7e1cd",    // Soft Mint / Emerald Green
-  COLOR_YES_TEXT: "#0d652d",  // Dark Forest Green
-  COLOR_NO_BG: "#f4c7c3",     // Soft Rose / Light Red
-  COLOR_NO_TEXT: "#c5221f"    // Dark Rich Red
+  // Column 9 Dropdown & Formatting Configuration
+  STATUS_OPTIONS: ["Yes", "No"],
+  COLOR_YES_BG: "#b7e1cd",    // Emerald Green Background
+  COLOR_YES_TEXT: "#0d652d",  // Dark Green Text
+  COLOR_NO_BG: "#f4c7c3",     // Light Red Background
+  COLOR_NO_TEXT: "#c5221f"    // Dark Red Text
 };
 
 // ============================================================================
 // 1. SAFE RUNNERS FOR THE APPS SCRIPT EDITOR (TOP OF FILE)
-// (Selected by default when you click "Run" in the toolbar)
 // ============================================================================
 
 /**
- * Click "Run" on this function in the toolbar to initialize tabs,
- * set up headers, apply dropdown validation, and configure conditional formatting.
+ * MASTER SETUP FUNCTION:
+ * Run this to create ALL 8 Marhala tabs (Marhala 1 to 8), the 'parents email' tab,
+ * apply Yes/No validation, and configure Yes(Green)/No(Red) conditional formatting.
  */
 function testSetup() {
-  Logger.log("=== [Mauze Tahfeez] Running Sheet Setup ===");
+  Logger.log("=== [Mauze Tahfeez] Initializing All Marhala Tabs & Settings ===");
   try {
     const ss = resolveSpreadsheet("atfal");
-    Logger.log("✅ Successfully connected to spreadsheet: '" + ss.getName() + "'");
+    Logger.log("✅ Connected to Spreadsheet: '" + ss.getName() + "'");
     
-    // Setup or get 'parents email' tab
+    // 1. Setup 'parents email' tab
     const parentsSheet = getOrCreateParentsEmailSheet(ss);
-    Logger.log("✅ Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' is ready.");
-    
-    // Apply validation & formatting
     setupParentsEmailValidationAndFormatting(parentsSheet);
-    Logger.log("✅ Applied Yes/No dropdown validation and Yes(Green)/No(Red) conditional formatting to Column 9.");
+    Logger.log("✅ Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' is ready with Yes/No validation & conditional formatting.");
 
-    // Setup default Marhala 1 tab
-    getOrCreateMarhalaSheet(ss, "Marhala 1");
-    Logger.log("✅ Tab 'Marhala 1' is ready with formatted headers.");
+    // 2. Setup ALL 8 Marhala tabs
+    for (let i = 0; i < CONFIG.ALL_MARHALAS.length; i++) {
+      const mName = CONFIG.ALL_MARHALAS[i];
+      getOrCreateMarhalaSheet(ss, mName);
+      Logger.log("✅ Tab '" + mName + "' is ready with formatted headers.");
+    }
 
-    Logger.log("🎉 ALL SETTINGS APPLIED SUCCESSFULLY! You can now Deploy as Web App.");
-    return "Setup completed successfully!";
+    Logger.log("🎉 ALL 8 MARHALA TABS + 'parents email' TAB CREATED SUCCESSFULLY!");
+    return "All tabs and formatting created successfully!";
   } catch (err) {
     Logger.log("❌ Setup Error: " + err.message);
-    if (err.message.indexOf("Spreadsheet ID") !== -1) {
-      Logger.log("👉 TIP: If this is a standalone script, paste your Google Sheet ID in CONFIG.ATFAL_SPREADSHEET_ID at line 25.");
-    }
     throw err;
   }
 }
 
 /**
- * Click "Run" on this function to simulate an incoming mark progress update from the app
+ * Click "Run" on this function to populate sample students across ALL 8 Marhalas
+ * and into the 'parents email' tab to preview the complete system.
  */
-function testMockSync() {
-  Logger.log("=== [Mauze Tahfeez] Simulating Test Mark Progress Push ===");
-  const mockPayload = {
-    category: "atfal",
-    marhala: "Marhala 1",
-    student: {
-      student_id: 101,
-      name: "Husain Yusuf Test",
-      arabic_name: "حسين يوسف",
-      email: "test.parent@example.com",
-      parent_email: "test.parent@example.com",
-      its: "50401234",
-      teacher_name: "Mulla Murtaza",
-      group_name: "Group Alif",
-      marhala: "Marhala 1",
-      marhala_rank: 1,
-      overall_rank: 3
-    },
-    result: {
-      week_date: "2026-09-26",
-      from_date: "2026-09-20",
-      till_date: "2026-09-26",
-      fatemi_from_date: 10,
-      fatemi_till_date: 15,
-      fatemi_till_month_name: "ربيع الآخر",
-      attendance_count: 6,
-      murajazah: 10,
-      juz_hali: 9.5,
-      takhteet: 9,
-      jadeed: 10,
-      total_score: 38.5,
-      total_jadeed_pages: 3,
-      total_jadeed_unit: "صفه",
-      wusool_juz: 30,
-      wusool_page: 582,
-      wusool_surah: "النبأ",
-      attendance_note: "Mumtaz performance!"
-    }
-  };
+function testPopulateAllStudents() {
+  Logger.log("=== [Mauze Tahfeez] Populating Students Across All 8 Marhalas ===");
+  const ss = resolveSpreadsheet("atfal");
+  
+  // Create all tabs first
+  testSetup();
 
-  const res = processSyncPayload(mockPayload);
-  Logger.log("✅ Mock sync completed successfully!");
-  Logger.log(JSON.stringify(res, null, 2));
-  return res;
+  const demoStudents = [
+    { id: 101, its: "50401001", name: "Husain Yusuf", email: "parent.husain@example.com", marhala: "Marhala 1", teacher: "Mulla Murtaza", group: "Group A", score: 38.5, jadeed: "3 صفه", mRank: 1, oRank: 3, from: "10", till: "15", status: "Yes" },
+    { id: 102, its: "50401002", name: "Taher Shabbir", email: "parent.taher@example.com", marhala: "Marhala 1", teacher: "Mulla Murtaza", group: "Group A", score: 36.0, jadeed: "2.5 صفه", mRank: 2, oRank: 8, from: "10", till: "15", status: "Yes" },
+    { id: 103, its: "50401003", name: "Fatema Mustafa", email: "parent.fatema@example.com", marhala: "Marhala 2", teacher: "Shaikh Abbas", group: "Group B", score: 39.0, jadeed: "4 صفه", mRank: 1, oRank: 2, from: "10", till: "15", status: "Yes" },
+    { id: 104, its: "50401004", name: "Ali Asgar", email: "parent.aliasgar@example.com", marhala: "Marhala 2", teacher: "Shaikh Abbas", group: "Group B", score: 35.5, jadeed: "2 صفه", mRank: 2, oRank: 12, from: "10", till: "15", status: "Yes" },
+    { id: 105, its: "50401005", name: "Zainab Hatim", email: "parent.zainab@example.com", marhala: "Marhala 3", teacher: "Mulla Idris", group: "Group C", score: 40.0, jadeed: "5 صفه", mRank: 1, oRank: 1, from: "10", till: "15", status: "Yes" },
+    { id: 106, its: "50401006", name: "Burhanuddin Huzaifa", email: "parent.burhan@example.com", marhala: "Marhala 4", teacher: "Shaikh Taha", group: "Group D", score: 37.0, jadeed: "3 صفه", mRank: 1, oRank: 5, from: "10", till: "15", status: "Yes" },
+    { id: 107, its: "50401007", name: "Amatullah Moiz", email: "parent.amatullah@example.com", marhala: "Marhala 5", teacher: "Mulla Murtaza", group: "Group E", score: 34.0, jadeed: "2 صفه", mRank: 1, oRank: 15, from: "10", till: "15", status: "Yes" },
+    { id: 108, its: "50401008", name: "Qusai Abdeali", email: "parent.qusai@example.com", marhala: "Marhala 6", teacher: "Shaikh Abbas", group: "Group F", score: 38.0, jadeed: "3.5 صفه", mRank: 1, oRank: 4, from: "10", till: "15", status: "Yes" },
+    { id: 109, its: "50401009", name: "Maryam Saifuddin", email: "parent.maryam@example.com", marhala: "Marhala 7", teacher: "Mulla Idris", group: "Group G", score: 36.5, jadeed: "3 صفه", mRank: 1, oRank: 7, from: "10", till: "15", status: "Yes" },
+    { id: 110, its: "50401010", name: "Mohammed Johar", email: "parent.johar@example.com", marhala: "Marhala 8", teacher: "Shaikh Taha", group: "Group H", score: 39.5, jadeed: "4.5 صفه", mRank: 1, oRank: 2, from: "10", till: "15", status: "Yes" }
+  ];
+
+  demoStudents.forEach(function(ds) {
+    const payload = {
+      category: "atfal",
+      marhala: ds.marhala,
+      student: {
+        student_id: ds.id,
+        its: ds.its,
+        name: ds.name,
+        email: ds.email,
+        parent_email: ds.email,
+        teacher_name: ds.teacher,
+        group_name: ds.group,
+        marhala: ds.marhala,
+        marhala_rank: ds.mRank,
+        overall_rank: ds.oRank
+      },
+      result: {
+        week_date: "2026-09-26",
+        from_date: "2026-09-20",
+        till_date: "2026-09-26",
+        fatemi_from_date: ds.from,
+        fatemi_till_date: ds.till,
+        fatemi_till_month_name: "ربيع الآخر",
+        attendance_count: 6,
+        murajazah: 10,
+        juz_hali: 9.5,
+        takhteet: 9,
+        jadeed: 10,
+        total_score: ds.score,
+        total_jadeed_pages: ds.jadeed,
+        total_jadeed_unit: "",
+        wusool_juz: 30,
+        wusool_page: 582,
+        wusool_surah: "النبأ",
+        attendance_note: "Punctual & attentive"
+      }
+    };
+    processSyncPayload(payload);
+  });
+
+  Logger.log("🎉 POPULATED STUDENTS ACROSS ALL 8 MARHALAS AND 'parents email' TAB!");
 }
 
 // ============================================================================
 // 2. WEBHOOK HTTP HANDLERS (doPost & doGet)
 // ============================================================================
 
-/**
- * Main Webhook endpoint to accept JSON payloads from Mauze Tahfeez App.
- * NOTE: When clicked via the editor's manual "Run" button without HTTP data,
- * this function safely logs helpful guidance instead of throwing an error.
- */
 function doPost(e) {
-  // If clicked manually from Apps Script Editor
   if (!e || typeof e === "undefined" || !e.postData || !e.postData.contents) {
     Logger.log("⚠️ 'doPost' was run manually from the editor without HTTP POST data.");
-    Logger.log("👉 To test your sheet from the editor, select 'testSetup' or 'testMockSync' from the toolbar dropdown above and click 'Run'.");
+    Logger.log("👉 To test your sheet, select 'testSetup' or 'testPopulateAllStudents' from the toolbar dropdown above and click 'Run'.");
     return jsonResponse({
       success: false,
-      message: "doPost is an HTTP Webhook endpoint. To test in editor, run testSetup() or testMockSync()."
+      message: "doPost is an HTTP Webhook endpoint. To initialize, run testSetup() or testPopulateAllStudents()."
     }, 200);
   }
 
@@ -150,6 +174,13 @@ function doPost(e) {
       }, 400);
     }
 
+    // Check for bulk sync of all students
+    if (payload.action === "bulk_sync" && Array.isArray(payload.students)) {
+      const bulkResult = processBulkSync(payload);
+      return jsonResponse(bulkResult, 200);
+    }
+
+    // Single student sync
     const result = processSyncPayload(payload);
     return jsonResponse(result, 200);
 
@@ -162,13 +193,11 @@ function doPost(e) {
   }
 }
 
-/**
- * Health check endpoint for testing deployment in browser
- */
 function doGet(e) {
   return jsonResponse({
     status: "ok",
     service: "Mauze Tahfeez Google Sheets Live Sync",
+    marhalas: CONFIG.ALL_MARHALAS,
     timestamp: new Date().toISOString(),
     message: "Webhook is active and ready to accept POST requests."
   }, 200);
@@ -181,7 +210,41 @@ function jsonResponse(data, statusCode) {
 }
 
 // ============================================================================
-// 3. CORE SYNC & ROUTING LOGIC
+// 3. BULK SYNC LOGIC (LIST ALL STUDENTS PROPERLY)
+// ============================================================================
+
+function processBulkSync(payload) {
+  const category = (payload.category || "atfal").toLowerCase().trim();
+  const spreadsheet = resolveSpreadsheet(category);
+  const students = payload.students || [];
+
+  // Ensure all tabs exist
+  testSetup();
+
+  let syncedCount = 0;
+  for (let i = 0; i < students.length; i++) {
+    const item = students[i];
+    const sPayload = {
+      category: category,
+      marhala: item.marhala || item.student?.marhala,
+      student: item.student || item,
+      result: item.result || item.latestResult || {}
+    };
+    processSyncPayload(sPayload);
+    syncedCount++;
+  }
+
+  return {
+    success: true,
+    action: "bulk_sync",
+    category: category,
+    syncedCount: syncedCount,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// ============================================================================
+// 4. CORE SYNC & ROUTING LOGIC
 // ============================================================================
 
 function processSyncPayload(payload) {
@@ -189,15 +252,14 @@ function processSyncPayload(payload) {
   const student = payload.student || {};
   const result = payload.result || {};
   
-  // 1. Resolve Target Spreadsheet (Atfal vs Kibar)
   const spreadsheet = resolveSpreadsheet(category);
 
-  // 2. Resolve Marhala Tab & Update
+  // 1. Resolve exact Marhala Tab (e.g. Marhala 1, Marhala 2, etc.)
   const marhalaName = resolveMarhalaTabName(student.marhala || payload.marhala || result.marhala);
   const marhalaSheet = getOrCreateMarhalaSheet(spreadsheet, marhalaName);
   const marhalaSyncStatus = syncMarhalaSheetRow(marhalaSheet, student, result);
 
-  // 3. If Atfal, sync to the "parents email" tab
+  // 2. If Atfal, sync to the "parents email" tab
   let parentsEmailStatus = null;
   if (category === "atfal") {
     const parentsSheet = getOrCreateParentsEmailSheet(spreadsheet);
@@ -224,11 +286,10 @@ function resolveSpreadsheet(category) {
     try {
       return SpreadsheetApp.openById(targetId.trim());
     } catch (e) {
-      throw new Error("Could not open spreadsheet with ID '" + targetId + "'. Check that the ID is correct and permissions are granted.");
+      throw new Error("Could not open spreadsheet with ID '" + targetId + "'.");
     }
   }
 
-  // Fallback to active spreadsheet if container-bound (opened from Extensions > Apps Script)
   try {
     const active = SpreadsheetApp.getActiveSpreadsheet();
     if (active) return active;
@@ -236,17 +297,39 @@ function resolveSpreadsheet(category) {
 
   throw new Error(
     "Spreadsheet ID for category '" + category + "' is not configured. " +
-    "Please paste your Google Sheet ID into CONFIG." + (category === "kibar" ? "KIBAR" : "ATFAL") + "_SPREADSHEET_ID at line 25 of Code.gs."
+    "Please paste your Google Sheet ID into CONFIG." + (category === "kibar" ? "KIBAR" : "ATFAL") + "_SPREADSHEET_ID at line 28."
   );
 }
 
+/**
+ * Standardize Marhala to one of the 8 canonical Marhala tabs:
+ * "Marhala 1" through "Marhala 8"
+ */
 function resolveMarhalaTabName(rawMarhala) {
   if (!rawMarhala || String(rawMarhala).trim() === "") return "Marhala 1";
-  return String(rawMarhala).trim();
+  const s = String(rawMarhala).trim().toLowerCase();
+
+  // Handle numbers or Arabic names
+  if (s.includes("ula") || s === "marhala 1" || s === "1" || s.endsWith(" 1")) return "Marhala 1";
+  if (s.includes("saniyah") || s === "marhala 2" || s === "2" || s.endsWith(" 2")) return "Marhala 2";
+  if (s.includes("salesah") || s === "marhala 3" || s === "3" || s.endsWith(" 3")) return "Marhala 3";
+  if (s.includes("rabeah") || s === "marhala 4" || s === "4" || s.endsWith(" 4")) return "Marhala 4";
+  if (s.includes("khamesah") || s === "marhala 5" || s === "5" || s.endsWith(" 5")) return "Marhala 5";
+  if (s.includes("sadesah") || s === "marhala 6" || s === "6" || s.endsWith(" 6")) return "Marhala 6";
+  if (s.includes("sabeah") || s === "marhala 7" || s === "7" || s.endsWith(" 7")) return "Marhala 7";
+  if (s.includes("saminah") || s === "marhala 8" || s === "8" || s.endsWith(" 8")) return "Marhala 8";
+
+  // Check if an existing sheet matches directly
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss && ss.getSheetByName(rawMarhala)) return rawMarhala;
+  } catch (e) {}
+
+  return "Marhala 1";
 }
 
 // ============================================================================
-// 4. MARHALA SHEET SYNC
+// 5. MARHALA SHEET SYNC
 // ============================================================================
 
 const MARHALA_HEADERS = [
@@ -354,7 +437,7 @@ function syncMarhalaSheetRow(sheet, student, result) {
 }
 
 // ============================================================================
-// 5. PARENTS EMAIL TAB SYNC
+// 6. PARENTS EMAIL TAB SYNC
 // ============================================================================
 
 const PARENTS_EMAIL_HEADERS = [
@@ -409,7 +492,9 @@ function syncParentsEmailSheetRow(sheet, student, result) {
 
   const marhalaRank = student.marhala_rank || student.marhalaRank || "";
   const overallRank = student.overall_rank || student.computedRank || "";
-  const latestWeekStatus = "Yes"; // Automatically set to Yes upon automated sync
+  
+  // If result has scores, status is "Yes", otherwise default to "No"
+  const latestWeekStatus = (weeklyScore !== "" && weeklyScore !== null) ? "Yes" : "No";
 
   const rowValues = [
     email,
@@ -447,7 +532,7 @@ function syncParentsEmailSheetRow(sheet, student, result) {
 }
 
 // ============================================================================
-// 6. CONDITIONAL FORMATTING & VALIDATION SETUP
+// 7. CONDITIONAL FORMATTING & VALIDATION SETUP
 // ============================================================================
 
 function applyValidationToCell(range) {
@@ -459,29 +544,21 @@ function applyValidationToCell(range) {
   range.setDataValidation(rule);
 }
 
-/**
- * Applies dropdown validation (Yes/No) and Yes(Green)/No(Red) conditional formatting
- * safely respecting actual sheet row count.
- */
 function setupParentsEmailValidationAndFormatting(sheet) {
   if (!sheet) {
     const spreadsheet = resolveSpreadsheet("atfal");
     sheet = spreadsheet.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
   }
   
-  if (!sheet) {
-    Logger.log("Sheet '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' not found.");
-    return;
-  }
+  if (!sheet) return;
 
-  // Ensure sheet has at least 100 rows so getRange never goes out of bounds
   const currentMax = sheet.getMaxRows();
   if (currentMax <= 1) {
     sheet.insertRowsAfter(1, 100);
   }
   const totalRows = sheet.getMaxRows();
-  const numRows = totalRows - 1; // All rows below header row 1
-  const statusColumnRange = sheet.getRange(2, 9, numRows, 1); // Column 9 (I2:I)
+  const numRows = totalRows - 1;
+  const statusColumnRange = sheet.getRange(2, 9, numRows, 1);
 
   // 1. Dropdown Validation (Yes/No)
   const validationRule = SpreadsheetApp.newDataValidation()
@@ -522,6 +599,4 @@ function setupParentsEmailValidationAndFormatting(sheet) {
   filteredRules.push(yesRule);
   filteredRules.push(noRule);
   sheet.setConditionalFormatRules(filteredRules);
-
-  Logger.log("✅ Successfully configured Data Validation and Conditional Formatting on '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "'.");
 }

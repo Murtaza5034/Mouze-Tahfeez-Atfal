@@ -3,6 +3,7 @@
  * 
  * Automatically pushes weekly mark progress to Google Sheets in real-time
  * whenever a teacher submits or auto-saves progress.
+ * Also supports bulk syncing all students into all 8 Marhala tabs.
  */
 
 import { getStudentMarhala } from "./marhalaRanking";
@@ -33,15 +34,7 @@ export function setGoogleSheetsWebhookUrl(url) {
 }
 
 /**
- * Sync student mark progress payload to Google Sheets Web App
- * 
- * @param {Object} params
- * @param {Object} params.student - The student object from schoolData.students
- * @param {Object} params.result - The weekly result payload being saved
- * @param {boolean} params.isKibar - Whether this is Kibar or Atfal
- * @param {number|string} [params.marhalaRank] - Calculated Marhala rank
- * @param {number|string} [params.overallRank] - Overall computed rank
- * @param {string} [params.webhookUrl] - Optional webhook URL override
+ * Sync individual student mark progress payload to Google Sheets Web App
  */
 export async function syncStudentResultToGoogleSheets({
   student,
@@ -53,7 +46,6 @@ export async function syncStudentResultToGoogleSheets({
 }) {
   const url = webhookUrl || getGoogleSheetsWebhookUrl();
   if (!url) {
-    // If webhook is not configured, silently skip without error
     return { skipped: true, reason: "Webhook URL not configured" };
   }
 
@@ -61,7 +53,6 @@ export async function syncStudentResultToGoogleSheets({
     const category = isKibar ? "kibar" : "atfal";
     const resolvedMarhala = getStudentMarhala(student, result) || "Marhala 1";
     
-    // Resolve email (check parent_email, email, user_id/user_email)
     const email = (
       student?.parent_email ||
       student?.email ||
@@ -116,8 +107,6 @@ export async function syncStudentResultToGoogleSheets({
       }
     };
 
-    // Google Apps Script Web Apps require 'no-cors' mode with 'text/plain' body
-    // to bypass preflight OPTIONS CORS restrictions from browsers and PWAs
     fetch(url, {
       method: "POST",
       mode: "no-cors",
@@ -134,6 +123,99 @@ export async function syncStudentResultToGoogleSheets({
 
   } catch (err) {
     console.error("[GoogleSheetsSync] Error preparing sync payload:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Bulk sync all active students and their latest marks to Google Sheets.
+ * Lists each student in their respective Marhala tab and in the "parents email" tab.
+ */
+export async function syncAllStudentsToGoogleSheets({
+  students = [],
+  isKibar = false,
+  webhookUrl = ""
+}) {
+  const url = webhookUrl || getGoogleSheetsWebhookUrl();
+  if (!url) {
+    return { skipped: true, reason: "Webhook URL not configured" };
+  }
+
+  const category = isKibar ? "kibar" : "atfal";
+  const packagedStudents = (students || []).map((s) => {
+    const res = s.latestResult || {};
+    const resolvedMarhala = getStudentMarhala(s, res) || "Marhala 1";
+    const email = (s.parent_email || s.email || s.user_email || "").trim();
+
+    return {
+      marhala: resolvedMarhala,
+      student: {
+        student_id: s.student_id || s.id || "",
+        id: s.id || "",
+        its: s.its || "",
+        name: s.name || s.full_name || "",
+        arabic_name: s.arabic_name || "",
+        email: email,
+        parent_email: email,
+        teacher_name: s.teacherName || s.teacher_name || "",
+        group_name: s.groupName || s.group_name || "",
+        marhala: resolvedMarhala,
+        marhala_rank: s.marhalaRank || "",
+        overall_rank: s.computedRank || res.computedRank || ""
+      },
+      result: {
+        week_date: res.week_date || "",
+        from_date: res.from_date || "",
+        till_date: res.till_date || res.week_date || "",
+        fatemi_from_date: res.fatemi_from_date || null,
+        fatemi_till_date: res.fatemi_till_date || null,
+        fatemi_till_month_name: res.fatemi_till_month_name || "",
+        attendance_count: res.attendance_count !== undefined ? res.attendance_count : "",
+        murajazah: res.murajazah !== undefined ? res.murajazah : 0,
+        juz_hali: res.juz_hali !== undefined ? res.juz_hali : 0,
+        takhteet: res.takhteet !== undefined ? res.takhteet : 0,
+        jadeed: res.jadeed !== undefined ? res.jadeed : 0,
+        total_score: res.total_score !== undefined ? res.total_score : 0,
+        total_jadeed_pages: res.total_jadeed_pages || 0,
+        total_jadeed_unit: res.total_jadeed_unit || "صفه",
+        wusool_juz: res.wusool_juz || s.hifz?.juz || s.juz || "",
+        wusool_page: res.wusool_page || "",
+        wusool_surah: res.wusool_surah || s.hifz?.surat || s.surat || "",
+        next_week_juz: res.next_week_juz || "",
+        next_week_page: res.next_week_page || "",
+        next_week_surah: res.next_week_surah || "",
+        istifadah_juz: res.istifadah_juz || "",
+        istifadah_page: res.istifadah_page || "",
+        istifadah_surah: res.istifadah_surah || "",
+        matrookah: res.matrookah || "",
+        daeefah: res.daeefah || "",
+        attendance_note: res.attendance_note || ""
+      }
+    };
+  });
+
+  const payload = {
+    action: "bulk_sync",
+    category,
+    students: packagedStudents
+  };
+
+  try {
+    fetch(url, {
+      method: "POST",
+      mode: "no-cors",
+      cache: "no-cache",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(payload)
+    }).catch((fetchErr) => {
+      console.warn("[GoogleSheetsSync] Bulk sync error:", fetchErr);
+    });
+
+    return { success: true, count: packagedStudents.length };
+  } catch (err) {
+    console.error("[GoogleSheetsSync] Failed to bulk sync students:", err);
     return { success: false, error: err.message };
   }
 }
