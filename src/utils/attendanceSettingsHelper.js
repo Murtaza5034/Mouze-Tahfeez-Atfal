@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { Geolocation } from "@capacitor/geolocation";
+import { AppLauncher } from "@capacitor/app-launcher";
 
 export const DEFAULT_ATTENDANCE_SETTINGS = {
   id: 1,
@@ -233,82 +234,156 @@ export function checkAttendanceWindow(settings, currentDate = new Date()) {
  * Attempts native Capacitor Geolocation on mobile first, falling back to navigator.geolocation.
  */
 export async function getExactUserLocation() {
+  let capError = null;
+
   // 1. Try Capacitor Geolocation if available
   try {
     if (Geolocation && typeof Geolocation.getCurrentPosition === "function") {
-      // Check/request permission
+      // Check/request permission with explicit permission types for Android
       try {
         const permStatus = await Geolocation.checkPermissions();
         if (
           permStatus.location !== "granted" &&
           permStatus.coarseLocation !== "granted"
         ) {
-          const requested = await Geolocation.requestPermissions();
+          const requested = await Geolocation.requestPermissions({
+            permissions: ["location", "coarseLocation"],
+          });
           if (
             requested.location !== "granted" &&
             requested.coarseLocation !== "granted"
           ) {
-            throw new Error("LOCATION_PERMISSION_DENIED");
+            capError = new Error("LOCATION_PERMISSION_DENIED");
           }
         }
       } catch (pErr) {
-        if (pErr.message === "LOCATION_PERMISSION_DENIED") throw pErr;
-        // Proceed to try getCurrentPosition anyway as webview might delegate
+        const msg = String(pErr?.message || "").toLowerCase();
+        if (msg.includes("denied")) {
+          capError = new Error("LOCATION_PERMISSION_DENIED");
+        } else if (msg.includes("disabled") || msg.includes("service")) {
+          capError = new Error("LOCATION_SERVICES_DISABLED");
+        } else {
+          console.warn("[getExactUserLocation] Permission check/request warning:", pErr);
+        }
       }
 
-      const position = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 3000,
-      });
+      // If permissions not explicitly denied, attempt position retrieval
+      if (!capError || capError.message !== "LOCATION_PERMISSION_DENIED") {
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 3000,
+          enableLocationFallback: true,
+        });
 
-      if (position?.coords) {
-        return {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          source: "capacitor",
-        };
+        if (position?.coords) {
+          return {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            source: "capacitor",
+          };
+        }
       }
     }
   } catch (capErr) {
-    if (capErr?.message === "LOCATION_PERMISSION_DENIED") {
-      throw capErr;
+    const msg = String(capErr?.message || "").toLowerCase();
+    if (msg.includes("denied")) {
+      capError = new Error("LOCATION_PERMISSION_DENIED");
+    } else if (msg.includes("disabled") || msg.includes("service")) {
+      capError = new Error("LOCATION_SERVICES_DISABLED");
+    } else {
+      capError = capErr;
     }
-    // Fall back to navigator.geolocation
+    console.warn("[getExactUserLocation] Capacitor Geolocation error:", capErr);
+    // Proceed to try browser navigator.geolocation as fallback!
   }
 
-  // 2. Fall back to navigator.geolocation
+  // 2. Fall back to navigator.geolocation (e.g. WebView native prompt fallback)
   if (typeof window !== "undefined" && navigator?.geolocation) {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          resolve({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-            source: "browser",
-          });
-        },
-        (err) => {
-          if (err.code === 1) {
-            reject(new Error("LOCATION_PERMISSION_DENIED"));
-          } else if (err.code === 2) {
-            reject(new Error("LOCATION_POSITION_UNAVAILABLE"));
-          } else {
-            reject(new Error("LOCATION_TIMEOUT"));
+    try {
+      const browserPos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracy: pos.coords.accuracy,
+              source: "browser",
+            });
+          },
+          (err) => {
+            if (err.code === 1) {
+              reject(new Error("LOCATION_PERMISSION_DENIED"));
+            } else if (err.code === 2) {
+              reject(new Error("LOCATION_SERVICES_DISABLED"));
+            } else {
+              reject(new Error("LOCATION_TIMEOUT"));
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 3000,
           }
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 12000,
-          maximumAge: 3000,
-        }
-      );
-    });
+        );
+      });
+      return browserPos;
+    } catch (browserErr) {
+      if (browserErr.message === "LOCATION_PERMISSION_DENIED") {
+        throw browserErr;
+      }
+      if (capError) throw capError;
+      throw browserErr;
+    }
   }
 
+  if (capError) throw capError;
   throw new Error("GEOLOCATION_NOT_SUPPORTED");
+}
+
+/**
+ * Attempts to launch system or app settings on Android/iOS when location is denied or disabled.
+ */
+export async function openDeviceLocationSettings() {
+  // 1. Android Native Bridge (opens exact GPS location toggle screen)
+  if (typeof window !== "undefined" && window.MauzeLocationBridge?.openLocationSettings) {
+    try {
+      window.MauzeLocationBridge.openLocationSettings();
+      return true;
+    } catch (e) {
+      console.warn("MauzeLocationBridge openLocationSettings error:", e);
+    }
+  }
+
+  try {
+    if (AppLauncher && typeof AppLauncher.openUrl === "function") {
+      // 2. Try generic app-settings:
+      try {
+        const res = await AppLauncher.openUrl({ url: "app-settings:" });
+        if (res?.completed) return true;
+      } catch (_) {}
+
+      // 3. Try Android package scheme
+      try {
+        const res = await AppLauncher.openUrl({
+          url: "package:com.mauzetahfeez.myapp",
+        });
+        if (res?.completed) return true;
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.warn("Could not open device settings via AppLauncher:", err);
+  }
+
+  // 4. Webview / fallback
+  if (typeof window !== "undefined") {
+    try {
+      window.open("app-settings:", "_system");
+      return true;
+    } catch (_) {}
+  }
+  return false;
 }
 
 /**

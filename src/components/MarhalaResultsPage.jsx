@@ -1,6 +1,29 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Download, Minus, Sparkles, Trophy } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Download,
+  Minus,
+  Sparkles,
+  Trophy,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  Database,
+  Trash2,
+  Copy,
+  Check,
+  ExternalLink,
+  X
+} from "lucide-react";
 import { calculateMarhalaRanks, effectiveScore, parseJadeed } from "../utils/marhalaRanking";
+import {
+  getGoogleSheetsWebhookUrl,
+  setGoogleSheetsWebhookUrl,
+  testGoogleSheetsConnection,
+  clearGoogleSheetsDemoData,
+  syncAllStudentsToGoogleSheets
+} from "../utils/googleSheetsSync";
 
 /**
  * MarhalaResultsPage — APPEND-ONLY feature page (Task 3 + Task 5).
@@ -61,7 +84,7 @@ function JadeedBox({ student }) {
   );
 }
 
-export default function MarhalaResultsPage({ students = [], weeklyResults = [], onShowAction }) {
+export default function MarhalaResultsPage({ students = [], weeklyResults = [], onShowAction, reportSettings = null }) {
   const { groups, orderedMarhalas } = useMemo(
     () => calculateMarhalaRanks(students, weeklyResults),
     [students, weeklyResults]
@@ -79,8 +102,131 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
   const [downloadingCsv, setDownloadingCsv] = useState(false);
   const tableWrapRef = useRef(null);
 
+  // Google Sheets Live Sync State
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [webhookInput, setWebhookInput] = useState(() => getGoogleSheetsWebhookUrl(reportSettings));
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [isTestingConn, setIsTestingConn] = useState(false);
+  const [isPurgingDemo, setIsPurgingDemo] = useState(false);
+  const [clearDemoChecked, setClearDemoChecked] = useState(true);
+  const [testResult, setTestResult] = useState(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [lastSyncInfo, setLastSyncInfo] = useState(() => {
+    return (typeof window !== "undefined" && window.localStorage?.getItem("mauze_sheets_last_sync_info")) || null;
+  });
+
+  // Keep webhookInput updated if reportSettings loads later
+  useEffect(() => {
+    const url = getGoogleSheetsWebhookUrl(reportSettings);
+    if (url && !webhookInput) {
+      setWebhookInput(url);
+    }
+  }, [reportSettings]);
+
+  // Real students filter (excluding demo dummy students)
+  const realStudents = useMemo(() => {
+    return (students || []).filter((s) => {
+      const email = String(s.parent_email || s.email || "").toLowerCase().trim();
+      const sid = String(s.student_id || s.id || "").trim();
+      const name = String(s.name || s.full_name || "").trim().toLowerCase();
+      if (!name || name === "student") return false;
+      if (email.includes("example.com")) return false;
+      if (Number(sid) >= 101 && Number(sid) <= 110 && email.includes("parent.")) return false;
+      return true;
+    });
+  }, [students]);
+
+  // Count real students per Marhala
+  const realStudentMarhalaCounts = useMemo(() => {
+    const counts = {};
+    orderedMarhalas.forEach((m) => {
+      counts[m] = (groups[m] || []).length;
+    });
+    return counts;
+  }, [orderedMarhalas, groups]);
+
   const showAction = (type, text) => {
     if (typeof onShowAction === "function") onShowAction(type, text);
+  };
+
+  const handleSaveWebhook = () => {
+    const trimmed = (webhookInput || "").trim();
+    setGoogleSheetsWebhookUrl(trimmed);
+    showAction("success", trimmed ? "Google Sheets Webhook URL saved successfully!" : "Webhook URL cleared.");
+  };
+
+  const handleTestConnection = async () => {
+    const url = (webhookInput || "").trim();
+    if (!url) {
+      setTestResult({ success: false, message: "Please paste your Webhook URL before testing." });
+      return;
+    }
+    setIsTestingConn(true);
+    setTestResult(null);
+    setGoogleSheetsWebhookUrl(url);
+
+    const res = await testGoogleSheetsConnection(url);
+    setIsTestingConn(false);
+    setTestResult({
+      success: res.success,
+      message: res.success ? "Connection verified! Webhook is live and responding." : (res.error || "Could not reach webhook.")
+    });
+  };
+
+  const handlePurgeDemoRows = async () => {
+    const url = (webhookInput || "").trim();
+    if (!url) {
+      showAction("error", "Please configure and save your Webhook URL first.");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to clear test/demo dummy rows from all Marhala sheets and the parents email tab?")) {
+      return;
+    }
+    setIsPurgingDemo(true);
+    const res = await clearGoogleSheetsDemoData(url);
+    setIsPurgingDemo(false);
+    if (res.success) {
+      showAction("success", "Demo data purge signal sent! Sheet dummy rows are being cleared.");
+    } else {
+      showAction("error", "Purge failed: " + res.error);
+    }
+  };
+
+  const handleBulkSyncRealStudents = async () => {
+    const url = (webhookInput || "").trim();
+    if (!url) {
+      showAction("error", "Please paste and save your Google Apps Script Webhook URL first.");
+      return;
+    }
+
+    setIsSyncingSheets(true);
+    setTestResult(null);
+    setGoogleSheetsWebhookUrl(url);
+
+    try {
+      const res = await syncAllStudentsToGoogleSheets({
+        students: realStudents,
+        weeklyResults: weeklyResults,
+        webhookUrl: url,
+        clearExisting: clearDemoChecked,
+      });
+
+      setIsSyncingSheets(false);
+      if (res.success) {
+        const timeNow = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + ", " + new Date().toLocaleDateString();
+        const syncMsg = `Synced ${res.count} real Atfal students across 8 Marhalas${clearDemoChecked ? " (demo data purged)" : ""} on ${timeNow}`;
+        setLastSyncInfo(syncMsg);
+        if (typeof window !== "undefined") {
+          window.localStorage?.setItem("mauze_sheets_last_sync_info", syncMsg);
+        }
+        showAction("success", `Google Sheets updated smoothly! Synced ${res.count} real students.`);
+      } else {
+        showAction("error", "Sync failed: " + (res.error || "Unknown error"));
+      }
+    } catch (err) {
+      setIsSyncingSheets(false);
+      showAction("error", "Sync error: " + err.message);
+    }
   };
 
   // Latin-only check: jsPDF standard fonts carry no Arabic glyphs, so only
@@ -445,6 +591,19 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
           >
             <Download size={16} /> {downloadingCsv ? "Preparing…" : `Download Excel — ${currentTab}`}
           </button>
+          <button
+            className="mrk-sync-btn"
+            onClick={() => setIsSyncModalOpen(true)}
+            title="Google Sheets Live Sync: Sync all real Atfal students and view live sync status"
+          >
+            <RefreshCw size={15} className={isSyncingSheets ? "mrk-spin" : ""} />
+            <span>Sheets Live Sync</span>
+            {webhookInput ? (
+              <span className="mrk-sync-indicator live" title="Google Sheets Webhook connected & live"></span>
+            ) : (
+              <span className="mrk-sync-indicator setup" title="Webhook configuration needed"></span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -536,6 +695,165 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
           <span><ArrowUp size={13} className="mrk-arrow-up" /> Rank improved <ArrowDown size={13} className="mrk-arrow-down" /> Rank dropped</span>
         </div>
       </div>
+
+      {/* ── Google Sheets Live Sync Modal ── */}
+      {isSyncModalOpen && (
+        <div
+          className="mrk-modal-overlay"
+          onClick={() => setIsSyncModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="mrk-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mrk-modal-header">
+              <div className="mrk-modal-title-wrap">
+                <Database size={22} color="#10b981" />
+                <div>
+                  <h3 className="mrk-modal-title">Google Sheets Live Sync</h3>
+                  <p className="mrk-modal-subtitle">
+                    Atfal Marhala Master Sheets &amp; Parents Email Tab
+                  </p>
+                </div>
+              </div>
+              <button
+                className="mrk-modal-close"
+                onClick={() => setIsSyncModalOpen(false)}
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mrk-modal-body">
+              {/* Real-time automatic notice */}
+              <div className="mrk-live-card">
+                <CheckCircle2 size={18} className="mrk-live-card-icon" />
+                <div className="mrk-live-card-text">
+                  <strong>Automatic Real-Time Sync:</strong> Whenever any teacher fills or updates weekly mark progress in the portal, that student's row in their respective Marhala tab and the <em>parents email</em> tab automatically updates in real-time.
+                </div>
+              </div>
+
+              {/* Webhook URL Input */}
+              <div className="mrk-form-group">
+                <label className="mrk-label">
+                  <span>Google Apps Script Webhook URL</span>
+                  {webhookInput ? (
+                    <span style={{ color: "#10b981", fontSize: "0.78rem" }}>● Configured</span>
+                  ) : (
+                    <span style={{ color: "#f59e0b", fontSize: "0.78rem" }}>Required</span>
+                  )}
+                </label>
+                <div className="mrk-input-row">
+                  <input
+                    type="text"
+                    className="mrk-text-input"
+                    placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+                    value={webhookInput}
+                    onChange={(e) => setWebhookInput(e.target.value)}
+                  />
+                  <button
+                    className="mrk-btn-secondary"
+                    onClick={handleSaveWebhook}
+                    title="Save Webhook URL to browser"
+                  >
+                    Save
+                  </button>
+                  <button
+                    className="mrk-btn-secondary"
+                    onClick={handleTestConnection}
+                    disabled={isTestingConn || !webhookInput}
+                    title="Test connection to Google Apps Script"
+                  >
+                    {isTestingConn ? (
+                      <RefreshCw size={14} className="mrk-spin" />
+                    ) : (
+                      "Test"
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Test connection result banner */}
+              {testResult && (
+                <div className={`mrk-test-banner ${testResult.success ? "success" : "error"}`}>
+                  {testResult.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                  <span>{testResult.message}</span>
+                </div>
+              )}
+
+              {/* Real Student Dataset Breakdown */}
+              <div className="mrk-roster-summary">
+                <div className="mrk-roster-head">
+                  <span className="mrk-roster-title">
+                    <Database size={15} /> Real Student Data Ready to Sync
+                  </span>
+                  <span className="mrk-roster-badge">
+                    {realStudents.length} Active Atfal Students
+                  </span>
+                </div>
+                <div className="mrk-marhala-chips">
+                  {orderedMarhalas.map((m) => {
+                    const count = realStudentMarhalaCounts[m] || 0;
+                    return (
+                      <span key={m} className="mrk-marhala-chip">
+                        <span>{m}:</span> <strong>{count}</strong>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Purge demo data option */}
+              <label className="mrk-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={clearDemoChecked}
+                  onChange={(e) => setClearDemoChecked(e.target.checked)}
+                />
+                <span className="mrk-checkbox-text">
+                  <strong>Replace test/demo dummy data with real students:</strong> Cleans out dummy test rows (Husain Yusuf, Taher Shabbir, etc.) and writes a fresh, 100% real student roster into all 8 Marhala sheets and the parents email tab.
+                </span>
+              </label>
+
+              {/* Last Sync Info */}
+              {lastSyncInfo && (
+                <div className="mrk-last-sync-notice">
+                  🕒 Last full sync: {lastSyncInfo}
+                </div>
+              )}
+            </div>
+
+            <div className="mrk-modal-footer">
+              <div className="mrk-footer-left">
+                <button
+                  className="mrk-btn-purge"
+                  onClick={handlePurgeDemoRows}
+                  disabled={isPurgingDemo || !webhookInput}
+                  title="Purge dummy test rows from Google Sheet"
+                >
+                  <Trash2 size={14} />
+                  <span>{isPurgingDemo ? "Purging…" : "Purge Demo Rows"}</span>
+                </button>
+              </div>
+              <button
+                className="mrk-btn-primary"
+                onClick={handleBulkSyncRealStudents}
+                disabled={isSyncingSheets || !webhookInput}
+              >
+                <RefreshCw size={16} className={isSyncingSheets ? "mrk-spin" : ""} />
+                <span>
+                  {isSyncingSheets
+                    ? "Syncing All Real Students…"
+                    : `Sync ${realStudents.length} Real Students Now`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

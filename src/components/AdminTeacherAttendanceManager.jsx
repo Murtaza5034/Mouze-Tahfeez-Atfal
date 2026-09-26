@@ -12,6 +12,10 @@ import {
   Settings,
   MapPin,
 } from "lucide-react";
+import {
+  AdminTeacherRankingModal,
+  AdminTeacherRankingTriggerButton,
+} from "./AdminTeacherRankingCard";
 
 export default function AdminTeacherAttendanceManager({
   teacherProfiles = [],
@@ -22,6 +26,7 @@ export default function AdminTeacherAttendanceManager({
   onRefresh,
   onNavigateSettings,
 }) {
+  const [showRankingModal, setShowRankingModal] = useState(false);
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
@@ -201,31 +206,36 @@ export default function AdminTeacherAttendanceManager({
             Manually record or update teacher attendance for any date
           </p>
         </div>
-        {onNavigateSettings && (
-          <button
-            type="button"
-            onClick={onNavigateSettings}
-            style={{
-              marginLeft: "auto",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "7px 14px",
-              borderRadius: "8px",
-              border: "1px solid rgba(212, 175, 55, 0.4)",
-              background: "rgba(212, 175, 55, 0.1)",
-              color: "#947414",
-              fontWeight: 700,
-              fontSize: "0.8rem",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            title="Configure geofence radius, venue pin, and timing window"
-          >
-            <MapPin size={14} />
-            <span>Geofence & Timing Settings</span>
-          </button>
-        )}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <AdminTeacherRankingTriggerButton
+            onClick={() => setShowRankingModal(true)}
+            label="Weekly Faculty Ranking"
+          />
+          {onNavigateSettings && (
+            <button
+              type="button"
+              onClick={onNavigateSettings}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "7px 14px",
+                borderRadius: "8px",
+                border: "1px solid rgba(212, 175, 55, 0.4)",
+                background: "rgba(212, 175, 55, 0.1)",
+                color: "#947414",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              title="Configure geofence radius, venue pin, and timing window"
+            >
+              <MapPin size={14} />
+              <span>Geofence & Timing Settings</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSaveAttendance} className="stack-form">
@@ -369,6 +379,15 @@ export default function AdminTeacherAttendanceManager({
           </button>
         </div>
       </form>
+
+      {/* Weekly Faculty Ranking Modal */}
+      <AdminTeacherRankingModal
+        isOpen={showRankingModal}
+        onClose={() => setShowRankingModal(false)}
+        teacherProfiles={teacherProfiles}
+        portalAccessList={portalAccessList}
+        teacherAttendance={teacherAttendance}
+      />
     </section>
   );
 }

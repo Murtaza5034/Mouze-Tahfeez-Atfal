@@ -152,12 +152,21 @@
   margin: 0;
 }
 
+.teacher-permission-btns-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
 .teacher-permission-btn {
+  flex: 1 1 180px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 13px 22px;
+  padding: 13px 20px;
   background: linear-gradient(135deg, #d4af37, #b8941f);
   color: #ffffff;
   border: none;
@@ -172,6 +181,40 @@
 .teacher-permission-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(184, 148, 31, 0.45);
+}
+
+.teacher-permission-settings-btn {
+  flex: 1 1 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 18px;
+  background: rgba(245, 192, 66, 0.12);
+  border: 1.5px solid rgba(212, 175, 55, 0.5);
+  color: #8c6a0c;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.teacher-permission-settings-btn:hover {
+  background: rgba(245, 192, 66, 0.2);
+  border-color: #d4af37;
+  transform: translateY(-1px);
+}
+
+.teacher-permission-hint {
+  font-size: 0.78rem;
+  color: #635745;
+  line-height: 1.45;
+  margin: 2px 0 0 0;
+  background: rgba(212, 175, 55, 0.08);
+  padding: 8px 12px;
+  border-radius: 9px;
+  border-left: 3px solid #d4af37;
 }
 
 /* --- Live Self-Attendance Action Card --- */
@@ -666,28 +709,36 @@
 
 /* Modal Popup */
 .teacher-att-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(3, 14, 28, 0.72);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 16px;
-  box-sizing: border-box;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  background: rgba(4, 13, 26, 0.82) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 100000 !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 .teacher-att-modal-card {
   width: 100%;
   max-width: 440px;
+  max-height: min(92dvh, 700px);
   background: var(--surface-card, #ffffff);
-  border-radius: 22px;
-  border: 1px solid rgba(212, 175, 55, 0.4);
-  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.32);
+  border-radius: 24px;
+  border: 1.5px solid rgba(212, 175, 55, 0.45);
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   animation: att-modal-pop 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   box-sizing: border-box;
+  position: relative;
 }
 
 @keyframes att-modal-pop {
@@ -701,8 +752,32 @@
   }
 }
 
+.teacher-att-modal-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: none;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.teacher-att-modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.32);
+  transform: scale(1.08);
+}
+
 .teacher-att-modal-header {
-  padding: 26px 20px 22px 20px;
+  flex-shrink: 0;
+  padding: 22px 20px 18px 20px;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -719,13 +794,13 @@
 }
 
 .teacher-att-modal-check-icon {
-  width: 66px;
-  height: 66px;
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 12px auto;
+  margin: 0 auto 10px auto;
   position: relative;
 }
 
@@ -770,9 +845,10 @@
 
 .teacher-att-modal-title {
   margin: 0;
-  font-size: clamp(1.1rem, 2.5vw, 1.25rem);
+  font-size: clamp(1.05rem, 2.5vw, 1.22rem);
   font-weight: 800;
   letter-spacing: 0.2px;
+  line-height: 1.35;
 }
 
 .teacher-att-modal-title.ontime {
@@ -786,21 +862,22 @@
 }
 
 .teacher-att-modal-subtitle {
-  margin: 6px 0 0 0;
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.9);
+  margin: 5px 0 0 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.92);
   font-weight: 500;
+  line-height: 1.4;
 }
 
 /* Professional Message / Alert Box */
 .teacher-att-message-box {
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   font-size: 0.82rem;
-  line-height: 1.5;
+  line-height: 1.48;
 }
 
 .teacher-att-message-box.ontime {
@@ -834,20 +911,39 @@
 }
 
 .teacher-att-modal-body {
-  padding: clamp(16px, 2vw, 22px);
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 18px 18px 18px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.teacher-att-modal-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.teacher-att-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.teacher-att-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 10px;
 }
 
 .teacher-att-modal-detail-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
+  padding: 9px 12px;
   background: #f8fafc;
   border-radius: 10px;
-  font-size: 0.84rem;
+  font-size: 0.83rem;
+  border: 1px solid #f1f5f9;
 }
 
 .teacher-att-modal-detail-label {
@@ -861,26 +957,169 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  text-align: right;
+}
+
+.teacher-att-modal-actions-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.teacher-att-modal-disable-loc-btn {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.teacher-att-modal-disable-loc-btn:hover {
+  background: rgba(220, 38, 38, 0.16);
+  border-color: #dc2626;
+  transform: translateY(-1px);
 }
 
 .teacher-att-modal-done-btn {
   width: 100%;
-  padding: 13px;
+  padding: 12px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, #d4af37, #b8941f);
+  background: linear-gradient(135deg, #10b981, #059669);
   color: #ffffff;
   font-size: 0.94rem;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(184, 148, 31, 0.38);
-  margin-top: 6px;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.38);
   transition: all 0.2s ease;
 }
 
 .teacher-att-modal-done-btn:hover {
+  filter: brightness(1.08);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(184, 148, 31, 0.48);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.48);
+}
+
+.teacher-gps-saved-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
+/* Compact devices adjustments */
+@media (max-height: 720px) {
+  .teacher-att-modal-card {
+    max-height: 94dvh;
+    border-radius: 18px;
+  }
+  .teacher-att-modal-header {
+    padding: 16px 16px 12px 16px;
+  }
+  .teacher-att-modal-check-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 6px;
+  }
+  .teacher-att-modal-check-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+  .teacher-att-modal-title {
+    font-size: 1.05rem;
+  }
+  .teacher-att-modal-subtitle {
+    font-size: 0.74rem;
+  }
+  .teacher-att-modal-body {
+    padding: 10px 14px 14px 14px;
+    gap: 7px;
+  }
+  .teacher-att-message-box {
+    padding: 8px 10px;
+    font-size: 0.76rem;
+  }
+  .teacher-att-modal-detail-row {
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+  .teacher-att-modal-done-btn {
+    padding: 10px;
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .teacher-att-modal-overlay {
+    padding: 12px !important;
+  }
+  .teacher-att-modal-card {
+    max-width: 100%;
+    border-radius: 20px;
+  }
+}
+
+/* Dark Mode Overrides for Attendance Modal */
+[data-theme='dark'] .teacher-att-modal-card,
+body.dark-mode .teacher-att-modal-card,
+.dark .teacher-att-modal-card {
+  background: #0f172a !important;
+  border-color: rgba(212, 175, 55, 0.35) !important;
+}
+
+[data-theme='dark'] .teacher-att-modal-detail-row,
+body.dark-mode .teacher-att-modal-detail-row,
+.dark .teacher-att-modal-detail-row {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme='dark'] .teacher-att-modal-detail-label,
+body.dark-mode .teacher-att-modal-detail-label,
+.dark .teacher-att-modal-detail-label {
+  color: #94a3b8 !important;
+}
+
+[data-theme='dark'] .teacher-att-modal-detail-val,
+body.dark-mode .teacher-att-modal-detail-val,
+.dark .teacher-att-modal-detail-val {
+  color: #f8fafc !important;
+}
+
+[data-theme='dark'] .teacher-att-message-box.ontime,
+body.dark-mode .teacher-att-message-box.ontime,
+.dark .teacher-att-message-box.ontime {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #a7f3d0 !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+[data-theme='dark'] .teacher-att-message-box.late,
+body.dark-mode .teacher-att-message-box.late,
+.dark .teacher-att-message-box.late {
+  background: rgba(234, 88, 12, 0.15) !important;
+  color: #fdba74 !important;
+  border-color: rgba(234, 88, 12, 0.35) !important;
 }
 
 /* Dark Mode Overrides */
@@ -935,3 +1174,35 @@ body.dark-mode .teacher-att-modal-detail-row {
 body.dark-mode .teacher-att-modal-detail-val {
   color: #f1f5f9 !important;
 }
+
+[data-theme='dark'] .teacher-permission-settings-btn,
+body.dark-mode .teacher-permission-settings-btn,
+.dark .teacher-permission-settings-btn {
+  background: rgba(245, 192, 66, 0.14) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 192, 66, 0.35) !important;
+}
+
+[data-theme='dark'] .teacher-permission-hint,
+body.dark-mode .teacher-permission-hint,
+.dark .teacher-permission-hint {
+  background: rgba(245, 192, 66, 0.08) !important;
+  color: #cbd5e1 !important;
+}
+
+[data-theme='dark'] .teacher-att-modal-disable-loc-btn,
+body.dark-mode .teacher-att-modal-disable-loc-btn,
+.dark .teacher-att-modal-disable-loc-btn {
+  background: rgba(239, 68, 68, 0.14) !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  color: #fca5a5 !important;
+}
+
+[data-theme='dark'] .teacher-gps-saved-pill,
+body.dark-mode .teacher-gps-saved-pill,
+.dark .teacher-gps-saved-pill {
+  background: rgba(16, 185, 129, 0.18) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+

@@ -46,6 +46,7 @@ public class MainActivity extends BridgeActivity {
 
     private static final int STORAGE_PERMISSION_REQUEST_CODE = 1001;
     private static final int MEDIA_PERMISSION_REQUEST_CODE = 2002;
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 3003;
 
     private WebView webView;
     private SharedPreferences prefs;
@@ -70,6 +71,7 @@ public class MainActivity extends BridgeActivity {
                 wv.addJavascriptInterface(new MauzeNotifBridge(), "MauzeNotifBridge");
                 wv.addJavascriptInterface(new MauzeMediaPermissionBridge(), "MauzeMediaPermissionBridge");
                 wv.addJavascriptInterface(new MauzeBackLockBridge(), "MauzeBackLockBridge");
+                wv.addJavascriptInterface(new MauzeLocationBridge(), "MauzeLocationBridge");
             }
         } catch (Exception ignored) {}
 
@@ -198,6 +200,46 @@ public class MainActivity extends BridgeActivity {
                         MEDIA_PERMISSION_REQUEST_CODE
                 );
             }
+        }
+    }
+
+    public void requestLocationPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            boolean hasFine = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            boolean hasCoarse = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            if (!hasFine || !hasCoarse) {
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{
+                                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                android.Manifest.permission.ACCESS_COARSE_LOCATION
+                        },
+                        LOCATION_PERMISSION_REQUEST_CODE
+                );
+            }
+        }
+    }
+
+    private class MauzeLocationBridge {
+        @JavascriptInterface
+        public boolean hasLocationPermission() {
+            boolean hasFine = ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            boolean hasCoarse = ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            return hasFine || hasCoarse;
+        }
+
+        @JavascriptInterface
+        public void requestLocationPermission() {
+            runOnUiThread(() -> MainActivity.this.requestLocationPermissions());
+        }
+
+        @JavascriptInterface
+        public void openLocationSettings() {
+            try {
+                Intent intent = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                MainActivity.this.startActivity(intent);
+            } catch (Exception ignored) {}
         }
     }
 
@@ -425,6 +467,7 @@ public class MainActivity extends BridgeActivity {
         settings.setAllowUniversalAccessFromFileURLs(true);
 
         settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setGeolocationEnabled(true);
 
         webView.addJavascriptInterface(
                 new MauzeDownloadInterface(), "MauzeDownloader");
@@ -432,6 +475,7 @@ public class MainActivity extends BridgeActivity {
         webView.addJavascriptInterface(new MauzeNotifBridge(), "MauzeNotifBridge");
         webView.addJavascriptInterface(new MauzeMediaPermissionBridge(), "MauzeMediaPermissionBridge");
         webView.addJavascriptInterface(new MauzeBackLockBridge(), "MauzeBackLockBridge");
+        webView.addJavascriptInterface(new MauzeLocationBridge(), "MauzeLocationBridge");
     }
 
     @Override

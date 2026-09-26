@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient";
 import {
   MapPin,
@@ -14,6 +15,8 @@ import {
   Zap,
   Footprints,
   Lock,
+  MapPinOff,
+  Settings,
 } from "lucide-react";
 import {
   DEFAULT_ATTENDANCE_SETTINGS,
@@ -22,6 +25,7 @@ import {
   checkAttendanceWindow,
   calculateHaversineDistanceMeters,
   getExactUserLocation,
+  openDeviceLocationSettings,
 } from "../utils/attendanceSettingsHelper";
 import "./TeacherSelfAttendanceCard.css";
 
@@ -219,7 +223,10 @@ export default function TeacherSelfAttendanceCard({
       console.warn("[TeacherSelfAttendance] GPS error:", err);
       if (err.message === "LOCATION_PERMISSION_DENIED") {
         setLocationStatus("denied");
-        setLocationError("GPS permission denied. Please allow location access.");
+        setLocationError("GPS permission denied. Please allow location access to verify attendance.");
+      } else if (err.message === "LOCATION_SERVICES_DISABLED") {
+        setLocationStatus("disabled_device");
+        setLocationError("Device Location is turned OFF. Please enable Location in your phone's notification bar.");
       } else {
         setLocationStatus("error");
         setLocationError(
@@ -228,13 +235,6 @@ export default function TeacherSelfAttendanceCard({
       }
     }
   }, []);
-
-  // Only request location if we are in the time window (saves device battery)
-  useEffect(() => {
-    if (windowStatus.isInWindow) {
-      fetchLocation();
-    }
-  }, [windowStatus.isInWindow, fetchLocation]);
 
   // -------------------------------------------------------------------------
   // 5. Calculate Haversine Distance & Proximity States
@@ -347,6 +347,64 @@ export default function TeacherSelfAttendanceCard({
       (String(todayRecord.status).toLowerCase() === "present" ||
         String(todayRecord.status).toLowerCase() === "late")
   );
+
+  const isLocationTurnedOffToday = useMemo(() => {
+    if (typeof window === "undefined" || !window.localStorage) return false;
+    return localStorage.getItem(`mauze_loc_disabled_${todayKey}`) === "true";
+  }, [todayKey]);
+
+  // Request location ONLY if:
+  // 1. In the active time window
+  // 2. Teacher has NOT already marked attendance today (saves battery & prevents unwanted tracking)
+  // 3. Teacher has NOT manually turned off location for today
+  useEffect(() => {
+    if (windowStatus.isInWindow && !isAlreadyMarked && !isLocationTurnedOffToday) {
+      fetchLocation();
+    }
+  }, [windowStatus.isInWindow, isAlreadyMarked, isLocationTurnedOffToday, fetchLocation]);
+
+  // If already marked, automatically release active GPS coordinates to preserve mobile battery
+  useEffect(() => {
+    if (isAlreadyMarked && userCoords) {
+      setUserCoords(null);
+    }
+  }, [isAlreadyMarked, userCoords]);
+
+  // Handler: Turn Off Location Tracking & prompt device settings
+  const handleTurnOffLocation = async () => {
+    try {
+      setUserCoords(null);
+      setLocationStatus("disabled");
+
+      if (typeof window !== "undefined" && window.localStorage) {
+        try {
+          localStorage.setItem(`mauze_loc_disabled_${todayKey}`, "true");
+        } catch (_) {}
+      }
+
+      setShowSuccessModal(false);
+
+      // Attempt to launch device location settings so user can toggle off hardware GPS
+      try {
+        await openDeviceLocationSettings();
+      } catch (_) {}
+
+      if (onShowAction) {
+        onShowAction(
+          "info",
+          "Location tracking disabled for today. Battery saved!"
+        );
+      }
+    } catch (_) {
+      setShowSuccessModal(false);
+    }
+  };
+
+  const handleModalDone = () => {
+    setShowSuccessModal(false);
+    // Free GPS coords once attendance is recorded and modal is acknowledged
+    setUserCoords(null);
+  };
 
   // -------------------------------------------------------------------------
   // 7. Handle Mark Attendance Action
@@ -548,8 +606,12 @@ export default function TeacherSelfAttendanceCard({
     );
   }
 
-  // Graceful Handling: Location permission denied or error
-  if (locationStatus === "denied" || locationStatus === "error") {
+  // Graceful Handling: Location permission denied, error, or disabled on device
+  if (
+    locationStatus === "denied" ||
+    locationStatus === "error" ||
+    locationStatus === "disabled_device"
+  ) {
     return (
       <div className="teacher-self-att-wrapper card-appear">
         <div className="teacher-permission-card">
@@ -566,13 +628,67 @@ export default function TeacherSelfAttendanceCard({
               {locationError ||
                 `Please allow location access on your device so we can verify your presence at ${settings.venue_name} to mark self attendance.`}
             </p>
+            <div className="teacher-permission-btns-row">
+              <button
+                type="button"
+                className="teacher-permission-btn"
+                onClick={fetchLocation}
+              >
+                <Navigation size={16} />
+                <span>Allow GPS Location</span>
+              </button>
+              <button
+                type="button"
+                className="teacher-permission-settings-btn"
+                onClick={async () => {
+                  await openDeviceLocationSettings();
+                  setTimeout(fetchLocation, 2500);
+                }}
+              >
+                <Settings size={15} />
+                <span>Open Device Settings</span>
+              </button>
+            </div>
+            <p className="teacher-permission-hint">
+              💡 If Android denied permission or GPS is off, tap <strong>Open Device Settings</strong> or swipe down your notification bar and turn ON <strong>Location</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Graceful Handling: Location was manually disabled for today
+  if (locationStatus === "disabled" && !isAlreadyMarked) {
+    return (
+      <div className="teacher-self-att-wrapper card-appear">
+        <div className="teacher-permission-card">
+          <div className="teacher-permission-header">
+            <h3 className="teacher-permission-header-title">
+              <MapPinOff size={18} /> Location Tracking Disabled
+            </h3>
+            <span style={{ fontSize: "0.72rem", color: "#f5c042", fontWeight: 700 }}>
+              {windowStatus.startLabel} – {windowStatus.endLabel}
+            </span>
+          </div>
+          <div className="teacher-permission-body">
+            <p className="teacher-permission-text">
+              Location tracking is turned off for today. If you need to mark attendance now, tap below to re-enable GPS.
+            </p>
             <button
               type="button"
               className="teacher-permission-btn"
-              onClick={fetchLocation}
+              onClick={() => {
+                if (typeof window !== "undefined" && window.localStorage) {
+                  try {
+                    localStorage.removeItem(`mauze_loc_disabled_${todayKey}`);
+                  } catch (_) {}
+                }
+                fetchLocation();
+              }}
             >
               <Navigation size={16} />
-              <span>Allow GPS Location</span>
+              <span>Turn On Location &amp; Mark Attendance</span>
             </button>
           </div>
         </div>
@@ -801,6 +917,10 @@ export default function TeacherSelfAttendanceCard({
                     </span>
                   )}
                 </p>
+                <div className="teacher-gps-saved-pill">
+                  <ShieldCheck size={12} />
+                  <span>GPS Inactive • Phone Battery Saved</span>
+                </div>
               </div>
             </div>
           ) : isInsideGeofence ? (
@@ -857,11 +977,13 @@ export default function TeacherSelfAttendanceCard({
         </div>
       </div>
 
-      {/* Success Modal */}
-      {showSuccessModal && modalDetails && (
+      {/* Success Modal using Portal directly onto document.body */}
+      {showSuccessModal && modalDetails && typeof document !== "undefined" && createPortal(
         <div
           className="teacher-att-modal-overlay"
-          onClick={() => setShowSuccessModal(false)}
+          onClick={handleModalDone}
+          role="dialog"
+          aria-modal="true"
         >
           <div
             className="teacher-att-modal-card"
@@ -873,6 +995,14 @@ export default function TeacherSelfAttendanceCard({
                  ======================================================= */
               <>
                 <div className="teacher-att-modal-header late">
+                  <button
+                    type="button"
+                    className="teacher-att-modal-close-btn"
+                    onClick={handleModalDone}
+                    aria-label="Close"
+                  >
+                    <X size={18} />
+                  </button>
                   <div className="teacher-att-modal-check-icon late">
                     <AlertTriangle size={36} />
                   </div>
@@ -917,17 +1047,28 @@ export default function TeacherSelfAttendanceCard({
                     <span className="teacher-att-modal-detail-val">{modalDetails.distance}m</span>
                   </div>
 
-                  <button
-                    type="button"
-                    className="teacher-att-modal-done-btn"
-                    onClick={() => setShowSuccessModal(false)}
-                    style={{
-                      background: "linear-gradient(135deg, #ea580c, #c2410c)",
-                      boxShadow: "0 4px 14px rgba(234, 88, 12, 0.4)",
-                    }}
-                  >
-                    Understood • Strive for Tomorrow
-                  </button>
+                  <div className="teacher-att-modal-actions-col">
+                    <button
+                      type="button"
+                      className="teacher-att-modal-disable-loc-btn"
+                      onClick={handleTurnOffLocation}
+                      title="Disable GPS tracking in app and turn off device location"
+                    >
+                      <MapPinOff size={16} />
+                      <span>Disable Location &amp; Turn Off GPS</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="teacher-att-modal-done-btn"
+                      onClick={handleModalDone}
+                      style={{
+                        background: "linear-gradient(135deg, #ea580c, #c2410c)",
+                        boxShadow: "0 4px 14px rgba(234, 88, 12, 0.4)",
+                      }}
+                    >
+                      Understood • Strive for Tomorrow
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -936,6 +1077,14 @@ export default function TeacherSelfAttendanceCard({
                  ======================================================= */
               <>
                 <div className="teacher-att-modal-header ontime">
+                  <button
+                    type="button"
+                    className="teacher-att-modal-close-btn"
+                    onClick={handleModalDone}
+                    aria-label="Close"
+                  >
+                    <X size={18} />
+                  </button>
                   <div className="teacher-att-modal-sparkle-halo" />
                   <div className="teacher-att-modal-check-icon ontime">
                     <CheckCircle2 size={36} />
@@ -944,7 +1093,7 @@ export default function TeacherSelfAttendanceCard({
                     Mubarakaat! Attendance Recorded On Time!
                   </h3>
                   <p className="teacher-att-modal-subtitle">
-                    {modalDetails.isAuto ? "⚡ Auto-Marked via GPS • " : ""}Prompt & Punctual • Verified at {modalDetails.venue}
+                    {modalDetails.isAuto ? "⚡ Auto-Marked via GPS • " : ""}Prompt &amp; Punctual • Verified at {modalDetails.venue}
                   </p>
                 </div>
 
@@ -981,18 +1130,30 @@ export default function TeacherSelfAttendanceCard({
                     <span className="teacher-att-modal-detail-val">{modalDetails.distance}m</span>
                   </div>
 
-                  <button
-                    type="button"
-                    className="teacher-att-modal-done-btn"
-                    onClick={() => setShowSuccessModal(false)}
-                  >
-                    Alhamdulillah • Done
-                  </button>
+                  <div className="teacher-att-modal-actions-col">
+                    <button
+                      type="button"
+                      className="teacher-att-modal-disable-loc-btn"
+                      onClick={handleTurnOffLocation}
+                      title="Disable GPS tracking in app and turn off device location"
+                    >
+                      <MapPinOff size={16} />
+                      <span>Disable Location &amp; Turn Off GPS</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="teacher-att-modal-done-btn"
+                      onClick={handleModalDone}
+                    >
+                      Alhamdulillah • Done
+                    </button>
+                  </div>
                 </div>
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

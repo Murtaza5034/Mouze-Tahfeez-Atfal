@@ -143,6 +143,7 @@ import TeacherSelfAttendanceCard from "./components/TeacherSelfAttendanceCard";
 import TeacherAttendanceHistoryCard from "./components/TeacherAttendanceHistoryCard";
 import AdminTeacherAttendanceManager from "./components/AdminTeacherAttendanceManager";
 import AdminTeacherAttendanceSettings from "./components/AdminTeacherAttendanceSettings";
+import AdminTeacherRankingGraphCard from "./components/AdminTeacherRankingCard";
 import SearchableSelect from "./SearchableSelect";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
@@ -23117,6 +23118,11 @@ function AdminPortal({
 
               {!isKibarAdmin && (
                 <>
+                  <AdminTeacherRankingGraphCard
+                    teacherProfiles={teacherProfiles}
+                    portalAccessList={portalAccessList}
+                    teacherAttendance={teacherAttendance}
+                  />
                   <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
                   <AtfalLeagueAdminInfographic
                     students={students}
@@ -23158,6 +23164,7 @@ function AdminPortal({
                   ...(weeklyResultsArchive || []),
                 ]}
                 onShowAction={onShowAction}
+                reportSettings={reportSettings}
               />
             </div>
           )}
@@ -29155,6 +29162,9 @@ function AdminPortal({
           {activePage === "Teacher Attendance Settings" ? (
             <AdminTeacherAttendanceSettings
               isKibarAdmin={portalRole === "kibar-admin"}
+              teacherProfiles={teacherProfiles}
+              portalAccessList={portalAccessList}
+              teacherAttendance={teacherAttendance}
               onShowAction={showAction || onShowAction}
               onRefresh={() =>
                 loadPortalData &&
@@ -50563,16 +50573,28 @@ export default function App() {
       }
     }
 
-    // Live sync to Google Sheets (non-blocking)
+    // Live sync to Google Sheets (fast & smooth non-blocking update)
     const isKibar = portalRole === "kibar-teacher" || getSectionScope() === "kibar";
     const targetStudent = schoolData.students?.find(
       (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId)
     );
+    let exactMarhalaRank = "";
+    try {
+      const exactRankInfo = getExactMarhalaRankForStudent(
+        targetStudent,
+        schoolData.weeklyResults || [],
+        payload
+      );
+      exactMarhalaRank = exactRankInfo?.rank || targetStudent?.marhalaRank || "";
+    } catch (_e) {}
+
     syncStudentResultToGoogleSheets({
       student: targetStudent,
       result: payload,
       isKibar: isKibar,
+      marhalaRank: exactMarhalaRank,
       overallRank: targetStudent?.computedRank || targetStudent?.latestResult?.computedRank || "",
+      reportSettings: schoolData?.reportSettings,
     });
 
     // Perform database write in background

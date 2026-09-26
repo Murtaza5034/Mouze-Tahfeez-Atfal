@@ -29,6 +29,10 @@ import {
   checkAttendanceWindow,
   getExactUserLocation,
 } from "../utils/attendanceSettingsHelper";
+import {
+  AdminTeacherRankingModal,
+  AdminTeacherRankingTriggerButton,
+} from "./AdminTeacherRankingCard";
 import "./AdminTeacherAttendanceSettings.css";
 
 const ALL_DAYS = [
@@ -79,9 +83,14 @@ const RADIUS_STEP_PRESETS = [
 
 export default function AdminTeacherAttendanceSettings({
   isKibarAdmin = false,
+  teacherProfiles = [],
+  portalAccessList = [],
+  teacherAttendance = [],
   onShowAction,
   onRefresh,
 }) {
+  const [showRankingModal, setShowRankingModal] = useState(false);
+
   // Section toggle: atfal vs kibar
   const [selectedSection, setSelectedSection] = useState(() =>
     isKibarAdmin ? "kibar" : "atfal"
@@ -620,24 +629,31 @@ export default function AdminTeacherAttendanceSettings({
             </div>
           </div>
 
-          {/* Section Switcher (Atfal vs Kibar) */}
-          <div className="att-section-toggle-wrap">
-            <button
-              type="button"
-              className={`att-section-toggle-btn ${selectedSection === "atfal" ? "active" : ""}`}
-              onClick={() => setSelectedSection("atfal")}
-            >
-              <span>🕌</span>
-              <span>Atfal Settings</span>
-            </button>
-            <button
-              type="button"
-              className={`att-section-toggle-btn ${selectedSection === "kibar" ? "active" : ""}`}
-              onClick={() => setSelectedSection("kibar")}
-            >
-              <span>🏛️</span>
-              <span>Kibar Settings</span>
-            </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <AdminTeacherRankingTriggerButton
+              onClick={() => setShowRankingModal(true)}
+              label="Weekly Faculty Ranking & Punctuality"
+            />
+
+            {/* Section Switcher (Atfal vs Kibar) */}
+            <div className="att-section-toggle-wrap">
+              <button
+                type="button"
+                className={`att-section-toggle-btn ${selectedSection === "atfal" ? "active" : ""}`}
+                onClick={() => setSelectedSection("atfal")}
+              >
+                <span>🕌</span>
+                <span>Atfal Settings</span>
+              </button>
+              <button
+                type="button"
+                className={`att-section-toggle-btn ${selectedSection === "kibar" ? "active" : ""}`}
+                onClick={() => setSelectedSection("kibar")}
+              >
+                <span>🏛️</span>
+                <span>Kibar Settings</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1078,6 +1094,15 @@ export default function AdminTeacherAttendanceSettings({
           )}
         </button>
       </div>
+
+      {/* Weekly Faculty Ranking Modal */}
+      <AdminTeacherRankingModal
+        isOpen={showRankingModal}
+        onClose={() => setShowRankingModal(false)}
+        teacherProfiles={teacherProfiles}
+        portalAccessList={portalAccessList}
+        teacherAttendance={teacherAttendance}
+      />
     </div>
   );
 }
