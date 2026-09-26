@@ -161,6 +161,7 @@ import {
   getJadeedTrendForStudent,
   getExactMarhalaRankForStudent,
 } from "./utils/marhalaRanking";
+import { syncStudentResultToGoogleSheets } from "./utils/googleSheetsSync";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -36926,6 +36927,17 @@ function TeacherPortal({
       };
     });
 
+    // Live sync to Google Sheets on autosave (non-blocking)
+    const targetAutoStudent = schoolData.students?.find(
+      (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId)
+    );
+    syncStudentResultToGoogleSheets({
+      student: targetAutoStudent,
+      result: data,
+      isKibar: isKibarTeacher,
+      overallRank: targetAutoStudent?.computedRank || targetAutoStudent?.latestResult?.computedRank || "",
+    });
+
     // Re-apply global rank after local re-rank so teacher sees same rank as admin
     try {
       const { data: allRanksData } = await supabase.functions.invoke(
@@ -50551,8 +50563,19 @@ export default function App() {
       }
     }
 
-    // Perform database write in background
+    // Live sync to Google Sheets (non-blocking)
     const isKibar = portalRole === "kibar-teacher" || getSectionScope() === "kibar";
+    const targetStudent = schoolData.students?.find(
+      (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId)
+    );
+    syncStudentResultToGoogleSheets({
+      student: targetStudent,
+      result: payload,
+      isKibar: isKibar,
+      overallRank: targetStudent?.computedRank || targetStudent?.latestResult?.computedRank || "",
+    });
+
+    // Perform database write in background
     const targetResultsTable = isKibar ? "kibar_weekly_results" : "weekly_results";
     supabase
       .from(targetResultsTable)
