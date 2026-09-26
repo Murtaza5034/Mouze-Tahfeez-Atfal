@@ -3,25 +3,20 @@
  * MAUZE TAHFEEZ - GOOGLE SHEETS LIVE SYNC AUTOMATION
  * ============================================================================
  * 
- * Features:
- * 1. Categorization: Routes incoming data to Atfal or Kibar spreadsheets.
- * 2. Marhala Routing: Automatically updates or appends the student's result
- *    in their designated "Marhala" tab (e.g. Marhala 1, Marhala 2, Marhala Ula, etc.).
- * 3. Parents Email Tab: Automatically updates the "parents email" tab in Atfal
- *    with columns: email, name, from date, till date, wekly score, total Jadeed,
- *    marhala rank, over all rank, and data update for latest week ("Yes").
- * 4. Data Validation & Conditional Formatting:
- *    - Column 9 dropdown with "Yes" and "No".
- *    - Green background for "Yes", Red background for "No".
+ * Instructions:
+ * 1. Put your Google Sheet ID(s) in CONFIG below.
+ * 2. In the toolbar function dropdown, select "testSetup" and click "Run".
+ * 3. Deploy as Web App: Deploy > New deployment > Web app > Execute as: Me > Who has access: Anyone.
  */
 
 // ============================================================================
-// CONFIGURATION: Set your Spreadsheet IDs below
+// CONFIGURATION: Set your Google Spreadsheet IDs here
 // ============================================================================
 const CONFIG = {
-  // If running as a Container-Bound Script inside the Atfal sheet, leave as "" or "auto"
-  // If running standalone or across two sheets, paste the 44-character Google Sheet ID from URL:
-  // e.g. https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
+  // If this script is created inside your Atfal Sheet (Extensions > Apps Script),
+  // leave ATFAL_SPREADSHEET_ID as "" and it will auto-detect the active sheet.
+  // Otherwise, paste the 44-character Sheet ID from your Google Sheet URL:
+  // (e.g. https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit)
   ATFAL_SPREADSHEET_ID: "", 
   KIBAR_SPREADSHEET_ID: "", 
   
@@ -38,21 +33,113 @@ const CONFIG = {
 };
 
 // ============================================================================
-// WEBHOOK HTTP HANDLERS (doPost & doGet)
+// 1. SAFE RUNNERS FOR THE APPS SCRIPT EDITOR (TOP OF FILE)
+// (Selected by default when you click "Run" in the toolbar)
 // ============================================================================
 
 /**
- * Main Webhook endpoint to accept JSON payloads from Mauze Tahfeez App
+ * Click "Run" on this function in the toolbar to initialize tabs,
+ * set up headers, apply dropdown validation, and configure conditional formatting.
+ */
+function testSetup() {
+  Logger.log("=== [Mauze Tahfeez] Running Sheet Setup ===");
+  try {
+    const ss = resolveSpreadsheet("atfal");
+    Logger.log("✅ Successfully connected to spreadsheet: '" + ss.getName() + "'");
+    
+    // Setup or get 'parents email' tab
+    const parentsSheet = getOrCreateParentsEmailSheet(ss);
+    Logger.log("✅ Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' is ready.");
+    
+    // Apply validation & formatting
+    setupParentsEmailValidationAndFormatting(parentsSheet);
+    Logger.log("✅ Applied Yes/No dropdown validation and Yes(Green)/No(Red) conditional formatting to Column 9.");
+
+    // Setup default Marhala 1 tab
+    getOrCreateMarhalaSheet(ss, "Marhala 1");
+    Logger.log("✅ Tab 'Marhala 1' is ready with formatted headers.");
+
+    Logger.log("🎉 ALL SETTINGS APPLIED SUCCESSFULLY! You can now Deploy as Web App.");
+    return "Setup completed successfully!";
+  } catch (err) {
+    Logger.log("❌ Setup Error: " + err.message);
+    if (err.message.indexOf("Spreadsheet ID") !== -1) {
+      Logger.log("👉 TIP: If this is a standalone script, paste your Google Sheet ID in CONFIG.ATFAL_SPREADSHEET_ID at line 25.");
+    }
+    throw err;
+  }
+}
+
+/**
+ * Click "Run" on this function to simulate an incoming mark progress update from the app
+ */
+function testMockSync() {
+  Logger.log("=== [Mauze Tahfeez] Simulating Test Mark Progress Push ===");
+  const mockPayload = {
+    category: "atfal",
+    marhala: "Marhala 1",
+    student: {
+      student_id: 101,
+      name: "Husain Yusuf Test",
+      arabic_name: "حسين يوسف",
+      email: "test.parent@example.com",
+      parent_email: "test.parent@example.com",
+      its: "50401234",
+      teacher_name: "Mulla Murtaza",
+      group_name: "Group Alif",
+      marhala: "Marhala 1",
+      marhala_rank: 1,
+      overall_rank: 3
+    },
+    result: {
+      week_date: "2026-09-26",
+      from_date: "2026-09-20",
+      till_date: "2026-09-26",
+      fatemi_from_date: 10,
+      fatemi_till_date: 15,
+      fatemi_till_month_name: "ربيع الآخر",
+      attendance_count: 6,
+      murajazah: 10,
+      juz_hali: 9.5,
+      takhteet: 9,
+      jadeed: 10,
+      total_score: 38.5,
+      total_jadeed_pages: 3,
+      total_jadeed_unit: "صفه",
+      wusool_juz: 30,
+      wusool_page: 582,
+      wusool_surah: "النبأ",
+      attendance_note: "Mumtaz performance!"
+    }
+  };
+
+  const res = processSyncPayload(mockPayload);
+  Logger.log("✅ Mock sync completed successfully!");
+  Logger.log(JSON.stringify(res, null, 2));
+  return res;
+}
+
+// ============================================================================
+// 2. WEBHOOK HTTP HANDLERS (doPost & doGet)
+// ============================================================================
+
+/**
+ * Main Webhook endpoint to accept JSON payloads from Mauze Tahfeez App.
+ * NOTE: When clicked via the editor's manual "Run" button without HTTP data,
+ * this function safely logs helpful guidance instead of throwing an error.
  */
 function doPost(e) {
-  try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return jsonResponse({
-        success: false,
-        error: "Empty request body received."
-      }, 400);
-    }
+  // If clicked manually from Apps Script Editor
+  if (!e || typeof e === "undefined" || !e.postData || !e.postData.contents) {
+    Logger.log("⚠️ 'doPost' was run manually from the editor without HTTP POST data.");
+    Logger.log("👉 To test your sheet from the editor, select 'testSetup' or 'testMockSync' from the toolbar dropdown above and click 'Run'.");
+    return jsonResponse({
+      success: false,
+      message: "doPost is an HTTP Webhook endpoint. To test in editor, run testSetup() or testMockSync()."
+    }, 200);
+  }
 
+  try {
     let payload;
     try {
       payload = JSON.parse(e.postData.contents);
@@ -70,14 +157,13 @@ function doPost(e) {
     Logger.log("doPost Error: " + err.toString());
     return jsonResponse({
       success: false,
-      error: err.toString(),
-      stack: err.stack
+      error: err.toString()
     }, 500);
   }
 }
 
 /**
- * Health check endpoint for testing deployment
+ * Health check endpoint for testing deployment in browser
  */
 function doGet(e) {
   return jsonResponse({
@@ -85,7 +171,7 @@ function doGet(e) {
     service: "Mauze Tahfeez Google Sheets Live Sync",
     timestamp: new Date().toISOString(),
     message: "Webhook is active and ready to accept POST requests."
-  });
+  }, 200);
 }
 
 function jsonResponse(data, statusCode) {
@@ -95,22 +181,16 @@ function jsonResponse(data, statusCode) {
 }
 
 // ============================================================================
-// CORE SYNC LOGIC
+// 3. CORE SYNC & ROUTING LOGIC
 // ============================================================================
 
-/**
- * Process the incoming student mark progress payload
- */
 function processSyncPayload(payload) {
   const category = (payload.category || "atfal").toLowerCase().trim();
   const student = payload.student || {};
   const result = payload.result || {};
   
   // 1. Resolve Target Spreadsheet (Atfal vs Kibar)
-  const spreadsheet = getSpreadsheetForCategory(category);
-  if (!spreadsheet) {
-    throw new Error("Unable to open spreadsheet for category: " + category + ". Please verify Spreadsheet IDs in CONFIG.");
-  }
+  const spreadsheet = resolveSpreadsheet(category);
 
   // 2. Resolve Marhala Tab & Update
   const marhalaName = resolveMarhalaTabName(student.marhala || payload.marhala || result.marhala);
@@ -120,11 +200,8 @@ function processSyncPayload(payload) {
   // 3. If Atfal, sync to the "parents email" tab
   let parentsEmailStatus = null;
   if (category === "atfal") {
-    const atfalSpreadsheet = (category === "atfal") ? spreadsheet : getSpreadsheetForCategory("atfal");
-    if (atfalSpreadsheet) {
-      const parentsSheet = getOrCreateParentsEmailSheet(atfalSpreadsheet);
-      parentsEmailStatus = syncParentsEmailSheetRow(parentsSheet, student, result);
-    }
+    const parentsSheet = getOrCreateParentsEmailSheet(spreadsheet);
+    parentsEmailStatus = syncParentsEmailSheetRow(parentsSheet, student, result);
   }
 
   return {
@@ -138,101 +215,59 @@ function processSyncPayload(payload) {
   };
 }
 
-/**
- * Get the Spreadsheet object based on category
- */
-function getSpreadsheetForCategory(category) {
+function resolveSpreadsheet(category) {
   let targetId = (category === "kibar") 
     ? CONFIG.KIBAR_SPREADSHEET_ID 
     : CONFIG.ATFAL_SPREADSHEET_ID;
 
   if (targetId && targetId !== "auto" && targetId.trim() !== "") {
-    return SpreadsheetApp.openById(targetId.trim());
+    try {
+      return SpreadsheetApp.openById(targetId.trim());
+    } catch (e) {
+      throw new Error("Could not open spreadsheet with ID '" + targetId + "'. Check that the ID is correct and permissions are granted.");
+    }
   }
 
-  // Fallback to active spreadsheet if bound
+  // Fallback to active spreadsheet if container-bound (opened from Extensions > Apps Script)
   try {
     const active = SpreadsheetApp.getActiveSpreadsheet();
     if (active) return active;
-  } catch (e) {
-    // Not container-bound
-  }
+  } catch (e) {}
 
   throw new Error(
-    "Spreadsheet ID for '" + category + "' is not set in CONFIG. " +
-    "Please open Code.gs and paste the Google Sheet ID."
+    "Spreadsheet ID for category '" + category + "' is not configured. " +
+    "Please paste your Google Sheet ID into CONFIG." + (category === "kibar" ? "KIBAR" : "ATFAL") + "_SPREADSHEET_ID at line 25 of Code.gs."
   );
 }
 
-/**
- * Standardize Marhala tab names (e.g. "Marhala 1", "Marhala Ula", etc.)
- */
 function resolveMarhalaTabName(rawMarhala) {
-  if (!rawMarhala || String(rawMarhala).trim() === "") {
-    return "Marhala 1";
-  }
-  const clean = String(rawMarhala).trim();
-  // Ensure friendly format
-  return clean;
+  if (!rawMarhala || String(rawMarhala).trim() === "") return "Marhala 1";
+  return String(rawMarhala).trim();
 }
 
 // ============================================================================
-// 1. MARHALA SHEET SYNC
+// 4. MARHALA SHEET SYNC
 // ============================================================================
 
 const MARHALA_HEADERS = [
-  "Student ID",
-  "ITS",
-  "Name",
-  "Arabic Name",
-  "Email",
-  "Teacher Name",
-  "Group",
-  "Marhala",
-  "Week Date",
-  "From Date",
-  "Till Date",
-  "Fatemi Date",
-  "Attendance Count",
-  "Murajazah",
-  "Juz Hali",
-  "Takhteet",
-  "Jadeed",
-  "Weekly Score",
-  "Total Jadeed Pages",
-  "Total Jadeed Unit",
-  "Marhala Rank",
-  "Overall Rank",
-  "Wusool Juz",
-  "Wusool Page",
-  "Wusool Surah",
-  "Next Week Juz",
-  "Next Week Page",
-  "Next Week Surah",
-  "Istifadah Juz",
-  "Istifadah Page",
-  "Istifadah Surah",
-  "Matrookah",
-  "Daeefah",
-  "Attendance Note",
-  "Last Updated"
+  "Student ID", "ITS", "Name", "Arabic Name", "Email", "Teacher Name", "Group",
+  "Marhala", "Week Date", "From Date", "Till Date", "Fatemi Date",
+  "Attendance Count", "Murajazah", "Juz Hali", "Takhteet", "Jadeed", "Weekly Score",
+  "Total Jadeed Pages", "Total Jadeed Unit", "Marhala Rank", "Overall Rank",
+  "Wusool Juz", "Wusool Page", "Wusool Surah", "Next Week Juz", "Next Week Page",
+  "Next Week Surah", "Istifadah Juz", "Istifadah Page", "Istifadah Surah",
+  "Matrookah", "Daeefah", "Attendance Note", "Last Updated"
 ];
 
-/**
- * Ensure Marhala tab exists with clean, locked headers
- */
 function getOrCreateMarhalaSheet(spreadsheet, marhalaName) {
   let sheet = spreadsheet.getSheetByName(marhalaName);
   if (!sheet) {
     sheet = spreadsheet.insertSheet(marhalaName);
-    
-    // Set headers
     sheet.getRange(1, 1, 1, MARHALA_HEADERS.length).setValues([MARHALA_HEADERS]);
     sheet.setFrozenRows(1);
     
-    // Style headers
     const headerRange = sheet.getRange(1, 1, 1, MARHALA_HEADERS.length);
-    headerRange.setBackground("#1b365d"); // Royal Navy Blue
+    headerRange.setBackground("#1b365d");
     headerRange.setFontColor("#ffffff");
     headerRange.setFontWeight("bold");
     headerRange.setFontFamily("Segoe UI");
@@ -242,21 +277,16 @@ function getOrCreateMarhalaSheet(spreadsheet, marhalaName) {
   return sheet;
 }
 
-/**
- * Upsert student row into their Marhala tab
- */
 function syncMarhalaSheetRow(sheet, student, result) {
   const data = sheet.getDataRange().getValues();
   const studentId = String(student.student_id || student.id || "").trim();
   const email = String(student.email || student.parent_email || "").trim().toLowerCase();
   const weekDate = String(result.week_date || result.till_date || "").trim();
 
-  // Find column indices
   const headers = data[0] || MARHALA_HEADERS;
   const colStudentId = headers.indexOf("Student ID");
   const colEmail = headers.indexOf("Email");
   const colWeekDate = headers.indexOf("Week Date");
-  const colFromDate = headers.indexOf("From Date");
 
   const rowValues = [
     studentId || "",
@@ -298,7 +328,6 @@ function syncMarhalaSheetRow(sheet, student, result) {
     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss")
   ];
 
-  // Search existing row matching (StudentId OR Email) AND WeekDate
   let matchRowIndex = -1;
   for (let r = 1; r < data.length; r++) {
     const row = data[r];
@@ -310,7 +339,7 @@ function syncMarhalaSheetRow(sheet, student, result) {
     const weekMatches = (!weekDate || !rowWeek || rowWeek === weekDate);
 
     if (idMatches && weekMatches) {
-      matchRowIndex = r + 1; // 1-indexed
+      matchRowIndex = r + 1;
       break;
     }
   }
@@ -325,7 +354,7 @@ function syncMarhalaSheetRow(sheet, student, result) {
 }
 
 // ============================================================================
-// 2. PARENTS EMAIL TAB SYNC & FORMATTING
+// 5. PARENTS EMAIL TAB SYNC
 // ============================================================================
 
 const PARENTS_EMAIL_HEADERS = [
@@ -340,9 +369,6 @@ const PARENTS_EMAIL_HEADERS = [
   "data update for latest week"
 ];
 
-/**
- * Ensure the "parents email" tab exists with exact headings, validation, and styling
- */
 function getOrCreateParentsEmailSheet(spreadsheet) {
   let sheet = spreadsheet.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
   if (!sheet) {
@@ -350,7 +376,6 @@ function getOrCreateParentsEmailSheet(spreadsheet) {
     sheet.getRange(1, 1, 1, PARENTS_EMAIL_HEADERS.length).setValues([PARENTS_EMAIL_HEADERS]);
     sheet.setFrozenRows(1);
 
-    // Header styling
     const headerRange = sheet.getRange(1, 1, 1, PARENTS_EMAIL_HEADERS.length);
     headerRange.setBackground("#2c3e50");
     headerRange.setFontColor("#ffffff");
@@ -358,22 +383,16 @@ function getOrCreateParentsEmailSheet(spreadsheet) {
     headerRange.setFontFamily("Segoe UI");
     headerRange.setHorizontalAlignment("center");
     
-    // Apply validation & conditional formatting immediately
     setupParentsEmailValidationAndFormatting(sheet);
     sheet.autoResizeColumns(1, PARENTS_EMAIL_HEADERS.length);
   }
   return sheet;
 }
 
-/**
- * Find matching email in "parents email" tab and update columns 1 through 9.
- * If not found, appends a new row.
- */
 function syncParentsEmailSheetRow(sheet, student, result) {
   const email = String(student.email || student.parent_email || "").trim().toLowerCase();
   const name = String(student.name || student.full_name || "").trim();
 
-  // If no email is provided, skip or fallback to student identifier
   if (!email) {
     return { action: "skipped", reason: "No email address found for student: " + name };
   }
@@ -382,51 +401,44 @@ function syncParentsEmailSheetRow(sheet, student, result) {
   const tillDate = String(result.till_date || result.fatemi_till_date || "").trim();
   const weeklyScore = result.total_score !== undefined ? result.total_score : "";
   
-  // Format total Jadeed (e.g. "3 صفه" or "3")
   let totalJadeed = "";
   if (result.total_jadeed_pages !== undefined && result.total_jadeed_pages !== null) {
     totalJadeed = String(result.total_jadeed_pages);
-    if (result.total_jadeed_unit) {
-      totalJadeed += " " + result.total_jadeed_unit;
-    }
+    if (result.total_jadeed_unit) totalJadeed += " " + result.total_jadeed_unit;
   }
 
   const marhalaRank = student.marhala_rank || student.marhalaRank || "";
   const overallRank = student.overall_rank || student.computedRank || "";
-  const latestWeekStatus = "Yes"; // Automatically set to Yes upon automated push
+  const latestWeekStatus = "Yes"; // Automatically set to Yes upon automated sync
 
   const rowValues = [
-    email,              // Col 1: email (unique identifier)
-    name,               // Col 2: name
-    fromDate,           // Col 3: from date
-    tillDate,           // Col 4: till date
-    weeklyScore,        // Col 5: wekly score
-    totalJadeed,        // Col 6: total Jadeed
-    marhalaRank,        // Col 7: marhala rank
-    overallRank,        // Col 8: over all rank
-    latestWeekStatus    // Col 9: data update for latest week
+    email,
+    name,
+    fromDate,
+    tillDate,
+    weeklyScore,
+    totalJadeed,
+    marhalaRank,
+    overallRank,
+    latestWeekStatus
   ];
 
   const data = sheet.getDataRange().getValues();
   let matchRowIndex = -1;
 
-  // Scan column 1 (email) starting from row 2
   for (let r = 1; r < data.length; r++) {
     const existingEmail = String(data[r][0] || "").trim().toLowerCase();
     if (existingEmail === email) {
-      matchRowIndex = r + 1; // 1-indexed
+      matchRowIndex = r + 1;
       break;
     }
   }
 
   if (matchRowIndex > 0) {
-    // Update existing row
     sheet.getRange(matchRowIndex, 1, 1, 9).setValues([rowValues]);
-    // Ensure dropdown validation is applied to this cell
     applyValidationToCell(sheet.getRange(matchRowIndex, 9));
     return { action: "updated", row: matchRowIndex, email: email };
   } else {
-    // Append new row
     sheet.appendRow(rowValues);
     const newRow = sheet.getLastRow();
     applyValidationToCell(sheet.getRange(newRow, 9));
@@ -435,12 +447,9 @@ function syncParentsEmailSheetRow(sheet, student, result) {
 }
 
 // ============================================================================
-// 3. CONDITIONAL FORMATTING & DATA VALIDATION SETUP (TASK ITEM 4)
+// 6. CONDITIONAL FORMATTING & VALIDATION SETUP
 // ============================================================================
 
-/**
- * Applies dropdown validation (Yes/No) to a specific cell
- */
 function applyValidationToCell(range) {
   const rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(CONFIG.STATUS_OPTIONS, true)
@@ -451,13 +460,12 @@ function applyValidationToCell(range) {
 }
 
 /**
- * MASTER SETUP FUNCTION:
- * Run this function manually from the Apps Script Editor (or it runs automatically)
- * to configure Data Validation and Conditional Formatting on Column 9 ("data update for latest week").
+ * Applies dropdown validation (Yes/No) and Yes(Green)/No(Red) conditional formatting
+ * safely respecting actual sheet row count.
  */
 function setupParentsEmailValidationAndFormatting(sheet) {
   if (!sheet) {
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet() || getSpreadsheetForCategory("atfal");
+    const spreadsheet = resolveSpreadsheet("atfal");
     sheet = spreadsheet.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
   }
   
@@ -466,10 +474,16 @@ function setupParentsEmailValidationAndFormatting(sheet) {
     return;
   }
 
-  const maxRows = Math.max(sheet.getMaxRows(), 500);
-  const statusColumnRange = sheet.getRange(2, 9, maxRows - 1, 1); // Column 9 (I2:I)
+  // Ensure sheet has at least 100 rows so getRange never goes out of bounds
+  const currentMax = sheet.getMaxRows();
+  if (currentMax <= 1) {
+    sheet.insertRowsAfter(1, 100);
+  }
+  const totalRows = sheet.getMaxRows();
+  const numRows = totalRows - 1; // All rows below header row 1
+  const statusColumnRange = sheet.getRange(2, 9, numRows, 1); // Column 9 (I2:I)
 
-  // 1. Data Validation (Yes/No Dropdown)
+  // 1. Dropdown Validation (Yes/No)
   const validationRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(CONFIG.STATUS_OPTIONS, true)
     .setAllowInvalid(false)
@@ -477,11 +491,9 @@ function setupParentsEmailValidationAndFormatting(sheet) {
     .build();
   statusColumnRange.setDataValidation(validationRule);
 
-  // 2. Conditional Formatting (Green for Yes, Red for No)
-  // Retrieve existing rules to avoid duplicate rules
+  // 2. Clean Existing Rules on Column 9
   const rules = sheet.getConditionalFormatRules();
   const filteredRules = rules.filter(function(r) {
-    // Remove old rules applied to column 9
     const ranges = r.getRanges();
     for (let i = 0; i < ranges.length; i++) {
       if (ranges[i].getColumn() === 9) return false;
@@ -489,7 +501,7 @@ function setupParentsEmailValidationAndFormatting(sheet) {
     return true;
   });
 
-  // Rule 1: "Yes" -> Emerald Green Background
+  // Rule 1: "Yes" -> Emerald Green
   const yesRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo("Yes")
     .setBackground(CONFIG.COLOR_YES_BG)
@@ -498,7 +510,7 @@ function setupParentsEmailValidationAndFormatting(sheet) {
     .setRanges([statusColumnRange])
     .build();
 
-  // Rule 2: "No" -> Rose / Light Red Background
+  // Rule 2: "No" -> Soft Red
   const noRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo("No")
     .setBackground(CONFIG.COLOR_NO_BG)
@@ -511,14 +523,5 @@ function setupParentsEmailValidationAndFormatting(sheet) {
   filteredRules.push(noRule);
   sheet.setConditionalFormatRules(filteredRules);
 
-  Logger.log("Successfully applied Data Validation and Conditional Formatting to '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "'!");
-}
-
-/**
- * Standalone runner for testing or initializing the sheet formatting
- */
-function runManualSetup() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet() || getSpreadsheetForCategory("atfal");
-  const sheet = getOrCreateParentsEmailSheet(ss);
-  setupParentsEmailValidationAndFormatting(sheet);
+  Logger.log("✅ Successfully configured Data Validation and Conditional Formatting on '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "'.");
 }
