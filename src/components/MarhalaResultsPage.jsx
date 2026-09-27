@@ -965,9 +965,9 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
                   <div className="mrk-wa-title" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <Send size={20} style={{ color: "#0088cc", flexShrink: 0 }} />
                     <div>
-                      <strong style={{ color: "#0088cc" }}>Telegram Result Images (@Mh_Design_bot)</strong>
+                      <strong style={{ color: "#0088cc" }}>Rawdat Tahfeez al Atfal Bot (@Mh_Design_bot)</strong>
                       <span className="mrk-wa-sub" style={{ display: "block", fontSize: "0.78rem", color: "#64748b" }}>
-                        Helpline: +91 81079 25353 • Sends summary image card to parents &amp; students
+                        Helpline: +91 81079 25353 • Sends weekly result card to parents &amp; students
                       </span>
                     </div>
                   </div>

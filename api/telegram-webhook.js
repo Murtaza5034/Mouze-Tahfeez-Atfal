@@ -21,8 +21,84 @@ import { Resvg } from '@resvg/resvg-js';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const HELPLINE_NUMBER = '+91 81079 25353';
-const HELPLINE_NAME = 'Mauze Tahfeez Helpline';
+const HELPLINE_NAME = 'Rawdat Tahfeez al Atfal Helpline';
+const ACADEMY_NAME = 'Rawdat Tahfeez al Atfal';
 const PORTAL_URL = 'https://mouze-tahfeez-atfal.vercel.app';
+
+// In-memory rate limiting & safety anti-bruteforce (per chatId)
+const safetyLimits = new Map(); // chatId -> { count, firstTimestamp, blockedUntil, failCount }
+
+function checkSafetyLimit(chatId) {
+  const now = Date.now();
+  let record = safetyLimits.get(chatId);
+  if (!record) {
+    record = { count: 1, firstTimestamp: now, blockedUntil: 0, failCount: 0 };
+    safetyLimits.set(chatId, record);
+    return { allowed: true };
+  }
+
+  // Active safety cooldown
+  if (record.blockedUntil && now < record.blockedUntil) {
+    const secLeft = Math.ceil((record.blockedUntil - now) / 1000);
+    return {
+      allowed: false,
+      reason: `⚠️ *Safety Cooldown Active*\n\nFor student data privacy, please wait ${secLeft}s before trying again, or call our helpline: \`${HELPLINE_NUMBER}\`.`
+    };
+  }
+
+  // Sliding 60-second window
+  if (now - record.firstTimestamp > 60000) {
+    record.count = 1;
+    record.firstTimestamp = now;
+  } else {
+    record.count += 1;
+    if (record.count > 25) {
+      record.blockedUntil = now + 60000;
+      return {
+        allowed: false,
+        reason: `⚠️ *Safety Notice*\n\nToo many requests in a short period. Please wait 1 minute before trying again.`
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
+function recordSafetyFail(chatId) {
+  const now = Date.now();
+  let record = safetyLimits.get(chatId);
+  if (!record) {
+    record = { count: 1, firstTimestamp: now, blockedUntil: 0, failCount: 1 };
+    safetyLimits.set(chatId, record);
+  } else {
+    record.failCount = (record.failCount || 0) + 1;
+    if (record.failCount >= 5) {
+      record.blockedUntil = now + 120000; // 2 minutes lockout on 5 bad attempts
+      record.failCount = 0;
+    }
+  }
+}
+
+function recordSafetySuccess(chatId) {
+  let record = safetyLimits.get(chatId);
+  if (record) record.failCount = 0;
+}
+
+// Strict input sanitization (removes dangerous characters and bounds length)
+function sanitizeInput(str, maxLen = 60) {
+  if (!str) return '';
+  return String(str)
+    .replace(/[<>{}\\]/g, '')
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    .trim()
+    .substring(0, maxLen);
+}
+
+// Security code format check (4 to 16 alphanumeric characters)
+function isValidSecurityCode(code) {
+  if (!code) return false;
+  return /^[a-zA-Z0-9]{4,16}$/.test(String(code).trim());
+}
 
 // Helper to escape XML/SVG special chars safely
 function escapeXml(unsafe) {
@@ -107,7 +183,7 @@ function generateMarhalaResultSvg(data) {
   </text>
 
   <text x="540" y="170" font-family="sans-serif" font-size="28" fill="#ffffff" text-anchor="middle" font-weight="700" letter-spacing="3">
-    MAUZE TAHFEEZ
+    RAWDAT TAHFEEZ AL ATFAL
   </text>
   <text x="540" y="205" font-family="sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="600" letter-spacing="5">
     DARA SA'ADATIL ABADIYAH • GALIAKOT SHARIF
@@ -173,7 +249,7 @@ function generateMarhalaResultSvg(data) {
   
   <rect x="160" y="1220" width="760" height="52" rx="26" fill="#132a48" stroke="url(#goldGrad)" stroke-width="2" />
   <text x="540" y="1253" font-family="sans-serif" font-size="17" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="1">
-    📞 HELPLINE: ${escapeXml(helpline)} • BOT: @Mh_Design_bot
+    📞 HELPLINE: ${escapeXml(helpline)} • RAWDAT TAHFEEZ AL ATFAL
   </text>
 </svg>`;
 }
@@ -252,7 +328,7 @@ async function sendTelegramPhoto(chatId, pngBuffer, caption, extra = {}) {
 
 // Build formatted caption for result card
 function buildResultCaption(data) {
-  const name = data.name || 'Student';
+  const name = sanitizeInput(data.name || 'Student', 50);
   const fromDate = data.fromDate || '';
   const tillDate = data.tillDate || '';
   const score = data.weeklyScore || '—';
@@ -261,8 +337,7 @@ function buildResultCaption(data) {
   const oRank = data.overallRank || '—';
   const dateStr = (fromDate && tillDate && fromDate !== '—') ? `${fromDate} to ${tillDate}` : (tillDate || 'Latest Academic Week');
 
-  return `بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\n\n` +
-    `*MAUZE TAHFEEZ - WEEKLY RESULT SUMMARY*\n` +
+  return `*RAWDAT TAHFEEZ AL ATFAL - WEEKLY RESULT SUMMARY*\n` +
     `_Dara Sa'adatil Abadiyah, Galiakot Sharif_\n\n` +
     `Student: *${name}*\n` +
     `📅 Period: ${dateStr}\n\n` +
@@ -270,7 +345,7 @@ function buildResultCaption(data) {
     `📖 *Total Jadeed:* ${jadeed}\n` +
     `👑 *Marhala Rank:* #${mRank}\n` +
     `🌟 *Overall Rank:* #${oRank}\n\n` +
-    `📞 *Mauze Tahfeez Helpline:* ${HELPLINE_NUMBER}\n` +
+    `📞 *Helpline Number:* ${HELPLINE_NUMBER}\n` +
     `🌐 *Online Portal:* ${PORTAL_URL}`;
 }
 
@@ -291,20 +366,31 @@ function getStandardKeyboard() {
   };
 }
 
-// Send the official one-way helpline greeting
-async function sendHelplineWelcome(chatId, userName = '') {
-  const greeting = userName ? `Assalamu Alaikum ${userName}!` : 'Assalamu Alaikum!';
-  const text = `بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\n\n` +
-    `${greeting}\n\n` +
-    `Welcome to the official *Mauze Tahfeez Automated Result Notification Bot* (@Mh_Design_bot).\n\n` +
-    `📞 *Mauze Tahfeez Official Helpline:* \`${HELPLINE_NUMBER}\`\n\n` +
+// Send the official welcome template (Starts with Salam Jameel, uses Rawdat Tahfeez al Atfal only)
+async function sendHelplineWelcome(chatId) {
+  const text = `Salam Jameel\n\n` +
+    `Welcome to the Rawdat Tahfeez al Atfal\n` +
+    `This the only automation bot for official student weekly result updates and announcements.\n\n` +
+    `📞 *Helpline Number:*\n` +
+    `\`${HELPLINE_NUMBER}\`\n\n` +
     `For any assistance, admission queries, or student progress details, please call or WhatsApp our helpline.\n\n` +
     `📌 *Quick Access Options:*\n` +
-    `• Tap *📱 Check My Child Result* below to view result using your mobile number.\n` +
+    `• Tap *📱 Check My Child Result* below to view result using your registered mobile number.\n` +
     `• If you are using a different mobile number, send:\n` +
     `  \`/result [Child Name], [Code]\`\n` +
     `  _(Example: \`/result Taher Shabbir, 50401002\`)_\n\n` +
     `🌐 *Online Portal:* ${PORTAL_URL}`;
+
+  return await sendTelegramMessage(chatId, text, {
+    reply_markup: getStandardKeyboard()
+  });
+}
+
+// Send ONLY the helpline number when user asks for helpline/contact
+async function sendHelplineOnly(chatId) {
+  const text = `📞 *Helpline Number:*\n` +
+    `\`${HELPLINE_NUMBER}\`\n\n` +
+    `_(Available on Call and WhatsApp for all queries and assistance)_`;
 
   return await sendTelegramMessage(chatId, text, {
     reply_markup: getStandardKeyboard()
@@ -466,6 +552,28 @@ export default async function handler(req, res) {
     const userFirstName = message.from?.first_name || body.callback_query?.from?.first_name || '';
     const rawText = (message.text || body.callback_query?.data || '').trim();
 
+    // ── Security Check: Anti-flood & Rate Limiting ──
+    const safetyCheck = checkSafetyLimit(chatId);
+    if (!safetyCheck.allowed) {
+      await sendTelegramMessage(chatId, safetyCheck.reason, {
+        reply_markup: getStandardKeyboard()
+      });
+      return res.status(200).json({ ok: true, rate_limited: true });
+    }
+
+    // ── Helpline Request: Send ONLY the helpline number ──
+    const isHelplineQuery =
+      rawText === '📞 Helpline Number' ||
+      /^(helpline|help|\/helpline|\/help|number|contact|phone|call)$/i.test(rawText) ||
+      rawText.toLowerCase().includes('helpline') ||
+      rawText.toLowerCase().includes('helpline number') ||
+      rawText.toLowerCase() === 'helpline';
+
+    if (isHelplineQuery) {
+      await sendHelplineOnly(chatId);
+      return res.status(200).json({ ok: true, helpline_only_sent: true });
+    }
+
     // Case 1: Parent tapped "📱 Check My Child Result" and shared phone contact
     if (message.contact && message.contact.phone_number) {
       const sharedPhone = cleanPhone(message.contact.phone_number);
@@ -474,6 +582,7 @@ export default async function handler(req, res) {
       const student = await queryStudentFromSheets(sheetsWebhookUrl, { phone: sharedPhone });
 
       if (student && student.name) {
+        recordSafetySuccess(chatId);
         try {
           const svg = generateMarhalaResultSvg(student);
           const png = renderSvgToPng(svg);
@@ -483,7 +592,7 @@ export default async function handler(req, res) {
           });
           return res.status(200).json({ ok: true, delivered: true, student: student.name });
         } catch (err) {
-          await sendTelegramMessage(chatId, `Found student *${student.name}*!\n\nScore: ${student.weeklyScore}/100\nRank: #${student.marhalaRank}\n\n📞 Helpline: ${HELPLINE_NUMBER}`);
+          await sendTelegramMessage(chatId, `Found student *${sanitizeInput(student.name)}*!\n\nScore: ${student.weeklyScore}/100\nRank: #${student.marhalaRank}\n\n📞 *Helpline Number:* ${HELPLINE_NUMBER}`);
           return res.status(200).json({ ok: true, delivered: true });
         }
       } else {
@@ -492,7 +601,7 @@ export default async function handler(req, res) {
           `If your registered number is different, please verify your child using:\n` +
           `\`/result [Child Name], [Code]\`\n\n` +
           `_(Code is your child's 8-digit ITS number or Student ID)_\n\n` +
-          `📞 *Mauze Tahfeez Helpline:* \`${HELPLINE_NUMBER}\``,
+          `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
           { reply_markup: getStandardKeyboard() }
         );
         return res.status(200).json({ ok: true, not_found: true });
@@ -501,9 +610,8 @@ export default async function handler(req, res) {
 
     // Case 2: User requests /result or /find (Child Name & Code Verification)
     if (rawText.toLowerCase().startsWith('/result') || rawText.toLowerCase().startsWith('/find') || rawText.toLowerCase().startsWith('result')) {
-      // Format: /result Name, Code
       const cleaned = rawText.replace(/^\/?(result|find)\s*/i, '').trim();
-      const parts = cleaned.split(/[,:]+/).map((p) => p.trim()).filter(Boolean);
+      const parts = cleaned.split(/[,:]+/).map((p) => sanitizeInput(p.trim())).filter(Boolean);
 
       if (parts.length < 2) {
         await sendTelegramMessage(chatId,
@@ -511,7 +619,7 @@ export default async function handler(req, res) {
           `To view your child's latest result, please provide your child's Name and Security Code (ITS or Student ID):\n\n` +
           `👉 Format: \`/result [Child Name], [Code]\`\n` +
           `👉 Example: \`/result Taher Shabbir, 50401002\`\n\n` +
-          `📞 *Mauze Tahfeez Helpline:* \`${HELPLINE_NUMBER}\``,
+          `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
           { reply_markup: getStandardKeyboard() }
         );
         return res.status(200).json({ ok: true, prompt_sent: true });
@@ -520,6 +628,19 @@ export default async function handler(req, res) {
       const childName = parts[0];
       const securityCode = parts[1];
 
+      // Validate security code format strictly
+      if (!isValidSecurityCode(securityCode)) {
+        recordSafetyFail(chatId);
+        await sendTelegramMessage(chatId,
+          `⚠️ *Invalid Security Code Format*\n\n` +
+          `Please provide a valid code (your child's 8-digit ITS number or Student ID).\n\n` +
+          `👉 Example: \`/result Taher Shabbir, 50401002\`\n\n` +
+          `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
+          { reply_markup: getStandardKeyboard() }
+        );
+        return res.status(200).json({ ok: true, invalid_format: true });
+      }
+
       // Query student by Name & verify Code
       const student = await queryStudentFromSheets(sheetsWebhookUrl, {
         name: childName,
@@ -527,6 +648,7 @@ export default async function handler(req, res) {
       });
 
       if (student && student.name) {
+        recordSafetySuccess(chatId);
         try {
           const svg = generateMarhalaResultSvg(student);
           const png = renderSvgToPng(svg);
@@ -537,24 +659,23 @@ export default async function handler(req, res) {
           return res.status(200).json({ ok: true, verified: true, student: student.name });
         } catch (cardErr) {
           await sendTelegramMessage(chatId,
-            `✅ *Verified Result for ${student.name}:*\n\n` +
+            `✅ *Verified Result for ${sanitizeInput(student.name)}:*\n\n` +
             `• Weekly Score: *${student.weeklyScore}* / 100\n` +
             `• Total Jadeed: *${student.totalJadeed}*\n` +
             `• Marhala Rank: *#${student.marhalaRank}*\n` +
             `• Overall Rank: *#${student.overallRank}*\n\n` +
-            `📞 Helpline: ${HELPLINE_NUMBER}`
+            `📞 *Helpline Number:* ${HELPLINE_NUMBER}`
           );
           return res.status(200).json({ ok: true, text_sent: true });
         }
       } else {
+        recordSafetyFail(chatId);
         await sendTelegramMessage(chatId,
           `❌ *Verification Failed*\n\n` +
-          `No active record matched:\n` +
-          `• Child: *${childName}*\n` +
-          `• Code: *${securityCode}*\n\n` +
+          `The provided child details and security code did not match any active student record.\n\n` +
           `Please check the spelling and your child's ITS or Student ID.\n\n` +
-          `📞 *Mauze Tahfeez Helpline:* \`${HELPLINE_NUMBER}\`\n` +
-          `Please contact our helpline if you need help finding your child's code.`,
+          `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\`\n` +
+          `_(Call or WhatsApp our helpline if you need help finding your child's code)_`,
           { reply_markup: getStandardKeyboard() }
         );
         return res.status(200).json({ ok: true, match_failed: true });
@@ -569,15 +690,14 @@ export default async function handler(req, res) {
         `\`/result [Child Name], [Code]\`\n\n` +
         `Example:\n` +
         `\`/result Husain Yusuf, 50401001\`\n\n` +
-        `📞 *Mauze Tahfeez Helpline:* \`${HELPLINE_NUMBER}\``,
+        `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
         { reply_markup: getStandardKeyboard() }
       );
       return res.status(200).json({ ok: true });
     }
 
-    // Case 4: Any other message (Start, Helpline, or General message)
-    // "create one way only if at teleger user den msg in this bot only send them a helpline number mauzer tahfeez you know"
-    await sendHelplineWelcome(chatId, userFirstName);
+    // Case 4: Any other message (Start, Greetings, or General message)
+    await sendHelplineWelcome(chatId);
     return res.status(200).json({ ok: true, helpline_sent: true });
   }
 
