@@ -896,11 +896,19 @@ export default async function handler(req, res) {
         const cPhone = cleanPhone(stu.phone || '');
         const cIts = String(stu.its || '').trim();
         const cName = String(stu.name || '').trim().toLowerCase();
-        if (
-          (targetIts && cIts === targetIts) ||
-          (targetPhone && cPhone === targetPhone) ||
-          (targetName && cName.includes(targetName.toLowerCase()))
-        ) {
+        const cIdRef = String(stu.student_id || stu.id || '').trim();
+
+        const phoneMatches = Boolean(
+          targetPhone && cPhone && (
+            cPhone === targetPhone ||
+            (cPhone.length >= 10 && targetPhone.length >= 10 && cPhone.slice(-10) === targetPhone.slice(-10))
+          )
+        );
+        const itsMatches = Boolean(targetIts && cIts && cIts === targetIts);
+        const nameMatches = Boolean(targetName && cName && (cName.includes(targetName.toLowerCase()) || targetName.toLowerCase().includes(cName)));
+        const idMatches = Boolean(studentId && cIdRef && cIdRef === String(studentId));
+
+        if (itsMatches || phoneMatches || nameMatches || idMatches) {
           if (!chatIds.includes(String(cId))) chatIds.push(String(cId));
         }
       }
@@ -1037,6 +1045,9 @@ export default async function handler(req, res) {
 
     // Resolve if user already has a linked student profile
     const linkedStudent = await getLinkedStudent(sheetsWebhookUrl, chatId);
+    if (linkedStudent) {
+      saveLinkedSubscriber(chatId, linkedStudent);
+    }
 
     // ── Helpline Request: Send ONLY the helpline number ──
     const isHelplineQuery =

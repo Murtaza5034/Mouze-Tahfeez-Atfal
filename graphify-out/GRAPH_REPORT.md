@@ -1,16 +1,16 @@
 # Graph Report - Mauze Tahfeez  (2026-09-28)
 
 ## Corpus Check
-- 1642 files · ~2,278,409 words
+- 1642 files · ~2,278,469 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 14946 nodes · 25812 edges · 1014 communities (738 shown, 276 thin omitted)
+- 14946 nodes · 25812 edges · 1018 communities (742 shown, 276 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 732 edges (avg confidence: 0.82)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d3ef6f80`
+- Built from commit: `9c697ff0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -21,14 +21,14 @@
 - org.junit.jupiter.api.Test
 - plugins.service.ts
 - BaileysAdapter
-- TeacherProfileView.jsx
+- config.js
 - ._make_strategy
 - WhatsAppWebJsAdapter
 - LocalAgentConfig
-- plugin-loader.service.ts
+- plugin.interfaces.ts
 - IWhatsAppEngine
-- local_connection_test.py
-- plugin-loader.service.spec.ts
+- LocalConnection
+- plugin-loader.service.ts
 - EventsGateway
 - app.module.ts
 - Template
@@ -44,10 +44,10 @@
 - whatsapp-web-js.adapter.ts
 - LocalConnectionTest
 - policy.py
-- antigravity/__init__.py
+- ToolContext
 - GroupsResource
 - dependencies
-- tool-registry.spec.ts
+- ContactService
 - WebhookEvent
 - ApiKey
 - api.ts
@@ -60,7 +60,7 @@
 - client.ts
 - StorageService
 - BaileysSessionStore
-- mcp.server.ts
+- auth.service.ts
 - metrics.service.ts
 - StatusResourceTest.java
 - dependencies
@@ -81,7 +81,7 @@
 - UpdateWebhookDto
 - scripts
 - CacheService
-- Jadwal.jsx
+- SelfJadwal.jsx
 - SendImageStatusDto
 - ToolCall
 - ChatResponse
@@ -92,7 +92,7 @@
 - ChatsResourceTest.java
 - DatabaseConfigDto
 - DockerService
-- message.service.ts
+- MessageService
 - compilerOptions
 - request-metrics.ts
 - Common Errors
@@ -131,7 +131,7 @@
 - marhalaRanking.js
 - _make_mock_connection
 - SessionsService
-- message.controller.ts
+- message.service.ts
 - SessionService
 - .connect
 - ingress.processor.ts
@@ -156,7 +156,7 @@
 - HookRunnerTest
 - compilerOptions
 - HookManager
-- labels.ts
+- api-key.guard.ts
 - 14.3 Database Migration: SQLite → PostgreSQL
 - LocalConnectionStepFromDictTest
 - _make_tool_call
@@ -186,7 +186,7 @@
 - db-adapter.js
 - TestLocalHarness
 - TestMcpBridgeFiltering
-- run
+- from_file
 - types_test.py
 - SEO optimization
 - .eslintrc.json
@@ -198,7 +198,7 @@
 - devDependencies
 - MockBackend
 - openwa.sh
-- conversation_test.py
+- PluginManifest
 - Hook Types
 - ssrf-guard.ts
 - webhook.service.ts
@@ -301,7 +301,7 @@
 - types_group.go
 - ProfileService
 - 13.4 Kubernetes Deployment
-- 6.4.5 Message Templates
+- plugin-worker.integration.spec.ts
 - add-uuid-defaults-migration.spec.ts
 - 16 - Risk Management
 - ExampleInstrumentedTest.java
@@ -352,13 +352,13 @@
 - reset-password.js
 - test-jadawal-table.js
 - Contributing to OpenWA
-- [0.1.8] - 2026-06-13
+- resources/catalog.ts
 - portal-proxy.js
 - fix.js
 - composio
-- [0.2.10] - 2026-06-17
+- BuiltinTools
 - ScopeBatchIdUniqueToSession1781800000000
-- StatusController
+- SendTextStatusDto
 - 17 - Dashboard Design
 - 6.4.2 Messages
 - firebase-messaging-sw.js
@@ -382,7 +382,7 @@
 - Schema Reference
 - AddMessageAuthor1784908800000
 - 07.4 Messages
-- fatemiCalendarApi.js
+- Jadwal.jsx
 - Step 2: Choose a Deploy Method
 - check_schedule.cjs
 - check_schedule.js
@@ -530,7 +530,7 @@
 - Resources & Methods
 - Resources & Methods
 - [0.8.0] - 2026-07-02
-- linkifyjs
+- PremiumTodaySchedule.jsx
 - 6. Rendering Performance
 - Rolldown Migration (Vite 8)
 - Google Antigravity SDK
@@ -581,9 +581,11 @@
 - 3.2 Pluggable Architecture Philosophy
 - 6.4.10 System (Health, Metrics, Stats, Settings)
 - 07.12 System (Health, Metrics, Stats, Settings)
+- Spinner
 - 26 - Global Search
 - 27 - Writing a Search-Provider Plugin
 - n8n Appointment Booking Workflow
+- 6.4.8 Webhooks (management)
 - mauze-whatsapp-bot.js
 - Accessibility Code Patterns
 - Operable
@@ -605,6 +607,7 @@
 - 18 - SDK Design
 - [0.8.14] - 2026-07-10
 - rmyndharis-openwa
+- LocalConnectionHookAcceptanceTest
 - antigravity/types.py
 - Common ARIA patterns
 - Understandable
@@ -617,6 +620,7 @@
 - Manual Initialization
 - [0.1.0] - 2026-02-05
 - session.service.ts
+- [0.10.1] - 2026-07-20
 - 6.4.9 API Keys
 - 07.10 Webhooks (management)
 - CallService
@@ -645,6 +649,7 @@
 - [0.2.0] - 2026-06-15
 - [0.2.2] - 2026-06-15
 - OverviewCard.jsx
+- [0.10.8] - 2026-07-23
 - 6.6 Webhook Events & Delivery Semantics
 - S
 - AuditService
@@ -677,7 +682,7 @@
 - [0.7.18] - 2026-07-02
 - [0.4.3] - 2026-06-19
 - [0.7.0] - 2026-06-23
-- LocalConnectionToolCallHooksTest
+- react-is
 - [0.2.1] - 2026-06-15
 - 6.3 Media Specifications
 - 18.2 TypeScript / JavaScript SDK
@@ -686,7 +691,6 @@
 - P
 - W
 - pull_request_template.md
-- policies.py
 - [0.2.3] - 2026-06-15
 - [0.7.16] - 2026-06-30
 - 8. Advanced Patterns
@@ -1010,8 +1014,6 @@
 10. `PluginLoaderService` - 73 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `ThinkingLevel` --inherits--> `str`  [EXTRACTED]
-  antigravity-sdk-python-main/google/antigravity/types.py → OpenWA/dashboard/src/utils/pluginConfigForm.test.ts
 - `BuiltinTools` --inherits--> `str`  [EXTRACTED]
   antigravity-sdk-python-main/google/antigravity/types.py → OpenWA/dashboard/src/utils/pluginConfigForm.test.ts
 - `FileChangeKind` --inherits--> `str`  [EXTRACTED]
@@ -1019,6 +1021,8 @@
 - `StepSource` --inherits--> `str`  [EXTRACTED]
   antigravity-sdk-python-main/google/antigravity/types.py → OpenWA/dashboard/src/utils/pluginConfigForm.test.ts
 - `StepStatus` --inherits--> `str`  [EXTRACTED]
+  antigravity-sdk-python-main/google/antigravity/types.py → OpenWA/dashboard/src/utils/pluginConfigForm.test.ts
+- `StepTarget` --inherits--> `str`  [EXTRACTED]
   antigravity-sdk-python-main/google/antigravity/types.py → OpenWA/dashboard/src/utils/pluginConfigForm.test.ts
 
 ## Import Cycles
@@ -1028,7 +1032,7 @@
 - 5-file cycle: `OpenWA/src/core/plugins/index.ts -> OpenWA/src/core/plugins/plugin-loader.service.ts -> OpenWA/src/modules/session/session.service.ts -> OpenWA/src/engine/engine.factory.ts -> OpenWA/src/plugins/engines/baileys/index.ts -> OpenWA/src/core/plugins/index.ts`
 - 5-file cycle: `OpenWA/src/core/plugins/index.ts -> OpenWA/src/core/plugins/plugin-loader.service.ts -> OpenWA/src/modules/session/session.service.ts -> OpenWA/src/engine/engine.factory.ts -> OpenWA/src/plugins/engines/whatsapp-web-js/index.ts -> OpenWA/src/core/plugins/index.ts`
 
-## Communities (1014 total, 276 thin omitted)
+## Communities (1018 total, 276 thin omitted)
 
 ### Community 0 - "App.jsx"
 Cohesion: 0.03
@@ -1054,9 +1058,9 @@ Nodes (38): ApiConsumes, PluginConfigSchema, PluginI18n, annotateCatalog(), Cata
 Cohesion: 0.04
 Nodes (9): BaileysAdapter, extractBaileysBody(), Channel, ChannelMessage, Label, MediaInput, MessageReaction, MessageResult (+1 more)
 
-### Community 6 - "TeacherProfileView.jsx"
-Cohesion: 0.18
-Nodes (19): FirstTimeStudentRegistryModal(), ICON_MAP, StaffProfilePermissionsManager(), analyzePassportImage(), NOTE: parent_email and group_name are purposefully OMITTED so user cannot…, resolveStudentPhoto(), StudentProfileView(), resolveTeacherPhoto() (+11 more)
+### Community 6 - "config.js"
+Cohesion: 0.07
+Nodes (29): AtfalTeacherLeagueEntry(), MONTHS_CONFIG, FirstTimeStudentRegistryModal(), ICON_MAP, StaffProfilePermissionsManager(), analyzePassportImage(), NOTE: parent_email and group_name are purposefully OMITTED so user cannot…, resolveStudentPhoto() (+21 more)
 
 ### Community 7 - "._make_strategy"
 Cohesion: 0.03
@@ -1068,19 +1072,19 @@ Nodes (5): extractLinkedParentJID(), WhatsAppWebJsAdapter, wwebjsAckToDeliverySt
 
 ### Community 9 - "LocalAgentConfig"
 Cohesion: 0.03
-Nodes (86): AsyncChatRoom, main(), pass_turn(), Independent loop for one agent — reacts to new messages., Format only the new messages this agent hasn't seen yet. Agent is stateful and…, Decline to respond in the current turn. Call this when the topic is outside…, Manages a fully async conversation where agents react independently., Start a discussion and let agents react freely until done. (+78 more)
+Nodes (101): AsyncChatRoom, main(), pass_turn(), Independent loop for one agent — reacts to new messages., Format only the new messages this agent hasn't seen yet. Agent is stateful and…, Decline to respond in the current turn. Call this when the topic is outside…, Manages a fully async conversation where agents react independently., Start a discussion and let agents react freely until done. (+93 more)
 
-### Community 10 - "plugin-loader.service.ts"
-Cohesion: 0.05
-Nodes (42): RFC-7230, buildConversationSendFacade(), ConversationMediaType, ConversationSendDeps, MEDIA_TYPES, MESSAGE_HOOK_EVENTS, shouldDispatchToPlugin(), deepMerge() (+34 more)
+### Community 10 - "plugin.interfaces.ts"
+Cohesion: 0.07
+Nodes (26): RFC-7230, buildConversationSendFacade(), ConversationMediaType, ConversationSendDeps, MEDIA_TYPES, MESSAGE_HOOK_EVENTS, ConversationSendEnvelope, IngressChallengeSpec (+18 more)
 
-### Community 12 - "local_connection_test.py"
+### Community 12 - "LocalConnection"
 Cohesion: 0.02
-Nodes (81): callable_to_tool_proto(), _extract_tool_result(), _get_default_binary_path(), _get_sdk_version(), LocalConnection, LocalConnectionStep, LocalConnectionStrategy, _make_step_id() (+73 more)
+Nodes (77): callable_to_tool_proto(), _extract_tool_result(), _get_sdk_version(), LocalConnection, LocalConnectionStep, LocalConnectionStrategy, _make_step_id(), normalize_wire_path() (+69 more)
 
-### Community 13 - "plugin-loader.service.spec.ts"
-Cohesion: 0.06
-Nodes (24): TestableLoader, CapturingLoader, RealWorkerLoader, PluginWorkerHost, BOOTSTRAP, CAP_FIXTURE, CTX_FIXTURE, CTX_LIFECYCLE_FIXTURE (+16 more)
+### Community 13 - "plugin-loader.service.ts"
+Cohesion: 0.05
+Nodes (31): shouldDispatchToPlugin(), deepMerge(), isPlainObject(), isPluginActiveForSession(), resolvePluginConfig(), IPlugin, PluginStatus, PluginType (+23 more)
 
 ### Community 14 - "EventsGateway"
 Cohesion: 0.12
@@ -1088,7 +1092,7 @@ Nodes (4): EventsGateway, readTrustedProxies(), WebSocketGateway, WebSocketServe
 
 ### Community 15 - "app.module.ts"
 Cohesion: 0.04
-Nodes (63): mcpModules, queueModules, searchModules, serveStaticModules, StorageModule, Global, Module, EnvConfig (+55 more)
+Nodes (60): mcpModules, queueModules, searchModules, serveStaticModules, StorageModule, Global, Module, EnvConfig (+52 more)
 
 ### Community 16 - "Template"
 Cohesion: 0.06
@@ -1112,7 +1116,7 @@ Nodes (55): Dashboard, Logs, PageHeader(), PageHeaderProps, useApiKeysQuery(), u
 
 ### Community 21 - "HookRunner"
 Cohesion: 0.03
-Nodes (71): PrintToolCallHook, HookContext, HookResult, Hook to print tool calls before they run., PrintToolCallHook, HookContext, HookResult, Hook to print tool calls before they run. (+63 more)
+Nodes (67): PrintToolCallHook, HookContext, HookResult, Hook to print tool calls before they run., LocalConnectionPostTurnHookTest, Tests for post-turn hook dispatch., Verifies PostTurnHook fires when a terminal model step is received., Verifies TARGET_ENVIRONMENT steps are yielded by receive_steps(). (+59 more)
 
 ### Community 22 - "messages.ts"
 Cohesion: 0.08
@@ -1139,12 +1143,12 @@ Cohesion: 0.04
 Nodes (27): LocalConnectionSerializationTest, LocalConnectionTest, Tests that LocalConnectionStep maps fields correctly., Tests that thinking field is correctly populated from step dict., Tests that thinking defaults to empty string when not present., Tests that thinking field flows from proto through to SDK Step., Tests that thinking and text are independent, non-exclusive fields. This is the…, Tests that thinking-only steps are TARGET_USER but not is_complete_response.… (+19 more)
 
 ### Community 28 - "policy.py"
-Cohesion: 0.05
-Nodes (62): allow(), allow_all(), ask_user(), _bucket_index(), confirm_run_command(), Decision, deny(), deny_all() (+54 more)
+Cohesion: 0.04
+Nodes (73): _block_rm_predicate(), _critical_file_predicate(), DeleteFileArgs, main(), programmatic_approval_handler(), Arguments for run_command tool., Arguments for file modification tools., Predicate to detect 'rm' in command line arguments. (+65 more)
 
-### Community 29 - "antigravity/__init__.py"
-Cohesion: 0.06
-Nodes (27): lookup_fruit_sku(), main(), Looks up the SKU for a given fruit. Args: fruit_name: The name of the fruit.…, Records the count of fruits by SKU. Args: sku: The SKU of the fruit. count: The…, record_fruit(), Initializes the Agent. Args: config: Declarative agent configuration., AgentConfig, Any (+19 more)
+### Community 29 - "ToolContext"
+Cohesion: 0.11
+Nodes (14): lookup_fruit_sku(), main(), Looks up the SKU for a given fruit. Args: fruit_name: The name of the fruit.…, Records the count of fruits by SKU. Args: sku: The SKU of the fruit. count: The…, record_fruit(), Any, Conversation-aware context injected into tools that request it. Modeled after…, Initializes the ToolContext. Args: conn: The active connection to the agent… (+6 more)
 
 ### Community 30 - "GroupsResource"
 Cohesion: 0.04
@@ -1154,17 +1158,17 @@ Nodes (17): Builder, CreateGroupRequest, Builder, GroupDescriptionRequest, Group
 Cohesion: 0.03
 Nodes (73): adm-zip, archiver, @aws-sdk/client-s3, better-sqlite3, @bull-board/api, @bull-board/express, @bull-board/nestjs, bullmq (+65 more)
 
-### Community 32 - "tool-registry.spec.ts"
-Cohesion: 0.08
-Nodes (19): DEFAULT_LIST_LIMIT, ListOptions, paginate(), resolveListWindow(), ToolDescriptor, invokeTool(), readTool, ToolRegistryService (+11 more)
+### Community 32 - "ContactService"
+Cohesion: 0.16
+Nodes (7): DEFAULT_LIST_LIMIT, ListOptions, paginate(), resolveListWindow(), contactTools(), ContactService, Injectable
 
 ### Community 33 - "WebhookEvent"
 Cohesion: 0.05
 Nodes (28): Builder, CreateWebhookRequest, Builder, UpdateWebhookRequest, WebhookEvent, ALL, CALL_RECEIVED, GROUP_JOIN (+20 more)
 
 ### Community 34 - "ApiKey"
-Cohesion: 0.06
-Nodes (30): ApiHeader, setRequestActor(), AuditContext, hashApiKey(), API_KEY_FILE, AuthService, bannerKeyLine(), resolveSeedApiKey() (+22 more)
+Cohesion: 0.08
+Nodes (23): ApiHeader, AuditContext, AuthService, bannerKeyLine(), resolveSeedApiKey(), createMockApiKey(), hashKey(), Injectable (+15 more)
 
 ### Community 35 - "api.ts"
 Cohesion: 0.05
@@ -1172,11 +1176,11 @@ Nodes (45): MessageTester, useSessionGroupsQuery(), fallbackMime, mediaAccept, m
 
 ### Community 36 - "types.ts"
 Cohesion: 0.05
-Nodes (38): CatalogResource, NOTE: the catalog controller is mounted under the session root, so catalog, SearchResource, BatchMessageResult, BatchProgress, BulkMediaRequest, BulkMessageContent, BulkMessageItem (+30 more)
+Nodes (38): ListGroupsQuery, SearchResource, BatchMessageResult, BatchProgress, BulkMediaRequest, BulkMessageContent, BulkMessageItem, BulkMessageType (+30 more)
 
 ### Community 37 - "Conversation"
-Cohesion: 0.04
-Nodes (39): _print_telemetry(), Prints telemetry data for the current turn., Returns the active Conversation session. Use this for advanced session…, Receives steps as they complete from the agent. Yields Step objects…, _add_usage(), Conversation, Any, Content (+31 more)
+Cohesion: 0.03
+Nodes (51): _print_telemetry(), Prints telemetry data for the current turn., Returns the active Conversation session. Use this for advanced session…, _parse_usage_metadata(), Extracts UsageMetadata from proto message., _add_usage(), Conversation, Any (+43 more)
 
 ### Community 38 - "ingress.service.ts"
 Cohesion: 0.11
@@ -1206,9 +1210,9 @@ Nodes (7): positiveIntFromEnv(), S3Config, StorageService, Injectable, isPathWit
 Cohesion: 0.06
 Nodes (23): isSelfAdmin(), mapBaileysGroup(), mapBaileysGroupInfo(), NormalizeJid, BaileysSessionStore, LastMessage, WhatsAppWebJsConfig, LidMappingStore (+15 more)
 
-### Community 45 - "mcp.server.ts"
-Cohesion: 0.07
-Nodes (34): BullBoardAuthMiddleware, res, Injectable, ProxyAwareThrottlerGuard, Injectable, ipMatches(), ipv4ToInt(), normalizeIp() (+26 more)
+### Community 45 - "auth.service.ts"
+Cohesion: 0.06
+Nodes (38): BullBoardAuthMiddleware, res, Injectable, ProxyAwareThrottlerGuard, Injectable, ipMatches(), ipv4ToInt(), normalizeIp() (+30 more)
 
 ### Community 46 - "metrics.service.ts"
 Cohesion: 0.19
@@ -1243,8 +1247,8 @@ Cohesion: 0.06
 Nodes (15): Builder, BulkMediaRequest, Builder, BulkMessageContent, Builder, BulkMessageItem, BulkMessageType, AUDIO (+7 more)
 
 ### Community 54 - "encodeSegment"
-Cohesion: 0.08
-Nodes (20): encodeSegment(), ContactsResource, ListContactsQuery, GroupsResource, ListGroupsQuery, ProfileResource, CheckNumberResponse, ContactPhoneResponse (+12 more)
+Cohesion: 0.09
+Nodes (15): encodeSegment(), ContactsResource, ListContactsQuery, GroupsResource, LabelsResource, ProfileResource, AddLabelRequest, CheckNumberResponse (+7 more)
 
 ### Community 55 - "GroupService"
 Cohesion: 0.13
@@ -1264,7 +1268,7 @@ Nodes (18): Builder, CreateSessionRequest, PairingCodeResponse, QrCodeResponse, 
 
 ### Community 59 - "PluginLoaderService"
 Cohesion: 0.07
-Nodes (15): PluginInstance, PluginRegistryEntry, PluginStorage, LEGACY_REMOVED_PLUGIN_IDS, PluginLoaderService, resolvePluginMainPath(), seedConfigDefaults(), Injectable (+7 more)
+Nodes (14): PluginInstance, PluginRegistryEntry, PluginStorage, LEGACY_REMOVED_PLUGIN_IDS, PluginLoaderService, seedConfigDefaults(), Injectable, Optional (+6 more)
 
 ### Community 60 - "docs/README.md"
 Cohesion: 0.10
@@ -1290,9 +1294,9 @@ Nodes (44): scripts, build, build:all, check:versions, dashboard:build, dashboar
 Cohesion: 0.18
 Nodes (3): CacheService, Injectable, InjectRepository
 
-### Community 66 - "Jadwal.jsx"
-Cohesion: 0.05
-Nodes (69): getWeekDateStr(), LazyJadwalParentView, LazyJadwalTeacherView, LazySelfJadwalParentView, LazySelfJadwalTeacherView, ReadJadwalView(), summarizeMiqaats(), useFatemiCalendar() (+61 more)
+### Community 66 - "SelfJadwal.jsx"
+Cohesion: 0.08
+Nodes (35): getWeekDateStr(), LazySelfJadwalParentView, LazySelfJadwalTeacherView, ReadJadwalView(), getTypeConfig(), MiqaatPopup(), TYPE_CONFIG, SearchableSelect() (+27 more)
 
 ### Community 67 - "SendImageStatusDto"
 Cohesion: 0.21
@@ -1300,11 +1304,11 @@ Nodes (16): IsDefined, SendImageStatusDto, SendVideoStatusDto, StatusMediaInput,
 
 ### Community 68 - "ToolCall"
 Cohesion: 0.04
-Nodes (72): broken_tool(), greet(), log_compaction(), log_post_subagent_call(), log_post_tool_call(), log_post_turn(), log_pre_subagent_call(), log_pre_tool_call_decide() (+64 more)
+Nodes (70): HookContext, HookResult, broken_tool(), greet(), log_compaction(), log_post_subagent_call(), log_post_tool_call(), log_post_turn() (+62 more)
 
 ### Community 69 - "ChatResponse"
-Cohesion: 0.06
-Nodes (28): Content, Sends a prompt and returns the final response. Args: prompt: The user prompt or…, AntigravityConnectionError, AntigravityExecutionError, AntigravityValidationError, ChatResponse, Any, Exception (+20 more)
+Cohesion: 0.07
+Nodes (26): _find_generated_image(), _header(), main(), Streams a ChatResponse, printing text and tool calls as they arrive., Searches the antigravity brain dirs for a generated image by name. The…, Runs the generator/discriminator multimodal pipeline., run(), _stream_response() (+18 more)
 
 ### Community 70 - "ChatResponseStreamTest"
 Cohesion: 0.05
@@ -1312,7 +1316,7 @@ Nodes (22): ChatResponseStreamTest, Cache replay: thoughts → tool_calls → te
 
 ### Community 71 - "Changelog"
 Cohesion: 0.04
-Nodes (49): [0.10.1] - 2026-07-20, [0.10.2] - 2026-07-20, [0.10.4] - 2026-07-21, [0.10.7] - 2026-07-23, [0.10.8] - 2026-07-23, [0.1.6] - 2026-05-17, [0.2.6] - 2026-06-16, [0.4.8] - 2026-06-21 (+41 more)
+Nodes (49): [0.10.2] - 2026-07-20, [0.10.4] - 2026-07-21, [0.10.7] - 2026-07-23, [0.1.6] - 2026-05-17, [0.1.8] - 2026-06-13, [0.2.10] - 2026-06-17, [0.2.6] - 2026-06-16, [0.4.8] - 2026-06-21 (+41 more)
 
 ### Community 72 - "MainActivity"
 Cohesion: 0.08
@@ -1330,9 +1334,9 @@ Nodes (14): ChatState, PAUSED, RECORDING, TYPING, ChatSummary, Builder, DeleteCh
 Cohesion: 0.24
 Nodes (17): DatabaseConfigDto, EngineConfigDto, QueueConfigDto, RedisConfigDto, RestartDto, SaveConfigDto, StorageConfigDto, ApiProperty (+9 more)
 
-### Community 77 - "message.service.ts"
-Cohesion: 0.10
-Nodes (28): messageTools(), PluginMessagingCapability, MessageResponseDto, SendAudioMessageDto, SendMediaMessageDto, SendTextMessageDto, ApiProperty, ApiPropertyOptional (+20 more)
+### Community 77 - "MessageService"
+Cohesion: 0.16
+Nodes (13): messageTools(), PluginMessagingCapability, MessageResponseDto, Message, Column, CreateDateColumn, Entity, Index (+5 more)
 
 ### Community 78 - "compilerOptions"
 Cohesion: 0.07
@@ -1379,16 +1383,16 @@ Cohesion: 0.10
 Nodes (17): getNotificationPermission(), loadFcmService(), NotificationStatus(), IOSNotificationGuideModal(), FCMService, stashNotificationTap(), firebaseApp, firebaseConfig (+9 more)
 
 ### Community 89 - "supabaseClient.js"
-Cohesion: 0.04
-Nodes (68): LazyAppUpdateManager, DEPLOY_STAGES, PLAY_TRACKS, STATUS_CONFIG, AppUpdatePopup(), AdminHelpManagement(), CATEGORIES, AdminTeacherAttendanceManager() (+60 more)
+Cohesion: 0.05
+Nodes (57): LazyAppUpdateManager, DEPLOY_STAGES, PLAY_TRACKS, STATUS_CONFIG, AppUpdatePopup(), AdminHelpManagement(), CATEGORIES, AdminTeacherAttendanceManager() (+49 more)
 
 ### Community 90 - "Common Errors"
 Cohesion: 0.04
 Nodes (44): Authentication, Find Available Models, Usage, Vercel AI Gateway, `addToolResult` → `addToolOutput`, Common Errors, `generateObject` → `generateText` with `output`, Manual JSON parsing → `generateText` with `output` (+36 more)
 
 ### Community 91 - "api-key.entity.ts"
-Cohesion: 0.11
-Nodes (20): REQUIRED_ROLE_KEY, SessionScoped(), ApiKeyRole, SubscribeChannelDto, ApiProperty, IsNotEmpty, IsString, NOTE: declared BEFORE @Get(':contactId') so the literal segment wins over the… (+12 more)
+Cohesion: 0.07
+Nodes (30): ToolDescriptor, ToolRegistryService, Injectable, r, w, sessionId, sessionId, sessionId (+22 more)
 
 ### Community 92 - "08 - Development Guidelines"
 Cohesion: 0.04
@@ -1400,7 +1404,7 @@ Nodes (32): BatchError, BatchMessageResult, BatchProgress, BatchStatusResponse, 
 
 ### Community 94 - "dependencies"
 Cohesion: 0.10
-Nodes (21): i18next, i18next-browser-languagedetector, linkify-react, dependencies, i18next, i18next-browser-languagedetector, linkify-react, react-dom (+13 more)
+Nodes (21): i18next, i18next-browser-languagedetector, linkify-react, linkifyjs, dependencies, i18next, i18next-browser-languagedetector, linkify-react (+13 more)
 
 ### Community 95 - "catalog.controller.ts"
 Cohesion: 0.16
@@ -1420,7 +1424,7 @@ Nodes (24): calculateProgress(), ChildProgress, getChildProgress(), mockChildPro
 
 ### Community 99 - ".setUp"
 Cohesion: 0.06
-Nodes (16): LocalConnectionBuiltinDecideHookTest, LocalConnectionCompactionHookTest, LocalConnectionHookAcceptanceTest, LocalConnectionSessionHooksTest, LocalConnectionToolCallNoRunnerTest, Tests for tool call handling when no ToolRunner is configured., Verifies that a tool call with no ToolRunner queues a step for the user. Why:…, Tests for session start/end hook dispatch. (+8 more)
+Nodes (17): LocalConnectionBuiltinDecideHookTest, LocalConnectionCompactionHookTest, LocalConnectionSessionHooksTest, LocalConnectionToolCallHooksTest, LocalConnectionToolCallNoRunnerTest, Tests for tool call handling when no ToolRunner is configured., Verifies that a tool call with no ToolRunner queues a step for the user. Why:…, Tests for session start/end hook dispatch. (+9 more)
 
 ### Community 100 - "LocalConnectionBuiltinToolHooksTest"
 Cohesion: 0.09
@@ -1447,8 +1451,8 @@ Cohesion: 0.04
 Nodes (51): ChatRoom, main(), _moderator_nudge(), pass_turn(), Ask all agents simultaneously, return non-pass responses., Format only the new messages this agent hasn't seen yet. Agent is stateful and…, Decline to respond in the current round. Call this when the topic is outside…, Nudges the agent to wrap up after a delay. (+43 more)
 
 ### Community 106 - "Connection"
-Cohesion: 0.05
-Nodes (21): Connection, ConnectionStrategy, A live session with an agent backend. This is the common contract that all…, Returns True if the connection is idle and ready for input., Returns the conversation identifier, or empty string if unset., Disconnects the session and releases resources., Cancels the current turn in progress., Deletes this connection and all associated state from the backend. (+13 more)
+Cohesion: 0.04
+Nodes (28): Initializes the Agent. Args: config: Declarative agent configuration., AgentConfig, Connection, ConnectionStrategy, Any, Content, field_validator, A live session with an agent backend. This is the common contract that all… (+20 more)
 
 ### Community 107 - "redact-config.ts"
 Cohesion: 0.17
@@ -1486,9 +1490,9 @@ Nodes (17): _make_mock_connection(), Verifies multiple send() calls dispatch ind
 Cohesion: 0.09
 Nodes (15): CreateSessionRequest, ListSessionsQuery, MemoryUsage, PairingCodeResponse, QrCodeResponse, RequestPairingCodeRequest, SessionResponse, SessionsService (+7 more)
 
-### Community 116 - "message.controller.ts"
+### Community 116 - "message.service.ts"
 Cohesion: 0.06
-Nodes (54): IsLatitude, IsLongitude, coerceStrictBoolean(), coerceStrictNumber(), NumberSubject, PIPE_TRANSFORM_OPTS, PIPE_VALIDATOR_OPTS, Subject (+46 more)
+Nodes (58): IsLatitude, IsLongitude, coerceStrictBoolean(), coerceStrictNumber(), NumberSubject, PIPE_TRANSFORM_OPTS, PIPE_VALIDATOR_OPTS, Subject (+50 more)
 
 ### Community 117 - "SessionService"
 Cohesion: 0.12
@@ -1519,8 +1523,8 @@ Cohesion: 0.17
 Nodes (18): config, Logger, Middleware, nopLogger, RetryPolicy, RoundTripperFunc, net/http.RoundTripper, time.Duration (+10 more)
 
 ### Community 124 - "ConversationMapping"
-Cohesion: 0.10
-Nodes (17): isUniqueViolation(), PluginMappingsCapability, PluginsModule, Global, Module, ConversationMappingConflict, ConversationMappingService, MappingKey (+9 more)
+Cohesion: 0.08
+Nodes (20): isUniqueViolation(), PluginHandoverCapability, PluginMappingsCapability, PluginsModule, Global, Module, CapabilityContext, dispatchCapabilityVerb() (+12 more)
 
 ### Community 125 - "ChannelsResourceTest.java"
 Cohesion: 0.12
@@ -1579,12 +1583,12 @@ Cohesion: 0.09
 Nodes (22): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, moduleResolution, noEmit (+14 more)
 
 ### Community 140 - "HookManager"
-Cohesion: 0.05
-Nodes (32): HOOK_EVENT_REGISTRY, HookContext, HookEvent, HookHandler, HookRegistration, HookResult, isKnownHookEvent(), KNOWN_HOOK_EVENTS (+24 more)
+Cohesion: 0.10
+Nodes (13): HOOK_EVENT_REGISTRY, HookContext, HookEvent, HookHandler, HookRegistration, HookResult, isKnownHookEvent(), KNOWN_HOOK_EVENTS (+5 more)
 
-### Community 141 - "labels.ts"
-Cohesion: 0.29
-Nodes (3): LabelsResource, AddLabelRequest, LabelRecord
+### Community 141 - "api-key.guard.ts"
+Cohesion: 0.17
+Nodes (10): requestContextMiddleware(), getRequestId(), RequestContext, requestContextStorage, runWithRequestId(), setRequestActor(), PUBLIC_KEY, SESSION_SCOPED_KEY (+2 more)
 
 ### Community 142 - "14.3 Database Migration: SQLite → PostgreSQL"
 Cohesion: 0.05
@@ -1675,8 +1679,8 @@ Cohesion: 0.14
 Nodes (21): BulkMediaDto, BulkMessageContentDto, BulkMessageItemDto, BulkMessageOptionsDto, BulkMessageResponseDto, SendBulkMessageDto, ApiProperty, ApiPropertyOptional (+13 more)
 
 ### Community 164 - "_make_step"
-Cohesion: 0.04
-Nodes (43): ConversationChatTest, ConversationReceiveChunksTest, ConversationReceiveStepsTest, _make_step(), Validates receive_steps delegation and history accumulation., Verifies steps are yielded from the underlying connection., Verifies steps are recorded in history as they are received., Verifies history returns a copy, not a reference to internal state. (+35 more)
+Cohesion: 0.03
+Nodes (62): ConversationChatTest, ConversationClearHistoryTest, ConversationCreateTest, ConversationHistoryTest, ConversationReceiveChunksTest, ConversationReceiveStepsTest, ConversationSendDrainTest, ConversationSendTest (+54 more)
 
 ### Community 165 - "fetchAllPages.ts"
 Cohesion: 0.40
@@ -1691,8 +1695,8 @@ Cohesion: 0.14
 Nodes (14): ChannelController, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags, Body, Controller (+6 more)
 
 ### Community 168 - "db-adapter.js"
-Cohesion: 0.05
-Nodes (44): TahfeezChatUI(), auth, authApi, readyPromise, firebaseConfig, firebaseProjectId, PLACEHOLDER_KEYS, callableCache (+36 more)
+Cohesion: 0.07
+Nodes (36): auth, authApi, readyPromise, callableCache, callFunction(), computeGlobalRankLocally(), createClient(), FUNCTION_NAMES (+28 more)
 
 ### Community 169 - "TestLocalHarness"
 Cohesion: 0.12
@@ -1702,9 +1706,9 @@ Nodes (11): Awaits a test event to be fired with a given timeout., Simulates the
 Cohesion: 0.19
 Nodes (10): patch, Helper to set up ClientSessionGroup mock with tools added during connect., Verifies that all tools are kept when no filtering is configured., Verifies that disabled tools are filtered out., Verifies that only enabled tools are kept., Verifies that ValueError is raised if configured enabled_tools do not exist., Verifies that ValueError is raised if configured disabled_tools do not exist., Verifies filtering works independently for multiple servers. (+2 more)
 
-### Community 171 - "run"
-Cohesion: 0.08
-Nodes (29): _find_generated_image(), _header(), main(), Streams a ChatResponse, printing text and tool calls as they arrive., Searches the antigravity brain dirs for a generated image by name. The…, Runs the generator/discriminator multimodal pipeline., run(), _stream_response() (+21 more)
+### Community 171 - "from_file"
+Cohesion: 0.10
+Nodes (21): Audio, _BaseMedia, Document, from_file(), Image, field_validator, Path, Robustly loads local file bytes with comprehensive error wrapping. Args: path:… (+13 more)
 
 ### Community 172 - "types_test.py"
 Cohesion: 0.11
@@ -1746,9 +1750,9 @@ Nodes (8): GuzzleHttp\Client, GuzzleHttp\Handler\MockHandler, GuzzleHttp\Handler
 Cohesion: 0.33
 Nodes (16): cmd_build(), cmd_help(), cmd_logs(), cmd_restart(), cmd_start(), cmd_status(), cmd_stop(), cmd_update() (+8 more)
 
-### Community 183 - "conversation_test.py"
-Cohesion: 0.04
-Nodes (34): ConversationClearHistoryTest, ConversationCreateTest, ConversationHistoryTest, ConversationSendDrainTest, ConversationSendTest, ConversationUsageMetadataTest, Concurrent receive_steps() triggers wait_for_idle() fallback. When another…, Validates history accessors across multiple turns. (+26 more)
+### Community 183 - "PluginManifest"
+Cohesion: 0.17
+Nodes (12): PluginManifest, DEFAULT_PACKAGE_LIMITS, INSTALLABLE_TYPES, PackageLimits, ParsedPackage, parsePluginPackage(), readEntryData(), REQUIRED_FIELDS (+4 more)
 
 ### Community 184 - "Hook Types"
 Cohesion: 0.06
@@ -1836,7 +1840,7 @@ Nodes (8): BaseHookTest, Tests default behavior of specific Hook classes and res
 
 ### Community 206 - "ToolRunnerTest"
 Cohesion: 0.09
-Nodes (15): Verifies execution of standard synchronous tools. What: Checks that execution…, Verifies that sync tools are executed in a separate thread. Why: If a tool is…, Verifies that executing an unregistered tool raises KeyError. What: Checks…, Verifies constructor-based tool registration. What: Checks that tools provided…, Verifies that tool internal crashes are propagated as exceptions., Verifies ToolWithSchema with a synchronous callable. What: Checks that…, Verifies execution of a class instance with a sync __call__ method., Validates the in-process ToolRunner. Ensures that Python tools can be… (+7 more)
+Nodes (15): Verifies execution of standard synchronous tools. What: Checks that execution…, Verifies that sync tools are executed in a separate thread. Why: If a tool is…, Verifies that executing an unregistered tool raises KeyError. What: Checks…, Verifies that tool internal crashes are propagated as exceptions., Verifies ToolWithSchema with a synchronous callable. What: Checks that…, Verifies tools property returns a copy of the dictionary., Verifies execution of a class instance with a sync __call__ method., Validates the in-process ToolRunner. Ensures that Python tools can be… (+7 more)
 
 ### Community 207 - "SEO optimization"
 Cohesion: 0.06
@@ -1920,11 +1924,11 @@ Nodes (35): 1. Auto-Reply Bot, 1. Error Handling, 22 - n8n Integration, 2. Lead 
 
 ### Community 228 - "logger.service.ts"
 Cohesion: 0.06
-Nodes (20): requestContextMiddleware(), ANSI, LEVEL_COLOR, LEVEL_LABEL, LogContext, LogFormat, LoggerService, LogLevel (+12 more)
+Nodes (18): ANSI, LEVEL_COLOR, LEVEL_LABEL, LogContext, LogFormat, LoggerService, LogLevel, redactSecrets() (+10 more)
 
 ### Community 229 - "_async_tool"
 Cohesion: 0.15
-Nodes (7): _async_tool(), Verifies execution of asynchronous (coroutine) tools. What: Checks that…, Verifies ToolWithSchema with an asynchronous callable. What: Checks that…, Verifies tools property returns a copy of the dictionary., Verifies processing multiple tool calls in a batch. What: Checks that all tool…, Verifies batch processing of ToolWithSchema. What: Checks that ToolWithSchema…, Verifies that successful tool calls have exception=None.
+Nodes (7): _async_tool(), Verifies execution of asynchronous (coroutine) tools. What: Checks that…, Verifies constructor-based tool registration. What: Checks that tools provided…, Verifies ToolWithSchema with an asynchronous callable. What: Checks that…, Verifies processing multiple tool calls in a batch. What: Checks that all tool…, Verifies batch processing of ToolWithSchema. What: Checks that ToolWithSchema…, Verifies that successful tool calls have exception=None.
 
 ### Community 230 - "compilerOptions"
 Cohesion: 0.15
@@ -2138,9 +2142,9 @@ Nodes (5): ProfileService, SetProfilePictureRequest, SuccessResult, SetProfileNa
 Cohesion: 0.07
 Nodes (28): 13.1 Architecture Overview, 13.2 Session Affinity Strategy, 13.3 Docker Swarm Deployment, 13.4 Kubernetes Deployment, 13.5 Load Balancer Configuration, 13.6 Capacity Planning, 13.7 Monitoring, 13 - Horizontal Scaling Guide (+20 more)
 
-### Community 286 - "6.4.5 Message Templates"
-Cohesion: 0.33
-Nodes (6): 6.4.5 Message Templates, DELETE /api/sessions/:sessionId/templates/:id, GET /api/sessions/:sessionId/templates, GET /api/sessions/:sessionId/templates/:id, POST /api/sessions/:sessionId/templates, PUT /api/sessions/:sessionId/templates/:id
+### Community 286 - "plugin-worker.integration.spec.ts"
+Cohesion: 0.13
+Nodes (14): BOOTSTRAP, CAP_FIXTURE, CTX_FIXTURE, CTX_LIFECYCLE_FIXTURE, FIXTURE, HOOK_CONFIG_FIXTURE, HOOK_FIXTURE, HOOK_HANG_FIXTURE (+6 more)
 
 ### Community 287 - "add-uuid-defaults-migration.spec.ts"
 Cohesion: 0.22
@@ -2310,9 +2314,9 @@ Nodes (5): envContent, envPath, supabase, supabaseKey, supabaseUrl
 Cohesion: 0.08
 Nodes (21): Adoption, Attribution, Code of Conduct, Enforcement, Our pledge, Our standards, Before opening a pull request, Code of conduct (+13 more)
 
-### Community 337 - "[0.1.8] - 2026-06-13"
-Cohesion: 0.67
-Nodes (3): [0.1.8] - 2026-06-13, Added, Fixed
+### Community 337 - "resources/catalog.ts"
+Cohesion: 0.19
+Nodes (8): CatalogResource, NOTE: the catalog controller is mounted under the session root, so catalog, CatalogInfo, CatalogProduct, CatalogProductsQuery, PaginatedProducts, SendCatalogRequest, SendProductRequest
 
 ### Community 338 - "portal-proxy.js"
 Cohesion: 0.52
@@ -2326,13 +2330,13 @@ Nodes (6): adminPortalStart, code, componentBody, fs, iifeCode, startIndex
 Cohesion: 0.29
 Nodes (6): oauth, type, url, mcp, composio, $schema
 
-### Community 341 - "[0.2.10] - 2026-06-17"
-Cohesion: 0.67
-Nodes (3): [0.2.10] - 2026-06-17, Fixed, Internal
+### Community 341 - "BuiltinTools"
+Cohesion: 0.17
+Nodes (7): BuiltinTools, Identifiers for common connection-provided builtin tools. Attributes: LIST_DIR:…, Returns tools that only read state (no writes, deletes, or commands). Returns:…, Returns tools that cannot delete content. Returns: A list of non-destructive…, Returns all builtin tools. Returns: A list of all BuiltinTools., Returns tools that perform file read/write/create operations. These tools…, Returns an empty tool list (no builtin tools). Returns: An empty list of…
 
-### Community 343 - "StatusController"
-Cohesion: 0.25
-Nodes (10): StatusController, ApiOperation, ApiTags, Body, Controller, Delete, Get, Param (+2 more)
+### Community 343 - "SendTextStatusDto"
+Cohesion: 0.11
+Nodes (21): SendTextStatusDto, ApiProperty, ApiPropertyOptional, ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional (+13 more)
 
 ### Community 344 - "17 - Dashboard Design"
 Cohesion: 0.09
@@ -2406,9 +2410,9 @@ Nodes (20): @col, Contents, Core Directives, Customizing Tables, Data Types, @de
 Cohesion: 0.10
 Nodes (21): 07.4 Messages, GET /api/sessions/:sessionId/messages, GET /api/sessions/:sessionId/messages/batch/:batchId, GET /api/sessions/:sessionId/messages/:chatId/history, GET /api/sessions/:sessionId/messages/:chatId/:messageId/reactions, POST /api/sessions/:sessionId/messages/batch/:batchId/cancel, POST /api/sessions/:sessionId/messages/delete, POST /api/sessions/:sessionId/messages/forward (+13 more)
 
-### Community 367 - "fatemiCalendarApi.js"
-Cohesion: 0.20
-Nodes (13): ANNUAL_MIQAAT_FALLBACK, ARABIC_MONTHS, convertToHijri(), ENGLISH_MONTHS, fetchFatemiDataForDates(), fetchMiqaatsForDate(), fetchWithTimeout(), formatHijriArabic() (+5 more)
+### Community 367 - "Jadwal.jsx"
+Cohesion: 0.08
+Nodes (47): LazyJadwalParentView, LazyJadwalTeacherView, ANNUAL_MIQAAT_FALLBACK, ARABIC_MONTHS, convertToHijri(), ENGLISH_MONTHS, fetchFatemiDataForDates(), fetchMiqaatsForDate() (+39 more)
 
 ### Community 368 - "Step 2: Choose a Deploy Method"
 Cohesion: 0.10
@@ -2643,8 +2647,8 @@ Cohesion: 0.13
 Nodes (14): 1. The Anti-Ruby Mandate, 2. Modern Xcode Folder Synchronization, 3. Allowed Scripting Languages, 4. Toolchain Verification, 5. Mandatory Linker Flags for Static Frameworks (Firebase), **CRITICAL: Always Use Latest SDK Version**, ⛔️ CRITICAL RULES & ENVIRONMENT CHECKS, Empty Directory Workflow (+6 more)
 
 ### Community 510 - "6.4 REST API Reference"
-Cohesion: 0.12
-Nodes (17): 6.4.12 Search, 6.4.13 Profile (own account), 6.4.14 Calls, 6.4.8 Webhooks (management), 6.4 REST API Reference, DELETE /api/sessions/:sessionId/webhooks/:id, GET /api/search, GET /api/sessions/:sessionId/webhooks (+9 more)
+Cohesion: 0.13
+Nodes (15): 6.4.12 Search, 6.4.13 Profile (own account), 6.4.14 Calls, 6.4.5 Message Templates, 6.4 REST API Reference, DELETE /api/sessions/:sessionId/templates/:id, GET /api/search, GET /api/sessions/:sessionId/templates (+7 more)
 
 ### Community 511 - "JavaScript API"
 Cohesion: 0.14
@@ -2761,6 +2765,10 @@ Nodes (13): `client.catalog` *(WhatsApp Business)*, `client.channels` *(Newslett
 ### Community 540 - "[0.8.0] - 2026-07-02"
 Cohesion: 0.67
 Nodes (3): [0.8.0] - 2026-07-02, Added, Fixed
+
+### Community 541 - "PremiumTodaySchedule.jsx"
+Cohesion: 0.29
+Nodes (9): DAY_NAMES, DAY_NAMES_SHORT, getFormattedToday(), getStudentLabel(), getTodayISO(), IKHTEBAR_OPTIONS, MARHALA_ARABIC_LABELS, MARHALA_OPTIONS (+1 more)
 
 ### Community 542 - "6. Rendering Performance"
 Cohesion: 0.17
@@ -2962,6 +2970,10 @@ Nodes (10): 6.4.10 System (Health, Metrics, Stats, Settings), GET /api/health, G
 Cohesion: 0.20
 Nodes (10): 07.12 System (Health, Metrics, Stats, Settings), GET /api/health, GET /api/health/live, GET /api/health/ready, GET /api/metrics, GET /api/settings, GET /api/stats/messages, GET /api/stats/overview (+2 more)
 
+### Community 592 - "Spinner"
+Cohesion: 0.29
+Nodes (3): A lightweight terminal spinner for async processing feedback., Updates the spinner display message., Spinner
+
 ### Community 593 - "26 - Global Search"
 Cohesion: 0.20
 Nodes (10): 26.1 What it is, 26.2 The provider model, 26.3 The built-in DB full-text default, 26.4 Dual-database switching safety, 26.5 Configuration, 26.6 The HTTP endpoint, 26.7 When to use a plugin backend, 26.8 Migration and backfill (+2 more)
@@ -2973,6 +2985,10 @@ Nodes (10): 27.1 What it is, 27.2 The contract, 27.3 Indexing via the `message:p
 ### Community 595 - "n8n Appointment Booking Workflow"
 Cohesion: 0.20
 Nodes (10): Alternative Slots Message, Availability Check, Booking Intent Check, Confirmation Message, Flow, Minimal Node Checklist, n8n Appointment Booking Workflow, Normalize the Request (+2 more)
+
+### Community 596 - "6.4.8 Webhooks (management)"
+Cohesion: 0.25
+Nodes (8): 6.4.8 Webhooks (management), DELETE /api/sessions/:sessionId/webhooks/:id, GET /api/sessions/:sessionId/webhooks, GET /api/sessions/:sessionId/webhooks/:id, GET /api/webhooks, POST /api/sessions/:sessionId/webhooks, POST /api/sessions/:sessionId/webhooks/:id/test, PUT /api/sessions/:sessionId/webhooks/:id
 
 ### Community 597 - "mauze-whatsapp-bot.js"
 Cohesion: 0.15
@@ -3054,9 +3070,13 @@ Nodes (3): [0.8.14] - 2026-07-10, Added, Fixed
 Cohesion: 0.22
 Nodes (8): Errors, Install, License, Messaging, Notes, rmyndharis-openwa, Search, Usage
 
+### Community 618 - "LocalConnectionHookAcceptanceTest"
+Cohesion: 0.29
+Nodes (4): LocalConnectionHookAcceptanceTest, Verifies that previously-unsupported hooks are now accepted., Subagent lifecycle is handled by tool hooks; no special subagent lists., Compaction hooks should be accepted now.
+
 ### Community 619 - "antigravity/types.py"
 Cohesion: 0.04
-Nodes (61): log_interaction(), on_interaction, Logs interaction requests. Skips all questions., _add(), main(), Entry point for the interactive CLI example. Args: argv: List of command-line…, Reads the file at the given path and returns its content with lines inverted.…, Adds two nullable ints, preserving None when both are absent. (+53 more)
+Nodes (65): log_interaction(), on_interaction, Logs interaction requests. Skips all questions., _add(), main(), Entry point for the interactive CLI example. Args: argv: List of command-line…, Reads the file at the given path and returns its content with lines inverted.…, Adds two nullable ints, preserving None when both are absent. (+57 more)
 
 ### Community 620 - "Common ARIA patterns"
 Cohesion: 0.25
@@ -3101,6 +3121,10 @@ Nodes (8): [0.1.0] - 2026-02-05, Advanced Features, Core Features, Dashboard, In
 ### Community 630 - "session.service.ts"
 Cohesion: 0.04
 Nodes (56): ChatState, DeliveryStatus, EngineStatus, LocationInput, PollInput, ReactionEvent, ReactionSender, RevokedMessage (+48 more)
+
+### Community 631 - "[0.10.1] - 2026-07-20"
+Cohesion: 0.67
+Nodes (3): [0.10.1] - 2026-07-20, Added, Fixed
 
 ### Community 632 - "6.4.9 API Keys"
 Cohesion: 0.25
@@ -3213,6 +3237,10 @@ Nodes (7): [0.2.2] - 2026-06-15, Added, Changed, Dependencies, Fixed, Security, 
 ### Community 659 - "OverviewCard.jsx"
 Cohesion: 0.40
 Nodes (5): ICON_MAP, OverviewCard(), RehalIcon(), renderIcon(), SegmentedGoldBar()
+
+### Community 660 - "[0.10.8] - 2026-07-23"
+Cohesion: 0.67
+Nodes (3): [0.10.8] - 2026-07-23, Added, Fixed
 
 ### Community 661 - "6.6 Webhook Events & Delivery Semantics"
 Cohesion: 0.29
@@ -3342,10 +3370,6 @@ Nodes (6): [0.4.3] - 2026-06-19, Added, Changed, Documentation, Fixed, Security
 Cohesion: 0.33
 Nodes (6): [0.7.0] - 2026-06-23, Added, Changed, Fixed, Removed, Security
 
-### Community 693 - "LocalConnectionToolCallHooksTest"
-Cohesion: 0.22
-Nodes (5): LocalConnectionToolCallHooksTest, Tests for post-tool-call and on-tool-error hooks., Verifies PostToolCallHook fires after successful tool execution., Verifies OnToolErrorHook can provide recovery values on tool failure., Verifies OnToolErrorHook receives the original exception, not wrapped.…
-
 ### Community 694 - "[0.2.1] - 2026-06-15"
 Cohesion: 0.67
 Nodes (3): [0.2.1] - 2026-06-15, Dependencies, Fixed
@@ -3377,10 +3401,6 @@ Nodes (6): W, WAHA, WAL (Write-Ahead Logging), Webhook, WebSocket, whatsapp-web.
 ### Community 702 - "pull_request_template.md"
 Cohesion: 0.33
 Nodes (5): Checklist, Description, Related Issues, Screenshots (if applicable), Type of Change
-
-### Community 703 - "policies.py"
-Cohesion: 0.24
-Nodes (11): _block_rm_predicate(), _critical_file_predicate(), DeleteFileArgs, main(), programmatic_approval_handler(), Arguments for run_command tool., Arguments for file modification tools., Predicate to detect 'rm' in command line arguments. (+3 more)
 
 ### Community 704 - "[0.2.3] - 2026-06-15"
 Cohesion: 0.67
@@ -3858,11 +3878,11 @@ Nodes (3): 4.4 Data Encryption, At Rest, In Transit
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ApiResponse` connect `ApiResponse` to `plugins.service.ts`, `message.entity.ts`, `Template`, `ContactController`, `.reject`, `AuditService`, `ApiKey`, `api.ts`, `ChannelService`, `stats.module.ts`, `ingress.controller.ts`, `PluginInstance`, `GroupService`, `InfraController`, `ShutdownService`, `.setName`, `.logInfo`, `StatusController`, `WebhookResponseDto`, `catalog.controller.ts`, `.findAll`, `LabelService`, `ingress.processor.ts`, `auth.controller.ts`?**
+- **Why does `ApiResponse` connect `ApiResponse` to `plugins.service.ts`, `message.entity.ts`, `Template`, `ContactController`, `.reject`, `AuditService`, `ApiKey`, `api.ts`, `ChannelService`, `stats.module.ts`, `ingress.controller.ts`, `PluginInstance`, `GroupService`, `InfraController`, `ShutdownService`, `.setName`, `.logInfo`, `SendTextStatusDto`, `WebhookResponseDto`, `catalog.controller.ts`, `.findAll`, `LabelService`, `ingress.processor.ts`, `auth.controller.ts`?**
   _High betweenness centrality (0.089) - this node is a cross-community bridge._
-- **Why does `str` connect `_make_step` to `antigravity/__init__.py`, `Plugins.tsx`?**
+- **Why does `str` connect `_make_step` to `BuiltinTools`, `Plugins.tsx`?**
   _High betweenness centrality (0.080) - this node is a cross-community bridge._
-- **Why does `IWhatsAppEngine` connect `IWhatsAppEngine` to `tool-registry.spec.ts`, `BaileysAdapter`, `ChannelService`, `WhatsAppWebJsAdapter`, `LabelService`, `plugin-loader.service.ts`, `message.service.ts`, `engine.factory.ts`, `profile.service.ts`, `.getEngine`, `SessionService`, `session.service.ts`, `CallService`, `GroupService`, `bulk-message.service.ts`, `whatsapp-web-js.adapter.ts`, `PluginLoaderService`?**
+- **Why does `IWhatsAppEngine` connect `IWhatsAppEngine` to `ContactService`, `BaileysAdapter`, `ChannelService`, `WhatsAppWebJsAdapter`, `LabelService`, `plugin.interfaces.ts`, `plugin-loader.service.ts`, `engine.factory.ts`, `profile.service.ts`, `.getEngine`, `message.service.ts`, `SessionService`, `session.service.ts`, `CallService`, `GroupService`, `bulk-message.service.ts`, `whatsapp-web-js.adapter.ts`, `PluginLoaderService`?**
   _High betweenness centrality (0.018) - this node is a cross-community bridge._
 - **What connects `deploy-codex.sh script`, `deploy.sh script`, `PackageDescription` to the rest of the system?**
   _4462 weakly-connected nodes found - possible documentation gaps or missing edges._
