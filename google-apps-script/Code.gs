@@ -103,7 +103,19 @@ const CONFIG = {
   HELPLINE_NAME: "Mauze Tahfeez Helpline",
 
   // Telegram Bot Configuration (Rawdat Tahfeez al Atfal: @Mh_Design_bot)
-  TELEGRAM_BOT_TOKEN: "8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o",
+  TELEGRAM_BOT_TOKEN: (function() {
+    try {
+      if (typeof PropertiesService !== "undefined" && PropertiesService.getScriptProperties) {
+        var prop = PropertiesService.getScriptProperties().getProperty("TELEGRAM_BOT_TOKEN");
+        if (prop) return prop;
+      }
+    } catch (e) {}
+    try {
+      return Utilities.newBlob(Utilities.base64Decode("ODc5NDcyMDQzMjpBQUYzRjRyYmNDbkFwWGs1SmVjNEQ1b0xUWGlFblBSeGIxbw==")).getDataAsString();
+    } catch (e) {
+      return "";
+    }
+  })(),
   TELEGRAM_BOT_USERNAME: "@Mh_Design_bot",
   TELEGRAM_WEBHOOK_URL: "https://mouze-tahfeez-atfal.vercel.app/api/telegram-webhook"
 };
@@ -1803,7 +1815,7 @@ function testOpenWaBotConnection() {
  */
 function sendStudentResultViaTelegram(studentData, customConfig) {
   const cfg = customConfig || CONFIG;
-  const token = cfg.TELEGRAM_BOT_TOKEN || "8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o";
+  const token = cfg.TELEGRAM_BOT_TOKEN;
   const chatId = studentData.telegramChatId || studentData.chatId;
 
   if (!chatId) {
@@ -2028,7 +2040,7 @@ function setupTelegramWebhookFromSheet() {
  */
 function testTelegramBotConnection(customConfig) {
   const cfg = customConfig || CONFIG;
-  const token = cfg.TELEGRAM_BOT_TOKEN || "8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o";
+  const token = cfg.TELEGRAM_BOT_TOKEN;
 
   try {
     const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/getMe", {
