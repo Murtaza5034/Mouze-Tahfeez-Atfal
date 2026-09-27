@@ -36333,7 +36333,10 @@ function TeacherPortal({
       {
         redirectPage: "Attendance",
         studentId: String(studentId),
-        status,
+        student_name: sName,
+        phone: attStudent?.mobile || attStudent?.phone || attStudent?.parent_phone || attStudent?.whatsapp_number || "",
+        its: attStudent?.its || attStudent?.its_id || attStudent?.student_id || "",
+        status: statusLabel,
         date,
       },
     ).catch((err) => console.warn("Attendance notification note:", err));
@@ -36443,15 +36446,31 @@ function TeacherPortal({
 
     overviewStudents.forEach((s) => {
       const parentTarget = s.parent_user_id || s.parent_email;
-      if (parentTarget) {
-        broadcastNotification(
-          "Attendance Updated",
-          `${s.name || "Your child"} was marked ${status} on ${date}.`,
-          "user",
-          parentTarget,
-          "Attendance",
-        );
-      }
+      const sName = s.name || s.full_name || "Your child";
+      const statusLabel =
+        status === "present"
+          ? "Present"
+          : status === "absent"
+            ? "Absent"
+            : status === "leave" || status === "uzur"
+              ? "Excused (Leave)"
+              : String(status).toUpperCase();
+      broadcastNotification(
+        "Attendance Updated",
+        `${sName} was marked ${statusLabel} on ${date}.`,
+        "user",
+        parentTarget || s.id,
+        "Attendance",
+        {
+          redirectPage: "Attendance",
+          studentId: String(s.id || s.student_id || ""),
+          student_name: sName,
+          phone: s.mobile || s.phone || s.parent_phone || s.whatsapp_number || "",
+          its: s.its || s.its_id || s.student_id || "",
+          status: statusLabel,
+          date,
+        },
+      );
     });
   };
 

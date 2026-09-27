@@ -586,7 +586,12 @@
     "totalJadeed": "3 صفه",
     "fromDate": "10",
     "tillDate": "15",
-    "status": "Yes"
+    "status": "Yes",
+    "latestAttendance": {
+      "status": "Absent",
+      "statusEmoji": "❌",
+      "date": "27/09/2026"
+    }
   },
   {
     "student_id": "a0b86790-02d5-4d0a-ae4a-81bf20d44d1b",

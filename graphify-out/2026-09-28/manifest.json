@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1790533484.7834172,
-    "seen": 1790533836.5071008,
-    "ast_hash": "158b5e57a1c60972f17b68f9f6408511",
+    "mtime": 1790524621.2871876,
+    "seen": 1790525753.2632935,
+    "ast_hash": "0cbd46799e675039e4c081bf741d45c4",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6612,10 +6612,10 @@
     "semantic_hash": "44388c888c93c2cec09b5fcc6cef0798"
   },
   "vercel.json": {
-    "mtime": 1790533453.1739001,
-    "seen": 1790533836.5120883,
-    "ast_hash": "c06f20436ec12843f2b36b144125a787",
-    "semantic_hash": ""
+    "mtime": 1787221008.2116113,
+    "seen": 1787510537.2115335,
+    "ast_hash": "0abcbc9493591f73a1cc00a78fe1c8b2",
+    "semantic_hash": "0abcbc9493591f73a1cc00a78fe1c8b2"
   },
   "verify-table-structure.cjs": {
     "mtime": 1778331650.0353363,
@@ -10344,15 +10344,15 @@
     "semantic_hash": ""
   },
   "api/telegram-webhook.js": {
-    "mtime": 1790533577.826352,
-    "seen": 1790533836.5035563,
-    "ast_hash": "d8fd9017724c08190dcb858332c3422e",
+    "mtime": 1790532037.4989777,
+    "seen": 1790532264.5182989,
+    "ast_hash": "3936534aa2c5a8b18c3fb5aaea806c4c",
     "semantic_hash": ""
   },
   "api/students-roster.json": {
-    "mtime": 1790533463.5045292,
-    "seen": 1790533836.5035543,
-    "ast_hash": "84eb0c142c8221facf1f998f33ca0bd6",
+    "mtime": 1790531908.5476358,
+    "seen": 1790532264.5182958,
+    "ast_hash": "b6ebc109897ba1d302b1aff03090e787",
     "semantic_hash": ""
   }
 }

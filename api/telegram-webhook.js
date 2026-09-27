@@ -18,6 +18,12 @@
 
 import { Resvg } from '@resvg/resvg-js';
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const require = createRequire(import.meta.url);
 let embeddedRoster = [];
@@ -28,6 +34,70 @@ try {
 }
 
 let runtimeSheetsWebhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL || '';
+
+// In-memory + /tmp persistence for live student attendance updates (keys: phone, its, name, studentId, chatId)
+const latestAttendanceMap = new Map();
+const TMP_ATTENDANCE_PATH = path.join('/tmp', 'latest_attendance.json');
+
+function saveAttendanceRecord(key, record) {
+  if (!key) return;
+  latestAttendanceMap.set(key, record);
+  try {
+    let diskData = {};
+    if (fs.existsSync(TMP_ATTENDANCE_PATH)) {
+      diskData = JSON.parse(fs.readFileSync(TMP_ATTENDANCE_PATH, 'utf8') || '{}');
+    }
+    diskData[key] = record;
+    fs.writeFileSync(TMP_ATTENDANCE_PATH, JSON.stringify(diskData));
+  } catch (_) {}
+}
+
+function getStoredAttendanceRecord(key) {
+  if (!key) return null;
+  if (latestAttendanceMap.has(key)) {
+    return latestAttendanceMap.get(key);
+  }
+  try {
+    if (fs.existsSync(TMP_ATTENDANCE_PATH)) {
+      const diskData = JSON.parse(fs.readFileSync(TMP_ATTENDANCE_PATH, 'utf8') || '{}');
+      if (diskData[key]) {
+        latestAttendanceMap.set(key, diskData[key]);
+        return diskData[key];
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+function findStudentAttendance(student, chatId) {
+  const cId = chatId ? String(chatId) : '';
+  const phone = cleanPhone(student?.phone || '');
+  const its = String(student?.its || '').trim();
+  const name = String(student?.name || '').trim().toLowerCase();
+  const sId = String(student?.student_id || student?.id || '').trim();
+
+  return (
+    getStoredAttendanceRecord(`chatId:${cId}`) ||
+    getStoredAttendanceRecord(`its:${its}`) ||
+    getStoredAttendanceRecord(`phone:${phone}`) ||
+    getStoredAttendanceRecord(`id:${sId}`) ||
+    getStoredAttendanceRecord(`name:${name}`) ||
+    student?.latestAttendance ||
+    null
+  );
+}
+
+function getFontFiles() {
+  const candidates = [
+    path.join(__dirname, 'fonts', 'arial.ttf'),
+    path.join(process.cwd(), 'api', 'fonts', 'arial.ttf'),
+    path.join(__dirname, 'fonts', 'al-kanz.ttf'),
+    path.join(process.cwd(), 'api', 'fonts', 'al-kanz.ttf')
+  ];
+  return Array.from(new Set(candidates.filter(f => {
+    try { return fs.existsSync(f); } catch (_) { return false; }
+  })));
+}
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -189,14 +259,14 @@ function generateMarhalaResultSvg(data) {
   <circle cx="50" cy="1300" r="8" fill="#d4af37" />
   <circle cx="1030" cy="1300" r="8" fill="#d4af37" />
 
-  <text x="540" y="115" font-family="sans-serif" font-size="34" fill="#fae29c" text-anchor="middle" font-weight="bold" letter-spacing="2">
+  <text x="540" y="115" font-family="Al-Kanz, Arial, sans-serif" font-size="34" fill="#fae29c" text-anchor="middle" font-weight="bold" letter-spacing="2">
     بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
   </text>
 
-  <text x="540" y="170" font-family="sans-serif" font-size="28" fill="#ffffff" text-anchor="middle" font-weight="700" letter-spacing="3">
+  <text x="540" y="170" font-family="Arial, Al-Kanz, sans-serif" font-size="28" fill="#ffffff" text-anchor="middle" font-weight="700" letter-spacing="3">
     RAWDAT TAHFEEZ AL ATFAL
   </text>
-  <text x="540" y="205" font-family="sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="600" letter-spacing="5">
+  <text x="540" y="205" font-family="Arial, Al-Kanz, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="600" letter-spacing="5">
     DARA SA'ADATIL ABADIYAH • GALIAKOT SHARIF
   </text>
 
@@ -204,70 +274,81 @@ function generateMarhalaResultSvg(data) {
   <polygon points="540,227 548,235 540,243 532,235" fill="#fae29c" />
 
   <rect x="340" y="260" width="400" height="42" rx="21" fill="url(#goldGrad)" />
-  <text x="540" y="287" font-family="sans-serif" font-size="16" fill="#0a192f" text-anchor="middle" font-weight="800" letter-spacing="2">
+  <text x="540" y="287" font-family="Arial, Al-Kanz, sans-serif" font-size="16" fill="#0a192f" text-anchor="middle" font-weight="800" letter-spacing="2">
     WEEKLY MARHALA REPORT
   </text>
 
   <rect x="80" y="335" width="920" height="235" rx="24" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="2.5" />
   
-  <text x="540" y="380" font-family="sans-serif" font-size="16" fill="#93aed0" text-anchor="middle" font-weight="600" letter-spacing="3">
+  <text x="540" y="380" font-family="Arial, Al-Kanz, sans-serif" font-size="16" fill="#93aed0" text-anchor="middle" font-weight="600" letter-spacing="3">
     STUDENT PERFORMANCE SUMMARY
   </text>
 
-  <text x="540" y="450" font-family="sans-serif" font-size="46" fill="#fae29c" text-anchor="middle" font-weight="800" filter="url(#glow)">
+  <text x="540" y="450" font-family="Arial, Al-Kanz, sans-serif" font-size="46" fill="#fae29c" text-anchor="middle" font-weight="800" filter="url(#glow)">
     ${escapeXml(name)}
   </text>
 
   <rect x="270" y="490" width="540" height="44" rx="22" fill="#09182d" stroke="#335987" stroke-width="1.5" />
-  <text x="540" y="518" font-family="sans-serif" font-size="17" fill="#e2edfc" text-anchor="middle" font-weight="600">
+  <text x="540" y="518" font-family="Arial, Al-Kanz, sans-serif" font-size="17" fill="#e2edfc" text-anchor="middle" font-weight="600">
     📅 Week: ${escapeXml(dateRange)}
   </text>
 
   <rect x="80" y="605" width="440" height="235" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
   <circle cx="135" cy="660" r="26" fill="#10b981" fill-opacity="0.2" stroke="#10b981" stroke-width="2" />
-  <text x="135" y="667" font-family="sans-serif" font-size="20" fill="#10b981" text-anchor="middle">★</text>
-  <text x="180" y="665" font-family="sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">WEEKLY SCORE</text>
-  <text x="300" y="745" font-family="sans-serif" font-size="64" fill="#ffffff" font-weight="900" text-anchor="middle">${escapeXml(score)}</text>
-  <text x="300" y="785" font-family="sans-serif" font-size="16" fill="#10b981" font-weight="700" text-anchor="middle">✔ Complete Weekly Evaluation</text>
+  <text x="135" y="667" font-family="Arial, sans-serif" font-size="20" fill="#10b981" text-anchor="middle">★</text>
+  <text x="180" y="665" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">WEEKLY SCORE</text>
+  <text x="300" y="745" font-family="Arial, sans-serif" font-size="64" fill="#ffffff" font-weight="900" text-anchor="middle">${escapeXml(score)}</text>
+  <text x="300" y="785" font-family="Arial, sans-serif" font-size="16" fill="#10b981" font-weight="700" text-anchor="middle">✔ Complete Weekly Evaluation</text>
 
   <rect x="560" y="605" width="440" height="235" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
   <circle cx="615" cy="660" r="26" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6" stroke-width="2" />
-  <text x="615" y="667" font-family="sans-serif" font-size="19" fill="#3b82f6" text-anchor="middle">📖</text>
-  <text x="660" y="665" font-family="sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">TOTAL JADEED</text>
-  <text x="780" y="745" font-family="sans-serif" font-size="44" fill="#fae29c" font-weight="900" text-anchor="middle">${escapeXml(jadeed)}</text>
-  <text x="780" y="785" font-family="sans-serif" font-size="16" fill="#93aed0" font-weight="600" text-anchor="middle">New Memorization Progress</text>
+  <text x="615" y="667" font-family="Arial, sans-serif" font-size="19" fill="#3b82f6" text-anchor="middle">📖</text>
+  <text x="660" y="665" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">TOTAL JADEED</text>
+  <text x="780" y="745" font-family="Arial, Al-Kanz, sans-serif" font-size="44" fill="#fae29c" font-weight="900" text-anchor="middle">${escapeXml(jadeed)}</text>
+  <text x="780" y="785" font-family="Arial, sans-serif" font-size="16" fill="#93aed0" font-weight="600" text-anchor="middle">New Memorization Progress</text>
 
   <rect x="80" y="870" width="440" height="220" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
   <circle cx="135" cy="925" r="26" fill="#f59e0b" fill-opacity="0.2" stroke="#f59e0b" stroke-width="2" />
-  <text x="135" y="932" font-family="sans-serif" font-size="20" fill="#f59e0b" text-anchor="middle">👑</text>
-  <text x="180" y="930" font-family="sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">MARHALA RANK</text>
-  <text x="300" y="1010" font-family="sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(marhalaRank)}</text>
-  <text x="300" y="1048" font-family="sans-serif" font-size="15" fill="#f59e0b" font-weight="700" text-anchor="middle">🏅 Section Standing</text>
+  <text x="135" y="932" font-family="Arial, sans-serif" font-size="20" fill="#f59e0b" text-anchor="middle">👑</text>
+  <text x="180" y="930" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">MARHALA RANK</text>
+  <text x="300" y="1010" font-family="Arial, sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(marhalaRank)}</text>
+  <text x="300" y="1048" font-family="Arial, sans-serif" font-size="15" fill="#f59e0b" font-weight="700" text-anchor="middle">🏅 Section Standing</text>
 
   <rect x="560" y="870" width="440" height="220" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
   <circle cx="615" cy="925" r="26" fill="#8b5cf6" fill-opacity="0.2" stroke="#8b5cf6" stroke-width="2" />
-  <text x="615" y="932" font-family="sans-serif" font-size="20" fill="#8b5cf6" text-anchor="middle">🌟</text>
-  <text x="660" y="930" font-family="sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">OVERALL RANK</text>
-  <text x="780" y="1010" font-family="sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(overallRank)}</text>
-  <text x="780" y="1048" font-family="sans-serif" font-size="15" fill="#a78bfa" font-weight="700" text-anchor="middle">🏆 Academy Standing</text>
+  <text x="615" y="932" font-family="Arial, sans-serif" font-size="20" fill="#8b5cf6" text-anchor="middle">🌟</text>
+  <text x="660" y="930" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">OVERALL RANK</text>
+  <text x="780" y="1010" font-family="Arial, sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(overallRank)}</text>
+  <text x="780" y="1048" font-family="Arial, sans-serif" font-size="15" fill="#a78bfa" font-weight="700" text-anchor="middle">🏆 Academy Standing</text>
 
   <rect x="260" y="1120" width="560" height="44" rx="22" fill="#0d2847" stroke="#10b981" stroke-width="1.8" />
-  <text x="540" y="1148" font-family="sans-serif" font-size="16" fill="#34d399" text-anchor="middle" font-weight="700">
+  <text x="540" y="1148" font-family="Arial, sans-serif" font-size="16" fill="#34d399" text-anchor="middle" font-weight="700">
     ✔ Verified Official Record • Latest Academic Week
   </text>
 
   <line x1="80" y1="1195" x2="1000" y2="1195" stroke="url(#goldGrad)" stroke-width="1.5" stroke-opacity="0.5" />
   
   <rect x="160" y="1220" width="760" height="52" rx="26" fill="#132a48" stroke="url(#goldGrad)" stroke-width="2" />
-  <text x="540" y="1253" font-family="sans-serif" font-size="17" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="1">
+  <text x="540" y="1253" font-family="Arial, sans-serif" font-size="17" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="1">
     📞 HELPLINE: ${escapeXml(helpline)} • RAWDAT TAHFEEZ AL ATFAL
   </text>
 </svg>`;
 }
 
-// Convert SVG to PNG buffer
+// Convert SVG to PNG buffer with embedded fonts
 function renderSvgToPng(svg) {
-  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: 1080 } });
+  const fontFiles = getFontFiles();
+  const opts = {
+    fitTo: { mode: 'width', value: 1080 }
+  };
+  if (fontFiles.length > 0) {
+    opts.font = {
+      loadSystemFonts: false,
+      fontFiles: fontFiles,
+      defaultFontFamily: 'Arial'
+    };
+  }
+  const resvg = new Resvg(svg, opts);
   const pngData = resvg.render();
   return pngData.asPng();
 }
@@ -770,22 +851,45 @@ export default async function handler(req, res) {
         }
       }
 
-      if (chatIds.length === 0) {
-        return res.status(200).json({ success: true, delivered: 0, note: 'No linked subscribers found' });
-      }
-
       const studentDisplayName = targetName || student?.name || 'Student';
       let notificationMsg = '';
 
       if (type === 'attendance') {
-        const attStatus = details?.status || details?.attendanceStatus || 'Present';
+        const rawStatus = details?.status || details?.attendanceStatus || 'Present';
+        const attStatus = /absent/i.test(rawStatus)
+          ? 'Absent'
+          : (/leave|uzur/i.test(rawStatus) ? 'Excused (Leave)' : 'Present');
         const attDate = details?.date || new Date().toLocaleDateString('en-GB');
-        const statusEmoji = /present/i.test(attStatus) ? '✅' : (/absent/i.test(attStatus) ? '❌' : '⏰');
+        const statusEmoji = attStatus === 'Absent' ? '❌' : (attStatus === 'Present' ? '✅' : '📝');
+
+        const record = {
+          status: attStatus,
+          statusEmoji: statusEmoji,
+          date: attDate,
+          name: studentDisplayName,
+          phone: targetPhone,
+          its: targetIts,
+          studentId: String(studentId || ''),
+          updatedAt: Date.now()
+        };
+
+        if (targetPhone) saveAttendanceRecord(`phone:${targetPhone}`, record);
+        if (targetIts) saveAttendanceRecord(`its:${targetIts}`, record);
+        if (targetName) saveAttendanceRecord(`name:${targetName.toLowerCase()}`, record);
+        if (studentId) saveAttendanceRecord(`id:${String(studentId)}`, record);
+        for (const cId of chatIds) {
+          saveAttendanceRecord(`chatId:${String(cId)}`, record);
+        }
+
         notificationMsg = `📋 *Daily Attendance Update*\n` +
           `Student: *${sanitizeInput(studentDisplayName)}*\n` +
           `📅 Date: ${attDate}\n` +
           `Status: ${statusEmoji} ${attStatus}\n\n` +
           `Rawdat Tahfeez al Atfal`;
+      }
+
+      if (chatIds.length === 0) {
+        return res.status(200).json({ success: true, delivered: 0, note: 'Attendance recorded; no linked subscribers found' });
       } else if (type === 'leave') {
         const lvStatus = details?.status || 'Update';
         const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
@@ -926,11 +1030,16 @@ export default async function handler(req, res) {
     // ── Today Attendance Status Check ──
     if (rawText === '📋 Today Attendance' || (linkedStudent && rawText.toLowerCase().includes('attendance'))) {
       if (linkedStudent) {
+        const attRec = findStudentAttendance(linkedStudent, chatId);
+        const status = attRec?.status || linkedStudent?.latestAttendance?.status || 'Present';
+        const date = attRec?.date || linkedStudent?.latestAttendance?.date || new Date().toLocaleDateString('en-GB');
+        const statusEmoji = attRec?.statusEmoji || linkedStudent?.latestAttendance?.statusEmoji || (/absent/i.test(status) ? '❌' : (/present/i.test(status) ? '✅' : '📝'));
+
         await sendTelegramMessage(chatId,
           `📋 *Daily Attendance Update*\n` +
           `Student: *${sanitizeInput(linkedStudent.name)}*\n` +
-          `📅 Date: ${new Date().toLocaleDateString('en-GB')}\n` +
-          `Status: ✅ Present\n\n` +
+          `📅 Date: ${date}\n` +
+          `Status: ${statusEmoji} ${status}\n\n` +
           `Rawdat Tahfeez al Atfal`,
           { reply_markup: getLinkedKeyboard(linkedStudent.name) }
         );
