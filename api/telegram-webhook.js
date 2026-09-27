@@ -249,11 +249,6 @@ async function sendTelegramPhoto(chatId, pngBuffer, caption, extra = {}) {
     return await sendTelegramMessage(chatId, caption, extra);
   }
 }
-    body: form
-  });
-
-  return await res.json();
-}
 
 // Build formatted caption for result card
 function buildResultCaption(data) {
