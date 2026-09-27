@@ -185,39 +185,70 @@ function renderSvgToPng(svg) {
   return pngData.asPng();
 }
 
-// Send text message via Telegram API
+// Send text message via Telegram API (with plain-text retry fallback)
 async function sendTelegramMessage(chatId, text, extra = {}) {
-  const payload = {
-    chat_id: chatId,
-    text: text,
-    parse_mode: 'Markdown',
-    ...extra
-  };
+  try {
+    const payload = {
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'Markdown',
+      ...extra
+    };
 
-  const res = await fetch(`${TELEGRAM_API_BASE}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+    let res = await fetch(`${TELEGRAM_API_BASE}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-  return await res.json();
+    let resJson = await res.json();
+    if (!resJson.ok) {
+      console.warn('[Telegram sendMessage retry with plain text]:', resJson);
+      delete payload.parse_mode;
+      res = await fetch(`${TELEGRAM_API_BASE}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      resJson = await res.json();
+    }
+    return resJson;
+  } catch (err) {
+    console.error('sendTelegramMessage error:', err);
+    return { ok: false, error: err.message };
+  }
 }
 
 // Send photo (result card PNG) via Telegram API
 async function sendTelegramPhoto(chatId, pngBuffer, caption, extra = {}) {
-  const form = new FormData();
-  form.append('chat_id', String(chatId));
-  const blob = new Blob([pngBuffer], { type: 'image/png' });
-  form.append('photo', blob, 'Weekly_Result_Summary.png');
-  form.append('caption', caption);
-  form.append('parse_mode', 'Markdown');
+  try {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    const blob = new Blob([pngBuffer], { type: 'image/png' });
+    form.append('photo', blob, 'Weekly_Result_Summary.png');
+    form.append('caption', caption);
+    form.append('parse_mode', 'Markdown');
 
-  if (extra.reply_markup) {
-    form.append('reply_markup', JSON.stringify(extra.reply_markup));
+    if (extra.reply_markup) {
+      form.append('reply_markup', JSON.stringify(extra.reply_markup));
+    }
+
+    let res = await fetch(`${TELEGRAM_API_BASE}/sendPhoto`, {
+      method: 'POST',
+      body: form
+    });
+
+    let resJson = await res.json();
+    if (!resJson.ok) {
+      console.warn('[sendPhoto fallback to message]:', resJson);
+      return await sendTelegramMessage(chatId, caption, extra);
+    }
+    return resJson;
+  } catch (err) {
+    console.error('sendTelegramPhoto error:', err);
+    return await sendTelegramMessage(chatId, caption, extra);
   }
-
-  const res = await fetch(`${TELEGRAM_API_BASE}/sendPhoto`, {
-    method: 'POST',
+}
     body: form
   });
 
@@ -307,6 +338,23 @@ async function queryStudentFromSheets(sheetsWebhookUrl, queryParam) {
   return null;
 }
 
+async function parseBody(req) {
+  if (req.body) {
+    if (typeof req.body === 'string') {
+      try { return JSON.parse(req.body); } catch (_) { return {}; }
+    }
+    return req.body;
+  }
+  return new Promise((resolve) => {
+    let data = '';
+    req.on('data', (chunk) => { data += chunk; });
+    req.on('end', () => {
+      try { resolve(data ? JSON.parse(data) : {}); } catch (_) { resolve({}); }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
 export default async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -374,7 +422,8 @@ export default async function handler(req, res) {
 
   // 2. POST Requests
   if (req.method === 'POST') {
-    const body = req.body || {};
+    const body = await parseBody(req);
+    console.log('[Telegram Webhook Update]:', JSON.stringify(body));
 
     // ── Direct API Action: Set Webhook ──
     if (body.action === 'set_webhook' || query.action === 'set_webhook') {
@@ -408,14 +457,19 @@ export default async function handler(req, res) {
     }
 
     // ── Telegram Update Handling (Webhook from Telegram) ──
-    const message = body.message;
+    // Handle standard message, edited message, or callback query
+    const message = body.message || body.edited_message || (body.callback_query && body.callback_query.message);
     if (!message) {
       return res.status(200).json({ ok: true, note: 'No message in update' });
     }
 
-    const chatId = message.chat.id;
-    const userFirstName = message.from?.first_name || '';
-    const rawText = (message.text || '').trim();
+    const chatId = message?.chat?.id || body.callback_query?.from?.id;
+    if (!chatId) {
+      return res.status(200).json({ ok: true, note: 'No chatId found' });
+    }
+
+    const userFirstName = message.from?.first_name || body.callback_query?.from?.first_name || '';
+    const rawText = (message.text || body.callback_query?.data || '').trim();
 
     // Case 1: Parent tapped "📱 Check My Child Result" and shared phone contact
     if (message.contact && message.contact.phone_number) {
