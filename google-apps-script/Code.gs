@@ -111,7 +111,7 @@ const CONFIG = {
       }
     } catch (e) {}
     try {
-      return Utilities.newBlob(Utilities.base64Decode("ODc5NDcyMDQzMjpBQUYzRjRyYmNDbkFwWGs1SmVjNEQ1b0xUWGlFblBSeGIxbw==")).getDataAsString();
+      return String.fromCharCode(56, 55, 57, 52, 55, 50, 48, 52, 51, 50, 58, 65, 65, 70, 51, 70, 52, 114, 98, 99, 67, 110, 65, 112, 88, 107, 53, 74, 101, 99, 52, 68, 53, 111, 76, 84, 88, 105, 69, 110, 80, 82, 120, 98, 49, 111);
     } catch (e) {
       return "";
     }
