@@ -369,7 +369,7 @@ function generateMarhalaResultSvg(data) {
 
   let dateRange = 'Current Academic Week';
   if (fromDate && tillDate && fromDate !== '—' && tillDate !== '—') {
-    dateRange = `${fromDate} ➔ ${tillDate}`;
+    dateRange = `${fromDate} to ${tillDate}`;
   } else if (tillDate && tillDate !== '—') {
     dateRange = tillDate;
   }
@@ -390,8 +390,8 @@ function generateMarhalaResultSvg(data) {
     </linearGradient>
 
     <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#142c4c" stop-opacity="0.9" />
-      <stop offset="100%" stop-color="#0d1e35" stop-opacity="0.95" />
+      <stop offset="0%" stop-color="#142c4c" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#0d1e35" stop-opacity="0.98" />
     </linearGradient>
 
     <linearGradient id="metricGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -405,87 +405,101 @@ function generateMarhalaResultSvg(data) {
     </filter>
   </defs>
 
+  <!-- Background -->
   <rect width="1080" height="1350" fill="url(#bgGrad)" />
   <rect x="30" y="30" width="1020" height="1290" rx="28" fill="none" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.85" />
   <rect x="42" y="42" width="996" height="1266" rx="22" fill="none" stroke="#d4af37" stroke-width="1.5" stroke-opacity="0.4" />
 
+  <!-- Corner Ornaments -->
   <circle cx="50" cy="50" r="8" fill="#d4af37" />
   <circle cx="1030" cy="50" r="8" fill="#d4af37" />
   <circle cx="50" cy="1300" r="8" fill="#d4af37" />
   <circle cx="1030" cy="1300" r="8" fill="#d4af37" />
 
-  <text x="540" y="115" font-family="Al-Kanz, Arial, sans-serif" font-size="34" fill="#fae29c" text-anchor="middle" font-weight="bold" letter-spacing="2">
-    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-  </text>
-
-  <text x="540" y="170" font-family="Arial, Al-Kanz, sans-serif" font-size="28" fill="#ffffff" text-anchor="middle" font-weight="700" letter-spacing="3">
+  <!-- Header: RAWDAT TAHFEEZ AL ATFAL (Prominent & Larger) -->
+  <text x="540" y="132" font-family="Arial, Al-Kanz, sans-serif" font-size="38" fill="#ffffff" text-anchor="middle" font-weight="900" letter-spacing="4" filter="url(#glow)">
     RAWDAT TAHFEEZ AL ATFAL
   </text>
-  <text x="540" y="205" font-family="Arial, Al-Kanz, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="600" letter-spacing="5">
-    DARA SA'ADATIL ABADIYAH • GALIAKOT SHARIF
-  </text>
 
-  <line x1="240" y1="235" x2="840" y2="235" stroke="url(#goldGrad)" stroke-width="2" />
-  <polygon points="540,227 548,235 540,243 532,235" fill="#fae29c" />
+  <line x1="260" y1="162" x2="820" y2="162" stroke="url(#goldGrad)" stroke-width="2" />
+  <polygon points="540,154 548,162 540,170 532,162" fill="#fae29c" />
 
-  <rect x="340" y="260" width="400" height="42" rx="21" fill="url(#goldGrad)" />
-  <text x="540" y="287" font-family="Arial, Al-Kanz, sans-serif" font-size="16" fill="#0a192f" text-anchor="middle" font-weight="800" letter-spacing="2">
+  <!-- Sub-header Badge: WEEKLY MARHALA REPORT -->
+  <rect x="340" y="188" width="400" height="42" rx="21" fill="url(#goldGrad)" />
+  <text x="540" y="215" font-family="Arial, Al-Kanz, sans-serif" font-size="16" fill="#0a192f" text-anchor="middle" font-weight="800" letter-spacing="2">
     WEEKLY MARHALA REPORT
   </text>
 
-  <rect x="80" y="335" width="920" height="235" rx="24" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="2.5" />
+  <!-- Student Banner Card -->
+  <rect x="80" y="260" width="920" height="235" rx="24" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="2.5" />
   
-  <text x="540" y="380" font-family="Arial, Al-Kanz, sans-serif" font-size="16" fill="#93aed0" text-anchor="middle" font-weight="600" letter-spacing="3">
+  <text x="540" y="305" font-family="Arial, Al-Kanz, sans-serif" font-size="16" fill="#93aed0" text-anchor="middle" font-weight="600" letter-spacing="3">
     STUDENT PERFORMANCE SUMMARY
   </text>
 
-  <text x="540" y="450" font-family="Arial, Al-Kanz, sans-serif" font-size="46" fill="#fae29c" text-anchor="middle" font-weight="800" filter="url(#glow)">
+  <text x="540" y="375" font-family="Arial, Al-Kanz, sans-serif" font-size="46" fill="#fae29c" text-anchor="middle" font-weight="800" filter="url(#glow)">
     ${escapeXml(name)}
   </text>
 
-  <rect x="270" y="490" width="540" height="44" rx="22" fill="#09182d" stroke="#335987" stroke-width="1.5" />
-  <text x="540" y="518" font-family="Arial, Al-Kanz, sans-serif" font-size="17" fill="#e2edfc" text-anchor="middle" font-weight="600">
-    📅 Week: ${escapeXml(dateRange)}
+  <rect x="270" y="415" width="540" height="44" rx="22" fill="#09182d" stroke="#335987" stroke-width="1.5" />
+  <text x="540" y="443" font-family="Arial, Al-Kanz, sans-serif" font-size="17" fill="#e2edfc" text-anchor="middle" font-weight="600">
+    WEEK: ${escapeXml(dateRange.toUpperCase())}
   </text>
 
-  <rect x="80" y="605" width="440" height="235" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
-  <circle cx="135" cy="660" r="26" fill="#10b981" fill-opacity="0.2" stroke="#10b981" stroke-width="2" />
-  <text x="135" y="667" font-family="Arial, sans-serif" font-size="20" fill="#10b981" text-anchor="middle">★</text>
-  <text x="180" y="665" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">WEEKLY SCORE</text>
-  <text x="300" y="745" font-family="Arial, sans-serif" font-size="64" fill="#ffffff" font-weight="900" text-anchor="middle">${escapeXml(score)}</text>
-  <text x="300" y="785" font-family="Arial, sans-serif" font-size="16" fill="#10b981" font-weight="700" text-anchor="middle">✔ Complete Weekly Evaluation</text>
+  <!-- Metric Card 1: WEEKLY SCORE -->
+  <rect x="80" y="530" width="440" height="260" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
+  <circle cx="135" cy="585" r="26" fill="#10b981" fill-opacity="0.2" stroke="#10b981" stroke-width="2" />
+  <!-- Vector Star -->
+  <path d="M135 572 L138.8 583.5 L150.8 584.5 L141.6 592.8 L144.3 604.5 L135 598.5 L125.7 604.5 L128.4 592.8 L119.2 584.5 L131.2 583.5 Z" fill="#10b981" />
+  <text x="180" y="590" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">WEEKLY SCORE</text>
+  <text x="300" y="680" font-family="Arial, sans-serif" font-size="64" fill="#ffffff" font-weight="900" text-anchor="middle">${escapeXml(score)}</text>
+  <text x="300" y="735" font-family="Arial, sans-serif" font-size="16" fill="#10b981" font-weight="700" text-anchor="middle">Evaluation Score / 100</text>
 
-  <rect x="560" y="605" width="440" height="235" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
-  <circle cx="615" cy="660" r="26" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6" stroke-width="2" />
-  <text x="615" y="667" font-family="Arial, sans-serif" font-size="19" fill="#3b82f6" text-anchor="middle">📖</text>
-  <text x="660" y="665" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">TOTAL JADEED</text>
-  <text x="780" y="745" font-family="Arial, Al-Kanz, sans-serif" font-size="44" fill="#fae29c" font-weight="900" text-anchor="middle">${escapeXml(jadeed)}</text>
-  <text x="780" y="785" font-family="Arial, sans-serif" font-size="16" fill="#93aed0" font-weight="600" text-anchor="middle">New Memorization Progress</text>
+  <!-- Metric Card 2: TOTAL JADEED -->
+  <rect x="560" y="530" width="440" height="260" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
+  <circle cx="615" cy="585" r="26" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6" stroke-width="2" />
+  <!-- Vector Book/Quran -->
+  <path d="M602 575 C608 572 614 575 615 578 C616 575 622 572 628 575 L628 598 C622 595 616 598 615 600 C614 598 608 595 602 598 Z" fill="#3b82f6" />
+  <line x1="615" y1="578" x2="615" y2="600" stroke="#1e3a8a" stroke-width="1.8" />
+  <text x="660" y="590" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">TOTAL JADEED</text>
+  <text x="780" y="680" font-family="Arial, Al-Kanz, sans-serif" font-size="44" fill="#fae29c" font-weight="900" text-anchor="middle">${escapeXml(jadeed)}</text>
+  <text x="780" y="735" font-family="Arial, sans-serif" font-size="16" fill="#93aed0" font-weight="600" text-anchor="middle">New Memorization Progress</text>
 
-  <rect x="80" y="870" width="440" height="220" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
-  <circle cx="135" cy="925" r="26" fill="#f59e0b" fill-opacity="0.2" stroke="#f59e0b" stroke-width="2" />
-  <text x="135" y="932" font-family="Arial, sans-serif" font-size="20" fill="#f59e0b" text-anchor="middle">👑</text>
-  <text x="180" y="930" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">MARHALA RANK</text>
-  <text x="300" y="1010" font-family="Arial, sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(marhalaRank)}</text>
-  <text x="300" y="1048" font-family="Arial, sans-serif" font-size="15" fill="#f59e0b" font-weight="700" text-anchor="middle">🏅 Section Standing</text>
+  <!-- Metric Card 3: MARHALA RANK -->
+  <rect x="80" y="825" width="440" height="260" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
+  <circle cx="135" cy="880" r="26" fill="#f59e0b" fill-opacity="0.2" stroke="#f59e0b" stroke-width="2" />
+  <!-- Vector Crown -->
+  <path d="M122 893 L124 873 L129.5 882 L135 871 L140.5 882 L146 873 L148 893 Z" fill="#f59e0b" />
+  <rect x="122" y="890" width="26" height="3" rx="1.5" fill="#f59e0b" />
+  <circle cx="124" cy="872" r="1.5" fill="#fae29c" />
+  <circle cx="135" cy="870" r="1.8" fill="#fae29c" />
+  <circle cx="146" cy="872" r="1.5" fill="#fae29c" />
+  <text x="180" y="885" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">MARHALA RANK</text>
+  <text x="300" y="975" font-family="Arial, sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(marhalaRank)}</text>
+  <text x="300" y="1030" font-family="Arial, sans-serif" font-size="15" fill="#f59e0b" font-weight="700" text-anchor="middle">Section Standing</text>
 
-  <rect x="560" y="870" width="440" height="220" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
-  <circle cx="615" cy="925" r="26" fill="#8b5cf6" fill-opacity="0.2" stroke="#8b5cf6" stroke-width="2" />
-  <text x="615" y="932" font-family="Arial, sans-serif" font-size="20" fill="#8b5cf6" text-anchor="middle">🌟</text>
-  <text x="660" y="930" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">OVERALL RANK</text>
-  <text x="780" y="1010" font-family="Arial, sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(overallRank)}</text>
-  <text x="780" y="1048" font-family="Arial, sans-serif" font-size="15" fill="#a78bfa" font-weight="700" text-anchor="middle">🏆 Academy Standing</text>
+  <!-- Metric Card 4: OVERALL RANK -->
+  <rect x="560" y="825" width="440" height="260" rx="20" fill="url(#metricGrad)" stroke="#224773" stroke-width="2" />
+  <circle cx="615" cy="880" r="26" fill="#8b5cf6" fill-opacity="0.2" stroke="#8b5cf6" stroke-width="2" />
+  <!-- Vector Trophy / Cup -->
+  <path d="M606 870 L624 870 L621 886 C619 893 611 893 609 886 Z" fill="#a78bfa" />
+  <path d="M604 872 C600 872 598 878 604 881 C605 881.5 606 882 607 882" stroke="#a78bfa" stroke-width="2" fill="none" />
+  <path d="M626 872 C630 872 632 878 626 881 C625 881.5 624 882 623 882" stroke="#a78bfa" stroke-width="2" fill="none" />
+  <rect x="613" y="890" width="4" height="6" fill="#8b5cf6" />
+  <rect x="609" y="896" width="12" height="4" rx="2" fill="#8b5cf6" />
+  <text x="660" y="885" font-family="Arial, sans-serif" font-size="18" fill="#93aed0" font-weight="700" letter-spacing="1">OVERALL RANK</text>
+  <text x="780" y="975" font-family="Arial, sans-serif" font-size="56" fill="#fae29c" font-weight="900" text-anchor="middle">#${escapeXml(overallRank)}</text>
+  <text x="780" y="1030" font-family="Arial, sans-serif" font-size="15" fill="#a78bfa" font-weight="700" text-anchor="middle">Academy Standing</text>
 
-  <rect x="260" y="1120" width="560" height="44" rx="22" fill="#0d2847" stroke="#10b981" stroke-width="1.8" />
-  <text x="540" y="1148" font-family="Arial, sans-serif" font-size="16" fill="#34d399" text-anchor="middle" font-weight="700">
-    ✔ Verified Official Record • Latest Academic Week
-  </text>
-
-  <line x1="80" y1="1195" x2="1000" y2="1195" stroke="url(#goldGrad)" stroke-width="1.5" stroke-opacity="0.5" />
+  <!-- Bottom Divider Line -->
+  <line x1="80" y1="1135" x2="1000" y2="1135" stroke="url(#goldGrad)" stroke-width="1.5" stroke-opacity="0.5" />
   
-  <rect x="160" y="1220" width="760" height="52" rx="26" fill="#132a48" stroke="url(#goldGrad)" stroke-width="2" />
-  <text x="540" y="1253" font-family="Arial, sans-serif" font-size="17" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="1">
-    📞 HELPLINE: ${escapeXml(helpline)} • RAWDAT TAHFEEZ AL ATFAL
+  <!-- Helpline Banner -->
+  <rect x="160" y="1175" width="760" height="54" rx="27" fill="#132a48" stroke="url(#goldGrad)" stroke-width="2" />
+  <!-- Vector Phone Icon in Helpline -->
+  <path d="M255 1195 C253 1195 250 1197 250 1200 C250 1209 257 1216 266 1216 C269 1216 271 1213 271 1211 L268 1205 C267 1204 265 1203 264 1204 L262 1206 C259 1204 257 1202 255 1199 L257 1197 C258 1196 257 1194 256 1193 Z" fill="#fae29c" />
+  <text x="548" y="1209" font-family="Arial, sans-serif" font-size="17" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="1">
+    HELPLINE: ${escapeXml(helpline)} • RAWDAT TAHFEEZ AL ATFAL
   </text>
 </svg>`;
 }
@@ -584,8 +598,7 @@ function buildResultCaption(data) {
   const oRank = data.overallRank || '—';
   const dateStr = (fromDate && tillDate && fromDate !== '—') ? `${fromDate} to ${tillDate}` : (tillDate || 'Latest Academic Week');
 
-  return `*RAWDAT TAHFEEZ AL ATFAL - WEEKLY RESULT SUMMARY*\n` +
-    `_Dara Sa'adatil Abadiyah, Galiakot Sharif_\n\n` +
+  return `*RAWDAT TAHFEEZ AL ATFAL - WEEKLY RESULT SUMMARY*\n\n` +
     `Student: *${name}*\n` +
     `📅 Period: ${dateStr}\n\n` +
     `📊 *Weekly Score:* ${score} / 100\n` +
