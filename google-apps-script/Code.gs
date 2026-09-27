@@ -123,10 +123,11 @@ function testSetup() {
     const ss = resolveSpreadsheet("atfal");
     Logger.log("✅ Connected to Spreadsheet: '" + ss.getName() + "'");
     
-    // 1. Setup 'parents email' tab
+    // 1. Setup 'parents email' tab and guarantee phone number column exists
     const parentsSheet = getOrCreateParentsEmailSheet(ss);
+    addPhoneNumberColumn(ss);
     setupParentsEmailValidationAndFormatting(parentsSheet);
-    Logger.log("✅ Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' is ready with Yes/No validation & conditional formatting.");
+    Logger.log("✅ Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' is ready with Phone Number column & Yes/No validation.");
 
     // 2. Setup ALL 8 Marhala tabs
     for (let i = 0; i < CONFIG.ALL_MARHALAS.length; i++) {
@@ -349,6 +350,13 @@ function doPost(e) {
       return jsonResponse(searchResult, 200);
     }
 
+    // Ensure / Add phone number column to parents email sheet
+    if (payload.action === "add_phone_column" || payload.action === "ensure_phone_column") {
+      const ss = resolveSpreadsheet(payload.category || "atfal");
+      const addRes = addPhoneNumberColumn(ss);
+      return jsonResponse({ success: true, message: addRes }, 200);
+    }
+
     // 3-Point Security Verification for Telegram Bot (Profile Contact + Full Name + ITS)
     if (payload.action === "verify_three_point") {
       const vResult = processVerifyThreePoint(payload);
@@ -406,9 +414,12 @@ function doPost(e) {
 
 function doGet(e) {
   let spreadsheetName = "Unknown";
+  let phoneEnsured = false;
   try {
     const ss = resolveSpreadsheet("atfal");
     spreadsheetName = ss.getName();
+    addPhoneNumberColumn(ss);
+    phoneEnsured = true;
   } catch (_e) {}
 
   return jsonResponse({
@@ -417,8 +428,9 @@ function doGet(e) {
     spreadsheet: spreadsheetName,
     marhalas: CONFIG.ALL_MARHALAS,
     parentsTab: CONFIG.PARENTS_EMAIL_SHEET_NAME,
+    phoneNumberColumnEnsured: phoneEnsured,
     timestamp: new Date().toISOString(),
-    message: "Webhook is live and accepting POST requests."
+    message: "Webhook is live and phone number column has been verified in Google Sheet."
   }, 200);
 }
 
@@ -867,8 +879,95 @@ function getOrCreateParentsEmailSheet(spreadsheet) {
     
     setupParentsEmailValidationAndFormatting(sheet);
     sheet.autoResizeColumns(1, PARENTS_EMAIL_HEADERS.length);
+  } else {
+    // If sheet already exists, guarantee 'phone number' column is present right after 'email'
+    addPhoneNumberColumn(spreadsheet);
   }
   return sheet;
+}
+
+/**
+ * Automatically ensures the 'phone number' column exists right after 'email' (Column 2)
+ * in the 'parents email' sheet, shifting existing columns right if needed.
+ */
+function addPhoneNumberColumn(spreadsheet) {
+  try {
+    const ss = spreadsheet || resolveSpreadsheet("atfal");
+    const sheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
+    if (!sheet) {
+      Logger.log("Creating parents email sheet...");
+      return getOrCreateParentsEmailSheet(ss);
+    }
+
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+    const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [];
+
+    let phoneColIndex = -1;
+    let emailColIndex = -1;
+
+    for (let i = 0; i < headerRow.length; i++) {
+      const h = String(headerRow[i] || '').trim().toLowerCase();
+      if (h.includes('phone') || h.includes('whatsapp') || h.includes('mobile')) {
+        phoneColIndex = i + 1;
+      }
+      if (h.includes('email')) {
+        emailColIndex = i + 1;
+      }
+    }
+
+    // If phone column already exists, ensure header text is set
+    if (phoneColIndex > 0) {
+      Logger.log("✅ 'phone number' column already exists at column " + phoneColIndex);
+      sheet.getRange(1, phoneColIndex).setValue("phone number");
+    } else {
+      // If phone column does NOT exist, insert right after email (or at col 2)
+      const insertAfterCol = emailColIndex > 0 ? emailColIndex : 1;
+      Logger.log("Inserting new 'phone number' column after column " + insertAfterCol);
+      sheet.insertColumnAfter(insertAfterCol);
+      phoneColIndex = insertAfterCol + 1;
+      
+      const phoneHeaderCell = sheet.getRange(1, phoneColIndex);
+      phoneHeaderCell.setValue("phone number");
+      phoneHeaderCell.setBackground("#2c3e50");
+      phoneHeaderCell.setFontColor("#ffffff");
+      phoneHeaderCell.setFontWeight("bold");
+      phoneHeaderCell.setFontFamily("Segoe UI");
+      phoneHeaderCell.setHorizontalAlignment("center");
+      Logger.log("✅ Successfully inserted 'phone number' column at column " + phoneColIndex);
+    }
+
+    // Also ensure 'telegram chat id' exists at the end
+    let telegramColIndex = -1;
+    const updatedHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+    for (let i = 0; i < updatedHeaders.length; i++) {
+      const h = String(updatedHeaders[i] || '').trim().toLowerCase();
+      if (h.includes('telegram')) {
+        telegramColIndex = i + 1;
+      }
+    }
+
+    if (telegramColIndex === -1) {
+      const newCol = sheet.getLastColumn() + 1;
+      const hCell = sheet.getRange(1, newCol);
+      hCell.setValue("telegram chat id");
+      hCell.setBackground("#0088cc");
+      hCell.setFontColor("#ffffff");
+      hCell.setFontWeight("bold");
+      hCell.setFontFamily("Segoe UI");
+      hCell.setHorizontalAlignment("center");
+    }
+
+    // Also ensure Telegram_Subscribers sheet exists
+    ensureTelegramSubscribersSheet(ss);
+
+    // Re-apply validation & conditional formatting
+    setupParentsEmailValidationAndFormatting(sheet);
+    sheet.autoResizeColumns(1, sheet.getLastColumn());
+    return "Successfully added 'phone number' column to parents email sheet!";
+  } catch (err) {
+    Logger.log("addPhoneNumberColumn error: " + err.toString());
+    return "Error adding phone number column: " + err.toString();
+  }
 }
 
 function buildParentsEmailRowValues(student, result) {
@@ -1060,8 +1159,15 @@ function setupParentsEmailValidationAndFormatting(sheet) {
  */
 function onOpen() {
   try {
+    // Automatically verify/add phone number column on open
+    try {
+      addPhoneNumberColumn();
+    } catch (_) {}
+
     SpreadsheetApp.getUi()
       .createMenu("📱 Mauze Telegram & WhatsApp Bot")
+      .addItem("📞 ➕ Add / Fix Phone Number Column in Parents Sheet", "addPhoneNumberColumn")
+      .addSeparator()
       .addItem("✈️ Send All Result Images via Telegram Bot (@Mh_Design_bot)", "sendAllParentsTelegramResultImages")
       .addItem("👤 Send Telegram Result Image for Selected Row", "sendSelectedStudentTelegramResultImage")
       .addItem("⚙️ Setup / Register Telegram Webhook", "setupTelegramWebhookFromSheet")
