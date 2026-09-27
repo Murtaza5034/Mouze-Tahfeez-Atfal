@@ -1791,6 +1791,44 @@ const broadcastNotification = async (
     }
   }
 
+  // Auto-send Telegram Bot notifications to verified & linked parents
+  try {
+    const isAttendance = /attendance/i.test(title) || /attendance/i.test(body);
+    const isLeave = /leave/i.test(title) || /leave/i.test(body);
+    const isJadwal = /jadwal|timetable|schedule/i.test(title) || /jadwal|timetable|schedule/i.test(body);
+    const isResult = /result|marhala/i.test(title) || /result|marhala/i.test(body);
+
+    let updateType = 'general';
+    if (isAttendance) updateType = 'attendance';
+    else if (isLeave) updateType = 'leave';
+    else if (isJadwal) updateType = 'jadwal';
+    else if (isResult) updateType = 'result';
+
+    const webhookEndpoint = '/api/telegram-webhook';
+    fetch(webhookEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'notify_student_update',
+        type: updateType,
+        studentId: targetUser || extraData?.student_id || extraData?.studentId || null,
+        phone: extraData?.phone || extraData?.whatsapp_number || null,
+        its: extraData?.its || extraData?.student_id || null,
+        name: extraData?.childName || extraData?.student_name || extraData?.name || null,
+        details: {
+          title,
+          body,
+          status: extraData?.status || (/present/i.test(body) ? 'Present' : (/absent/i.test(body) ? 'Absent' : (/approved/i.test(body) ? 'Approved' : (/rejected/i.test(body) ? 'Rejected' : 'Update')))),
+          date: extraData?.date || new Date().toLocaleDateString('en-GB'),
+          note: extraData?.note || body,
+          comment: extraData?.admin_comment || extraData?.comment || '',
+          fromDate: extraData?.from_date || extraData?.fromDate || '',
+          toDate: extraData?.to_date || extraData?.toDate || ''
+        }
+      })
+    }).catch((tgErr) => console.warn('[Telegram Dispatch Notice]:', tgErr.message));
+  } catch (_) {}
+
   return { inboxError, fcmError, fcmData };
 };
 

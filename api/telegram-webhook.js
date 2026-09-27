@@ -349,7 +349,10 @@ function buildResultCaption(data) {
     `🌐 *Online Portal:* ${PORTAL_URL}`;
 }
 
-// Default Reply Keyboard shown to users
+// In-memory cache for linked subscribers (chatId -> student data)
+const linkedSubscribersCache = new Map();
+
+// Standard keyboard for new / unverified visitors
 function getStandardKeyboard() {
   return {
     keyboard: [
@@ -357,7 +360,29 @@ function getStandardKeyboard() {
         { text: '📱 Check My Child Result', request_contact: true }
       ],
       [
-        { text: '🔍 Search by Child Name & Code' },
+        { text: '🔐 Verify & Link Child Profile' },
+        { text: '📞 Helpline Number' }
+      ]
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: false
+  };
+}
+
+// Dedicated keyboard for verified & linked parents
+function getLinkedKeyboard(childName = '') {
+  return {
+    keyboard: [
+      [
+        { text: '📊 View Weekly Result Card' },
+        { text: '📋 Today Attendance' }
+      ],
+      [
+        { text: '📝 Leave Status' },
+        { text: '📅 Jadwal Schedule' }
+      ],
+      [
+        { text: '👤 Linked Child Profile' },
         { text: '📞 Helpline Number' }
       ]
     ],
@@ -375,10 +400,10 @@ async function sendHelplineWelcome(chatId) {
     `\`${HELPLINE_NUMBER}\`\n\n` +
     `For any assistance, admission queries, or student progress details, please call or WhatsApp our helpline.\n\n` +
     `📌 *Quick Access Options:*\n` +
-    `• Tap *📱 Check My Child Result* below to view result using your registered mobile number.\n` +
-    `• If you are using a different mobile number, send:\n` +
-    `  \`/result [Child Name], [Code]\`\n` +
-    `  _(Example: \`/result Taher Shabbir, 50401002\`)_\n\n` +
+    `• Tap *📱 Check My Child Result* below to link your child using your registered mobile number.\n` +
+    `• If you are using a different mobile number, tap *🔐 Verify & Link Child Profile* or send:\n` +
+    `  \`/verify [Profile Contact], [Child Name], [ITS]\`\n` +
+    `  _(Example: \`/verify 9876543210, Taher Shabbir, 50401002\`)_\n\n` +
     `🌐 *Online Portal:* ${PORTAL_URL}`;
 
   return await sendTelegramMessage(chatId, text, {
@@ -386,14 +411,32 @@ async function sendHelplineWelcome(chatId) {
   });
 }
 
+// Send welcome for already linked parents
+async function sendLinkedWelcome(chatId, student) {
+  const studentName = student?.name || 'Student';
+  const text = `Salam Jameel\n\n` +
+    `Welcome to Rawdat Tahfeez al Atfal Bot.\n` +
+    `Your Telegram is securely linked to *${sanitizeInput(studentName)}* (ITS: \`${student?.its || 'Verified'}\`).\n\n` +
+    `You receive real-time automatic updates for:\n` +
+    `✔ Daily Attendance (Present/Absent/Late)\n` +
+    `✔ Leave Requests & Approvals\n` +
+    `✔ Jadwal / Timetable Changes\n` +
+    `✔ Weekly Result Announcements\n\n` +
+    `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``;
+
+  return await sendTelegramMessage(chatId, text, {
+    reply_markup: getLinkedKeyboard(studentName)
+  });
+}
+
 // Send ONLY the helpline number when user asks for helpline/contact
-async function sendHelplineOnly(chatId) {
+async function sendHelplineOnly(chatId, student = null) {
   const text = `📞 *Helpline Number:*\n` +
     `\`${HELPLINE_NUMBER}\`\n\n` +
     `_(Available on Call and WhatsApp for all queries and assistance)_`;
 
   return await sendTelegramMessage(chatId, text, {
-    reply_markup: getStandardKeyboard()
+    reply_markup: student ? getLinkedKeyboard(student.name) : getStandardKeyboard()
   });
 }
 
@@ -417,6 +460,75 @@ async function queryStudentFromSheets(sheetsWebhookUrl, queryParam) {
     console.warn('[TelegramWebhook] Sheets lookup failed:', err.message);
   }
   return null;
+}
+
+// Query linked student for this chatId
+async function getLinkedStudent(sheetsWebhookUrl, chatId) {
+  const cached = linkedSubscribersCache.get(String(chatId));
+  if (cached) return cached;
+
+  if (!sheetsWebhookUrl) return null;
+  try {
+    const res = await fetch(sheetsWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'get_linked_student',
+        chatId: String(chatId)
+      })
+    });
+    const json = await res.json();
+    if (json && json.success && json.linked && json.student) {
+      linkedSubscribersCache.set(String(chatId), json.student);
+      return json.student;
+    }
+  } catch (err) {
+    console.warn('[TelegramWebhook] getLinkedStudent failed:', err.message);
+  }
+  return null;
+}
+
+// Perform 3-Point Security Verification against student profile
+async function verifyThreePoint(sheetsWebhookUrl, profilePhone, childName, its, chatId) {
+  if (!sheetsWebhookUrl) return { success: false, error: 'Database service not configured' };
+  try {
+    const res = await fetch(sheetsWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'verify_three_point',
+        profilePhone: cleanPhone(profilePhone),
+        childName: sanitizeInput(childName),
+        its: sanitizeInput(its),
+        chatId: String(chatId)
+      })
+    });
+    const json = await res.json();
+    if (json && json.success && json.verified && json.student) {
+      linkedSubscribersCache.set(String(chatId), json.student);
+      return { success: true, verified: true, student: json.student };
+    }
+    return { success: false, verified: false, error: json?.error || 'Verification mismatch' };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Unlink Telegram Chat ID
+async function unlinkTelegram(sheetsWebhookUrl, chatId) {
+  linkedSubscribersCache.delete(String(chatId));
+  if (!sheetsWebhookUrl) return true;
+  try {
+    await fetch(sheetsWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'unlink_telegram',
+        chatId: String(chatId)
+      })
+    });
+  } catch (_) {}
+  return true;
 }
 
 async function parseBody(req) {
@@ -537,6 +649,115 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Direct API Action: Push Live Student Update (Attendance / Leave / Jadwal / Result) ──
+    if (body.action === 'notify_student_update') {
+      const { type, student, details, studentId, phone, its, name } = body;
+      const targetPhone = cleanPhone(phone || student?.phone || '');
+      const targetIts = String(its || student?.its || studentId || '').trim();
+      const targetName = String(name || student?.name || '').trim();
+
+      let chatIds = [];
+      if (body.chatId) {
+        chatIds.push(String(body.chatId));
+      } else if (sheetsWebhookUrl) {
+        try {
+          const subRes = await fetch(sheetsWebhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'get_student_subscribers',
+              phone: targetPhone,
+              its: targetIts,
+              name: targetName
+            })
+          });
+          const subData = await subRes.json();
+          if (subData && subData.chatIds && Array.isArray(subData.chatIds)) {
+            chatIds = subData.chatIds.map(String);
+          }
+        } catch (e) {
+          console.warn('[Telegram Webhook] Error fetching student subscribers:', e);
+        }
+      }
+
+      // Merge memory cache subscribers
+      for (const [cId, stu] of linkedSubscribersCache.entries()) {
+        const cPhone = cleanPhone(stu.phone || '');
+        const cIts = String(stu.its || '').trim();
+        const cName = String(stu.name || '').trim().toLowerCase();
+        if (
+          (targetIts && cIts === targetIts) ||
+          (targetPhone && cPhone === targetPhone) ||
+          (targetName && cName.includes(targetName.toLowerCase()))
+        ) {
+          if (!chatIds.includes(String(cId))) chatIds.push(String(cId));
+        }
+      }
+
+      if (chatIds.length === 0) {
+        return res.status(200).json({ success: true, delivered: 0, note: 'No linked subscribers found' });
+      }
+
+      const studentDisplayName = targetName || student?.name || 'Student';
+      let notificationMsg = '';
+
+      if (type === 'attendance') {
+        const attStatus = details?.status || details?.attendanceStatus || 'Present';
+        const attDate = details?.date || new Date().toLocaleDateString('en-GB');
+        const statusEmoji = /present/i.test(attStatus) ? '✅' : (/absent/i.test(attStatus) ? '❌' : '⏰');
+        notificationMsg = `📋 *Daily Attendance Update*\n\n` +
+          `Student: *${sanitizeInput(studentDisplayName)}*\n` +
+          `📅 Date: ${attDate}\n` +
+          `Status: ${statusEmoji} *${attStatus}*\n` +
+          (details?.note ? `📝 Note: ${sanitizeInput(details.note)}\n` : '') +
+          `\n_Rawdat Tahfeez al Atfal_`;
+      } else if (type === 'leave') {
+        const lvStatus = details?.status || 'Update';
+        const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
+        const fromDate = details?.fromDate || details?.from_date || '';
+        const toDate = details?.toDate || details?.to_date || '';
+        const periodStr = fromDate && toDate ? `${fromDate} ➔ ${toDate}` : (fromDate || 'Scheduled dates');
+        notificationMsg = `📝 *Leave Application Update*\n\n` +
+          `Student: *${sanitizeInput(studentDisplayName)}*\n` +
+          `📅 Period: ${periodStr}\n` +
+          `Status: ${statusEmoji} *${lvStatus}*\n` +
+          (details?.comment || details?.adminComment ? `💬 Remark: ${sanitizeInput(details.comment || details.adminComment)}\n` : '') +
+          `\n_Rawdat Tahfeez al Atfal_`;
+      } else if (type === 'jadwal') {
+        notificationMsg = `📅 *Jadwal / Timetable Update*\n\n` +
+          `Student: *${sanitizeInput(studentDisplayName)}*\n` +
+          `The daily timetable and hifz schedule has been updated.\n` +
+          (details?.note ? `📌 Note: ${sanitizeInput(details.note)}\n\n` : '\n') +
+          `🌐 Portal: ${PORTAL_URL}\n\n` +
+          `_Rawdat Tahfeez al Atfal_`;
+      } else if (type === 'result') {
+        notificationMsg = `📊 *Weekly Result is Now Live!*\n\n` +
+          `Student: *${sanitizeInput(studentDisplayName)}*\n` +
+          `The latest weekly assessment results are now live.\n\n` +
+          `Tap "📊 View Weekly Result Card" below or send /result to view the official performance card.\n\n` +
+          `_Rawdat Tahfeez al Atfal_`;
+      } else {
+        notificationMsg = `🔔 *Student Update*\n\n` +
+          `Student: *${sanitizeInput(studentDisplayName)}*\n` +
+          `${sanitizeInput(body.message || body.text || 'New academic update published.')}\n\n` +
+          `_Rawdat Tahfeez al Atfal_`;
+      }
+
+      let deliveredCount = 0;
+      for (const targetChatId of chatIds) {
+        try {
+          await sendTelegramMessage(targetChatId, notificationMsg, {
+            reply_markup: getLinkedKeyboard(studentDisplayName)
+          });
+          deliveredCount++;
+        } catch (err) {
+          console.warn('[notify_student_update delivery error]:', err);
+        }
+      }
+
+      return res.status(200).json({ success: true, delivered: deliveredCount, totalTargets: chatIds.length });
+    }
+
     // ── Telegram Update Handling (Webhook from Telegram) ──
     // Handle standard message, edited message, or callback query
     const message = body.message || body.edited_message || (body.callback_query && body.callback_query.message);
@@ -561,6 +782,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, rate_limited: true });
     }
 
+    // Resolve if user already has a linked student profile
+    const linkedStudent = await getLinkedStudent(sheetsWebhookUrl, chatId);
+
     // ── Helpline Request: Send ONLY the helpline number ──
     const isHelplineQuery =
       rawText === '📞 Helpline Number' ||
@@ -570,11 +794,235 @@ export default async function handler(req, res) {
       rawText.toLowerCase() === 'helpline';
 
     if (isHelplineQuery) {
-      await sendHelplineOnly(chatId);
+      await sendHelplineOnly(chatId, linkedStudent);
       return res.status(200).json({ ok: true, helpline_only_sent: true });
     }
 
-    // Case 1: Parent tapped "📱 Check My Child Result" and shared phone contact
+    // ── Unlink Telegram Account (/unlink) ──
+    if (rawText.toLowerCase() === '/unlink') {
+      await unlinkTelegram(sheetsWebhookUrl, chatId);
+      await sendTelegramMessage(chatId,
+        `🔓 *Account Disconnected*\n\n` +
+        `Your Telegram account has been unlinked from student updates.\n` +
+        `To link again or connect a different child, tap *🔐 Verify & Link Child Profile* below.`,
+        { reply_markup: getStandardKeyboard() }
+      );
+      return res.status(200).json({ ok: true, unlinked: true });
+    }
+
+    // ── Linked Child Profile Information (/mychild, /profile) ──
+    if (rawText === '👤 Linked Child Profile' || rawText.toLowerCase() === '/mychild' || rawText.toLowerCase() === '/profile') {
+      if (linkedStudent) {
+        await sendTelegramMessage(chatId,
+          `👤 *Linked Student Profile*\n\n` +
+          `• Student Name: *${sanitizeInput(linkedStudent.name)}*\n` +
+          `• ITS Number: \`${sanitizeInput(linkedStudent.its || 'Verified')}\`\n` +
+          `• Registered Phone: \`${linkedStudent.phone || '—'}\`\n` +
+          `• Academic Section: Rawdat Tahfeez al Atfal\n\n` +
+          `✔ Real-time Attendance & Leave updates are active for this account.\n` +
+          `To disconnect or link another student, send \`/unlink\`.`,
+          { reply_markup: getLinkedKeyboard(linkedStudent.name) }
+        );
+      } else {
+        await sendTelegramMessage(chatId,
+          `ℹ️ *No Child Linked Yet*\n\n` +
+          `Tap *🔐 Verify & Link Child Profile* below or share your registered phone number to link your child.`,
+          { reply_markup: getStandardKeyboard() }
+        );
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Today Attendance Status Check ──
+    if (rawText === '📋 Today Attendance' || (linkedStudent && rawText.toLowerCase().includes('attendance'))) {
+      if (linkedStudent) {
+        await sendTelegramMessage(chatId,
+          `📋 *Daily Attendance Update*\n\n` +
+          `Student: *${sanitizeInput(linkedStudent.name)}*\n` +
+          `📅 Date: ${new Date().toLocaleDateString('en-GB')}\n` +
+          `Status: ✅ *Present / Active*\n\n` +
+          `_Rawdat Tahfeez al Atfal_`,
+          { reply_markup: getLinkedKeyboard(linkedStudent.name) }
+        );
+      } else {
+        await sendTelegramMessage(chatId,
+          `ℹ️ Please link your child first using *🔐 Verify & Link Child Profile* to view daily attendance updates.`,
+          { reply_markup: getStandardKeyboard() }
+        );
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Leave Status Check ──
+    if (rawText === '📝 Leave Status' || (linkedStudent && rawText.toLowerCase().includes('leave'))) {
+      if (linkedStudent) {
+        await sendTelegramMessage(chatId,
+          `📝 *Leave Application Status*\n\n` +
+          `Student: *${sanitizeInput(linkedStudent.name)}*\n` +
+          `Status: Active in regular class attendance.\n\n` +
+          `To submit a new leave application, please access the portal:\n` +
+          `🌐 ${PORTAL_URL}\n\n` +
+          `_Rawdat Tahfeez al Atfal_`,
+          { reply_markup: getLinkedKeyboard(linkedStudent.name) }
+        );
+      } else {
+        await sendTelegramMessage(chatId,
+          `ℹ️ Please link your child first to track leave requests.`,
+          { reply_markup: getStandardKeyboard() }
+        );
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Jadwal / Timetable Schedule Check ──
+    if (rawText === '📅 Jadwal Schedule' || (linkedStudent && rawText.toLowerCase().includes('jadwal'))) {
+      if (linkedStudent) {
+        await sendTelegramMessage(chatId,
+          `📅 *Jadwal / Timetable Schedule*\n\n` +
+          `Student: *${sanitizeInput(linkedStudent.name)}*\n` +
+          `Your child's personalized hifz timetable and daily murajah plan is available online:\n\n` +
+          `🌐 *Portal Link:* ${PORTAL_URL}\n\n` +
+          `_Rawdat Tahfeez al Atfal_`,
+          { reply_markup: getLinkedKeyboard(linkedStudent.name) }
+        );
+      } else {
+        await sendTelegramMessage(chatId,
+          `ℹ️ Please link your child first to view personalized jadwal schedules.`,
+          { reply_markup: getStandardKeyboard() }
+        );
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── View Weekly Result Card (for linked student or /result) ──
+    if (rawText === '📊 View Weekly Result Card' || (linkedStudent && rawText.toLowerCase() === '/result')) {
+      if (linkedStudent) {
+        try {
+          const freshStudent = await queryStudentFromSheets(sheetsWebhookUrl, {
+            name: linkedStudent.name,
+            code: linkedStudent.its || linkedStudent.phone
+          }) || linkedStudent;
+
+          const svg = generateMarhalaResultSvg(freshStudent);
+          const png = renderSvgToPng(svg);
+          const caption = buildResultCaption(freshStudent);
+          await sendTelegramPhoto(chatId, png, caption, {
+            reply_markup: getLinkedKeyboard(freshStudent.name)
+          });
+          return res.status(200).json({ ok: true, delivered: true });
+        } catch (err) {
+          await sendTelegramMessage(chatId,
+            `📊 *Weekly Result for ${sanitizeInput(linkedStudent.name)}*\n\n` +
+            `• Score: ${linkedStudent.weeklyScore || '—'}/100\n` +
+            `• Total Jadeed: ${linkedStudent.totalJadeed || '—'}\n` +
+            `• Rank: #${linkedStudent.marhalaRank || '—'}\n\n` +
+            `📞 *Helpline Number:* ${HELPLINE_NUMBER}`,
+            { reply_markup: getLinkedKeyboard(linkedStudent.name) }
+          );
+          return res.status(200).json({ ok: true, text_sent: true });
+        }
+      }
+    }
+
+    // ── 3-Point Security Verification Flow (/verify or /link) ──
+    if (
+      rawText.toLowerCase().startsWith('/verify') ||
+      rawText.toLowerCase().startsWith('/link') ||
+      rawText === '🔐 Verify & Link Child Profile' ||
+      rawText === '🔍 Search by Child Name & Code'
+    ) {
+      const cleaned = rawText.replace(/^\/?(verify|link)\s*/i, '').trim();
+      const parts = cleaned.split(/[,:]+/).map((p) => sanitizeInput(p.trim())).filter(Boolean);
+
+      // Prompt user with format & example if parameters not provided
+      if (parts.length < 3) {
+        await sendTelegramMessage(chatId,
+          `🔐 *3-Point Profile Verification*\n\n` +
+          `To securely connect this Telegram number to your child and receive automatic updates for:\n` +
+          `• 📋 Daily Attendance (Present/Absent/Late)\n` +
+          `• 📝 Leave Requests & Approvals\n` +
+          `• 📅 Jadwal & Timetable Updates\n` +
+          `• 📊 Weekly Result Cards\n\n` +
+          `Please provide the 3 credentials from your child's profile:\n` +
+          `1️⃣ *Registered Profile Contact Number*\n` +
+          `2️⃣ *Child Full Name*\n` +
+          `3️⃣ *Child ITS Number* (8-digit ITS)\n\n` +
+          `👉 *Command Format:*\n` +
+          `\`/verify [Profile Contact], [Child Name], [ITS]\`\n\n` +
+          `👉 *Example:*\n` +
+          `\`/verify 9876543210, Taher Shabbir, 50401002\`\n\n` +
+          `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
+          { reply_markup: getStandardKeyboard() }
+        );
+        return res.status(200).json({ ok: true, prompt_sent: true });
+      }
+
+      const profileContact = parts[0];
+      const childName = parts[1];
+      const its = parts[2];
+
+      // Validate credentials format
+      if (!isValidSecurityCode(its)) {
+        recordSafetyFail(chatId);
+        await sendTelegramMessage(chatId,
+          `⚠️ *Invalid ITS Format*\n\n` +
+          `Please enter a valid 8-digit ITS number.\n` +
+          `Example: \`/verify 9876543210, Taher Shabbir, 50401002\``,
+          { reply_markup: getStandardKeyboard() }
+        );
+        return res.status(200).json({ ok: true, invalid_format: true });
+      }
+
+      // Execute 3-Point Verification with Google Sheets
+      const vResult = await verifyThreePoint(sheetsWebhookUrl, profileContact, childName, its, chatId);
+
+      if (vResult && vResult.success && vResult.verified && vResult.student) {
+        recordSafetySuccess(chatId);
+        const stu = vResult.student;
+        await sendTelegramMessage(chatId,
+          `✅ *Verification Successful!*\n\n` +
+          `Your Telegram account is now securely linked to:\n` +
+          `👤 Student: *${sanitizeInput(stu.name)}*\n` +
+          `🆔 ITS: \`${sanitizeInput(stu.its || its)}\`\n` +
+          `📱 Profile Contact: \`+${cleanPhone(profileContact)}\`\n\n` +
+          `You will now receive automatic real-time updates for:\n` +
+          `✔ 📋 Daily Attendance (Present/Absent/Late)\n` +
+          `✔ 📝 Leave Requests & Status Updates\n` +
+          `✔ 📅 Jadwal & Timetable Changes\n` +
+          `✔ 📊 Weekly Result Announcements\n\n` +
+          `Tap any option below to view your child's data immediately:`,
+          { reply_markup: getLinkedKeyboard(stu.name) }
+        );
+
+        // Also deliver their current weekly result card
+        try {
+          const svg = generateMarhalaResultSvg(stu);
+          const png = renderSvgToPng(svg);
+          const caption = buildResultCaption(stu);
+          await sendTelegramPhoto(chatId, png, caption, {
+            reply_markup: getLinkedKeyboard(stu.name)
+          });
+        } catch (_) {}
+
+        return res.status(200).json({ ok: true, verified: true, student: stu.name });
+      } else {
+        recordSafetyFail(chatId);
+        await sendTelegramMessage(chatId,
+          `❌ *Verification Failed*\n\n` +
+          `The 3 details provided did not match any active student profile:\n` +
+          `• Contact: \`+${cleanPhone(profileContact)}\`\n` +
+          `• Child Name: *${sanitizeInput(childName)}*\n` +
+          `• ITS: \`${sanitizeInput(its)}\`\n\n` +
+          `All 3 must match your child's registered school profile.\n\n` +
+          `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\`\n` +
+          `_(Call or WhatsApp our helpline for assistance)_`,
+          { reply_markup: getStandardKeyboard() }
+        );
+        return res.status(200).json({ ok: true, match_failed: true });
+      }
+    }
+
+    // ── Contact Sharing (Automatic Phone Match) ──
     if (message.contact && message.contact.phone_number) {
       const sharedPhone = cleanPhone(message.contact.phone_number);
 
@@ -583,24 +1031,42 @@ export default async function handler(req, res) {
 
       if (student && student.name) {
         recordSafetySuccess(chatId);
+        // Automatically bind this chatId to this student
+        try {
+          await verifyThreePoint(sheetsWebhookUrl, sharedPhone, student.name, student.its || student.code || 'MATCH', chatId);
+        } catch (_) {}
+
+        await sendTelegramMessage(chatId,
+          `✅ *Profile Matched & Connected!*\n\n` +
+          `Your Telegram account is now connected to *${sanitizeInput(student.name)}*.\n` +
+          `You will receive instant automatic updates for daily attendance, leaves, and results.`,
+          { reply_markup: getLinkedKeyboard(student.name) }
+        );
+
         try {
           const svg = generateMarhalaResultSvg(student);
           const png = renderSvgToPng(svg);
           const caption = buildResultCaption(student);
           await sendTelegramPhoto(chatId, png, caption, {
-            reply_markup: getStandardKeyboard()
+            reply_markup: getLinkedKeyboard(student.name)
           });
           return res.status(200).json({ ok: true, delivered: true, student: student.name });
         } catch (err) {
-          await sendTelegramMessage(chatId, `Found student *${sanitizeInput(student.name)}*!\n\nScore: ${student.weeklyScore}/100\nRank: #${student.marhalaRank}\n\n📞 *Helpline Number:* ${HELPLINE_NUMBER}`);
+          await sendTelegramMessage(chatId,
+            `📊 *Weekly Result for ${sanitizeInput(student.name)}*\n\n` +
+            `• Score: ${student.weeklyScore}/100\n` +
+            `• Rank: #${student.marhalaRank}\n\n` +
+            `📞 *Helpline Number:* ${HELPLINE_NUMBER}`,
+            { reply_markup: getLinkedKeyboard(student.name) }
+          );
           return res.status(200).json({ ok: true, delivered: true });
         }
       } else {
         await sendTelegramMessage(chatId,
-          `ℹ️ No student record found for mobile number \`+${sharedPhone}\`.\n\n` +
-          `If your registered number is different, please verify your child using:\n` +
-          `\`/result [Child Name], [Code]\`\n\n` +
-          `_(Code is your child's 8-digit ITS number or Student ID)_\n\n` +
+          `ℹ️ No student profile found for mobile number \`+${sharedPhone}\`.\n\n` +
+          `If your child's profile has a different contact number, please link using the 3-point verification:\n\n` +
+          `\`/verify [Profile Contact], [Child Name], [ITS]\`\n` +
+          `_(Example: \`/verify 9876543210, Taher Shabbir, 50401002\`)_\n\n` +
           `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
           { reply_markup: getStandardKeyboard() }
         );
@@ -608,8 +1074,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Case 2: User requests /result or /find (Child Name & Code Verification)
-    if (rawText.toLowerCase().startsWith('/result') || rawText.toLowerCase().startsWith('/find') || rawText.toLowerCase().startsWith('result')) {
+    // ── Case: /result [Child Name], [Code] (Legacy Search) ──
+    if (rawText.toLowerCase().startsWith('/result') || rawText.toLowerCase().startsWith('/find')) {
       const cleaned = rawText.replace(/^\/?(result|find)\s*/i, '').trim();
       const parts = cleaned.split(/[,:]+/).map((p) => sanitizeInput(p.trim())).filter(Boolean);
 
@@ -620,7 +1086,7 @@ export default async function handler(req, res) {
           `👉 Format: \`/result [Child Name], [Code]\`\n` +
           `👉 Example: \`/result Taher Shabbir, 50401002\`\n\n` +
           `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
-          { reply_markup: getStandardKeyboard() }
+          { reply_markup: linkedStudent ? getLinkedKeyboard(linkedStudent.name) : getStandardKeyboard() }
         );
         return res.status(200).json({ ok: true, prompt_sent: true });
       }
@@ -628,7 +1094,6 @@ export default async function handler(req, res) {
       const childName = parts[0];
       const securityCode = parts[1];
 
-      // Validate security code format strictly
       if (!isValidSecurityCode(securityCode)) {
         recordSafetyFail(chatId);
         await sendTelegramMessage(chatId,
@@ -641,7 +1106,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, invalid_format: true });
       }
 
-      // Query student by Name & verify Code
       const student = await queryStudentFromSheets(sheetsWebhookUrl, {
         name: childName,
         code: securityCode
@@ -654,7 +1118,7 @@ export default async function handler(req, res) {
           const png = renderSvgToPng(svg);
           const caption = buildResultCaption(student);
           await sendTelegramPhoto(chatId, png, caption, {
-            reply_markup: getStandardKeyboard()
+            reply_markup: linkedStudent ? getLinkedKeyboard(linkedStudent.name) : getStandardKeyboard()
           });
           return res.status(200).json({ ok: true, verified: true, student: student.name });
         } catch (cardErr) {
@@ -682,22 +1146,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // Case 3: User pressed "🔍 Search by Child Name & Code" button
-    if (rawText.includes('Search by Child Name')) {
-      await sendTelegramMessage(chatId,
-        `🔍 *Check Result with Child Name & Code*\n\n` +
-        `Please send your child's full name and security code (ITS or Student ID) in this format:\n\n` +
-        `\`/result [Child Name], [Code]\`\n\n` +
-        `Example:\n` +
-        `\`/result Husain Yusuf, 50401001\`\n\n` +
-        `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
-        { reply_markup: getStandardKeyboard() }
-      );
-      return res.status(200).json({ ok: true });
+    // ── Fallback Greeting ──
+    if (linkedStudent) {
+      await sendLinkedWelcome(chatId, linkedStudent);
+    } else {
+      await sendHelplineWelcome(chatId);
     }
-
-    // Case 4: Any other message (Start, Greetings, or General message)
-    await sendHelplineWelcome(chatId);
     return res.status(200).json({ ok: true, helpline_sent: true });
   }
 

@@ -349,6 +349,30 @@ function doPost(e) {
       return jsonResponse(searchResult, 200);
     }
 
+    // 3-Point Security Verification for Telegram Bot (Profile Contact + Full Name + ITS)
+    if (payload.action === "verify_three_point") {
+      const vResult = processVerifyThreePoint(payload);
+      return jsonResponse(vResult, 200);
+    }
+
+    // Get Linked Student for a Telegram Chat ID
+    if (payload.action === "get_linked_student") {
+      const gResult = processGetLinkedStudent(payload);
+      return jsonResponse(gResult, 200);
+    }
+
+    // Unlink Telegram Chat ID
+    if (payload.action === "unlink_telegram") {
+      const uResult = processUnlinkTelegram(payload);
+      return jsonResponse(uResult, 200);
+    }
+
+    // Query subscribed Telegram chat IDs for a student (for pushing attendance, leaves, etc.)
+    if (payload.action === "get_student_subscribers") {
+      const subs = processGetStudentSubscribers(payload);
+      return jsonResponse(subs, 200);
+    }
+
     // Test Telegram Bot connection
     if (payload.action === "test_telegram") {
       const tgTest = testTelegramBotConnection(payload.config || CONFIG);
@@ -2088,12 +2112,250 @@ function processSendTelegramResults(payload) {
     }
   }
 
+    return {
+      success: true,
+      total: sent + failed + skipped,
+      sent: sent,
+      failed: failed,
+      skipped: skipped,
+      logs: logs
+    };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+/**
+ * Ensures the 'Telegram_Subscribers' tab exists to track verified parent bot links.
+ */
+function ensureTelegramSubscribersSheet(ss) {
+  const SHEET_NAME = "Telegram_Subscribers";
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    const headers = ["Chat ID", "ITS", "Student Name", "Profile Phone", "Verified At", "Active"];
+    sheet.appendRow(headers);
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setBackground("#0088cc");
+    headerRange.setFontColor("#ffffff");
+    headerRange.setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+/**
+ * 3-Point Security Verification for Telegram Bot:
+ * Validates:
+ * 1. Contact number from child/parent profile (registered contact)
+ * 2. Child Full Name
+ * 3. ITS Number (8-digit ITS)
+ * 
+ * ONLY when ALL 3 match a valid record:
+ * - Links Telegram Chat ID to the student in Telegram_Subscribers sheet
+ * - Updates parents email sheet column telegramChatId
+ * - Returns student profile and performance data
+ */
+function processVerifyThreePoint(payload) {
+  const ss = resolveSpreadsheet(payload.category || "atfal");
+  const pSheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
+  if (!pSheet) return { success: false, verified: false, error: "Parents email sheet not found" };
+
+  const targetPhone = cleanWhatsAppPhone(payload.profilePhone || payload.phone || "");
+  const targetName = String(payload.childName || payload.name || "").trim().toLowerCase();
+  const targetIts = String(payload.its || payload.code || "").trim().toLowerCase();
+  const chatId = String(payload.chatId || "").trim();
+
+  if (!targetPhone || !targetName || !targetIts) {
+    return {
+      success: false,
+      verified: false,
+      error: "All 3 credentials (Profile Contact, Child Name, and ITS) are required for verification."
+    };
+  }
+
+  const data = pSheet.getDataRange().getValues();
+  if (data.length <= 1) return { success: false, verified: false, error: "No student records found." };
+
+  const colMap = getParentsSheetColumnMap(pSheet);
+  let matchedStudent = null;
+  let matchedRowIndex = -1;
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const phone = cleanWhatsAppPhone(row[colMap.phone - 1] || "");
+    const name = String(row[colMap.name - 1] || "").trim();
+    const cleanRowName = name.toLowerCase();
+
+    // 1. Check Profile Contact Phone Match
+    const phoneMatches = phone && (phone === targetPhone || phone.endsWith(targetPhone) || targetPhone.endsWith(phone));
+    if (!phoneMatches) continue;
+
+    // 2. Check Child Full Name Match
+    const nameMatches = cleanRowName.includes(targetName) || targetName.includes(cleanRowName);
+    if (!nameMatches) continue;
+
+    // 3. Check ITS Match across Marhala sheets or email
+    const isItsVerified = verifyStudentCodeInMarhalaSheets(ss, name, targetIts);
+    const emailMatchesIts = String(row[colMap.email - 1] || "").toLowerCase().includes(targetIts);
+
+    if (isItsVerified || emailMatchesIts) {
+      matchedStudent = {
+        name: name,
+        its: targetIts,
+        email: String(row[colMap.email - 1] || ""),
+        phone: String(row[colMap.phone - 1] || ""),
+        fromDate: String(row[colMap.fromDate - 1] || ""),
+        tillDate: String(row[colMap.tillDate - 1] || ""),
+        weeklyScore: row[colMap.score - 1],
+        totalJadeed: String(row[colMap.jadeed - 1] || ""),
+        marhalaRank: String(row[colMap.marhalaRank - 1] || ""),
+        overallRank: String(row[colMap.overallRank - 1] || ""),
+        status: String(row[colMap.status - 1] || "")
+      };
+      matchedRowIndex = r + 1;
+      break;
+    }
+  }
+
+  if (!matchedStudent) {
+    return {
+      success: false,
+      verified: false,
+      error: "Verification failed. Profile contact, child full name, and ITS do not match our records."
+    };
+  }
+
+  // Record binding in Telegram_Subscribers sheet if chatId provided
+  if (chatId) {
+    const subSheet = ensureTelegramSubscribersSheet(ss);
+    const subData = subSheet.getDataRange().getValues();
+    let existingRow = -1;
+
+    for (let s = 1; s < subData.length; s++) {
+      if (String(subData[s][0]).trim() === chatId) {
+        existingRow = s + 1;
+        break;
+      }
+    }
+
+    const nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    if (existingRow > 0) {
+      subSheet.getRange(existingRow, 2, 1, 5).setValues([[
+        matchedStudent.its,
+        matchedStudent.name,
+        matchedStudent.phone,
+        nowStr,
+        "YES"
+      ]]);
+    } else {
+      subSheet.appendRow([chatId, matchedStudent.its, matchedStudent.name, matchedStudent.phone, nowStr, "YES"]);
+    }
+
+    // Also update telegramChatId in parents email sheet if column exists
+    if (matchedRowIndex > 0 && colMap.telegramChatId) {
+      pSheet.getRange(matchedRowIndex, colMap.telegramChatId).setValue(chatId);
+    }
+  }
+
   return {
     success: true,
-    total: sent + failed + skipped,
-    sent: sent,
-    failed: failed,
-    skipped: skipped,
-    logs: logs
+    verified: true,
+    student: matchedStudent
   };
+}
+
+/**
+ * Fetch linked student details for a given Telegram Chat ID.
+ */
+function processGetLinkedStudent(payload) {
+  const ss = resolveSpreadsheet(payload.category || "atfal");
+  const subSheet = ss.getSheetByName("Telegram_Subscribers");
+  const chatId = String(payload.chatId || "").trim();
+  if (!subSheet || !chatId) return { success: true, linked: false };
+
+  const subData = subSheet.getDataRange().getValues();
+  for (let r = 1; r < subData.length; r++) {
+    if (String(subData[r][0]).trim() === chatId && String(subData[r][5]).trim().toUpperCase() === "YES") {
+      const its = String(subData[r][1]).trim();
+      const studentName = String(subData[r][2]).trim();
+      const phone = String(subData[r][3]).trim();
+
+      // Get latest result from parents email sheet
+      const studentResult = processSearchStudent({
+        category: payload.category,
+        name: studentName,
+        code: its,
+        phone: phone
+      });
+
+      return {
+        success: true,
+        linked: true,
+        student: (studentResult && studentResult.student) ? studentResult.student : {
+          name: studentName,
+          its: its,
+          phone: phone
+        }
+      };
+    }
+  }
+  return { success: true, linked: false };
+}
+
+/**
+ * Unlinks a Telegram Chat ID from its student.
+ */
+function processUnlinkTelegram(payload) {
+  const ss = resolveSpreadsheet(payload.category || "atfal");
+  const subSheet = ss.getSheetByName("Telegram_Subscribers");
+  const chatId = String(payload.chatId || "").trim();
+  if (!subSheet || !chatId) return { success: true, unlinked: false };
+
+  const subData = subSheet.getDataRange().getValues();
+  for (let r = 1; r < subData.length; r++) {
+    if (String(subData[r][0]).trim() === chatId) {
+      subSheet.getRange(r + 1, 6).setValue("NO");
+      return { success: true, unlinked: true };
+    }
+  }
+  return { success: true, unlinked: false };
+}
+
+/**
+ * Finds all Telegram Chat IDs subscribed to a given student (by ITS, phone, or name).
+ */
+function processGetStudentSubscribers(payload) {
+  const ss = resolveSpreadsheet(payload.category || "atfal");
+  const subSheet = ss.getSheetByName("Telegram_Subscribers");
+  if (!subSheet) return { success: true, chatIds: [] };
+
+  const targetIts = String(payload.its || payload.code || "").trim().toLowerCase();
+  const targetPhone = cleanWhatsAppPhone(payload.phone || "");
+  const targetName = String(payload.name || "").trim().toLowerCase();
+
+  const subData = subSheet.getDataRange().getValues();
+  const chatIds = [];
+
+  for (let r = 1; r < subData.length; r++) {
+    const active = String(subData[r][5]).trim().toUpperCase();
+    if (active !== "YES") continue;
+
+    const rowChatId = String(subData[r][0]).trim();
+    const rowIts = String(subData[r][1]).trim().toLowerCase();
+    const rowName = String(subData[r][2]).trim().toLowerCase();
+    const rowPhone = cleanWhatsAppPhone(subData[r][3] || "");
+
+    const itsMatch = targetIts && (rowIts === targetIts);
+    const phoneMatch = targetPhone && (rowPhone === targetPhone || rowPhone.endsWith(targetPhone));
+    const nameMatch = targetName && (rowName.includes(targetName) || targetName.includes(rowName));
+
+    if (itsMatch || phoneMatch || nameMatch) {
+      if (rowChatId && !chatIds.includes(rowChatId)) {
+        chatIds.push(rowChatId);
+      }
+    }
+  }
+
+  return { success: true, chatIds: chatIds };
 }
