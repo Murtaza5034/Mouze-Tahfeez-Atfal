@@ -973,6 +973,29 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
                   </div>
                   <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                     <a
+                      href="https://web.telegram.org/k/#@Mh_Design_bot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mrk-btn-secondary"
+                      style={{
+                        textDecoration: "none",
+                        fontSize: "0.78rem",
+                        padding: "6px 10px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        borderRadius: "6px",
+                        background: "rgba(0, 136, 204, 0.12)",
+                        border: "1px solid rgba(0, 136, 204, 0.5)",
+                        color: "#0088cc",
+                        fontWeight: 600
+                      }}
+                      title="Open Telegram Bot in Browser (No desktop app needed)"
+                    >
+                      <ExternalLink size={13} />
+                      <span>Open Telegram Web</span>
+                    </a>
+                    <a
                       href="https://t.me/Mh_Design_bot"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -985,13 +1008,12 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
                         alignItems: "center",
                         gap: "4px",
                         borderRadius: "6px",
-                        border: "1px solid rgba(0, 136, 204, 0.4)",
-                        color: "#0088cc"
+                        border: "1px solid #cbd5e1",
+                        color: "#475569"
                       }}
-                      title="Open Telegram Bot in new window"
+                      title="Open in Telegram Desktop / Mobile App"
                     >
-                      <ExternalLink size={13} />
-                      <span>Open Bot</span>
+                      <span>App</span>
                     </a>
                     <button
                       className="mrk-btn-secondary"
