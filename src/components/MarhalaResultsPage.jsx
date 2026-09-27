@@ -25,7 +25,10 @@ import {
   testGoogleSheetsConnection,
   clearGoogleSheetsDemoData,
   syncAllStudentsToGoogleSheets,
-  sendWhatsAppResultImagesViaSheets
+  sendWhatsAppResultImagesViaSheets,
+  sendTelegramResultImagesViaSheets,
+  setupTelegramWebhook,
+  getTelegramWebhookInfo
 } from "../utils/googleSheetsSync";
 
 /**
@@ -119,6 +122,9 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
   });
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
   const [whatsAppStatus, setWhatsAppStatus] = useState(null);
+  const [isSendingTelegram, setIsSendingTelegram] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState(null);
+  const [isRegisteringTgWebhook, setIsRegisteringTgWebhook] = useState(false);
 
   // Keep webhookInput updated if reportSettings loads later
   useEffect(() => {
@@ -270,6 +276,61 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
       const errTxt = waErr.message || "WhatsApp dispatch error";
       setWhatsAppStatus({ success: false, message: `❌ ${errTxt}` });
       showAction("error", errTxt);
+    }
+  };
+
+  const handleSendTelegramResultImages = async () => {
+    const url = webhookInput || getGoogleSheetsWebhookUrl(reportSettings);
+    if (!url) {
+      showAction("error", "Please configure and save your Google Apps Script Webhook URL first.");
+      return;
+    }
+
+    setIsSendingTelegram(true);
+    setTelegramStatus(null);
+    showAction("info", "Dispatching weekly result images via Telegram Bot (@Mh_Design_bot)...");
+
+    try {
+      const res = await sendTelegramResultImagesViaSheets({
+        webhookUrl: url,
+        reportSettings,
+        category: "atfal",
+        onlyUpdated: true
+      });
+
+      setIsSendingTelegram(false);
+      if (res && res.success) {
+        const msg = res.sent !== undefined
+          ? `Dispatched! Sent: ${res.sent}, Skipped: ${res.skipped || 0}, Failed: ${res.failed || 0}`
+          : (res.message || "Command sent to Telegram Bot (@Mh_Design_bot) successfully!");
+        setTelegramStatus({ success: true, message: `✅ ${msg}` });
+        showAction("success", `Telegram Bot: ${msg}`);
+      } else {
+        const errMsg = res?.error || "Could not dispatch Telegram messages";
+        setTelegramStatus({ success: false, message: `❌ ${errMsg}` });
+        showAction("error", errMsg);
+      }
+    } catch (tgErr) {
+      setIsSendingTelegram(false);
+      const errTxt = tgErr.message || "Telegram dispatch error";
+      setTelegramStatus({ success: false, message: `❌ ${errTxt}` });
+      showAction("error", errTxt);
+    }
+  };
+
+  const handleRegisterTelegramWebhook = async () => {
+    setIsRegisteringTgWebhook(true);
+    try {
+      const res = await setupTelegramWebhook();
+      setIsRegisteringTgWebhook(false);
+      if (res && (res.status === "ok" || res.success)) {
+        showAction("success", "Telegram Webhook registered successfully to @Mh_Design_bot!");
+      } else {
+        showAction("error", "Could not register Telegram webhook: " + (res?.error || "Unknown error"));
+      }
+    } catch (err) {
+      setIsRegisteringTgWebhook(false);
+      showAction("error", "Webhook registration error: " + err.message);
     }
   };
 
@@ -885,6 +946,91 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
                 {whatsAppStatus && (
                   <div className={`mrk-wa-status ${whatsAppStatus.success ? "success" : "info"}`}>
                     {whatsAppStatus.message}
+                  </div>
+                )}
+              </div>
+
+              {/* Telegram Result Image Dispatch (@Mh_Design_bot) */}
+              <div
+                className="mrk-whatsapp-dispatch-card mrk-tg-dispatch-card"
+                style={{
+                  marginTop: "12px",
+                  border: "1px solid rgba(0, 136, 204, 0.35)",
+                  background: "rgba(0, 136, 204, 0.05)",
+                  borderRadius: "10px",
+                  padding: "14px"
+                }}
+              >
+                <div className="mrk-wa-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                  <div className="mrk-wa-title" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <Send size={20} style={{ color: "#0088cc", flexShrink: 0 }} />
+                    <div>
+                      <strong style={{ color: "#0088cc" }}>Telegram Result Images (@Mh_Design_bot)</strong>
+                      <span className="mrk-wa-sub" style={{ display: "block", fontSize: "0.78rem", color: "#64748b" }}>
+                        Helpline: +91 81079 25353 • Sends summary image card to parents &amp; students
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <a
+                      href="https://t.me/Mh_Design_bot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mrk-btn-secondary"
+                      style={{
+                        textDecoration: "none",
+                        fontSize: "0.78rem",
+                        padding: "6px 10px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        borderRadius: "6px",
+                        border: "1px solid rgba(0, 136, 204, 0.4)",
+                        color: "#0088cc"
+                      }}
+                      title="Open Telegram Bot in new window"
+                    >
+                      <ExternalLink size={13} />
+                      <span>Open Bot</span>
+                    </a>
+                    <button
+                      className="mrk-btn-secondary"
+                      style={{
+                        fontSize: "0.78rem",
+                        padding: "6px 10px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        borderRadius: "6px"
+                      }}
+                      onClick={handleRegisterTelegramWebhook}
+                      disabled={isRegisteringTgWebhook}
+                      title="Register/refresh Telegram webhook URL to this app"
+                    >
+                      <RefreshCw size={13} className={isRegisteringTgWebhook ? "mrk-spin" : ""} />
+                      <span>{isRegisteringTgWebhook ? "Setting…" : "Set Webhook"}</span>
+                    </button>
+                    <button
+                      className="mrk-btn-whatsapp"
+                      style={{
+                        background: "linear-gradient(135deg, #0088cc, #006699)",
+                        borderColor: "#0088cc",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                      onClick={handleSendTelegramResultImages}
+                      disabled={isSendingTelegram || !webhookInput}
+                      title="Send weekly result images to parents via Telegram bot"
+                    >
+                      <Send size={14} className={isSendingTelegram ? "mrk-spin" : ""} />
+                      <span>{isSendingTelegram ? "Sending Telegram…" : "Send via Telegram"}</span>
+                    </button>
+                  </div>
+                </div>
+                {telegramStatus && (
+                  <div className={`mrk-wa-status ${telegramStatus.success ? "success" : "info"}`} style={{ marginTop: "8px" }}>
+                    {telegramStatus.message}
                   </div>
                 )}
               </div>

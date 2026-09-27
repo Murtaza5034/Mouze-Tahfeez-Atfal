@@ -100,7 +100,12 @@ const CONFIG = {
   OPENWA_API_KEY: "",
   OPENWA_SESSION_ID: "mauze-helpline-8107925353",
   HELPLINE_NUMBER: "+91 81079 25353",
-  HELPLINE_NAME: "Mauze Tahfeez Helpline"
+  HELPLINE_NAME: "Mauze Tahfeez Helpline",
+
+  // Telegram Bot Configuration (Rawdat Tahfeez al Atfal: @Mh_Design_bot)
+  TELEGRAM_BOT_TOKEN: "8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o",
+  TELEGRAM_BOT_USERNAME: "@Mh_Design_bot",
+  TELEGRAM_WEBHOOK_URL: "https://mouze-tahfeez-atfal.vercel.app/api/telegram-webhook"
 };
 
 // ============================================================================
@@ -330,6 +335,24 @@ function doPost(e) {
     if (payload.action === "send_whatsapp_results") {
       const waResult = processSendWhatsAppResults(payload);
       return jsonResponse(waResult, 200);
+    }
+
+    // Send Telegram result images to parents & students via Telegram Bot (@Mh_Design_bot)
+    if (payload.action === "send_telegram_results") {
+      const tgResult = processSendTelegramResults(payload);
+      return jsonResponse(tgResult, 200);
+    }
+
+    // Search student by Phone OR by Name & Security Code for Telegram Bot
+    if (payload.action === "search_student") {
+      const searchResult = processSearchStudent(payload);
+      return jsonResponse(searchResult, 200);
+    }
+
+    // Test Telegram Bot connection
+    if (payload.action === "test_telegram") {
+      const tgTest = testTelegramBotConnection(payload.config || CONFIG);
+      return jsonResponse(tgTest, 200);
     }
 
     // Test OpenWA Bot connection
@@ -758,6 +781,7 @@ function batchMergeSheetRows(sheet, newRows, headers) {
 
 const PARENTS_EMAIL_HEADERS = [
   "email",
+  "phone number",
   "name",
   "from date",
   "till date",
@@ -766,8 +790,42 @@ const PARENTS_EMAIL_HEADERS = [
   "marhala rank",
   "over all rank",
   "data update for latest week",
-  "whatsapp number"
+  "telegram chat id"
 ];
+
+function getParentsSheetColumnMap(sheet) {
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [];
+  const map = {
+    email: 1,
+    phone: 2,
+    name: 3,
+    fromDate: 4,
+    tillDate: 5,
+    score: 6,
+    jadeed: 7,
+    marhalaRank: 8,
+    overallRank: 9,
+    status: 10,
+    telegramChatId: 11
+  };
+
+  for (let i = 0; i < headerRow.length; i++) {
+    const h = String(headerRow[i] || '').trim().toLowerCase();
+    if (h.includes('email')) map.email = i + 1;
+    else if (h.includes('phone') || h.includes('whatsapp') || h.includes('mobile')) map.phone = i + 1;
+    else if (h === 'name' || h.includes('student name')) map.name = i + 1;
+    else if (h.includes('from')) map.fromDate = i + 1;
+    else if (h.includes('till')) map.tillDate = i + 1;
+    else if (h.includes('score')) map.score = i + 1;
+    else if (h.includes('jadeed')) map.jadeed = i + 1;
+    else if (h.includes('marhala')) map.marhalaRank = i + 1;
+    else if (h.includes('over all') || h.includes('overall')) map.overallRank = i + 1;
+    else if (h.includes('data update') || h.includes('latest week') || h.includes('status')) map.status = i + 1;
+    else if (h.includes('telegram')) map.telegramChatId = i + 1;
+  }
+  return map;
+}
 
 function getOrCreateParentsEmailSheet(spreadsheet) {
   let sheet = spreadsheet.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
@@ -796,6 +854,9 @@ function buildParentsEmailRowValues(student, result) {
   // If email is missing, fallback to its@parents.local or name so row isn't lost
   const displayEmail = email || (student.its ? (student.its + "@parents.mauze") : "");
 
+  // Phone number placed right near email as column 2
+  const phoneNumber = String(student.whatsapp_number || student.phone || student.mobile || student.contact || "").trim();
+
   const fromDate = String(result.from_date || result.fatemi_from_date || "").trim();
   const tillDate = String(result.till_date || result.fatemi_till_date || "").trim();
   const weeklyScore = (result.total_score !== undefined && result.total_score !== null) ? result.total_score : "";
@@ -812,11 +873,11 @@ function buildParentsEmailRowValues(student, result) {
   // If result has scores, status is "Yes", otherwise default to "No"
   const latestWeekStatus = (weeklyScore !== "" && weeklyScore !== null) ? "Yes" : "No";
 
-  // WhatsApp number
-  const whatsappNumber = String(student.whatsapp_number || student.phone || student.mobile || student.contact || "").trim();
+  const telegramChatId = String(student.telegram_chat_id || student.telegramChatId || "").trim();
 
   return [
     displayEmail,
+    phoneNumber,
     name,
     fromDate,
     tillDate,
@@ -825,21 +886,22 @@ function buildParentsEmailRowValues(student, result) {
     marhalaRank,
     overallRank,
     latestWeekStatus,
-    whatsappNumber
+    telegramChatId
   ];
 }
 
 function syncParentsEmailSheetRow(sheet, student, result) {
   const email = String(student.email || student.parent_email || "").trim().toLowerCase();
   const name = String(student.name || student.full_name || "").trim();
+  const colMap = getParentsSheetColumnMap(sheet);
 
   const rowValues = buildParentsEmailRowValues(student, result);
   const data = sheet.getDataRange().getValues();
   let matchRowIndex = -1;
 
   for (let r = 1; r < data.length; r++) {
-    const existingEmail = String(data[r][0] || "").trim().toLowerCase();
-    const existingName = String(data[r][1] || "").trim().toLowerCase();
+    const existingEmail = String(data[r][colMap.email - 1] || "").trim().toLowerCase();
+    const existingName = String(data[r][colMap.name - 1] || "").trim().toLowerCase();
 
     if ((email && existingEmail === email) || (name && existingName === name.toLowerCase())) {
       matchRowIndex = r + 1;
@@ -849,12 +911,12 @@ function syncParentsEmailSheetRow(sheet, student, result) {
 
   if (matchRowIndex > 0) {
     sheet.getRange(matchRowIndex, 1, 1, PARENTS_EMAIL_HEADERS.length).setValues([rowValues]);
-    applyValidationToCell(sheet.getRange(matchRowIndex, 9));
+    applyValidationToCell(sheet.getRange(matchRowIndex, colMap.status));
     return { action: "updated", row: matchRowIndex, email: email || name };
   } else {
     sheet.appendRow(rowValues);
     const newRow = sheet.getLastRow();
-    applyValidationToCell(sheet.getRange(newRow, 9));
+    applyValidationToCell(sheet.getRange(newRow, colMap.status));
     return { action: "appended", row: newRow, email: email || name };
   }
 }
@@ -866,10 +928,11 @@ function batchMergeParentsEmailRows(sheet, newRows) {
     return;
   }
 
+  const colMap = getParentsSheetColumnMap(sheet);
   const existingMap = new Map();
   for (let r = 1; r < data.length; r++) {
-    const mail = String(data[r][0] || "").toLowerCase().trim();
-    const name = String(data[r][1] || "").toLowerCase().trim();
+    const mail = String(data[r][colMap.email - 1] || "").toLowerCase().trim();
+    const name = String(data[r][colMap.name - 1] || "").toLowerCase().trim();
     if (mail) existingMap.set(mail, r + 1);
     if (name) existingMap.set(name, r + 1);
   }
@@ -878,7 +941,7 @@ function batchMergeParentsEmailRows(sheet, newRows) {
   for (let i = 0; i < newRows.length; i++) {
     const nr = newRows[i];
     const mail = String(nr[0] || "").toLowerCase().trim();
-    const name = String(nr[1] || "").toLowerCase().trim();
+    const name = String(nr[2] || "").toLowerCase().trim();
     const existingRow = existingMap.get(mail) || existingMap.get(name);
 
     if (existingRow) {
@@ -911,13 +974,16 @@ function setupParentsEmailValidationAndFormatting(sheet) {
   
   if (!sheet) return;
 
+  const colMap = getParentsSheetColumnMap(sheet);
+  const statusCol = colMap.status || 10;
+
   const currentMax = sheet.getMaxRows();
   if (currentMax <= 1) {
     sheet.insertRowsAfter(1, 100);
   }
   const totalRows = sheet.getMaxRows();
   const numRows = totalRows - 1;
-  const statusColumnRange = sheet.getRange(2, 9, numRows, 1);
+  const statusColumnRange = sheet.getRange(2, statusCol, numRows, 1);
 
   // 1. Dropdown Validation (Yes/No)
   const validationRule = SpreadsheetApp.newDataValidation()
@@ -927,12 +993,12 @@ function setupParentsEmailValidationAndFormatting(sheet) {
     .build();
   statusColumnRange.setDataValidation(validationRule);
 
-  // 2. Clean Existing Rules on Column 9
+  // 2. Clean Existing Rules on Column
   const rules = sheet.getConditionalFormatRules();
   const filteredRules = rules.filter(function(r) {
     const ranges = r.getRanges();
     for (let i = 0; i < ranges.length; i++) {
-      if (ranges[i].getColumn() === 9) return false;
+      if (ranges[i].getColumn() === statusCol) return false;
     }
     return true;
   });
@@ -971,13 +1037,18 @@ function setupParentsEmailValidationAndFormatting(sheet) {
 function onOpen() {
   try {
     SpreadsheetApp.getUi()
-      .createMenu("📱 Mauze WhatsApp Bot")
-      .addItem("✨ Send All Result Images to Parents via WhatsApp", "sendAllParentsWhatsAppResultImages")
-      .addItem("👤 Send Result Image for Selected Student Row", "sendSelectedStudentWhatsAppResultImage")
-      .addItem("🖼️ Preview Result Image for Selected Student", "previewSelectedStudentResultImage")
+      .createMenu("📱 Mauze Telegram & WhatsApp Bot")
+      .addItem("✈️ Send All Result Images via Telegram Bot (@Mh_Design_bot)", "sendAllParentsTelegramResultImages")
+      .addItem("👤 Send Telegram Result Image for Selected Row", "sendSelectedStudentTelegramResultImage")
+      .addItem("⚙️ Setup / Register Telegram Webhook", "setupTelegramWebhookFromSheet")
+      .addItem("🧪 Test Telegram Bot Connection", "testTelegramBotConnection")
       .addSeparator()
-      .addItem("⚙️ Test OpenWA Bot Connection (+91 81079 25353)", "testOpenWaBotConnection")
-      .addItem("🔄 Re-initialize Sheets & WhatsApp Columns", "testSetup")
+      .addItem("✨ Send All Result Images to Parents via WhatsApp", "sendAllParentsWhatsAppResultImages")
+      .addItem("👤 Send Result Image for Selected Student Row via WhatsApp", "sendSelectedStudentWhatsAppResultImage")
+      .addItem("⚙️ Test OpenWA WhatsApp Connection (+91 81079 25353)", "testOpenWaBotConnection")
+      .addSeparator()
+      .addItem("🖼️ Preview Result Image for Selected Student", "previewSelectedStudentResultImage")
+      .addItem("🔄 Re-initialize Sheets with Phone Number Column", "testSetup")
       .addToUi();
   } catch (_e) {}
 }
@@ -1482,6 +1553,7 @@ function processSendWhatsAppResults(payload) {
     return { success: false, error: "No student records found in sheet" };
   }
 
+  const colMap = getParentsSheetColumnMap(sheet);
   const cfg = Object.assign({}, CONFIG, payload.config || {});
   let sent = 0;
   let failed = 0;
@@ -1490,9 +1562,9 @@ function processSendWhatsAppResults(payload) {
 
   for (let r = 1; r < data.length; r++) {
     const row = data[r];
-    const name = String(row[1] || "");
-    const status = String(row[8] || "");
-    const rawPhone = String(row[9] || "");
+    const name = String(row[colMap.name - 1] || "");
+    const status = String(row[colMap.status - 1] || "");
+    const rawPhone = String(row[colMap.phone - 1] || "");
 
     if (payload.onlyUpdated !== false && status.trim().toLowerCase() !== "yes") {
       skipped++;
@@ -1507,14 +1579,14 @@ function processSendWhatsAppResults(payload) {
     }
 
     const studentData = {
-      email: String(row[0] || ""),
+      email: String(row[colMap.email - 1] || ""),
       name: name,
-      fromDate: String(row[2] || ""),
-      tillDate: String(row[3] || ""),
-      weeklyScore: row[4],
-      totalJadeed: String(row[5] || ""),
-      marhalaRank: String(row[6] || ""),
-      overallRank: String(row[7] || ""),
+      fromDate: String(row[colMap.fromDate - 1] || ""),
+      tillDate: String(row[colMap.tillDate - 1] || ""),
+      weeklyScore: row[colMap.score - 1],
+      totalJadeed: String(row[colMap.jadeed - 1] || ""),
+      marhalaRank: String(row[colMap.marhalaRank - 1] || ""),
+      overallRank: String(row[colMap.overallRank - 1] || ""),
       whatsappNumber: cleanPhone
     };
 
@@ -1586,4 +1658,442 @@ function testOpenWaBotConnection() {
   } else {
     ui.alert("OpenWA Connection Status", "Status: " + (res.error || res.response || "Code " + res.code) + "\n\nNote: If OpenWA is hosted locally, configure your public/tunnel URL in CONFIG.OPENWA_API_URL.", ui.ButtonSet.OK);
   }
+}
+
+// ============================================================================
+// 8. TELEGRAM BOT INTEGRATION (@Mh_Design_bot)
+//    Helpline Number: +91 81079 25353
+// ============================================================================
+
+/**
+ * Dispatches a single student result image via Telegram Bot API.
+ */
+function sendStudentResultViaTelegram(studentData, customConfig) {
+  const cfg = customConfig || CONFIG;
+  const token = cfg.TELEGRAM_BOT_TOKEN || "8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o";
+  const chatId = studentData.telegramChatId || studentData.chatId;
+
+  if (!chatId) {
+    return { success: false, error: "Missing Telegram chat ID for " + studentData.name };
+  }
+
+  const pngBlob = generateMarhalaResultPngBlob(studentData);
+  const caption = buildWhatsAppResultCaption(studentData, cfg);
+
+  const boundary = "----MauzeTgBoundary" + Utilities.getUuid();
+  const requestData = 
+    "--" + boundary + "\r\n" +
+    "Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n" +
+    chatId + "\r\n" +
+    "--" + boundary + "\r\n" +
+    "Content-Disposition: form-data; name=\"caption\"\r\n\r\n" +
+    caption + "\r\n" +
+    "--" + boundary + "\r\n" +
+    "Content-Disposition: form-data; name=\"parse_mode\"\r\n\r\n" +
+    "Markdown\r\n" +
+    "--" + boundary + "\r\n" +
+    "Content-Disposition: form-data; name=\"photo\"; filename=\"Weekly_Result.png\"\r\n" +
+    "Content-Type: image/png\r\n\r\n";
+
+  const closing = "\r\n--" + boundary + "--\r\n";
+
+  const payload = Utilities.newBlob(requestData).getBytes()
+    .concat(pngBlob.getBytes())
+    .concat(Utilities.newBlob(closing).getBytes());
+
+  const options = {
+    method: "post",
+    contentType: "multipart/form-data; boundary=" + boundary,
+    payload: payload,
+    muteHttpExceptions: true
+  };
+
+  try {
+    const res = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendPhoto", options);
+    const resCode = res.getResponseCode();
+    if (resCode >= 200 && resCode < 300) {
+      return { success: true, student: studentData.name, chatId: chatId };
+    } else {
+      // Text fallback if photo upload errors
+      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify({
+          chat_id: chatId,
+          text: caption,
+          parse_mode: "Markdown"
+        }),
+        muteHttpExceptions: true
+      });
+      return { success: true, textFallback: true, student: studentData.name };
+    }
+  } catch (err) {
+    return { success: false, error: err.message, student: studentData.name };
+  }
+}
+
+/**
+ * Dispatches weekly result images to all parents via Telegram Bot.
+ */
+function sendAllParentsTelegramResultImages() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    "✈️ Dispatch Telegram Result Images",
+    "Send weekly Marhala result images to parents via Telegram Bot (@Mh_Design_bot)?\n\nOnly rows with 'Yes' status and a linked Telegram Chat ID or phone will be sent.",
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  const ss = resolveSpreadsheet("atfal");
+  const sheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
+  if (!sheet) {
+    ui.alert("Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' not found.");
+    return;
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    ui.alert("No student data found in '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "'.");
+    return;
+  }
+
+  const colMap = getParentsSheetColumnMap(sheet);
+  let sentCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const name = String(row[colMap.name - 1] || "");
+    const status = String(row[colMap.status - 1] || "");
+    const chatId = String(row[colMap.telegramChatId - 1] || "").trim();
+
+    if (status.trim().toLowerCase() !== "yes" || !chatId) {
+      skippedCount++;
+      continue;
+    }
+
+    const studentData = {
+      email: String(row[colMap.email - 1] || ""),
+      name: name,
+      fromDate: String(row[colMap.fromDate - 1] || ""),
+      tillDate: String(row[colMap.tillDate - 1] || ""),
+      weeklyScore: row[colMap.score - 1],
+      totalJadeed: String(row[colMap.jadeed - 1] || ""),
+      marhalaRank: String(row[colMap.marhalaRank - 1] || ""),
+      overallRank: String(row[colMap.overallRank - 1] || ""),
+      telegramChatId: chatId
+    };
+
+    const res = sendStudentResultViaTelegram(studentData, CONFIG);
+    if (res.success) sentCount++;
+    else failedCount++;
+  }
+
+  ui.alert("Telegram Dispatch Summary",
+    "✅ Sent: " + sentCount + "\n⏭️ Skipped: " + skippedCount + "\n❌ Failed: " + failedCount + "\n\nHelpline: " + CONFIG.HELPLINE_NUMBER,
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Send Telegram result image for currently selected row.
+ */
+function sendSelectedStudentTelegramResultImage() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = resolveSpreadsheet("atfal");
+  const sheet = ss.getActiveSheet();
+
+  if (sheet.getName() !== CONFIG.PARENTS_EMAIL_SHEET_NAME) {
+    ui.alert("Please switch to the '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' tab.");
+    return;
+  }
+
+  const activeRow = sheet.getActiveCell().getRow();
+  if (activeRow <= 1) {
+    ui.alert("Please select a student row (row 2 or below).");
+    return;
+  }
+
+  const colMap = getParentsSheetColumnMap(sheet);
+  const rowValues = sheet.getRange(activeRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const name = String(rowValues[colMap.name - 1] || "Student");
+  const chatId = String(rowValues[colMap.telegramChatId - 1] || "").trim();
+
+  if (!chatId) {
+    const input = ui.prompt(
+      "Telegram Chat ID Required",
+      "Enter Telegram Chat ID for " + name + " (or user can message @Mh_Design_bot to link):",
+      ui.ButtonSet.OK_CANCEL
+    );
+    if (input.getSelectedButton() !== ui.Button.OK || !input.getResponseText().trim()) return;
+    sheet.getRange(activeRow, colMap.telegramChatId).setValue(input.getResponseText().trim());
+  }
+
+  const targetChatId = chatId || sheet.getRange(activeRow, colMap.telegramChatId).getValue();
+
+  const studentData = {
+    email: String(rowValues[colMap.email - 1] || ""),
+    name: name,
+    fromDate: String(rowValues[colMap.fromDate - 1] || ""),
+    tillDate: String(rowValues[colMap.tillDate - 1] || ""),
+    weeklyScore: rowValues[colMap.score - 1],
+    totalJadeed: String(rowValues[colMap.jadeed - 1] || ""),
+    marhalaRank: String(rowValues[colMap.marhalaRank - 1] || ""),
+    overallRank: String(rowValues[colMap.overallRank - 1] || ""),
+    telegramChatId: targetChatId
+  };
+
+  const res = sendStudentResultViaTelegram(studentData, CONFIG);
+  if (res.success) {
+    ui.alert("Success", "✅ Telegram result card sent to " + name + "!", ui.ButtonSet.OK);
+  } else {
+    ui.alert("Error", "❌ Could not send via Telegram:\n" + (res.error || "Unknown error"), ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Webhook setup helper callable directly from Google Sheets UI.
+ */
+function setupTelegramWebhookFromSheet() {
+  const ui = SpreadsheetApp.getUi();
+  const token = CONFIG.TELEGRAM_BOT_TOKEN;
+  const webhookUrl = CONFIG.TELEGRAM_WEBHOOK_URL;
+
+  try {
+    const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/setWebhook", {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({ url: webhookUrl }),
+      muteHttpExceptions: true
+    });
+
+    const json = JSON.parse(response.getContentText());
+    if (json.ok) {
+      ui.alert("Webhook Registered Successfully",
+        "✅ Telegram Webhook registered to:\n" + webhookUrl + "\n\nBot: @Mh_Design_bot\nHelpline: " + CONFIG.HELPLINE_NUMBER,
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert("Webhook Error", "Telegram returned error:\n" + response.getContentText(), ui.ButtonSet.OK);
+    }
+  } catch (err) {
+    ui.alert("Connection Error", "Could not reach Telegram API: " + err.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Tests connection to Telegram Bot API.
+ */
+function testTelegramBotConnection(customConfig) {
+  const cfg = customConfig || CONFIG;
+  const token = cfg.TELEGRAM_BOT_TOKEN || "8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o";
+
+  try {
+    const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/getMe", {
+      method: "get",
+      muteHttpExceptions: true
+    });
+    const code = response.getResponseCode();
+    const data = JSON.parse(response.getContentText());
+
+    return {
+      success: code === 200 && data.ok,
+      bot: data.result ? data.result.username : null,
+      name: data.result ? data.result.first_name : null,
+      helpline: cfg.HELPLINE_NUMBER || "+91 81079 25353"
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Searches for student in sheets by Phone OR by Name & Security Code (ITS/Student ID).
+ * Used by Telegram Webhook API.
+ */
+function processSearchStudent(payload) {
+  const ss = resolveSpreadsheet("atfal");
+  const sheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
+  if (!sheet) return { success: false, error: "Parents email sheet not found" };
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { success: false, error: "No student data" };
+
+  const colMap = getParentsSheetColumnMap(sheet);
+  const targetPhone = cleanWhatsAppPhone(payload.phone || "");
+  const targetName = String(payload.name || "").trim().toLowerCase();
+  const targetCode = String(payload.code || "").trim().toLowerCase();
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const email = String(row[colMap.email - 1] || "");
+    const phone = String(row[colMap.phone - 1] || "");
+    const name = String(row[colMap.name - 1] || "");
+    const fromDate = String(row[colMap.fromDate - 1] || "");
+    const tillDate = String(row[colMap.tillDate - 1] || "");
+    const score = row[colMap.score - 1];
+    const jadeed = String(row[colMap.jadeed - 1] || "");
+    const mRank = String(row[colMap.marhalaRank - 1] || "");
+    const oRank = String(row[colMap.overallRank - 1] || "");
+    const status = String(row[colMap.status - 1] || "");
+
+    // 1. Match by Phone Number
+    if (targetPhone && cleanWhatsAppPhone(phone) === targetPhone) {
+      return {
+        success: true,
+        student: {
+          name: name,
+          email: email,
+          phone: phone,
+          fromDate: fromDate,
+          tillDate: tillDate,
+          weeklyScore: score,
+          totalJadeed: jadeed,
+          marhalaRank: mRank,
+          overallRank: oRank,
+          status: status
+        }
+      };
+    }
+
+    // 2. Match by Child Name and Security Code (ITS / Student ID)
+    if (targetName && targetCode) {
+      const nameMatch = name.toLowerCase().includes(targetName) || targetName.includes(name.toLowerCase());
+      if (nameMatch) {
+        // Verify code against Marhala tabs (Student ID or ITS) or email/phone
+        const isVerifiedInMarhala = verifyStudentCodeInMarhalaSheets(ss, name, targetCode);
+        const codeMatchesEmailOrPhone = email.toLowerCase().includes(targetCode) || cleanWhatsAppPhone(phone).includes(targetCode);
+
+        if (isVerifiedInMarhala || codeMatchesEmailOrPhone) {
+          return {
+            success: true,
+            student: {
+              name: name,
+              email: email,
+              phone: phone,
+              fromDate: fromDate,
+              tillDate: tillDate,
+              weeklyScore: score,
+              totalJadeed: jadeed,
+              marhalaRank: mRank,
+              overallRank: oRank,
+              status: status
+            }
+          };
+        }
+      }
+    }
+  }
+
+  return { success: false, not_found: true };
+}
+
+/**
+ * Checks all 8 Marhala tabs to verify if student has the given Student ID or ITS code.
+ */
+function verifyStudentCodeInMarhalaSheets(ss, studentName, code) {
+  if (!code || !studentName) return false;
+  const cleanCode = String(code).trim().toLowerCase();
+  const cleanName = String(studentName).trim().toLowerCase();
+
+  for (let i = 0; i < CONFIG.ALL_MARHALAS.length; i++) {
+    const sheet = ss.getSheetByName(CONFIG.ALL_MARHALAS[i]);
+    if (!sheet) continue;
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) continue;
+
+    const headers = data[0];
+    const colSid = headers.indexOf("Student ID");
+    const colIts = headers.indexOf("ITS");
+    const colName = headers.indexOf("Name");
+
+    for (let r = 1; r < data.length; r++) {
+      const row = data[r];
+      const sid = String(row[colSid] || "").trim().toLowerCase();
+      const its = colIts !== -1 ? String(row[colIts] || "").trim().toLowerCase() : "";
+      const name = colName !== -1 ? String(row[colName] || "").trim().toLowerCase() : "";
+
+      const nameMatch = name.includes(cleanName) || cleanName.includes(name);
+      if (nameMatch) {
+        if (cleanCode === sid || cleanCode === its) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Programmatic Webhook Processor for Telegram Results Dispatch.
+ */
+function processSendTelegramResults(payload) {
+  const ss = resolveSpreadsheet(payload.category || "atfal");
+  const sheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
+  if (!sheet) {
+    return { success: false, error: "Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' not found" };
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return { success: false, error: "No student records found in sheet" };
+  }
+
+  const colMap = getParentsSheetColumnMap(sheet);
+  const cfg = Object.assign({}, CONFIG, payload.config || {});
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  const logs = [];
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const name = String(row[colMap.name - 1] || "");
+    const status = String(row[colMap.status - 1] || "");
+    const chatId = String(row[colMap.telegramChatId - 1] || "").trim();
+
+    if (payload.onlyUpdated !== false && status.trim().toLowerCase() !== "yes") {
+      skipped++;
+      continue;
+    }
+
+    if (!chatId) {
+      skipped++;
+      logs.push({ student: name, status: "skipped", reason: "missing_telegram_chat_id" });
+      continue;
+    }
+
+    const studentData = {
+      email: String(row[colMap.email - 1] || ""),
+      name: name,
+      fromDate: String(row[colMap.fromDate - 1] || ""),
+      tillDate: String(row[colMap.tillDate - 1] || ""),
+      weeklyScore: row[colMap.score - 1],
+      totalJadeed: String(row[colMap.jadeed - 1] || ""),
+      marhalaRank: String(row[colMap.marhalaRank - 1] || ""),
+      overallRank: String(row[colMap.overallRank - 1] || ""),
+      telegramChatId: chatId
+    };
+
+    const res = sendStudentResultViaTelegram(studentData, cfg);
+    if (res.success) {
+      sent++;
+      logs.push({ student: name, chatId: chatId, status: "sent" });
+    } else {
+      failed++;
+      logs.push({ student: name, chatId: chatId, status: "failed", error: res.error });
+    }
+  }
+
+  return {
+    success: true,
+    total: sent + failed + skipped,
+    sent: sent,
+    failed: failed,
+    skipped: skipped,
+    logs: logs
+  };
 }
