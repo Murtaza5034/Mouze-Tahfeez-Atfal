@@ -226,8 +226,9 @@ function testPopulateAllStudents() {
   testSetup();
 
   const demoStudents = [
-    { id: 101, its: "50401001", name: "Husain Yusuf", email: "parent.husain@example.com", marhala: "Marhala 1", teacher: "Mulla Murtaza", group: "Group A", score: 38.5, jadeed: "3 صفه", mRank: 1, oRank: 3, from: "10", till: "15", status: "Yes" },
-    { id: 102, its: "50401002", name: "Taher Shabbir", email: "parent.taher@example.com", marhala: "Marhala 1", teacher: "Mulla Murtaza", group: "Group A", score: 36.0, jadeed: "2.5 صفه", mRank: 2, oRank: 8, from: "10", till: "15", status: "Yes" },
+    { id: 100, its: "515253", name: "Demo Student", email: "murtazahamid66@gmail.com", phone: "9930852533", marhala: "Marhala 1", teacher: "Janab Mulla Murtaza bhai Hamid", group: "02", score: 38.5, jadeed: "3 صفه", mRank: 1, oRank: 1, from: "10", till: "15", status: "Yes" },
+    { id: 101, its: "50401001", name: "Husain Yusuf", email: "parent.husain@example.com", phone: "", marhala: "Marhala 1", teacher: "Mulla Murtaza", group: "Group A", score: 38.5, jadeed: "3 صفه", mRank: 1, oRank: 3, from: "10", till: "15", status: "Yes" },
+    { id: 102, its: "50401002", name: "Taher Shabbir", email: "parent.taher@example.com", phone: "9930852533", marhala: "Marhala 1", teacher: "Mulla Murtaza", group: "Group A", score: 36.0, jadeed: "2.5 صفه", mRank: 2, oRank: 8, from: "10", till: "15", status: "Yes" },
     { id: 103, its: "50401003", name: "Fatema Mustafa", email: "parent.fatema@example.com", marhala: "Marhala 2", teacher: "Shaikh Abbas", group: "Group B", score: 39.0, jadeed: "4 صفه", mRank: 1, oRank: 2, from: "10", till: "15", status: "Yes" },
     { id: 104, its: "50401004", name: "Ali Asgar", email: "parent.aliasgar@example.com", marhala: "Marhala 2", teacher: "Shaikh Abbas", group: "Group B", score: 35.5, jadeed: "2 صفه", mRank: 2, oRank: 12, from: "10", till: "15", status: "Yes" },
     { id: 105, its: "50401005", name: "Zainab Hatim", email: "parent.zainab@example.com", marhala: "Marhala 3", teacher: "Mulla Idris", group: "Group C", score: 40.0, jadeed: "5 صفه", mRank: 1, oRank: 1, from: "10", till: "15", status: "Yes" },
@@ -248,6 +249,8 @@ function testPopulateAllStudents() {
         name: ds.name,
         email: ds.email,
         parent_email: ds.email,
+        phone: ds.phone || "",
+        whatsapp_number: ds.phone || "",
         teacher_name: ds.teacher,
         group_name: ds.group,
         marhala: ds.marhala,
@@ -1989,20 +1992,27 @@ function sendSelectedStudentTelegramResultImage() {
 function setupTelegramWebhookFromSheet() {
   const ui = SpreadsheetApp.getUi();
   const token = CONFIG.TELEGRAM_BOT_TOKEN;
-  const webhookUrl = CONFIG.TELEGRAM_WEBHOOK_URL;
+  let webAppUrl = "";
+  try {
+    webAppUrl = ScriptApp.getService().getUrl() || "";
+  } catch (_) {}
+
+  const baseWebhook = CONFIG.TELEGRAM_WEBHOOK_URL;
+  const fullWebhookUrl = webAppUrl ? (baseWebhook + "?sheets_url=" + encodeURIComponent(webAppUrl)) : baseWebhook;
 
   try {
     const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/setWebhook", {
       method: "post",
       contentType: "application/json",
-      payload: JSON.stringify({ url: webhookUrl }),
+      payload: JSON.stringify({ url: fullWebhookUrl }),
       muteHttpExceptions: true
     });
 
     const json = JSON.parse(response.getContentText());
     if (json.ok) {
       ui.alert("Webhook Registered Successfully",
-        "✅ Telegram Webhook registered to:\n" + webhookUrl + "\n\nBot: @Mh_Design_bot\nHelpline: " + CONFIG.HELPLINE_NUMBER,
+        "✅ Telegram Webhook registered to:\n" + fullWebhookUrl + "\n\nBot: @Mh_Design_bot\nHelpline: " + CONFIG.HELPLINE_NUMBER +
+        (webAppUrl ? "\n\nLinked Web App: " + webAppUrl : ""),
         ui.ButtonSet.OK
       );
     } else {
@@ -2069,8 +2079,14 @@ function processSearchStudent(payload) {
     const oRank = String(row[colMap.overallRank - 1] || "");
     const status = String(row[colMap.status - 1] || "");
 
-    // 1. Match by Phone Number
-    if (targetPhone && cleanWhatsAppPhone(phone) === targetPhone) {
+    // 1. Match by Phone Number (resilient match: exact or last 10 digits)
+    const rowCleanPhone = cleanWhatsAppPhone(phone);
+    const phoneMatches = targetPhone && rowCleanPhone && (
+      targetPhone === rowCleanPhone ||
+      (targetPhone.length >= 10 && rowCleanPhone.length >= 10 && targetPhone.slice(-10) === rowCleanPhone.slice(-10))
+    );
+
+    if (phoneMatches) {
       return {
         success: true,
         student: {
@@ -2294,8 +2310,12 @@ function processVerifyThreePoint(payload) {
     const name = String(row[colMap.name - 1] || "").trim();
     const cleanRowName = name.toLowerCase();
 
-    // 1. Check Profile Contact Phone Match
-    const phoneMatches = phone && (phone === targetPhone || phone.endsWith(targetPhone) || targetPhone.endsWith(phone));
+    // 1. Check Profile Contact Phone Match (resilient: exact or last 10 digits)
+    const phoneMatches = phone && targetPhone && (
+      phone === targetPhone ||
+      (phone.length >= 10 && targetPhone.length >= 10 && phone.slice(-10) === targetPhone.slice(-10)) ||
+      phone.endsWith(targetPhone) || targetPhone.endsWith(phone)
+    );
     if (!phoneMatches) continue;
 
     // 2. Check Child Full Name Match

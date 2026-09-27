@@ -17,6 +17,17 @@
  */
 
 import { Resvg } from '@resvg/resvg-js';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+let embeddedRoster = [];
+try {
+  embeddedRoster = require('./students-roster.json');
+} catch (e) {
+  console.warn('[TelegramWebhook] Could not load embedded students-roster.json:', e);
+}
+
+let runtimeSheetsWebhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL || '';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8794720432:AAF3F4rbcCnApXk5Jec4D5oLTXiEnPRxb1o';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -442,22 +453,52 @@ async function sendHelplineOnly(chatId, student = null) {
 
 // Query Google Sheets Webhook or fallback student data
 async function queryStudentFromSheets(sheetsWebhookUrl, queryParam) {
-  if (!sheetsWebhookUrl) return null;
-  try {
-    const res = await fetch(sheetsWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'search_student',
-        ...queryParam
-      })
-    });
-    const json = await res.json();
-    if (json && json.success && json.student) {
-      return json.student;
+  if (sheetsWebhookUrl) {
+    try {
+      const res = await fetch(sheetsWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'search_student',
+          ...queryParam
+        })
+      });
+      const json = await res.json();
+      if (json && json.success && json.student) {
+        return json.student;
+      }
+    } catch (err) {
+      console.warn('[TelegramWebhook] Sheets lookup failed:', err.message);
     }
-  } catch (err) {
-    console.warn('[TelegramWebhook] Sheets lookup failed:', err.message);
+  }
+
+  // Resilient fallback to embedded student roster
+  return lookupStudentFallback(queryParam);
+}
+
+// Fallback search in embedded roster (supports 10-digit resilient mobile matching)
+function lookupStudentFallback(queryParam) {
+  const targetPhone = cleanPhone(queryParam.phone || '');
+  const targetName = String(queryParam.name || '').trim().toLowerCase();
+  const targetCode = String(queryParam.code || queryParam.its || '').trim().toLowerCase();
+
+  for (const s of embeddedRoster) {
+    const sPhone = cleanPhone(s.phone || '');
+    // 1. Phone match (check exact or last 10 digits)
+    if (targetPhone) {
+      const phoneMatch = sPhone === targetPhone || (sPhone.length >= 10 && targetPhone.length >= 10 && sPhone.slice(-10) === targetPhone.slice(-10));
+      if (phoneMatch) return s;
+    }
+
+    // 2. Name + Code match
+    if (targetName && targetCode) {
+      const sName = String(s.name || '').toLowerCase();
+      const sIts = String(s.its || '').toLowerCase();
+      const sPhoneDigits = sPhone.slice(-10);
+      if ((sName.includes(targetName) || targetName.includes(sName)) && (sIts === targetCode || sPhoneDigits === targetCode)) {
+        return s;
+      }
+    }
   }
   return null;
 }
@@ -467,51 +508,74 @@ async function getLinkedStudent(sheetsWebhookUrl, chatId) {
   const cached = linkedSubscribersCache.get(String(chatId));
   if (cached) return cached;
 
-  if (!sheetsWebhookUrl) return null;
-  try {
-    const res = await fetch(sheetsWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'get_linked_student',
-        chatId: String(chatId)
-      })
-    });
-    const json = await res.json();
-    if (json && json.success && json.linked && json.student) {
-      linkedSubscribersCache.set(String(chatId), json.student);
-      return json.student;
+  if (sheetsWebhookUrl) {
+    try {
+      const res = await fetch(sheetsWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_linked_student',
+          chatId: String(chatId)
+        })
+      });
+      const json = await res.json();
+      if (json && json.success && json.linked && json.student) {
+        linkedSubscribersCache.set(String(chatId), json.student);
+        return json.student;
+      }
+    } catch (err) {
+      console.warn('[TelegramWebhook] getLinkedStudent failed:', err.message);
     }
-  } catch (err) {
-    console.warn('[TelegramWebhook] getLinkedStudent failed:', err.message);
   }
   return null;
 }
 
 // Perform 3-Point Security Verification against student profile
 async function verifyThreePoint(sheetsWebhookUrl, profilePhone, childName, its, chatId) {
-  if (!sheetsWebhookUrl) return { success: false, error: 'Database service not configured' };
-  try {
-    const res = await fetch(sheetsWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'verify_three_point',
-        profilePhone: cleanPhone(profilePhone),
-        childName: sanitizeInput(childName),
-        its: sanitizeInput(its),
-        chatId: String(chatId)
-      })
-    });
-    const json = await res.json();
-    if (json && json.success && json.verified && json.student) {
-      linkedSubscribersCache.set(String(chatId), json.student);
-      return { success: true, verified: true, student: json.student };
+  if (sheetsWebhookUrl) {
+    try {
+      const res = await fetch(sheetsWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify_three_point',
+          profilePhone: cleanPhone(profilePhone),
+          childName: sanitizeInput(childName),
+          its: sanitizeInput(its),
+          chatId: String(chatId)
+        })
+      });
+      const json = await res.json();
+      if (json && json.success && json.verified && json.student) {
+        linkedSubscribersCache.set(String(chatId), json.student);
+        return { success: true, verified: true, student: json.student };
+      }
+    } catch (err) {
+      console.warn('[TelegramWebhook] verifyThreePoint sheets failed:', err.message);
     }
-    return { success: false, verified: false, error: json?.error || 'Verification mismatch' };
-  } catch (err) {
-    return { success: false, error: err.message };
   }
+
+  // Resilient fallback against embedded student roster
+  const pPhone = cleanPhone(profilePhone);
+  const cName = sanitizeInput(childName).toLowerCase();
+  const cIts = sanitizeInput(its).toLowerCase();
+
+  for (const s of embeddedRoster) {
+    const sPhone = cleanPhone(s.phone || '');
+    const sName = String(s.name || '').toLowerCase();
+    const sIts = String(s.its || '').toLowerCase();
+
+    const phoneMatch = sPhone === pPhone || (sPhone.length >= 10 && pPhone.length >= 10 && sPhone.slice(-10) === pPhone.slice(-10));
+    const nameMatch = sName.includes(cName) || cName.includes(sName);
+    const itsMatch = sIts === cIts;
+
+    if (phoneMatch && nameMatch && itsMatch) {
+      linkedSubscribersCache.set(String(chatId), s);
+      return { success: true, verified: true, student: s };
+    }
+  }
+
+  return { success: false, verified: false, error: 'Verification mismatch' };
 }
 
 // Unlink Telegram Chat ID
@@ -560,16 +624,28 @@ export default async function handler(req, res) {
 
   const query = req.query || {};
   const headers = req.headers || {};
-  const sheetsWebhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL || query.sheets_url || '';
+  if (query.sheets_url) {
+    runtimeSheetsWebhookUrl = query.sheets_url;
+  }
+  const sheetsWebhookUrl = query.sheets_url || runtimeSheetsWebhookUrl || process.env.GOOGLE_SHEETS_WEBHOOK_URL || '';
 
   // 1. GET Requests: Diagnostics & Webhook Management
   if (req.method === 'GET') {
     const action = query.action || 'info';
 
+    // Store sheets webhook URL dynamically
+    if (action === 'set_sheets_url' && query.url) {
+      runtimeSheetsWebhookUrl = query.url;
+      return res.status(200).json({ status: 'ok', sheets_url: runtimeSheetsWebhookUrl });
+    }
+
     // Set Webhook to this Vercel deployment
     if (action === 'set_webhook') {
       const host = req.headers.host || 'mouze-tahfeez-atfal.vercel.app';
-      const webhookUrl = `https://${host}/api/telegram-webhook`;
+      const targetSheetsUrl = query.sheets_url || runtimeSheetsWebhookUrl;
+      const webhookUrl = targetSheetsUrl
+        ? `https://${host}/api/telegram-webhook?sheets_url=${encodeURIComponent(targetSheetsUrl)}`
+        : `https://${host}/api/telegram-webhook`;
       try {
         const tgRes = await fetch(`${TELEGRAM_API_BASE}/setWebhook`, {
           method: 'POST',
@@ -795,6 +871,21 @@ export default async function handler(req, res) {
     if (isHelplineQuery) {
       await sendHelplineOnly(chatId, linkedStudent);
       return res.status(200).json({ ok: true, helpline_only_sent: true });
+    }
+
+    // ── Admin: Connect Google Sheets Webhook (/setsheets <url>) ──
+    if (rawText.toLowerCase().startsWith('/setsheets') || rawText.toLowerCase().startsWith('/sheets')) {
+      const newUrl = rawText.replace(/^\/?(setsheets|sheets)\s*/i, '').trim();
+      if (newUrl.startsWith('http')) {
+        runtimeSheetsWebhookUrl = newUrl;
+        await sendTelegramMessage(chatId,
+          `✅ *Google Sheets Webhook Connected!*\n\n` +
+          `Database endpoint set to:\n\`${newUrl}\`\n\n` +
+          `All student queries, attendance, and results will now sync live with your Google Sheet.`,
+          { reply_markup: linkedStudent ? getLinkedKeyboard(linkedStudent.name) : getStandardKeyboard() }
+        );
+        return res.status(200).json({ ok: true, sheets_url_updated: true });
+      }
     }
 
     // ── Unlink Telegram Account (/unlink) ──
@@ -1025,20 +1116,28 @@ export default async function handler(req, res) {
     if (message.contact && message.contact.phone_number) {
       const sharedPhone = cleanPhone(message.contact.phone_number);
 
-      // Search student by phone number in Google Sheets
+      // Search student by phone number in Google Sheets or embedded roster
       const student = await queryStudentFromSheets(sheetsWebhookUrl, { phone: sharedPhone });
 
       if (student && student.name) {
         recordSafetySuccess(chatId);
-        // Automatically bind this chatId to this student
+        linkedSubscribersCache.set(String(chatId), student);
+        // Automatically bind this chatId to this student in Google Sheets
         try {
-          await verifyThreePoint(sheetsWebhookUrl, sharedPhone, student.name, student.its || student.code || 'MATCH', chatId);
+          if (sheetsWebhookUrl) {
+            await verifyThreePoint(sheetsWebhookUrl, sharedPhone, student.name, student.its || student.code || 'MATCH', chatId);
+          }
         } catch (_) {}
 
         await sendTelegramMessage(chatId,
           `✅ *Profile Matched & Connected!*\n\n` +
-          `Your Telegram account is now connected to *${sanitizeInput(student.name)}*.\n` +
-          `You will receive instant automatic updates for daily attendance, leaves, and results.`,
+          `Your Telegram account is now connected to *${sanitizeInput(student.name)}* (ITS: \`${student.its || 'Verified'}\`).\n\n` +
+          `You will receive instant automatic updates for:\n` +
+          `✔ 📋 Daily Attendance Updates\n` +
+          `✔ 📝 Leave Requests & Approvals\n` +
+          `✔ 📅 Jadwal & Timetable Changes\n` +
+          `✔ 📊 Weekly Result Announcements\n\n` +
+          `Here is the latest weekly result card for *${sanitizeInput(student.name)}*:`,
           { reply_markup: getLinkedKeyboard(student.name) }
         );
 
@@ -1054,6 +1153,7 @@ export default async function handler(req, res) {
           await sendTelegramMessage(chatId,
             `📊 *Weekly Result for ${sanitizeInput(student.name)}*\n\n` +
             `• Score: ${student.weeklyScore}/100\n` +
+            `• Total Jadeed: ${student.totalJadeed || '—'}\n` +
             `• Rank: #${student.marhalaRank}\n\n` +
             `📞 *Helpline Number:* ${HELPLINE_NUMBER}`,
             { reply_markup: getLinkedKeyboard(student.name) }
@@ -1065,7 +1165,7 @@ export default async function handler(req, res) {
           `ℹ️ No student profile found for mobile number \`+${sharedPhone}\`.\n\n` +
           `If your child's profile has a different contact number, please link using the 3-point verification:\n\n` +
           `\`/verify [Profile Contact], [Child Name], [ITS]\`\n` +
-          `_(Example: \`/verify 9876543210, Taher Shabbir, 50401002\`)_\n\n` +
+          `_(Example: \`/verify 9930852533, Demo Student, 515253\`)_\n\n` +
           `📞 *Helpline Number:* \`${HELPLINE_NUMBER}\``,
           { reply_markup: getStandardKeyboard() }
         );
