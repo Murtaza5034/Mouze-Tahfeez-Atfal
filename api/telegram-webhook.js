@@ -705,12 +705,11 @@ export default async function handler(req, res) {
         const attStatus = details?.status || details?.attendanceStatus || 'Present';
         const attDate = details?.date || new Date().toLocaleDateString('en-GB');
         const statusEmoji = /present/i.test(attStatus) ? '✅' : (/absent/i.test(attStatus) ? '❌' : '⏰');
-        notificationMsg = `📋 *Daily Attendance Update*\n\n` +
+        notificationMsg = `📋 *Daily Attendance Update*\n` +
           `Student: *${sanitizeInput(studentDisplayName)}*\n` +
           `📅 Date: ${attDate}\n` +
-          `Status: ${statusEmoji} *${attStatus}*\n` +
-          (details?.note ? `📝 Note: ${sanitizeInput(details.note)}\n` : '') +
-          `\n_Rawdat Tahfeez al Atfal_`;
+          `Status: ${statusEmoji} ${attStatus}\n\n` +
+          `Rawdat Tahfeez al Atfal`;
       } else if (type === 'leave') {
         const lvStatus = details?.status || 'Update';
         const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
@@ -837,11 +836,11 @@ export default async function handler(req, res) {
     if (rawText === '📋 Today Attendance' || (linkedStudent && rawText.toLowerCase().includes('attendance'))) {
       if (linkedStudent) {
         await sendTelegramMessage(chatId,
-          `📋 *Daily Attendance Update*\n\n` +
+          `📋 *Daily Attendance Update*\n` +
           `Student: *${sanitizeInput(linkedStudent.name)}*\n` +
           `📅 Date: ${new Date().toLocaleDateString('en-GB')}\n` +
-          `Status: ✅ *Present / Active*\n\n` +
-          `_Rawdat Tahfeez al Atfal_`,
+          `Status: ✅ Present\n\n` +
+          `Rawdat Tahfeez al Atfal`,
           { reply_markup: getLinkedKeyboard(linkedStudent.name) }
         );
       } else {
