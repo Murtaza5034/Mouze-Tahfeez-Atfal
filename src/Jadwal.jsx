@@ -1842,7 +1842,15 @@ export const JadwalTeacherView = ({ students, onShowAction, onBroadcastNotificat
             `The weekly Quran study schedule (Jadwal) for ${studentName} has been updated by the teacher. Tap to view.`,
             "parents",
             parentId,
-            "Jadwal"
+            "Jadwal",
+            {
+              redirectPage: "Jadwal",
+              studentId: String(selectedStudentId),
+              student_name: studentName,
+              phone: targetStudent?.mobile || targetStudent?.phone || targetStudent?.parent_phone || "",
+              its: targetStudent?.its || targetStudent?.its_id || targetStudent?.student_id || "",
+              note: `The weekly Quran study schedule (Jadwal) for ${studentName} has been updated by the teacher.`
+            }
           );
           onShowAction('success', 'Parents notified successfully');
         } else {

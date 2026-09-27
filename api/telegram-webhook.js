@@ -87,6 +87,50 @@ function findStudentAttendance(student, chatId) {
   );
 }
 
+// In-memory + /tmp persistence for linked Telegram subscribers
+const linkedSubscribersCache = new Map();
+const TMP_SUBSCRIBERS_PATH = path.join('/tmp', 'linked_subscribers.json');
+
+function saveLinkedSubscriber(chatId, student) {
+  if (!chatId || !student) return;
+  const cIdStr = String(chatId);
+  linkedSubscribersCache.set(cIdStr, student);
+  try {
+    let diskData = {};
+    if (fs.existsSync(TMP_SUBSCRIBERS_PATH)) {
+      diskData = JSON.parse(fs.readFileSync(TMP_SUBSCRIBERS_PATH, 'utf8') || '{}');
+    }
+    diskData[cIdStr] = student;
+    fs.writeFileSync(TMP_SUBSCRIBERS_PATH, JSON.stringify(diskData));
+  } catch (_) {}
+}
+
+function removeLinkedSubscriber(chatId) {
+  if (!chatId) return;
+  const cIdStr = String(chatId);
+  linkedSubscribersCache.delete(cIdStr);
+  try {
+    if (fs.existsSync(TMP_SUBSCRIBERS_PATH)) {
+      const diskData = JSON.parse(fs.readFileSync(TMP_SUBSCRIBERS_PATH, 'utf8') || '{}');
+      delete diskData[cIdStr];
+      fs.writeFileSync(TMP_SUBSCRIBERS_PATH, JSON.stringify(diskData));
+    }
+  } catch (_) {}
+}
+
+function getAllLinkedSubscribers() {
+  const map = new Map(linkedSubscribersCache);
+  try {
+    if (fs.existsSync(TMP_SUBSCRIBERS_PATH)) {
+      const diskData = JSON.parse(fs.readFileSync(TMP_SUBSCRIBERS_PATH, 'utf8') || '{}');
+      for (const [cId, stu] of Object.entries(diskData)) {
+        if (!map.has(cId)) map.set(cId, stu);
+      }
+    }
+  } catch (_) {}
+  return map;
+}
+
 function getFontFiles() {
   const candidates = [
     path.join(__dirname, 'fonts', 'arial.ttf'),
@@ -441,9 +485,6 @@ function buildResultCaption(data) {
     `🌐 *Online Portal:* ${PORTAL_URL}`;
 }
 
-// In-memory cache for linked subscribers (chatId -> student data)
-const linkedSubscribersCache = new Map();
-
 // Standard keyboard for new / unverified visitors
 function getStandardKeyboard() {
   return {
@@ -586,7 +627,19 @@ function lookupStudentFallback(queryParam) {
 
 // Query linked student for this chatId
 async function getLinkedStudent(sheetsWebhookUrl, chatId) {
-  const cached = linkedSubscribersCache.get(String(chatId));
+  const cIdStr = String(chatId);
+  let cached = linkedSubscribersCache.get(cIdStr);
+  if (!cached) {
+    try {
+      if (fs.existsSync(TMP_SUBSCRIBERS_PATH)) {
+        const diskData = JSON.parse(fs.readFileSync(TMP_SUBSCRIBERS_PATH, 'utf8') || '{}');
+        if (diskData[cIdStr]) {
+          cached = diskData[cIdStr];
+          linkedSubscribersCache.set(cIdStr, cached);
+        }
+      }
+    } catch (_) {}
+  }
   if (cached) return cached;
 
   if (sheetsWebhookUrl) {
@@ -596,12 +649,12 @@ async function getLinkedStudent(sheetsWebhookUrl, chatId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'get_linked_student',
-          chatId: String(chatId)
+          chatId: cIdStr
         })
       });
       const json = await res.json();
       if (json && json.success && json.linked && json.student) {
-        linkedSubscribersCache.set(String(chatId), json.student);
+        saveLinkedSubscriber(cIdStr, json.student);
         return json.student;
       }
     } catch (err) {
@@ -628,7 +681,7 @@ async function verifyThreePoint(sheetsWebhookUrl, profilePhone, childName, its, 
       });
       const json = await res.json();
       if (json && json.success && json.verified && json.student) {
-        linkedSubscribersCache.set(String(chatId), json.student);
+        saveLinkedSubscriber(String(chatId), json.student);
         return { success: true, verified: true, student: json.student };
       }
     } catch (err) {
@@ -651,7 +704,7 @@ async function verifyThreePoint(sheetsWebhookUrl, profilePhone, childName, its, 
     const itsMatch = sIts === cIts;
 
     if (phoneMatch && nameMatch && itsMatch) {
-      linkedSubscribersCache.set(String(chatId), s);
+      saveLinkedSubscriber(String(chatId), s);
       return { success: true, verified: true, student: s };
     }
   }
@@ -661,7 +714,7 @@ async function verifyThreePoint(sheetsWebhookUrl, profilePhone, childName, its, 
 
 // Unlink Telegram Chat ID
 async function unlinkTelegram(sheetsWebhookUrl, chatId) {
-  linkedSubscribersCache.delete(String(chatId));
+  removeLinkedSubscriber(String(chatId));
   if (!sheetsWebhookUrl) return true;
   try {
     await fetch(sheetsWebhookUrl, {
@@ -837,8 +890,9 @@ export default async function handler(req, res) {
         }
       }
 
-      // Merge memory cache subscribers
-      for (const [cId, stu] of linkedSubscribersCache.entries()) {
+      // Merge memory and disk cache subscribers
+      const allSubscribers = getAllLinkedSubscribers();
+      for (const [cId, stu] of allSubscribers.entries()) {
         const cPhone = cleanPhone(stu.phone || '');
         const cIts = String(stu.its || '').trim();
         const cName = String(stu.name || '').trim().toLowerCase();
@@ -886,40 +940,60 @@ export default async function handler(req, res) {
           `📅 Date: ${attDate}\n` +
           `Status: ${statusEmoji} ${attStatus}\n\n` +
           `Rawdat Tahfeez al Atfal`;
-      }
-
-      if (chatIds.length === 0) {
-        return res.status(200).json({ success: true, delivered: 0, note: 'Attendance recorded; no linked subscribers found' });
       } else if (type === 'leave') {
         const lvStatus = details?.status || 'Update';
-        const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : '⏳');
+        const isMsg = details?.type === 'leave_chat_message' || /message/i.test(details?.title || '');
+        const statusEmoji = /approved/i.test(lvStatus) ? '✅' : (/rejected/i.test(lvStatus) ? '❌' : (isMsg ? '💬' : '⏳'));
         const fromDate = details?.fromDate || details?.from_date || '';
         const toDate = details?.toDate || details?.to_date || '';
-        const periodStr = fromDate && toDate ? `${fromDate} ➔ ${toDate}` : (fromDate || 'Scheduled dates');
-        notificationMsg = `📝 *Leave Application Update*\n\n` +
-          `Student: *${sanitizeInput(studentDisplayName)}*\n` +
-          `📅 Period: ${periodStr}\n` +
-          `Status: ${statusEmoji} *${lvStatus}*\n` +
-          (details?.comment || details?.adminComment ? `💬 Remark: ${sanitizeInput(details.comment || details.adminComment)}\n` : '') +
-          `\n_Rawdat Tahfeez al Atfal_`;
+        const periodStr = fromDate && toDate ? `${fromDate} ➔ ${toDate}` : (fromDate || '');
+        const comment = details?.comment || details?.adminComment || details?.admin_comment || details?.note || '';
+
+        if (isMsg) {
+          notificationMsg = `💬 *Admin Leave Message*\n` +
+            `Student: *${sanitizeInput(studentDisplayName)}*\n` +
+            (comment ? `Message: ${sanitizeInput(comment)}\n\n` : '\n') +
+            `Rawdat Tahfeez al Atfal`;
+        } else {
+          notificationMsg = `📝 *Leave Application Update*\n` +
+            `Student: *${sanitizeInput(studentDisplayName)}*\n` +
+            (periodStr ? `📅 Period: ${periodStr}\n` : '') +
+            `Status: ${statusEmoji} ${lvStatus}\n` +
+            (comment ? `Remark: ${sanitizeInput(comment)}\n\n` : '\n') +
+            `Rawdat Tahfeez al Atfal`;
+        }
       } else if (type === 'jadwal') {
-        notificationMsg = `📅 *Jadwal / Timetable Update*\n\n` +
+        const jDate = details?.date || details?.day || '';
+        const juz = details?.juz || details?.juzNumber || '';
+        const jh = details?.jh || details?.juzhali || '';
+        const jadeed = details?.jadeed || '';
+        const detailsParts = [];
+        if (juz) detailsParts.push(`📖 Juz: ${juz}`);
+        if (jh) detailsParts.push(`JH: ${jh}`);
+        if (jadeed) detailsParts.push(`Jadeed: ${jadeed}`);
+        const scheduleDetails = detailsParts.length > 0 ? `${detailsParts.join(' | ')}\n` : '';
+
+        notificationMsg = `📅 *Jadwal Schedule Update*\n` +
           `Student: *${sanitizeInput(studentDisplayName)}*\n` +
-          `The daily timetable and hifz schedule has been updated.\n` +
-          (details?.note ? `📌 Note: ${sanitizeInput(details.note)}\n\n` : '\n') +
-          `🌐 Portal: ${PORTAL_URL}\n\n` +
-          `_Rawdat Tahfeez al Atfal_`;
+          (jDate ? `📅 Date: ${sanitizeInput(jDate)}\n` : '') +
+          scheduleDetails +
+          (details?.note && !scheduleDetails ? `📌 Note: ${sanitizeInput(details.note)}\n` : '') +
+          `\nRawdat Tahfeez al Atfal`;
       } else if (type === 'result') {
         notificationMsg = `📊 *Weekly Result is Now Live!*\n\n` +
           `Student: *${sanitizeInput(studentDisplayName)}*\n` +
           `The latest weekly assessment results are now live.\n\n` +
           `Tap "📊 View Weekly Result Card" below or send /result to view the official performance card.\n\n` +
-          `_Rawdat Tahfeez al Atfal_`;
+          `Rawdat Tahfeez al Atfal`;
       } else {
         notificationMsg = `🔔 *Student Update*\n\n` +
           `Student: *${sanitizeInput(studentDisplayName)}*\n` +
           `${sanitizeInput(body.message || body.text || 'New academic update published.')}\n\n` +
-          `_Rawdat Tahfeez al Atfal_`;
+          `Rawdat Tahfeez al Atfal`;
+      }
+
+      if (chatIds.length === 0) {
+        return res.status(200).json({ success: true, delivered: 0, note: 'Update processed; no linked subscribers found' });
       }
 
       let deliveredCount = 0;
@@ -1230,7 +1304,7 @@ export default async function handler(req, res) {
 
       if (student && student.name) {
         recordSafetySuccess(chatId);
-        linkedSubscribersCache.set(String(chatId), student);
+        saveLinkedSubscriber(String(chatId), student);
         // Automatically bind this chatId to this student in Google Sheets
         try {
           if (sheetsWebhookUrl) {

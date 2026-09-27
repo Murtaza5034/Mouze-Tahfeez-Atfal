@@ -1544,6 +1544,31 @@ export const SelfJadwalTeacherView
     }
   }, [selectedUserId, students]);
 
+  const getUpdatedJadwalDetails = () => {
+    let dayName = '';
+    let dayData = null;
+    if (editHistory && Object.keys(editHistory).length > 0) {
+      const sorted = Object.entries(editHistory).sort((a, b) => new Date(b[1]) - new Date(a[1]));
+      if (sorted.length > 0) {
+        dayName = sorted[0][0].split('_')[0];
+        dayData = scheduleData[dayName];
+      }
+    }
+    if (!dayData) {
+      const todayIndex = new Date().getDay();
+      const currentDayName = DAYS[todayIndex === 6 ? 0 : todayIndex + 1] || 'SATURDAY';
+      dayName = currentDayName;
+      dayData = scheduleData[currentDayName] || scheduleData[DAYS[0]] || {};
+    }
+    return {
+      day: dayName,
+      date: dayData?.date || dayName,
+      juz: dayData?.juz1 || dayData?.juz || dayData?.juz2 || '',
+      jh: dayData?.juzhali || '',
+      jadeed: dayData?.jadeed || ''
+    };
+  };
+
   useEffect(() => {
     if (!resolvedUserId) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -1589,6 +1614,35 @@ export const SelfJadwalTeacherView
       } else {
         lastSavedSnapshotRef.current = JSON.stringify({ data: scheduleData, mode });
         if (showAction) showAction('success', 'Self Jadwal saved!');
+        if (onBroadcastNotification) {
+          try {
+            const isKibar = typeof window !== "undefined" && window.location?.href?.includes("kibar");
+            const targetSection = isKibar ? "kibar" : "atfal";
+            const targetUserId = resolvedUserId || selectedUserId;
+            const details = getUpdatedJadwalDetails();
+            const childName = child?.name || child?.full_name || selectedUserName || "Your child";
+            onBroadcastNotification(
+              "Jadwal Timetable Updated",
+              `Self Jadwal schedule for ${childName} has been updated.`,
+              "user",
+              targetUserId,
+              "Self Jadwal",
+              {
+                redirectPage: "Self Jadwal",
+                section: targetSection,
+                studentId: String(sid),
+                student_name: childName,
+                phone: child?.mobile || child?.phone || child?.parent_phone || "",
+                its: child?.its || child?.its_id || child?.student_id || "",
+                date: details.date || details.day,
+                juz: details.juz,
+                jh: details.jh,
+                jadeed: details.jadeed,
+              },
+              targetSection
+            ).catch(() => {});
+          } catch (_) {}
+        }
       }
       if (saveGenerationRef.current === thisGen) setIsSaving(false);
     }, 1500);
@@ -1657,13 +1711,33 @@ export const SelfJadwalTeacherView
         const isKibar = typeof window !== "undefined" && window.location?.href?.includes("kibar");
         const targetSection = isKibar ? "kibar" : "atfal";
         const targetUserId = resolvedUserId || selectedUserId;
+        const child = (students || []).find(s =>
+          String(s.student_id) === String(selectedUserId) ||
+          String(s.id) === String(selectedUserId) ||
+          String(s.user_id) === String(selectedUserId) ||
+          (s.allIds && s.allIds.includes(String(selectedUserId)))
+        );
+        const childName = child?.name || child?.full_name || selectedUserName || "Your child";
+        const details = getUpdatedJadwalDetails();
+
         await onBroadcastNotification(
-          "Self Jadwal Timetable Updated",
-          `Your personal Self Jadwal schedule has been updated by the teacher. Tap to view.`,
+          "Jadwal Timetable Updated",
+          `Self Jadwal schedule for ${childName} has been updated.`,
           "user",
           targetUserId,
           "Self Jadwal",
-          { redirectPage: "Self Jadwal", section: targetSection },
+          {
+            redirectPage: "Self Jadwal",
+            section: targetSection,
+            studentId: String(child?.student_id || targetUserId),
+            student_name: childName,
+            phone: child?.mobile || child?.phone || child?.parent_phone || "",
+            its: child?.its || child?.its_id || child?.student_id || "",
+            date: details.date || details.day,
+            juz: details.juz,
+            jh: details.jh,
+            jadeed: details.jadeed,
+          },
           targetSection
         );
         if (showAction) showAction('success', 'User notified successfully');
