@@ -2161,8 +2161,9 @@ function verifyStudentCodeInMarhalaSheets(ss, studentName, code) {
  * Programmatic Webhook Processor for Telegram Results Dispatch.
  */
 function processSendTelegramResults(payload) {
-  const ss = resolveSpreadsheet(payload.category || "atfal");
-  const sheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
+  try {
+    const ss = resolveSpreadsheet(payload.category || "atfal");
+    const sheet = ss.getSheetByName(CONFIG.PARENTS_EMAIL_SHEET_NAME);
   if (!sheet) {
     return { success: false, error: "Tab '" + CONFIG.PARENTS_EMAIL_SHEET_NAME + "' not found" };
   }
