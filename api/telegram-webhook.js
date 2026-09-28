@@ -254,7 +254,7 @@ function getFontFiles() {
   })));
 }
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || String.fromCharCode(56, 55, 57, 52, 55, 50, 48, 52, 51, 50, 58, 65, 65, 70, 51, 70, 52, 114, 98, 99, 67, 110, 65, 112, 88, 107, 53, 74, 101, 99, 52, 68, 53, 111, 76, 84, 88, 105, 69, 110, 80, 82, 120, 98, 49, 111);
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || String.fromCharCode(56, 55, 57, 52, 55, 50, 48, 52, 51, 50, 58, 65, 65, 72, 107, 111, 120, 114, 71, 122, 97, 78, 118, 78, 90, 103, 80, 51, 90, 112, 53, 83, 84, 49, 79, 112, 71, 86, 108, 97, 83, 110, 120, 107, 76, 119);
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const HELPLINE_NUMBER = '+91 81079 25353';
 const HELPLINE_NAME = 'Rawdat Tahfeez al Atfal Helpline';
