@@ -1186,6 +1186,18 @@ export default async function handler(req, res) {
         }
       }
 
+      // Forward live update to WhatsApp Bot service (OpenWA / Baileys Helpline: +91 81079 25353)
+      try {
+        const waGatewayUrl = process.env.OPENWA_GATEWAY_URL || 'http://localhost:2785';
+        fetch(`${waGatewayUrl}/api/notify-student-update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }).catch((waErr) => {
+          console.warn('[WhatsApp Bot Forward]:', waErr.message);
+        });
+      } catch (_) {}
+
       return res.status(200).json({ success: true, delivered: deliveredCount, totalTargets: chatIds.length });
     }
 

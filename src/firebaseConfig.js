@@ -68,18 +68,30 @@ export const getFCMToken = async (retries = 3) => {
     try {
       console.log(`[FCM] Requesting FCM Token (attempt ${attempt}/${retries})...`);
       
-      // Explicitly obtain active service worker registration for official PWA / background push support
+      // Explicitly register and obtain dedicated FCM service worker registration
       if ('serviceWorker' in navigator) {
-        let registration = await navigator.serviceWorker.ready.catch(() => null);
-        if (!registration) {
-          try {
-            registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-              scope: '/'
+        let registration = null;
+        try {
+          registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+            scope: '/firebase-cloud-messaging-push-scope'
+          });
+          // Wait for service worker to activate if installing/waiting
+          if (registration.installing || registration.waiting) {
+            await new Promise((resolve) => {
+              const sw = registration.installing || registration.waiting;
+              if (sw.state === 'activated') {
+                resolve();
+              } else {
+                sw.addEventListener('statechange', () => {
+                  if (sw.state === 'activated') resolve();
+                });
+                setTimeout(resolve, 2000);
+              }
             });
-            await navigator.serviceWorker.ready;
-          } catch (regErr) {
-            console.warn('[FCM] Service worker registration attempt note:', regErr);
           }
+        } catch (regErr) {
+          console.warn('[FCM] Dedicated FCM SW registration note:', regErr);
+          registration = await navigator.serviceWorker.ready.catch(() => null);
         }
         console.log('[FCM] Service Worker active registration:', registration?.scope);
         
@@ -130,6 +142,10 @@ export const getFCMToken = async (retries = 3) => {
           }
         } catch (e) {
           console.warn("[FCM] Failed to clear IndexedDB database:", e);
+        }
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 600));
+          continue;
         }
         return null;
       }

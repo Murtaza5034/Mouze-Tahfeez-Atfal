@@ -6,10 +6,8 @@ import android.app.NotificationManager;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.app.DownloadManager;
-import android.content.ContentValues;
-import android.content.Context;
-import android.content.Intent;
-import android.content.SharedPreferences;
+import android.location.Location;
+import android.location.LocationManager;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -65,6 +63,8 @@ public class MainActivity extends BridgeActivity {
         requestMediaPermissions();
 
         // Expose bridges to the WebView as early as possible
+        // Note: configureWebView() also registers these after WebView is fully set up.
+        // This early registration ensures bridges are available before page load completes.
         try {
             WebView wv = getBridge().getWebView();
             if (wv != null) {
@@ -216,7 +216,63 @@ public class MainActivity extends BridgeActivity {
                         },
                         LOCATION_PERMISSION_REQUEST_CODE
                 );
+            } else {
+                if (webView != null) {
+                    webView.post(() -> {
+                        webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('mauze-location-permission-result', { detail: { granted: true } }));", null);
+                    });
+                }
             }
+        } else {
+            if (webView != null) {
+                webView.post(() -> {
+                    webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('mauze-location-permission-result', { detail: { granted: true } }));", null);
+                });
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (webView != null) {
+                webView.post(() -> {
+                    // Dispatch permission result first
+                    webView.evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('mauze-location-permission-result', { detail: { granted: " + granted + " } }));",
+                        null
+                    );
+                    // If granted but GPS/Location provider is OFF, immediately notify JS to open settings
+                    if (granted) {
+                        boolean gpsOn = false;
+                        try {
+                            LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                            if (lm != null) {
+                                gpsOn = lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                                     || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                            }
+                        } catch (Exception ignored) { gpsOn = true; }
+                        if (!gpsOn) {
+                            webView.evaluateJavascript(
+                                "window.dispatchEvent(new CustomEvent('mauze-gps-disabled'));",
+                                null
+                            );
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.post(() -> {
+                webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('mauze-app-resumed'));", null);
+            });
         }
     }
 
@@ -226,6 +282,18 @@ public class MainActivity extends BridgeActivity {
             boolean hasFine = ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
             boolean hasCoarse = ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
             return hasFine || hasCoarse;
+        }
+
+        @JavascriptInterface
+        public boolean isGpsEnabled() {
+            try {
+                LocationManager lm = (LocationManager) MainActivity.this.getSystemService(Context.LOCATION_SERVICE);
+                if (lm == null) return false;
+                return lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                       lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+            } catch (Exception ignored) {
+                return true;
+            }
         }
 
         @JavascriptInterface
@@ -239,9 +307,101 @@ public class MainActivity extends BridgeActivity {
                 Intent intent = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 MainActivity.this.startActivity(intent);
+            } catch (Exception ignored) {
+                openAppSettings();
+            }
+        }
+
+        @JavascriptInterface
+        public void openAppSettings() {
+            try {
+                Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                intent.setData(Uri.fromParts("package", MainActivity.this.getPackageName(), null));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                MainActivity.this.startActivity(intent);
             } catch (Exception ignored) {}
         }
-    }
+
+        @JavascriptInterface
+        public String getNativeLocation() {
+            try {
+                if (!hasLocationPermission()) return null;
+                LocationManager lm = (LocationManager) MainActivity.this.getSystemService(Context.LOCATION_SERVICE);
+                if (lm == null) return null;
+
+                Location bestLoc = null;
+                // Collect last known from all enabled providers
+                for (String provider : lm.getProviders(true)) {
+                    try {
+                        Location l = lm.getLastKnownLocation(provider);
+                        if (l == null) continue;
+                        long ageMs = System.currentTimeMillis() - l.getTime();
+                        // Prefer recent (< 2min) and accurate fixes
+                        if (bestLoc == null
+                                || (ageMs < 120000 && l.getAccuracy() < bestLoc.getAccuracy())) {
+                            bestLoc = l;
+                        }
+                    } catch (SecurityException ignored) {}
+                }
+                if (bestLoc != null) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("lat", bestLoc.getLatitude());
+                    obj.put("lng", bestLoc.getLongitude());
+                    obj.put("accuracy", (double) bestLoc.getAccuracy());
+                    obj.put("time", bestLoc.getTime());
+                    return obj.toString();
+                }
+            } catch (Exception ignored) {}
+            return null;
+        }
+
+        /**
+         * Requests a fresh one-shot GPS fix and dispatches result to JS as
+         * 'mauze-native-location-result' CustomEvent with { lat, lng, accuracy }.
+         * Falls back silently if GPS is unavailable.
+         */
+        @JavascriptInterface
+        public void requestFreshLocation() {
+            try {
+                if (!hasLocationPermission()) return;
+                LocationManager lm = (LocationManager) MainActivity.this.getSystemService(Context.LOCATION_SERVICE);
+                if (lm == null) return;
+
+                // Choose best available provider (prefer GPS, fall back to network)
+                String provider = null;
+                if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    provider = LocationManager.GPS_PROVIDER;
+                } else if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                    provider = LocationManager.NETWORK_PROVIDER;
+                }
+                if (provider == null) return;
+
+                final String finalProvider = provider;
+                runOnUiThread(() -> {
+                    try {
+                        lm.requestSingleUpdate(finalProvider, new android.location.LocationListener() {
+                            @Override
+                            public void onLocationChanged(android.location.Location location) {
+                                if (webView == null) return;
+                                try {
+                                    JSONObject obj = new JSONObject();
+                                    obj.put("lat", location.getLatitude());
+                                    obj.put("lng", location.getLongitude());
+                                    obj.put("accuracy", (double) location.getAccuracy());
+                                    obj.put("time", location.getTime());
+                                    String js = "window.dispatchEvent(new CustomEvent('mauze-native-location-result', { detail: " + obj.toString() + " }));";
+                                    webView.post(() -> webView.evaluateJavascript(js, null));
+                                } catch (Exception ignored) {}
+                            }
+                            @Override public void onStatusChanged(String p, int s, android.os.Bundle e) {}
+                            @Override public void onProviderEnabled(String p) {}
+                            @Override public void onProviderDisabled(String p) {}
+                        }, null);
+                    } catch (SecurityException | IllegalArgumentException ignored) {}
+                });
+            } catch (Exception ignored) {}
+        }
+    }  // end MauzeLocationBridge
 
     private class MauzeMediaPermissionBridge {
         @JavascriptInterface
@@ -513,10 +673,13 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void setupDownloadListener() {
-        WebView webView = getBridge().getWebView();
-
-        if (webView == null) {
-            webView.post(this::attachDownloadListener);
+        WebView wv = getBridge().getWebView();
+        if (wv == null) {
+            // WebView not ready yet; schedule attachment after it's available
+            getBridge().getWebView(); // ensure init
+            try {
+                getBridge().getWebView().post(this::attachDownloadListener);
+            } catch (Exception ignored) {}
         } else {
             attachDownloadListener();
         }

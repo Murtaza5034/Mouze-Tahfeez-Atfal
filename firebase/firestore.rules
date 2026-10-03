@@ -393,6 +393,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /user_fcm_tokens/{id} {
+      allow read, write: if isSignedIn();
+    }
+
     match /kibar_quran_ikhtebar/{id} {
       allow read, write: if isSignedIn();
     }

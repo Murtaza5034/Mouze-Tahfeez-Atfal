@@ -1,6 +1,6 @@
 import React from "react";
 import "./QuranDirectAccessCard.css";
-import { BookOpen, Sparkles, ArrowRight, Mic, BookMarked, Layers, CheckCircle2 } from "lucide-react";
+import { Sparkles, ArrowRight, Mic, BookMarked, Layers, CheckCircle2 } from "lucide-react";
 
 export default function QuranDirectAccessCard({ onOpen }) {
   return (
@@ -23,10 +23,12 @@ export default function QuranDirectAccessCard({ onOpen }) {
       <div className="quran-direct-content">
         <div className="quran-direct-left">
           <div className="quran-direct-icon-wrap">
-            <BookOpen size={30} className="quran-direct-icon" />
-            <span className="quran-direct-icon-sparkle">
-              <Sparkles size={14} />
-            </span>
+            <img
+              src="/quran-3d-gold.png"
+              alt="Quran on Stand"
+              className="quran-3d-img"
+              draggable={false}
+            />
           </div>
 
           <div className="quran-direct-texts">
@@ -70,7 +72,7 @@ export default function QuranDirectAccessCard({ onOpen }) {
               onOpen();
             }}
           >
-            <BookOpen size={18} className="cta-icon" />
+            <img src="/quran-3d-gold.png" alt="" className="cta-icon-3d" draggable={false} />
             <span className="arabic-kanz">تصفح القرآن الكريم</span>
             <ArrowRight size={17} className="cta-arrow" />
           </button>

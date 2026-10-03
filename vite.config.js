@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import fs from 'fs'
 
 export default defineConfig(({ mode }) => ({
   define: {
@@ -9,6 +10,26 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    {
+      name: 'dev-debug-dump',
+      configureServer(server) {
+        server.middlewares.use('/api/debug-dump', (req, res) => {
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', () => {
+              try {
+                fs.writeFileSync('scratch/debug_portal_dump.json', body, 'utf8');
+              } catch (_) {}
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ ok: true }));
+            });
+            return;
+          }
+          res.end('ok');
+        });
+      }
+    },
     // Patch: Add missing getRefreshReg to @vitejs/plugin-react v6's
     // bundled refresh-runtime.js (needed by React 18 Fast Refresh).
     // The plugin v6 ships a simplified runtime that omits this function.
@@ -83,7 +104,6 @@ export function getRefreshReg() {
         'Qilka-Bold.otf',
       ],
       workbox: {
-        importScripts: ['/firebase-messaging-sw.js'],
         maximumFileSizeToCacheInBytes: 10485760,
         globPatterns: ['**/*.{js,css,html,json,png,jpg,jpeg,gif,svg,ico,woff,woff2,ttf,otf}'],
         globIgnores: ['**/login background.jpg', '**/kanz-al-marjaan-webfont.svg'],

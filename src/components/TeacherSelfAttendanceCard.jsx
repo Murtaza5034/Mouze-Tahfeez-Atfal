@@ -25,6 +25,7 @@ import {
   checkAttendanceWindow,
   calculateHaversineDistanceMeters,
   getExactUserLocation,
+  requestDeviceLocationPermission,
   openDeviceLocationSettings,
 } from "../utils/attendanceSettingsHelper";
 import "./TeacherSelfAttendanceCard.css";
@@ -212,19 +213,50 @@ export default function TeacherSelfAttendanceCard({
   // -------------------------------------------------------------------------
   // 4. Fetch User GPS Location (Condition 2)
   // -------------------------------------------------------------------------
-  const fetchLocation = useCallback(async () => {
+  const fetchLocation = useCallback(async (opts = {}) => {
     setLocationStatus("locating");
     setLocationError(null);
     try {
+      if (opts?.requestPerm) {
+        // On Android, if bridge is available, request via native bridge
+        // and wait for the permission result event before proceeding
+        const isAndroidBridge =
+          typeof window !== "undefined" && !!window.MauzeLocationBridge;
+        if (isAndroidBridge) {
+          const hasPerm = window.MauzeLocationBridge.hasLocationPermission?.();
+          if (!hasPerm) {
+            // Trigger the system dialog
+            window.MauzeLocationBridge.requestLocationPermission();
+            // Wait up to 30s for the user to respond to the dialog
+            await new Promise((resolve) => {
+              const tid = setTimeout(resolve, 30000); // timeout fallback
+              const handler = () => {
+                clearTimeout(tid);
+                window.removeEventListener("mauze-location-permission-result", handler);
+                resolve();
+              };
+              window.addEventListener("mauze-location-permission-result", handler, { once: true });
+            });
+          }
+        } else {
+          await requestDeviceLocationPermission();
+        }
+      }
       const pos = await getExactUserLocation();
-      setUserCoords(pos);
-      setLocationStatus("granted");
+      if (pos && pos.lat != null && pos.lng != null) {
+        setUserCoords(pos);
+        setLocationStatus("granted");
+        return pos;
+      } else {
+        throw new Error("LOCATION_EMPTY");
+      }
     } catch (err) {
       console.warn("[TeacherSelfAttendance] GPS error:", err);
-      if (err.message === "LOCATION_PERMISSION_DENIED") {
+      const msg = String(err?.message || "");
+      if (msg === "LOCATION_PERMISSION_DENIED" || msg.includes("denied")) {
         setLocationStatus("denied");
         setLocationError("GPS permission denied. Please allow location access to verify attendance.");
-      } else if (err.message === "LOCATION_SERVICES_DISABLED") {
+      } else if (msg === "LOCATION_SERVICES_DISABLED" || msg.includes("disabled") || msg.includes("service")) {
         setLocationStatus("disabled_device");
         setLocationError("Device Location is turned OFF. Please enable Location in your phone's notification bar.");
       } else {
@@ -233,6 +265,7 @@ export default function TeacherSelfAttendanceCard({
           "Could not retrieve GPS coordinates. Please check your device location settings."
         );
       }
+      return null;
     }
   }, []);
 
@@ -357,11 +390,50 @@ export default function TeacherSelfAttendanceCard({
   // 1. In the active time window
   // 2. Teacher has NOT already marked attendance today (saves battery & prevents unwanted tracking)
   // 3. Teacher has NOT manually turned off location for today
+  // Directly prompt location permission when attendance window is live on Home page
   useEffect(() => {
     if (windowStatus.isInWindow && !isAlreadyMarked && !isLocationTurnedOffToday) {
-      fetchLocation();
+      fetchLocation({ requestPerm: true });
     }
   }, [windowStatus.isInWindow, isAlreadyMarked, isLocationTurnedOffToday, fetchLocation]);
+
+  // Re-fetch location after app resume / returning from Settings
+  useEffect(() => {
+    const handleResume = () => {
+      if (windowStatus.isInWindow && !isAlreadyMarked) {
+        // Small delay so Android has time to propagate location permission state
+        setTimeout(() => fetchLocation({ requestPerm: false }), 800);
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && windowStatus.isInWindow && !isAlreadyMarked) {
+        setTimeout(() => fetchLocation({ requestPerm: false }), 800);
+      }
+    };
+
+    // When Android reports GPS provider is OFF right after permission grant —
+    // immediately open device location settings so teacher can toggle it on
+    const handleGpsDisabled = () => {
+      if (windowStatus.isInWindow && !isAlreadyMarked) {
+        openDeviceLocationSettings("gps");
+        setLocationStatus("disabled_device");
+        setLocationError("Device Location (GPS) is turned OFF. Please enable it now to mark attendance.");
+      }
+    };
+
+    window.addEventListener("mauze-app-resumed", handleResume);
+    window.addEventListener("focus", handleResume);
+    window.addEventListener("mauze-gps-disabled", handleGpsDisabled);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("mauze-app-resumed", handleResume);
+      window.removeEventListener("focus", handleResume);
+      window.removeEventListener("mauze-gps-disabled", handleGpsDisabled);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [windowStatus.isInWindow, isAlreadyMarked, fetchLocation]);
 
   // If already marked, automatically release active GPS coordinates to preserve mobile battery
   useEffect(() => {
@@ -410,11 +482,31 @@ export default function TeacherSelfAttendanceCard({
   // 7. Handle Mark Attendance Action
   // -------------------------------------------------------------------------
   const handleMarkAttendance = async (opts = {}) => {
-    if (!isInsideGeofence) {
+    let activeCoords = opts?.coords || userCoords;
+    let activeDist = opts?.dist != null ? opts.dist : distanceMeters;
+
+    if (!activeCoords || activeDist == null) {
+      const pos = await fetchLocation({ requestPerm: true });
+      if (!pos) {
+        if (onShowAction) {
+          onShowAction("error", "Please allow location access to verify attendance.");
+        }
+        return;
+      }
+      activeCoords = pos;
+      activeDist = calculateHaversineDistanceMeters(
+        pos.lat,
+        pos.lng,
+        settings.venue_lat,
+        settings.venue_lng
+      );
+    }
+
+    if (activeDist > configuredRadius) {
       if (onShowAction) {
         onShowAction(
           "error",
-          `Cannot mark attendance: You must be strictly within ${configuredRadius}m of ${settings.venue_name}.`
+          `Cannot mark attendance: You are ${Math.round(activeDist)}m away. You must be strictly within ${configuredRadius}m of ${settings.venue_name}.`
         );
       }
       return;
@@ -453,14 +545,14 @@ export default function TeacherSelfAttendanceCard({
       attendance_time: formattedTime,
       minutes_present: isLate ? 80 : 90,
       note: opts.isAuto
-        ? `Auto-marked at ${settings.venue_name} via GPS (${isLate ? "Late" : "On Time"}, ${distanceMeters}m away)`
+        ? `Auto-marked at ${settings.venue_name} via GPS (${isLate ? "Late" : "On Time"}, ${Math.round(activeDist)}m away)`
         : isLate
-        ? `Self-marked via GPS at ${settings.venue_name} (Late - after 4:33 PM, ${distanceMeters}m away)`
-        : `Self-marked via GPS at ${settings.venue_name} (On Time, ${distanceMeters}m away)`,
+        ? `Self-marked via GPS at ${settings.venue_name} (Late - after 4:33 PM, ${Math.round(activeDist)}m away)`
+        : `Self-marked via GPS at ${settings.venue_name} (On Time, ${Math.round(activeDist)}m away)`,
       marked_by: opts.isAuto ? "auto" : "self",
-      latitude: userCoords?.lat || null,
-      longitude: userCoords?.lng || null,
-      distance_meters: distanceMeters,
+      latitude: activeCoords?.lat || null,
+      longitude: activeCoords?.lng || null,
+      distance_meters: Math.round(activeDist),
       venue_name: settings.venue_name,
       updated_at: markTime.toISOString(),
     };
@@ -575,126 +667,7 @@ export default function TeacherSelfAttendanceCard({
     return null;
   }
 
-  // Skeleton Loader while GPS is retrieving
-  if (locationStatus === "locating") {
-    return (
-      <div className="teacher-self-att-wrapper card-appear">
-        <div className="teacher-att-skeleton-card">
-          <div className="teacher-att-skeleton-header">
-            <div className="teacher-att-skeleton-title-row">
-              <div className="teacher-att-skeleton-circle teacher-att-skeleton-shimmer" />
-              <div className="teacher-att-skeleton-lines">
-                <div className="teacher-att-skeleton-line-lg teacher-att-skeleton-shimmer" />
-                <div className="teacher-att-skeleton-line-sm teacher-att-skeleton-shimmer" />
-              </div>
-            </div>
-            <div
-              className="teacher-att-skeleton-line-sm teacher-att-skeleton-shimmer"
-              style={{ width: 60 }}
-            />
-          </div>
 
-          <div className="teacher-att-skeleton-body teacher-att-skeleton-shimmer" />
-          <div className="teacher-att-skeleton-btn teacher-att-skeleton-shimmer" />
-
-          <div className="teacher-att-skeleton-status">
-            <RotateCw size={13} className="att-spin" />
-            <span>Validating device GPS & venue geofence...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Graceful Handling: Location permission denied, error, or disabled on device
-  if (
-    locationStatus === "denied" ||
-    locationStatus === "error" ||
-    locationStatus === "disabled_device"
-  ) {
-    return (
-      <div className="teacher-self-att-wrapper card-appear">
-        <div className="teacher-permission-card">
-          <div className="teacher-permission-header">
-            <h3 className="teacher-permission-header-title">
-              <AlertTriangle size={18} /> GPS Location Required
-            </h3>
-            <span style={{ fontSize: "0.72rem", color: "#f5c042", fontWeight: 700 }}>
-              {windowStatus.startLabel} – {windowStatus.endLabel}
-            </span>
-          </div>
-          <div className="teacher-permission-body">
-            <p className="teacher-permission-text">
-              {locationError ||
-                `Please allow location access on your device so we can verify your presence at ${settings.venue_name} to mark self attendance.`}
-            </p>
-            <div className="teacher-permission-btns-row">
-              <button
-                type="button"
-                className="teacher-permission-btn"
-                onClick={fetchLocation}
-              >
-                <Navigation size={16} />
-                <span>Allow GPS Location</span>
-              </button>
-              <button
-                type="button"
-                className="teacher-permission-settings-btn"
-                onClick={async () => {
-                  await openDeviceLocationSettings();
-                  setTimeout(fetchLocation, 2500);
-                }}
-              >
-                <Settings size={15} />
-                <span>Open Device Settings</span>
-              </button>
-            </div>
-            <p className="teacher-permission-hint">
-              💡 If Android denied permission or GPS is off, tap <strong>Open Device Settings</strong> or swipe down your notification bar and turn ON <strong>Location</strong>.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Graceful Handling: Location was manually disabled for today
-  if (locationStatus === "disabled" && !isAlreadyMarked) {
-    return (
-      <div className="teacher-self-att-wrapper card-appear">
-        <div className="teacher-permission-card">
-          <div className="teacher-permission-header">
-            <h3 className="teacher-permission-header-title">
-              <MapPinOff size={18} /> Location Tracking Disabled
-            </h3>
-            <span style={{ fontSize: "0.72rem", color: "#f5c042", fontWeight: 700 }}>
-              {windowStatus.startLabel} – {windowStatus.endLabel}
-            </span>
-          </div>
-          <div className="teacher-permission-body">
-            <p className="teacher-permission-text">
-              Location tracking is turned off for today. If you need to mark attendance now, tap below to re-enable GPS.
-            </p>
-            <button
-              type="button"
-              className="teacher-permission-btn"
-              onClick={() => {
-                if (typeof window !== "undefined" && window.localStorage) {
-                  try {
-                    localStorage.removeItem(`mauze_loc_disabled_${todayKey}`);
-                  } catch (_) {}
-                }
-                fetchLocation();
-              }}
-            >
-              <Navigation size={16} />
-              <span>Turn On Location &amp; Mark Attendance</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // -------------------------------------------------------------------------
   // 10. RENDER THE GEOFENCE & PROXIMITY CARD
@@ -745,8 +718,100 @@ export default function TeacherSelfAttendanceCard({
 
         {/* Card Body */}
         <div className="teacher-self-att-body">
-          {/* PROXIMITY STATE 1: INSIDE GEOFENCE */}
-          {isInsideGeofence ? (
+          {/* STATE 1: LOCATION PERMISSION REQUIRED / ERROR */}
+          {(locationStatus === "denied" ||
+            locationStatus === "error" ||
+            locationStatus === "disabled_device") &&
+          !isAlreadyMarked ? (
+            <div className="teacher-permission-inline-card card-appear">
+              <div className="teacher-permission-header">
+                <h4 className="teacher-permission-header-title">
+                  <AlertTriangle size={18} /> GPS Location Permission Required
+                </h4>
+                <span className="teacher-permission-tag">Action Needed</span>
+              </div>
+              <div className="teacher-permission-body">
+                <p className="teacher-permission-text">
+                  {locationError ||
+                    `Please allow location access on your device so we can verify your presence at ${settings.venue_name} to mark self attendance.`}
+                </p>
+                <div className="teacher-permission-btns-row">
+                  <button
+                    type="button"
+                    className="teacher-permission-btn"
+                    onClick={async () => {
+                      await requestDeviceLocationPermission();
+                      fetchLocation({ requestPerm: true });
+                    }}
+                  >
+                    <Navigation size={16} />
+                    <span>Allow GPS Location</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="teacher-permission-settings-btn"
+                    onClick={async () => {
+                      await openDeviceLocationSettings(
+                        locationStatus === "disabled_device" ? "gps" : "app"
+                      );
+                      setTimeout(() => fetchLocation({ requestPerm: true }), 2500);
+                    }}
+                  >
+                    <Settings size={15} />
+                    <span>Open Device Settings</span>
+                  </button>
+                </div>
+                <p className="teacher-permission-hint">
+                  💡 Tap <strong>Allow GPS Location</strong> or <strong>Open Device Settings</strong> to grant permission, or swipe down your phone's notification bar and turn ON <strong>Location</strong>.
+                </p>
+              </div>
+            </div>
+          ) : locationStatus === "disabled" && !isAlreadyMarked ? (
+            /* STATE 2: LOCATION MANUALLY DISABLED FOR TODAY */
+            <div className="teacher-permission-inline-card card-appear">
+              <div className="teacher-permission-header">
+                <h4 className="teacher-permission-header-title">
+                  <MapPinOff size={18} /> Location Tracking Disabled
+                </h4>
+              </div>
+              <div className="teacher-permission-body">
+                <p className="teacher-permission-text">
+                  Location tracking is turned off for today. If you need to mark attendance now, tap below to re-enable GPS.
+                </p>
+                <button
+                  type="button"
+                  className="teacher-permission-btn"
+                  onClick={() => {
+                    if (typeof window !== "undefined" && window.localStorage) {
+                      try {
+                        localStorage.removeItem(`mauze_loc_disabled_${todayKey}`);
+                      } catch (_) {}
+                    }
+                    fetchLocation({ requestPerm: true });
+                  }}
+                >
+                  <Navigation size={16} />
+                  <span>Turn On Location &amp; Mark Attendance</span>
+                </button>
+              </div>
+            </div>
+          ) : locationStatus === "locating" && !isAlreadyMarked && !userCoords ? (
+            /* STATE 3: LOCATING / SHIMMER */
+            <div className="teacher-loc-banner locating card-appear">
+              <div className="teacher-loc-icon-col locating">
+                <RotateCw size={18} className="att-spin" />
+              </div>
+              <div className="teacher-loc-content">
+                <div className="teacher-loc-title">
+                  Detecting GPS Location...
+                </div>
+                <div className="teacher-loc-desc">
+                  Connecting to device GPS to verify proximity to {settings.venue_name}.
+                </div>
+              </div>
+            </div>
+          ) : isInsideGeofence ? (
+            /* PROXIMITY STATE 1: INSIDE GEOFENCE */
             <div className="teacher-loc-banner verified">
               <div className="teacher-loc-icon-col">
                 <CheckCircle2 size={18} />
@@ -762,7 +827,7 @@ export default function TeacherSelfAttendanceCard({
               <button
                 type="button"
                 className="teacher-loc-refresh-btn"
-                onClick={fetchLocation}
+                onClick={() => fetchLocation({ requestPerm: false })}
                 title="Refresh GPS"
               >
                 <RotateCw size={11} /> Refresh
@@ -785,7 +850,7 @@ export default function TeacherSelfAttendanceCard({
               <button
                 type="button"
                 className="teacher-loc-refresh-btn"
-                onClick={fetchLocation}
+                onClick={() => fetchLocation({ requestPerm: false })}
                 title="Refresh GPS"
               >
                 <RotateCw size={11} /> Refresh
@@ -808,7 +873,7 @@ export default function TeacherSelfAttendanceCard({
               <button
                 type="button"
                 className="teacher-loc-refresh-btn"
-                onClick={fetchLocation}
+                onClick={() => fetchLocation({ requestPerm: false })}
                 title="Refresh GPS"
               >
                 <RotateCw size={11} /> Refresh
@@ -825,13 +890,13 @@ export default function TeacherSelfAttendanceCard({
                   Venue: {settings.venue_name}
                 </div>
                 <div className="teacher-loc-desc outside">
-                  Distance: {distanceMeters != null ? (distanceMeters >= 1000 ? `${(distanceMeters/1000).toFixed(1)} km` : `${Math.round(distanceMeters)}m`) : "Detecting"} away. You must be at the venue to mark attendance.
+                  Distance: {distanceMeters != null ? (distanceMeters >= 1000 ? `${(distanceMeters/1000).toFixed(1)} km` : `${Math.round(distanceMeters)}m`) : "Detecting"} away. Attendance will auto-mark once you reach within {configuredRadius}m.
                 </div>
               </div>
               <button
                 type="button"
                 className="teacher-loc-refresh-btn"
-                onClick={fetchLocation}
+                onClick={() => fetchLocation({ requestPerm: false })}
                 title="Refresh GPS"
               >
                 <RotateCw size={11} /> Refresh
@@ -944,33 +1009,125 @@ export default function TeacherSelfAttendanceCard({
                 </>
               )}
             </button>
+          ) : (locationStatus === "denied" ||
+              locationStatus === "error" ||
+              locationStatus === "disabled_device") ? (
+            /* Button when location needs permission / GPS */
+            <button
+              type="button"
+              className="teacher-mark-btn pulse-glow"
+              onClick={async () => {
+                await requestDeviceLocationPermission();
+                const pos = await fetchLocation({ requestPerm: true });
+                if (pos) {
+                  const dist = calculateHaversineDistanceMeters(
+                    pos.lat,
+                    pos.lng,
+                    settings.venue_lat,
+                    settings.venue_lng
+                  );
+                  if (dist <= configuredRadius) {
+                    handleMarkAttendance({ isAuto: false, coords: pos, dist });
+                  } else {
+                    if (onShowAction) {
+                      onShowAction(
+                        "info",
+                        `Location acquired: You are ${Math.round(dist)}m away from ${settings.venue_name}. Reach within ${configuredRadius}m to mark attendance.`
+                      );
+                    }
+                  }
+                }
+              }}
+            >
+              <Navigation size={18} />
+              <span>Allow Location &amp; Mark Attendance</span>
+              <ChevronRight size={18} />
+            </button>
           ) : isOneStepAway ? (
             /* Button 1 step away: PROXIMITY LOCKED */
             <div className="teacher-btn-locked-wrap">
               <button
                 type="button"
                 className="teacher-mark-btn locked onestep-btn"
-                onClick={fetchLocation}
+                onClick={async () => {
+                  const pos = await fetchLocation({ requestPerm: false });
+                  const dist = pos
+                    ? calculateHaversineDistanceMeters(
+                        pos.lat,
+                        pos.lng,
+                        settings.venue_lat,
+                        settings.venue_lng
+                      )
+                    : distanceMeters;
+                  if (dist != null && dist <= configuredRadius) {
+                    handleMarkAttendance({ isAuto: false, coords: pos, dist });
+                  } else {
+                    if (onShowAction) {
+                      onShowAction(
+                        "info",
+                        `You are just 1 step outside (${Math.max(
+                          1,
+                          Math.round(dist - configuredRadius)
+                        )}m). Step inside to mark!`
+                      );
+                    }
+                  }
+                }}
                 title="Step inside venue to unlock"
               >
                 <Footprints size={18} />
-                <span>1 Step Away • Step Inside Venue to Unlock</span>
+                <span>1 Step Away • Step Inside Venue to Mark</span>
               </button>
             </div>
           ) : (
-            /* Button outside geofence: DISABLED WITH DISTANCE */
+            /* Button outside geofence: SHOWS DISTANCE & TAPPING RE-CHECKS */
             <div className="teacher-btn-locked-wrap">
               <button
                 type="button"
-                className="teacher-mark-btn locked"
-                onClick={fetchLocation}
-                title="Reach venue to unlock attendance"
+                className="teacher-mark-btn"
+                style={{
+                  background: "linear-gradient(135deg, #1e293b, #334155)",
+                  color: "#f8fafc",
+                  boxShadow: "0 4px 14px rgba(30, 41, 59, 0.35)",
+                }}
+                onClick={async () => {
+                  const pos = await fetchLocation({ requestPerm: false });
+                  const dist = pos
+                    ? calculateHaversineDistanceMeters(
+                        pos.lat,
+                        pos.lng,
+                        settings.venue_lat,
+                        settings.venue_lng
+                      )
+                    : distanceMeters;
+                  if (dist != null && dist <= configuredRadius) {
+                    handleMarkAttendance({ isAuto: false, coords: pos, dist });
+                  } else if (dist != null) {
+                    if (onShowAction) {
+                      onShowAction(
+                        "info",
+                        `You are ${
+                          dist >= 1000
+                            ? `${(dist / 1000).toFixed(1)} km`
+                            : `${Math.round(dist)}m`
+                        } away from ${settings.venue_name}. Reach within ${configuredRadius}m (~${stepsToBoundary} steps) to mark attendance!`
+                      );
+                    }
+                  }
+                }}
+                title="Tap to check location and mark attendance"
               >
-                <Lock size={16} />
+                <MapPin size={18} />
                 <span>
-                  Reach {settings.venue_name} to Mark Attendance (
-                  {distanceMeters != null ? `${Math.round(distanceMeters)}m` : "Detecting"} away)
+                  Mark Attendance (
+                  {distanceMeters != null
+                    ? distanceMeters >= 1000
+                      ? `${(distanceMeters / 1000).toFixed(1)} km`
+                      : `${Math.round(distanceMeters)}m`
+                    : "Detecting"}{" "}
+                  away)
                 </span>
+                <ChevronRight size={18} />
               </button>
             </div>
           )}

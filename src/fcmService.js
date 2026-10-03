@@ -524,6 +524,7 @@ class FCMService {
         });
 
       // 2. Secondary backup: Vercel serverless Admin SDK store-token
+      let backupSuccess = false;
       try {
         const endpoints = [
           "https://mouze-tahfeez-atfal.vercel.app/api/send-fcm",
@@ -533,7 +534,7 @@ class FCMService {
         }
         for (const ep of endpoints) {
           try {
-            await fetch(ep, {
+            const resp = await fetch(ep, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -545,17 +546,20 @@ class FCMService {
                 deviceInfo
               })
             });
-            break;
+            if (resp.ok) {
+              backupSuccess = true;
+              break;
+            }
           } catch (_) {}
         }
       } catch (_) {}
 
-      if (error) {
-        console.warn('[FCM] Primary token upsert note:', error.message);
-        return false;
-      } else {
+      if (!error || backupSuccess) {
         console.log('[FCM] Token stored successfully for user:', user.id);
         return true;
+      } else {
+        console.warn('[FCM] Primary token upsert note:', error?.message);
+        return false;
       }
     } catch (error) {
       console.error('[FCM] Error in storeToken:', error);
@@ -595,8 +599,8 @@ class FCMService {
       // Create notification options with official styling
       const options = {
         body: notification?.body || 'New notification from Mauze Tahfeez',
-        icon: '/LOGO ATFAAL-192.png',
-        badge: '/LOGO ATFAAL-192.png',
+        icon: '/mauze-tahfeez-logo.png',
+        badge: '/favicon.png',
         vibrate: [200, 100, 200],
         data: {
           ...data,
@@ -613,7 +617,7 @@ class FCMService {
           {
             action: 'open',
             title: 'Open Portal',
-            icon: '/LOGO ATFAAL-192.png'
+            icon: '/favicon.png'
           },
           {
             action: 'dismiss',

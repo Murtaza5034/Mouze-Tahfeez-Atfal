@@ -40,11 +40,12 @@ async function callFunction(name, data) {
     name === "sendResultLiveNotifier"
   ) {
     try {
-      const isResultLive =
-        name === "result-live-notifier" || name === "sendResultLiveNotifier";
+      const unwrappedData = (data && typeof data === "object" && data.body && typeof data.body === "object" && !Array.isArray(data.body))
+        ? { ...data, ...data.body }
+        : (data || {});
       const payload = isResultLive
-        ? { action: "result-live-notifier", ...(data || {}) }
-        : data || {};
+        ? { action: "result-live-notifier", ...unwrappedData }
+        : unwrappedData;
 
       const endpoints = [
         "https://mouze-tahfeez-atfal.vercel.app/api/send-fcm",

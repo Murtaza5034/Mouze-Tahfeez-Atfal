@@ -108,3 +108,4 @@ ngrok.zip
 openwa-qr.html
 openwa-qr.png
 ngrok_temp/
+.env*

@@ -20,6 +20,9 @@ const FALLBACK_SA = {
   client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/mauze-tahfeez-592%40mawaid-b929a.iam.gserviceaccount.com"
 };
 
+// Module-level token cache (persists in warm Vercel serverless function instances)
+const _tokenCache = new Map();
+
 // Initialize Firebase Admin once using modular API
 let appInstance = null;
 if (!getApps().length) {
@@ -97,12 +100,25 @@ async function tokensForUser(userId, section = 'atfal') {
   const rawId = String(userId).trim();
   const rawIdLower = rawId.toLowerCase();
 
+  // 0. Check in-memory token cache
+  for (const [tkn, doc] of _tokenCache.entries()) {
+    if (
+      String(doc.user_id || '').toLowerCase() === rawIdLower ||
+      String(doc.email || '').toLowerCase() === rawIdLower
+    ) {
+      out.push(tkn);
+    }
+  }
+
   // 1. Direct query by user_id
   try {
     const snap = await db.collection(col).where('user_id', '==', rawId).limit(200).get();
     snap.docs.forEach((d) => {
       const t = d.data().fcm_token;
-      if (t) out.push(String(t));
+      if (t) {
+        out.push(String(t));
+        _tokenCache.set(String(t), d.data());
+      }
     });
   } catch (_) {}
 
@@ -253,12 +269,23 @@ async function tokensForRole(role, section = 'atfal') {
   const out = [];
   const col = 'user_fcm_tokens';
   const target = String(role || 'all').toLowerCase().trim();
-  const snap = await db.collection(col).limit(500).get();
 
-  for (const d of snap.docs) {
-    const data = d.data();
+  try {
+    const snap = await db.collection(col).limit(500).get();
+    for (const d of snap.docs) {
+      const data = d.data();
+      const t = data.fcm_token;
+      if (t) {
+        _tokenCache.set(String(t), data);
+      }
+    }
+  } catch (snapErr) {
+    console.warn('[send-fcm] Firestore tokens read note (using cache fallback if available):', snapErr?.message);
+  }
+
+  for (const data of _tokenCache.values()) {
     const r = String(data.user_role || '').toLowerCase().trim();
-    const t = data.fcm_token;
+    const t = data.fcm_token || data.token;
     if (!t) continue;
 
     const isKibarToken = r.startsWith('kibar-');
@@ -456,7 +483,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = req.body || {};
+    let body = req.body || {};
+    // Unwrap nested body if sent via supabase.functions.invoke({ body: { ... } })
+    if (body.body && typeof body.body === 'object' && !Array.isArray(body.body)) {
+      body = { ...body, ...body.body };
+    }
 
     // 0. Result Live Notifier action
     if (body.action === 'result-live-notifier' || body.action === 'sendResultLiveNotifier') {
@@ -471,15 +502,22 @@ export default async function handler(req, res) {
       const userId = String(body.userId || body.user_id || '').trim();
       const email = normalizeEmail(body.email);
       const role = String(body.role || body.user_role || '').trim();
-
-      await db.collection(col).doc(cleanToken).set({
+      const tokenDoc = {
         fcm_token: cleanToken,
         user_id: userId,
         email,
         user_role: role,
-        device_info: body.deviceInfo || { platform: 'Android App', isNative: true },
+        device_info: body.deviceInfo || { platform: 'Web', isNative: false },
         updated_at: new Date().toISOString()
-      }, { merge: true });
+      };
+
+      _tokenCache.set(cleanToken, tokenDoc);
+
+      try {
+        await db.collection(col).doc(cleanToken).set(tokenDoc, { merge: true });
+      } catch (dbErr) {
+        console.warn('[send-fcm] Note writing token to Firestore:', dbErr.message);
+      }
 
       return res.status(200).json({ success: true, message: 'Token stored' });
     }
@@ -593,8 +631,8 @@ export default async function handler(req, res) {
           notification: {
             title,
             body: messageBody,
-            icon: '/LOGO ATFAAL-192.png',
-            badge: '/LOGO ATFAAL-192.png',
+            icon: '/mauze-tahfeez-logo.png',
+            badge: '/favicon.png',
             tag: notifTag,
             renotify: true,
             requireInteraction: true,

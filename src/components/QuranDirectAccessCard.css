@@ -70,44 +70,58 @@
 }
 
 .quran-direct-icon-wrap {
-  width: 68px;
-  height: 68px;
+  width: 96px;
+  height: 96px;
   border-radius: 20px;
-  background: linear-gradient(135deg, #c9a24d 0%, #9a7629 100%);
-  color: #ffffff;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 20px rgba(201, 162, 77, 0.35);
-  border: 2px solid rgba(255, 255, 255, 0.9);
   position: relative;
   flex-shrink: 0;
-  transition: transform 0.3s;
+  /* Drop shadow on the container for depth */
+  filter: drop-shadow(0 8px 18px rgba(150, 100, 0, 0.35));
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.3s;
 }
 
 .quran-direct-card:hover .quran-direct-icon-wrap {
-  transform: scale(1.06) rotate(-2deg);
+  transform: scale(1.08) translateY(-3px) rotate(-1deg);
+  filter: drop-shadow(0 14px 28px rgba(212, 175, 55, 0.55));
 }
 
-.quran-direct-icon {
-  color: #ffffff;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+/* 3D Quran image — auto-reveal + float animation */
+.quran-3d-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: quranReveal 0.65s cubic-bezier(0.22, 1.5, 0.36, 1) both,
+             quranFloat 3.2s ease-in-out 0.65s infinite;
+  transform-origin: center bottom;
 }
 
-.quran-direct-icon-sparkle {
-  position: absolute;
-  top: -4px;
-  right: -4px;
+@keyframes quranReveal {
+  0%   { opacity: 0; transform: scale(0.1) translateY(12px) rotateX(30deg); }
+  60%  { opacity: 1; transform: scale(1.12) translateY(-4px) rotateX(-4deg); }
+  80%  { transform: scale(0.96) translateY(2px) rotateX(2deg); }
+  100% { opacity: 1; transform: scale(1) translateY(0) rotateX(0deg); }
+}
+
+@keyframes quranFloat {
+  0%   { transform: translateY(0px) rotate(0deg); }
+  30%  { transform: translateY(-5px) rotate(0.8deg); }
+  60%  { transform: translateY(-2px) rotate(-0.5deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+/* Small Quran in CTA button */
+.cta-icon-3d {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #c9a24d;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
+  animation: quranReveal 0.5s cubic-bezier(0.22, 1.5, 0.36, 1) 0.3s both;
 }
+
 
 .quran-direct-texts {
   flex: 1;

@@ -217,6 +217,25 @@
   border-left: 3px solid #d4af37;
 }
 
+.teacher-permission-inline-card {
+  background: rgba(245, 192, 66, 0.07);
+  border: 1.5px solid rgba(212, 175, 55, 0.38);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(184, 148, 31, 0.08);
+}
+
+.teacher-permission-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #ea580c;
+  color: #ffffff;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
 /* --- Live Self-Attendance Action Card --- */
 .teacher-self-att-card {
   position: relative;
@@ -465,6 +484,35 @@
 
 .teacher-loc-desc.outside {
   color: #64748b;
+}
+
+.teacher-loc-banner.denied {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.05));
+  border: 1.5px solid rgba(239, 68, 68, 0.4);
+  color: #991b1b;
+}
+
+.teacher-loc-icon-col.denied {
+  color: #dc2626;
+}
+
+.teacher-loc-title.denied {
+  color: #991b1b;
+  font-weight: 800;
+}
+
+.teacher-loc-desc.denied {
+  color: #b91c1c;
+}
+
+.teacher-loc-banner.locating {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.03));
+  border: 1px dashed rgba(212, 175, 55, 0.45);
+  color: #854d0e;
+}
+
+.teacher-loc-icon-col.locating {
+  color: #b45309;
 }
 
 /* Smart Auto-Mark Countdown Indicator */

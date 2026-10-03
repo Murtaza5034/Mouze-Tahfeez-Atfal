@@ -495,14 +495,16 @@ function processBulkSync(payload) {
       marhalaGroups[targetTabName] = [];
     }
 
-    const rowValues = buildMarhalaRowValues(s, r, targetTabName);
+    const mSheet = getOrCreateMarhalaSheet(spreadsheet, targetTabName);
+    const rowValues = buildMarhalaRowValues(s, r, targetTabName, mSheet);
     marhalaGroups[targetTabName].push(rowValues);
     marhalaCounts[targetTabName] = (marhalaCounts[targetTabName] || 0) + 1;
 
     // Collect row for parents email tab (if Atfal)
     if (category === "atfal") {
+      const parentsSheet = getOrCreateParentsEmailSheet(spreadsheet);
       const email = String(s.email || s.parent_email || "").trim().toLowerCase();
-      const parentRow = buildParentsEmailRowValues(s, r);
+      const parentRow = buildParentsEmailRowValues(s, r, parentsSheet);
       if (parentRow) {
         const key = email || String(s.student_id || s.id || s.name || ("row_" + i)).toLowerCase();
         parentsRowsMap.set(key, parentRow);
@@ -519,7 +521,7 @@ function processBulkSync(payload) {
 
     if (clearExisting) {
       // Direct bulk set
-      sheet.getRange(2, 1, rows.length, MARHALA_HEADERS.length).setValues(rows);
+      sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
     } else {
       // Merge with existing rows without creating duplicates
       batchMergeSheetRows(sheet, rows, MARHALA_HEADERS);
@@ -534,21 +536,27 @@ function processBulkSync(payload) {
     parentsCount = parentsRows.length;
 
     if (clearExisting) {
-      parentsSheet.getRange(2, 1, parentsRows.length, PARENTS_EMAIL_HEADERS.length).setValues(parentsRows);
+      parentsSheet.getRange(2, 1, parentsRows.length, parentsRows[0].length).setValues(parentsRows);
     } else {
       batchMergeParentsEmailRows(parentsSheet, parentsRows);
     }
 
-    // Apply Yes/No validation rule to all rows in column 9
-    const lastRow = parentsSheet.getLastRow();
-    if (lastRow > 1) {
-      const statusRange = parentsSheet.getRange(2, 9, lastRow - 1, 1);
-      const validationRule = SpreadsheetApp.newDataValidation()
-        .requireValueInList(CONFIG.STATUS_OPTIONS, true)
-        .setAllowInvalid(false)
-        .setHelpText("Select 'Yes' or 'No'")
-        .build();
-      statusRange.setDataValidation(validationRule);
+    // Apply Yes/No validation rule to status column (safe for typed columns)
+    try {
+      const colMap = getParentsSheetColumnMap(parentsSheet);
+      const statusCol = colMap.status || 10;
+      const lastRow = parentsSheet.getLastRow();
+      if (lastRow > 1) {
+        const statusRange = parentsSheet.getRange(2, statusCol, lastRow - 1, 1);
+        const validationRule = SpreadsheetApp.newDataValidation()
+          .requireValueInList(CONFIG.STATUS_OPTIONS, true)
+          .setAllowInvalid(false)
+          .setHelpText("Select 'Yes' or 'No'")
+          .build();
+        statusRange.setDataValidation(validationRule);
+      }
+    } catch (_valErr) {
+      Logger.log("Note: Validation skipped for typed column: " + _valErr.message);
     }
   }
 
@@ -693,15 +701,101 @@ function getOrCreateMarhalaSheet(spreadsheet, marhalaName) {
   return sheet;
 }
 
-function buildMarhalaRowValues(student, result, marhalaTabName) {
-  const studentId = String(student.student_id || student.id || "").trim();
+function buildMarhalaRowValues(student, result, marhalaTabName, sheet) {
+  const studentId = String(student.student_id || student.id || result.student_id || "").trim();
+  const its = String(student.its || student.its_number || "").trim();
+  const name = String(student.name || student.full_name || "").trim();
+  const arabicName = String(student.arabic_name || "").trim();
   const email = String(student.email || student.parent_email || "").trim().toLowerCase();
-
+  const teacherName = String(student.teacher_name || student.teacherName || "").trim();
+  const groupName = String(student.group_name || student.groupName || "").trim();
+  const marhala = String(student.marhala || marhalaTabName || "").trim();
+  const weekDate = String(result.week_date || "").trim();
+  const fromDate = String(result.from_date || result.fatemi_from_date || "").trim();
+  const tillDate = String(result.till_date || result.fatemi_till_date || result.week_date || "").trim();
   const fatemiStr = (result.fatemi_from_date && result.fatemi_till_date)
     ? (result.fatemi_from_date + " - " + result.fatemi_till_date + " " + (result.fatemi_till_month_name || ""))
     : (result.fatemi_till_month_name || "");
 
   const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+
+  const attendanceCount = result.attendance_count !== undefined ? result.attendance_count : "";
+  const murajazah = result.murajazah !== undefined ? result.murajazah : "";
+  const juzHali = result.juz_hali !== undefined ? result.juz_hali : "";
+  const takhteet = result.takhteet !== undefined ? result.takhteet : "";
+  const jadeedMarks = result.jadeed !== undefined ? result.jadeed : "";
+  const totalScore = (result.total_score !== undefined && result.total_score !== null && result.total_score !== "")
+    ? result.total_score
+    : ((Number(murajazah) || 0) + (Number(juzHali) || 0) + (Number(takhteet) || 0) + (Number(jadeedMarks) || 0));
+
+  const totalJadeedPages = (result.total_jadeed_pages !== undefined && result.total_jadeed_pages !== null)
+    ? result.total_jadeed_pages
+    : "";
+  const totalJadeedUnit = result.total_jadeed_unit || "صفه";
+  const marhalaRank = student.marhala_rank || student.marhalaRank || "";
+  const overallRank = student.overall_rank || student.computedRank || result.computedRank || "";
+
+  const wusoolJuz = result.wusool_juz || "";
+  const wusoolPage = result.wusool_page || "";
+  const wusoolSurah = result.wusool_surah || "";
+  const nextWeekJuz = result.next_week_juz || "";
+  const nextWeekPage = result.next_week_page || "";
+  const nextWeekSurah = result.next_week_surah || "";
+  const istifadahJuz = result.istifadah_juz || "";
+  const istifadahPage = result.istifadah_page || "";
+  const istifadahSurah = result.istifadah_surah || "";
+  const matrookah = result.matrookah || "";
+  const daeefah = result.daeefah || "";
+  const attendanceNote = result.attendance_note || "";
+
+  if (sheet) {
+    const lastCol = Math.max(sheet.getLastColumn(), MARHALA_HEADERS.length);
+    const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [];
+    const effectiveHeaders = (headerRow.length > 0 && String(headerRow[0] || '').trim() !== "")
+      ? headerRow
+      : MARHALA_HEADERS;
+
+    const row = new Array(effectiveHeaders.length).fill("");
+    for (let c = 0; c < effectiveHeaders.length; c++) {
+      const h = String(effectiveHeaders[c] || "").trim().toLowerCase();
+      if (h.includes("student id") || h === "id") row[c] = studentId;
+      else if (h === "its" || h.includes("its number")) row[c] = its;
+      else if (h.includes("arabic name")) row[c] = arabicName;
+      else if (h === "name" || h.includes("student name")) row[c] = name;
+      else if (h.includes("email")) row[c] = email;
+      else if (h.includes("teacher")) row[c] = teacherName;
+      else if (h.includes("group")) row[c] = groupName;
+      else if (h === "marhala") row[c] = marhala;
+      else if (h.includes("week date")) row[c] = weekDate;
+      else if (h.includes("from date") || h === "from") row[c] = fromDate;
+      else if (h.includes("till date") || h.includes("to date") || h === "till") row[c] = tillDate;
+      else if (h.includes("fatemi")) row[c] = fatemiStr;
+      else if (h.includes("attendance count") || (h.includes("attendance") && !h.includes("note"))) row[c] = attendanceCount;
+      else if (h.includes("murajazah") || h.includes("murajah")) row[c] = murajazah;
+      else if (h.includes("juz hali") || h.includes("juz_hali")) row[c] = juzHali;
+      else if (h.includes("takhteet")) row[c] = takhteet;
+      else if (h.includes("total jadeed pages") || h.includes("jadeed pages") || h.includes("total_jadeed_pages")) row[c] = totalJadeedPages;
+      else if (h.includes("total jadeed unit") || h.includes("jadeed unit") || h.includes("total_jadeed_unit")) row[c] = totalJadeedUnit;
+      else if (h === "jadeed" || h.includes("jadeed marks") || h === "new memorization") row[c] = jadeedMarks;
+      else if (h.includes("weekly score") || h.includes("total score") || h.includes("score")) row[c] = totalScore;
+      else if (h.includes("marhala rank")) row[c] = marhalaRank;
+      else if (h.includes("overall rank") || h.includes("over all rank")) row[c] = overallRank;
+      else if (h.includes("wusool juz")) row[c] = wusoolJuz;
+      else if (h.includes("wusool page")) row[c] = wusoolPage;
+      else if (h.includes("wusool surah")) row[c] = wusoolSurah;
+      else if (h.includes("next week juz")) row[c] = nextWeekJuz;
+      else if (h.includes("next week page")) row[c] = nextWeekPage;
+      else if (h.includes("next week surah")) row[c] = nextWeekSurah;
+      else if (h.includes("istifadah juz")) row[c] = istifadahJuz;
+      else if (h.includes("istifadah page")) row[c] = istifadahPage;
+      else if (h.includes("istifadah surah")) row[c] = istifadahSurah;
+      else if (h.includes("matrookah")) row[c] = matrookah;
+      else if (h.includes("daeefah")) row[c] = daeefah;
+      else if (h.includes("note")) row[c] = attendanceNote;
+      else if (h.includes("updated") || h.includes("timestamp")) row[c] = timestamp;
+    }
+    return row;
+  }
 
   return [
     studentId || "",
@@ -743,46 +837,69 @@ function buildMarhalaRowValues(student, result, marhalaTabName) {
 }
 
 function syncMarhalaSheetRow(sheet, student, result) {
-  const data = sheet.getDataRange().getValues();
-  const studentId = String(student.student_id || student.id || "").trim();
-  const its = String(student.its || "").trim();
+  const spreadsheet = sheet.getParent();
+  const studentId = String(student.student_id || student.id || result.student_id || "").trim();
+  const its = String(student.its || student.its_number || "").trim();
   const email = String(student.email || student.parent_email || "").trim().toLowerCase();
   const name = String(student.name || student.full_name || "").trim().toLowerCase();
 
-  const headers = data[0] || MARHALA_HEADERS;
-  const colStudentId = headers.indexOf("Student ID");
-  const colIts = headers.indexOf("ITS");
-  const colName = headers.indexOf("Name");
-  const colEmail = headers.indexOf("Email");
+  // Helper to find match in a given sheet
+  function findMatchInSheet(targetSheet) {
+    const data = targetSheet.getDataRange().getValues();
+    if (data.length <= 1) return -1;
+    const headers = data[0] || MARHALA_HEADERS;
+    const colStudentId = headers.indexOf("Student ID");
+    const colIts = headers.indexOf("ITS");
+    const colName = headers.indexOf("Name");
+    const colEmail = headers.indexOf("Email");
 
-  const rowValues = buildMarhalaRowValues(student, result, sheet.getName());
+    for (let r = 1; r < data.length; r++) {
+      const row = data[r];
+      const rowSid = colStudentId !== -1 ? String(row[colStudentId] || "").trim() : "";
+      const rowIts = colIts !== -1 ? String(row[colIts] || "").trim() : "";
+      const rowMail = colEmail !== -1 ? String(row[colEmail] || "").trim().toLowerCase() : "";
+      const rowName = colName !== -1 ? String(row[colName] || "").trim().toLowerCase() : "";
 
-  let matchRowIndex = -1;
-  for (let r = 1; r < data.length; r++) {
-    const row = data[r];
-    const rowSid = String(row[colStudentId] || "").trim();
-    const rowIts = colIts !== -1 ? String(row[colIts] || "").trim() : "";
-    const rowMail = String(row[colEmail] || "").trim().toLowerCase();
-    const rowName = colName !== -1 ? String(row[colName] || "").trim().toLowerCase() : "";
+      const idMatches = 
+        (studentId && rowSid === studentId) ||
+        (its && rowIts === its) ||
+        (email && rowMail === email) ||
+        (name && (rowName === name || rowName.replace(/\s+/g, '') === name.replace(/\s+/g, '') || rowName.includes(name) || name.includes(rowName)));
 
-    const idMatches = 
-      (studentId && rowSid === studentId) ||
-      (its && rowIts === its) ||
-      (email && rowMail === email) ||
-      (name && rowName === name);
+      if (idMatches) return r + 1;
+    }
+    return -1;
+  }
 
-    if (idMatches) {
-      matchRowIndex = r + 1;
-      break;
+  // 1. Search in target sheet
+  let matchRowIndex = findMatchInSheet(sheet);
+  let activeSheet = sheet;
+
+  // 2. If not found in target sheet, check other Marhala sheets
+  if (matchRowIndex === -1 && spreadsheet) {
+    const allSheets = spreadsheet.getSheets();
+    for (let i = 0; i < allSheets.length; i++) {
+      const s = allSheets[i];
+      if (s.getName() === sheet.getName()) continue;
+      if (s.getName() === CONFIG.PARENTS_EMAIL_SHEET_NAME) continue;
+      if (CONFIG.ALL_MARHALAS.indexOf(s.getName()) === -1 && s.getName().toLowerCase().indexOf("marhala") === -1) continue;
+      const foundRow = findMatchInSheet(s);
+      if (foundRow !== -1) {
+        matchRowIndex = foundRow;
+        activeSheet = s;
+        break;
+      }
     }
   }
 
+  const finalRowValues = buildMarhalaRowValues(student, result, activeSheet.getName(), activeSheet);
+
   if (matchRowIndex > 0) {
-    sheet.getRange(matchRowIndex, 1, 1, rowValues.length).setValues([rowValues]);
-    return { action: "updated", row: matchRowIndex };
+    activeSheet.getRange(matchRowIndex, 1, 1, finalRowValues.length).setValues([finalRowValues]);
+    return { action: "updated", sheet: activeSheet.getName(), row: matchRowIndex };
   } else {
-    sheet.appendRow(rowValues);
-    return { action: "appended", row: sheet.getLastRow() };
+    sheet.appendRow(finalRowValues);
+    return { action: "appended", sheet: sheet.getName(), row: sheet.getLastRow() };
   }
 }
 
@@ -985,7 +1102,7 @@ function addPhoneNumberColumn(spreadsheet) {
   }
 }
 
-function buildParentsEmailRowValues(student, result) {
+function buildParentsEmailRowValues(student, result, sheet) {
   const email = String(student.email || student.parent_email || "").trim().toLowerCase();
   const name = String(student.name || student.full_name || "").trim();
 
@@ -996,22 +1113,73 @@ function buildParentsEmailRowValues(student, result) {
   const phoneNumber = String(student.whatsapp_number || student.phone || student.mobile || student.contact || "").trim();
 
   const fromDate = String(result.from_date || result.fatemi_from_date || "").trim();
-  const tillDate = String(result.till_date || result.fatemi_till_date || "").trim();
-  const weeklyScore = (result.total_score !== undefined && result.total_score !== null) ? result.total_score : "";
+  const tillDate = String(result.till_date || result.fatemi_till_date || result.week_date || "").trim();
+  const weeklyScore = (result.total_score !== undefined && result.total_score !== null && result.total_score !== "")
+    ? result.total_score
+    : ((Number(result.murajazah) || 0) + (Number(result.juz_hali) || 0) + (Number(result.takhteet) || 0) + (Number(result.jadeed) || 0));
   
   let totalJadeed = "";
-  if (result.total_jadeed_pages !== undefined && result.total_jadeed_pages !== null) {
-    totalJadeed = String(result.total_jadeed_pages);
-    if (result.total_jadeed_unit) totalJadeed += " " + result.total_jadeed_unit;
+  const rawPages = (result.total_jadeed_pages !== undefined && result.total_jadeed_pages !== null)
+    ? String(result.total_jadeed_pages).trim()
+    : "";
+  const rawUnit = String(result.total_jadeed_unit || "صفه").trim();
+  if (rawPages !== "") {
+    if (rawPages.includes("صفه") || rawPages.includes("سطر") || rawPages.toLowerCase().includes("safah") || rawPages.toLowerCase().includes("satar")) {
+      totalJadeed = rawPages;
+    } else {
+      totalJadeed = rawPages + " " + rawUnit;
+    }
+  } else if (result.total_jadeed) {
+    totalJadeed = String(result.total_jadeed).trim();
+  } else if (result.jadeed !== undefined && result.jadeed !== null && result.jadeed !== "") {
+    totalJadeed = String(result.jadeed);
   }
 
   const marhalaRank = student.marhala_rank || student.marhalaRank || "";
-  const overallRank = student.overall_rank || student.computedRank || "";
+  const overallRank = student.overall_rank || student.computedRank || result.computedRank || "";
   
   // If result has scores, status is "Yes", otherwise default to "No"
   const latestWeekStatus = (weeklyScore !== "" && weeklyScore !== null) ? "Yes" : "No";
-
   const telegramChatId = String(student.telegram_chat_id || student.telegramChatId || "").trim();
+
+  if (sheet) {
+    const lastCol = Math.max(sheet.getLastColumn(), PARENTS_EMAIL_HEADERS.length);
+    const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [];
+    const effectiveHeaders = (headerRow.length > 0 && String(headerRow[0] || '').trim() !== "") 
+      ? headerRow 
+      : PARENTS_EMAIL_HEADERS;
+
+    const rowValues = new Array(effectiveHeaders.length).fill("");
+
+    for (let c = 0; c < effectiveHeaders.length; c++) {
+      const h = String(effectiveHeaders[c] || '').trim().toLowerCase();
+      if (h.includes('email')) {
+        rowValues[c] = displayEmail;
+      } else if (h.includes('phone') || h.includes('whatsapp') || h.includes('mobile')) {
+        rowValues[c] = phoneNumber;
+      } else if (h === 'name' || h.includes('student name')) {
+        rowValues[c] = name;
+      } else if (h.includes('from')) {
+        rowValues[c] = fromDate;
+      } else if (h.includes('till') || h.includes('to date')) {
+        rowValues[c] = tillDate;
+      } else if (h.includes('score') || h.includes('total score') || h.includes('marks')) {
+        rowValues[c] = weeklyScore;
+      } else if (h.includes('jadeed')) {
+        rowValues[c] = totalJadeed;
+      } else if (h.includes('marhala')) {
+        rowValues[c] = marhalaRank;
+      } else if (h.includes('over all') || h.includes('overall') || h.includes('total rank')) {
+        rowValues[c] = overallRank;
+      } else if (h.includes('data update') || h.includes('latest week') || h.includes('status')) {
+        rowValues[c] = latestWeekStatus;
+      } else if (h.includes('telegram')) {
+        rowValues[c] = telegramChatId;
+      }
+    }
+
+    return rowValues;
+  }
 
   return [
     displayEmail,
@@ -1031,38 +1199,67 @@ function buildParentsEmailRowValues(student, result) {
 function syncParentsEmailSheetRow(sheet, student, result) {
   const email = String(student.email || student.parent_email || "").trim().toLowerCase();
   const name = String(student.name || student.full_name || "").trim();
-  const colMap = getParentsSheetColumnMap(sheet);
+  const its = String(student.its || student.its_number || "").trim();
+  const sid = String(student.student_id || student.id || result.student_id || "").trim();
+  const phone = cleanWhatsAppPhone(student.whatsapp_number || student.phone || student.mobile || "");
 
-  const rowValues = buildParentsEmailRowValues(student, result);
+  const colMap = getParentsSheetColumnMap(sheet);
+  const rowValues = buildParentsEmailRowValues(student, result, sheet);
   const data = sheet.getDataRange().getValues();
   let matchRowIndex = -1;
 
   for (let r = 1; r < data.length; r++) {
-    const existingEmail = String(data[r][colMap.email - 1] || "").trim().toLowerCase();
-    const existingName = String(data[r][colMap.name - 1] || "").trim().toLowerCase();
+    const row = data[r];
+    const existingEmail = colMap.email ? String(row[colMap.email - 1] || "").trim().toLowerCase() : "";
+    const existingName = colMap.name ? String(row[colMap.name - 1] || "").trim().toLowerCase() : "";
+    const existingPhone = colMap.phone ? cleanWhatsAppPhone(String(row[colMap.phone - 1] || "")) : "";
+    const rowStr = row.join(" ").toLowerCase();
 
-    if ((email && existingEmail === email) || (name && existingName === name.toLowerCase())) {
+    const nameMatches = name && (
+      existingName === name.toLowerCase() ||
+      existingName.replace(/\s+/g, '') === name.toLowerCase().replace(/\s+/g, '') ||
+      existingName.includes(name.toLowerCase()) ||
+      name.toLowerCase().includes(existingName)
+    );
+
+    const emailMatches = email && existingEmail === email;
+    const phoneMatches = phone && existingPhone && (
+      phone === existingPhone ||
+      (phone.length >= 10 && existingPhone.length >= 10 && phone.slice(-10) === existingPhone.slice(-10))
+    );
+    const codeMatches = (its && rowStr.includes(its.toLowerCase())) || (sid && rowStr.includes(sid.toLowerCase()));
+
+    if (emailMatches || nameMatches || phoneMatches || codeMatches) {
       matchRowIndex = r + 1;
       break;
     }
   }
 
   if (matchRowIndex > 0) {
-    sheet.getRange(matchRowIndex, 1, 1, PARENTS_EMAIL_HEADERS.length).setValues([rowValues]);
-    applyValidationToCell(sheet.getRange(matchRowIndex, colMap.status));
-    return { action: "updated", row: matchRowIndex, email: email || name };
+    sheet.getRange(matchRowIndex, 1, 1, rowValues.length).setValues([rowValues]);
+    if (colMap.status) applyValidationToCell(sheet.getRange(matchRowIndex, colMap.status));
+    return { action: "updated", row: matchRowIndex, email: email || name, jadeed: totalJadeedFromRow(rowValues, colMap) };
   } else {
     sheet.appendRow(rowValues);
     const newRow = sheet.getLastRow();
-    applyValidationToCell(sheet.getRange(newRow, colMap.status));
-    return { action: "appended", row: newRow, email: email || name };
+    if (colMap.status) applyValidationToCell(sheet.getRange(newRow, colMap.status));
+    return { action: "appended", row: newRow, email: email || name, jadeed: totalJadeedFromRow(rowValues, colMap) };
   }
+}
+
+function totalJadeedFromRow(rowValues, colMap) {
+  if (colMap && colMap.jadeed && rowValues.length >= colMap.jadeed) {
+    return rowValues[colMap.jadeed - 1];
+  }
+  return "";
 }
 
 function batchMergeParentsEmailRows(sheet, newRows) {
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) {
-    sheet.getRange(2, 1, newRows.length, PARENTS_EMAIL_HEADERS.length).setValues(newRows);
+    if (newRows.length > 0) {
+      sheet.getRange(2, 1, newRows.length, newRows[0].length).setValues(newRows);
+    }
     return;
   }
 
@@ -1078,12 +1275,12 @@ function batchMergeParentsEmailRows(sheet, newRows) {
   const toAppend = [];
   for (let i = 0; i < newRows.length; i++) {
     const nr = newRows[i];
-    const mail = String(nr[0] || "").toLowerCase().trim();
-    const name = String(nr[2] || "").toLowerCase().trim();
-    const existingRow = existingMap.get(mail) || existingMap.get(name);
+    const mail = colMap.email ? String(nr[colMap.email - 1] || "").toLowerCase().trim() : "";
+    const name = colMap.name ? String(nr[colMap.name - 1] || "").toLowerCase().trim() : "";
+    const existingRow = (mail && existingMap.get(mail)) || (name && existingMap.get(name));
 
     if (existingRow) {
-      sheet.getRange(existingRow, 1, 1, PARENTS_EMAIL_HEADERS.length).setValues([nr]);
+      sheet.getRange(existingRow, 1, 1, nr.length).setValues([nr]);
     } else {
       toAppend.push(nr);
     }
@@ -1091,17 +1288,22 @@ function batchMergeParentsEmailRows(sheet, newRows) {
 
   if (toAppend.length > 0) {
     const startRow = sheet.getLastRow() + 1;
-    sheet.getRange(startRow, 1, toAppend.length, PARENTS_EMAIL_HEADERS.length).setValues(toAppend);
+    sheet.getRange(startRow, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
   }
 }
 
 function applyValidationToCell(range) {
-  const rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(CONFIG.STATUS_OPTIONS, true)
-    .setAllowInvalid(false)
-    .setHelpText("Please choose either 'Yes' or 'No'.")
-    .build();
-  range.setDataValidation(rule);
+  if (!range) return;
+  try {
+    const rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(CONFIG.STATUS_OPTIONS, true)
+      .setAllowInvalid(false)
+      .setHelpText("Please choose either 'Yes' or 'No'.")
+      .build();
+    range.setDataValidation(rule);
+  } catch (_e) {
+    // Typed columns / structured tables manage their own column validation chips
+  }
 }
 
 function setupParentsEmailValidationAndFormatting(sheet) {
@@ -1115,53 +1317,64 @@ function setupParentsEmailValidationAndFormatting(sheet) {
   const colMap = getParentsSheetColumnMap(sheet);
   const statusCol = colMap.status || 10;
 
-  const currentMax = sheet.getMaxRows();
-  if (currentMax <= 1) {
-    sheet.insertRowsAfter(1, 100);
-  }
+  try {
+    const currentMax = sheet.getMaxRows();
+    if (currentMax <= 1) {
+      sheet.insertRowsAfter(1, 100);
+    }
+  } catch (_e) {}
+
   const totalRows = sheet.getMaxRows();
   const numRows = totalRows - 1;
+  if (numRows < 1) return;
+
   const statusColumnRange = sheet.getRange(2, statusCol, numRows, 1);
 
-  // 1. Dropdown Validation (Yes/No)
-  const validationRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(CONFIG.STATUS_OPTIONS, true)
-    .setAllowInvalid(false)
-    .setHelpText("Select 'Yes' or 'No'")
-    .build();
-  statusColumnRange.setDataValidation(validationRule);
+  // 1. Dropdown Validation (Yes/No) - safe for typed columns / structured tables
+  try {
+    const validationRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(CONFIG.STATUS_OPTIONS, true)
+      .setAllowInvalid(false)
+      .setHelpText("Select 'Yes' or 'No'")
+      .build();
+    statusColumnRange.setDataValidation(validationRule);
+  } catch (valErr) {
+    Logger.log("Note: Validation skipped for typed column / table: " + valErr.message);
+  }
 
-  // 2. Clean Existing Rules on Column
-  const rules = sheet.getConditionalFormatRules();
-  const filteredRules = rules.filter(function(r) {
-    const ranges = r.getRanges();
-    for (let i = 0; i < ranges.length; i++) {
-      if (ranges[i].getColumn() === statusCol) return false;
-    }
-    return true;
-  });
+  // 2. Conditional Formatting (Yes -> Green, No -> Red) - safe for typed columns / structured tables
+  try {
+    const rules = sheet.getConditionalFormatRules() || [];
+    const filteredRules = rules.filter(function(r) {
+      const ranges = r.getRanges();
+      for (let i = 0; i < ranges.length; i++) {
+        if (ranges[i].getColumn() === statusCol) return false;
+      }
+      return true;
+    });
 
-  // Rule 1: "Yes" -> Emerald Green
-  const yesRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenTextEqualTo("Yes")
-    .setBackground(CONFIG.COLOR_YES_BG)
-    .setFontColor(CONFIG.COLOR_YES_TEXT)
-    .setBold(true)
-    .setRanges([statusColumnRange])
-    .build();
+    const yesRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo("Yes")
+      .setBackground(CONFIG.COLOR_YES_BG)
+      .setFontColor(CONFIG.COLOR_YES_TEXT)
+      .setBold(true)
+      .setRanges([statusColumnRange])
+      .build();
 
-  // Rule 2: "No" -> Soft Red
-  const noRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenTextEqualTo("No")
-    .setBackground(CONFIG.COLOR_NO_BG)
-    .setFontColor(CONFIG.COLOR_NO_TEXT)
-    .setBold(true)
-    .setRanges([statusColumnRange])
-    .build();
+    const noRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo("No")
+      .setBackground(CONFIG.COLOR_NO_BG)
+      .setFontColor(CONFIG.COLOR_NO_TEXT)
+      .setBold(true)
+      .setRanges([statusColumnRange])
+      .build();
 
-  filteredRules.push(yesRule);
-  filteredRules.push(noRule);
-  sheet.setConditionalFormatRules(filteredRules);
+    filteredRules.push(yesRule);
+    filteredRules.push(noRule);
+    sheet.setConditionalFormatRules(filteredRules);
+  } catch (fmtErr) {
+    Logger.log("Note: Conditional formatting skipped for typed column / table: " + fmtErr.message);
+  }
 }
 
 // ============================================================================

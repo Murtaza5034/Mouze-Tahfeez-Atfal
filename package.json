@@ -1,13 +1,14 @@
 {
   "name": "mauze-tahfeez",
   "private": true,
-  "version": "1.5.50",
+  "version": "1.5.55",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bot:whatsapp": "node scripts/mauze-whatsapp-bot.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.8",

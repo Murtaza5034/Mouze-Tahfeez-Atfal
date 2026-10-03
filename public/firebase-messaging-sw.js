@@ -133,8 +133,8 @@ function makeDeterministicTag(info) {
 function buildNotificationOptions(info) {
   const options = {
     body: info.body,
-    icon: '/LOGO ATFAAL-192.png',
-    badge: '/LOGO ATFAAL-192.png',
+    icon: '/mauze-tahfeez-logo.png',
+    badge: '/favicon.png',
     vibrate: [200, 100, 200, 100, 200],
     data: {
       ...info.data,
@@ -151,7 +151,7 @@ function buildNotificationOptions(info) {
       {
         action: 'open',
         title: 'Open Portal',
-        icon: '/LOGO ATFAAL-192.png'
+        icon: '/favicon.png'
       },
       {
         action: 'dismiss',
@@ -174,23 +174,20 @@ async function displayPushNotification(payload) {
       return;
     }
 
-    // Check if there is an active, focused client window
+    // Broadcast to any open window clients so router / in-app listeners can update state
     const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const hasFocusedClient = windowClients.some(c => c.focused);
-
-    // If website is open and in foreground, broadcast to client and avoid duplicate OS banner
-    if (hasFocusedClient) {
+    if (windowClients && windowClients.length > 0) {
       windowClients.forEach(c => {
-        c.postMessage({
-          type: 'mauze:fcm-foreground-message',
-          payload: payload
-        });
+        try {
+          c.postMessage({
+            type: 'mauze:fcm-foreground-message',
+            payload: payload
+          });
+        } catch (_) {}
       });
-      console.log('[SW] Client is open in foreground, dispatched in-app message.');
-      return;
     }
 
-    console.log('[SW] Displaying background notification:', info.title);
+    console.log('[SW] Displaying push notification banner:', info.title);
     return self.registration.showNotification(info.title, buildNotificationOptions(info));
   } catch (err) {
     console.error('[SW] Error showing push notification:', err);

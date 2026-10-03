@@ -160,8 +160,12 @@ export async function syncStudentResultToGoogleSheets({
         juz_hali: result?.juz_hali !== undefined ? result.juz_hali : 0,
         takhteet: result?.takhteet !== undefined ? result.takhteet : 0,
         jadeed: result?.jadeed !== undefined ? result.jadeed : 0,
-        total_score: result?.total_score !== undefined ? result.total_score : 0,
-        total_jadeed_pages: result?.total_jadeed_pages || 0,
+        total_score: (result?.total_score !== undefined && result?.total_score !== null && result?.total_score !== "")
+          ? result.total_score
+          : ((Number(result?.murajazah) || 0) + (Number(result?.juz_hali) || 0) + (Number(result?.takhteet) || 0) + (Number(result?.jadeed) || 0)),
+        total_jadeed_pages: (result?.total_jadeed_pages !== undefined && result?.total_jadeed_pages !== null && result?.total_jadeed_pages !== "")
+          ? result.total_jadeed_pages
+          : 0,
         total_jadeed_unit: result?.total_jadeed_unit || "صفه",
         wusool_juz: result?.wusool_juz || student?.hifz?.juz || student?.juz || "",
         wusool_page: result?.wusool_page || "",
@@ -274,8 +278,12 @@ export async function syncAllStudentsToGoogleSheets({
         juz_hali: res.juz_hali !== undefined ? res.juz_hali : 0,
         takhteet: res.takhteet !== undefined ? res.takhteet : 0,
         jadeed: res.jadeed !== undefined ? res.jadeed : 0,
-        total_score: res.total_score !== undefined ? res.total_score : 0,
-        total_jadeed_pages: res.total_jadeed_pages || 0,
+        total_score: (res.total_score !== undefined && res.total_score !== null && res.total_score !== "")
+          ? res.total_score
+          : ((Number(res.murajazah) || 0) + (Number(res.juz_hali) || 0) + (Number(res.takhteet) || 0) + (Number(res.jadeed) || 0)),
+        total_jadeed_pages: (res.total_jadeed_pages !== undefined && res.total_jadeed_pages !== null && res.total_jadeed_pages !== "")
+          ? res.total_jadeed_pages
+          : 0,
         total_jadeed_unit: res.total_jadeed_unit || "صفه",
         wusool_juz: res.wusool_juz || s.hifz?.juz || s.juz || "",
         wusool_page: res.wusool_page || "",

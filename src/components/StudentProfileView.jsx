@@ -548,16 +548,38 @@ export default function StudentProfileView({
         conditions.push(`student_id.eq.${cid}`);
         conditions.push(`id.eq.${cid}`);
         conditions.push(`its.eq.${cid}`);
+        conditions.push(`user_id.eq.${cid}`);
+        conditions.push(`parent_user_id.eq.${cid}`);
       });
+      if (currentUser?.email) {
+        conditions.push(`parent_email.eq.${currentUser.email}`);
+      }
 
       if (conditions.length > 0) {
         try {
-          const { error: sbError } = await supabase
+          const { data: updatedRows, error: sbError } = await supabase
             .from(targetTable)
             .update(updatePayload)
-            .or(conditions.join(","));
+            .or(conditions.join(","))
+            .select();
 
-          if (sbError) console.warn("Supabase profile update note:", sbError);
+          if (sbError || !updatedRows || updatedRows.length === 0) {
+            // Upsert fallback to ensure profile is created/saved if no row was updated
+            const fallbackStudentId = studentProfile?.student_id || studentKey;
+            const upsertPayload = {
+              student_id: !isNaN(fallbackStudentId) ? Number(fallbackStudentId) : fallbackStudentId,
+              ...updatePayload,
+              parent_email: studentProfile?.parent_email || currentUser?.email || null,
+              parent_user_id: studentProfile?.parent_user_id || currentUser?.id || null,
+              user_id: studentProfile?.user_id || currentUser?.id || null,
+              is_active: true,
+              section: isKibar ? "kibar" : "atfal",
+            };
+            await supabase
+              .from(targetTable)
+              .upsert(upsertPayload, { onConflict: "student_id" })
+              .catch((upErr) => console.warn("Fallback upsert note:", upErr));
+          }
         } catch (sbErr) {
           console.warn("Supabase update error:", sbErr);
         }

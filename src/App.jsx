@@ -56,6 +56,7 @@ import {
   CheckCheck,
   UserCheck,
   UserX,
+  Pencil,
   RotateCw,
   Mic,
   Square,
@@ -107,7 +108,6 @@ import {
   CalendarClock,
   School,
   Reply,
-  Pencil,
   Video,
   HelpCircle,
   BarChart2,
@@ -1791,42 +1791,59 @@ const broadcastNotification = async (
     }
   }
 
-  // Auto-send Telegram Bot notifications to verified & linked parents
+  // Auto-send Telegram Bot and WhatsApp Bot notifications to verified & linked parents
   try {
     const isAttendance = /attendance/i.test(title) || /attendance/i.test(body);
     const isLeave = /leave/i.test(title) || /leave/i.test(body);
     const isJadwal = /jadwal|timetable|schedule/i.test(title) || /jadwal|timetable|schedule/i.test(body);
     const isResult = /result|marhala/i.test(title) || /result|marhala/i.test(body);
+    const isEventLeave = extraData?.type === 'event_leave' || /event leave/i.test(title);
+    const isLeaveApplied = extraData?.type === 'leave_applied' || /applied for leave|application submitted/i.test(body) || /application submitted/i.test(title);
+    const isLeaveChat = extraData?.type === 'leave_chat_message' || /leave message/i.test(title);
 
     let updateType = 'general';
-    if (isAttendance) updateType = 'attendance';
+    if (isEventLeave) updateType = 'event_leave';
+    else if (isLeaveApplied) updateType = 'leave_applied';
+    else if (isLeaveChat) updateType = 'leave_chat_message';
+    else if (isAttendance) updateType = 'attendance';
     else if (isLeave) updateType = 'leave';
     else if (isJadwal) updateType = 'jadwal';
     else if (isResult) updateType = 'result';
+    if (extraData?.type) updateType = extraData.type;
 
-    const webhookEndpoint = '/api/telegram-webhook';
-    fetch(webhookEndpoint, {
+    const notifPayload = {
+      action: 'notify_student_update',
+      type: updateType,
+      studentId: targetUser || extraData?.student_id || extraData?.studentId || null,
+      phone: extraData?.phone || extraData?.whatsapp_number || extraData?.mobile || extraData?.parent_phone || null,
+      its: extraData?.its || extraData?.student_id || null,
+      name: extraData?.childName || extraData?.student_name || extraData?.name || null,
+      details: {
+        title,
+        body,
+        status: extraData?.status || (/present/i.test(body) ? 'Present' : (/absent/i.test(body) ? 'Absent' : (/approved/i.test(body) ? 'Approved' : (/rejected/i.test(body) ? 'Rejected' : 'Update')))),
+        date: extraData?.date || new Date().toLocaleDateString('en-GB'),
+        note: extraData?.note || body,
+        comment: extraData?.admin_comment || extraData?.comment || '',
+        fromDate: extraData?.from_date || extraData?.fromDate || '',
+        toDate: extraData?.to_date || extraData?.toDate || '',
+        eventName: extraData?.eventName || title,
+        reason: extraData?.reason || extraData?.note || ''
+      }
+    };
+
+    fetch('/api/telegram-webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'notify_student_update',
-        type: updateType,
-        studentId: targetUser || extraData?.student_id || extraData?.studentId || null,
-        phone: extraData?.phone || extraData?.whatsapp_number || null,
-        its: extraData?.its || extraData?.student_id || null,
-        name: extraData?.childName || extraData?.student_name || extraData?.name || null,
-        details: {
-          title,
-          body,
-          status: extraData?.status || (/present/i.test(body) ? 'Present' : (/absent/i.test(body) ? 'Absent' : (/approved/i.test(body) ? 'Approved' : (/rejected/i.test(body) ? 'Rejected' : 'Update')))),
-          date: extraData?.date || new Date().toLocaleDateString('en-GB'),
-          note: extraData?.note || body,
-          comment: extraData?.admin_comment || extraData?.comment || '',
-          fromDate: extraData?.from_date || extraData?.fromDate || '',
-          toDate: extraData?.to_date || extraData?.toDate || ''
-        }
-      })
+      body: JSON.stringify(notifPayload)
     }).catch((tgErr) => console.warn('[Telegram Dispatch Notice]:', tgErr.message));
+
+    // Direct instant shoot to local WhatsApp Bot (port 2785)
+    fetch('http://localhost:2785/api/notify-student-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notifPayload)
+    }).catch((waErr) => console.warn('[WhatsApp Dispatch Notice]:', waErr.message));
   } catch (_) {}
 
   return { inboxError, fcmError, fcmData };
@@ -4862,28 +4879,43 @@ function buildStudents(
   const isKibarDoc = (d) => {
     if (!d || typeof d !== "object") return false;
     if (d.is_kibar === true || d.is_kibar_student === true) return true;
-    return (
-      String(d.section || "")
-        .trim()
-        .toLowerCase() === "kibar"
-    );
+    const sec = String(d.section || "").trim().toLowerCase();
+    if (sec === "kibar") return true;
+    const role = String(d.portal_role || d.role || "").trim().toLowerCase();
+    if (role === "kibar-student" || role === "kibar-teacher" || role === "kibar-admin") return true;
+    const sId = String(d.student_id || d.id || "").trim();
+    if (sId === "VED0Qd8aMIUAfHpdFeVWYAbzKm83") return true; // Mulla Idris Gadiyali (kibar student)
+    return false;
   };
   const isAtfalDoc = (d) => {
     if (!d || typeof d !== "object") return false;
     if (isKibarDoc(d)) return false;
-    return (
-      String(d.section || "")
-        .trim()
-        .toLowerCase() === "atfal"
-    );
+    const sec = String(d.section || "").trim().toLowerCase();
+    if (sec === "atfal") return true;
+    const role = String(d.portal_role || d.role || "").trim().toLowerCase();
+    if (role === "parents") return true;
+    return false;
   };
   let profiles = childProfiles || [];
   let results = weeklyResults || [];
   if (section === "atfal") {
-    profiles = profiles.filter((p) => !isKibarDoc(p));
+    profiles = profiles.filter((p) => {
+      if (!p) return false;
+      if (isKibarDoc(p)) return false;
+      const nm = normalizeText(p.full_name || p.name || "");
+      if (nm.includes("demo student")) return false;
+      if (nm === "janab mulla murtaza bhai hamid") return false;
+      return true;
+    });
     results = results.filter((r) => !isKibarDoc(r));
   } else if (section === "kibar") {
-    profiles = profiles.filter((p) => !isAtfalDoc(p));
+    profiles = profiles.filter((p) => {
+      if (!p) return false;
+      if (isAtfalDoc(p)) return false;
+      const nm = normalizeText(p.full_name || p.name || "");
+      if (nm.includes("demo student")) return false;
+      return true;
+    });
     results = results.filter((r) => !isAtfalDoc(r));
   }
   const resultsByWeek = {};
@@ -4984,54 +5016,65 @@ function buildStudents(
     }
   });
 
-  // Deduplicate childProfiles by student_id or id or name so identical rows are unified
+  // Deduplicate childProfiles by normalized name or ID so multiple records for the same student are unified
   const dedupedProfiles = [];
-  const seenStudentKeys = new Set();
   (profiles || []).forEach((profile) => {
     if (!profile) return;
-    const sId = profile.student_id || profile.its || profile.id;
+    const sId = String(profile.student_id || profile.its || profile.id || "").trim().toLowerCase();
     const sName = normalizeText(profile.full_name || profile.name || "");
-    const dedupKey = sId
-      ? `id:${String(sId).trim().toLowerCase()}`
-      : `name:${sName}`;
-    if (!seenStudentKeys.has(dedupKey)) {
-      seenStudentKeys.add(dedupKey);
-      dedupedProfiles.push({ ...profile });
-    } else {
-      const existingIdx = dedupedProfiles.findIndex((p) => {
-        const pId = p.student_id || p.its || p.id;
-        const pName = normalizeText(p.full_name || p.name || "");
-        return (
-          (sId &&
-            String(pId).trim().toLowerCase() ===
-              String(sId).trim().toLowerCase()) ||
-          (sName && pName === sName)
-        );
+    if (!sName && !sId) return;
+
+    const matchedIdx = dedupedProfiles.findIndex((p) => {
+      const pId = String(p.student_id || p.its || p.id || "").trim().toLowerCase();
+      const pName = normalizeText(p.full_name || p.name || "");
+      if (sName && pName === sName) return true;
+      if (sId && pId && sId === pId) return true;
+      return false;
+    });
+
+    if (matchedIdx === -1) {
+      dedupedProfiles.push({
+        ...profile,
+        allCandidateIds: [profile.id, profile.student_id, profile.its].filter(Boolean),
       });
-      if (existingIdx !== -1) {
-        dedupedProfiles[existingIdx] = {
-          ...profile,
-          ...dedupedProfiles[existingIdx],
-          teacher_id:
-            dedupedProfiles[existingIdx].teacher_id ||
-            profile.teacher_id ||
-            profile.muhaffiz_id,
-          muhaffiz_id:
-            dedupedProfiles[existingIdx].muhaffiz_id ||
-            profile.muhaffiz_id ||
-            profile.teacher_id,
-          teacher_name:
-            dedupedProfiles[existingIdx].teacher_name ||
-            profile.teacher_name ||
-            profile.muhaffiz_name,
-          parent_user_id:
-            dedupedProfiles[existingIdx].parent_user_id ||
-            profile.parent_user_id ||
-            profile.user_id,
-          parent_email:
-            dedupedProfiles[existingIdx].parent_email || profile.parent_email,
-        };
-      }
+    } else {
+      const existing = dedupedProfiles[matchedIdx];
+      const mergedCandidateIds = Array.from(
+        new Set([
+          ...(existing.allCandidateIds || []),
+          existing.id,
+          existing.student_id,
+          existing.its,
+          profile.id,
+          profile.student_id,
+          profile.its,
+        ].filter(Boolean))
+      );
+      dedupedProfiles[matchedIdx] = {
+        ...profile,
+        ...existing,
+        student_id: existing.student_id || profile.student_id,
+        its: existing.its || profile.its,
+        teacher_id:
+          existing.teacher_id ||
+          profile.teacher_id ||
+          profile.muhaffiz_id,
+        muhaffiz_id:
+          existing.muhaffiz_id ||
+          profile.muhaffiz_id ||
+          profile.teacher_id,
+        teacher_name:
+          existing.teacher_name ||
+          profile.teacher_name ||
+          profile.muhaffiz_name,
+        parent_user_id:
+          existing.parent_user_id ||
+          profile.parent_user_id ||
+          profile.user_id,
+        parent_email:
+          existing.parent_email || profile.parent_email,
+        allCandidateIds: mergedCandidateIds,
+      };
     }
   });
 
@@ -9422,6 +9465,31 @@ function ChildLeaveApply({
         },
         targetSection,
       );
+
+      // Instant WhatsApp update to parent confirming their leave submission
+      try {
+        await broadcastNotification(
+          `Leave Application Submitted: ${sName}`,
+          `Your leave application for ${sName} has been submitted. Dates: ${leaveWindowLabel}. Reason: ${reason || "Not provided"}. Status: Pending Admin Approval.`,
+          "user",
+          user?.id || sId,
+          "Apply Leave",
+          {
+            type: "leave_applied",
+            redirectPage: "Apply Leave",
+            section: targetSection,
+            studentId: String(sId),
+            student_name: sName,
+            phone: studentProfile?.phone || studentProfile?.whatsapp_number || "",
+            its: studentProfile?.its || sId,
+            from_date: fromGreg,
+            to_date: tillGreg,
+            reason: reason || "Not provided",
+            status: "Pending Admin Approval",
+          },
+          targetSection,
+        );
+      } catch (_) {}
 
       // Also notify the student's teacher (resolve reliably from the DB so the
       // teacher always gets the leave notification for their group child).
@@ -16781,22 +16849,24 @@ function AdminLeaveManagement({
     onShowAction("success", `Leave ${statusLabel}! Notification sent.`);
 
     const targetUser = leaveToUpdate?.parent_id || leaveToUpdate?.user_id;
-    if (targetUser) {
+    const targetRecipient = targetUser || leaveToUpdate?.student_id || student?.id;
+    if (targetRecipient) {
       try {
         const targetSection = sectionKibar ? "kibar" : "atfal";
         await broadcastNotification(
           `Leave ${statusLabel}`,
           notifyBody,
           "user",
-          targetUser,
+          targetRecipient,
           "Apply Leave",
           {
+            type: "leave",
             redirectPage: "Apply Leave",
             section: targetSection,
-            studentId: String(leaveToUpdate?.student_id || ""),
+            studentId: String(leaveToUpdate?.student_id || student?.student_id || ""),
             student_name: studentName,
-            phone: student?.mobile || student?.phone || student?.parent_phone || "",
-            its: student?.its || student?.its_id || student?.student_id || "",
+            phone: student?.mobile || student?.phone || student?.parent_phone || student?.whatsapp_number || "",
+            its: student?.its || student?.its_id || student?.student_id || leaveToUpdate?.student_id || "",
             status: statusLabel,
             from_date: leaveToUpdate?.from_date || leaveToUpdate?.fromDate || "",
             to_date: leaveToUpdate?.to_date || leaveToUpdate?.toDate || "",
@@ -19095,6 +19165,24 @@ function PremiumEventLeavePage({ onShowAction, user }) {
     const title = "Event Leave: " + eventName;
     const body = `Leave has been applied for ${eventName} from ${fromDate} to ${toDate}.${reason ? "\nReason: " + reason : ""}`;
     await sendNotificationToAll(title, body);
+    try {
+      await broadcastNotification(
+        title,
+        body,
+        "all",
+        null,
+        "Inbox",
+        {
+          type: "event_leave",
+          eventName,
+          fromDate,
+          toDate,
+          from_date: fromDate,
+          to_date: toDate,
+          reason: reason || "",
+        },
+      );
+    } catch (_) {}
     if (onShowAction)
       onShowAction(
         "success",
@@ -19617,6 +19705,40 @@ function AdminPortal({
     weeklyResults = [],
   } = adminData || {};
 
+  const isKibarAdmin = portalRole === "kibar-admin";
+
+  useEffect(() => {
+    if (adminData) {
+      fetch('/api/debug-dump', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          portalRole,
+          students: (students || []).map(s => ({
+            student_id: s.student_id,
+            name: s.name || s.full_name,
+            section: s.section,
+            is_kibar: s.is_kibar,
+            is_kibar_student: s.is_kibar_student,
+            portal_role: s.portal_role,
+            teacherName: s.teacherName,
+            teacher_id: s.teacher_id,
+            groupName: s.groupName,
+          })),
+          teachers: (teacherProfiles || []).map(t => ({
+            id: t.id,
+            user_id: t.user_id,
+            name: t.full_name,
+            teacher_role: t.teacher_role,
+            portal_role: t.portal_role,
+            section: t.section,
+            email: t.email
+          }))
+        })
+      }).catch(() => {});
+    }
+  }, [adminData, portalRole, students, teacherProfiles]);
+
   /* ── Marhala-wise Ranking (APPEND-ONLY, Task 1–3): derived read-only from
      students[].latestResult + weeklyResults. Never writes to Mark Progress. ── */
   const marhalaRankCache = useMemo(
@@ -19689,6 +19811,8 @@ function AdminPortal({
     useState(false);
   const [adminScheduleStudentId, setAdminScheduleStudentId] = useState("");
   const [registryStudentId, setRegistryStudentId] = useState("");
+  const [editingRegistryStudent, setEditingRegistryStudent] = useState(null);
+  const registryFormRef = useRef(null);
   const studentPhotoInputRef = useRef(null);
   const assignmentPhotoInputRef = useRef(null);
   const [assignModal, setAssignModal] = useState(null);
@@ -19716,8 +19840,156 @@ function AdminPortal({
         });
       }
     });
+
+    // Also include any portal accounts (parents or kibar students) so they directly appear at dropdown
+    (portalAccessList || []).forEach((pa) => {
+      if (!pa) return;
+      const r = (pa.portal_role || "").toLowerCase();
+      const isCandidate = isKibarAdmin
+        ? r === "kibar-student" || r === "student"
+        : r === "parents" || r === "parent";
+      if (!isCandidate) return;
+
+      const sid = String(pa.student_id || pa.user_id || pa.id || pa.email || "").trim();
+      const label = pa.full_name || pa.name || pa.email || "Student";
+      const key = sid
+        ? `id:${sid.toLowerCase()}`
+        : `name:${normalizeText(label)}`;
+      const alreadyPresent = list.some(
+        (item) =>
+          String(item.value).toLowerCase() === sid.toLowerCase() ||
+          normalizeText(item.label) === normalizeText(label),
+      );
+      if (!seenKeys.has(key) && !alreadyPresent) {
+        seenKeys.add(key);
+        list.push({
+          value: sid,
+          label: `${label} (Portal User)`,
+          sub: pa.email ? `(${pa.email})` : "",
+        });
+      }
+    });
+
     return list;
-  }, [students]);
+  }, [students, portalAccessList, isKibarAdmin]);
+
+  const kibarTeacherOptions = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+
+    const addOption = (id, name, email) => {
+      if (!name && !email) return;
+      const cleanName = (name || email || "").trim();
+      const key = normalizeText(cleanName);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      const val = id || cleanName;
+      list.push({
+        value: val,
+        label: cleanName,
+        sub: email && email !== cleanName ? `(${email})` : "",
+        teacher_id: val,
+        teacher_name: cleanName,
+      });
+    };
+
+    (teacherProfiles || []).forEach((tp) => {
+      if (!tp) return;
+      addOption(
+        tp.user_id || tp.id || tp.teacher_id,
+        tp.full_name || tp.name,
+        tp.email,
+      );
+    });
+
+    (portalAccessList || []).forEach((p) => {
+      if (!p) return;
+      const r = (p.portal_role || "").toLowerCase();
+      if (
+        r === "kibar-teacher" ||
+        (r.includes("teacher") && !r.includes("student") && !r.includes("parent")) ||
+        r.includes("muhaffiz")
+      ) {
+        addOption(
+          p.user_id || p.id,
+          p.full_name || p.name,
+          p.email,
+        );
+      }
+    });
+
+    return list.sort((a, b) => a.label.localeCompare(b.label));
+  }, [teacherProfiles, portalAccessList]);
+
+  const renderTeacherInlineOptions = useCallback(() => {
+    const renderedKeys = new Set();
+    const options = [];
+
+    (portalAccessList || [])
+      .filter((a) => {
+        const r = (a.portal_role || "").toLowerCase();
+        if (isKibarAdmin) {
+          return (
+            r === "kibar-teacher" ||
+            (r.includes("teacher") && !r.includes("student")) ||
+            r.includes("muhaffiz")
+          );
+        }
+        return (
+          (r.includes("teacher") || r.includes("muhaffiz")) &&
+          !r.includes("kibar-student") &&
+          !r.includes("student")
+        );
+      })
+      .forEach((p) => {
+        const val =
+          p.user_id ||
+          p.id ||
+          p.email ||
+          p.full_name;
+        const key = normalizeText(
+          p.full_name || p.email || val,
+        );
+        if (!renderedKeys.has(key)) {
+          renderedKeys.add(key);
+          options.push(
+            <option
+              key={`portal-inline-${p.id || val}`}
+              value={val}
+            >
+              {p.full_name || p.email}
+            </option>,
+          );
+        }
+      });
+
+    (teacherProfiles || []).forEach((tp) => {
+      const key = normalizeText(
+        tp.full_name ||
+          tp.email ||
+          tp.user_id ||
+          tp.id,
+      );
+      if (!renderedKeys.has(key)) {
+        renderedKeys.add(key);
+        const val =
+          tp.user_id ||
+          tp.id ||
+          tp.email ||
+          tp.full_name;
+        options.push(
+          <option
+            key={`profile-inline-${tp.id || val}`}
+            value={val}
+          >
+            {tp.full_name}
+          </option>,
+        );
+      }
+    });
+
+    return options;
+  }, [portalAccessList, teacherProfiles, isKibarAdmin]);
 
   const isStudentAssigned = useCallback((s) => {
     if (!s) return false;
@@ -20603,7 +20875,6 @@ function AdminPortal({
     "Email Settings",
     "App Update",
   ];
-  const isKibarAdmin = portalRole === "kibar-admin";
   const navPages = [
     "Overview",
     ...(!isKibarAdmin ? ["Hifz League Tracking"] : []),
@@ -22739,10 +23010,40 @@ function AdminPortal({
                       color: "var(--deep-brown)",
                     }}
                   >
-                    Add New Student
+                    {editingRegistryStudent
+                      ? `Edit Student: ${editingRegistryStudent.name}`
+                      : "Add New Student"}
                   </h3>
+                  {editingRegistryStudent && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingRegistryStudent(null);
+                        if (registryFormRef.current)
+                          registryFormRef.current.reset();
+                      }}
+                      style={{
+                        marginLeft: "auto",
+                        padding: "4px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--glass-border)",
+                        background: "var(--premium-white)",
+                        cursor: "pointer",
+                        fontSize: "0.82rem",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      ✕ Cancel Edit
+                    </button>
+                  )}
                 </div>
                 <form
+                  ref={registryFormRef}
+                  key={
+                    editingRegistryStudent
+                      ? `edit-${editingRegistryStudent.student_id}`
+                      : "new-student"
+                  }
                   className="stack-form"
                   onSubmit={async (e) => {
                     e.preventDefault();
@@ -22755,35 +23056,78 @@ function AdminPortal({
                     const numericIts =
                       itsVal && !isNaN(itsVal) ? Number(itsVal) : itsVal;
 
-                    const { data, error } = await supabase
-                      .from("child_profiles")
-                      .insert([
-                        {
-                          full_name,
-                          arabic_name: formData.get("arabic_name"),
-                          parent_email: formData.get("parent_email"),
-                          whatsapp_number: formData.get("whatsapp_number")
-                            ? String(formData.get("whatsapp_number")).trim()
-                            : null,
-                          juz: formData.get("juz"),
-                          surat: formData.get("surat"),
-                          photo_url: formData.get("photo_url"),
-                          group_name: formData.get("group_name"),
-                          its: numericIts,
-                          gender: formData.get("gender") || "male",
-                          is_active: true,
-                        },
-                      ])
-                      .select()
-                      .single();
+                    const targetTable = isKibarAdmin
+                      ? "kibar_child_profiles"
+                      : "child_profiles";
+                    const sId = editingRegistryStudent
+                      ? editingRegistryStudent.student_id
+                      : (formData.get("its") || `std_${Date.now()}`);
+                    const numericSId = !isNaN(sId) ? Number(sId) : sId;
+
+                    const payload = {
+                      student_id: numericSId,
+                      full_name,
+                      name: full_name,
+                      arabic_name: formData.get("arabic_name") || null,
+                      parent_email: formData.get("parent_email") || null,
+                      whatsapp_number: formData.get("whatsapp_number")
+                        ? String(formData.get("whatsapp_number")).trim()
+                        : null,
+                      juz: formData.get("juz") || null,
+                      surat: formData.get("surat") || null,
+                      photo_url: formData.get("photo_url") || null,
+                      group_name: formData.get("group_name") || null,
+                      its: numericIts || null,
+                      gender: formData.get("gender") || "male",
+                      is_active: true,
+                      section: isKibarAdmin ? "kibar" : "atfal",
+                    };
+
+                    if (editingRegistryStudent) {
+                      if (editingRegistryStudent.teacher_id) {
+                        payload.teacher_id =
+                          editingRegistryStudent.teacher_id;
+                        payload.teacher_name =
+                          editingRegistryStudent.teacherName ||
+                          editingRegistryStudent.teacher_name;
+                        payload.muhaffiz_id =
+                          editingRegistryStudent.muhaffiz_id ||
+                          editingRegistryStudent.teacher_id;
+                        payload.muhaffiz_name =
+                          editingRegistryStudent.muhaffiz_name ||
+                          editingRegistryStudent.teacherName;
+                        payload.original_teacher_id =
+                          editingRegistryStudent.original_teacher_id ||
+                          editingRegistryStudent.teacher_id;
+                      }
+                      if (editingRegistryStudent.parent_user_id) {
+                        payload.parent_user_id =
+                          editingRegistryStudent.parent_user_id;
+                      }
+                      if (editingRegistryStudent.user_id) {
+                        payload.user_id = editingRegistryStudent.user_id;
+                      }
+                    }
+
+                    const { error } = await supabase
+                      .from(targetTable)
+                      .upsert(payload, { onConflict: "student_id" });
 
                     if (error) {
                       showAction(
                         "error",
-                        "Error adding student: " + error.message,
+                        (editingRegistryStudent
+                          ? "Error updating student: "
+                          : "Error adding student: ") + error.message,
                       );
                     } else {
-                      showAction("success", "Student added successfully!");
+                      showAction(
+                        "success",
+                        editingRegistryStudent
+                          ? "Student details updated successfully!"
+                          : "Student added successfully!",
+                      );
+                      setEditingRegistryStudent(null);
                       e.target.reset();
                       loadPortalData(portalRole, user, null, { silent: true });
                     }
@@ -22795,6 +23139,11 @@ function AdminPortal({
                       name="full_name"
                       type="text"
                       placeholder="Enter name..."
+                      defaultValue={
+                        editingRegistryStudent?.name ||
+                        editingRegistryStudent?.full_name ||
+                        ""
+                      }
                       required
                       className="premium-input"
                     />
@@ -22805,6 +23154,7 @@ function AdminPortal({
                       name="arabic_name"
                       type="text"
                       placeholder="Arabic Name"
+                      defaultValue={editingRegistryStudent?.arabic_name || ""}
                       className="premium-input arabic-kanz"
                       style={{ fontSize: "1.2rem" }}
                     />
@@ -22815,6 +23165,7 @@ function AdminPortal({
                       name="parent_email"
                       type="email"
                       placeholder="parent@example.com"
+                      defaultValue={editingRegistryStudent?.parent_email || ""}
                       className="premium-input"
                     />
                   </label>
@@ -22824,6 +23175,9 @@ function AdminPortal({
                       name="whatsapp_number"
                       type="text"
                       placeholder="e.g. 923001234567"
+                      defaultValue={
+                        editingRegistryStudent?.whatsapp_number || ""
+                      }
                       className="premium-input"
                     />
                   </label>
@@ -22836,6 +23190,11 @@ function AdminPortal({
                         name="photo_url"
                         type="text"
                         placeholder="https://..."
+                        defaultValue={
+                          editingRegistryStudent?.photoUrl ||
+                          editingRegistryStudent?.photo_url ||
+                          ""
+                        }
                         className="premium-input"
                         style={{ flex: 1 }}
                       />
@@ -22875,6 +23234,11 @@ function AdminPortal({
                       name="its"
                       type="text"
                       placeholder="ITS"
+                      defaultValue={
+                        editingRegistryStudent?.its === "..."
+                          ? ""
+                          : editingRegistryStudent?.its || ""
+                      }
                       className="premium-input"
                     />
                   </label>
@@ -22884,6 +23248,7 @@ function AdminPortal({
                       name="juz"
                       type="text"
                       placeholder="e.g. 30"
+                      defaultValue={editingRegistryStudent?.juz || ""}
                       className="premium-input"
                     />
                   </label>
@@ -22893,6 +23258,7 @@ function AdminPortal({
                       name="surat"
                       type="text"
                       placeholder="e.g. Al-Naba"
+                      defaultValue={editingRegistryStudent?.surat || ""}
                       className="premium-input"
                     />
                   </label>
@@ -22902,6 +23268,11 @@ function AdminPortal({
                       name="group_name"
                       type="text"
                       placeholder="e.g. Group A"
+                      defaultValue={
+                        editingRegistryStudent?.groupName === "Ungrouped"
+                          ? ""
+                          : editingRegistryStudent?.groupName || ""
+                      }
                       className="premium-input"
                     />
                   </label>
@@ -22910,7 +23281,13 @@ function AdminPortal({
                     <select
                       name="gender"
                       className="premium-input"
-                      defaultValue="male"
+                      defaultValue={
+                        String(
+                          editingRegistryStudent?.gender || "male",
+                        ).toLowerCase() === "female"
+                          ? "female"
+                          : "male"
+                      }
                     >
                       <option value="male">👦 Boy</option>
                       <option value="female">👧 Girl</option>
@@ -22927,7 +23304,15 @@ function AdminPortal({
                       fontSize: "1rem",
                     }}
                   >
-                    <UserPlus size={18} /> Add Student to Database
+                    {editingRegistryStudent ? (
+                      <>
+                        <CheckCircle2 size={18} /> Update Student Details
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={18} /> Add Student to Database
+                      </>
+                    )}
                   </button>
                 </form>
               </div>
@@ -23011,6 +23396,28 @@ function AdminPortal({
                         }}
                       >
                         <button
+                          type="button"
+                          className="btn-text-only"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            fontSize: "0.85rem",
+                            color: "var(--primary-gold)",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                          }}
+                          onClick={() => {
+                            setEditingRegistryStudent(s);
+                            window.scrollTo({ top: 120, behavior: "smooth" });
+                          }}
+                          title="Edit student details"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                        <button
                           className={`gender-toggle-btn${String(s.gender || "male").toLowerCase() === "female" ? " girl" : " boy"}`}
                           onClick={() =>
                             handleToggleStudentGender(s.student_id, s.gender)
@@ -23030,7 +23437,9 @@ function AdminPortal({
                           className="btn-text-only red"
                           onClick={() =>
                             onDeleteRecord(
-                              "child_profiles",
+                              isKibarAdmin
+                                ? "kibar_child_profiles"
+                                : "child_profiles",
                               "student_id",
                             )(s.student_id)
                           }
@@ -28339,75 +28748,7 @@ function AdminPortal({
                               }}
                             >
                               <option value="">-- Select Teacher --</option>
-                              {(() => {
-                                const renderedKeys = new Set();
-                                const options = [];
-
-                                (portalAccessList || [])
-                                  .filter((a) => {
-                                    const r = (a.portal_role || "").toLowerCase();
-                                    if (isKibarAdmin) {
-                                      return (
-                                        r === "kibar-teacher" ||
-                                        (r.includes("teacher") && !r.includes("student")) ||
-                                        r.includes("muhaffiz")
-                                      );
-                                    }
-                                    return (
-                                      (r.includes("teacher") || r.includes("muhaffiz")) &&
-                                      !r.includes("kibar-student") &&
-                                      !r.includes("student")
-                                    );
-                                  })
-                                  .forEach((p) => {
-                                    const val =
-                                      p.user_id ||
-                                      p.id ||
-                                      p.email ||
-                                      p.full_name;
-                                    const key = normalizeText(
-                                      p.full_name || p.email || val,
-                                    );
-                                    if (!renderedKeys.has(key)) {
-                                      renderedKeys.add(key);
-                                      options.push(
-                                        <option
-                                          key={`portal-inline-${p.id || val}`}
-                                          value={val}
-                                        >
-                                          {p.full_name || p.email}
-                                        </option>,
-                                      );
-                                    }
-                                  });
-
-                                (teacherProfiles || []).forEach((tp) => {
-                                  const key = normalizeText(
-                                    tp.full_name ||
-                                      tp.email ||
-                                      tp.user_id ||
-                                      tp.id,
-                                  );
-                                  if (!renderedKeys.has(key)) {
-                                    renderedKeys.add(key);
-                                    const val =
-                                      tp.user_id ||
-                                      tp.id ||
-                                      tp.email ||
-                                      tp.full_name;
-                                    options.push(
-                                      <option
-                                        key={`profile-inline-${tp.id || val}`}
-                                        value={val}
-                                      >
-                                        {tp.full_name}
-                                      </option>,
-                                    );
-                                  }
-                                });
-
-                                return options;
-                              })()}
+                              {renderTeacherInlineOptions()}
                             </select>
                           </div>
 
@@ -28460,7 +28801,7 @@ function AdminPortal({
 
               <section
                 className="data-card card-appear"
-                style={{ marginTop: "20px", opacity: 0.8 }}
+                style={{ marginTop: "20px", opacity: 0.95 }}
               >
                 <div className="card-headline">
                   <UserX size={18} />
@@ -28479,6 +28820,35 @@ function AdminPortal({
                           <div className="child-card-info">
                             <strong>{student.name}</strong>
                             <p>Ready for assignment</p>
+                          </div>
+                        </div>
+                        <div className="assignment-details" style={{ marginTop: "10px", width: "100%" }}>
+                          <div className="detail-item" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span className="detail-label" style={{ fontWeight: 600, fontSize: "0.82rem" }}>
+                              Assign Teacher:
+                            </span>
+                            <select
+                              className="premium-select badal-inline-select"
+                              value={
+                                student.muhaffiz_id ||
+                                student.teacher_id ||
+                                student.teacherName ||
+                                ""
+                              }
+                              onChange={(e) => {
+                                const tid = e.target.value;
+                                if (tid) {
+                                  handleAssignClick({
+                                    student_id: student.student_id,
+                                    teacher_id: tid,
+                                    original_teacher_id: tid,
+                                  });
+                                }
+                              }}
+                            >
+                              <option value="">-- Select Teacher --</option>
+                              {renderTeacherInlineOptions()}
+                            </select>
                           </div>
                         </div>
                         <div className="child-card-actions">
@@ -29324,29 +29694,51 @@ function AdminPortal({
                   </div>
                   <div className="form-grid">
                     <label>
-                      <span>{isKibarAdmin ? "Link to Student (Kibar Student)" : "Link to Student (Parents only)"}</span>
-                      <SearchableSelect
-                        name="student_id"
-                        options={students.map((s) => ({
-                          value: s.student_id,
-                          label: s.name,
-                          sub: `(${s.groupName})`,
-                          allIds: s.allIds,
-                        }))}
-                        value={adminForms.portalAccess.student_id || ""}
-                        onChange={(v) =>
-                          setAdminForms((curr) => ({
-                            ...curr,
-                            portalAccess: {
-                              ...curr.portalAccess,
-                              student_id: v,
-                            },
-                          }))
-                        }
-                        placeholder="-- No Student Linked --"
-                        emptyValue="-- No Student Linked --"
-                        searchPlaceholder="Search student by name…"
-                      />
+                      <span>{isKibarAdmin ? "Assign Teacher" : "Link to Student (Parents only)"}</span>
+                      {isKibarAdmin ? (
+                        <SearchableSelect
+                          name="teacher_id"
+                          options={kibarTeacherOptions}
+                          value={adminForms.portalAccess.teacher_id || ""}
+                          onChange={(v) => {
+                            const found = kibarTeacherOptions.find((t) => String(t.value) === String(v));
+                            setAdminForms((curr) => ({
+                              ...curr,
+                              portalAccess: {
+                                ...curr.portalAccess,
+                                teacher_id: v,
+                                teacher_name: found ? found.teacher_name : (v || ""),
+                              },
+                            }));
+                          }}
+                          placeholder="-- Select Teacher to Assign --"
+                          emptyValue="-- Select Teacher to Assign --"
+                          searchPlaceholder="Search teacher by name…"
+                        />
+                      ) : (
+                        <SearchableSelect
+                          name="student_id"
+                          options={students.map((s) => ({
+                            value: s.student_id,
+                            label: s.name,
+                            sub: `(${s.groupName})`,
+                            allIds: s.allIds,
+                          }))}
+                          value={adminForms.portalAccess.student_id || ""}
+                          onChange={(v) =>
+                            setAdminForms((curr) => ({
+                              ...curr,
+                              portalAccess: {
+                                ...curr.portalAccess,
+                                student_id: v,
+                              },
+                            }))
+                          }
+                          placeholder="-- No Student Linked --"
+                          emptyValue="-- No Student Linked --"
+                          searchPlaceholder="Search student by name…"
+                        />
+                      )}
                     </label>
                   </div>
 
@@ -36878,6 +37270,7 @@ function TeacherPortal({
     const sJuzHali = toNumber(f.juz_hali);
     const sTakhteet = toNumber(f.takhteet);
     const sJadeed = toNumber(f.jadeed);
+    const sTotalScore = sMurajazah + sJuzHali + sTakhteet + sJadeed;
     const payload = {
       week_date: f.week_date || getToday(),
       from_date: f.from_date || null,
@@ -36896,6 +37289,7 @@ function TeacherPortal({
       juz_hali: sJuzHali,
       takhteet: sTakhteet,
       jadeed: sJadeed,
+      total_score: sTotalScore,
       wusool_juz: f.wusool_juz || null,
       wusool_page: f.wusool_page || null,
       wusool_surah: f.wusool_surah ?? "",
@@ -37007,13 +37401,25 @@ function TeacherPortal({
 
     // Live sync to Google Sheets on autosave (non-blocking)
     const targetAutoStudent = schoolData.students?.find(
-      (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId)
+      (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId) || (s.allIds && s.allIds.includes(String(numericId)))
     );
+    let autoMarhalaRank = "";
+    try {
+      const rankInfo = getExactMarhalaRankForStudent(
+        targetAutoStudent,
+        schoolData.weeklyResults || [],
+        { ...payload, ...(data || {}) }
+      );
+      autoMarhalaRank = rankInfo?.rank || targetAutoStudent?.marhalaRank || "";
+    } catch (_e) {}
+
     syncStudentResultToGoogleSheets({
       student: targetAutoStudent,
-      result: data,
+      result: { ...payload, ...(data || {}), total_score: sTotalScore },
       isKibar: isKibarTeacher,
+      marhalaRank: autoMarhalaRank,
       overallRank: targetAutoStudent?.computedRank || targetAutoStudent?.latestResult?.computedRank || "",
+      reportSettings: schoolData?.reportSettings || reportSettingsObject,
     });
 
     // Re-apply global rank after local re-rank so teacher sees same rank as admin
@@ -37098,6 +37504,28 @@ function TeacherPortal({
           weekDate: currentWeekDate,
         }
       ).catch((err) => console.warn("Live result notification note:", err));
+
+      // Non-blocking update to WhatsApp bot gateway
+      try {
+        fetch("http://localhost:2785/api/notify-student-update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "result_progress",
+            student_id: String(numericId),
+            student_name: studentName,
+            details: {
+              week_date: currentWeekDate,
+              total_score: sTotalScore,
+              wusool_juz: data?.wusool_juz || payload?.wusool_juz || "",
+              wusool_surah: data?.wusool_surah || payload?.wusool_surah || "",
+              wusool_page: data?.wusool_page || payload?.wusool_page || "",
+              totalJadeed: targetAutoStudent?.totalJadeed || "",
+              rank: autoMarhalaRank,
+            },
+          }),
+        }).catch(() => {});
+      } catch (_) {}
     } catch (_liveErr) {}
   }, [
     canTeacherFillProgress,
@@ -42535,9 +42963,13 @@ function TeacherPortal({
                       String(studentObj?.parent_user_id || studentObj?.parent_email || histStudentId),
                       "Attendance",
                       {
+                        type: "attendance",
                         redirectPage: "Attendance",
                         studentId: String(histStudentId),
-                        status,
+                        student_name: sName,
+                        phone: studentObj?.mobile || studentObj?.phone || studentObj?.parent_phone || studentObj?.whatsapp_number || "",
+                        its: studentObj?.its || studentObj?.its_id || studentObj?.student_id || "",
+                        status: statusLabel,
                         date,
                       },
                     ).catch((err) => console.warn("Attendance hist notification note:", err));
@@ -45712,6 +46144,8 @@ export default function App() {
       full_name: "",
       portal_role: "parents",
       student_id: "",
+      teacher_id: "",
+      teacher_name: "",
       salary_per_minute: "2.3",
       show_salary_card: false,
     },
@@ -46719,36 +47153,68 @@ export default function App() {
         const isExistingAccount = localRegDone || isRegisteredInDb;
 
         // If no profiles found, seamlessly create fallback profile without any popup
+        const targetChildTable = isKibar
+          ? "kibar_child_profiles"
+          : "child_profiles";
+
         if (!rawProfiles || rawProfiles.length === 0) {
           setNeedsFirstTimeRegistration(false);
-          rawProfiles = [
-            {
-              id: currentUser.id,
-              user_id: currentUser.id,
-              name:
-                currentUser.user_metadata?.full_name ||
-                currentUser.user_metadata?.name ||
-                currentUser.email?.split("@")[0] ||
-                (isKibar ? "Student" : "Child"),
-              full_name:
-                currentUser.user_metadata?.full_name ||
-                currentUser.user_metadata?.name ||
-                currentUser.email?.split("@")[0] ||
-                (isKibar ? "Student" : "Child"),
-              student_id:
-                currentUser.user_metadata?.student_id ||
-                currentUser.user_metadata?.its ||
-                currentUser.id,
-              its:
-                currentUser.user_metadata?.its ||
-                currentUser.user_metadata?.its_number ||
-                "...",
-              section: isKibar ? "kibar" : "atfal",
-              is_kibar: isKibar,
-            },
-          ];
+          const autoFullName =
+            currentUser.user_metadata?.full_name ||
+            currentUser.user_metadata?.name ||
+            currentUser.email?.split("@")[0] ||
+            (isKibar ? "Student" : "Child");
+          const autoStudentId =
+            currentUser.user_metadata?.student_id ||
+            currentUser.user_metadata?.its ||
+            currentUser.id;
+          const autoIts =
+            currentUser.user_metadata?.its ||
+            currentUser.user_metadata?.its_number ||
+            null;
+
+          const createdProfile = {
+            id: currentUser.id,
+            user_id: currentUser.id,
+            parent_user_id: currentUser.id,
+            parent_email: currentUser.email || null,
+            name: autoFullName,
+            full_name: autoFullName,
+            arabic_name: currentUser.user_metadata?.arabic_name || null,
+            student_id: autoStudentId,
+            its: autoIts || "...",
+            whatsapp_number:
+              currentUser.user_metadata?.whatsapp_number ||
+              currentUser.user_metadata?.phone ||
+              null,
+            gender: currentUser.user_metadata?.gender || "male",
+            section: isKibar ? "kibar" : "atfal",
+            is_kibar: isKibar,
+            is_active: true,
+          };
+          rawProfiles = [createdProfile];
+
+          // Persist directly to DB table so Admin & Teachers immediately see them in assignment dropdowns
+          supabase
+            .from(targetChildTable)
+            .upsert(createdProfile, { onConflict: "student_id" })
+            .catch(() => {});
         } else {
           setNeedsFirstTimeRegistration(false);
+        }
+
+        // Ensure registration / first login flags are set so modal never blocks the user
+        localStorage.setItem("mauze_reg_done_" + currentUser.id, "true");
+        localStorage.setItem("mauze_first_login_done_" + currentUser.id, "true");
+        if (currentUser.email) {
+          localStorage.setItem(
+            "mauze_reg_done_" + currentUser.email.toLowerCase(),
+            "true",
+          );
+          localStorage.setItem(
+            "mauze_first_login_done_" + currentUser.email.toLowerCase(),
+            "true",
+          );
         }
 
         let nextParentState = {
@@ -46764,32 +47230,34 @@ export default function App() {
         };
 
         if (rawProfiles && rawProfiles.length > 0) {
-          // AUTO-LINK: If any profile only has email but no ID, link it now (only for parents)
-          if (!isKibar) {
-            const profilesToLink = rawProfiles.filter(
-              (p) =>
-                !p.parent_user_id &&
-                p.parent_email &&
-                normalizeText(p.parent_email) ===
-                  normalizeText(currentUser.email),
+          // AUTO-LINK: If any profile only has email but no ID, link it now (both Atfal and Kibar)
+          const profilesToLink = rawProfiles.filter(
+            (p) =>
+              (!p.parent_user_id || (isKibar && !p.user_id)) &&
+              p.parent_email &&
+              normalizeText(p.parent_email) ===
+                normalizeText(currentUser.email),
+          );
+          if (profilesToLink.length > 0) {
+            console.log(
+              "Auto-linking parent user_id to student profiles:",
+              profilesToLink.length,
             );
-            if (profilesToLink.length > 0) {
-              console.log(
-                "Auto-linking parent user_id to student profiles:",
-                profilesToLink.length,
-              );
-              await Promise.all(
-                profilesToLink.map((p) =>
-                  supabase
-                    .from("child_profiles")
-                    .update({ parent_user_id: currentUser.id })
-                    .eq("student_id", p.student_id),
-                ),
-              );
-              profilesToLink.forEach(
-                (p) => (p.parent_user_id = currentUser.id),
-              );
-            }
+            await Promise.all(
+              profilesToLink.map((p) =>
+                supabase
+                  .from(targetChildTable)
+                  .update({
+                    parent_user_id: currentUser.id,
+                    user_id: currentUser.id,
+                  })
+                  .eq("student_id", p.student_id),
+              ),
+            );
+            profilesToLink.forEach((p) => {
+              p.parent_user_id = currentUser.id;
+              p.user_id = currentUser.id;
+            });
           }
 
           // Fetch necessary data for all potential students
@@ -46856,12 +47324,6 @@ export default function App() {
               .from(isKibar ? "kibar_teacher_profiles" : "teacher_profiles")
               .select("*")
               .order("full_name", { ascending: true }),
-            Promise.resolve(
-              supabase
-                .from(isKibar ? "teacher_profiles" : "kibar_teacher_profiles")
-                .select("*")
-                .order("full_name", { ascending: true }),
-            ).catch(() => ({ data: [] })),
             supabase
               .from(isKibar ? "kibar_report_settings" : "report_settings")
               .select("*"),
@@ -46890,10 +47352,18 @@ export default function App() {
           if (scheduleResponse.error) throw scheduleResponse.error;
           if (announcementResponse.error) throw announcementResponse.error;
 
-          const rawTeacherProfiles = [
-            ...(teacherProfilesResponse.data || []),
-            ...(fallbackTeacherProfilesResponse?.data || []),
-          ];
+          const rawTeacherProfiles = (teacherProfilesResponse.data || []).filter((tp) => {
+            if (!tp) return false;
+            const pRole = normalizeText(tp.teacher_role || tp.portal_role || "");
+            const pSec = normalizeText(tp.section || "");
+            const pem = String(tp.email || "").toLowerCase().trim();
+            if (isKibar) {
+              return pSec === "kibar" || pRole.includes("kibar") || !pSec;
+            }
+            if (pSec === "kibar" || pRole.includes("kibar")) return false;
+            if (pem === "tmjiger@gmail.com" || pem === "idrisbiscuit786@gmail.com" || pem === "taherrawat786@gamil.com") return false;
+            return true;
+          });
           const rawPortalAccess = portalAccessResponse?.data || [];
 
           const teacherMap = new Map();
@@ -47354,6 +47824,23 @@ export default function App() {
         // under the user_id key) - keeping one row avoids showing two entries.
         const profileByKey = new Map();
         for (const profile of teacherProfilesResponse.data || []) {
+          if (!profile) continue;
+          const pem = String(profile.email || "").toLowerCase().trim();
+          const pName = normalizeText(profile.full_name || profile.name || "");
+          const pRole = normalizeText(profile.teacher_role || profile.portal_role || "");
+          const pSec = normalizeText(profile.section || "");
+
+          if (isKibarAdmin) {
+            // Strictly Kibar teachers
+            if (pSec === "atfal") continue;
+          } else {
+            // Strictly Atfal teachers
+            if (pSec === "kibar" || pRole.includes("kibar")) continue;
+            if (pem === "tmjiger@gmail.com" || pem === "idrisbiscuit786@gmail.com" || pem === "taherrawat786@gamil.com") continue;
+            if (pName.includes("taher bhai jigar") || pName.includes("biscutwala") || pName.includes("biscuitwala") || pName.includes("taher bhai zulfaqar")) continue;
+            if (pName === "demo teacher" || pName === "mauze tahfeez atfal (helpline)") continue;
+          }
+
           const access = (portalAccessResponse.data || []).find(
             (a) =>
               normalizeText(a.full_name) === normalizeText(profile.full_name),
@@ -47377,8 +47864,64 @@ export default function App() {
         );
         setTeacherProfiles(enrichedProfiles);
 
+        const rawProfilesList = [...(profilesResponse.data || [])];
+        const existingKeys = new Set();
+        rawProfilesList.forEach((p) => {
+          if (p.student_id) existingKeys.add(String(p.student_id).toLowerCase());
+          if (p.id) existingKeys.add(String(p.id).toLowerCase());
+          if (p.user_id) existingKeys.add(String(p.user_id).toLowerCase());
+          if (p.parent_user_id) existingKeys.add(String(p.parent_user_id).toLowerCase());
+          if (p.parent_email) existingKeys.add(String(p.parent_email).toLowerCase().trim());
+          if (p.email) existingKeys.add(String(p.email).toLowerCase().trim());
+        });
+
+        const portalAccessData = portalAccessResponse?.data || [];
+        portalAccessData.forEach((pa) => {
+          if (!pa) return;
+          const r = (pa.portal_role || "").toLowerCase();
+          const sec = (pa.section || "").toLowerCase();
+          if (isKibarAdmin) {
+            if (sec === "atfal") return;
+            if (r !== "kibar-student") return;
+          } else {
+            if (sec === "kibar" || r.includes("kibar")) return;
+            if (r !== "parents") return;
+          }
+
+          const paId = String(pa.user_id || pa.id || "").toLowerCase();
+          const paEmail = String(pa.email || "").toLowerCase().trim();
+          if ((paId && existingKeys.has(paId)) || (paEmail && existingKeys.has(paEmail))) {
+            return;
+          }
+
+          const sId = pa.student_id || pa.user_id || pa.id || paEmail;
+          const sName = pa.full_name || pa.name || (paEmail ? paEmail.split("@")[0] : (isKibarAdmin ? "Student" : "Child"));
+          const synthProfile = {
+            student_id: sId,
+            id: pa.id || pa.user_id || sId,
+            user_id: pa.user_id || pa.id,
+            parent_user_id: pa.user_id || pa.id,
+            parent_email: pa.email || null,
+            full_name: sName,
+            name: sName,
+            arabic_name: pa.arabic_name || null,
+            gender: pa.gender || "male",
+            is_active: true,
+            section: isKibarAdmin ? "kibar" : "atfal",
+            is_kibar: isKibarAdmin,
+            is_kibar_student: isKibarAdmin,
+            portal_role: isKibarAdmin ? "kibar-student" : "parents",
+          };
+          rawProfilesList.push(synthProfile);
+          if (paId) existingKeys.add(paId);
+          if (paEmail) existingKeys.add(paEmail);
+
+          const targetTable = isKibarAdmin ? "kibar_child_profiles" : "child_profiles";
+          supabase.from(targetTable).upsert(synthProfile, { onConflict: "student_id" }).catch(() => {});
+        });
+
         const students = buildStudents(
-          profilesResponse.data || [],
+          rawProfilesList,
           resultsResponse.data || [],
           enrichedProfiles,
           isKibarAdmin ? "kibar" : "atfal",
@@ -47426,7 +47969,16 @@ export default function App() {
           // Fall back to buildStudents ranks
         }
 
-        let resolvedPortalAccess = portalAccessResponse.data || [];
+        let resolvedPortalAccess = (portalAccessResponse.data || []).filter((a) => {
+          if (!a) return false;
+          const r = String(a.portal_role || "").toLowerCase();
+          const sec = String(a.section || "").toLowerCase();
+          if (isKibarAdmin) {
+            return r.startsWith("kibar-") || sec === "kibar";
+          }
+          if (r.startsWith("kibar-") || sec === "kibar") return false;
+          return true;
+        });
         if (isKibarAdmin) {
           try {
             const { data: allUsers } = await supabase
@@ -47466,6 +48018,16 @@ export default function App() {
             }
           } catch (_e) {}
         }
+
+        console.log(`[PORTAL_SECTION] role=${role} isKibarAdmin=${isKibarAdmin}`);
+        console.log(`[STUDENT_DUMP] total=${students.length}`);
+        students.forEach((s) => {
+          console.log(`[STD] sid=${s.student_id} | name=${s.name || s.full_name} | sec=${s.section} | is_k=${s.is_kibar} | role=${s.portal_role} | t=${s.teacherName}`);
+        });
+        console.log(`[TEACHER_DUMP] total=${enrichedProfiles.length}`);
+        enrichedProfiles.forEach((t) => {
+          console.log(`[TCH] id=${t.id} | name=${t.full_name} | role=${t.teacher_role} | portal_role=${t.portal_role} | sec=${t.section}`);
+        });
 
         setSchoolData({
           students,
@@ -48298,22 +48860,65 @@ export default function App() {
           )
           .catch(() => {});
       } else if (targetRole === "kibar-student") {
+        const selectedTeacherId = payload.teacher_id || null;
+        let resolvedTeacherName = payload.teacher_name || null;
+        if (selectedTeacherId && !resolvedTeacherName) {
+          const allTeachers = [
+            ...(schoolData?.portalAccessList || []),
+            ...(schoolData?.teacherProfiles || []),
+            ...(teacherProfiles || []),
+          ];
+          const tr = allTeachers.find(
+            (t) =>
+              String(t.user_id || t.id || t.teacher_id || "").trim() === String(selectedTeacherId).trim() ||
+              (t.email && String(t.email).trim().toLowerCase() === String(selectedTeacherId).trim().toLowerCase()) ||
+              (t.full_name && normalizeText(t.full_name) === normalizeText(selectedTeacherId)),
+          );
+          if (tr) resolvedTeacherName = tr.full_name || tr.name;
+        }
+
+        const studentRecord = {
+          id: createdUserId,
+          user_id: createdUserId,
+          parent_user_id: createdUserId,
+          email: targetEmail,
+          parent_email: targetEmail,
+          name: payload.full_name,
+          full_name: payload.full_name,
+          student_id: payload.student_id || createdUserId,
+          teacher_id: selectedTeacherId || null,
+          teacher_name: resolvedTeacherName || null,
+          muhaffiz_id: selectedTeacherId || null,
+          muhaffiz_name: resolvedTeacherName || null,
+          original_teacher_id: selectedTeacherId || null,
+          section: "kibar",
+          is_kibar: true,
+          is_active: true,
+        };
         await supabase
           .from("kibar_student_profiles")
-          .upsert(
-            {
-              id: createdUserId,
-              user_id: createdUserId,
-              email: targetEmail,
-              parent_email: targetEmail,
-              name: payload.full_name,
-              full_name: payload.full_name,
-              student_id: payload.student_id || createdUserId,
-              section: "kibar",
-              is_active: true,
-            },
-            { onConflict: "id" },
-          )
+          .upsert(studentRecord, { onConflict: "id" })
+          .catch(() => {});
+        await supabase
+          .from("kibar_child_profiles")
+          .upsert(studentRecord, { onConflict: "student_id" })
+          .catch(() => {});
+      } else if (targetRole === "parents") {
+        const studentRecord = {
+          id: createdUserId,
+          user_id: createdUserId,
+          parent_user_id: createdUserId,
+          email: targetEmail,
+          parent_email: targetEmail,
+          name: payload.full_name,
+          full_name: payload.full_name,
+          student_id: payload.student_id || createdUserId,
+          section: "atfal",
+          is_active: true,
+        };
+        await supabase
+          .from("child_profiles")
+          .upsert(studentRecord, { onConflict: "student_id" })
           .catch(() => {});
       } else if (targetRole === "teacher") {
         await supabase
@@ -48414,6 +49019,43 @@ export default function App() {
       }
     }
 
+    if (isKibar && payload.teacher_id && finalUserId) {
+      const selectedTeacherId = payload.teacher_id;
+      let resolvedTeacherName = payload.teacher_name || null;
+      if (!resolvedTeacherName) {
+        const allTeachers = [
+          ...(schoolData?.portalAccessList || []),
+          ...(schoolData?.teacherProfiles || []),
+          ...(teacherProfiles || []),
+        ];
+        const tr = allTeachers.find(
+          (t) =>
+            String(t.user_id || t.id || t.teacher_id || "").trim() === String(selectedTeacherId).trim() ||
+            (t.email && String(t.email).trim().toLowerCase() === String(selectedTeacherId).trim().toLowerCase()) ||
+            (t.full_name && normalizeText(t.full_name) === normalizeText(selectedTeacherId)),
+        );
+        if (tr) resolvedTeacherName = tr.full_name || tr.name;
+      }
+
+      const teacherAssignUpdate = {
+        teacher_id: selectedTeacherId,
+        teacher_name: resolvedTeacherName,
+        muhaffiz_id: selectedTeacherId,
+        muhaffiz_name: resolvedTeacherName,
+        original_teacher_id: selectedTeacherId,
+      };
+
+      await supabase
+        .from("kibar_child_profiles")
+        .update(teacherAssignUpdate)
+        .or(`user_id.eq.${finalUserId},parent_user_id.eq.${finalUserId},id.eq.${finalUserId},parent_email.eq.${targetEmail}`);
+
+      await supabase
+        .from("kibar_student_profiles")
+        .update(teacherAssignUpdate)
+        .or(`user_id.eq.${finalUserId},id.eq.${finalUserId},email.eq.${targetEmail}`);
+    }
+
     const { data: freshList, error: refreshError } = await supabase
       .from(targetAccessTable)
       .select("*")
@@ -48446,6 +49088,8 @@ export default function App() {
         portal_role: isKibar ? "kibar-student" : "parents",
         password: "",
         student_id: "",
+        teacher_id: "",
+        teacher_name: "",
       },
     }));
 
@@ -48485,9 +49129,13 @@ export default function App() {
       full_name: payload.full_name,
       email: targetEmail,
       portal_role: targetRole,
-      linkedStudentName,
+      linkedStudentName: (isKibar && (payload.teacher_name || payload.teacher_id))
+        ? `Teacher: ${payload.teacher_name || payload.teacher_id}`
+        : linkedStudentName,
       grantedAt: new Date().toLocaleString(),
     });
+
+    loadPortalData(portalRole, user, null, { silent: true });
 
     showAction("success", "Portal access granted successfully!");
   };
@@ -49767,6 +50415,17 @@ export default function App() {
         String(s.student_id) === String(student_id) ||
         (s.allIds && s.allIds.includes(String(student_id))),
     );
+    const accessMatch = !existingStudent
+      ? (schoolData?.portalAccessList || []).find(
+          (a) =>
+            String(a.user_id || "").trim() === String(student_id).trim() ||
+            String(a.id || "").trim() === String(student_id).trim() ||
+            (a.email &&
+              String(a.email).trim().toLowerCase() ===
+                String(student_id).trim().toLowerCase()),
+        )
+      : null;
+
     const isNewTeacher =
       teacherRecord &&
       (!existingStudent ||
@@ -49828,6 +50487,26 @@ export default function App() {
       const trimmed = typeof value === "string" ? value.trim() : "";
       updatePayload[key] = trimmed || null;
     });
+
+    if (existingStudent) {
+      if (!updatePayload.full_name) updatePayload.full_name = existingStudent.full_name || existingStudent.name;
+      if (!updatePayload.name) updatePayload.name = existingStudent.name || existingStudent.full_name;
+      if (!updatePayload.gender) updatePayload.gender = existingStudent.gender || "male";
+      if (!updatePayload.parent_email && existingStudent.parent_email) updatePayload.parent_email = existingStudent.parent_email;
+      if (!updatePayload.parent_user_id && existingStudent.parent_user_id) updatePayload.parent_user_id = existingStudent.parent_user_id;
+      if (!updatePayload.user_id && existingStudent.user_id) updatePayload.user_id = existingStudent.user_id;
+      if (!updatePayload.its && existingStudent.its) updatePayload.its = existingStudent.its;
+    } else if (accessMatch) {
+      const matchName = accessMatch.full_name || accessMatch.name || accessMatch.email?.split("@")[0] || "Student";
+      if (!updatePayload.full_name) updatePayload.full_name = matchName;
+      if (!updatePayload.name) updatePayload.name = matchName;
+      if (!updatePayload.parent_email && accessMatch.email) updatePayload.parent_email = accessMatch.email;
+      if (!updatePayload.parent_user_id) updatePayload.parent_user_id = accessMatch.user_id || accessMatch.id;
+      if (!updatePayload.user_id) updatePayload.user_id = accessMatch.user_id || accessMatch.id;
+      if (!updatePayload.gender) updatePayload.gender = accessMatch.gender || "male";
+    }
+    updatePayload.is_active = true;
+    updatePayload.section = isKibar ? "kibar" : "atfal";
 
     const numericStudentId = !isNaN(student_id)
       ? Number(student_id)
@@ -50644,7 +51323,7 @@ export default function App() {
     // Live sync to Google Sheets (fast & smooth non-blocking update)
     const isKibar = portalRole === "kibar-teacher" || getSectionScope() === "kibar";
     const targetStudent = schoolData.students?.find(
-      (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId)
+      (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId) || (s.allIds && s.allIds.includes(String(numericId)))
     );
     let exactMarhalaRank = "";
     try {
@@ -50662,7 +51341,7 @@ export default function App() {
       isKibar: isKibar,
       marhalaRank: exactMarhalaRank,
       overallRank: targetStudent?.computedRank || targetStudent?.latestResult?.computedRank || "",
-      reportSettings: schoolData?.reportSettings,
+      reportSettings: schoolData?.reportSettings || reportSettingsObject,
     });
 
     // Perform database write in background
@@ -50728,6 +51407,28 @@ export default function App() {
             weekDate: currentWeekDate,
           },
         ).catch((err) => console.warn("Notification broadcast error:", err));
+
+        // Non-blocking update to WhatsApp bot gateway
+        try {
+          fetch("http://localhost:2785/api/notify-student-update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "result_progress",
+              student_id: String(numericId),
+              student_name: studentName,
+              details: {
+                week_date: currentWeekDate,
+                total_score: payload?.total_score,
+                wusool_juz: payload?.wusool_juz || "",
+                wusool_surah: payload?.wusool_surah || "",
+                wusool_page: payload?.wusool_page || "",
+                totalJadeed: targetStudent?.totalJadeed || "",
+                rank: exactMarhalaRank,
+              },
+            }),
+          }).catch(() => {});
+        } catch (_) {}
       }
     } catch (_) {}
   };
@@ -50845,22 +51546,43 @@ export default function App() {
           }
           
           .premium-loader-center-icon {
-            width: 48px; height: 48px; border-radius: 50%;
-            background: linear-gradient(135deg, #d4af37, #b8860b);
-            display: grid; place-items: center; color: #fff;
-            box-shadow: 0 8px 24px rgba(212, 175, 55, 0.45);
+            width: 54px; height: 54px; border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid #d4af37;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 8px 24px rgba(212, 175, 55, 0.35);
             z-index: 2;
-            animation: floatIcon 3s ease-in-out infinite;
+          }
+
+          .premium-loader-quran-img {
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+            transform-origin: center bottom;
+            animation: quranReveal 0.65s cubic-bezier(0.22, 1.5, 0.36, 1) both,
+                       quranFloat 3.2s ease-in-out 0.65s infinite;
+            filter: drop-shadow(0 4px 10px rgba(180, 130, 20, 0.42));
+            user-select: none;
+            -webkit-user-drag: none;
+          }
+
+          @keyframes quranReveal {
+            0%   { opacity: 0; transform: scale(0.2) translateY(10px) rotateX(25deg); }
+            60%  { opacity: 1; transform: scale(1.1) translateY(-3px) rotateX(-3deg); }
+            80%  { transform: scale(0.96) translateY(2px) rotateX(2deg); }
+            100% { opacity: 1; transform: scale(1) translateY(0) rotateX(0deg); }
+          }
+
+          @keyframes quranFloat {
+            0%   { transform: translateY(0px) rotate(0deg); }
+            30%  { transform: translateY(-4px) rotate(0.8deg); }
+            60%  { transform: translateY(-1px) rotate(-0.6deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
           }
           
           @keyframes loaderRingPulse {
             0% { transform: scale(0.85); opacity: 0.8; }
             100% { transform: scale(1.4); opacity: 0; }
-          }
-          
-          @keyframes floatIcon {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); }
           }
           
           .premium-loader-title {
@@ -50912,7 +51634,12 @@ export default function App() {
                 justifyContent: "center",
               }}
             >
-              <Sparkles size={26} color="#d4af37" />
+              <img
+                src="/quran-3d-gold.png"
+                alt="Holy Quran"
+                className="premium-loader-quran-img"
+                draggable={false}
+              />
             </div>
           </div>
           <h2 className="premium-loader-title">Mauze Tahfeez</h2>

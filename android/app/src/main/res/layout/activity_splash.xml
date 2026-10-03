@@ -2,14 +2,23 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#fffdf8">
+    android:background="#FFFDF8">
 
+    <!-- Subtle Islamic geometric background image (the icon art) -->
     <ImageView
-        android:id="@+id/splashLogo"
+        android:id="@+id/splashBg"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="center"
-        android:scaleType="fitCenter"
+        android:scaleType="centerCrop"
+        android:alpha="0.08"
         android:src="@drawable/logo_splash" />
+
+    <!-- Custom animated text view - draws outline then fills -->
+    <com.mauzetahfeez.myapp.SplashTextView
+        android:id="@+id/splashTextView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center" />
 
 </FrameLayout>
