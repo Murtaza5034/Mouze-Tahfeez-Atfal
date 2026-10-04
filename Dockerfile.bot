@@ -1,0 +1,32 @@
+# ============================================
+# 24/7 Continuous WhatsApp Bot Daemon Container
+# ============================================
+FROM node:20-bullseye-slim
+
+WORKDIR /app
+
+# Install fonts and basic utilities needed for SVG/PNG rendering
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    fonts-liberation \
+    fontconfig \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package descriptors
+COPY package*.json ./
+
+# Install production dependencies
+RUN npm ci --legacy-peer-deps --omit=dev
+
+# Copy bot scripts and application files
+COPY . .
+
+# Expose bot gateway port
+ENV PORT=2785
+EXPOSE 2785
+
+# Persistent volume for Baileys auth tokens & multi-device credentials
+VOLUME ["/app/baileys_auth_info"]
+
+# Start the continuous WhatsApp multi-device bot daemon
+CMD ["node", "scripts/mauze-whatsapp-bot.js"]

@@ -1,6 +1,6 @@
 # ============================================
 # Docker Compose for Mauze Tahfeez
-# One-command production deployment
+# Web Portal + 24/7 Persistent WhatsApp Bot Service
 # ============================================
 
 services:
@@ -20,3 +20,17 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  whatsapp-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: mauze-whatsapp-bot
+    ports:
+      - "2785:2785"
+    volumes:
+      - ./baileys_auth_info:/app/baileys_auth_info
+    restart: always
+    environment:
+      - PORT=2785
+      - NODE_ENV=production
