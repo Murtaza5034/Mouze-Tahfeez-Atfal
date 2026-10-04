@@ -109,3 +109,4 @@ openwa-qr.html
 openwa-qr.png
 ngrok_temp/
 .env*
+graphify-out/cache/

@@ -81,7 +81,7 @@ const APP_KB = [
   {
     keywords: ['dark mode', 'theme', 'appearance', 'light mode'],
     page: 'Settings',
-    answer: 'You can switch between light and dark mode, and choose from themes like Classic, Playful Learning, Executive Dark, Royal Grace, Ashara Mode, Classic Pro, and Plutonium — all from Settings > Dark mode or App themes.'
+    answer: 'You can switch between light and dark mode, and choose from themes like Cyber Neon (Bespoke Dark), Organic Calming, Classic, Playful Learning, Executive Dark, Royal Grace, Ashara Mode, Classic Pro, and Plutonium — all from Settings > App themes.'
   },
   {
     keywords: ['password', 'change password', 'security', 'app lock'],
@@ -218,11 +218,21 @@ const SupportBot = ({ onNavigate, onClose, pageMode }) => {
         <div className="support-bot-header">
           <div className="support-bot-header-left">
             <div className="support-bot-avatar">
+              <span className="ai-orb-glow" />
               <span>AI</span>
             </div>
             <div>
               <h3>Technical Support</h3>
-              <p className="support-bot-status">Online — AI Assistant</p>
+              <div className="support-bot-status-row">
+                <span className="ai-status-dot" />
+                <p className="support-bot-status">Active — AI Assistant</p>
+                <div className="ai-waveform" aria-label="AI Waveform feedback" title="AI Voice & Reasoning Active">
+                  <span className="ai-wave-bar" />
+                  <span className="ai-wave-bar" />
+                  <span className="ai-wave-bar" />
+                  <span className="ai-wave-bar" />
+                </div>
+              </div>
             </div>
           </div>
           {!pageMode && (

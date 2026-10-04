@@ -3285,6 +3285,498 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
   background: linear-gradient(135deg, #c5a059, #d4af37) !important;
 }
 
+/* ============================================
+   CYBER NEON (BESPOKE DARK) MODE — Futuristic Spatial UX
+   High-contrast obsidian dark, glowing electric green/orange accents,
+   spatial 3D glassmorphism depth, tactile micro-interactions.
+   ============================================ */
+
+[data-theme="cyber-neon"] {
+  --primary-gold: #00f59b !important;       /* Electric Cyber Neon Green */
+  --accent-gold: #ff6b00 !important;        /* Radiant Cyber Orange */
+  --dark-gold: #00c77d !important;
+  --light-gold: rgba(0, 245, 155, 0.12) !important;
+  --deep-brown: #f8fafc !important;         /* Crisp High-Contrast Heading */
+  --soft-brown: rgba(226, 232, 240, 0.85) !important;
+  --text-main: #f1f5f9 !important;          /* Crystal Clear Visible Body */
+  --text-muted: rgba(148, 163, 184, 0.8) !important;
+  --premium-white: #0d1424 !important;      /* Deep Obsidian Card */
+  --off-white: #090e18 !important;
+  --cream-bg: #060910 !important;          /* Deep Space Void */
+  --glass-bg: rgba(13, 20, 36, 0.85) !important;
+  --glass-border: rgba(0, 245, 155, 0.18) !important;
+  --shadow-premium: 0 16px 48px rgba(0, 0, 0, 0.7) !important;
+  --shadow-gold: 0 0 25px rgba(0, 245, 155, 0.25) !important;
+  --shadow-gold-lg: 0 0 50px rgba(0, 245, 155, 0.35) !important;
+  --bg-gradient: radial-gradient(circle at 50% 0%, rgba(0, 245, 155, 0.08) 0%, transparent 60%),
+    linear-gradient(rgba(0, 245, 155, 0.025) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, rgba(0, 245, 155, 0.025) 1px, transparent 1px) 0 0 / 28px 28px,
+    #060910 !important;
+}
+
+[data-theme="cyber-neon"] ::selection {
+  background: #00f59b !important;
+  color: #060910 !important;
+}
+
+/* ---- Body & Shell (Spatial Grid Background) ---- */
+[data-theme="cyber-neon"] body {
+  background: #060910 !important;
+  color: #f1f5f9 !important;
+}
+
+[data-theme="cyber-neon"] .admin-shell,
+[data-theme="cyber-neon"] .app-shell,
+[data-theme="cyber-neon"] .portal-shell {
+  background: var(--bg-gradient) !important;
+}
+
+/* ---- Scrollbar ---- */
+[data-theme="cyber-neon"] ::-webkit-scrollbar-track {
+  background: #090e18 !important;
+}
+
+[data-theme="cyber-neon"] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #00f59b, #ff6b00) !important;
+  border-radius: 10px !important;
+}
+
+[data-theme="cyber-neon"] ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #34d399, #fb923c) !important;
+}
+
+/* ---- Spatial Layered Cards (3D Glassmorphism) ---- */
+[data-theme="cyber-neon"] .premium-card,
+[data-theme="cyber-neon"] .dashboard-card,
+[data-theme="cyber-neon"] .settings-tab-pane,
+[data-theme="cyber-neon"] .glass-card,
+[data-theme="cyber-neon"] .data-card,
+[data-theme="cyber-neon"] .form-card,
+[data-theme="cyber-neon"] .dashboard-section {
+  background: linear-gradient(145deg, rgba(13, 20, 36, 0.92), rgba(18, 28, 50, 0.92)) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(0, 245, 155, 0.16) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65), 0 0 25px rgba(0, 245, 155, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  border-radius: 20px !important;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s !important;
+}
+
+[data-theme="cyber-neon"] .premium-card:hover,
+[data-theme="cyber-neon"] .data-card:hover,
+[data-theme="cyber-neon"] .dashboard-section:hover {
+  border-color: rgba(0, 245, 155, 0.35) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 35px rgba(0, 245, 155, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+  transform: translateY(-2px) !important;
+}
+
+[data-theme="cyber-neon"] .premium-card::before {
+  background: linear-gradient(90deg, transparent, #00f59b, #ff6b00, #00f59b, transparent) !important;
+  height: 2px !important;
+  box-shadow: 0 0 12px rgba(0, 245, 155, 0.5) !important;
+}
+
+/* ---- Sidebar & Navigation ---- */
+[data-theme="cyber-neon"] .admin-sidebar,
+[data-theme="cyber-neon"] .sidebar {
+  background: linear-gradient(180deg, #090e18 0%, #060910 100%) !important;
+  border-right: 1px solid rgba(0, 245, 155, 0.15) !important;
+  box-shadow: 12px 0 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="cyber-neon"] .sidebar-link:hover {
+  background: rgba(0, 245, 155, 0.08) !important;
+  color: #fff !important;
+}
+
+[data-theme="cyber-neon"] .sidebar-link.active {
+  background: linear-gradient(90deg, rgba(0, 245, 155, 0.15) 0%, transparent 100%) !important;
+  border-left: 4px solid #00f59b !important;
+  box-shadow: inset 0 1px 0 rgba(0, 245, 155, 0.1) !important;
+  color: #00f59b !important;
+}
+
+[data-theme="cyber-neon"] .sidebar-link.active svg {
+  filter: drop-shadow(0 0 8px rgba(0, 245, 155, 0.6)) !important;
+  color: #00f59b !important;
+}
+
+[data-theme="cyber-neon"] .sidebar-link svg {
+  color: #00f59b !important;
+}
+
+[data-theme="cyber-neon"] .sidebar-category {
+  color: rgba(0, 245, 155, 0.7) !important;
+  letter-spacing: 1px !important;
+}
+
+[data-theme="cyber-neon"] .sidebar-category::after {
+  background: linear-gradient(90deg, rgba(0, 245, 155, 0.25), transparent) !important;
+}
+
+/* ---- Topbar ---- */
+[data-theme="cyber-neon"] .topbar,
+[data-theme="cyber-neon"] .admin-topbar-dynamic {
+  background: rgba(9, 14, 24, 0.88) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(0, 245, 155, 0.15) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 245, 155, 0.04) !important;
+}
+
+[data-theme="cyber-neon"] .topbar-menu-btn {
+  background: rgba(0, 245, 155, 0.06) !important;
+  border-color: rgba(0, 245, 155, 0.18) !important;
+  color: #f1f5f9 !important;
+}
+
+[data-theme="cyber-neon"] .topbar-menu-btn:hover {
+  background: rgba(0, 245, 155, 0.15) !important;
+  border-color: #00f59b !important;
+  box-shadow: 0 0 15px rgba(0, 245, 155, 0.25) !important;
+}
+
+/* ---- Typography & Text Visibility ---- */
+[data-theme="cyber-neon"] h1,
+[data-theme="cyber-neon"] h2,
+[data-theme="cyber-neon"] h3,
+[data-theme="cyber-neon"] h4,
+[data-theme="cyber-neon"] h5,
+[data-theme="cyber-neon"] .page-title,
+[data-theme="cyber-neon"] .card-headline h3 {
+  color: #f8fafc !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="cyber-neon"] p,
+[data-theme="cyber-neon"] span,
+[data-theme="cyber-neon"] label,
+[data-theme="cyber-neon"] td,
+[data-theme="cyber-neon"] th,
+[data-theme="cyber-neon"] .text-main {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="cyber-neon"] .page-eyebrow,
+[data-theme="cyber-neon"] .text-muted,
+[data-theme="cyber-neon"] .muted-text {
+  color: rgba(148, 163, 184, 0.85) !important;
+}
+
+[data-theme="cyber-neon"] .accent-text,
+[data-theme="cyber-neon"] .gold-text {
+  color: #00f59b !important;
+  text-shadow: 0 0 12px rgba(0, 245, 155, 0.3) !important;
+}
+
+/* ---- Tactile Micro-Interactions (Buttons & Taps) ---- */
+[data-theme="cyber-neon"] button:not(.no-theme):not([class*="toggle-"]):not(.swiper-button-next):not(.swiper-button-prev) {
+  background: linear-gradient(135deg, rgba(0, 245, 155, 0.12), rgba(255, 107, 0, 0.08)) !important;
+  border: 1px solid rgba(0, 245, 155, 0.25) !important;
+  color: #f8fafc !important;
+  border-radius: 12px !important;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, background 0.2s !important;
+}
+
+[data-theme="cyber-neon"] button:not(.no-theme):not([class*="toggle-"]):not(.swiper-button-next):not(.swiper-button-prev):hover {
+  background: linear-gradient(135deg, rgba(0, 245, 155, 0.2), rgba(255, 107, 0, 0.15)) !important;
+  border-color: #00f59b !important;
+  box-shadow: 0 0 25px rgba(0, 245, 155, 0.25), 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+[data-theme="cyber-neon"] button:not(.no-theme):not([class*="toggle-"]):active,
+[data-theme="cyber-neon"] .setting-card:active,
+[data-theme="cyber-neon"] .theme-card:active,
+[data-theme="cyber-neon"] .topbar-menu-btn:active,
+[data-theme="cyber-neon"] .action-button:active {
+  transform: scale(0.96) translateY(1px) !important;
+  box-shadow: 0 0 8px rgba(0, 245, 155, 0.35) !important;
+}
+
+[data-theme="cyber-neon"] .action-button,
+[data-theme="cyber-neon"] .login-button {
+  background: linear-gradient(135deg, #00f59b 0%, #00c77d 70%, #ff6b00 100%) !important;
+  color: #060910 !important;
+  font-weight: 800 !important;
+  border: none !important;
+  box-shadow: 0 6px 24px rgba(0, 245, 155, 0.35) !important;
+}
+
+[data-theme="cyber-neon"] .action-button:hover,
+[data-theme="cyber-neon"] .login-button:hover {
+  box-shadow: 0 10px 36px rgba(0, 245, 155, 0.45) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* ---- Input Fields & Form Controls ---- */
+[data-theme="cyber-neon"] input,
+[data-theme="cyber-neon"] select,
+[data-theme="cyber-neon"] textarea,
+[data-theme="cyber-neon"] .premium-input {
+  background: rgba(9, 14, 24, 0.88) !important;
+  border: 1px solid rgba(0, 245, 155, 0.2) !important;
+  color: #f8fafc !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+
+[data-theme="cyber-neon"] input:focus,
+[data-theme="cyber-neon"] select:focus,
+[data-theme="cyber-neon"] textarea:focus,
+[data-theme="cyber-neon"] .premium-input:focus {
+  border-color: #00f59b !important;
+  box-shadow: 0 0 0 4px rgba(0, 245, 155, 0.15), 0 0 15px rgba(0, 245, 155, 0.2) !important;
+  outline: none !important;
+}
+
+/* ---- Performance & Status Badges ---- */
+[data-theme="cyber-neon"] .performance-pill {
+  background: rgba(0, 245, 155, 0.1) !important;
+  border: 1px solid rgba(0, 245, 155, 0.3) !important;
+  color: #00f59b !important;
+  box-shadow: 0 0 12px rgba(0, 245, 155, 0.15) !important;
+}
+
+[data-theme="cyber-neon"] .status-badge.present {
+  background: rgba(0, 245, 155, 0.15) !important;
+  color: #00f59b !important;
+  border: 1px solid rgba(0, 245, 155, 0.3) !important;
+}
+
+[data-theme="cyber-neon"] .status-badge.absent {
+  background: rgba(255, 107, 0, 0.15) !important;
+  color: #ff6b00 !important;
+  border: 1px solid rgba(255, 107, 0, 0.3) !important;
+}
+
+[data-theme="cyber-neon"] .status-badge.pending {
+  background: rgba(251, 191, 36, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.3) !important;
+}
+
+/* ---- Settings & Theme Selector ---- */
+[data-theme="cyber-neon"] .settings-tabs {
+  background: rgba(13, 20, 36, 0.85) !important;
+  border: 1px solid rgba(0, 245, 155, 0.15) !important;
+}
+
+[data-theme="cyber-neon"] .settings-tab-btn {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="cyber-neon"] .settings-tab-btn:hover {
+  background: rgba(0, 245, 155, 0.08) !important;
+  color: #f1f5f9 !important;
+}
+
+[data-theme="cyber-neon"] .settings-tab-btn.active {
+  background: rgba(0, 245, 155, 0.12) !important;
+  color: #00f59b !important;
+  box-shadow: inset 3px 0 0 #00f59b !important;
+}
+
+[data-theme="cyber-neon"] .setting-card {
+  background: rgba(13, 20, 36, 0.85) !important;
+  border: 1px solid rgba(0, 245, 155, 0.12) !important;
+}
+
+[data-theme="cyber-neon"] .setting-card:hover {
+  background: rgba(18, 28, 50, 0.95) !important;
+  border-color: rgba(0, 245, 155, 0.35) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 245, 155, 0.1) !important;
+}
+
+[data-theme="cyber-neon"] .setting-card-title {
+  color: #f8fafc !important;
+}
+
+[data-theme="cyber-neon"] .theme-card {
+  background: rgba(13, 20, 36, 0.85) !important;
+  border: 2px solid rgba(0, 245, 155, 0.12) !important;
+}
+
+[data-theme="cyber-neon"] .theme-card:hover {
+  border-color: rgba(0, 245, 155, 0.4) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 245, 155, 0.15) !important;
+}
+
+[data-theme="cyber-neon"] .theme-card.selected {
+  border-color: #00f59b !important;
+  background: rgba(0, 245, 155, 0.08) !important;
+  box-shadow: 0 0 30px rgba(0, 245, 155, 0.25) !important;
+}
+
+[data-theme="cyber-neon"] .toggle-switch {
+  background: rgba(0, 245, 155, 0.15) !important;
+}
+
+[data-theme="cyber-neon"] .toggle-switch.on {
+  background: #00f59b !important;
+  box-shadow: 0 0 15px rgba(0, 245, 155, 0.5) !important;
+}
+
+[data-theme="cyber-neon"] .toggle-switch.on .toggle-thumb {
+  background: #060910 !important;
+}
+
+/* ---- Login Card Futuristic 3D Elevation ---- */
+[data-theme="cyber-neon"] .login-card {
+  background: linear-gradient(155deg, rgba(13, 20, 36, 0.96), rgba(18, 28, 50, 0.96)) !important;
+  backdrop-filter: blur(24px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+  border: 1px solid rgba(0, 245, 155, 0.22) !important;
+  box-shadow: 0 36px 90px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 245, 155, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="cyber-neon"] .login-container {
+  background: #060910 !important;
+}
+
+[data-theme="cyber-neon"] .portal-tab {
+  background: rgba(0, 245, 155, 0.06) !important;
+  border-color: rgba(0, 245, 155, 0.15) !important;
+  color: var(--text-muted) !important;
+}
+
+[data-theme="cyber-neon"] .portal-tab.active {
+  background: rgba(0, 245, 155, 0.18) !important;
+  border-color: #00f59b !important;
+  color: #00f59b !important;
+  box-shadow: 0 0 15px rgba(0, 245, 155, 0.25) !important;
+}
+
+
+/* ============================================
+   ORGANIC CALMING MODE — Serene Wellness UI/UX
+   Soft pastel gradients, off-white porcelain backdrops,
+   calming deep emerald & eucalyptus tones.
+   ============================================ */
+
+[data-theme="organic-calm"] {
+  --primary-gold: #059669 !important;       /* Calming Deep Emerald */
+  --accent-gold: #0d9488 !important;        /* Serene Sage Teal */
+  --dark-gold: #047857 !important;
+  --light-gold: rgba(5, 150, 105, 0.09) !important;
+  --deep-brown: #064e3b !important;         /* Rich Forest Green */
+  --soft-brown: #334155 !important;
+  --text-main: #0f172a !important;          /* Deep Slate Crisp Readability */
+  --text-muted: #64748b !important;
+  --premium-white: #ffffff !important;
+  --off-white: #f8fafc !important;
+  --cream-bg: #f2f7f4 !important;          /* Soft Porcelain Backdrop */
+  --glass-bg: rgba(255, 255, 255, 0.88) !important;
+  --glass-border: rgba(5, 150, 105, 0.14) !important;
+  --shadow-premium: 0 16px 40px rgba(6, 78, 59, 0.07) !important;
+  --shadow-gold: 0 8px 24px rgba(5, 150, 105, 0.14) !important;
+  --shadow-gold-lg: 0 16px 40px rgba(5, 150, 105, 0.2) !important;
+  --bg-gradient: linear-gradient(135deg, #f2f7f4 0%, #e6f0eb 50%, #f0f7f3 100%) !important;
+}
+
+[data-theme="organic-calm"] ::selection {
+  background: #059669 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="organic-calm"] body {
+  background: #f2f7f4 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="organic-calm"] .admin-shell,
+[data-theme="organic-calm"] .app-shell,
+[data-theme="organic-calm"] .portal-shell {
+  background: var(--bg-gradient) !important;
+}
+
+[data-theme="organic-calm"] .premium-card,
+[data-theme="organic-calm"] .dashboard-card,
+[data-theme="organic-calm"] .settings-tab-pane,
+[data-theme="organic-calm"] .glass-card,
+[data-theme="organic-calm"] .data-card,
+[data-theme="organic-calm"] .form-card,
+[data-theme="organic-calm"] .dashboard-section {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(5, 150, 105, 0.12) !important;
+  box-shadow: 0 12px 36px rgba(6, 78, 59, 0.06), 0 2px 6px rgba(0, 0, 0, 0.02) !important;
+  border-radius: 20px !important;
+}
+
+[data-theme="organic-calm"] .premium-card::before {
+  background: linear-gradient(90deg, transparent, #059669, #0d9488, #059669, transparent) !important;
+  height: 3px !important;
+}
+
+[data-theme="organic-calm"] h1,
+[data-theme="organic-calm"] h2,
+[data-theme="organic-calm"] h3,
+[data-theme="organic-calm"] h4,
+[data-theme="organic-calm"] h5,
+[data-theme="organic-calm"] .page-title {
+  color: #064e3b !important;
+}
+
+[data-theme="organic-calm"] .action-button,
+[data-theme="organic-calm"] .login-button {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.25) !important;
+}
+
+[data-theme="organic-calm"] .sidebar-link.active {
+  background: rgba(5, 150, 105, 0.1) !important;
+  border-left: 4px solid #059669 !important;
+  color: #064e3b !important;
+}
+
+[data-theme="organic-calm"] .toggle-switch.on {
+  background: #059669 !important;
+}
+
+[data-theme="organic-calm"] .theme-card.selected {
+  border-color: #059669 !important;
+  background: rgba(5, 150, 105, 0.08) !important;
+}
+
+/* ============================================
+   GLOBAL TACTILE MICRO-INTERACTIONS & 60FPS TRANSITIONS
+   ============================================ */
+
+/* Tactile button compression on mobile & desktop */
+button,
+.action-button,
+.setting-card,
+.theme-card,
+.topbar-menu-btn,
+.portal-tab {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+button:active:not(:disabled),
+.action-button:active:not(:disabled),
+.setting-card:active,
+.theme-card:active,
+.topbar-menu-btn:active {
+  transform: scale(0.97) translateY(1px);
+}
+
+/* Fluid 60fps spring transitions on tab switches */
+.settings-tab-btn,
+.portal-tab,
+.sidebar-link {
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Smooth toggle spring switch */
+.toggle-thumb {
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
 /* ---- Premium badge on theme card ---- */
 .premium-badge {
   display: inline-flex;

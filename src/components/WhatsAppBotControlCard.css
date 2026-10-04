@@ -1,0 +1,415 @@
+/* WhatsApp Bot Control Card Styles */
+.wa-bot-control-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--glass-border, rgba(212, 175, 55, 0.25));
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  margin-top: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wa-bot-card-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #25D366, #128C7E, #d4af37);
+  opacity: 0.8;
+}
+
+.wa-bot-card-glow.paused {
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
+.wa-bot-card-glow.offline {
+  background: linear-gradient(90deg, #ef4444, #991b1b);
+}
+
+.wa-bot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.wa-bot-title-area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.wa-bot-icon-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
+  flex-shrink: 0;
+}
+
+.wa-bot-icon-badge.paused {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+}
+
+.wa-bot-icon-badge.offline {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+.wa-bot-title-info h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--deep-brown, #2c1e11);
+  letter-spacing: -0.01em;
+}
+
+.wa-bot-meta-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--soft-brown, #6b5545);
+}
+
+.wa-bot-phone-pill {
+  font-weight: 600;
+  color: #128C7E;
+  background: rgba(18, 140, 126, 0.1);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* Master Toggle Switch */
+.wa-master-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.wa-toggle-label-wrap {
+  text-align: right;
+}
+
+.wa-toggle-title {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--deep-brown, #2c1e11);
+}
+
+.wa-toggle-status-text {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.wa-toggle-status-text.active {
+  color: #16a34a;
+}
+
+.wa-toggle-status-text.inactive {
+  color: #dc2626;
+}
+
+.wa-switch-button {
+  width: 58px;
+  height: 32px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  outline: none;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.wa-switch-button.is-on {
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  box-shadow: 0 0 12px rgba(37, 211, 102, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+}
+
+.wa-switch-handle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffff;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.wa-switch-button.is-on .wa-switch-handle {
+  left: 29px;
+}
+
+/* Status Banner */
+.wa-status-alert-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+
+.wa-status-alert-banner.live {
+  background: rgba(37, 211, 102, 0.12);
+  border: 1px solid rgba(37, 211, 102, 0.3);
+  color: #065f46;
+}
+
+.wa-status-alert-banner.paused {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #92400e;
+}
+
+.wa-status-alert-banner.unpaired {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #1e40af;
+}
+
+.wa-status-alert-banner.offline {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #991b1b;
+}
+
+.wa-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.wa-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Diagnostic Grid */
+.wa-diagnostic-section {
+  margin-bottom: 22px;
+}
+
+.wa-diagnostic-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--deep-brown, #2c1e11);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wa-diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.wa-diag-pill {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+
+.wa-diag-pill.ok {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.wa-diag-pill.warn {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.wa-diag-pill.err {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.wa-diag-pill-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.wa-diag-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--soft-brown, #6b5545);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.wa-diag-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--deep-brown, #2c1e11);
+}
+
+.wa-diag-detail {
+  font-size: 0.74rem;
+  color: var(--text-muted, #8b7355);
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+/* Why is bot not responding accordion/callout */
+.wa-why-not-responding-box {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.08), rgba(255, 255, 255, 0.7));
+  border: 1px dashed rgba(212, 175, 55, 0.4);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+
+.wa-why-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--deep-brown, #2c1e11);
+  margin-bottom: 6px;
+}
+
+.wa-why-explanation {
+  font-size: 0.82rem;
+  color: var(--soft-brown, #5c4333);
+  line-height: 1.5;
+}
+
+/* Quick Test & Ping section */
+.wa-test-ping-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.wa-quick-preset-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--deep-brown, #2c1e11);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wa-quick-preset-btn:hover {
+  background: rgba(37, 211, 102, 0.15);
+  border-color: #25D366;
+  color: #065f46;
+}
+
+/* Action Buttons */
+.wa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wa-btn-primary {
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
+}
+
+.wa-btn-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.wa-btn-secondary {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--deep-brown, #2c1e11);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.wa-btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.wa-btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
+}
+
+/* QR Code & Pairing Drawer */
+.wa-pairing-card {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 16px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.wa-qr-img {
+  width: 140px;
+  height: 140px;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.wa-pairing-code-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-family: monospace;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: #0f172a;
+}

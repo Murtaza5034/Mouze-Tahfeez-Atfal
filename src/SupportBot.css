@@ -72,17 +72,33 @@
 }
 
 .support-bot-avatar {
+  position: relative;
   width: 42px;
   height: 42px;
-  background: linear-gradient(135deg, #d4af37, #f6dc88);
+  background: linear-gradient(135deg, var(--primary-gold, #d4af37), var(--accent-gold, #f6dc88));
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 900;
   font-size: 0.85rem;
-  color: #3e2723;
-  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+  color: #060910;
+  box-shadow: 0 2px 12px rgba(0, 245, 155, 0.35);
+}
+
+.ai-orb-glow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0, 245, 155, 0.6), rgba(255, 107, 0, 0.4));
+  filter: blur(4px);
+  animation: ai-orb-pulse 2s ease-in-out infinite alternate;
+  z-index: 0;
+}
+
+.support-bot-avatar span:not(.ai-orb-glow) {
+  position: relative;
+  z-index: 1;
 }
 
 .support-bot-header h3 {
@@ -92,11 +108,63 @@
   color: #fffdf8;
 }
 
+.support-bot-status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.ai-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00f59b;
+  box-shadow: 0 0 8px #00f59b;
+  animation: ai-dot-blink 1.8s infinite;
+}
+
 .support-bot-status {
-  margin: 2px 0 0;
+  margin: 0;
   font-size: 0.72rem;
-  opacity: 0.8;
+  opacity: 0.9;
   color: #f6dc88;
+}
+
+.ai-waveform {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 12px;
+  margin-left: 4px;
+}
+
+.ai-wave-bar {
+  width: 2.5px;
+  height: 100%;
+  background: #00f59b;
+  border-radius: 2px;
+  animation: ai-waveform-dance 1.2s ease-in-out infinite alternate;
+}
+
+.ai-wave-bar:nth-child(1) { height: 40%; animation-delay: 0s; }
+.ai-wave-bar:nth-child(2) { height: 100%; animation-delay: 0.2s; }
+.ai-wave-bar:nth-child(3) { height: 60%; animation-delay: 0.4s; }
+.ai-wave-bar:nth-child(4) { height: 80%; animation-delay: 0.1s; }
+
+@keyframes ai-orb-pulse {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  100% { transform: scale(1.15); opacity: 0.9; }
+}
+
+@keyframes ai-dot-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+@keyframes ai-waveform-dance {
+  0% { height: 25%; opacity: 0.5; }
+  100% { height: 100%; opacity: 1; }
 }
 
 .support-bot-close {

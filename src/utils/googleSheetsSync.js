@@ -9,31 +9,52 @@
 import { getStudentMarhala, calculateMarhalaRanks } from "./marhalaRanking";
 
 // Global webhook URL resolver:
-// 1. Parameter override
+// 1. In-memory window variable
 // 2. LocalStorage override (configured by admin in-app)
-// 3. Database reportSettings.google_sheets_webhook_url
+// 3. Database reportSettings (array or object: google_sheets_webhook_url, sheets_webhook_url, google_sheets_url)
 // 4. Window global variable
 // 5. Vite environment variable
 export function getGoogleSheetsWebhookUrl(reportSettings = null) {
+  if (typeof window !== "undefined" && window.__MAUZE_GOOGLE_SHEETS_WEBHOOK_URL__) {
+    const mem = String(window.__MAUZE_GOOGLE_SHEETS_WEBHOOK_URL__).trim();
+    if (mem) return mem;
+  }
+
   if (typeof window !== "undefined") {
-    const local = window.localStorage?.getItem("mauze_google_sheets_webhook_url");
-    if (local && local.trim() !== "") return local.trim();
+    try {
+      const local = window.localStorage?.getItem("mauze_google_sheets_webhook_url");
+      if (local && local.trim() !== "") return local.trim();
+    } catch (_e) {}
   }
-  if (reportSettings && reportSettings.google_sheets_webhook_url && reportSettings.google_sheets_webhook_url.trim() !== "") {
-    return reportSettings.google_sheets_webhook_url.trim();
+
+  const settingsObj = Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
+  if (settingsObj) {
+    const candidate =
+      settingsObj.google_sheets_webhook_url ||
+      settingsObj.sheets_webhook_url ||
+      settingsObj.google_sheets_url;
+    if (candidate && String(candidate).trim() !== "") {
+      return String(candidate).trim();
+    }
   }
+
   if (typeof window !== "undefined" && window.GOOGLE_SHEETS_WEBHOOK_URL && window.GOOGLE_SHEETS_WEBHOOK_URL.trim() !== "") {
     return window.GOOGLE_SHEETS_WEBHOOK_URL.trim();
   }
+
   return import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL || "";
 }
 
 export function setGoogleSheetsWebhookUrl(url) {
-  if (typeof window !== "undefined" && window.localStorage) {
-    if (url && url.trim()) {
-      window.localStorage.setItem("mauze_google_sheets_webhook_url", url.trim());
-    } else {
-      window.localStorage.removeItem("mauze_google_sheets_webhook_url");
+  const clean = (url || "").trim();
+  if (typeof window !== "undefined") {
+    window.__MAUZE_GOOGLE_SHEETS_WEBHOOK_URL__ = clean;
+    if (window.localStorage) {
+      if (clean) {
+        window.localStorage.setItem("mauze_google_sheets_webhook_url", clean);
+      } else {
+        window.localStorage.removeItem("mauze_google_sheets_webhook_url");
+      }
     }
   }
 }
@@ -103,7 +124,7 @@ export async function clearGoogleSheetsDemoData(customUrl = "") {
 
 /**
  * Sync individual student mark progress payload to Google Sheets Web App.
- * Called automatically when a teacher submits weekly marks.
+ * Called automatically when a teacher submits or auto-saves weekly marks.
  */
 export async function syncStudentResultToGoogleSheets({
   student,
@@ -127,6 +148,67 @@ export async function syncStudentResultToGoogleSheets({
       student?.parent_email ||
       student?.email ||
       student?.user_email ||
+      result?.parent_email ||
+      result?.email ||
+      ""
+    ).trim();
+
+    const studentId = String(
+      student?.student_id ||
+      student?.id ||
+      result?.student_id ||
+      result?.id ||
+      ""
+    ).trim();
+
+    const its = String(
+      student?.its ||
+      student?.its_number ||
+      result?.its ||
+      result?.its_number ||
+      ""
+    ).trim();
+
+    const studentName = String(
+      student?.name ||
+      student?.full_name ||
+      student?.student_name ||
+      result?.student_name ||
+      result?.name ||
+      result?.full_name ||
+      ""
+    ).trim();
+
+    const arabicName = String(
+      student?.arabic_name ||
+      result?.arabic_name ||
+      ""
+    ).trim();
+
+    const teacherName = String(
+      student?.teacherName ||
+      student?.teacher_name ||
+      result?.teacher_name ||
+      result?.teacherName ||
+      ""
+    ).trim();
+
+    const groupName = String(
+      student?.groupName ||
+      student?.group_name ||
+      result?.group_name ||
+      result?.groupName ||
+      ""
+    ).trim();
+
+    const phone = String(
+      student?.whatsapp_number ||
+      student?.phone ||
+      student?.mobile ||
+      student?.contact ||
+      result?.whatsapp_number ||
+      result?.phone ||
+      result?.mobile ||
       ""
     ).trim();
 
@@ -134,24 +216,24 @@ export async function syncStudentResultToGoogleSheets({
       category,
       marhala: resolvedMarhala,
       student: {
-        student_id: student?.student_id || student?.id || result?.student_id || "",
-        id: student?.id || student?.student_id || "",
-        its: student?.its || student?.its_number || "",
-        name: student?.name || student?.full_name || "",
-        arabic_name: student?.arabic_name || "",
+        student_id: studentId,
+        id: studentId,
+        its: its,
+        name: studentName,
+        arabic_name: arabicName,
         email: email,
         parent_email: email,
-        teacher_name: student?.teacherName || student?.teacher_name || "",
-        group_name: student?.groupName || student?.group_name || "",
+        teacher_name: teacherName,
+        group_name: groupName,
         marhala: resolvedMarhala,
         marhala_rank: marhalaRank || student?.marhalaRank || "",
-        overall_rank: overallRank || student?.computedRank || result?.computedRank || "",
-        whatsapp_number: student?.whatsapp_number || student?.phone || student?.mobile || student?.contact || ""
+        overall_rank: overallRank || student?.computedRank || student?.latestResult?.computedRank || result?.computedRank || "",
+        whatsapp_number: phone
       },
       result: {
         week_date: result?.week_date || "",
         from_date: result?.from_date || "",
-        till_date: result?.till_date || result?.week_date || "",
+        till_date: result?.till_date || result?.to_date || result?.week_date || "",
         fatemi_from_date: result?.fatemi_from_date || null,
         fatemi_till_date: result?.fatemi_till_date || null,
         fatemi_till_month_name: result?.fatemi_till_month_name || "",
@@ -186,6 +268,7 @@ export async function syncStudentResultToGoogleSheets({
       method: "POST",
       mode: "no-cors",
       cache: "no-cache",
+      keepalive: true,
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },
@@ -242,7 +325,32 @@ export async function syncAllStudentsToGoogleSheets({
   } catch (_e) {}
 
   const packagedStudents = (students || []).map((s) => {
-    const res = s.latestResult || {};
+    // If s does not have a complete latestResult, resolve latest entry from weeklyResults
+    let res = s.latestResult;
+    if (!res || Object.keys(res).length === 0 || (!res.week_date && !res.total_score && !res.murajazah && !res.juz_hali)) {
+      const sId = String(s.student_id || s.id || "").trim().toLowerCase();
+      const sIts = String(s.its || s.its_number || "").trim().toLowerCase();
+      const sName = String(s.name || s.full_name || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+      const matchedHistory = (weeklyResults || []).filter((r) => {
+        if (!r?.week_date) return false;
+        const rSid = String(r?.student_id ?? "").trim().toLowerCase();
+        if (sId && rSid === sId) return true;
+        if (sIts && rSid === sIts) return true;
+        if (s.allIds && Array.isArray(s.allIds) && s.allIds.some((aid) => String(aid).trim().toLowerCase() === rSid)) return true;
+        const rn = String(r?.student_name || r?.name || r?.full_name || "").trim().toLowerCase().replace(/\s+/g, " ");
+        if (sName && rn && (sName === rn || sName.includes(rn) || rn.includes(sName))) return true;
+        return false;
+      });
+
+      if (matchedHistory.length > 0) {
+        matchedHistory.sort((a, b) => new Date(b.week_date || 0) - new Date(a.week_date || 0));
+        res = matchedHistory[0];
+      } else {
+        res = s.latestResult || {};
+      }
+    }
+
     const resolvedMarhala = getStudentMarhala(s, res) || "Marhala 1";
     const email = (s.parent_email || s.email || s.user_email || "").trim();
 
@@ -269,7 +377,7 @@ export async function syncAllStudentsToGoogleSheets({
       result: {
         week_date: res.week_date || "",
         from_date: res.from_date || "",
-        till_date: res.till_date || res.week_date || "",
+        till_date: res.till_date || res.to_date || res.week_date || "",
         fatemi_from_date: res.fatemi_from_date || null,
         fatemi_till_date: res.fatemi_till_date || null,
         fatemi_till_month_name: res.fatemi_till_month_name || "",
@@ -313,6 +421,7 @@ export async function syncAllStudentsToGoogleSheets({
       method: "POST",
       mode: "no-cors",
       cache: "no-cache",
+      keepalive: true,
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },

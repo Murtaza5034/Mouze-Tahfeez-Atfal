@@ -81,6 +81,8 @@ export let latestQrRaw = '';
 export let latestPairingCode = '';
 export let connectedUser = null;
 export const DISPATCH_LOG = [];
+export let botEnabled = true;
+export function setBotEnabled(val) { botEnabled = !!val; }
 const AUTH_DIR = path.resolve('baileys_auth_info');
 
 // ---------------------------------------------------------------------------
@@ -903,6 +905,16 @@ export async function checkAndSendTeacherDailySchedules(options = {}) {
   const forceSchedule = options.forceSchedule || null; // 'self_attendance' | 'elearning_summary'
   const ist = getISTDateParts();
   const isMonToSat = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].includes(ist.weekday);
+
+  // Strictly Monday to Saturday only: Do not send scheduled reminder messages to teachers on Sunday
+  if (!isMonToSat && !forceSchedule) {
+    return {
+      success: true,
+      sent: 0,
+      reason: 'Sunday - Teacher scheduled reminders are paused on Sundays. Regular bot responses remain fully active.',
+      currentTimeIST: `${ist.weekday} ${ist.dateDisplay} ${ist.hour}:${ist.minute}:${ist.second}`
+    };
+  }
 
   // Collect verified teachers to receive notifications
   const teachersToNotify = new Map();
@@ -2576,6 +2588,12 @@ export async function handleIncomingWhatsAppMessage(msg) {
   const rawText = extractMessageText(msg.message);
   if (!rawText) return;
 
+  // Master Bot ON/OFF Check
+  if (!botEnabled) {
+    console.log(`[WHATSAPP-INBOUND] ⏸️ Bot is toggled OFF by Admin. Ignoring inbound message from +${senderPhone} (LID: ${rawJidId})`);
+    return;
+  }
+
   console.log(`[WHATSAPP-INBOUND] 💬 From +${senderPhone} (LID: ${rawJidId}): "${rawText}"`);
 
   // Instant visual feedback: show "typing..." on WhatsApp immediately
@@ -3633,6 +3651,23 @@ export function initFirestoreRealtimeListeners() {
     firestoreListenersActive = true;
     console.log('[FIRESTORE-LISTENER] 📡 Cloud Firestore Realtime Listeners Initializing...');
 
+    // 0. Synchronize Bot ON/OFF status in real-time with whatsapp_config/1
+    try {
+      firestoreAdminDb.collection('whatsapp_config').doc('1').onSnapshot((docSnap) => {
+        if (docSnap && docSnap.exists) {
+          const cfgData = docSnap.data();
+          if (typeof cfgData?.enabled === 'boolean') {
+            botEnabled = cfgData.enabled;
+            console.log(`[FIRESTORE-CONFIG] 🔄 whatsapp_config updated: WhatsApp Bot is ${botEnabled ? 'ENABLED (ON)' : 'DISABLED (OFF)'}`);
+          }
+        }
+      }, (err) => {
+        console.warn('[FIRESTORE-CONFIG-WARN] whatsapp_config listener warning:', err.message);
+      });
+    } catch (e) {
+      console.warn('[FIRESTORE-CONFIG-WARN] Failed to setup whatsapp_config listener:', e.message);
+    }
+
     const RECENT_CUTOFF_MS = Date.now() - 4 * 60 * 60 * 1000; // 4 hours window to backfill today's tests
 
     // 1. Listen to student_leaves
@@ -4262,12 +4297,51 @@ if (process.argv[1] && process.argv[1].endsWith('mauze-whatsapp-bot.js')) {
         service: 'Mauze Tahfeez WhatsApp Bot',
         helpline: BOT_CONFIG.HELPLINE_NUMBER,
         session: BOT_CONFIG.OPENWA_SESSION_ID,
+        botEnabled,
         baileysStatus,
+        me: sock?.user || connectedUser || null,
         qrDataUrl: latestQrDataUrl,
+        pairingCode: latestPairingCode,
         openwa: status,
         dispatchesCount: DISPATCH_LOG.length,
         timestamp: new Date().toISOString()
       }));
+      return;
+    }
+
+    // 2b. Toggle WhatsApp Bot ON/OFF (POST /api/toggle-bot)
+    if (pathname === '/api/toggle-bot' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body || '{}');
+          const newStatus = typeof parsed.enabled === 'boolean' ? parsed.enabled : !botEnabled;
+          botEnabled = newStatus;
+          // Synchronize to Firestore
+          if (firestoreAdminDb) {
+            try {
+              await firestoreAdminDb.collection('whatsapp_config').doc('1').set({
+                enabled: botEnabled,
+                updated_at: new Date().toISOString()
+              }, { merge: true });
+            } catch (fsErr) {
+              console.warn('[TOGGLE-BOT-FS-WARN]:', fsErr.message);
+            }
+          }
+          console.log(`[BOT-TOGGLE] 🔄 WhatsApp Bot is now: ${botEnabled ? 'ENABLED (ON)' : 'DISABLED (OFF)'}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            enabled: botEnabled,
+            baileysStatus,
+            message: botEnabled ? 'WhatsApp Bot is now LIVE & ACTIVE' : 'WhatsApp Bot is now PAUSED (OFF)'
+          }));
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
       return;
     }
 

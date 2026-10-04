@@ -30,6 +30,7 @@ import {
   setupTelegramWebhook,
   getTelegramWebhookInfo
 } from "../utils/googleSheetsSync";
+import { supabase } from "../supabaseClient";
 
 /**
  * MarhalaResultsPage — APPEND-ONLY feature page (Task 3 + Task 5).
@@ -160,10 +161,21 @@ export default function MarhalaResultsPage({ students = [], weeklyResults = [], 
     if (typeof onShowAction === "function") onShowAction(type, text);
   };
 
-  const handleSaveWebhook = () => {
+  const handleSaveWebhook = async () => {
     const trimmed = (webhookInput || "").trim();
     setGoogleSheetsWebhookUrl(trimmed);
-    showAction("success", trimmed ? "Google Sheets Webhook URL saved successfully!" : "Webhook URL cleared.");
+
+    try {
+      const targetSettings = Array.isArray(reportSettings) ? reportSettings[0] : reportSettings;
+      const settingsId = targetSettings?.id || 1;
+      await supabase
+        .from("report_settings")
+        .upsert([{ id: settingsId, google_sheets_webhook_url: trimmed }], { onConflict: "id" });
+    } catch (_dbErr) {
+      console.warn("Could not persist webhook to report_settings:", _dbErr);
+    }
+
+    showAction("success", trimmed ? "Google Sheets Webhook URL saved successfully across all devices!" : "Webhook URL cleared.");
   };
 
   const handleTestConnection = async () => {

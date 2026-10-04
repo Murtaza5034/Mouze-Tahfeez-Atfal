@@ -155,6 +155,7 @@ import MarhalaResultsPage from "./components/MarhalaResultsPage";
 import MarhalaMonthlyPage from "./components/MarhalaMonthlyPage";
 import IkhtebarMushaf from "./components/IkhtebarMushaf";
 import QuranDirectAccessCard from "./components/QuranDirectAccessCard";
+import WhatsAppBotControlCard from "./components/WhatsAppBotControlCard";
 import {
   calculateMarhalaRanks,
   getMarhalaRankForStudent,
@@ -6940,6 +6941,22 @@ function SettingsPage({
       color: "#5d4037",
     },
     {
+      id: "cyber-neon",
+      name: "Cyber Neon",
+      desc: "Bespoke dark mode with glowing electric neon & 3D spatial depth",
+      color: "#00f59b",
+      previewBg: "linear-gradient(135deg, #060910 20%, #00f59b 100%)",
+      premium: true,
+    },
+    {
+      id: "organic-calm",
+      name: "Organic Calming",
+      desc: "Soft pastel gradients, off-white backdrops & serene deep greens",
+      color: "#059669",
+      previewBg: "linear-gradient(135deg, #064e3b 0%, #059669 100%)",
+      premium: true,
+    },
+    {
       id: "childish",
       name: "Playful Learning",
       desc: "Colorful and fun for kids",
@@ -6962,6 +6979,7 @@ function SettingsPage({
       name: "Ashara Mode",
       desc: "Aashra Mubarakah — Mourning for Imam Hussain (AS)",
       color: "#0a5c36",
+      previewBg: "linear-gradient(135deg, #052618 0%, #0a5c36 100%)",
       premium: true,
     },
     {
@@ -6969,6 +6987,7 @@ function SettingsPage({
       name: "Classic Pro",
       desc: "Frosted glass with classic gold tones",
       color: "#c5a059",
+      previewBg: "linear-gradient(135deg, #2b1f14 0%, #c5a059 100%)",
       premium: true,
     },
     {
@@ -6976,6 +6995,7 @@ function SettingsPage({
       name: "Plutonium",
       desc: "Dark neon — where darkness meets the web",
       color: "#f81ce5",
+      previewBg: "linear-gradient(135deg, #11111b 0%, #f81ce5 100%)",
       premium: true,
     },
   ];
@@ -7459,8 +7479,11 @@ function SettingsPage({
                     >
                       <div
                         className="theme-preview"
-                        style={{ backgroundColor: t.color }}
+                        style={{ background: t.previewBg || t.color }}
                       >
+                        {t.premium && (
+                          <span className="premium-badge">PRO</span>
+                        )}
                         {appTheme === t.id && (
                           <CheckCircle size={24} color="white" />
                         )}
@@ -32997,6 +33020,13 @@ function AdminPortal({
                 </form>
               </section>
 
+              {/* WhatsApp Bot Live Control, Diagnostic & Master ON/OFF Switch */}
+              <WhatsAppBotControlCard
+                whatsappConfig={whatsappConfig}
+                onUpdateWhatsappConfig={onUpdateWhatsappConfig}
+                onShowAction={onShowAction}
+              />
+
               {/* WhatsApp Integration Configuration Section */}
               <section
                 className="form-card card-appear"
@@ -37402,7 +37432,7 @@ function TeacherPortal({
     // Live sync to Google Sheets on autosave (non-blocking)
     const targetAutoStudent = schoolData.students?.find(
       (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId) || (s.allIds && s.allIds.includes(String(numericId)))
-    );
+    ) || selectedStudent;
     let autoMarhalaRank = "";
     try {
       const rankInfo = getExactMarhalaRankForStudent(
@@ -47886,6 +47916,11 @@ export default function App() {
           } else {
             if (sec === "kibar" || r.includes("kibar")) return;
             if (r !== "parents") return;
+            // Only synthesize a student profile for parent accounts that explicitly
+            // have a student_id — i.e., they are linked to an actual child record.
+            // Pure parent/guardian portal accounts (no student_id) must NOT be
+            // synthesized into student profiles or they will pollute the registry.
+            if (!pa.student_id) return;
           }
 
           const paId = String(pa.user_id || pa.id || "").toLowerCase();
@@ -51010,6 +51045,31 @@ export default function App() {
         return;
       }
 
+      // When deleting a student from child_profiles, also remove their
+      // portal access entry so they don't get re-synthesized on next reload.
+      const isChildProfilesDelete =
+        table === "child_profiles" || table === "kibar_child_profiles";
+      if (isChildProfilesDelete) {
+        const isKibar = table === "kibar_child_profiles";
+        const accessTable = isKibar
+          ? "kibar_user_portal_access"
+          : "user_portal_access";
+        // Try to remove by user_id (if id is a UUID) and by student_id field
+        await supabase
+          .from(accessTable)
+          .delete()
+          .eq("student_id", id)
+          .catch(() => {});
+        // Also remove by user_id in case the student_id == user_id
+        if (String(id).includes("-") || String(id).length > 20) {
+          await supabase
+            .from(accessTable)
+            .delete()
+            .eq("user_id", id)
+            .catch(() => {});
+        }
+      }
+
       // Refresh school data
       await loadPortalData(portalRole, user, parentData.studentProfile, {
         silent: true,
@@ -51324,7 +51384,9 @@ export default function App() {
     const isKibar = portalRole === "kibar-teacher" || getSectionScope() === "kibar";
     const targetStudent = schoolData.students?.find(
       (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId) || (s.allIds && s.allIds.includes(String(numericId)))
-    );
+    ) || (students || []).find(
+      (s) => String(s.student_id) === String(numericId) || String(s.id) === String(numericId) || (s.allIds && s.allIds.includes(String(numericId)))
+    ) || null;
     let exactMarhalaRank = "";
     try {
       const exactRankInfo = getExactMarhalaRankForStudent(

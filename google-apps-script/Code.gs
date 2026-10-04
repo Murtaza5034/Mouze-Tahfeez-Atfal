@@ -39,6 +39,7 @@ const CONFIG = {
   KIBAR_SPREADSHEET_ID: "", 
   
   PARENTS_EMAIL_SHEET_NAME: "parents email",
+  ALL_MARHALA_SUMMARY_SHEET_NAME: "All Marhala Result",
   
   // ALL 8 Canonical Marhalas (English numbers)
   ALL_MARHALAS: [
@@ -148,7 +149,11 @@ function testSetup() {
       Logger.log("✅ Tab '" + mName + "' is ready with formatted headers.");
     }
 
-    Logger.log("🎉 ALL 8 MARHALA TABS + 'parents email' TAB ARE READY!");
+    // 3. Setup 'All Marhala Result' master summary tab
+    getOrCreateAllMarhalaSummarySheet(ss);
+    Logger.log("✅ Tab '" + (CONFIG.ALL_MARHALA_SUMMARY_SHEET_NAME || "All Marhala Result") + "' is ready with formatted headers.");
+
+    Logger.log("🎉 ALL 8 MARHALA TABS + 'All Marhala Result' + 'parents email' TAB ARE READY!");
     return "All tabs and formatting ready successfully!";
   } catch (err) {
     Logger.log("❌ Setup Error: " + err.message);
@@ -466,7 +471,7 @@ function processBulkSync(payload) {
   const students = payload.students || [];
   const clearExisting = payload.clear_existing === true || payload.clear_demo === true;
 
-  // 1. Ensure all tabs exist
+  // 1. Ensure all tabs exist (All 8 Marhalas + All Marhala Result + Parents Email)
   testSetup();
 
   // 2. If requested, clear all existing student rows first (wipes demo data)
@@ -482,6 +487,8 @@ function processBulkSync(payload) {
 
   const parentsRowsMap = new Map(); // Keyed by email or student identifier
   const marhalaCounts = {};
+  const allMarhalaRows = [];
+  const allMarhalaSheet = getOrCreateAllMarhalaSummarySheet(spreadsheet);
 
   for (let i = 0; i < students.length; i++) {
     const item = students[i];
@@ -499,6 +506,11 @@ function processBulkSync(payload) {
     const rowValues = buildMarhalaRowValues(s, r, targetTabName, mSheet);
     marhalaGroups[targetTabName].push(rowValues);
     marhalaCounts[targetTabName] = (marhalaCounts[targetTabName] || 0) + 1;
+
+    // Collect row for "All Marhala Result" master summary tab
+    if (allMarhalaSheet) {
+      allMarhalaRows.push(buildMarhalaRowValues(s, r, targetTabName, allMarhalaSheet));
+    }
 
     // Collect row for parents email tab (if Atfal)
     if (category === "atfal") {
@@ -520,11 +532,18 @@ function processBulkSync(payload) {
     const sheet = getOrCreateMarhalaSheet(spreadsheet, tabName);
 
     if (clearExisting) {
-      // Direct bulk set
       sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
     } else {
-      // Merge with existing rows without creating duplicates
       batchMergeSheetRows(sheet, rows, MARHALA_HEADERS);
+    }
+  }
+
+  // 4b. Batch Write to 'All Marhala Result' master summary tab
+  if (allMarhalaSheet && allMarhalaRows.length > 0) {
+    if (clearExisting) {
+      allMarhalaSheet.getRange(2, 1, allMarhalaRows.length, allMarhalaRows[0].length).setValues(allMarhalaRows);
+    } else {
+      batchMergeSheetRows(allMarhalaSheet, allMarhalaRows, MARHALA_HEADERS);
     }
   }
 
@@ -590,7 +609,18 @@ function processSyncPayload(payload) {
   const rawMarhala = student.marhala || payload.marhala || result.marhala;
   const marhalaName = resolveMarhalaTabName(rawMarhala, spreadsheet);
   const marhalaSheet = getOrCreateMarhalaSheet(spreadsheet, marhalaName);
-  const marhalaSyncStatus = syncMarhalaSheetRow(marhalaSheet, student, result);
+  const marhalaSyncStatus = syncMarhalaSheetRow(marhalaSheet, student, result, false);
+
+  // 1b. Sync to "All Marhala Result" master summary sheet if present or created
+  let allMarhalaSummaryStatus = null;
+  try {
+    const allSummarySheet = getOrCreateAllMarhalaSummarySheet(spreadsheet);
+    if (allSummarySheet) {
+      allMarhalaSummaryStatus = syncMarhalaSheetRow(allSummarySheet, student, result, true);
+    }
+  } catch (_e) {
+    Logger.log("Note: All Marhala summary sync: " + _e.message);
+  }
 
   // 2. If Atfal, sync to the "parents email" tab
   let parentsEmailStatus = null;
@@ -606,6 +636,7 @@ function processSyncPayload(payload) {
     studentName: student.name || student.full_name || "",
     marhalaTab: marhalaName,
     marhalaSync: marhalaSyncStatus,
+    allMarhalaSummarySync: allMarhalaSummaryStatus,
     parentsEmailSync: parentsEmailStatus,
     timestamp: new Date().toISOString()
   };
@@ -615,6 +646,13 @@ function resolveSpreadsheet(category) {
   let targetId = (category === "kibar") 
     ? CONFIG.KIBAR_SPREADSHEET_ID 
     : CONFIG.ATFAL_SPREADSHEET_ID;
+
+  if (!targetId && typeof PropertiesService !== "undefined" && PropertiesService.getScriptProperties) {
+    try {
+      const propKey = (category === "kibar") ? "KIBAR_SPREADSHEET_ID" : "ATFAL_SPREADSHEET_ID";
+      targetId = PropertiesService.getScriptProperties().getProperty(propKey) || "";
+    } catch (_pErr) {}
+  }
 
   if (targetId && targetId !== "auto" && targetId.trim() !== "") {
     try {
@@ -648,14 +686,38 @@ function resolveMarhalaTabName(rawMarhala, ss) {
     try {
       const direct = ss.getSheetByName(rawMarhala);
       if (direct) return rawMarhala;
+      const allSheets = ss.getSheets();
+      for (let i = 0; i < allSheets.length; i++) {
+        if (allSheets[i].getName().toLowerCase().trim() === s) {
+          return allSheets[i].getName();
+        }
+      }
     } catch (_e) {}
   }
 
-  // 2. Match against alias map
+  // 2. Check for numeric tokens (e.g. "Marhala 2" -> 2)
+  const numMatch = s.match(/\b([1-8])\b/) || s.match(/marhala\s*([1-8])/);
+  if (numMatch && numMatch[1]) {
+    const num = numMatch[1];
+    const canonicalNum = "Marhala " + num;
+    const arabicAliases = [
+      "Marhala Ula", "Marhala Saniyah", "Marhala Salesah", "Marhala Rabeah",
+      "Marhala Khamesah", "Marhala Sadesah", "Marhala Sabeah", "Marhala Saminah"
+    ];
+    const arabicVariant = arabicAliases[Number(num) - 1] || "";
+    if (ss) {
+      try {
+        if (ss.getSheetByName(canonicalNum)) return canonicalNum;
+        if (arabicVariant && ss.getSheetByName(arabicVariant)) return arabicVariant;
+      } catch (_e) {}
+    }
+    return canonicalNum;
+  }
+
+  // 3. Match against alias map
   for (const alias in CONFIG.MARHALA_ALIASES) {
     if (s === alias || s.indexOf(alias) !== -1) {
       const canonical = CONFIG.MARHALA_ALIASES[alias];
-      // Check if sheet has "Marhala Ula" variant or canonical "Marhala 1"
       if (ss) {
         try {
           if (ss.getSheetByName(canonical)) return canonical;
@@ -666,6 +728,13 @@ function resolveMarhalaTabName(rawMarhala, ss) {
     }
   }
 
+  // Default
+  if (ss) {
+    try {
+      if (ss.getSheetByName("Marhala 1")) return "Marhala 1";
+      if (ss.getSheetByName("Marhala Ula")) return "Marhala Ula";
+    } catch (_e) {}
+  }
   return "Marhala 1";
 }
 
@@ -683,6 +752,45 @@ const MARHALA_HEADERS = [
   "Matrookah", "Daeefah", "Attendance Note", "Last Updated"
 ];
 
+function isAllMarhalaSummarySheet(sheetName) {
+  if (!sheetName) return false;
+  const n = String(sheetName).trim().toLowerCase().replace(/[\s_-]+/g, " ");
+  return n === "all marhala result" ||
+         n === "all marhala results" ||
+         n === "all marhala" ||
+         n === "all mrahala result" ||
+         n === "all mrahala results" ||
+         n === "all marhala master" ||
+         n === "all marhalas";
+}
+
+function getOrCreateAllMarhalaSummarySheet(spreadsheet) {
+  if (!spreadsheet) return null;
+  const allSheets = spreadsheet.getSheets();
+  for (let i = 0; i < allSheets.length; i++) {
+    if (isAllMarhalaSummarySheet(allSheets[i].getName())) {
+      return allSheets[i];
+    }
+  }
+
+  const sheetName = CONFIG.ALL_MARHALA_SUMMARY_SHEET_NAME || "All Marhala Result";
+  let sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+    sheet.getRange(1, 1, 1, MARHALA_HEADERS.length).setValues([MARHALA_HEADERS]);
+    sheet.setFrozenRows(1);
+
+    const headerRange = sheet.getRange(1, 1, 1, MARHALA_HEADERS.length);
+    headerRange.setBackground("#0d5c3a"); // distinct rich forest green for All Marhala master tab
+    headerRange.setFontColor("#ffffff");
+    headerRange.setFontWeight("bold");
+    headerRange.setFontFamily("Segoe UI");
+    headerRange.setHorizontalAlignment("center");
+    sheet.autoResizeColumns(1, MARHALA_HEADERS.length);
+  }
+  return sheet;
+}
+
 function getOrCreateMarhalaSheet(spreadsheet, marhalaName) {
   let sheet = spreadsheet.getSheetByName(marhalaName);
   if (!sheet) {
@@ -699,6 +807,45 @@ function getOrCreateMarhalaSheet(spreadsheet, marhalaName) {
     sheet.autoResizeColumns(1, MARHALA_HEADERS.length);
   }
   return sheet;
+}
+
+function getMarhalaSheetColumnMap(sheet) {
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [];
+  const map = {
+    studentId: -1,
+    its: -1,
+    name: -1,
+    arabicName: -1,
+    email: -1,
+    teacher: -1,
+    group: -1,
+    marhala: -1,
+    phone: -1
+  };
+  for (let i = 0; i < headerRow.length; i++) {
+    const h = String(headerRow[i] || '').trim().toLowerCase();
+    if (h.includes("student id") || h === "id" || h === "sid") {
+      if (map.studentId === -1) map.studentId = i + 1;
+    } else if (h === "its" || h.includes("its number") || h.includes("its_no")) {
+      if (map.its === -1) map.its = i + 1;
+    } else if (h.includes("arabic name")) {
+      if (map.arabicName === -1) map.arabicName = i + 1;
+    } else if (h === "name" || h.includes("student name") || h.includes("full name")) {
+      if (map.name === -1) map.name = i + 1;
+    } else if (h.includes("email")) {
+      if (map.email === -1) map.email = i + 1;
+    } else if (h.includes("teacher")) {
+      if (map.teacher === -1) map.teacher = i + 1;
+    } else if (h.includes("group")) {
+      if (map.group === -1) map.group = i + 1;
+    } else if (h === "marhala" || h.includes("marhala name") || (h.includes("marhala") && !h.includes("rank"))) {
+      if (map.marhala === -1) map.marhala = i + 1;
+    } else if (h.includes("phone") || h.includes("mobile") || h.includes("whatsapp")) {
+      if (map.phone === -1) map.phone = i + 1;
+    }
+  }
+  return map;
 }
 
 function buildMarhalaRowValues(student, result, marhalaTabName, sheet) {
@@ -758,14 +905,14 @@ function buildMarhalaRowValues(student, result, marhalaTabName, sheet) {
     const row = new Array(effectiveHeaders.length).fill("");
     for (let c = 0; c < effectiveHeaders.length; c++) {
       const h = String(effectiveHeaders[c] || "").trim().toLowerCase();
-      if (h.includes("student id") || h === "id") row[c] = studentId;
-      else if (h === "its" || h.includes("its number")) row[c] = its;
+      if (h.includes("student id") || h === "id" || h === "sid") row[c] = studentId;
+      else if (h === "its" || h.includes("its number") || h.includes("its_no")) row[c] = its;
       else if (h.includes("arabic name")) row[c] = arabicName;
-      else if (h === "name" || h.includes("student name")) row[c] = name;
+      else if (h === "name" || h.includes("student name") || h.includes("full name")) row[c] = name;
       else if (h.includes("email")) row[c] = email;
       else if (h.includes("teacher")) row[c] = teacherName;
       else if (h.includes("group")) row[c] = groupName;
-      else if (h === "marhala") row[c] = marhala;
+      else if (h === "marhala" || h.includes("marhala name") || (h.includes("marhala") && !h.includes("rank"))) row[c] = marhala;
       else if (h.includes("week date")) row[c] = weekDate;
       else if (h.includes("from date") || h === "from") row[c] = fromDate;
       else if (h.includes("till date") || h.includes("to date") || h === "till") row[c] = tillDate;
@@ -778,7 +925,7 @@ function buildMarhalaRowValues(student, result, marhalaTabName, sheet) {
       else if (h.includes("total jadeed unit") || h.includes("jadeed unit") || h.includes("total_jadeed_unit")) row[c] = totalJadeedUnit;
       else if (h === "jadeed" || h.includes("jadeed marks") || h === "new memorization") row[c] = jadeedMarks;
       else if (h.includes("weekly score") || h.includes("total score") || h.includes("score")) row[c] = totalScore;
-      else if (h.includes("marhala rank")) row[c] = marhalaRank;
+      else if (h.includes("marhala rank") || (h.includes("marhala") && h.includes("rank"))) row[c] = marhalaRank;
       else if (h.includes("overall rank") || h.includes("over all rank")) row[c] = overallRank;
       else if (h.includes("wusool juz")) row[c] = wusoolJuz;
       else if (h.includes("wusool page")) row[c] = wusoolPage;
@@ -836,99 +983,123 @@ function buildMarhalaRowValues(student, result, marhalaTabName, sheet) {
   ];
 }
 
-function syncMarhalaSheetRow(sheet, student, result) {
-  const spreadsheet = sheet.getParent();
-  const studentId = String(student.student_id || student.id || result.student_id || "").trim();
-  const its = String(student.its || student.its_number || "").trim();
-  const email = String(student.email || student.parent_email || "").trim().toLowerCase();
-  const name = String(student.name || student.full_name || "").trim().toLowerCase();
+function findMatchInSheet(targetSheet, student, result) {
+  const data = targetSheet.getDataRange().getValues();
+  if (data.length <= 1) return -1;
+  const colMap = getMarhalaSheetColumnMap(targetSheet);
+  const sId = String(student.student_id || student.id || result?.student_id || "").trim();
+  const its = String(student.its || student.its_number || result?.its || "").trim();
+  const email = String(student.email || student.parent_email || result?.email || "").trim().toLowerCase();
+  const name = String(student.name || student.full_name || result?.student_name || "").trim().toLowerCase();
+  const cleanPhone = cleanWhatsAppPhone(student.whatsapp_number || student.phone || student.mobile || "");
 
-  // Helper to find match in a given sheet
-  function findMatchInSheet(targetSheet) {
-    const data = targetSheet.getDataRange().getValues();
-    if (data.length <= 1) return -1;
-    const headers = data[0] || MARHALA_HEADERS;
-    const colStudentId = headers.indexOf("Student ID");
-    const colIts = headers.indexOf("ITS");
-    const colName = headers.indexOf("Name");
-    const colEmail = headers.indexOf("Email");
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const rowSid = colMap.studentId > 0 ? String(row[colMap.studentId - 1] || "").trim() : "";
+    const rowIts = colMap.its > 0 ? String(row[colMap.its - 1] || "").trim() : "";
+    const rowMail = colMap.email > 0 ? String(row[colMap.email - 1] || "").trim().toLowerCase() : "";
+    const rowName = colMap.name > 0 ? String(row[colMap.name - 1] || "").trim().toLowerCase() : "";
+    const rowPhone = colMap.phone > 0 ? cleanWhatsAppPhone(String(row[colMap.phone - 1] || "")) : "";
 
-    for (let r = 1; r < data.length; r++) {
-      const row = data[r];
-      const rowSid = colStudentId !== -1 ? String(row[colStudentId] || "").trim() : "";
-      const rowIts = colIts !== -1 ? String(row[colIts] || "").trim() : "";
-      const rowMail = colEmail !== -1 ? String(row[colEmail] || "").trim().toLowerCase() : "";
-      const rowName = colName !== -1 ? String(row[colName] || "").trim().toLowerCase() : "";
+    const idMatches = (sId && rowSid && String(rowSid).replace(/\.0$/, '') === String(sId).replace(/\.0$/, '')) ||
+                      (its && rowIts && String(rowIts).replace(/\.0$/, '') === String(its).replace(/\.0$/, ''));
+    const emailMatches = email && rowMail && email === rowMail;
+    const phoneMatches = cleanPhone && rowPhone && (
+      cleanPhone === rowPhone ||
+      (cleanPhone.length >= 10 && rowPhone.length >= 10 && cleanPhone.slice(-10) === rowPhone.slice(-10))
+    );
+    const nameMatches = name && rowName && (
+      name === rowName ||
+      name.replace(/\s+/g, '') === rowName.replace(/\s+/g, '') ||
+      (name.length >= 5 && rowName.includes(name)) ||
+      (rowName.length >= 5 && name.includes(rowName))
+    );
 
-      const idMatches = 
-        (studentId && rowSid === studentId) ||
-        (its && rowIts === its) ||
-        (email && rowMail === email) ||
-        (name && (rowName === name || rowName.replace(/\s+/g, '') === name.replace(/\s+/g, '') || rowName.includes(name) || name.includes(rowName)));
-
-      if (idMatches) return r + 1;
+    if (idMatches || emailMatches || (phoneMatches && nameMatches) || (nameMatches && !sId && !its)) {
+      return r + 1;
     }
-    return -1;
   }
+  return -1;
+}
+
+function syncMarhalaSheetRow(sheet, student, result, isSummarySheet) {
+  const spreadsheet = sheet.getParent();
+  const targetSheetName = sheet.getName();
 
   // 1. Search in target sheet
-  let matchRowIndex = findMatchInSheet(sheet);
-  let activeSheet = sheet;
+  let matchRowIndex = findMatchInSheet(sheet, student, result);
 
-  // 2. If not found in target sheet, check other Marhala sheets
-  if (matchRowIndex === -1 && spreadsheet) {
+  // 2. If not found in target sheet, and not a summary sheet, check other Marhala sheets
+  // to remove the student from their previous Marhala (e.g. Marhala 1 -> Marhala 2)
+  if (!isSummarySheet && matchRowIndex === -1 && spreadsheet) {
     const allSheets = spreadsheet.getSheets();
     for (let i = 0; i < allSheets.length; i++) {
       const s = allSheets[i];
-      if (s.getName() === sheet.getName()) continue;
+      if (s.getName() === targetSheetName) continue;
       if (s.getName() === CONFIG.PARENTS_EMAIL_SHEET_NAME) continue;
+      if (isAllMarhalaSummarySheet(s.getName())) continue;
       if (CONFIG.ALL_MARHALAS.indexOf(s.getName()) === -1 && s.getName().toLowerCase().indexOf("marhala") === -1) continue;
-      const foundRow = findMatchInSheet(s);
+
+      const foundRow = findMatchInSheet(s, student, result);
       if (foundRow !== -1) {
-        matchRowIndex = foundRow;
-        activeSheet = s;
+        try {
+          s.deleteRow(foundRow);
+          Logger.log("Relocated student " + (student.name || "") + " from " + s.getName() + " to " + targetSheetName);
+        } catch (_delErr) {
+          Logger.log("Note: Could not delete row from old sheet: " + _delErr.message);
+        }
         break;
       }
     }
   }
 
-  const finalRowValues = buildMarhalaRowValues(student, result, activeSheet.getName(), activeSheet);
+  const finalRowValues = buildMarhalaRowValues(student, result, targetSheetName, sheet);
 
   if (matchRowIndex > 0) {
-    activeSheet.getRange(matchRowIndex, 1, 1, finalRowValues.length).setValues([finalRowValues]);
-    return { action: "updated", sheet: activeSheet.getName(), row: matchRowIndex };
+    sheet.getRange(matchRowIndex, 1, 1, finalRowValues.length).setValues([finalRowValues]);
+    return { action: "updated", sheet: targetSheetName, row: matchRowIndex };
   } else {
     sheet.appendRow(finalRowValues);
-    return { action: "appended", sheet: sheet.getName(), row: sheet.getLastRow() };
+    return { action: "appended", sheet: targetSheetName, row: sheet.getLastRow() };
   }
 }
 
 function batchMergeSheetRows(sheet, newRows, headers) {
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) {
-    sheet.getRange(2, 1, newRows.length, headers.length).setValues(newRows);
+    if (newRows.length > 0) {
+      sheet.getRange(2, 1, newRows.length, headers.length).setValues(newRows);
+    }
     return;
   }
 
-  const colStudentId = headers.indexOf("Student ID");
-  const colIts = headers.indexOf("ITS");
-  const colName = headers.indexOf("Name");
-  const colEmail = headers.indexOf("Email");
-
+  const colMap = getMarhalaSheetColumnMap(sheet);
   const existingMap = new Map();
   for (let r = 1; r < data.length; r++) {
     const row = data[r];
-    const key = String(row[colStudentId] || row[colIts] || row[colEmail] || row[colName] || "").toLowerCase().trim();
-    if (key) {
-      existingMap.set(key, r + 1); // 1-indexed row number
-    }
+    const sid = colMap.studentId > 0 ? String(row[colMap.studentId - 1] || "").trim().toLowerCase() : "";
+    const its = colMap.its > 0 ? String(row[colMap.its - 1] || "").trim().toLowerCase() : "";
+    const mail = colMap.email > 0 ? String(row[colMap.email - 1] || "").trim().toLowerCase() : "";
+    const name = colMap.name > 0 ? String(row[colMap.name - 1] || "").trim().toLowerCase() : "";
+
+    if (sid) existingMap.set(sid, r + 1);
+    if (its) existingMap.set(its, r + 1);
+    if (mail) existingMap.set(mail, r + 1);
+    if (name) existingMap.set(name, r + 1);
   }
 
   const toAppend = [];
   for (let i = 0; i < newRows.length; i++) {
     const nr = newRows[i];
-    const key = String(nr[colStudentId] || nr[colIts] || nr[colEmail] || nr[colName] || "").toLowerCase().trim();
-    const existingRow = existingMap.get(key);
+    const sid = colMap.studentId > 0 ? String(nr[colMap.studentId - 1] || "").trim().toLowerCase() : "";
+    const its = colMap.its > 0 ? String(nr[colMap.its - 1] || "").trim().toLowerCase() : "";
+    const mail = colMap.email > 0 ? String(nr[colMap.email - 1] || "").trim().toLowerCase() : "";
+    const name = colMap.name > 0 ? String(nr[colMap.name - 1] || "").trim().toLowerCase() : "";
+
+    const existingRow = (sid && existingMap.get(sid)) ||
+                        (its && existingMap.get(its)) ||
+                        (mail && existingMap.get(mail)) ||
+                        (name && existingMap.get(name));
 
     if (existingRow) {
       sheet.getRange(existingRow, 1, 1, headers.length).setValues([nr]);
@@ -984,11 +1155,11 @@ function getParentsSheetColumnMap(sheet) {
     else if (h.includes('phone') || h.includes('whatsapp') || h.includes('mobile')) map.phone = i + 1;
     else if (h === 'name' || h.includes('student name')) map.name = i + 1;
     else if (h.includes('from')) map.fromDate = i + 1;
-    else if (h.includes('till')) map.tillDate = i + 1;
-    else if (h.includes('score')) map.score = i + 1;
+    else if (h.includes('till') || h.includes('to date')) map.tillDate = i + 1;
+    else if (h.includes('score') || h.includes('wekly') || h.includes('weekly')) map.score = i + 1;
     else if (h.includes('jadeed')) map.jadeed = i + 1;
-    else if (h.includes('marhala')) map.marhalaRank = i + 1;
-    else if (h.includes('over all') || h.includes('overall')) map.overallRank = i + 1;
+    else if (h.includes('marhala') && h.includes('rank')) map.marhalaRank = i + 1;
+    else if (h.includes('over all') || h.includes('overall') || (h.includes('rank') && !h.includes('marhala'))) map.overallRank = i + 1;
     else if (h.includes('data update') || h.includes('latest week') || h.includes('status')) map.status = i + 1;
     else if (h.includes('telegram')) map.telegramChatId = i + 1;
   }
@@ -1114,9 +1285,20 @@ function buildParentsEmailRowValues(student, result, sheet) {
 
   const fromDate = String(result.from_date || result.fatemi_from_date || "").trim();
   const tillDate = String(result.till_date || result.fatemi_till_date || result.week_date || "").trim();
+  
+  const hasMarks = Boolean(
+    (result.total_score !== undefined && result.total_score !== null && result.total_score !== "") ||
+    (result.murajazah !== undefined && result.murajazah !== null && result.murajazah !== "") ||
+    (result.juz_hali !== undefined && result.juz_hali !== null && result.juz_hali !== "") ||
+    (result.jadeed !== undefined && result.jadeed !== null && result.jadeed !== "") ||
+    (result.takhteet !== undefined && result.takhteet !== null && result.takhteet !== "")
+  );
+
   const weeklyScore = (result.total_score !== undefined && result.total_score !== null && result.total_score !== "")
     ? result.total_score
-    : ((Number(result.murajazah) || 0) + (Number(result.juz_hali) || 0) + (Number(result.takhteet) || 0) + (Number(result.jadeed) || 0));
+    : (hasMarks
+        ? ((Number(result.murajazah) || 0) + (Number(result.juz_hali) || 0) + (Number(result.takhteet) || 0) + (Number(result.jadeed) || 0))
+        : "");
   
   let totalJadeed = "";
   const rawPages = (result.total_jadeed_pages !== undefined && result.total_jadeed_pages !== null)
@@ -1138,8 +1320,8 @@ function buildParentsEmailRowValues(student, result, sheet) {
   const marhalaRank = student.marhala_rank || student.marhalaRank || "";
   const overallRank = student.overall_rank || student.computedRank || result.computedRank || "";
   
-  // If result has scores, status is "Yes", otherwise default to "No"
-  const latestWeekStatus = (weeklyScore !== "" && weeklyScore !== null) ? "Yes" : "No";
+  // If result has marks or valid week date, status is "Yes", otherwise default to "No"
+  const latestWeekStatus = (hasMarks || (fromDate && tillDate)) ? "Yes" : "No";
   const telegramChatId = String(student.telegram_chat_id || student.telegramChatId || "").trim();
 
   if (sheet) {
@@ -1163,13 +1345,15 @@ function buildParentsEmailRowValues(student, result, sheet) {
         rowValues[c] = fromDate;
       } else if (h.includes('till') || h.includes('to date')) {
         rowValues[c] = tillDate;
-      } else if (h.includes('score') || h.includes('total score') || h.includes('marks')) {
+      } else if (h.includes('score') || h.includes('wekly') || h.includes('weekly') || h.includes('marks')) {
         rowValues[c] = weeklyScore;
       } else if (h.includes('jadeed')) {
         rowValues[c] = totalJadeed;
-      } else if (h.includes('marhala')) {
+      } else if (h.includes('marhala') && h.includes('rank')) {
         rowValues[c] = marhalaRank;
-      } else if (h.includes('over all') || h.includes('overall') || h.includes('total rank')) {
+      } else if (h === 'marhala') {
+        rowValues[c] = student.marhala || "";
+      } else if (h.includes('over all') || h.includes('overall') || (h.includes('rank') && !h.includes('marhala'))) {
         rowValues[c] = overallRank;
       } else if (h.includes('data update') || h.includes('latest week') || h.includes('status')) {
         rowValues[c] = latestWeekStatus;
@@ -1236,6 +1420,14 @@ function syncParentsEmailSheetRow(sheet, student, result) {
   }
 
   if (matchRowIndex > 0) {
+    const existingRow = data[matchRowIndex - 1];
+    // Preserve existing non-empty values (e.g. telegramChatId, phone, email) if incoming payload is empty
+    for (let c = 0; c < rowValues.length; c++) {
+      if ((rowValues[c] === "" || rowValues[c] === null || rowValues[c] === undefined) &&
+          existingRow[c] !== "" && existingRow[c] !== null && existingRow[c] !== undefined) {
+        rowValues[c] = existingRow[c];
+      }
+    }
     sheet.getRange(matchRowIndex, 1, 1, rowValues.length).setValues([rowValues]);
     if (colMap.status) applyValidationToCell(sheet.getRange(matchRowIndex, colMap.status));
     return { action: "updated", row: matchRowIndex, email: email || name, jadeed: totalJadeedFromRow(rowValues, colMap) };
@@ -1266,20 +1458,33 @@ function batchMergeParentsEmailRows(sheet, newRows) {
   const colMap = getParentsSheetColumnMap(sheet);
   const existingMap = new Map();
   for (let r = 1; r < data.length; r++) {
-    const mail = String(data[r][colMap.email - 1] || "").toLowerCase().trim();
-    const name = String(data[r][colMap.name - 1] || "").toLowerCase().trim();
+    const mail = (colMap.email && colMap.email <= data[r].length) ? String(data[r][colMap.email - 1] || "").toLowerCase().trim() : "";
+    const name = (colMap.name && colMap.name <= data[r].length) ? String(data[r][colMap.name - 1] || "").toLowerCase().trim() : "";
+    const phone = (colMap.phone && colMap.phone <= data[r].length) ? cleanWhatsAppPhone(String(data[r][colMap.phone - 1] || "")) : "";
     if (mail) existingMap.set(mail, r + 1);
     if (name) existingMap.set(name, r + 1);
+    if (phone) existingMap.set(phone, r + 1);
   }
 
   const toAppend = [];
   for (let i = 0; i < newRows.length; i++) {
     const nr = newRows[i];
-    const mail = colMap.email ? String(nr[colMap.email - 1] || "").toLowerCase().trim() : "";
-    const name = colMap.name ? String(nr[colMap.name - 1] || "").toLowerCase().trim() : "";
-    const existingRow = (mail && existingMap.get(mail)) || (name && existingMap.get(name));
+    const mail = (colMap.email && colMap.email <= nr.length) ? String(nr[colMap.email - 1] || "").toLowerCase().trim() : "";
+    const name = (colMap.name && colMap.name <= nr.length) ? String(nr[colMap.name - 1] || "").toLowerCase().trim() : "";
+    const phone = (colMap.phone && colMap.phone <= nr.length) ? cleanWhatsAppPhone(String(nr[colMap.phone - 1] || "")) : "";
+
+    const existingRow = (mail && existingMap.get(mail)) || 
+                        (name && existingMap.get(name)) || 
+                        (phone && existingMap.get(phone));
 
     if (existingRow) {
+      const existingData = data[existingRow - 1];
+      for (let c = 0; c < nr.length; c++) {
+        if ((nr[c] === "" || nr[c] === null || nr[c] === undefined) &&
+            existingData[c] !== "" && existingData[c] !== null && existingData[c] !== undefined) {
+          nr[c] = existingData[c];
+        }
+      }
       sheet.getRange(existingRow, 1, 1, nr.length).setValues([nr]);
     } else {
       toAppend.push(nr);

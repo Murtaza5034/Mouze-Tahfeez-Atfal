@@ -5,8 +5,8 @@ import fs from 'fs'
 
 export default defineConfig(({ mode }) => ({
   define: {
-    __APP_VERSION__: JSON.stringify("1.5.44"),
-    __APP_VERSION_CODE__: JSON.stringify(88),
+    __APP_VERSION__: JSON.stringify("1.5.57"),
+    __APP_VERSION_CODE__: JSON.stringify(101),
   },
   plugins: [
     react(),
@@ -85,6 +85,109 @@ export function getRefreshReg() {
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+      }
+    },
+    // Dev proxy & controller for /api/whatsapp-bot — connects frontend to local bot on port 2785
+    {
+      name: 'dev-whatsapp-bot-proxy',
+      configureServer(server) {
+        server.middlewares.use('/api/whatsapp-bot', async (req, res) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204;
+            res.end();
+            return;
+          }
+
+          const urlObj = new URL(req.url, 'http://localhost');
+          const subPath = urlObj.pathname;
+
+          // 1. Start bot daemon process if requested
+          if (subPath === '/start' && req.method === 'POST') {
+            try {
+              const check = await fetch('http://127.0.0.1:2785/api/status', { signal: AbortSignal.timeout(1000) }).catch(() => null);
+              if (check && check.ok) {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: true, message: 'Bot process is already running on port 2785' }));
+                return;
+              }
+              const { spawn } = await import('child_process');
+              const botProc = spawn('node', ['scripts/mauze-whatsapp-bot.js'], {
+                detached: true,
+                stdio: 'ignore',
+                shell: true
+              });
+              botProc.unref();
+              await new Promise(r => setTimeout(r, 2000));
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, message: 'Bot process launched on port 2785' }));
+              return;
+            } catch (startErr) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: startErr.message }));
+              return;
+            }
+          }
+
+          // 2. Map subPath to upstream bot path on http://127.0.0.1:2785
+          let targetPath = '/api/status';
+          if (subPath === '/status') targetPath = '/api/status';
+          else if (subPath === '/toggle') targetPath = '/api/toggle-bot';
+          else if (subPath === '/request-pairing-code') targetPath = '/api/request-pairing-code';
+          else if (subPath === '/test-message') targetPath = '/api/test-message';
+          else if (subPath === '/qr') targetPath = '/qr';
+          else if (subPath === '/dispatches') targetPath = '/api/dispatches';
+          else targetPath = subPath.startsWith('/api') ? subPath : `/api${subPath}`;
+
+          try {
+            let body = undefined;
+            if (req.method === 'POST') {
+              const chunks = [];
+              for await (const chunk of req) {
+                chunks.push(chunk);
+              }
+              body = Buffer.concat(chunks).toString();
+            }
+
+            const upstream = await fetch(`http://127.0.0.1:2785${targetPath}`, {
+              method: req.method,
+              headers: {
+                'Content-Type': req.headers['content-type'] || 'application/json'
+              },
+              body: body,
+              signal: AbortSignal.timeout(6000)
+            });
+
+            const contentType = upstream.headers.get('content-type') || 'application/json';
+            res.statusCode = upstream.status;
+            res.setHeader('Content-Type', contentType);
+
+            if (contentType.includes('image/')) {
+              const arrBuf = await upstream.arrayBuffer();
+              res.end(Buffer.from(arrBuf));
+            } else {
+              const text = await upstream.text();
+              res.end(text);
+            }
+          } catch (connErr) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              online: false,
+              botRunning: false,
+              baileysStatus: 'DAEMON_OFFLINE',
+              botEnabled: false,
+              reason: 'WhatsApp Bot daemon is stopped or port 2785 is inactive. Click "Start Bot" to launch it.',
+              port: 2785,
+              helpline: '+91 81079 25353',
+              error: connErr.message
+            }));
           }
         });
       }
