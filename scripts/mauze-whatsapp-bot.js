@@ -5128,15 +5128,18 @@ export function startWhatsAppBotEngine() {
     console.log(`[WHATSAPP BOT] ⏱ Monday-Saturday Teacher Scheduler Active (4:25 PM Self-Attendance & 10:00 PM eLearning/Attendance Summary).`);
   });
 
-  // Dual-port safety: if primaryPort != 2785, also listen on 2785 so Railway custom networking works seamlessly
-  if (primaryPort !== 2785) {
+  // Universal multi-port listeners: bind all common Railway/cloud ports (2785, 8080, 3000)
+  // so no matter how Railway Networking is configured, the bot responds 100% of the time!
+  const auxPorts = [2785, 8080, 3000].filter(p => p !== primaryPort);
+  for (const p of auxPorts) {
     try {
-      const dualServer = http.createServer((req, res) => server.emit('request', req, res));
-      dualServer.listen(2785, '0.0.0.0', () => {
-        console.log(`[WHATSAPP BOT] 🌐 Dual-port listening also active on port 2785.`);
+      const auxServer = http.createServer((req, res) => server.emit('request', req, res));
+      auxServer.listen(p, '0.0.0.0', () => {
+        console.log(`[WHATSAPP BOT] 🌐 Auxiliary cloud listener online on port ${p}`);
       });
-      dualServer.on('error', (err) => {
-        console.log('[WHATSAPP BOT] Dual-port 2785 notice:', err.message);
+      auxServer.on('error', (err) => {
+        // Port might be in use or unavailable, harmless notice
+        console.log(`[WHATSAPP BOT] Port ${p} auxiliary notice: ${err.message}`);
       });
     } catch (_) {}
   }

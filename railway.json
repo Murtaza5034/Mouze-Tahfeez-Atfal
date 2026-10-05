@@ -7,7 +7,7 @@
   "deploy": {
     "startCommand": "node scripts/mauze-whatsapp-bot.js",
     "healthcheckPath": "/api/status",
-    "healthcheckTimeout": 180,
+    "healthcheckTimeout": 300,
     "restartPolicyType": "ALWAYS",
     "restartPolicyMaxRetries": 10
   }

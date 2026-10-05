@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1791140083.1451263,
-    "seen": 1791140545.2798638,
-    "ast_hash": "136c4a03d12cf44f4fd3e226275f4a84",
+    "mtime": 1790927763.7314596,
+    "seen": 1790931687.3869455,
+    "ast_hash": "4f0f4c4a34963d3ec426380acf63f5cc",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1791182973.430784,
-    "seen": 1791186973.8769913,
+    "mtime": 1790967976.8817742,
+    "seen": 1790968272.1152647,
     "ast_hash": "f3c1db3e5a1641513a1e5a6bff1ee565",
     "semantic_hash": ""
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1791182973.4297335,
-    "seen": 1791186973.8775384,
+    "mtime": 1790967976.880775,
+    "seen": 1790968272.115779,
     "ast_hash": "4d3b13b87f1d8abf11219d4ea2d0fef1",
     "semantic_hash": ""
   },
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1791181204.3340838,
-    "seen": 1791181919.7315054,
-    "ast_hash": "0e5e1bc16c58d0b3495690af2de0f70f",
+    "mtime": 1790927770.155517,
+    "seen": 1790931687.394118,
+    "ast_hash": "322433c1c44d2316093a3f880af296df",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1791186329.6454391,
-    "seen": 1791186973.888312,
-    "ast_hash": "3522ae9139183889b7bec9649d07a043",
+    "mtime": 1790927035.1832693,
+    "seen": 1790927309.1224124,
+    "ast_hash": "fd54c2e4a9c547d3df8795e5e4e26c2b",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -6438,10 +6438,10 @@
     "semantic_hash": ""
   },
   "src/SupportBot.jsx": {
-    "mtime": 1791112605.6472363,
-    "seen": 1791112840.3805645,
-    "ast_hash": "5de026b15a0ac61791cbeaa2841f7936",
-    "semantic_hash": ""
+    "mtime": 1786349547.033027,
+    "seen": 1787510537.2115085,
+    "ast_hash": "6b9bc9ad426c4be98f91a1591db3f419",
+    "semantic_hash": "6b9bc9ad426c4be98f91a1591db3f419"
   },
   "src/TakhteetProgress.jsx": {
     "mtime": 1785932262.7180138,
@@ -6630,9 +6630,9 @@
     "semantic_hash": "957bbea90bb141a8c66d5fe0b0321a96"
   },
   "vite.config.js": {
-    "mtime": 1791140074.614382,
-    "seen": 1791140545.2978265,
-    "ast_hash": "a521b71ff5aa3aa30f63c71ff3aba93e",
+    "mtime": 1790967812.2338872,
+    "seen": 1790968272.1303568,
+    "ast_hash": "0328b5b71aea696fc077c423f14e1836",
     "semantic_hash": ""
   },
   ".agents/rules/graphify.md": {
@@ -9648,9 +9648,9 @@
     "semantic_hash": ""
   },
   "docker-compose.yml": {
-    "mtime": 1791179011.7114308,
-    "seen": 1791179560.8200214,
-    "ast_hash": "b61c93c771105849a276b78643362b3d",
+    "mtime": 1781174838.6410646,
+    "seen": 1787511956.8777125,
+    "ast_hash": "43ed23c4fdba5e237474d10f6b788bc6",
     "semantic_hash": ""
   },
   "docs/FIREBASE_MIGRATION.md": {
@@ -9762,9 +9762,9 @@
     "semantic_hash": ""
   },
   "android/app/src/main/res/drawable-nodpi/logo_splash.png": {
-    "mtime": 1791012206.408904,
-    "seen": 1791012540.8708832,
-    "ast_hash": "28fba83eee9127f86fc46ddb048b9986",
+    "mtime": 1790659668.910758,
+    "seen": 1790678817.3128948,
+    "ast_hash": "fa3c7c9e225e2a5f6324ba40c5e0af13",
     "semantic_hash": ""
   },
   "android/app/src/main/res/drawable-port-hdpi/splash.png": {
@@ -9804,93 +9804,93 @@
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-hdpi/ic_launcher.png": {
-    "mtime": 1791012205.5247886,
-    "seen": 1791012540.8712955,
-    "ast_hash": "84e18cf3398159457b511b56dd67c548",
+    "mtime": 1790665168.5955203,
+    "seen": 1790678817.313354,
+    "ast_hash": "c81ca48384bfe416ca406fe3065747d1",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png": {
-    "mtime": 1791012204.652877,
-    "seen": 1791012540.8712971,
-    "ast_hash": "3f742353aaa77f05fb6eac0ca80c930b",
+    "mtime": 1790665168.597525,
+    "seen": 1790678817.3133557,
+    "ast_hash": "c81ca48384bfe416ca406fe3065747d1",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png": {
-    "mtime": 1791012205.5352907,
-    "seen": 1791012540.8713007,
-    "ast_hash": "cc19627a3e3fae18acac2a7eb74fad16",
+    "mtime": 1790665168.5965247,
+    "seen": 1790678817.3133574,
+    "ast_hash": "c81ca48384bfe416ca406fe3065747d1",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-mdpi/ic_launcher.png": {
-    "mtime": 1791012205.507199,
-    "seen": 1791012540.871302,
-    "ast_hash": "34598e568400b52d4a8aadf2e691bf04",
+    "mtime": 1790665168.623481,
+    "seen": 1790678817.3133585,
+    "ast_hash": "9d4c21f1049060b948b6ad458110295f",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png": {
-    "mtime": 1791012204.5752783,
-    "seen": 1791012540.871303,
-    "ast_hash": "21df4a1c79818011596958ce02828e03",
+    "mtime": 1790665168.624517,
+    "seen": 1790678817.31336,
+    "ast_hash": "9d4c21f1049060b948b6ad458110295f",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png": {
-    "mtime": 1791012205.5132718,
-    "seen": 1791012540.8713057,
-    "ast_hash": "20a016773e0b8e91858f602aed139083",
+    "mtime": 1790665168.6240003,
+    "seen": 1790678817.3133612,
+    "ast_hash": "9d4c21f1049060b948b6ad458110295f",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png": {
-    "mtime": 1791012205.5589752,
-    "seen": 1791012540.8713074,
-    "ast_hash": "ac5d1c1c785a87a110649b32042f2bbc",
+    "mtime": 1790665168.6153858,
+    "seen": 1790678817.3133621,
+    "ast_hash": "12551f8b45190544f8e7607158a08f5d",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png": {
-    "mtime": 1791012204.7339158,
-    "seen": 1791012540.8713088,
-    "ast_hash": "d45266907d38a880a554eda13c59b709",
+    "mtime": 1790665168.6175923,
+    "seen": 1790678817.3133633,
+    "ast_hash": "12551f8b45190544f8e7607158a08f5d",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png": {
-    "mtime": 1791012205.573169,
-    "seen": 1791012540.8713117,
-    "ast_hash": "ac50085c6503cb430804f24d3ed4b603",
+    "mtime": 1790665168.616587,
+    "seen": 1790678817.3133643,
+    "ast_hash": "12551f8b45190544f8e7607158a08f5d",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png": {
-    "mtime": 1791012205.6044445,
-    "seen": 1791012540.8713129,
-    "ast_hash": "6ae6cb3a226e5004eeaa0e89244f988d",
+    "mtime": 1790665168.575421,
+    "seen": 1790678817.313366,
+    "ast_hash": "833b95105bdc72ab266f822bc9836e2c",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png": {
-    "mtime": 1791012204.9082236,
-    "seen": 1791012540.8713143,
-    "ast_hash": "c3dbb1f17bfdb20b025fe6c5be599152",
+    "mtime": 1790665168.57842,
+    "seen": 1790678817.3133674,
+    "ast_hash": "833b95105bdc72ab266f822bc9836e2c",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png": {
-    "mtime": 1791012205.629997,
-    "seen": 1791012540.8713174,
-    "ast_hash": "10d9a72b3f1b8e7114e3d326b4873123",
+    "mtime": 1790665168.5764217,
+    "seen": 1790678817.3133686,
+    "ast_hash": "833b95105bdc72ab266f822bc9836e2c",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": {
-    "mtime": 1791012205.68121,
-    "seen": 1791012540.8713186,
-    "ast_hash": "ca2d26a1c05064d805d4b57c68a6593b",
+    "mtime": 1790665168.5220864,
+    "seen": 1790678817.3133698,
+    "ast_hash": "5b3901bcd3dc182c1113f98ade516c9c",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png": {
-    "mtime": 1791012205.2177448,
-    "seen": 1791012540.8713202,
-    "ast_hash": "72f2bca67019324a2a53e47f4d78ea54",
+    "mtime": 1790665168.5532055,
+    "seen": 1790678817.3133707,
+    "ast_hash": "5b3901bcd3dc182c1113f98ade516c9c",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": {
-    "mtime": 1791012205.745531,
-    "seen": 1791012540.8713226,
-    "ast_hash": "95cb0a65ac1e2a7109374d8dea4e10c9",
+    "mtime": 1790665168.541765,
+    "seen": 1790678817.3133717,
+    "ast_hash": "5b3901bcd3dc182c1113f98ade516c9c",
     "semantic_hash": ""
   },
   "antigravity-sdk-python-main/examples/resources/example_image.png": {
@@ -9912,21 +9912,21 @@
     "semantic_hash": ""
   },
   "public/LOGO ATFAAL-192.png": {
-    "mtime": 1791012206.1694937,
-    "seen": 1791012540.8715217,
-    "ast_hash": "268b910b4d0701ed01e30f06a5eca1ce",
+    "mtime": 1781174838.6595705,
+    "seen": 1787511956.877786,
+    "ast_hash": "14e7209fdf98d8f158b28f1b0073640f",
     "semantic_hash": ""
   },
   "public/LOGO ATFAAL-512.png": {
-    "mtime": 1791012206.1324348,
-    "seen": 1791012540.8715234,
-    "ast_hash": "28fba83eee9127f86fc46ddb048b9986",
+    "mtime": 1781174838.6605704,
+    "seen": 1787511956.8777876,
+    "ast_hash": "2963b90e70357a5188e3c2a4fd9db35f",
     "semantic_hash": ""
   },
   "public/LOGO ATFAAL.png": {
-    "mtime": 1791012206.0959134,
-    "seen": 1791012540.8715248,
-    "ast_hash": "28fba83eee9127f86fc46ddb048b9986",
+    "mtime": 1781174838.6605704,
+    "seen": 1787511956.8777897,
+    "ast_hash": "6a3b6f39cd1b6ea6d9a9a875d6be548b",
     "semantic_hash": ""
   },
   "public/atfal logo splash.png": {
@@ -10188,9 +10188,9 @@
     "semantic_hash": ""
   },
   "src/components/MarhalaResultsPage.jsx": {
-    "mtime": 1791106055.9232717,
-    "seen": 1791106421.8685203,
-    "ast_hash": "09e5f8139af824e10c2d1c39afddc944",
+    "mtime": 1790523315.2079887,
+    "seen": 1790525753.265099,
+    "ast_hash": "38807f65556d93ae7d955c7ef7116258",
     "semantic_hash": ""
   },
   "src/utils/marhalaMonthly.js": {
@@ -10284,9 +10284,9 @@
     "semantic_hash": ""
   },
   "public/M tahfeez logo.png": {
-    "mtime": 1791012206.0583453,
-    "seen": 1791012540.8715265,
-    "ast_hash": "28fba83eee9127f86fc46ddb048b9986",
+    "mtime": 1790264626.286505,
+    "seen": 1790322842.3788908,
+    "ast_hash": "606c817bf0fd880aff8d70919302c38f",
     "semantic_hash": ""
   },
   "src/components/AdminTeacherAttendanceManager.jsx": {
@@ -10326,9 +10326,9 @@
     "semantic_hash": ""
   },
   "src/utils/googleSheetsSync.js": {
-    "mtime": 1791105048.1982665,
-    "seen": 1791106421.8717318,
-    "ast_hash": "26d54edc5e4764cb35c2299c24e87750",
+    "mtime": 1790600831.5259912,
+    "seen": 1790601521.318826,
+    "ast_hash": "b41b1d784f2575116e3abb57643fcf81",
     "semantic_hash": ""
   },
   "src/components/AdminTeacherRankingCard.jsx": {
@@ -10338,9 +10338,9 @@
     "semantic_hash": ""
   },
   "scripts/mauze-whatsapp-bot.js": {
-    "mtime": 1791186881.8354876,
-    "seen": 1791186973.8872995,
-    "ast_hash": "83d0114fea24fe0daa8aadfe84831a9b",
+    "mtime": 1790924861.6912684,
+    "seen": 1790925454.8460543,
+    "ast_hash": "f07f15960b80329cb84cc784c6970bf1",
     "semantic_hash": ""
   },
   "api/telegram-webhook.js": {
@@ -10374,9 +10374,9 @@
     "semantic_hash": ""
   },
   "today_leaves.json": {
-    "mtime": 1791003897.2476504,
-    "seen": 1791010796.6347382,
-    "ast_hash": "2de4ad4f0fa0cb9893d7e695d7b2aa5b",
+    "mtime": 1790938658.28793,
+    "seen": 1790968272.1301894,
+    "ast_hash": "42afb38f5111b6d30d176c735306bbfb",
     "semantic_hash": ""
   },
   "android/app/src/main/java/com/mauzetahfeez/myapp/SplashTextView.java": {
@@ -10386,39 +10386,39 @@
     "semantic_hash": ""
   },
   "linked_whatsapp_teachers.json": {
-    "mtime": 1791114537.931075,
-    "seen": 1791139071.2469614,
-    "ast_hash": "d8ad49d6de58f1d2ec9af204d42a8765",
+    "mtime": 1790925057.4866455,
+    "seen": 1790925454.8427782,
+    "ast_hash": "c3f81c141693fc0c31a2dfda78e95881",
     "semantic_hash": ""
   },
   "android/app/src/main/res/drawable-port-hdpi/logo_splash.png": {
-    "mtime": 1791012206.5207195,
-    "seen": 1791012540.8708856,
-    "ast_hash": "a22fb2108115922fb67ffb968187858e",
+    "mtime": 1790659669.176215,
+    "seen": 1790678817.312897,
+    "ast_hash": "812a6d2d960fa283f2323adc44fa442a",
     "semantic_hash": ""
   },
   "android/app/src/main/res/drawable-port-mdpi/logo_splash.png": {
-    "mtime": 1791012206.4638796,
-    "seen": 1791012540.8709538,
-    "ast_hash": "268b910b4d0701ed01e30f06a5eca1ce",
+    "mtime": 1790659668.9887779,
+    "seen": 1790678817.3129752,
+    "ast_hash": "9e0f347237aeedeeb238e09881af133c",
     "semantic_hash": ""
   },
   "android/app/src/main/res/drawable-port-xhdpi/logo_splash.png": {
-    "mtime": 1791012206.664034,
-    "seen": 1791012540.8710198,
-    "ast_hash": "8fa7598482302df509d8fe622829d882",
+    "mtime": 1790659669.5112064,
+    "seen": 1790678817.3130567,
+    "ast_hash": "92de29c238b8631bc2b4430b106fc29f",
     "semantic_hash": ""
   },
   "android/app/src/main/res/drawable-port-xxhdpi/logo_splash.png": {
-    "mtime": 1791012207.0318577,
-    "seen": 1791012540.8710933,
-    "ast_hash": "28fba83eee9127f86fc46ddb048b9986",
+    "mtime": 1790659670.1734912,
+    "seen": 1790678817.3131304,
+    "ast_hash": "0ba9e6520c23fbdded62547770ce6eff",
     "semantic_hash": ""
   },
   "android/app/src/main/res/drawable-port-xxxhdpi/logo_splash.png": {
-    "mtime": 1791012207.84978,
-    "seen": 1791012540.8711605,
-    "ast_hash": "fc444e03c568a5add7844a8bb343773c",
+    "mtime": 1790659671.3956528,
+    "seen": 1790678817.313204,
+    "ast_hash": "93208142db4c9a53a37694a7c959879c",
     "semantic_hash": ""
   },
   "public/hd-quran-book-black-icon-transparent-background-735811696865408wye2nrcih3.png": {
@@ -10434,9 +10434,9 @@
     "semantic_hash": ""
   },
   "latest_weekly_results.json": {
-    "mtime": 1791114542.1943848,
-    "seen": 1791139071.2468956,
-    "ast_hash": "38cd06e21f64111e296dd58a9a790a58",
+    "mtime": 1790957883.4836886,
+    "seen": 1790968272.1224737,
+    "ast_hash": "9358a67ce3a86e24c8e74ffc4a58bace",
     "semantic_hash": ""
   },
   "scripts/search_repo.ps1": {
@@ -11010,63 +11010,15 @@
     "semantic_hash": ""
   },
   "public/favicon.png": {
-    "mtime": 1791012206.1770046,
-    "seen": 1791012540.871983,
-    "ast_hash": "3d275b331f86f992d9838664c33b842c",
+    "mtime": 1790264626.286505,
+    "seen": 1790931687.4452765,
+    "ast_hash": "606c817bf0fd880aff8d70919302c38f",
     "semantic_hash": ""
   },
   "public/mauze-tahfeez-logo.png": {
-    "mtime": 1791012205.9777384,
-    "seen": 1791012540.8723822,
-    "ast_hash": "28fba83eee9127f86fc46ddb048b9986",
-    "semantic_hash": ""
-  },
-  "android/app/src/main/res/mipmap-hdpi/ic_launcher_monochrome.png": {
-    "mtime": 1791012204.694025,
-    "seen": 1791012540.8712988,
-    "ast_hash": "e4df0e57095e67817ddcccc05b6cbe42",
-    "semantic_hash": ""
-  },
-  "android/app/src/main/res/mipmap-mdpi/ic_launcher_monochrome.png": {
-    "mtime": 1791012204.6160173,
-    "seen": 1791012540.8713045,
-    "ast_hash": "ba7c8f26ddf4c600ff52495bd540b397",
-    "semantic_hash": ""
-  },
-  "android/app/src/main/res/mipmap-xhdpi/ic_launcher_monochrome.png": {
-    "mtime": 1791012204.8179018,
-    "seen": 1791012540.87131,
-    "ast_hash": "f86bc7177870004cefde619031c69dd9",
-    "semantic_hash": ""
-  },
-  "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_monochrome.png": {
-    "mtime": 1791012205.0633943,
-    "seen": 1791012540.871316,
-    "ast_hash": "eab29516e1d657d840fa81ca4903e670",
-    "semantic_hash": ""
-  },
-  "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_monochrome.png": {
-    "mtime": 1791012205.5022025,
-    "seen": 1791012540.8713217,
-    "ast_hash": "4beee7e1aac97f28506e68a6eac34c7e",
-    "semantic_hash": ""
-  },
-  "src/components/WhatsAppBotControlCard.jsx": {
-    "mtime": 1791138237.636522,
-    "seen": 1791139071.2532406,
-    "ast_hash": "2f5c2f93c24e6a4ee61504d5b878bb80",
-    "semantic_hash": ""
-  },
-  "railway.json": {
-    "mtime": 1791186865.5398893,
-    "seen": 1791186973.8855739,
-    "ast_hash": "d396de9481b422ac12890c9e9990814b",
-    "semantic_hash": ""
-  },
-  "src/components/AmazonBottomNav.jsx": {
-    "mtime": 1791186107.7640898,
-    "seen": 1791186973.889506,
-    "ast_hash": "04de322dd07f8728592149c14abd2dfe",
+    "mtime": 1790264626.286505,
+    "seen": 1790931687.4456425,
+    "ast_hash": "606c817bf0fd880aff8d70919302c38f",
     "semantic_hash": ""
   }
 }

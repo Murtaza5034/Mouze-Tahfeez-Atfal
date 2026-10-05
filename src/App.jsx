@@ -41,6 +41,7 @@ import {
   EyeOff,
   Sparkles,
   Trophy,
+  Award,
   Trash,
   X,
   User,
@@ -12510,12 +12511,6 @@ function ParentPortal({
             className="parent-topbar-left"
             style={{ display: "flex", alignItems: "center", gap: "12px" }}
           >
-            <button
-              className="topbar-menu-btn"
-              onClick={() => setMenuOpen(true)}
-            >
-              <Menu size={22} />
-            </button>
             {(() => {
               const sKey = studentProfile?.student_id || studentProfile?.id || studentProfile?.its || "";
               const localPhoto = typeof localStorage !== "undefined" && sKey
@@ -16282,7 +16277,19 @@ function ParentPortal({
 
       {/* Amazon-style Bottom Navigation for Parent Portal (locked to bottom, 0 footer space) */}
       <AmazonBottomNav
-        items={bottomPages.map(({ key, label, icon }) => ({ id: key, label, icon }))}
+        items={[
+          {
+            id: "Menu",
+            label: "Menu",
+            icon: Menu,
+            isAction: true,
+            onClick: () => setMenuOpen(true),
+          },
+          { id: "Home", label: "Home", icon: Home },
+          { id: "Child Summary", label: "Progress", icon: Award },
+          { id: "Schedule", label: "Schedule", icon: Calendar },
+          { id: "Teachers", label: "Teachers", icon: Users },
+        ]}
         activeId={activePage}
         onSelect={(key) => {
           setActivePage(key);

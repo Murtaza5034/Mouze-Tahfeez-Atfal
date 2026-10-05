@@ -3,15 +3,16 @@ import React, { useMemo } from "react";
 /**
  * AmazonBottomNav - Premium Amazon-style bottom navigation bar
  * Locked to bottom edge with zero footer gap, featuring a smooth
- * sliding active pill with backdrop blur and responsive micro-animations.
+ * sliding active pill with backdrop blur, 3D icon elevation,
+ * and responsive micro-animations.
  */
 export default function AmazonBottomNav({ items = [], activeId, onSelect }) {
   const activeIndex = useMemo(() => {
-    return items.findIndex((item) => item.id === activeId);
+    return items.findIndex((item) => !item.isAction && item.id === activeId);
   }, [items, activeId]);
 
   const hasActive = activeIndex >= 0;
-  const tabWidthPct = items.length > 0 ? 100 / items.length : 20;
+  const tabWidthPct = items.length > 0 ? 100 / items.length : 16.66;
 
   return (
     <nav className="amazon-bottom-nav" aria-label="Portal Bottom Navigation">
@@ -32,21 +33,27 @@ export default function AmazonBottomNav({ items = [], activeId, onSelect }) {
 
         {/* Tab Buttons */}
         {items.map((item, idx) => {
-          const isActive = item.id === activeId;
+          const isActive = !item.isAction && item.id === activeId;
           const Icon = item.icon;
           return (
             <button
               key={item.id}
               type="button"
-              className={`amazon-nav-tab ${isActive ? "active" : ""}`}
-              onClick={() => onSelect(item.id)}
+              className={`amazon-nav-tab ${isActive ? "active" : ""} ${item.isAction ? "action-tab" : ""}`}
+              onClick={() => {
+                if (typeof item.onClick === "function") {
+                  item.onClick();
+                } else if (onSelect) {
+                  onSelect(item.id);
+                }
+              }}
               aria-selected={isActive}
               role="tab"
               title={item.label}
               data-nav-idx={idx}
             >
               <div className="amazon-nav-tab-icon">
-                {Icon && <Icon size={22} strokeWidth={isActive ? 2.3 : 1.8} />}
+                {Icon && <Icon size={20} strokeWidth={isActive ? 2.4 : 2} />}
               </div>
               <span className="amazon-nav-tab-label">{item.label}</span>
             </button>
