@@ -1,17 +1,9 @@
 # ============================================
 # Mauze Tahfeez WhatsApp 24/7 Bot Daemon
 # ============================================
-FROM node:20-bullseye-slim
+FROM node:20-slim
 
 WORKDIR /app
-
-# Install fonts and SSL certificates required for canvas / SVG rendering
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    fonts-liberation \
-    fontconfig \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency specifications
 COPY package*.json ./
@@ -23,6 +15,7 @@ RUN npm ci --legacy-peer-deps --omit=dev
 COPY . .
 
 # Expose default port
+ENV PORT=2785
 EXPOSE 2785
 
 # Start WhatsApp Multi-Device bot daemon
