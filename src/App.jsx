@@ -156,6 +156,7 @@ import MarhalaMonthlyPage from "./components/MarhalaMonthlyPage";
 import IkhtebarMushaf from "./components/IkhtebarMushaf";
 import QuranDirectAccessCard from "./components/QuranDirectAccessCard";
 import WhatsAppBotControlCard from "./components/WhatsAppBotControlCard";
+import AmazonBottomNav from "./components/AmazonBottomNav";
 import {
   calculateMarhalaRanks,
   getMarhalaRankForStudent,
@@ -16279,20 +16280,15 @@ function ParentPortal({
         )}
       </main>
 
-      {bottomPages.some((p) => p.key === activePage) && (
-        <nav className="parent-bottom-nav">
-          {bottomPages.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              className={`bottom-nav-btn ${activePage === key ? "active" : ""}`}
-              onClick={() => setActivePage(key)}
-            >
-              <Icon size={22} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
-      )}
+      {/* Amazon-style Bottom Navigation for Parent Portal (locked to bottom, 0 footer space) */}
+      <AmazonBottomNav
+        items={bottomPages.map(({ key, label, icon }) => ({ id: key, label, icon }))}
+        activeId={activePage}
+        onSelect={(key) => {
+          setActivePage(key);
+          setMenuOpen(false);
+        }}
+      />
       {activeCall && (
         <VideoCall
           call={{ ...activeCall, isTeacher: false }}
@@ -44966,6 +44962,22 @@ function TeacherPortal({
           isKibar={isKibarTeacher}
         />
       )}
+
+      {/* Amazon-style Bottom Navigation for Teacher Portal (locked to bottom, 0 footer space) */}
+      <AmazonBottomNav
+        items={[
+          { id: "Profile", label: "My Profile", icon: UserCheck },
+          { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
+          { id: "BadalEntry", label: "Badal Entry", icon: FileText },
+          { id: "Badal", label: "Badal Updates", icon: RotateCw },
+          { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
+        ]}
+        activeId={activePage}
+        onSelect={(pageId) => {
+          setActivePage(pageId);
+          setMenuOpen(false);
+        }}
+      />
     </div>
   );
 }
