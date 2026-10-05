@@ -5057,7 +5057,8 @@ if (process.argv[1] && process.argv[1].endsWith('mauze-whatsapp-bot.js')) {
     res.end(JSON.stringify({ error: 'Endpoint not found' }));
   });
 
-  server.listen(BOT_CONFIG.PORT, () => {
+  const listenPort = Number(process.env.PORT) || Number(BOT_CONFIG.PORT) || 2785;
+  server.listen(listenPort, '0.0.0.0', () => {
     console.log(`\n======================================================`);
     console.log(`📱 Mauze Tahfeez WhatsApp Bot Engine Online`);
     console.log(`📞 Helpline Number : ${BOT_CONFIG.HELPLINE_NUMBER}`);
