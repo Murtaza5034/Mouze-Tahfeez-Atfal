@@ -1,9 +1,16 @@
 # ============================================
 # Mauze Tahfeez WhatsApp 24/7 Bot Daemon
 # ============================================
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
+
+# Install essential system libraries for native modules and font rendering
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    fontconfig \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency specifications
 COPY package*.json ./

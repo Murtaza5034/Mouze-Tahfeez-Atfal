@@ -23,11 +23,45 @@ import makeWASocket, {
   Browsers,
   makeCacheableSignalKeyStore
 } from '@whiskeysockets/baileys';
-import pino from 'pino';
 import QRCode from 'qrcode';
-import { Resvg } from '@resvg/resvg-js';
 import { initializeApp as initAdminApp, getApps as getAdminApps, cert } from 'firebase-admin/app';
 import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+
+// Resilient dynamic imports for native / optional modules
+let pino = null;
+try {
+  const pinoMod = await import('pino');
+  pino = pinoMod.default || pinoMod;
+} catch (e) {
+  console.warn('[PINO-FALLBACK] Pino module unavailable, activating built-in silent logger.');
+}
+
+let Resvg = null;
+try {
+  const resvgMod = await import('@resvg/resvg-js');
+  Resvg = resvgMod.Resvg || resvgMod.default?.Resvg;
+} catch (e) {
+  console.warn('[RESVG-FALLBACK] Resvg unavailable, fallback SVG rendering active:', e.message);
+}
+
+export function createSilentLogger() {
+  if (typeof pino === 'function') {
+    try {
+      return pino({ level: 'silent' });
+    } catch (_) {}
+  }
+  const dummy = {
+    level: 'silent',
+    trace: () => {},
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    fatal: () => {},
+    child: function() { return this; }
+  };
+  return dummy;
+}
 
 // Global process error handlers to prevent silent crashes
 process.on('uncaughtException', (err) => {
@@ -1923,19 +1957,28 @@ export function generateResultSvg(data) {
  * Converts SVG markup to crisp PNG buffer via Resvg with embedded Arabic and English fonts.
  */
 export function svgToPngBuffer(svgString) {
-  const fontFiles = getFontFiles();
-  const opts = {
-    fitTo: { mode: 'width', value: 1080 }
-  };
-  if (fontFiles.length > 0) {
-    opts.font = {
-      loadSystemFonts: false,
-      fontFiles: fontFiles,
-      defaultFontFamily: 'Arial'
-    };
+  if (!Resvg) {
+    console.warn('[RESVG-NOTICE] Resvg renderer not loaded, returning raw SVG buffer.');
+    return Buffer.from(svgString, 'utf-8');
   }
-  const resvg = new Resvg(svgString, opts);
-  return resvg.render().asPng();
+  try {
+    const fontFiles = getFontFiles();
+    const opts = {
+      fitTo: { mode: 'width', value: 1080 }
+    };
+    if (fontFiles.length > 0) {
+      opts.font = {
+        loadSystemFonts: false,
+        fontFiles: fontFiles,
+        defaultFontFamily: 'Arial'
+      };
+    }
+    const resvg = new Resvg(svgString, opts);
+    return resvg.render().asPng();
+  } catch (err) {
+    console.warn('[RESVG-RENDER-ERR] Error rendering PNG with Resvg:', err.message);
+    return Buffer.from(svgString, 'utf-8');
+  }
 }
 
 /**
@@ -1991,11 +2034,11 @@ export async function initBaileysSocket() {
 
   sock = makeWASocket({
     version,
-    logger: pino({ level: 'silent' }),
+    logger: createSilentLogger(),
     printQRInTerminal: true,
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+      keys: makeCacheableSignalKeyStore(state.keys, createSilentLogger())
     },
     browser: Browsers.macOS('Desktop'),
     syncFullHistory: false,
@@ -3874,7 +3917,7 @@ export function initFirestoreRealtimeListeners() {
 // ---------------------------------------------------------------------------
 // Standalone HTTP Server & Bot Engine
 // ---------------------------------------------------------------------------
-if (process.argv[1] && process.argv[1].endsWith('mauze-whatsapp-bot.js')) {
+export function startWhatsAppBotEngine() {
   // Start Baileys Multi-Device WhatsApp Socket
   initBaileysSocket().catch((err) => {
     console.error('[BAILEYS-ERROR] Failed to init socket:', err);
@@ -5057,14 +5100,14 @@ if (process.argv[1] && process.argv[1].endsWith('mauze-whatsapp-bot.js')) {
     res.end(JSON.stringify({ error: 'Endpoint not found' }));
   });
 
-  const listenPort = Number(process.env.PORT) || Number(BOT_CONFIG.PORT) || 2785;
-  server.listen(listenPort, '0.0.0.0', () => {
+  const primaryPort = Number(process.env.PORT) || Number(BOT_CONFIG.PORT) || 2785;
+  server.listen(primaryPort, '0.0.0.0', () => {
     console.log(`\n======================================================`);
     console.log(`📱 Mauze Tahfeez WhatsApp Bot Engine Online`);
     console.log(`📞 Helpline Number : ${BOT_CONFIG.HELPLINE_NUMBER}`);
     console.log(`⚡ Session ID      : ${BOT_CONFIG.OPENWA_SESSION_ID}`);
-    console.log(`🚀 Gateway Port    : ${BOT_CONFIG.PORT}`);
-    console.log(`🌐 Live Dashboard  : http://localhost:${BOT_CONFIG.PORT}`);
+    console.log(`🚀 Gateway Port    : ${primaryPort}`);
+    console.log(`🌐 Live Dashboard  : http://0.0.0.0:${primaryPort}`);
     console.log(`======================================================\n`);
 
     // Schedule periodic Fatemi month-end fee reminder check (every 12 hours)
@@ -5084,4 +5127,21 @@ if (process.argv[1] && process.argv[1].endsWith('mauze-whatsapp-bot.js')) {
     }, 30 * 1000);
     console.log(`[WHATSAPP BOT] ⏱ Monday-Saturday Teacher Scheduler Active (4:25 PM Self-Attendance & 10:00 PM eLearning/Attendance Summary).`);
   });
+
+  // Dual-port safety: if primaryPort != 2785, also listen on 2785 so Railway custom networking works seamlessly
+  if (primaryPort !== 2785) {
+    try {
+      const dualServer = http.createServer((req, res) => server.emit('request', req, res));
+      dualServer.listen(2785, '0.0.0.0', () => {
+        console.log(`[WHATSAPP BOT] 🌐 Dual-port listening also active on port 2785.`);
+      });
+      dualServer.on('error', (err) => {
+        console.log('[WHATSAPP BOT] Dual-port 2785 notice:', err.message);
+      });
+    } catch (_) {}
+  }
 }
+
+// Automatically start engine
+startWhatsAppBotEngine();
+
