@@ -3031,7 +3031,7 @@ tajweed.sl { color: #bbbbbb !important; } /* Silent letters */
 
 /* ---- Base text overrides for readability ---- */
 [data-theme="classic-pro"] p,
-[data-theme="classic-pro"] span,
+[data-theme="classic-pro"] span:not(button *):not([class*="btn"] *):not([class*="badge"]):not([class*="badge"] *):not([class*="tag"]):not([class*="tag"] *):not([class*="pill"]):not([class*="pill"] *):not([class*="chip"]):not([class*="chip"] *),
 [data-theme="classic-pro"] label,
 [data-theme="classic-pro"] li,
 [data-theme="classic-pro"] td,

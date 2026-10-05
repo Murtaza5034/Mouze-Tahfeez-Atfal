@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1791186329.6454391,
-    "seen": 1791186973.888312,
-    "ast_hash": "3522ae9139183889b7bec9649d07a043",
+    "mtime": 1791188679.5015914,
+    "seen": 1791196306.8296318,
+    "ast_hash": "d3de0ce0c3e7645256f0ca9bc48ad405",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {

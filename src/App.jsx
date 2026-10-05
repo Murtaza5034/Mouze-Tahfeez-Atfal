@@ -37813,12 +37813,6 @@ function TeacherPortal({
               className="admin-header-left"
               style={{ display: "flex", alignItems: "center", gap: "12px" }}
             >
-              <button
-                className="topbar-menu-btn"
-                onClick={() => setMenuOpen(!menuOpen)}
-              >
-                {menuOpen ? <X size={22} /> : <Menu size={22} />}
-              </button>
               {(() => {
                 const matchedTeacher = teacherProfiles.find(
                   (p) =>
@@ -44973,11 +44967,18 @@ function TeacherPortal({
       {/* Amazon-style Bottom Navigation for Teacher Portal (locked to bottom, 0 footer space) */}
       <AmazonBottomNav
         items={[
+          {
+            id: "Menu",
+            label: "Menu",
+            icon: Menu,
+            isAction: true,
+            onClick: () => setMenuOpen(true),
+          },
+          { id: "Home", label: "Home", icon: Home },
           { id: "Profile", label: "My Profile", icon: UserCheck },
-          { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
-          { id: "BadalEntry", label: "Badal Entry", icon: FileText },
-          { id: "Badal", label: "Badal Updates", icon: RotateCw },
-          { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
+          { id: "Fill Result", label: "Mark Progress", icon: Award },
+          { id: "Self Jadwal", label: "Self Jadwal", icon: Clock },
+          { id: "My Group", label: "Students", icon: Users },
         ]}
         activeId={activePage}
         onSelect={(pageId) => {
