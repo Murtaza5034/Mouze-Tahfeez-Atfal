@@ -40,6 +40,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  MousePointerClick,
   Trophy,
   Award,
   Trash,
@@ -51,6 +52,7 @@ import {
   MessageCircle,
   ArrowLeft,
   ArrowRight,
+  ArrowLeftRight,
   ArrowUp,
   ArrowDown,
   CheckCircle,
@@ -146,6 +148,7 @@ import AdminTeacherAttendanceManager from "./components/AdminTeacherAttendanceMa
 import AdminTeacherAttendanceSettings from "./components/AdminTeacherAttendanceSettings";
 import AdminTeacherRankingGraphCard from "./components/AdminTeacherRankingCard";
 import SearchableSelect from "./SearchableSelect";
+import PremiumDatePicker from "./components/PremiumDatePicker";
 import { getDeviceInfo } from "./utils/deviceUtils";
 import { useMobileBackNavigation } from "./hooks/useMobileBackNavigation";
 import OverviewCard, {
@@ -165,7 +168,10 @@ import {
   getJadeedTrendForStudent,
   getExactMarhalaRankForStudent,
 } from "./utils/marhalaRanking";
-import { syncStudentResultToGoogleSheets } from "./utils/googleSheetsSync";
+import {
+  syncStudentResultToGoogleSheets,
+  queueStudentResultSyncToGoogleSheets,
+} from "./utils/googleSheetsSync";
 import "./style.css";
 import "./salary.css";
 import "./teacher-profiles.css";
@@ -1301,8 +1307,8 @@ function SidebarHeader({ photoUrl, name, arabicName, tag }) {
             borderRadius: "50%",
             alignItems: "center",
             justifyContent: "center",
-            background: "linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05))",
-            color: "var(--primary-gold, #c5a059)",
+            background: "linear-gradient(135deg, rgba(212, 175, 55, 0.25), rgba(212, 175, 55, 0.08))",
+            color: "#e5c158",
           }}
         >
           <User size={38} />
@@ -1310,7 +1316,11 @@ function SidebarHeader({ photoUrl, name, arabicName, tag }) {
         <div className="avatar-ring"></div>
       </div>
       <div className="profile-info-centered">
-        <p className="profile-tag-premium">{tag}</p>
+        {tag && (
+          <div className="profile-tag-container">
+            <span className="profile-tag-premium">{tag}</span>
+          </div>
+        )}
         <h2 className="profile-name-premium">{name}</h2>
         {arabicName && (
           <h3 className="profile-arabic-premium arabic-kanz">
@@ -1519,13 +1529,18 @@ const DEAD_PHOTO_HOSTS = ["xmlmfijikkptvwbkkoil.supabase.co"];
 function cleanPhotoUrl(url) {
   if (!url) return "";
   try {
-    if (typeof url === "string" && (url.startsWith("data:") || url.startsWith("blob:"))) return url;
-    const host = new URL(url).hostname;
+    if (typeof url !== "string") return "";
+    const trimmed = url.trim();
+    if (!trimmed || trimmed === "null" || trimmed === "undefined" || trimmed === "/logo.png") return "";
+    if (trimmed.startsWith("data:") || trimmed.startsWith("blob:") || trimmed.startsWith("/")) {
+      return trimmed;
+    }
+    const host = new URL(trimmed, typeof window !== "undefined" ? window.location.origin : "http://localhost").hostname;
     if (DEAD_PHOTO_HOSTS.includes(host)) return "";
+    return trimmed;
   } catch (_) {
-    return "";
+    return url;
   }
-  return url;
 }
 
 async function downloadFile(...args) {
@@ -16291,6 +16306,7 @@ function ParentPortal({
           { id: "Teachers", label: "Teachers", icon: Users },
         ]}
         activeId={activePage}
+        isHidden={menuOpen}
         onSelect={(key) => {
           setActivePage(key);
           setMenuOpen(false);
@@ -23610,6 +23626,8 @@ function AdminPortal({
                   <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
                   <AtfalLeagueAdminInfographic
                     students={students}
+                    teacherProfiles={teacherProfiles}
+                    portalAccessList={portalAccessList}
                     showRoster={false}
                     onNavigateToTracking={() => {
                       setActivePage("Hifz League Tracking");
@@ -23628,6 +23646,8 @@ function AdminPortal({
               <AtfalLeagueTop3Card isAdmin={true} showDownload={true} />
               <AtfalLeagueAdminInfographic
                 students={students}
+                teacherProfiles={teacherProfiles}
+                portalAccessList={portalAccessList}
                 showRoster={true}
               />
             </div>
@@ -35620,6 +35640,27 @@ function TeacherPortal({
     setActionStatus(actionKey, "info", `Navigated to ${label}`);
   };
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleOutsideClose = (e) => {
+      const sidebar = document.querySelector(".admin-sidebar");
+      if (sidebar && !sidebar.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const timer = setTimeout(() => {
+      window.addEventListener("click", handleOutsideClose);
+      window.addEventListener("touchstart", handleOutsideClose, {
+        passive: true,
+      });
+    }, 50);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("click", handleOutsideClose);
+      window.removeEventListener("touchstart", handleOutsideClose);
+    };
+  }, [menuOpen, setMenuOpen]);
+
   const badalOverviewStudents = useMemo(() => {
     /* Also directly check child_profiles.badal_teacher_id for the new approach */
     const rawId = user?.id || teacherIdentity;
@@ -37669,58 +37710,154 @@ function TeacherPortal({
       <style>{PREMIUM_NOTIFICATION_CSS}</style>
       {menuOpen && (
         <div
-          className="sidebar-overlay"
+          className="sidebar-overlay visible"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(44, 24, 16, 0.45)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            zIndex: 1999,
+            pointerEvents: "auto",
+            cursor: "pointer",
+            display: "block",
+          }}
           onClick={() => setMenuOpen(false)}
+          onTouchStart={() => setMenuOpen(false)}
+          onPointerDown={() => setMenuOpen(false)}
         ></div>
       )}
-      <aside className={`admin-sidebar ${!menuOpen ? "collapsed" : ""}`}>
-        <div className="sidebar-header">
-          <SidebarHeader
-            photoUrl={
-              teacherProfiles.find(
-                (p) =>
-                  normalizeText(p.full_name) === normalizeText(teacherIdentity),
-              )?.photo_url ||
-              portalAccess?.photo_url ||
-              user?.user_metadata?.avatar_url ||
-              user?.user_metadata?.photo_url
-            }
-            name={
+      <aside
+        className={`admin-sidebar its-teacher-sidebar ${!menuOpen ? "collapsed" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ITS Style Header */}
+        <div className="its-sidebar-header">
+          {(() => {
+            const profilesList = Array.isArray(teacherProfiles) ? teacherProfiles : [];
+            const matchedTeacher = profilesList.find(
+              (p) =>
+                (teacherIdentity && normalizeText(p.full_name) === normalizeText(teacherIdentity)) ||
+                (user?.id && (String(p.user_id) === String(user.id) || String(p.id) === String(user.id))) ||
+                (user?.email && p.email && p.email.toLowerCase() === user.email.toLowerCase()),
+            );
+            const teacherName =
               portalAccess?.full_name ||
               user?.user_metadata?.full_name ||
+              matchedTeacher?.full_name ||
               user?.email?.split("@")[0] ||
-              "Teacher"
-            }
-            arabicName={portalAccess?.arabic_name}
-            tag={
-              isKibarTeacher
-                ? "Tahfeez al Kibar — Teacher Portal"
-                : "Teacher Portal"
-            }
-          />
-          <button
-            className="sidebar-close-btn"
-            onClick={() => setMenuOpen(false)}
-          >
-            <X size={20} />
-          </button>
+              teacherIdentity ||
+              "Teacher";
+            const rawIts =
+              portalAccess?.its ||
+              portalAccess?.its_id ||
+              portalAccess?.its_no ||
+              portalAccess?.its_number ||
+              (portalAccess?.user_id && /^\d{6,9}$/.test(String(portalAccess.user_id).trim()) ? portalAccess.user_id : "") ||
+              user?.user_metadata?.its ||
+              user?.user_metadata?.its_id ||
+              matchedTeacher?.its ||
+              matchedTeacher?.its_id ||
+              matchedTeacher?.its_no ||
+              matchedTeacher?.its_number ||
+              (matchedTeacher?.user_id && /^\d{6,9}$/.test(String(matchedTeacher.user_id).trim()) ? matchedTeacher.user_id : "") ||
+              (matchedTeacher?.id && /^\d{6,9}$/.test(String(matchedTeacher.id).trim()) ? matchedTeacher.id : "") ||
+              (teacherIdentity ? teacherIdentity.match(/\d{6,8}/)?.[0] : "") ||
+              (typeof localStorage !== "undefined"
+                ? localStorage.getItem("mauze_teacher_its") ||
+                  localStorage.getItem("mauze_user_its") ||
+                  localStorage.getItem("portal_its") ||
+                  localStorage.getItem("its") ||
+                  ""
+                : "");
+
+            const isMurtaza =
+              normalizeText(teacherName).includes("murtaza") ||
+              normalizeText(teacherIdentity || "").includes("murtaza") ||
+              (user?.email && user.email.toLowerCase().includes("murtaza"));
+
+            const teacherIts =
+              (rawIts && /^\d{6,9}$/.test(String(rawIts).trim()))
+                ? String(rawIts).trim()
+                : (isMurtaza ? "50432737" : (rawIts || "50432737"));
+
+            const tId =
+              user?.id ||
+              matchedTeacher?.user_id ||
+              matchedTeacher?.id ||
+              matchedTeacher?.its ||
+              teacherIts ||
+              "";
+            const cachedPhoto =
+              typeof localStorage !== "undefined"
+                ? localStorage.getItem(`mauze_teacher_photo_${tId}`) ||
+                  localStorage.getItem(`mauze_photo_${tId}`) ||
+                  localStorage.getItem("mauze_my_teacher_photo") ||
+                  ""
+                : "";
+            const rawPhoto =
+              matchedTeacher?.photo_url ||
+              matchedTeacher?.avatar_url ||
+              portalAccess?.photo_url ||
+              portalAccess?.avatar_url ||
+              user?.user_metadata?.avatar_url ||
+              user?.user_metadata?.photo_url ||
+              cachedPhoto ||
+              "";
+            const photoUrl = cleanPhotoUrl(rawPhoto);
+
+            return (
+              <>
+                <div className="its-sidebar-user-details">
+                  <h2 className="its-sidebar-name">{teacherName}</h2>
+                  <p className="its-sidebar-its">
+                    ITS: {teacherIts || "50432737"}
+                  </p>
+                </div>
+                <div className="its-sidebar-avatar-squircle">
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt="Profile"
+                      className="its-sidebar-avatar-img"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        const fb = e.currentTarget.parentElement?.querySelector(
+                          ".its-sidebar-avatar-fallback",
+                        );
+                        if (fb) fb.style.display = "flex";
+                      }}
+                    />
+                  ) : (
+                    <div className="its-sidebar-avatar-fallback">
+                      <User size={36} />
+                    </div>
+                  )}
+                  {photoUrl ? (
+                    <div
+                      className="its-sidebar-avatar-fallback"
+                      style={{ display: "none" }}
+                    >
+                      <User size={36} />
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            );
+          })()}
         </div>
-        <nav className="sidebar-nav">
-          <p className="sidebar-category management-cat">Workplace</p>
+
+        {/* ITS Style Navigation */}
+        <nav className="its-sidebar-nav">
           {[
-            { id: "Home", label: "Home", icon: Sparkles },
+            { id: "BadalEntry", label: "Badal Entry", icon: ArrowLeftRight },
             { id: "Quran Ikhtebar", label: "Quran", icon: BookOpen },
-            { id: "Profile", label: "My Profile", icon: UserCheck },
-            { id: "My Group", label: "Students", icon: Users },
-            { id: "Fill Result", label: "Mark Progress", icon: Sparkles },
             ...(!isKibarTeacher
               ? [{ id: "Hifz League", label: "Hifz League", icon: Trophy }]
               : []),
             { id: "Overview", label: "Performance", icon: Layers3 },
             { id: "Jadwal", label: "Jadwal", icon: Calendar },
-            { id: "Self Jadwal", label: "Self Jadwal", icon: Crown },
             { id: "Inbox", label: "Inbox", icon: Bell },
-            { id: "BadalEntry", label: "Badal Entry", icon: FileText },
             { id: "Badal", label: "Badal Update", icon: RotateCw },
             {
               id: "Attendance History",
@@ -37750,7 +37887,9 @@ function TeacherPortal({
               </button>
             ))}
         </nav>
-        <div className="sidebar-footer">
+
+        {/* ITS Style Footer */}
+        <div className="its-sidebar-footer">
           {(() => {
             const isKibar = portalRole === "kibar-teacher" || isKibarTeacher;
             const fromMetadata = getAssignedRoles(user).filter(
@@ -37793,15 +37932,15 @@ function TeacherPortal({
             return roles.map((role) => (
               <button
                 key={role}
-                className="sidebar-link"
+                className="its-switch-role-btn"
                 onClick={() => onRoleChange(role)}
               >
                 <LogOut size={18} /> Switch to {ROLE_LABELS[role] || role}
               </button>
             ));
           })()}
-          <button className="sidebar-link logout-btn" onClick={onLogout}>
-            <LogOut size={18} /> Logout
+          <button className="its-logout-btn" onClick={onLogout}>
+            <Power size={18} /> Logout
           </button>
         </div>
       </aside>
@@ -39036,7 +39175,10 @@ function TeacherPortal({
               <div className="premium-quick-panel card-appear">
                 <div className="quick-panel-header">
                   <div className="quick-panel-header-left">
-                    <Sparkles size={22} className="sparkle-icon" />
+                    <MousePointerClick
+                      size={22}
+                      className="sparkle-icon quick-click-icon"
+                    />
                     <h3>Quick Actions Panel</h3>
                   </div>
                   <div className="quick-panel-header-right">
@@ -39169,36 +39311,36 @@ function TeacherPortal({
                           className="quick-action-btn"
                           onClick={() =>
                             handleNavigateTo(
-                              "Self Jadwal",
-                              "selfJadwal",
-                              "Self Jadwal",
+                              "My Group",
+                              "students",
+                              "Students",
                             )
                           }
                         >
-                          <Crown size={20} />
-                          <span className="q-btn-label">Self Jadwal</span>
+                          <Users size={20} />
+                          <span className="q-btn-label">Students</span>
                           <ArrowRight size={16} className="q-btn-arrow" />
                         </button>
                       </div>
                       <div className="quick-panel-status-col">
-                        {quickActionStatuses["selfJadwal"] ? (
+                        {quickActionStatuses["students"] ? (
                           <div
-                            className={`q-status ${quickActionStatuses["selfJadwal"].type}`}
+                            className={`q-status ${quickActionStatuses["students"].type}`}
                           >
-                            {quickActionStatuses["selfJadwal"].type ===
+                            {quickActionStatuses["students"].type ===
                             "success" ? (
                               <CheckCircle size={16} />
-                            ) : quickActionStatuses["selfJadwal"].type ===
+                            ) : quickActionStatuses["students"].type ===
                               "error" ? (
                               <XCircle size={16} />
                             ) : (
                               <AlertCircle size={16} />
                             )}
                             <span className="q-status-msg">
-                              {quickActionStatuses["selfJadwal"].message}
+                              {quickActionStatuses["students"].message}
                             </span>
                             <span className="q-status-time">
-                              {quickActionStatuses["selfJadwal"].time}
+                              {quickActionStatuses["students"].time}
                             </span>
                           </div>
                         ) : (
@@ -39216,36 +39358,36 @@ function TeacherPortal({
                           className="quick-action-btn"
                           onClick={() =>
                             handleNavigateTo(
-                              "Fill Result",
-                              "markProgress",
-                              "Mark Progress",
+                              "Badal",
+                              "badalUpdate",
+                              "Badal Update",
                             )
                           }
                         >
-                          <Sparkles size={20} />
-                          <span className="q-btn-label">Mark Progress</span>
+                          <RotateCw size={20} />
+                          <span className="q-btn-label">Badal Update</span>
                           <ArrowRight size={16} className="q-btn-arrow" />
                         </button>
                       </div>
                       <div className="quick-panel-status-col">
-                        {quickActionStatuses["markProgress"] ? (
+                        {quickActionStatuses["badalUpdate"] ? (
                           <div
-                            className={`q-status ${quickActionStatuses["markProgress"].type}`}
+                            className={`q-status ${quickActionStatuses["badalUpdate"].type}`}
                           >
-                            {quickActionStatuses["markProgress"].type ===
+                            {quickActionStatuses["badalUpdate"].type ===
                             "success" ? (
                               <CheckCircle size={16} />
-                            ) : quickActionStatuses["markProgress"].type ===
+                            ) : quickActionStatuses["badalUpdate"].type ===
                               "error" ? (
                               <XCircle size={16} />
                             ) : (
                               <AlertCircle size={16} />
                             )}
                             <span className="q-status-msg">
-                              {quickActionStatuses["markProgress"].message}
+                              {quickActionStatuses["badalUpdate"].message}
                             </span>
                             <span className="q-status-time">
-                              {quickActionStatuses["markProgress"].time}
+                              {quickActionStatuses["badalUpdate"].time}
                             </span>
                           </div>
                         ) : (
@@ -43066,12 +43208,7 @@ function TeacherPortal({
                           size={24}
                           style={{ color: "var(--primary-gold)" }}
                         />
-                        <h3>
-                          Attendance History
-                          <span className="att-history-premium-badge">
-                            PREMIUM
-                          </span>
-                        </h3>
+                        <h3>Attendance History</h3>
                       </div>
                     </div>
 
@@ -43111,16 +43248,14 @@ function TeacherPortal({
                           />
                           Select Date
                         </label>
-                        <input
-                          type="date"
-                          className="premium-input"
-                          style={{ width: "100%", boxSizing: "border-box" }}
+                        <PremiumDatePicker
                           value={histDate}
-                          max={new Date().toISOString().slice(0, 10)}
-                          onChange={(e) => {
-                            setHistDate(e.target.value);
+                          onChange={(newDate) => {
+                            setHistDate(newDate);
                             setHistStatus(null);
                           }}
+                          maxDate={new Date().toISOString().slice(0, 10)}
+                          placeholder="Select attendance date..."
                         />
                       </div>
                     </div>
@@ -43202,7 +43337,13 @@ function TeacherPortal({
                         },
                         {
                           status: "holiday",
-                          icon: "☾",
+                          icon: (
+                            <img
+                              src="/holiday-sign.png"
+                              alt="Holiday"
+                              className="att-holiday-action-icon"
+                            />
+                          ),
                           label: "Holiday",
                           activeClass: "active-holiday",
                         },
@@ -43344,7 +43485,15 @@ function TeacherPortal({
                                         <div
                                           className={`att-day-status-chip ${statusClass}`}
                                         >
-                                          {iconChar}
+                                          {day.status === "holiday" ? (
+                                            <img
+                                              src="/holiday-sign.png"
+                                              alt="Holiday"
+                                              className="att-holiday-img"
+                                            />
+                                          ) : (
+                                            iconChar
+                                          )}
                                         </div>
                                       </button>
                                     );
@@ -44978,9 +45127,10 @@ function TeacherPortal({
           { id: "Profile", label: "My Profile", icon: UserCheck },
           { id: "Fill Result", label: "Mark Progress", icon: Award },
           { id: "Self Jadwal", label: "Self Jadwal", icon: Clock },
-          { id: "My Group", label: "Students", icon: Users },
+          { id: "BadalEntry", label: "Badal Entry", icon: ArrowLeftRight },
         ]}
         activeId={activePage}
+        isHidden={menuOpen}
         onSelect={(pageId) => {
           setActivePage(pageId);
           setMenuOpen(false);
@@ -49687,6 +49837,42 @@ export default function App() {
         result: nextResult,
       };
     });
+
+    // Schedule debounced database auto-save
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (performAutoSaveRef.current) {
+        performAutoSaveRef.current();
+      }
+    }, 1200);
+
+    // Instant real-time background sync to Google Sheets (debounced per student)
+    const targetStudentId = teacherForms?.result?.student_id;
+    if (targetStudentId) {
+      const isKibarTeacher =
+        portalRole === "kibar-teacher" ||
+        portalRole === "kibar_teacher" ||
+        getSectionScope() === "kibar";
+      const targetStudent = (schoolData?.students || []).find(
+        (s) =>
+          String(s.student_id) === String(targetStudentId) ||
+          String(s.id) === String(targetStudentId) ||
+          (s.allIds && s.allIds.includes(String(targetStudentId))),
+      );
+      if (targetStudent) {
+        queueStudentResultSyncToGoogleSheets({
+          student: targetStudent,
+          result: { ...teacherForms.result, [name]: cleanValue },
+          isKibar: isKibarTeacher,
+          marhalaRank: targetStudent.marhalaRank || "",
+          overallRank: targetStudent.computedRank || targetStudent.latestResult?.computedRank || "",
+          reportSettings: schoolData?.reportSettings || reportSettings,
+          delayMs: 600,
+        });
+      }
+    }
   };
 
   const handleNotificationFileChange = async (e) => {

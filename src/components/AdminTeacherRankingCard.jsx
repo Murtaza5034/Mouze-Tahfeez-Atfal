@@ -260,7 +260,40 @@ export function useTeacherAttendanceRanking({
 
   // 4. Extract all unique Atfal teachers
   const allAtfalTeachers = useMemo(() => {
-    const map = new Map();
+    const teachersMap = new Map();
+    const idToKeyMap = new Map();
+
+    const addOrMergeTeacher = (rawId, rawName, email, photo_url) => {
+      const name = (rawName || email || "").trim();
+      const nameKey = normalizeName(name);
+      const id = String(rawId || name || "").trim();
+      if (!nameKey && !id) return;
+
+      // Check if we already have this teacher either by id or by nameKey
+      const existingKey = (id && idToKeyMap.get(id)) || (nameKey && teachersMap.has(nameKey) ? nameKey : null);
+
+      if (existingKey && teachersMap.has(existingKey)) {
+        const existing = teachersMap.get(existingKey);
+        // Merge in any better info
+        teachersMap.set(existingKey, {
+          id: existing.id || id,
+          name: existing.name || name,
+          email: existing.email || email || "",
+          photo_url: existing.photo_url || photo_url || null,
+        });
+        if (id) idToKeyMap.set(id, existingKey);
+      } else {
+        const primaryKey = nameKey || id;
+        teachersMap.set(primaryKey, {
+          id: id || primaryKey,
+          name: name || "Teacher",
+          email: email || "",
+          photo_url: photo_url || null,
+        });
+        if (id) idToKeyMap.set(id, primaryKey);
+        if (nameKey) idToKeyMap.set(nameKey, primaryKey);
+      }
+    };
 
     // From portalAccessList
     (portalAccessList || [])
@@ -273,49 +306,22 @@ export function useTeacherAttendanceRanking({
         );
       })
       .forEach((p) => {
-        const name = (p.full_name || p.name || p.email || "").trim();
-        const key = normalizeName(name);
-        if (key && !map.has(key)) {
-          map.set(key, {
-            id: String(p.user_id || p.id || p.email).trim(),
-            name,
-            email: p.email || "",
-            photo_url: p.photo_url || null,
-          });
-        }
+        addOrMergeTeacher(p.user_id || p.id, p.full_name || p.name, p.email, p.photo_url);
       });
 
     // From teacherProfiles
     (teacherProfiles || [])
       .filter((tp) => !tp.is_kibar)
       .forEach((tp) => {
-        const name = (tp.full_name || tp.name || tp.email || "").trim();
-        const key = normalizeName(name);
-        if (key && !map.has(key)) {
-          map.set(key, {
-            id: String(tp.user_id || tp.id || tp.email || tp.full_name).trim(),
-            name,
-            email: tp.email || "",
-            photo_url: tp.photo_url || null,
-          });
-        }
+        addOrMergeTeacher(tp.user_id || tp.id, tp.full_name || tp.name, tp.email, tp.photo_url);
       });
 
     // From attendance records
     (combinedAttendance || []).forEach((rec) => {
-      const name = (rec.teacher_name || "").trim();
-      const key = normalizeName(name);
-      if (key && !map.has(key)) {
-        map.set(key, {
-          id: String(rec.teacher_id || name).trim(),
-          name,
-          email: "",
-          photo_url: null,
-        });
-      }
+      addOrMergeTeacher(rec.teacher_id, rec.teacher_name, "", null);
     });
 
-    return Array.from(map.values());
+    return Array.from(teachersMap.values());
   }, [portalAccessList, teacherProfiles, combinedAttendance]);
 
   // 5. Calculate statistics & rankings
@@ -730,14 +736,14 @@ export function AdminTeacherRankingModal({
 
         {/* Scrollable Teacher Roster Stack */}
         <div className="teacher-rank-modal-body">
-          {filteredTeachers.map((teacher) => {
+          {filteredTeachers.map((teacher, idx) => {
             const isRank1 = teacher.rank === 1;
             const isRank2 = teacher.rank === 2;
             const isRank3 = teacher.rank === 3;
 
             return (
               <div
-                key={teacher.id || teacher.name}
+                key={`teacher-rank-row-${teacher.id || teacher.name || idx}-${teacher.rank || idx}-${idx}`}
                 className={`teacher-rank-row-item ${
                   isRank1 ? "rank-1" : isRank2 ? "rank-2" : isRank3 ? "rank-3" : ""
                 }`}
@@ -811,7 +817,7 @@ export function AdminTeacherRankingModal({
                   {periodMode === "weekly" && weekDays.length > 0 ? (
                     /* Day-by-Day Mini Indicators */
                     <div className="teacher-rank-day-dots-row">
-                      {weekDays.map((w) => {
+                      {weekDays.map((w, wIdx) => {
                         const dayInfo = teacher.dayMap[w.dateKey] || { status: "unmarked" };
                         const st = dayInfo.status;
                         const dotClass =
@@ -825,7 +831,7 @@ export function AdminTeacherRankingModal({
 
                         return (
                           <div
-                            key={w.dateKey}
+                            key={`teacher-dot-${teacher.id || teacher.name || idx}-${w.dateKey}-${wIdx}`}
                             className={`teacher-rank-day-dot ${dotClass}`}
                             title={`${w.dayName} (${w.label}): ${st.toUpperCase()}${dayInfo.time ? ` at ${dayInfo.time}` : ""}`}
                           >
@@ -1061,7 +1067,7 @@ export function AdminTeacherRankingGraphCard({
             </span>
           </div>
 
-          {topTeachers.map((t) => {
+          {topTeachers.map((t, idx) => {
             const barClass =
               t.rank === 1
                 ? "rank-1"
@@ -1072,7 +1078,7 @@ export function AdminTeacherRankingGraphCard({
                 : "";
 
             return (
-              <div key={t.id || t.name} className="teacher-rank-graph-row">
+              <div key={`top-rank-graph-${t.id || t.name || idx}-${t.rank || idx}-${idx}`} className="teacher-rank-graph-row">
                 <div className="teacher-rank-graph-name-col">
                   <span>
                     {t.rank === 1 ? "🥇" : t.rank === 2 ? "🥈" : t.rank === 3 ? "🥉" : `#${t.rank}`}

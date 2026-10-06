@@ -5496,14 +5496,14 @@
     "semantic_hash": "3013e7bcc4cf1aabe86b8f4015d4c1de"
   },
   "android/app/build.gradle": {
-    "mtime": 1791140083.1451263,
-    "seen": 1791140545.2798638,
-    "ast_hash": "136c4a03d12cf44f4fd3e226275f4a84",
+    "mtime": 1791284394.360147,
+    "seen": 1791290417.0120728,
+    "ast_hash": "a74c6abc2be1ba12c13f5a45514f4fe1",
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1791182973.430784,
-    "seen": 1791186973.8769913,
+    "mtime": 1791284443.4660215,
+    "seen": 1791290417.0120754,
     "ast_hash": "f3c1db3e5a1641513a1e5a6bff1ee565",
     "semantic_hash": ""
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1791182973.4297335,
-    "seen": 1791186973.8775384,
+    "mtime": 1791284443.465021,
+    "seen": 1791290417.0127053,
     "ast_hash": "4d3b13b87f1d8abf11219d4ea2d0fef1",
     "semantic_hash": ""
   },
@@ -6138,9 +6138,9 @@
     "semantic_hash": "fffa152f0ee02e28b0660997e2f6e452"
   },
   "package.json": {
-    "mtime": 1791181204.3340838,
-    "seen": 1791181919.7315054,
-    "ast_hash": "0e5e1bc16c58d0b3495690af2de0f70f",
+    "mtime": 1791284400.215225,
+    "seen": 1791290417.0198734,
+    "ast_hash": "792736609c5c0371a9b5fcfce0401ebb",
     "semantic_hash": ""
   },
   "public/112c6490-1181-11ee-b0f7-871603e699f6.json": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1791188679.5015914,
-    "seen": 1791196306.8296318,
-    "ast_hash": "d3de0ce0c3e7645256f0ca9bc48ad405",
+    "mtime": 1791271516.9252713,
+    "seen": 1791290417.0235016,
+    "ast_hash": "5a02e00cef51d83c2f4852009435fe5c",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -10044,9 +10044,9 @@
     "semantic_hash": ""
   },
   "src/components/AtfalTeacherLeagueEntry.jsx": {
-    "mtime": 1790235211.4913692,
-    "seen": 1790235719.4974072,
-    "ast_hash": "1627eaf4e545a3be410af230d804590f",
+    "mtime": 1791270337.4539416,
+    "seen": 1791270518.9937084,
+    "ast_hash": "8d8d18ecf33ced260414760e250b7f6a",
     "semantic_hash": ""
   },
   "public/assets/gems/gem-week1-emerald.png": {
@@ -10104,9 +10104,9 @@
     "semantic_hash": ""
   },
   "src/components/AtfalLeagueAdminInfographic.jsx": {
-    "mtime": 1790235249.7463708,
-    "seen": 1790235719.4974048,
-    "ast_hash": "d146d2dc7dc237a2e626a5fc3e5a8279",
+    "mtime": 1791270416.049981,
+    "seen": 1791270518.9936328,
+    "ast_hash": "b6b2f91643ec076f9d33acc31331fd2b",
     "semantic_hash": ""
   },
   "src/utils/atfalLeagueUtils.js": {
@@ -10236,9 +10236,9 @@
     "semantic_hash": ""
   },
   "src/components/TeacherProfileView.jsx": {
-    "mtime": 1790235136.406965,
-    "seen": 1790235719.4984229,
-    "ast_hash": "b0b05fc2248fc7f373a5adb881cf6788",
+    "mtime": 1791264049.2481241,
+    "seen": 1791269162.1457117,
+    "ast_hash": "591419ac005a10bb0956f6c1abf0a988",
     "semantic_hash": ""
   },
   "src/utils/teacherProfilePermissions.js": {
@@ -10296,9 +10296,9 @@
     "semantic_hash": ""
   },
   "src/components/AdminTeacherAttendanceSettings.jsx": {
-    "mtime": 1790427886.931833,
-    "seen": 1790428770.640323,
-    "ast_hash": "bff82066aa3d45f98d96d9d63bf8d7d5",
+    "mtime": 1791269046.2190354,
+    "seen": 1791269162.14432,
+    "ast_hash": "19cafabccc9e57a2f43f6f762fe33f82",
     "semantic_hash": ""
   },
   "src/components/TeacherSelfAttendanceCard.jsx": {
@@ -10326,21 +10326,21 @@
     "semantic_hash": ""
   },
   "src/utils/googleSheetsSync.js": {
-    "mtime": 1791105048.1982665,
-    "seen": 1791106421.8717318,
-    "ast_hash": "26d54edc5e4764cb35c2299c24e87750",
+    "mtime": 1791271490.2795866,
+    "seen": 1791290417.0282898,
+    "ast_hash": "600ef3f869b37abc6da495b302998600",
     "semantic_hash": ""
   },
   "src/components/AdminTeacherRankingCard.jsx": {
-    "mtime": 1790428966.4082904,
-    "seen": 1790429080.1049314,
-    "ast_hash": "e54e780950c5d497cb4425ed021d51d0",
+    "mtime": 1791268745.0652816,
+    "seen": 1791269162.1443222,
+    "ast_hash": "f1f80d49dba02ff7bafd2252c4fb6ef5",
     "semantic_hash": ""
   },
   "scripts/mauze-whatsapp-bot.js": {
-    "mtime": 1791186881.8354876,
-    "seen": 1791186973.8872995,
-    "ast_hash": "83d0114fea24fe0daa8aadfe84831a9b",
+    "mtime": 1791283930.543533,
+    "seen": 1791290417.0224068,
+    "ast_hash": "c720b9266240a9f49e45fe6b1d2ea220",
     "semantic_hash": ""
   },
   "api/telegram-webhook.js": {
@@ -10368,15 +10368,15 @@
     "semantic_hash": ""
   },
   "today_attendance.json": {
-    "mtime": 1790957869.7496974,
-    "seen": 1790968272.1301877,
-    "ast_hash": "0a046d13c6dd77e59c9cc0920be4b7cf",
+    "mtime": 1791289647.8062696,
+    "seen": 1791290417.0288718,
+    "ast_hash": "d72498c280b62e2272456dac3103eca4",
     "semantic_hash": ""
   },
   "today_leaves.json": {
-    "mtime": 1791003897.2476504,
-    "seen": 1791010796.6347382,
-    "ast_hash": "2de4ad4f0fa0cb9893d7e695d7b2aa5b",
+    "mtime": 1791284335.393697,
+    "seen": 1791290417.0288732,
+    "ast_hash": "71d6b9e894113386d99f5fb295c490ca",
     "semantic_hash": ""
   },
   "android/app/src/main/java/com/mauzetahfeez/myapp/SplashTextView.java": {
@@ -10386,9 +10386,9 @@
     "semantic_hash": ""
   },
   "linked_whatsapp_teachers.json": {
-    "mtime": 1791114537.931075,
-    "seen": 1791139071.2469614,
-    "ast_hash": "d8ad49d6de58f1d2ec9af204d42a8765",
+    "mtime": 1791283943.619136,
+    "seen": 1791290417.0198078,
+    "ast_hash": "e471f6000c20dd35158044155790b35d",
     "semantic_hash": ""
   },
   "android/app/src/main/res/drawable-port-hdpi/logo_splash.png": {
@@ -10434,9 +10434,9 @@
     "semantic_hash": ""
   },
   "latest_weekly_results.json": {
-    "mtime": 1791114542.1943848,
-    "seen": 1791139071.2468956,
-    "ast_hash": "38cd06e21f64111e296dd58a9a790a58",
+    "mtime": 1791283947.5323083,
+    "seen": 1791290417.019739,
+    "ast_hash": "f0ca71baf4f0afca41a0f23e01b7f54a",
     "semantic_hash": ""
   },
   "scripts/search_repo.ps1": {
@@ -11064,9 +11064,45 @@
     "semantic_hash": ""
   },
   "src/components/AmazonBottomNav.jsx": {
-    "mtime": 1791186107.7640898,
-    "seen": 1791186973.889506,
-    "ast_hash": "04de322dd07f8728592149c14abd2dfe",
+    "mtime": 1791206978.5720413,
+    "seen": 1791207214.0744102,
+    "ast_hash": "3a2af97862a4974b8d9cce6e47222a7b",
+    "semantic_hash": ""
+  },
+  "src/utils/googleMapsLoader.js": {
+    "mtime": 1791266958.9705315,
+    "seen": 1791269162.1472342,
+    "ast_hash": "dbde41db4a582a14f80f0d34c2292d12",
+    "semantic_hash": ""
+  },
+  "public/holiday-sign.png": {
+    "mtime": 1791269284.0304165,
+    "seen": 1791269428.4152842,
+    "ast_hash": "4ae1466a1a9cba30b148128b1018a1b4",
+    "semantic_hash": ""
+  },
+  "src/assets/holiday-sign.png": {
+    "mtime": 1791269284.0304165,
+    "seen": 1791269428.4158235,
+    "ast_hash": "4ae1466a1a9cba30b148128b1018a1b4",
+    "semantic_hash": ""
+  },
+  "src/components/PremiumDatePicker.jsx": {
+    "mtime": 1791269557.8721893,
+    "seen": 1791269708.3747826,
+    "ast_hash": "11804daa11fba582e845592920035ec8",
+    "semantic_hash": ""
+  },
+  "src/components/AtfalLeagueLockModal.jsx": {
+    "mtime": 1791270687.4005494,
+    "seen": 1791270788.9409432,
+    "ast_hash": "e49e5b466d18bef793b4317da5be36c5",
+    "semantic_hash": ""
+  },
+  "src/utils/leagueLockManager.js": {
+    "mtime": 1791270201.0498085,
+    "seen": 1791270518.9965503,
+    "ast_hash": "480f4d052016417782150dc466d900d7",
     "semantic_hash": ""
   }
 }

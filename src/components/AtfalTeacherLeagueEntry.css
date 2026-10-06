@@ -1385,3 +1385,103 @@
   color: #d4af37;
   margin: 10px 0;
 }
+
+/* =========================================================
+   HIFZ LEAGUE LOCK & ENTRY PERMISSION BADGES
+   ========================================================= */
+
+.league-month-locked-alert {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1.5px solid #f59e0b;
+  color: #92400e;
+  padding: 10px 16px;
+  border-radius: 12px;
+  margin-top: 14px;
+  font-size: 0.88rem;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+  animation: fadeIn 0.25s ease;
+}
+
+.atfal-league-entry-root.dark-theme .league-month-locked-alert {
+  background: linear-gradient(135deg, #3d2a14, #2b1d0c);
+  border-color: #d97706;
+  color: #fde68a;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.week-lock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.week-lock-pill.locked {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
+  border: 1px solid #f87171;
+}
+
+.atfal-league-entry-root.dark-theme .week-lock-pill.locked {
+  background: linear-gradient(135deg, #4c1d1d, #3b1414);
+  color: #fca5a5;
+  border-color: #ef4444;
+}
+
+.week-lock-pill.custom-unlocked {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #166534;
+  border: 1px solid #4ade80;
+}
+
+.atfal-league-entry-root.dark-theme .week-lock-pill.custom-unlocked {
+  background: linear-gradient(135deg, #143820, #0d2817);
+  color: #86efac;
+  border-color: #22c55e;
+}
+
+.parchment-week-card.is-week-locked {
+  position: relative;
+  background: linear-gradient(135deg, #fdfbf7, #f7f2e8);
+  border-color: rgba(220, 38, 38, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.atfal-league-entry-root.dark-theme .parchment-week-card.is-week-locked {
+  background: linear-gradient(135deg, #201a14, #181410);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.gem-score-input.is-locked,
+.gem-score-input:disabled {
+  background: #f5f0e8 !important;
+  color: #8c7b6a !important;
+  border-color: rgba(140, 123, 106, 0.3) !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  opacity: 0.85;
+}
+
+.atfal-league-entry-root.dark-theme .gem-score-input.is-locked,
+.atfal-league-entry-root.dark-theme .gem-score-input:disabled {
+  background: #1c1712 !important;
+  color: #786958 !important;
+  border-color: rgba(120, 105, 88, 0.3) !important;
+}
+
+.gem-stepper-btns button:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+

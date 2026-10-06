@@ -1,0 +1,661 @@
+/* =========================================================
+   HIFZ LEAGUE LOCK & PERMISSIONS MODAL — LUXURY ADMIN STYLES
+   ========================================================= */
+
+.league-lock-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: rgba(14, 10, 6, 0.76);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.league-lock-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 780px;
+  max-height: calc(100dvh - 32px);
+  max-height: calc(100vh - 32px);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 22px;
+  border: 1.5px solid rgba(212, 175, 55, 0.38);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.32), 0 6px 24px rgba(212, 175, 55, 0.18);
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.league-lock-modal-backdrop.dark-theme .league-lock-modal-card {
+  background: #1c1712;
+  border-color: rgba(212, 175, 55, 0.32);
+  box-shadow: 0 25px 65px rgba(0, 0, 0, 0.75);
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal Header */
+.league-lock-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  background: linear-gradient(135deg, #fdfbf7, #f7f2e7);
+  flex-shrink: 0;
+}
+
+.league-lock-modal-backdrop.dark-theme .league-lock-modal-header {
+  background: linear-gradient(135deg, #251f18, #1c1712);
+}
+
+.modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lock-modal-icon-bubble {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.35);
+  flex-shrink: 0;
+}
+
+.lock-modal-title {
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: var(--deep-brown, #2a1f0e);
+  margin: 0 0 2px 0;
+  letter-spacing: -0.2px;
+}
+
+.league-lock-modal-backdrop.dark-theme .lock-modal-title {
+  color: #f7e7a9;
+}
+
+.lock-modal-sub {
+  font-size: 0.82rem;
+  color: var(--soft-brown, #7a6a52);
+  margin: 0;
+}
+
+.league-lock-modal-backdrop.dark-theme .lock-modal-sub {
+  color: #c5b59f;
+}
+
+.lock-modal-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  background: rgba(255, 255, 255, 0.7);
+  color: #7a6a52;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+
+.lock-modal-close-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+  transform: scale(1.05);
+}
+
+/* Tabs */
+.lock-modal-tab-bar {
+  display: flex;
+  background: #f3eee6;
+  padding: 6px 20px;
+  gap: 10px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+  flex-shrink: 0;
+}
+
+.league-lock-modal-backdrop.dark-theme .lock-modal-tab-bar {
+  background: #181410;
+}
+
+.lock-modal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #7a6a52;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.league-lock-modal-backdrop.dark-theme .lock-modal-tab {
+  color: #a89985;
+}
+
+.lock-modal-tab.active {
+  background: #ffffff;
+  color: var(--primary-gold, #b8860b);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.league-lock-modal-backdrop.dark-theme .lock-modal-tab.active {
+  background: #2a221a;
+  color: #f7e7a9;
+}
+
+/* Quick Presets Bar */
+.lock-presets-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 24px;
+  background: #fdfaf5;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.12);
+  flex-shrink: 0;
+}
+
+.league-lock-modal-backdrop.dark-theme .lock-presets-bar {
+  background: #201a14;
+}
+
+.presets-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--primary-gold, #b8860b);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.presets-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.preset-btn.default-preset {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border-color: #f59e0b;
+}
+
+.preset-btn.default-preset:hover {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.preset-btn.open-all {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.preset-btn.open-all:hover {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.preset-btn.lock-all {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.preset-btn.lock-all:hover {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* Individual Teacher Selector Box */
+.individual-teacher-selector-box {
+  padding: 12px 24px;
+  background: #fdfaf5;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.league-lock-modal-backdrop.dark-theme .individual-teacher-selector-box {
+  background: #201a14;
+}
+
+.teacher-select-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--deep-brown, #2a1f0e);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.league-lock-modal-backdrop.dark-theme .teacher-select-label {
+  color: #f7e7a9;
+}
+
+.teacher-select-dropdown {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  font-size: 0.92rem;
+  font-weight: 600;
+  background: #ffffff;
+  color: var(--text-main, #3d2b1f);
+}
+
+.league-lock-modal-backdrop.dark-theme .teacher-select-dropdown {
+  background: #28211a;
+  color: #f0e6d6;
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.teacher-select-hint {
+  font-size: 0.74rem;
+  color: var(--soft-brown, #7a6a52);
+}
+
+/* Scrollable Months Matrix */
+.lock-months-matrix {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px 24px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.month-lock-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  padding: 14px 18px;
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.league-lock-modal-backdrop.dark-theme .month-lock-card {
+  background: #241d16;
+  border-color: rgba(212, 175, 55, 0.2);
+}
+
+.month-lock-card.is-month-locked {
+  background: #fffbf7;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.league-lock-modal-backdrop.dark-theme .month-lock-card.is-month-locked {
+  background: #2b1c18;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.month-lock-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+
+.month-lock-info {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.month-ar-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--deep-brown, #2a1f0e);
+}
+
+.league-lock-modal-backdrop.dark-theme .month-ar-title {
+  color: #f7e7a9;
+}
+
+.month-en-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--soft-brown, #7a6a52);
+}
+
+.month-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
+}
+
+.month-toggle-btn.locked {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.month-toggle-btn.unlocked {
+  background: #dcfce7;
+  color: #16a34a;
+  border-color: #86efac;
+}
+
+/* 4 Weeks Grid */
+.weeks-lock-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.week-lock-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.week-lock-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.week-lock-chip.is-locked {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  border-color: #f87171;
+  color: #991b1b;
+}
+
+.league-lock-modal-backdrop.dark-theme .week-lock-chip.is-locked {
+  background: linear-gradient(135deg, #451a1a, #361414);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.week-lock-chip.is-open {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border-color: #4ade80;
+  color: #166534;
+}
+
+.league-lock-modal-backdrop.dark-theme .week-lock-chip.is-open {
+  background: linear-gradient(135deg, #143820, #0f2c19);
+  border-color: #22c55e;
+  color: #86efac;
+}
+
+.week-lock-chip.is-overridden {
+  box-shadow: 0 0 0 2px #d4af37, 0 4px 10px rgba(212, 175, 55, 0.3);
+}
+
+.week-lock-chip-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.week-num-tag {
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.week-chip-status {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.overridden-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  background: #d4af37;
+  color: #ffffff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+/* Modal Footer */
+.league-lock-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+  background: #fdfbf7;
+  flex-shrink: 0;
+}
+
+.league-lock-modal-backdrop.dark-theme .league-lock-modal-footer {
+  background: #1c1712;
+}
+
+.save-toast-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #16a34a;
+  animation: fadeIn 0.2s ease;
+}
+
+.footer-btns-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lock-modal-cancel-btn {
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(61, 43, 31, 0.18);
+  background: #ffffff;
+  color: var(--text-main, #3d2b1f);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.league-lock-modal-backdrop.dark-theme .lock-modal-cancel-btn {
+  background: #25201b;
+  border-color: rgba(212, 175, 55, 0.2);
+  color: #f0e6d6;
+}
+
+.lock-modal-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 22px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.35);
+  transition: all 0.18s ease;
+}
+
+.lock-modal-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(212, 175, 55, 0.45);
+}
+
+.lock-modal-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsive Styles for ALL screen sizes */
+@media (max-width: 640px) {
+  .league-lock-modal-backdrop {
+    padding: 8px;
+  }
+
+  .league-lock-modal-card {
+    max-height: calc(100dvh - 16px);
+    max-height: calc(100vh - 16px);
+    border-radius: 16px;
+  }
+
+  .league-lock-modal-header {
+    padding: 14px 16px 10px;
+  }
+
+  .lock-modal-icon-bubble {
+    width: 36px;
+    height: 36px;
+  }
+
+  .lock-modal-title {
+    font-size: 1rem;
+  }
+
+  .lock-modal-sub {
+    font-size: 0.74rem;
+  }
+
+  .lock-modal-tab-bar {
+    padding: 4px 12px;
+    gap: 6px;
+  }
+
+  .lock-modal-tab {
+    padding: 7px 10px;
+    font-size: 0.76rem;
+    gap: 5px;
+  }
+
+  .lock-presets-bar {
+    padding: 8px 14px;
+  }
+
+  .preset-btn {
+    padding: 5px 9px;
+    font-size: 0.72rem;
+  }
+
+  .individual-teacher-selector-box {
+    padding: 10px 14px;
+  }
+
+  .lock-months-matrix {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .month-lock-card {
+    padding: 10px 12px;
+  }
+
+  .weeks-lock-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .week-lock-chip {
+    min-height: 46px;
+    padding: 8px 6px;
+  }
+
+  .league-lock-modal-footer {
+    padding: 10px 14px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .footer-btns-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .lock-modal-save-btn {
+    padding: 8px 16px;
+    font-size: 0.84rem;
+  }
+
+  .lock-modal-cancel-btn {
+    padding: 8px 14px;
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .lock-modal-title {
+    font-size: 0.92rem;
+  }
+  .lock-modal-tab {
+    font-size: 0.7rem;
+    padding: 6px 8px;
+  }
+}

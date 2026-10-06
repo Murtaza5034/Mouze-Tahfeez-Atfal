@@ -1,0 +1,1470 @@
+{
+  "phone:919930852533": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Hatim bhai Mulla Zoeb bhai Ezzy",
+    "phone": "919930852533",
+    "its": "40190470",
+    "studentId": "e95f830f-671d-4658-bba5-771eb0c6f6e6",
+    "updatedAt": 1790943661280
+  },
+  "its:515253": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "studentId": "9dda1944-b1ca-4e37-a20d-0906edc48e79",
+    "time": "12:47 PM",
+    "updatedAt": 1790925447086,
+    "name": "Demo Student",
+    "its": "515253",
+    "phone": "919930852533"
+  },
+  "name:demo student": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "studentId": "9dda1944-b1ca-4e37-a20d-0906edc48e79",
+    "time": "12:47 PM",
+    "updatedAt": 1790925447086,
+    "name": "Demo Student",
+    "its": "515253",
+    "phone": "919930852533"
+  },
+  "id:9dda1944-b1ca-4e37-a20d-0906edc48e79": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "studentId": "9dda1944-b1ca-4e37-a20d-0906edc48e79",
+    "time": "12:47 PM",
+    "updatedAt": 1790925447086,
+    "name": "Demo Student",
+    "its": "515253",
+    "phone": "919930852533"
+  },
+  "phone:919601527453": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "28/09/2026",
+    "name": "Yusuf bhai Mufaddal bhai Barad",
+    "phone": "919601527453",
+    "its": "50171527",
+    "studentId": "001c967a-f06c-4062-a6ba-d550c6ec4e2b",
+    "updatedAt": 1790592205823
+  },
+  "its:50171527": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "28/09/2026",
+    "name": "Yusuf bhai Mufaddal bhai Barad",
+    "phone": "919601527453",
+    "its": "50171527",
+    "studentId": "001c967a-f06c-4062-a6ba-d550c6ec4e2b",
+    "updatedAt": 1790592205823
+  },
+  "name:yusuf bhai mufaddal bhai barad": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "28/09/2026",
+    "name": "Yusuf bhai Mufaddal bhai Barad",
+    "phone": "919601527453",
+    "its": "50171527",
+    "studentId": "001c967a-f06c-4062-a6ba-d550c6ec4e2b",
+    "updatedAt": 1790592205823
+  },
+  "id:001c967a-f06c-4062-a6ba-d550c6ec4e2b": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "28/09/2026",
+    "name": "Yusuf bhai Mufaddal bhai Barad",
+    "phone": "919601527453",
+    "its": "50171527",
+    "studentId": "001c967a-f06c-4062-a6ba-d550c6ec4e2b",
+    "updatedAt": 1790592205823
+  },
+  "phone:919610031332": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Insiyah bai Husain bhai Gheewala",
+    "phone": "919610031332",
+    "its": "30116062",
+    "studentId": "7def9fa3-62f6-47a6-a71d-002a68c3df2a",
+    "updatedAt": 1791289646729
+  },
+  "its:30116062": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Insiyah bai Husain bhai Gheewala",
+    "phone": "919610031332",
+    "its": "30116062",
+    "studentId": "7def9fa3-62f6-47a6-a71d-002a68c3df2a",
+    "updatedAt": 1791289646729
+  },
+  "name:insiyah bai husain bhai gheewala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Insiyah bai Husain bhai Gheewala",
+    "phone": "919610031332",
+    "its": "30116062",
+    "studentId": "7def9fa3-62f6-47a6-a71d-002a68c3df2a",
+    "updatedAt": 1791289646729
+  },
+  "id:7def9fa3-62f6-47a6-a71d-002a68c3df2a": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Insiyah bai Husain bhai Gheewala",
+    "phone": "919610031332",
+    "its": "30116062",
+    "studentId": "7def9fa3-62f6-47a6-a71d-002a68c3df2a",
+    "updatedAt": 1791289646729
+  },
+  "phone:917427075253": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Zainab bai Murtaza bhai Ujjainwala",
+    "phone": "917427075253",
+    "its": "40919420",
+    "studentId": "d696341d-00ef-4ffb-b712-eba1c0cc4bf8",
+    "updatedAt": 1791289646152
+  },
+  "its:40919420": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Zainab bai Murtaza bhai Ujjainwala",
+    "phone": "917427075253",
+    "its": "40919420",
+    "studentId": "d696341d-00ef-4ffb-b712-eba1c0cc4bf8",
+    "updatedAt": 1791289646152
+  },
+  "name:zainab bai murtaza bhai ujjainwala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Zainab bai Murtaza bhai Ujjainwala",
+    "phone": "917427075253",
+    "its": "40919420",
+    "studentId": "d696341d-00ef-4ffb-b712-eba1c0cc4bf8",
+    "updatedAt": 1791289646152
+  },
+  "id:d696341d-00ef-4ffb-b712-eba1c0cc4bf8": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Zainab bai Murtaza bhai Ujjainwala",
+    "phone": "917427075253",
+    "its": "40919420",
+    "studentId": "d696341d-00ef-4ffb-b712-eba1c0cc4bf8",
+    "updatedAt": 1791289646152
+  },
+  "phone:919001380086": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Abizer bhai Aziz bhai Tailor",
+    "phone": "919001380086",
+    "its": "40919422",
+    "studentId": "d7f13603-e2ee-4a9c-8f00-780bc8ed9d4f",
+    "updatedAt": 1791289647323
+  },
+  "its:40919422": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Abizer bhai Aziz bhai Tailor",
+    "phone": "919001380086",
+    "its": "40919422",
+    "studentId": "d7f13603-e2ee-4a9c-8f00-780bc8ed9d4f",
+    "updatedAt": 1791289647323
+  },
+  "name:abizer bhai aziz bhai tailor": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Abizer bhai Aziz bhai Tailor",
+    "phone": "919001380086",
+    "its": "40919422",
+    "studentId": "d7f13603-e2ee-4a9c-8f00-780bc8ed9d4f",
+    "updatedAt": 1791289647323
+  },
+  "id:d7f13603-e2ee-4a9c-8f00-780bc8ed9d4f": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Abizer bhai Aziz bhai Tailor",
+    "phone": "919001380086",
+    "its": "40919422",
+    "studentId": "d7f13603-e2ee-4a9c-8f00-780bc8ed9d4f",
+    "updatedAt": 1791289647323
+  },
+  "phone:919166645864": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Ummulkiram bai Aliakbar bhai Tekri",
+    "phone": "919166645864",
+    "its": "40184132",
+    "studentId": "2671cea9-346d-442e-b4dc-03403e8468d2",
+    "updatedAt": 1791289647800
+  },
+  "its:40184132": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Ummulkiram bai Aliakbar bhai Tekri",
+    "phone": "919166645864",
+    "its": "40184132",
+    "studentId": "2671cea9-346d-442e-b4dc-03403e8468d2",
+    "updatedAt": 1791289647800
+  },
+  "name:ummulkiram bai aliakbar bhai tekri": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Ummulkiram bai Aliakbar bhai Tekri",
+    "phone": "919166645864",
+    "its": "40184132",
+    "studentId": "2671cea9-346d-442e-b4dc-03403e8468d2",
+    "updatedAt": 1791289647800
+  },
+  "id:2671cea9-346d-442e-b4dc-03403e8468d2": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Ummulkiram bai Aliakbar bhai Tekri",
+    "phone": "919166645864",
+    "its": "40184132",
+    "studentId": "2671cea9-346d-442e-b4dc-03403e8468d2",
+    "updatedAt": 1791289647800
+  },
+  "phone:919909244234": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Shaikh Kumail bhai Raj",
+    "phone": "919909244234",
+    "its": "40153090",
+    "studentId": "2873a7f1-1599-477c-b5c0-f53639c7bfca",
+    "updatedAt": 1791285875274
+  },
+  "its:40153090": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Shaikh Kumail bhai Raj",
+    "phone": "919909244234",
+    "its": "40153090",
+    "studentId": "2873a7f1-1599-477c-b5c0-f53639c7bfca",
+    "updatedAt": 1791285875274
+  },
+  "name:burhanuddin bhai shaikh kumail bhai raj": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Shaikh Kumail bhai Raj",
+    "phone": "919909244234",
+    "its": "40153090",
+    "studentId": "2873a7f1-1599-477c-b5c0-f53639c7bfca",
+    "updatedAt": 1791285875274
+  },
+  "id:2873a7f1-1599-477c-b5c0-f53639c7bfca": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Shaikh Kumail bhai Raj",
+    "phone": "919909244234",
+    "its": "40153090",
+    "studentId": "2873a7f1-1599-477c-b5c0-f53639c7bfca",
+    "updatedAt": 1791285875274
+  },
+  "phone:919660386536": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Hakimuddin bhai Jaan",
+    "phone": "919660386536",
+    "its": "40182670",
+    "studentId": "209a7cc0-b3c1-4bcb-8e09-441984bc81ac",
+    "updatedAt": 1791285155951
+  },
+  "its:40182670": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Hakimuddin bhai Jaan",
+    "phone": "919660386536",
+    "its": "40182670",
+    "studentId": "209a7cc0-b3c1-4bcb-8e09-441984bc81ac",
+    "updatedAt": 1791285155951
+  },
+  "name:burhanuddin bhai hakimuddin bhai jaan": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Hakimuddin bhai Jaan",
+    "phone": "919660386536",
+    "its": "40182670",
+    "studentId": "209a7cc0-b3c1-4bcb-8e09-441984bc81ac",
+    "updatedAt": 1791285155951
+  },
+  "id:209a7cc0-b3c1-4bcb-8e09-441984bc81ac": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Hakimuddin bhai Jaan",
+    "phone": "919660386536",
+    "its": "40182670",
+    "studentId": "209a7cc0-b3c1-4bcb-8e09-441984bc81ac",
+    "updatedAt": 1791285155951
+  },
+  "phone:919784510433": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-08-18",
+    "name": "Burhanuddin bhai Husain bhai Haidery",
+    "phone": "919784510433",
+    "its": "40919436",
+    "studentId": "13687291-5761-44ff-8c59-f46e6b03b8b9",
+    "updatedAt": 1791286612636
+  },
+  "its:40919436": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-08-18",
+    "name": "Burhanuddin bhai Husain bhai Haidery",
+    "phone": "919784510433",
+    "its": "40919436",
+    "studentId": "13687291-5761-44ff-8c59-f46e6b03b8b9",
+    "updatedAt": 1791286612636
+  },
+  "name:burhanuddin bhai husain bhai haidery": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-08-18",
+    "name": "Burhanuddin bhai Husain bhai Haidery",
+    "phone": "919784510433",
+    "its": "40919436",
+    "studentId": "13687291-5761-44ff-8c59-f46e6b03b8b9",
+    "updatedAt": 1791286612636
+  },
+  "id:13687291-5761-44ff-8c59-f46e6b03b8b9": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-08-18",
+    "name": "Burhanuddin bhai Husain bhai Haidery",
+    "phone": "919784510433",
+    "its": "40919436",
+    "studentId": "13687291-5761-44ff-8c59-f46e6b03b8b9",
+    "updatedAt": 1791286612636
+  },
+  "its:40172347": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-30",
+    "name": "Burhanuddin bhai Shaikh Murtaza bhai Jamali",
+    "phone": "",
+    "its": "40172347",
+    "studentId": "06396a54-2570-402d-b22c-5340828bdaed",
+    "updatedAt": 1790943741686
+  },
+  "name:burhanuddin bhai shaikh murtaza bhai jamali": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-30",
+    "name": "Burhanuddin bhai Shaikh Murtaza bhai Jamali",
+    "phone": "",
+    "its": "40172347",
+    "studentId": "06396a54-2570-402d-b22c-5340828bdaed",
+    "updatedAt": 1790943741686
+  },
+  "id:06396a54-2570-402d-b22c-5340828bdaed": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-30",
+    "name": "Burhanuddin bhai Shaikh Murtaza bhai Jamali",
+    "phone": "",
+    "its": "40172347",
+    "studentId": "06396a54-2570-402d-b22c-5340828bdaed",
+    "updatedAt": 1790943741686
+  },
+  "phone:96598007054": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Burhanuddin Mulla Husain bhai Hamid",
+    "phone": "96598007054",
+    "its": "50172758",
+    "studentId": "11522d65-14c7-48dd-a9ce-5a399b7dba62",
+    "updatedAt": 1790943660906
+  },
+  "its:50172758": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Burhanuddin Mulla Husain bhai Hamid",
+    "phone": "96598007054",
+    "its": "50172758",
+    "studentId": "11522d65-14c7-48dd-a9ce-5a399b7dba62",
+    "updatedAt": 1790943660906
+  },
+  "name:burhanuddin mulla husain bhai hamid": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Burhanuddin Mulla Husain bhai Hamid",
+    "phone": "96598007054",
+    "its": "50172758",
+    "studentId": "11522d65-14c7-48dd-a9ce-5a399b7dba62",
+    "updatedAt": 1790943660906
+  },
+  "id:11522d65-14c7-48dd-a9ce-5a399b7dba62": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Burhanuddin Mulla Husain bhai Hamid",
+    "phone": "96598007054",
+    "its": "50172758",
+    "studentId": "11522d65-14c7-48dd-a9ce-5a399b7dba62",
+    "updatedAt": 1790943660906
+  },
+  "phone:917424915253": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Jabir bhai Huzaifa bhai Daudji",
+    "phone": "917424915253",
+    "its": "50420856",
+    "studentId": "4fe800b2-b745-4cd4-8ed1-517b28dbe0e3",
+    "updatedAt": 1790943662250
+  },
+  "its:50420856": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Jabir bhai Huzaifa bhai Daudji",
+    "phone": "917424915253",
+    "its": "50420856",
+    "studentId": "4fe800b2-b745-4cd4-8ed1-517b28dbe0e3",
+    "updatedAt": 1790943662250
+  },
+  "name:jabir bhai huzaifa bhai daudji": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Jabir bhai Huzaifa bhai Daudji",
+    "phone": "917424915253",
+    "its": "50420856",
+    "studentId": "4fe800b2-b745-4cd4-8ed1-517b28dbe0e3",
+    "updatedAt": 1790943662250
+  },
+  "id:4fe800b2-b745-4cd4-8ed1-517b28dbe0e3": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Jabir bhai Huzaifa bhai Daudji",
+    "phone": "917424915253",
+    "its": "50420856",
+    "studentId": "4fe800b2-b745-4cd4-8ed1-517b28dbe0e3",
+    "updatedAt": 1790943662250
+  },
+  "phone:918128535726": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Sakina bai Mulla Murtaza bhai Hamid",
+    "phone": "918128535726",
+    "its": "40190525",
+    "studentId": "a1cb1b17-d8a2-4cf0-9bab-bb73c92977df",
+    "updatedAt": 1791285306888
+  },
+  "its:40190525": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Sakina bai Mulla Murtaza bhai Hamid",
+    "phone": "918128535726",
+    "its": "40190525",
+    "studentId": "a1cb1b17-d8a2-4cf0-9bab-bb73c92977df",
+    "updatedAt": 1791285306888
+  },
+  "name:sakina bai mulla murtaza bhai hamid": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Sakina bai Mulla Murtaza bhai Hamid",
+    "phone": "918128535726",
+    "its": "40190525",
+    "studentId": "a1cb1b17-d8a2-4cf0-9bab-bb73c92977df",
+    "updatedAt": 1791285306888
+  },
+  "id:a1cb1b17-d8a2-4cf0-9bab-bb73c92977df": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Sakina bai Mulla Murtaza bhai Hamid",
+    "phone": "918128535726",
+    "its": "40190525",
+    "studentId": "a1cb1b17-d8a2-4cf0-9bab-bb73c92977df",
+    "updatedAt": 1791285306888
+  },
+  "name:burhanuddin aliasgar bhai bhura": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-08-13",
+    "name": "Burhanuddin Aliasgar bhai Bhura",
+    "phone": "",
+    "its": "",
+    "studentId": "09b4a179-788b-4285-b8fd-40de0dc90153",
+    "updatedAt": 1791285358492
+  },
+  "id:09b4a179-788b-4285-b8fd-40de0dc90153": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-08-13",
+    "name": "Burhanuddin Aliasgar bhai Bhura",
+    "phone": "",
+    "its": "",
+    "studentId": "09b4a179-788b-4285-b8fd-40de0dc90153",
+    "updatedAt": 1791285358492
+  },
+  "phone:918769052534": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Taha bhai  Aliasgar bhai Kanchwala",
+    "phone": "918769052534",
+    "its": "50420827",
+    "studentId": "11d7483f-dcd1-4e65-b35e-922401c98345",
+    "updatedAt": 1791285308439
+  },
+  "its:50420827": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Taha bhai  Aliasgar bhai Kanchwala",
+    "phone": "918769052534",
+    "its": "50420827",
+    "studentId": "11d7483f-dcd1-4e65-b35e-922401c98345",
+    "updatedAt": 1791285308439
+  },
+  "name:taha bhai  aliasgar bhai kanchwala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Taha bhai  Aliasgar bhai Kanchwala",
+    "phone": "918769052534",
+    "its": "50420827",
+    "studentId": "11d7483f-dcd1-4e65-b35e-922401c98345",
+    "updatedAt": 1791285308439
+  },
+  "id:11d7483f-dcd1-4e65-b35e-922401c98345": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Taha bhai  Aliasgar bhai Kanchwala",
+    "phone": "918769052534",
+    "its": "50420827",
+    "studentId": "11d7483f-dcd1-4e65-b35e-922401c98345",
+    "updatedAt": 1791285308439
+  },
+  "phone:919929192434": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Zahara bai Mustafa bhai Company",
+    "phone": "919929192434",
+    "its": "40154538",
+    "studentId": "88dc27aa-48f1-43ac-9100-b82d62e68570",
+    "updatedAt": 1791285307985
+  },
+  "its:40154538": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Zahara bai Mustafa bhai Company",
+    "phone": "919929192434",
+    "its": "40154538",
+    "studentId": "88dc27aa-48f1-43ac-9100-b82d62e68570",
+    "updatedAt": 1791285307985
+  },
+  "name:zahara bai mustafa bhai company": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Zahara bai Mustafa bhai Company",
+    "phone": "919929192434",
+    "its": "40154538",
+    "studentId": "88dc27aa-48f1-43ac-9100-b82d62e68570",
+    "updatedAt": 1791285307985
+  },
+  "id:88dc27aa-48f1-43ac-9100-b82d62e68570": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Zahara bai Mustafa bhai Company",
+    "phone": "919929192434",
+    "its": "40154538",
+    "studentId": "88dc27aa-48f1-43ac-9100-b82d62e68570",
+    "updatedAt": 1791285307985
+  },
+  "phone:917339884253": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Naqiyah bai Mustafa bhai Badri",
+    "phone": "917339884253",
+    "its": "60481261",
+    "studentId": "39d4794c-a9bb-438d-b5a5-77ef030d0336",
+    "updatedAt": 1791285155944
+  },
+  "its:60481261": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Naqiyah bai Mustafa bhai Badri",
+    "phone": "917339884253",
+    "its": "60481261",
+    "studentId": "39d4794c-a9bb-438d-b5a5-77ef030d0336",
+    "updatedAt": 1791285155944
+  },
+  "name:naqiyah bai mustafa bhai badri": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Naqiyah bai Mustafa bhai Badri",
+    "phone": "917339884253",
+    "its": "60481261",
+    "studentId": "39d4794c-a9bb-438d-b5a5-77ef030d0336",
+    "updatedAt": 1791285155944
+  },
+  "id:39d4794c-a9bb-438d-b5a5-77ef030d0336": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Naqiyah bai Mustafa bhai Badri",
+    "phone": "917339884253",
+    "its": "60481261",
+    "studentId": "39d4794c-a9bb-438d-b5a5-77ef030d0336",
+    "updatedAt": 1791285155944
+  },
+  "name:aliasgar mulla hatim bhai baravdawala": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Aliasgar Mulla Hatim bhai baravdawala",
+    "phone": "",
+    "its": "",
+    "studentId": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+    "updatedAt": 1791287833935
+  },
+  "id:7d1a633e-2123-47b4-8267-ecf262857dc3": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Aliasgar Mulla Hatim bhai baravdawala",
+    "phone": "",
+    "its": "",
+    "studentId": "7d1a633e-2123-47b4-8267-ecf262857dc3",
+    "updatedAt": 1791287833935
+  },
+  "phone:919587648899": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Mustansir bhai Burhanuddin bhai Bhopale",
+    "phone": "919587648899",
+    "its": "50420881",
+    "studentId": "21bf52b6-517f-4b7c-99db-befbdb7ac292",
+    "updatedAt": 1791285155937
+  },
+  "its:50420881": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Mustansir bhai Burhanuddin bhai Bhopale",
+    "phone": "919587648899",
+    "its": "50420881",
+    "studentId": "21bf52b6-517f-4b7c-99db-befbdb7ac292",
+    "updatedAt": 1791285155937
+  },
+  "name:mustansir bhai burhanuddin bhai bhopale": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Mustansir bhai Burhanuddin bhai Bhopale",
+    "phone": "919587648899",
+    "its": "50420881",
+    "studentId": "21bf52b6-517f-4b7c-99db-befbdb7ac292",
+    "updatedAt": 1791285155937
+  },
+  "id:21bf52b6-517f-4b7c-99db-befbdb7ac292": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Mustansir bhai Burhanuddin bhai Bhopale",
+    "phone": "919587648899",
+    "its": "50420881",
+    "studentId": "21bf52b6-517f-4b7c-99db-befbdb7ac292",
+    "updatedAt": 1791285155937
+  },
+  "id:yHH7Z7gwIG2C9ID4gIYf": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Student",
+    "phone": "",
+    "its": "",
+    "studentId": "yHH7Z7gwIG2C9ID4gIYf",
+    "updatedAt": 1791285155934
+  },
+  "phone:919057541481": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Mohammed bhai Yunus bhai Bhukhiya Wala",
+    "phone": "919057541481",
+    "its": "60481755",
+    "studentId": "fe47c15c-4557-4d96-90b3-b66f6f12db2a",
+    "updatedAt": 1790940724066
+  },
+  "its:60481755": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Mohammed bhai Yunus bhai Bhukhiya Wala",
+    "phone": "919057541481",
+    "its": "60481755",
+    "studentId": "fe47c15c-4557-4d96-90b3-b66f6f12db2a",
+    "updatedAt": 1790940724066
+  },
+  "name:mohammed bhai yunus bhai bhukhiya wala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Mohammed bhai Yunus bhai Bhukhiya Wala",
+    "phone": "919057541481",
+    "its": "60481755",
+    "studentId": "fe47c15c-4557-4d96-90b3-b66f6f12db2a",
+    "updatedAt": 1790940724066
+  },
+  "id:fe47c15c-4557-4d96-90b3-b66f6f12db2a": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Mohammed bhai Yunus bhai Bhukhiya Wala",
+    "phone": "919057541481",
+    "its": "60481755",
+    "studentId": "fe47c15c-4557-4d96-90b3-b66f6f12db2a",
+    "updatedAt": 1790940724066
+  },
+  "phone:918290015653": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Jumana bai Huzaifa bhai Moti wala",
+    "phone": "918290015653",
+    "its": "50420823",
+    "studentId": "c62422b7-2f93-40ad-88b1-f4eda82d94cd",
+    "updatedAt": 1790938934710
+  },
+  "its:50420823": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Jumana bai Huzaifa bhai Moti wala",
+    "phone": "918290015653",
+    "its": "50420823",
+    "studentId": "c62422b7-2f93-40ad-88b1-f4eda82d94cd",
+    "updatedAt": 1790938934710
+  },
+  "name:jumana bai huzaifa bhai moti wala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Jumana bai Huzaifa bhai Moti wala",
+    "phone": "918290015653",
+    "its": "50420823",
+    "studentId": "c62422b7-2f93-40ad-88b1-f4eda82d94cd",
+    "updatedAt": 1790938934710
+  },
+  "id:c62422b7-2f93-40ad-88b1-f4eda82d94cd": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Jumana bai Huzaifa bhai Moti wala",
+    "phone": "918290015653",
+    "its": "50420823",
+    "studentId": "c62422b7-2f93-40ad-88b1-f4eda82d94cd",
+    "updatedAt": 1790938934710
+  },
+  "phone:919950484151": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Alaqmar bhai Mufaddal bhai Tekri wala",
+    "phone": "919950484151",
+    "its": "40919416",
+    "studentId": "665f5d37-4a0f-4811-b223-415f0154d022",
+    "updatedAt": 1790940047335
+  },
+  "its:40919416": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Alaqmar bhai Mufaddal bhai Tekri wala",
+    "phone": "919950484151",
+    "its": "40919416",
+    "studentId": "665f5d37-4a0f-4811-b223-415f0154d022",
+    "updatedAt": 1790940047335
+  },
+  "name:alaqmar bhai mufaddal bhai tekri wala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Alaqmar bhai Mufaddal bhai Tekri wala",
+    "phone": "919950484151",
+    "its": "40919416",
+    "studentId": "665f5d37-4a0f-4811-b223-415f0154d022",
+    "updatedAt": 1790940047335
+  },
+  "id:665f5d37-4a0f-4811-b223-415f0154d022": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Alaqmar bhai Mufaddal bhai Tekri wala",
+    "phone": "919950484151",
+    "its": "40919416",
+    "studentId": "665f5d37-4a0f-4811-b223-415f0154d022",
+    "updatedAt": 1790940047335
+  },
+  "its:40919409": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "studentId": "10338619-9be5-4f2b-9a68-4c8f80a5b479",
+    "time": "5:12 PM",
+    "updatedAt": 1791275088713,
+    "name": "Mohammed bhai Aliasgar bhai Chikliwala",
+    "its": "40919409",
+    "phone": ""
+  },
+  "name:mohammed bhai aliasgar bhai chikliwala": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "studentId": "10338619-9be5-4f2b-9a68-4c8f80a5b479",
+    "time": "5:12 PM",
+    "updatedAt": 1791275088713,
+    "name": "Mohammed bhai Aliasgar bhai Chikliwala",
+    "its": "40919409",
+    "phone": ""
+  },
+  "id:10338619-9be5-4f2b-9a68-4c8f80a5b479": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "studentId": "10338619-9be5-4f2b-9a68-4c8f80a5b479",
+    "time": "5:12 PM",
+    "updatedAt": 1791275088713,
+    "name": "Mohammed bhai Aliasgar bhai Chikliwala",
+    "its": "40919409",
+    "phone": ""
+  },
+  "phone:919929805809": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-28",
+    "name": "Hasan bhai Murtaza bhai Hamid",
+    "phone": "919929805809",
+    "its": "40919431",
+    "studentId": "0cc27a7a-a964-4e64-bc58-cdd65142cd7e",
+    "updatedAt": 1790939828810
+  },
+  "its:40919431": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-28",
+    "name": "Hasan bhai Murtaza bhai Hamid",
+    "phone": "919929805809",
+    "its": "40919431",
+    "studentId": "0cc27a7a-a964-4e64-bc58-cdd65142cd7e",
+    "updatedAt": 1790939828810
+  },
+  "name:hasan bhai murtaza bhai hamid": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-28",
+    "name": "Hasan bhai Murtaza bhai Hamid",
+    "phone": "919929805809",
+    "its": "40919431",
+    "studentId": "0cc27a7a-a964-4e64-bc58-cdd65142cd7e",
+    "updatedAt": 1790939828810
+  },
+  "id:0cc27a7a-a964-4e64-bc58-cdd65142cd7e": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-28",
+    "name": "Hasan bhai Murtaza bhai Hamid",
+    "phone": "919929805809",
+    "its": "40919431",
+    "studentId": "0cc27a7a-a964-4e64-bc58-cdd65142cd7e",
+    "updatedAt": 1790939828810
+  },
+  "phone:96594084786": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Hasan bhai Husain bhai Bhukhiya wala",
+    "phone": "96594084786",
+    "its": "60481751",
+    "studentId": "36dd4f6e-8a1c-4ec2-99c5-6b5b2dc5f394",
+    "updatedAt": 1790940414508
+  },
+  "its:60481751": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Hasan bhai Husain bhai Bhukhiya wala",
+    "phone": "96594084786",
+    "its": "60481751",
+    "studentId": "36dd4f6e-8a1c-4ec2-99c5-6b5b2dc5f394",
+    "updatedAt": 1790940414508
+  },
+  "name:hasan bhai husain bhai bhukhiya wala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Hasan bhai Husain bhai Bhukhiya wala",
+    "phone": "96594084786",
+    "its": "60481751",
+    "studentId": "36dd4f6e-8a1c-4ec2-99c5-6b5b2dc5f394",
+    "updatedAt": 1790940414508
+  },
+  "id:36dd4f6e-8a1c-4ec2-99c5-6b5b2dc5f394": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-09-26",
+    "name": "Hasan bhai Husain bhai Bhukhiya wala",
+    "phone": "96594084786",
+    "its": "60481751",
+    "studentId": "36dd4f6e-8a1c-4ec2-99c5-6b5b2dc5f394",
+    "updatedAt": 1790940414508
+  },
+  "its:40192312": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "name": "Saifuddin bhai Abbas bhai Murga",
+    "phone": "",
+    "its": "40192312",
+    "studentId": "53991a31-3ba4-4e57-9bdf-8a3236feaf52",
+    "updatedAt": 1790939343672
+  },
+  "name:saifuddin bhai abbas bhai murga": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "name": "Saifuddin bhai Abbas bhai Murga",
+    "phone": "",
+    "its": "40192312",
+    "studentId": "53991a31-3ba4-4e57-9bdf-8a3236feaf52",
+    "updatedAt": 1790939343672
+  },
+  "id:53991a31-3ba4-4e57-9bdf-8a3236feaf52": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "name": "Saifuddin bhai Abbas bhai Murga",
+    "phone": "",
+    "its": "40192312",
+    "studentId": "53991a31-3ba4-4e57-9bdf-8a3236feaf52",
+    "updatedAt": 1790939343672
+  },
+  "its:40153100": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "name": "Ruqaiyah bai Shaikh Shabbir bhai Shakir",
+    "phone": "",
+    "its": "40153100",
+    "studentId": "43ad7291-43ff-49f7-8ae8-543a31eced80",
+    "updatedAt": 1790940446740
+  },
+  "name:ruqaiyah bai shaikh shabbir bhai shakir": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "name": "Ruqaiyah bai Shaikh Shabbir bhai Shakir",
+    "phone": "",
+    "its": "40153100",
+    "studentId": "43ad7291-43ff-49f7-8ae8-543a31eced80",
+    "updatedAt": 1790940446740
+  },
+  "id:43ad7291-43ff-49f7-8ae8-543a31eced80": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-02",
+    "name": "Ruqaiyah bai Shaikh Shabbir bhai Shakir",
+    "phone": "",
+    "its": "40153100",
+    "studentId": "43ad7291-43ff-49f7-8ae8-543a31eced80",
+    "updatedAt": 1790940446740
+  },
+  "phone:918849345085": {
+    "status": "Excused (Leave)",
+    "statusEmoji": "📝",
+    "date": "2026-10-02",
+    "name": "Fatema bai Shaikh Adnan bhai Haider mota",
+    "phone": "918849345085",
+    "its": "40901593",
+    "studentId": "a0b86790-02d5-4d0a-ae4a-81bf20d44d1b",
+    "updatedAt": 1790940447257
+  },
+  "its:40901593": {
+    "status": "Excused (Leave)",
+    "statusEmoji": "📝",
+    "date": "2026-10-02",
+    "name": "Fatema bai Shaikh Adnan bhai Haider mota",
+    "phone": "918849345085",
+    "its": "40901593",
+    "studentId": "a0b86790-02d5-4d0a-ae4a-81bf20d44d1b",
+    "updatedAt": 1790940447257
+  },
+  "name:fatema bai shaikh adnan bhai haider mota": {
+    "status": "Excused (Leave)",
+    "statusEmoji": "📝",
+    "date": "2026-10-02",
+    "name": "Fatema bai Shaikh Adnan bhai Haider mota",
+    "phone": "918849345085",
+    "its": "40901593",
+    "studentId": "a0b86790-02d5-4d0a-ae4a-81bf20d44d1b",
+    "updatedAt": 1790940447257
+  },
+  "id:a0b86790-02d5-4d0a-ae4a-81bf20d44d1b": {
+    "status": "Excused (Leave)",
+    "statusEmoji": "📝",
+    "date": "2026-10-02",
+    "name": "Fatema bai Shaikh Adnan bhai Haider mota",
+    "phone": "918849345085",
+    "its": "40901593",
+    "studentId": "a0b86790-02d5-4d0a-ae4a-81bf20d44d1b",
+    "updatedAt": 1790940447257
+  },
+  "phone:919833428502": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Burhanuddin Bhai Shaikh Juzer bhai Presswala",
+    "phone": "919833428502",
+    "its": "40163675",
+    "studentId": "520f5eeb-8c18-461e-b051-3cdb6f72f5e9",
+    "updatedAt": 1790940447794
+  },
+  "its:40163675": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Burhanuddin Bhai Shaikh Juzer bhai Presswala",
+    "phone": "919833428502",
+    "its": "40163675",
+    "studentId": "520f5eeb-8c18-461e-b051-3cdb6f72f5e9",
+    "updatedAt": 1790940447794
+  },
+  "name:burhanuddin bhai shaikh juzer bhai presswala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Burhanuddin Bhai Shaikh Juzer bhai Presswala",
+    "phone": "919833428502",
+    "its": "40163675",
+    "studentId": "520f5eeb-8c18-461e-b051-3cdb6f72f5e9",
+    "updatedAt": 1790940447794
+  },
+  "id:520f5eeb-8c18-461e-b051-3cdb6f72f5e9": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Burhanuddin Bhai Shaikh Juzer bhai Presswala",
+    "phone": "919833428502",
+    "its": "40163675",
+    "studentId": "520f5eeb-8c18-461e-b051-3cdb6f72f5e9",
+    "updatedAt": 1790940447794
+  },
+  "id:4090391": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Student",
+    "phone": "",
+    "its": "",
+    "studentId": "4090391",
+    "updatedAt": 1790943394543
+  },
+  "phone:918511387461": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Lamya bai Mulla Zoeb bhai Ezzy",
+    "phone": "918511387461",
+    "its": "40204487",
+    "studentId": "9536fa54-1bd3-42c4-908e-6ff55c77b7ae",
+    "updatedAt": 1790943573412
+  },
+  "its:40204487": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Lamya bai Mulla Zoeb bhai Ezzy",
+    "phone": "918511387461",
+    "its": "40204487",
+    "studentId": "9536fa54-1bd3-42c4-908e-6ff55c77b7ae",
+    "updatedAt": 1790943573412
+  },
+  "name:lamya bai mulla zoeb bhai ezzy": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Lamya bai Mulla Zoeb bhai Ezzy",
+    "phone": "918511387461",
+    "its": "40204487",
+    "studentId": "9536fa54-1bd3-42c4-908e-6ff55c77b7ae",
+    "updatedAt": 1790943573412
+  },
+  "id:9536fa54-1bd3-42c4-908e-6ff55c77b7ae": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Lamya bai Mulla Zoeb bhai Ezzy",
+    "phone": "918511387461",
+    "its": "40204487",
+    "studentId": "9536fa54-1bd3-42c4-908e-6ff55c77b7ae",
+    "updatedAt": 1790943573412
+  },
+  "its:40190470": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Hatim bhai Mulla Zoeb bhai Ezzy",
+    "phone": "919930852533",
+    "its": "40190470",
+    "studentId": "e95f830f-671d-4658-bba5-771eb0c6f6e6",
+    "updatedAt": 1790943661280
+  },
+  "name:hatim bhai mulla zoeb bhai ezzy": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Hatim bhai Mulla Zoeb bhai Ezzy",
+    "phone": "919930852533",
+    "its": "40190470",
+    "studentId": "e95f830f-671d-4658-bba5-771eb0c6f6e6",
+    "updatedAt": 1790943661280
+  },
+  "id:e95f830f-671d-4658-bba5-771eb0c6f6e6": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Hatim bhai Mulla Zoeb bhai Ezzy",
+    "phone": "919930852533",
+    "its": "40190470",
+    "studentId": "e95f830f-671d-4658-bba5-771eb0c6f6e6",
+    "updatedAt": 1790943661280
+  },
+  "phone:917737402778": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Shabbir bhai Ishaq bhai Kunwa",
+    "phone": "917737402778",
+    "its": "40154547",
+    "studentId": "070d6330-cb79-40d6-a97d-81bace2defb9",
+    "updatedAt": 1791289262889
+  },
+  "its:40154547": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Shabbir bhai Ishaq bhai Kunwa",
+    "phone": "917737402778",
+    "its": "40154547",
+    "studentId": "070d6330-cb79-40d6-a97d-81bace2defb9",
+    "updatedAt": 1791289262889
+  },
+  "name:shabbir bhai ishaq bhai kunwa": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Shabbir bhai Ishaq bhai Kunwa",
+    "phone": "917737402778",
+    "its": "40154547",
+    "studentId": "070d6330-cb79-40d6-a97d-81bace2defb9",
+    "updatedAt": 1791289262889
+  },
+  "id:070d6330-cb79-40d6-a97d-81bace2defb9": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Shabbir bhai Ishaq bhai Kunwa",
+    "phone": "917737402778",
+    "its": "40154547",
+    "studentId": "070d6330-cb79-40d6-a97d-81bace2defb9",
+    "updatedAt": 1791289262889
+  },
+  "phone:919799841174": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Samina bai Zoeb bhai Laljiwala",
+    "phone": "919799841174",
+    "its": "40154551",
+    "studentId": "7df8c8ef-c6cb-471e-98dc-a1b39ea1327f",
+    "updatedAt": 1791289260307
+  },
+  "its:40154551": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Samina bai Zoeb bhai Laljiwala",
+    "phone": "919799841174",
+    "its": "40154551",
+    "studentId": "7df8c8ef-c6cb-471e-98dc-a1b39ea1327f",
+    "updatedAt": 1791289260307
+  },
+  "name:samina bai zoeb bhai laljiwala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Samina bai Zoeb bhai Laljiwala",
+    "phone": "919799841174",
+    "its": "40154551",
+    "studentId": "7df8c8ef-c6cb-471e-98dc-a1b39ea1327f",
+    "updatedAt": 1791289260307
+  },
+  "id:7df8c8ef-c6cb-471e-98dc-a1b39ea1327f": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Samina bai Zoeb bhai Laljiwala",
+    "phone": "919799841174",
+    "its": "40154551",
+    "studentId": "7df8c8ef-c6cb-471e-98dc-a1b39ea1327f",
+    "updatedAt": 1791289260307
+  },
+  "name:mohammed hasan bhai banswara wala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Mohammed hasan bhai Banswara wala",
+    "phone": "",
+    "its": "",
+    "studentId": "302af2cb-86c3-4463-b633-0d84a105c022",
+    "updatedAt": 1791289258255
+  },
+  "id:302af2cb-86c3-4463-b633-0d84a105c022": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Mohammed hasan bhai Banswara wala",
+    "phone": "",
+    "its": "",
+    "studentId": "302af2cb-86c3-4463-b633-0d84a105c022",
+    "updatedAt": 1791289258255
+  },
+  "id:...": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Student",
+    "phone": "",
+    "its": "",
+    "studentId": "...",
+    "updatedAt": 1790949558305
+  },
+  "phone:916376615292": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Mohammed bhai Malvi",
+    "phone": "916376615292",
+    "its": "40192322",
+    "studentId": "3daa574d-1f97-45e2-a1e0-eebf7d4ce848",
+    "updatedAt": 1791287055065
+  },
+  "its:40192322": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Mohammed bhai Malvi",
+    "phone": "916376615292",
+    "its": "40192322",
+    "studentId": "3daa574d-1f97-45e2-a1e0-eebf7d4ce848",
+    "updatedAt": 1791287055065
+  },
+  "name:burhanuddin bhai mohammed bhai malvi": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Mohammed bhai Malvi",
+    "phone": "916376615292",
+    "its": "40192322",
+    "studentId": "3daa574d-1f97-45e2-a1e0-eebf7d4ce848",
+    "updatedAt": 1791287055065
+  },
+  "id:3daa574d-1f97-45e2-a1e0-eebf7d4ce848": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Mohammed bhai Malvi",
+    "phone": "916376615292",
+    "its": "40192322",
+    "studentId": "3daa574d-1f97-45e2-a1e0-eebf7d4ce848",
+    "updatedAt": 1791287055065
+  },
+  "phone:919925965352": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Ummehani bai Mulla Hatim bhai Poonawala",
+    "phone": "919925965352",
+    "its": "40914390",
+    "studentId": "673b971a-4684-4fc2-a3d7-54abd83b8db1",
+    "updatedAt": 1790950260049
+  },
+  "its:40914390": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Ummehani bai Mulla Hatim bhai Poonawala",
+    "phone": "919925965352",
+    "its": "40914390",
+    "studentId": "673b971a-4684-4fc2-a3d7-54abd83b8db1",
+    "updatedAt": 1790950260049
+  },
+  "name:ummehani bai mulla hatim bhai poonawala": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Ummehani bai Mulla Hatim bhai Poonawala",
+    "phone": "919925965352",
+    "its": "40914390",
+    "studentId": "673b971a-4684-4fc2-a3d7-54abd83b8db1",
+    "updatedAt": 1790950260049
+  },
+  "id:673b971a-4684-4fc2-a3d7-54abd83b8db1": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Ummehani bai Mulla Hatim bhai Poonawala",
+    "phone": "919925965352",
+    "its": "40914390",
+    "studentId": "673b971a-4684-4fc2-a3d7-54abd83b8db1",
+    "updatedAt": 1790950260049
+  },
+  "phone:917023805152": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Shabbir bhai Jamali",
+    "phone": "917023805152",
+    "its": "40184724",
+    "studentId": "cfd7fb59-e915-4e53-b3da-f32846e27d6f",
+    "updatedAt": 1791289265142
+  },
+  "its:40184724": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Shabbir bhai Jamali",
+    "phone": "917023805152",
+    "its": "40184724",
+    "studentId": "cfd7fb59-e915-4e53-b3da-f32846e27d6f",
+    "updatedAt": 1791289265142
+  },
+  "name:burhanuddin bhai shabbir bhai jamali": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Shabbir bhai Jamali",
+    "phone": "917023805152",
+    "its": "40184724",
+    "studentId": "cfd7fb59-e915-4e53-b3da-f32846e27d6f",
+    "updatedAt": 1791289265142
+  },
+  "id:cfd7fb59-e915-4e53-b3da-f32846e27d6f": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "name": "Burhanuddin bhai Shabbir bhai Jamali",
+    "phone": "917023805152",
+    "its": "40184724",
+    "studentId": "cfd7fb59-e915-4e53-b3da-f32846e27d6f",
+    "updatedAt": 1791289265142
+  },
+  "name:husaina bai shaikh murtaza bhai al saifee": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Husaina bai Shaikh Murtaza bhai Al Saifee",
+    "phone": "",
+    "its": "",
+    "studentId": "97abc227-00d8-4dd9-ae5d-109f1b7ee850",
+    "updatedAt": 1790952217459
+  },
+  "id:97abc227-00d8-4dd9-ae5d-109f1b7ee850": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-02",
+    "name": "Husaina bai Shaikh Murtaza bhai Al Saifee",
+    "phone": "",
+    "its": "",
+    "studentId": "97abc227-00d8-4dd9-ae5d-109f1b7ee850",
+    "updatedAt": 1790952217459
+  },
+  "id:123456": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "studentId": "123456",
+    "time": "5:47 PM",
+    "updatedAt": 1791275088719
+  },
+  "id:60202336": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "studentId": "60202336",
+    "time": "5:13 PM",
+    "updatedAt": 1791275088720
+  },
+  "id:e2b49e78-8688-4003-ae5f-4512aaca45c7": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "studentId": "e2b49e78-8688-4003-ae5f-4512aaca45c7",
+    "time": "5:11 PM",
+    "updatedAt": 1791275088721
+  },
+  "id:zmqGZXZjAGumqRTdH2dF": {
+    "status": "Present",
+    "statusEmoji": "✅",
+    "date": "2026-10-06",
+    "studentId": "zmqGZXZjAGumqRTdH2dF",
+    "time": "5:14 PM",
+    "updatedAt": 1791275088724
+  },
+  "id:50420823": {
+    "status": "Absent",
+    "statusEmoji": "❌",
+    "date": "2026-10-06",
+    "name": "Student",
+    "phone": "",
+    "its": "",
+    "studentId": "50420823",
+    "updatedAt": 1791285876288
+  }
+}

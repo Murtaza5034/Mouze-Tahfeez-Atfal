@@ -16,8 +16,16 @@ import {
   Award,
   Calendar,
   User,
-  Users
+  Users,
+  Lock,
+  Unlock,
+  AlertTriangle
 } from "lucide-react";
+import {
+  DEFAULT_LEAGUE_LOCK_CONFIG,
+  subscribeToLeagueLockConfig,
+  checkWeekLockStatus,
+} from "../utils/leagueLockManager";
 
 // ---------------------------------------------------------------------------
 // ISLAMIC MONTHS CONFIGURATION (Matching the 4-page PDF reference)
@@ -307,6 +315,16 @@ export default function AtfalTeacherLeagueEntry({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
 
+  // Lock & Permissions Configuration (Real-time synced from Admin)
+  const [lockConfig, setLockConfig] = useState(DEFAULT_LEAGUE_LOCK_CONFIG);
+
+  useEffect(() => {
+    const unsub = subscribeToLeagueLockConfig((latest) => {
+      setLockConfig(latest);
+    });
+    return () => unsub();
+  }, []);
+
   // Input draft buffer: prevents digit jumping/erasing while user types
   const [rawDrafts, setRawDrafts] = useState({});
   const activeFocusKeyRef = useRef(null);
@@ -594,6 +612,13 @@ export default function AtfalTeacherLeagueEntry({
 
   // 6. Handling marks input changes (0 to 60) with instant UI calculation
   const handleScoreChange = useCallback((weekKey, field, rawValue, immediateFlush = false) => {
+    // Check lock permission before modifying
+    const lockStatus = checkWeekLockStatus(lockConfig, selectedMonthId, weekKey, teacherIdentity, currentUserId);
+    if (lockStatus.isLocked) {
+      setSaveError(`This week is locked by Admin (${lockStatus.reason}). Changes cannot be saved.`);
+      return;
+    }
+
     const draftKey = `${selectedStudentId}_${selectedMonthId}_${weekKey}_${field}`;
 
     // Update raw string draft so typing is smooth and never resets
@@ -1023,11 +1048,24 @@ export default function AtfalTeacherLeagueEntry({
                 <span className="banner-ar-text">{currentMonthConfig.nameAr}</span>
               </div>
             </div>
+
+            {/* Month Lock Banner when month is archived/locked */}
+            {WEEKS_META.every(w => checkWeekLockStatus(lockConfig, selectedMonthId, w.key, teacherIdentity, currentUserId).isLocked) && (
+              <div className="league-month-locked-alert">
+                <Lock size={15} />
+                <span>
+                  <strong>Archived / Locked by Admin:</strong> Points for {currentMonthConfig.nameEn} are locked. Contact administrator to request unlock.
+                </span>
+              </div>
+            )}
           </header>
 
           {/* 4 WEEK ENTRY CARDS GRID */}
           <div className="parchment-weeks-grid">
             {WEEKS_META.filter(w => selectedWeekFilter === "all" || selectedWeekFilter === String(w.number)).map((week) => {
+              const lockStatus = checkWeekLockStatus(lockConfig, selectedMonthId, week.key, teacherIdentity, currentUserId);
+              const isWeekLocked = lockStatus.isLocked;
+
               const weekData = activeMonthData.weeks?.[week.key] || { post_it: 0, activity: 0 };
               const postItScore = Number(weekData.post_it) || 0;
               const activityScore = Number(weekData.activity) || 0;
@@ -1042,13 +1080,22 @@ export default function AtfalTeacherLeagueEntry({
               const actDisplayVal = actRaw !== undefined ? actRaw : (activityScore === 0 ? "" : String(activityScore));
 
               return (
-                <div key={week.key} className="parchment-week-card">
+                <div key={week.key} className={`parchment-week-card ${isWeekLocked ? "is-week-locked" : ""}`}>
                   {/* Week Header */}
                   <div className="week-card-header">
                     <div className="week-card-header-left">
                       <img src={week.gemImg} alt={week.gemName} className="header-mini-3d-gem" />
                       <span className="week-ar-tag">{week.titleAr}</span>
                       <span className="week-en-tag">({week.gemName})</span>
+                      {isWeekLocked ? (
+                        <span className="week-lock-pill locked" title={lockStatus.reason}>
+                          <Lock size={12} /> Locked
+                        </span>
+                      ) : lockStatus.isOverridden ? (
+                        <span className="week-lock-pill custom-unlocked" title={lockStatus.reason}>
+                          <Unlock size={12} /> Unlocked
+                        </span>
+                      ) : null}
                     </div>
                     <span className="week-total-pill">Total: {weekTotal} / 120</span>
                   </div>
@@ -1070,6 +1117,7 @@ export default function AtfalTeacherLeagueEntry({
                             type="number"
                             min="0"
                             max="60"
+                            disabled={isWeekLocked}
                             value={postItDisplayVal}
                             onFocus={() => { activeFocusKeyRef.current = postItDraftKey; }}
                             onBlur={() => handleScoreBlur(week.key, "post_it")}
@@ -1081,7 +1129,8 @@ export default function AtfalTeacherLeagueEntry({
                               }
                             }}
                             placeholder="0"
-                            className="gem-score-input"
+                            className={`gem-score-input ${isWeekLocked ? "is-locked" : ""}`}
+                            title={isWeekLocked ? lockStatus.reason : "Enter Post-It Gems (0-60)"}
                           />
                           <span className="gem-max-label">/ 60</span>
                         </div>
@@ -1090,6 +1139,7 @@ export default function AtfalTeacherLeagueEntry({
                         <div className="gem-stepper-btns">
                           <button
                             type="button"
+                            disabled={isWeekLocked}
                             onClick={() => handleScoreChange(week.key, "post_it", Math.max(0, postItScore - 5), true)}
                             title="-5 Gems"
                           >
@@ -1097,6 +1147,7 @@ export default function AtfalTeacherLeagueEntry({
                           </button>
                           <button
                             type="button"
+                            disabled={isWeekLocked}
                             onClick={() => handleScoreChange(week.key, "post_it", Math.min(60, postItScore + 5), true)}
                             title="+5 Gems"
                           >
@@ -1104,6 +1155,7 @@ export default function AtfalTeacherLeagueEntry({
                           </button>
                           <button
                             type="button"
+                            disabled={isWeekLocked}
                             className="btn-full-gems"
                             onClick={() => handleScoreChange(week.key, "post_it", 60, true)}
                             title="Full 60 Gems"
@@ -1132,6 +1184,7 @@ export default function AtfalTeacherLeagueEntry({
                             type="number"
                             min="0"
                             max="60"
+                            disabled={isWeekLocked}
                             value={actDisplayVal}
                             onFocus={() => { activeFocusKeyRef.current = actDraftKey; }}
                             onBlur={() => handleScoreBlur(week.key, "activity")}
@@ -1146,7 +1199,8 @@ export default function AtfalTeacherLeagueEntry({
                               }
                             }}
                             placeholder="0"
-                            className="gem-score-input"
+                            className={`gem-score-input ${isWeekLocked ? "is-locked" : ""}`}
+                            title={isWeekLocked ? lockStatus.reason : "Enter Activity Gems (0-60)"}
                           />
                           <span className="gem-max-label">/ 60</span>
                         </div>
@@ -1155,6 +1209,7 @@ export default function AtfalTeacherLeagueEntry({
                         <div className="gem-stepper-btns">
                           <button
                             type="button"
+                            disabled={isWeekLocked}
                             onClick={() => handleScoreChange(week.key, "activity", Math.max(0, activityScore - 5), true)}
                             title="-5 Gems"
                           >
@@ -1162,6 +1217,7 @@ export default function AtfalTeacherLeagueEntry({
                           </button>
                           <button
                             type="button"
+                            disabled={isWeekLocked}
                             onClick={() => handleScoreChange(week.key, "activity", Math.min(60, activityScore + 5), true)}
                             title="+5 Gems"
                           >
@@ -1169,6 +1225,7 @@ export default function AtfalTeacherLeagueEntry({
                           </button>
                           <button
                             type="button"
+                            disabled={isWeekLocked}
                             className="btn-full-gems"
                             onClick={() => handleScoreChange(week.key, "activity", 60, true)}
                             title="Full 60 Gems"

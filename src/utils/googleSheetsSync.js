@@ -285,6 +285,47 @@ export async function syncStudentResultToGoogleSheets({
   }
 }
 
+const syncQueueDebounceTimers = new Map();
+
+/**
+ * Real-time instant debounced sync to Google Sheets.
+ * When a teacher edits any field for any student, this buffers for delayMs (default 500ms)
+ * and then automatically pushes to Google Sheets in the background without UI lag.
+ */
+export function queueStudentResultSyncToGoogleSheets({
+  student,
+  result,
+  isKibar = false,
+  marhalaRank = "",
+  overallRank = "",
+  webhookUrl = "",
+  reportSettings = null,
+  delayMs = 500
+}) {
+  if (!student) return;
+  const sId = String(student.student_id || student.id || result?.student_id || "").trim();
+  if (!sId) return;
+
+  if (syncQueueDebounceTimers.has(sId)) {
+    clearTimeout(syncQueueDebounceTimers.get(sId));
+  }
+
+  const timer = setTimeout(() => {
+    syncQueueDebounceTimers.delete(sId);
+    syncStudentResultToGoogleSheets({
+      student,
+      result,
+      isKibar,
+      marhalaRank,
+      overallRank,
+      webhookUrl,
+      reportSettings
+    });
+  }, delayMs);
+
+  syncQueueDebounceTimers.set(sId, timer);
+}
+
 /**
  * Bulk sync all active students and their latest marks to Google Sheets.
  * Populates each student in their respective Marhala tab and in the "parents email" tab.

@@ -17,8 +17,11 @@ import {
   Award,
   AlertCircle,
   Gem,
-  BookOpen
+  BookOpen,
+  Lock,
+  ShieldCheck,
 } from "lucide-react";
+import AtfalLeagueLockModal from "./AtfalLeagueLockModal";
 import {
   MONTHS_CONFIG,
   calculateStudentMonthlyGems,
@@ -27,6 +30,8 @@ import {
 
 export default function AtfalLeagueAdminInfographic({
   students = [],
+  teacherProfiles = [],
+  portalAccessList = [],
   isDarkMode = false,
   showRoster = true,
   onNavigateToTracking = null,
@@ -38,6 +43,7 @@ export default function AtfalLeagueAdminInfographic({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'filled' | 'pending' | 'top'
   const [sortBy, setSortBy] = useState("gems-desc"); // 'gems-desc' | 'gems-asc' | 'name'
+  const [showLockModal, setShowLockModal] = useState(false);
 
   // 1. Subscribe in real-time to atfal_gem_league in Firestore
   useEffect(() => {
@@ -395,6 +401,15 @@ export default function AtfalLeagueAdminInfographic({
           <span className="section-sub-pill">Click a month card to inspect all student marks</span>
         </div>
         <div className="section-title-right">
+          <button
+            type="button"
+            className="league-lock-admin-trigger-btn"
+            onClick={() => setShowLockModal(true)}
+            title="Configure monthly and weekly lock permissions for teachers"
+          >
+            <Lock size={15} />
+            <span>Lock & Entry Permissions</span>
+          </button>
           <span className="active-month-reminder">
             Active: <strong>{activeMonthInfo.nameEn}</strong>
           </span>
@@ -753,6 +768,15 @@ export default function AtfalLeagueAdminInfographic({
         </div>
       </div>
       )}
+
+      {/* Admin League Lock Modal */}
+      <AtfalLeagueLockModal
+        isOpen={showLockModal}
+        onClose={() => setShowLockModal(false)}
+        teacherProfiles={teacherProfiles}
+        portalAccessList={portalAccessList}
+        isDarkMode={overallStats.isDark}
+      />
     </div>
   );
 }

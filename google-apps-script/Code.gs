@@ -515,11 +515,11 @@ function processBulkSync(payload) {
     // Collect row for parents email tab (if Atfal)
     if (category === "atfal") {
       const parentsSheet = getOrCreateParentsEmailSheet(spreadsheet);
-      const email = String(s.email || s.parent_email || "").trim().toLowerCase();
       const parentRow = buildParentsEmailRowValues(s, r, parentsSheet);
       if (parentRow) {
-        const key = email || String(s.student_id || s.id || s.name || ("row_" + i)).toLowerCase();
-        parentsRowsMap.set(key, parentRow);
+        // CRITICAL SIBLING FIX: Use unique student identifier (student_id, ITS, or Name) so siblings sharing the same parent email are BOTH preserved!
+        const studentUniqueKey = String(s.student_id || s.id || s.its || s.name || ("row_" + i)).trim().toLowerCase();
+        parentsRowsMap.set(studentUniqueKey, parentRow);
       }
     }
   }
@@ -1380,6 +1380,14 @@ function buildParentsEmailRowValues(student, result, sheet) {
   ];
 }
 
+function normalizeStudentNameForMatch(nameStr) {
+  if (!nameStr) return "";
+  return String(nameStr)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF]/g, "")
+    .trim();
+}
+
 function syncParentsEmailSheetRow(sheet, student, result) {
   const email = String(student.email || student.parent_email || "").trim().toLowerCase();
   const name = String(student.name || student.full_name || "").trim();
@@ -1392,28 +1400,33 @@ function syncParentsEmailSheetRow(sheet, student, result) {
   const data = sheet.getDataRange().getValues();
   let matchRowIndex = -1;
 
+  const normTargetName = normalizeStudentNameForMatch(name);
+
   for (let r = 1; r < data.length; r++) {
     const row = data[r];
-    const existingEmail = colMap.email ? String(row[colMap.email - 1] || "").trim().toLowerCase() : "";
-    const existingName = colMap.name ? String(row[colMap.name - 1] || "").trim().toLowerCase() : "";
-    const existingPhone = colMap.phone ? cleanWhatsAppPhone(String(row[colMap.phone - 1] || "")) : "";
+    const existingName = colMap.name ? String(row[colMap.name - 1] || "").trim() : "";
+    const normExistingName = normalizeStudentNameForMatch(existingName);
     const rowStr = row.join(" ").toLowerCase();
 
-    const nameMatches = name && (
-      existingName === name.toLowerCase() ||
-      existingName.replace(/\s+/g, '') === name.toLowerCase().replace(/\s+/g, '') ||
-      existingName.includes(name.toLowerCase()) ||
-      name.toLowerCase().includes(existingName)
-    );
+    // 1. Primary match: by Student Name (exact, normalized, or sub-phrase)
+    let isNameMatch = false;
+    if (normTargetName && normExistingName) {
+      if (normTargetName === normExistingName) {
+        isNameMatch = true;
+      } else if (normTargetName.length >= 4 && normExistingName.length >= 4) {
+        if (normExistingName.includes(normTargetName) || normTargetName.includes(normExistingName)) {
+          isNameMatch = true;
+        }
+      }
+    }
 
-    const emailMatches = email && existingEmail === email;
-    const phoneMatches = phone && existingPhone && (
-      phone === existingPhone ||
-      (phone.length >= 10 && existingPhone.length >= 10 && phone.slice(-10) === existingPhone.slice(-10))
-    );
-    const codeMatches = (its && rowStr.includes(its.toLowerCase())) || (sid && rowStr.includes(sid.toLowerCase()));
+    // 2. Secondary match: by ITS or Student ID in the row
+    const isCodeMatch = (its && its.length >= 3 && rowStr.includes(its.toLowerCase())) || 
+                        (sid && sid.length >= 2 && rowStr.includes(sid.toLowerCase()));
 
-    if (emailMatches || nameMatches || phoneMatches || codeMatches) {
+    // SIBLING PRESERVATION: We NEVER match solely by email/phone because siblings
+    // (such as Burhanuddin Jhoswa and Lamya) share the parent's email/phone and MUST have separate rows!
+    if (isNameMatch || isCodeMatch) {
       matchRowIndex = r + 1;
       break;
     }
@@ -1456,36 +1469,62 @@ function batchMergeParentsEmailRows(sheet, newRows) {
   }
 
   const colMap = getParentsSheetColumnMap(sheet);
-  const existingMap = new Map();
+  
+  // Index existing sheet rows by normalized student name and full row text
+  const existingRowsInfo = [];
   for (let r = 1; r < data.length; r++) {
-    const mail = (colMap.email && colMap.email <= data[r].length) ? String(data[r][colMap.email - 1] || "").toLowerCase().trim() : "";
-    const name = (colMap.name && colMap.name <= data[r].length) ? String(data[r][colMap.name - 1] || "").toLowerCase().trim() : "";
-    const phone = (colMap.phone && colMap.phone <= data[r].length) ? cleanWhatsAppPhone(String(data[r][colMap.phone - 1] || "")) : "";
-    if (mail) existingMap.set(mail, r + 1);
-    if (name) existingMap.set(name, r + 1);
-    if (phone) existingMap.set(phone, r + 1);
+    const name = (colMap.name && colMap.name <= data[r].length) ? String(data[r][colMap.name - 1] || "").trim() : "";
+    const normName = normalizeStudentNameForMatch(name);
+    const rowStr = data[r].join(" ").toLowerCase();
+    existingRowsInfo.push({
+      rowIndex: r + 1,
+      normName: normName,
+      rowStr: rowStr,
+      data: data[r]
+    });
   }
 
   const toAppend = [];
+  const updatedRowIndices = new Set();
+
   for (let i = 0; i < newRows.length; i++) {
     const nr = newRows[i];
-    const mail = (colMap.email && colMap.email <= nr.length) ? String(nr[colMap.email - 1] || "").toLowerCase().trim() : "";
-    const name = (colMap.name && colMap.name <= nr.length) ? String(nr[colMap.name - 1] || "").toLowerCase().trim() : "";
-    const phone = (colMap.phone && colMap.phone <= nr.length) ? cleanWhatsAppPhone(String(nr[colMap.phone - 1] || "")) : "";
+    const name = (colMap.name && colMap.name <= nr.length) ? String(nr[colMap.name - 1] || "").trim() : "";
+    const normName = normalizeStudentNameForMatch(name);
 
-    const existingRow = (mail && existingMap.get(mail)) || 
-                        (name && existingMap.get(name)) || 
-                        (phone && existingMap.get(phone));
+    // Match existing student row by name or unique student ID
+    let matchedRowInfo = null;
+    for (let k = 0; k < existingRowsInfo.length; k++) {
+      const info = existingRowsInfo[k];
+      if (updatedRowIndices.has(info.rowIndex)) continue; // Don't assign multiple distinct incoming students to the same row
 
-    if (existingRow) {
-      const existingData = data[existingRow - 1];
+      let nameMatch = false;
+      if (normName && info.normName) {
+        if (normName === info.normName) {
+          nameMatch = true;
+        } else if (normName.length >= 4 && info.normName.length >= 4) {
+          if (info.normName.includes(normName) || normName.includes(info.normName)) {
+            nameMatch = true;
+          }
+        }
+      }
+
+      if (nameMatch) {
+        matchedRowInfo = info;
+        break;
+      }
+    }
+
+    if (matchedRowInfo) {
+      updatedRowIndices.add(matchedRowInfo.rowIndex);
+      const existingData = matchedRowInfo.data;
       for (let c = 0; c < nr.length; c++) {
         if ((nr[c] === "" || nr[c] === null || nr[c] === undefined) &&
             existingData[c] !== "" && existingData[c] !== null && existingData[c] !== undefined) {
           nr[c] = existingData[c];
         }
       }
-      sheet.getRange(existingRow, 1, 1, nr.length).setValues([nr]);
+      sheet.getRange(matchedRowInfo.rowIndex, 1, 1, nr.length).setValues([nr]);
     } else {
       toAppend.push(nr);
     }

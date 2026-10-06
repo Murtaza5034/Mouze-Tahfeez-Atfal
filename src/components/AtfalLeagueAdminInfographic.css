@@ -218,6 +218,48 @@
   color: #94a3b8;
 }
 
+.section-title-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.league-lock-admin-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.league-lock-admin-trigger-btn:hover {
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #ffffff;
+  border-color: #b8860b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.35);
+}
+
+.dark-theme .league-lock-admin-trigger-btn {
+  background: linear-gradient(135deg, #3d2a14, #2b1d0c);
+  border-color: rgba(212, 175, 55, 0.3);
+  color: #fde68a;
+}
+
+.dark-theme .league-lock-admin-trigger-btn:hover {
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #ffffff;
+}
+
 .active-month-reminder {
   font-size: 0.8rem;
   color: #475569;

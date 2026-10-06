@@ -1346,7 +1346,6 @@ export function findStudentAttendance(student, phone, targetDate = '') {
     (its ? getStoredAttendanceRecord(`its:${its}`) : null) ||
     (p ? getStoredAttendanceRecord(`phone:${p}`) : null) ||
     (name ? getStoredAttendanceRecord(`name:${name}`) : null) ||
-    student?.latestAttendance ||
     null
   );
 
@@ -1372,36 +1371,41 @@ export async function syncTodayAttendanceFromFirestore() {
   if (!firestoreAdminDb) return;
   try {
     const ist = getISTDateParts();
-    const todayKey = ist.dateKey;
-    const snap = await firestoreAdminDb.collection('student_daily_attendance')
-      .where('attendance_date', '==', todayKey)
-      .get();
-    if (!snap.empty) {
-      snap.forEach(doc => {
-        const data = doc.data();
-        const sid = data.student_id;
-        const status = /absent/i.test(data.status) ? 'Absent' : (/leave|uzur/i.test(data.status) ? 'Leave' : 'Present');
-        const statusEmoji = status === 'Absent' ? '❌' : (status === 'Leave' ? '📝' : '✅');
-        const record = {
-          status,
-          statusEmoji,
-          date: data.attendance_date,
-          studentId: sid,
-          time: data.time || '',
-          updatedAt: Date.now()
-        };
-        const s = embeddedRoster.find(item => item.student_id === sid || item.id === sid);
-        if (s) {
-          record.name = s.name;
-          record.its = s.its;
-          record.phone = cleanPhone(s.phone);
-        }
-        if (record.studentId) saveAttendanceRecord(`id:${record.studentId}`, record);
-        if (record.its) saveAttendanceRecord(`its:${record.its}`, record);
-        if (record.phone) saveAttendanceRecord(`phone:${record.phone}`, record);
-        if (record.name) saveAttendanceRecord(`name:${record.name.toLowerCase()}`, record);
-      });
-      console.log(`[ATTENDANCE-SYNC] 📊 Synced ${snap.size} attendance records for today (${todayKey}) from Firestore.`);
+    const todayKey = ist.dateKey; // e.g. 2026-10-06
+    const todayDisplay = ist.dateDisplay; // e.g. 06/10/2026
+
+    for (const colName of ['student_daily_attendance', 'kibar_student_daily_attendance']) {
+      try {
+        const [snap1, snap2] = await Promise.all([
+          firestoreAdminDb.collection(colName).where('attendance_date', '==', todayKey).get(),
+          firestoreAdminDb.collection(colName).where('attendance_date', '==', todayDisplay).get()
+        ]);
+        const allDocs = [...(snap1?.docs || []), ...(snap2?.docs || [])];
+        allDocs.forEach(doc => {
+          const data = doc.data();
+          const sid = data.student_id;
+          const status = /absent/i.test(data.status) ? 'Absent' : (/leave|uzur/i.test(data.status) ? 'Leave' : 'Present');
+          const statusEmoji = status === 'Absent' ? '❌' : (status === 'Leave' ? '📝' : '✅');
+          const record = {
+            status,
+            statusEmoji,
+            date: data.attendance_date,
+            studentId: sid,
+            time: data.time || '',
+            updatedAt: Date.now()
+          };
+          const s = embeddedRoster.find(item => item.student_id === sid || item.id === sid || (data.its && String(item.its) === String(data.its)));
+          if (s) {
+            record.name = s.name;
+            record.its = s.its;
+            record.phone = cleanPhone(s.phone);
+          }
+          if (record.studentId) saveAttendanceRecord(`id:${record.studentId}`, record);
+          if (record.its) saveAttendanceRecord(`its:${record.its}`, record);
+          if (record.phone) saveAttendanceRecord(`phone:${record.phone}`, record);
+          if (record.name) saveAttendanceRecord(`name:${record.name.toLowerCase()}`, record);
+        });
+      } catch (_) {}
     }
   } catch (err) {
     console.warn('[ATTENDANCE-SYNC-ERR]:', err.message);
@@ -1467,11 +1471,194 @@ export function findStudentLeave(student, phone, targetDate = '') {
 }
 
 // ---------------------------------------------------------------------------
-// Persistent Live Weekly Results Store (Memory + Disk Sync + Backend Firebase)
+// ---------------------------------------------------------------------------
+// Persistent Live Weekly Results Store & Dynamic Ranking Engine
 // Scores are strictly out of 100, and Current Juz is derived from Wusool Juz.
 // ---------------------------------------------------------------------------
 const WA_RESULTS_PATH = path.resolve('latest_weekly_results.json');
 export const latestWeeklyResultsMap = new Map();
+
+// Canonical Marhala definitions
+export const MARHALA_ORDER = [
+  "Marhala Ula",
+  "Marhala Saniyah",
+  "Marhala Salesah",
+  "Marhala Rabeah",
+  "Marhala Khamesah",
+  "Marhala Sadesah",
+  "Marhala Sabeah",
+  "Marhala Saminah",
+];
+
+export const MARHALA_JUZ_BUCKETS = [
+  { marhala: "Marhala Ula", juz: [30] },
+  { marhala: "Marhala Saniyah", juz: [28, 29, 30] },
+  { marhala: "Marhala Salesah", juz: [26, 27, 28, 29, 30] },
+  { marhala: "Marhala Rabeah", juz: [1, 2, 3, 4, 5, 26, 27, 28, 29, 30] },
+  { marhala: "Marhala Khamesah", juz: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 26, 27, 28, 29, 30] },
+  { marhala: "Marhala Sadesah", juz: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 26, 27, 28, 29, 30] },
+  { marhala: "Marhala Sabeah", juz: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 26, 27, 28, 29, 30] },
+  { marhala: "Marhala Saminah", juz: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] },
+];
+
+export function deriveMarhalaFromJuz(juz) {
+  const n = parseInt(String(juz ?? "").trim().replace(/\D/g, ''), 10);
+  if (!n || isNaN(n)) return "Marhala Ula";
+  if (n === 30) return "Marhala Ula";
+  if (n === 28 || n === 29) return "Marhala Saniyah";
+  if (n === 26 || n === 27) return "Marhala Salesah";
+  if (n >= 1 && n <= 5) return "Marhala Rabeah";
+  if (n >= 6 && n <= 10) return "Marhala Khamesah";
+  if (n >= 11 && n <= 15) return "Marhala Sadesah";
+  if (n >= 16 && n <= 20) return "Marhala Sabeah";
+  if (n >= 21 && n <= 25) return "Marhala Saminah";
+  return "Marhala Ula";
+}
+
+export function getStudentMarhala(student, weeklyResult) {
+  const wJuz = weeklyResult?.wusool_juz;
+  if (wJuz && String(wJuz).trim() !== '' && String(wJuz).trim() !== '—') {
+    return deriveMarhalaFromJuz(wJuz);
+  }
+  const explicit = String(student?.marhala || weeklyResult?.marhala || "").trim();
+  if (explicit && MARHALA_ORDER.includes(explicit)) {
+    return explicit;
+  }
+  const juz = student?.juz || student?.hifz?.juz || "";
+  return deriveMarhalaFromJuz(juz);
+}
+
+/**
+ * Recalculates exact dynamic Marhala Ranks and Overall Ranks across active Atfal students
+ * strictly matching the web app's Marhala Results page logic.
+ */
+export function recalculateAllRanks() {
+  const allEntries = [];
+  const processedKeys = new Set();
+
+  // 1. Process active Atfal students from embedded roster
+  for (const s of embeddedRoster) {
+    const sId = String(s.student_id || s.id || '').trim();
+    const its = String(s.its || '').trim();
+    const key = sId || its || s.name;
+    if (processedKeys.has(key)) continue;
+    processedKeys.add(key);
+
+    const res = getStoredWeeklyResult(s) || {};
+    const rawScore = (res.total_score !== undefined && res.total_score !== null && res.total_score !== '')
+      ? res.total_score
+      : ((res.weeklyScore !== undefined && res.weeklyScore !== null && res.weeklyScore !== '') ? res.weeklyScore : (s.weeklyScore ?? 0));
+    
+    const score = Number(rawScore) || 0;
+    const jadeed = Number(res.jadeed || 0);
+    const jadeedPages = Number(String(res.total_jadeed_pages || 0).replace(/[^0-9.]/g, '')) || 0;
+    const att = Number(res.attendance_count || 0);
+    
+    const wJuz = res.wusool_juz ? String(res.wusool_juz).trim() : (s.juz || '30');
+    const marhala = deriveMarhalaFromJuz(wJuz);
+
+    allEntries.push({
+      student: s,
+      result: res,
+      key,
+      sId,
+      its,
+      name: s.name,
+      marhala,
+      score,
+      jadeed,
+      jadeedPages,
+      att
+    });
+  }
+
+  if (allEntries.length === 0) return;
+
+  // 2. Compute OVERALL RANKS across entire Atfal school cohort (out of total active students)
+  allEntries.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.jadeed !== a.jadeed) return b.jadeed - a.jadeed;
+    if (b.jadeedPages !== a.jadeedPages) return b.jadeedPages - a.jadeedPages;
+    return b.att - a.att;
+  });
+
+  const overallTotal = allEntries.length;
+  let curOverallRank = 1;
+  allEntries.forEach((entry, idx) => {
+    if (idx > 0) {
+      const prev = allEntries[idx - 1];
+      if (entry.score !== prev.score || entry.jadeed !== prev.jadeed || entry.jadeedPages !== prev.jadeedPages) {
+        curOverallRank = idx + 1;
+      }
+    } else {
+      curOverallRank = 1;
+    }
+    entry.overallRank = curOverallRank;
+    entry.overallTotal = overallTotal;
+  });
+
+  // 3. Compute MARHALA RANKS within each distinct Marhala group
+  const marhalaGroups = new Map();
+  for (const entry of allEntries) {
+    const m = entry.marhala || "Marhala Ula";
+    if (!marhalaGroups.has(m)) marhalaGroups.set(m, []);
+    marhalaGroups.get(m).push(entry);
+  }
+
+  for (const [mName, mList] of marhalaGroups.entries()) {
+    mList.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.jadeed !== a.jadeed) return b.jadeed - a.jadeed;
+      if (b.jadeedPages !== a.jadeedPages) return b.jadeedPages - a.jadeedPages;
+      return b.att - a.att;
+    });
+
+    const mTotal = mList.length;
+    let curMRank = 1;
+    mList.forEach((entry, idx) => {
+      if (idx > 0) {
+        const prev = mList[idx - 1];
+        if (entry.score !== prev.score || entry.jadeed !== prev.jadeed || entry.jadeedPages !== prev.jadeedPages) {
+          curMRank = idx + 1;
+        }
+      } else {
+        curMRank = 1;
+      }
+      entry.marhalaRank = curMRank;
+      entry.marhalaTotal = mTotal;
+    });
+  }
+
+  // 4. Update cache maps and student references with real ranks
+  for (const entry of allEntries) {
+    if (entry.result) {
+      entry.result.rank = entry.marhalaRank;
+      entry.result.marhalaRank = entry.marhalaRank;
+      entry.result.marhalaTotal = entry.marhalaTotal;
+      entry.result.overall_rank = entry.overallRank;
+      entry.result.overallRank = entry.overallRank;
+      entry.result.overallTotal = entry.overallTotal;
+      entry.result.marhala = entry.marhala;
+      if (entry.sId) {
+        latestWeeklyResultsMap.set(`id:${entry.sId}`, entry.result);
+        latestWeeklyResultsMap.set(entry.sId, entry.result);
+      }
+      if (entry.its) {
+        latestWeeklyResultsMap.set(`its:${entry.its}`, entry.result);
+      }
+      if (entry.name) {
+        latestWeeklyResultsMap.set(`name:${entry.name.toLowerCase()}`, entry.result);
+      }
+    }
+    if (entry.student) {
+      entry.student.marhalaRank = String(entry.marhalaRank);
+      entry.student.marhalaTotal = String(entry.marhalaTotal);
+      entry.student.overallRank = String(entry.overallRank);
+      entry.student.overallTotal = String(entry.overallTotal);
+      entry.student.marhala = entry.marhala;
+    }
+  }
+}
 
 export function saveWeeklyResultRecord(data) {
   if (!data) return null;
@@ -1533,6 +1720,9 @@ export function saveWeeklyResultRecord(data) {
   if (its) latestWeeklyResultsMap.set(`its:${its}`, record);
   if (name) latestWeeklyResultsMap.set(`name:${name}`, record);
 
+  // Trigger ranking recalculation across the board
+  recalculateAllRanks();
+
   // Sync to disk
   try {
     let diskData = {};
@@ -1565,43 +1755,58 @@ export function getStoredWeeklyResult(student) {
 
 export function enrichStudentWithLatestResult(student) {
   if (!student) return student;
-  const res = getStoredWeeklyResult(student);
-  if (!res) {
-    return {
-      ...student,
-      weeklyScore: student.weeklyScore !== undefined ? student.weeklyScore : 0,
-      totalOutOf: 100
-    };
-  }
 
-  const score = (res.total_score !== undefined && res.total_score !== null && res.total_score !== '')
+  // Find authoritative student in embeddedRoster
+  const sMatch = embeddedRoster.find(item =>
+    (student.student_id && (item.student_id === student.student_id || item.id === student.student_id)) ||
+    (student.id && (item.student_id === student.id || item.id === student.id)) ||
+    (student.its && item.its && String(item.its) === String(student.its)) ||
+    (student.name && item.name && item.name.toLowerCase() === student.name.toLowerCase())
+  ) || student;
+
+  const res = getStoredWeeklyResult(sMatch) || getStoredWeeklyResult(student);
+  
+  const wJuz = (res?.wusool_juz && String(res.wusool_juz).trim() !== '' && String(res.wusool_juz).trim() !== '—')
+    ? String(res.wusool_juz).trim()
+    : (sMatch.juz || '30');
+  const wSurah = (res?.wusool_surah && String(res.wusool_surah).trim() !== '' && String(res.wusool_surah).trim() !== '—')
+    ? String(res.wusool_surah).trim()
+    : (sMatch.surat || '—');
+  const marhala = deriveMarhalaFromJuz(wJuz);
+
+  const score = (res?.total_score !== undefined && res?.total_score !== null && res?.total_score !== '')
     ? Number(res.total_score)
-    : (Number(res.murajazah || 0) + Number(res.juz_hali || 0) + Number(res.takhteet || 0) + Number(res.jadeed || 0));
+    : (res?.weeklyScore !== undefined ? Number(res.weeklyScore) : (sMatch.weeklyScore ?? 0));
 
-  // Current Juz is derived directly from wusool_juz that teacher filled in Mark Progress
-  const currentJuz = res.wusool_juz ? String(res.wusool_juz).trim() : (student.juz || '—');
-  const currentSurah = res.wusool_surah ? String(res.wusool_surah).trim() : (student.surat || '—');
-  const totalJadeedStr = res.totalJadeed || (res.total_jadeed_pages ? `${res.total_jadeed_pages} ${res.total_jadeed_unit || 'صفه'}`.trim() : (student.totalJadeed || '—'));
+  const totalJadeedStr = res?.totalJadeed || (res?.total_jadeed_pages ? `${res.total_jadeed_pages} ${res.total_jadeed_unit || 'صفه'}`.trim() : (sMatch.totalJadeed || '—'));
 
   return {
+    ...sMatch,
     ...student,
-    weeklyScore: isNaN(score) ? (student.weeklyScore ?? 0) : score,
+    teacher: sMatch.teacher || student.teacher || 'Janab Mulla Murtaza bhai Hamid',
+    group: sMatch.group || student.group || '—',
+    its: sMatch.its || student.its || '',
+    name: sMatch.name || student.name || 'Student',
+    weeklyScore: isNaN(score) ? (sMatch.weeklyScore ?? 0) : score,
     totalOutOf: 100,
-    juz: currentJuz,
-    wusoolJuz: currentJuz,
-    surat: currentSurah,
-    wusoolSurah: currentSurah,
-    wusoolPage: res.wusool_page || student.wusool_page || '',
+    marhala,
+    juz: wJuz,
+    wusoolJuz: wJuz,
+    surat: wSurah,
+    wusoolSurah: wSurah,
+    wusoolPage: res?.wusool_page || sMatch.wusool_page || student.wusool_page || '',
     totalJadeed: totalJadeedStr,
-    marhalaRank: res.rank ? String(res.rank) : (student.marhalaRank || '1'),
-    overallRank: res.overall_rank ? String(res.overall_rank) : (student.overallRank || '1'),
-    fromDate: res.from_date || student.fromDate || '',
-    tillDate: res.till_date || res.week_date || student.tillDate || '',
-    weekDate: res.week_date || student.weekDate || '',
-    murajazah: res.murajazah,
-    juz_hali: res.juz_hali,
-    takhteet: res.takhteet,
-    jadeed: res.jadeed,
+    marhalaRank: res?.rank ? String(res.rank) : (res?.marhalaRank ? String(res.marhalaRank) : (sMatch.marhalaRank || '1')),
+    marhalaTotal: res?.marhalaTotal ? String(res.marhalaTotal) : (sMatch.marhalaTotal ? String(sMatch.marhalaTotal) : ''),
+    overallRank: res?.overall_rank ? String(res.overall_rank) : (res?.overallRank ? String(res.overallRank) : (sMatch.overallRank || '1')),
+    overallTotal: res?.overallTotal ? String(res.overallTotal) : (sMatch.overallTotal ? String(sMatch.overallTotal) : '40'),
+    fromDate: res?.from_date || sMatch.fromDate || student.fromDate || '',
+    tillDate: res?.till_date || res?.week_date || sMatch.tillDate || student.tillDate || '',
+    weekDate: res?.week_date || sMatch.weekDate || student.weekDate || '',
+    murajazah: res?.murajazah ?? 0,
+    juz_hali: res?.juz_hali ?? 0,
+    takhteet: res?.takhteet ?? 0,
+    jadeed: res?.jadeed ?? 0,
     latestResult: res
   };
 }
@@ -1644,7 +1849,9 @@ export function loadWeeklyResults() {
         }
       }
       for (const rec of studentLatestCsvMap.values()) {
-        saveWeeklyResultRecord(rec);
+        const sid = rec.student_id;
+        latestWeeklyResultsMap.set(`id:${sid}`, rec);
+        latestWeeklyResultsMap.set(sid, rec);
       }
       console.log(`[WHATSAPP BOT] 🏆 Preloaded ${studentLatestCsvMap.size} baseline student results from ${csvPath}`);
     }
@@ -1657,7 +1864,10 @@ export function loadWeeklyResults() {
       }
     }
 
-    // 3. Enrich all students in embeddedRoster
+    // 3. Dynamic Cohort Ranking across all loaded student data
+    recalculateAllRanks();
+
+    // 4. Enrich all students in embeddedRoster
     for (let i = 0; i < embeddedRoster.length; i++) {
       embeddedRoster[i] = enrichStudentWithLatestResult(embeddedRoster[i]);
     }
@@ -1727,7 +1937,6 @@ export function checkSafetyLimit(phone) {
   return { allowed: true };
 }
 
-
 /**
  * XML/SVG safe escaping.
  */
@@ -1743,32 +1952,37 @@ function escapeXml(unsafe) {
 
 /**
  * Generates an ultra-premium SVG card for the weekly Marhala result.
- * Matches the Google Sheet "parents email" tab data exactly.
+ * Rendered with vector icons and golden/emerald accents with 100% font compatibility.
  */
 export function generateResultSvg(data) {
   const name = String(data.name || data.studentName || 'Student Name').trim();
-  const fromDate = String(data.fromDate || '—').trim();
-  const tillDate = String(data.tillDate || '—').trim();
+  const fromDate = String(data.fromDate || '').trim();
+  const tillDate = String(data.tillDate || data.weekDate || '').trim();
   const score = (data.weeklyScore !== undefined && data.weeklyScore !== '' && data.weeklyScore !== null)
     ? String(data.weeklyScore)
-    : '—';
+    : '0';
   const jadeed = String(data.totalJadeed || '—').trim();
-  const marhalaRank = String(data.marhalaRank || '—').trim();
-  const overallRank = String(data.overallRank || '—').trim();
-  const juz = String(data.juz || '—').trim();
+  const marhalaRank = String(data.marhalaRank || '1').trim();
+  const overallRank = String(data.overallRank || '1').trim();
+  const marhala = String(data.marhala || deriveMarhalaFromJuz(data.juz) || 'Marhala Ula').trim();
+  const marhalaTotal = String(data.marhalaTotal || '').trim();
+  const overallTotal = String(data.overallTotal || '40').trim();
+  const juz = String(data.juz || '30').trim();
   const surat = String(data.surat || '—').trim();
-  const teacher = String(data.teacher || 'Assigned Ustad').trim();
+  const teacher = String(data.teacher || 'Janab Mulla Murtaza bhai Hamid').trim();
   const group = String(data.group || '—').trim();
   const its = String(data.its || '').trim();
 
   let dateRange = 'Current Academic Week';
-  if (fromDate && tillDate && fromDate !== '—' && tillDate !== '—') {
-    dateRange = `${fromDate} ➔ ${tillDate}`;
+  if (fromDate && tillDate && fromDate !== '—' && tillDate !== '—' && fromDate !== tillDate) {
+    dateRange = `${fromDate}  ➔  ${tillDate}`;
   } else if (tillDate && tillDate !== '—') {
     dateRange = tillDate;
   }
 
   const portalDomain = BOT_CONFIG.PORTAL_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const mRankSubtitle = marhalaTotal ? `Within ${marhala} (${marhalaRank} of ${marhalaTotal})` : `Within ${marhala}`;
+  const oRankSubtitle = overallTotal ? `Across All Atfal (${overallRank} of ${overallTotal})` : `Across All Registered Atfal`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="1080" height="1350" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg">
@@ -1826,129 +2040,172 @@ export function generateResultSvg(data) {
   <path d="M1038,1250 L980,1308 M1038,1230 L960,1308" stroke="url(#goldGrad)" stroke-width="2.5" opacity="0.75" />
 
   <!-- Main Big Institution Header -->
-  <text x="540" y="132" font-family="'Cinzel', 'Cinzel Decorative', Georgia, serif" font-size="34" fill="#ffffff" text-anchor="middle" font-weight="800" letter-spacing="3" filter="url(#glow)">
+  <text x="540" y="130" font-family="'Cinzel', 'Cinzel Decorative', Georgia, serif" font-size="34" fill="#ffffff" text-anchor="middle" font-weight="800" letter-spacing="3" filter="url(#glow)">
     Rawdat Tahfeez al Atfal - Galiakot
   </text>
 
-  <!-- Title Badge -->
-  <rect x="310" y="165" width="460" height="42" rx="21" fill="#362013" stroke="url(#goldGrad)" stroke-width="1.8" />
-  <text x="540" y="192" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="3">
-    WEEKLY MARHALA REPORT
+  <!-- Title Badge with Exact Marhala Heading -->
+  <rect x="260" y="162" width="560" height="42" rx="21" fill="#362013" stroke="url(#goldGrad)" stroke-width="1.8" />
+  <text x="540" y="189" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="3">
+    WEEKLY REPORT • ${escapeXml(marhala.toUpperCase())}
   </text>
 
   <!-- Student Name Hero Card -->
   <g filter="url(#shadow)">
-    <rect x="80" y="235" width="920" height="155" rx="24" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="2.5" />
+    <rect x="80" y="230" width="920" height="160" rx="24" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="2.5" />
   </g>
-  <text x="540" y="275" font-family="'Segoe UI', Roboto, sans-serif" font-size="15" fill="#dfd0c4" text-anchor="middle" letter-spacing="3" text-transform="uppercase">
+  <text x="540" y="270" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#dfd0c4" text-anchor="middle" letter-spacing="3" text-transform="uppercase">
     STUDENT PERFORMANCE SUMMARY
   </text>
-  <text x="540" y="332" font-family="'Cinzel', Georgia, serif" font-size="40" fill="#ffffff" text-anchor="middle" font-weight="800" filter="url(#glow)">
+  <text x="540" y="328" font-family="'Cinzel', Georgia, serif" font-size="40" fill="#ffffff" text-anchor="middle" font-weight="800" filter="url(#glow)">
     ${escapeXml(name)}
   </text>
-  <text x="540" y="367" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="600">
-    📅 ${escapeXml(dateRange)}
+  
+  <!-- Calendar Vector Icon + Date Range -->
+  <g transform="translate(390, 350)">
+    <rect x="0" y="2" width="18" height="16" rx="3" fill="none" stroke="#fae29c" stroke-width="1.8" />
+    <line x1="0" y1="7" x2="18" y2="7" stroke="#fae29c" stroke-width="1.5" />
+    <line x1="4" y1="0" x2="4" y2="4" stroke="#fae29c" stroke-width="2" stroke-linecap="round" />
+    <line x1="14" y1="0" x2="14" y2="4" stroke="#fae29c" stroke-width="2" stroke-linecap="round" />
+  </g>
+  <text x="548" y="365" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="600">
+    ${escapeXml(dateRange)}
   </text>
 
   <!-- Primary Metric: Weekly Score Card -->
   <g filter="url(#shadow)">
-    <rect x="80" y="420" width="445" height="235" rx="22" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="1.8" />
+    <rect x="80" y="415" width="445" height="235" rx="22" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="1.8" />
   </g>
-  <rect x="110" y="445" width="140" height="32" rx="16" fill="#4d2c17" stroke="url(#goldGrad)" stroke-width="1" />
-  <text x="180" y="466" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" fill="#fae29c" text-anchor="middle" font-weight="700">
+  <rect x="110" y="440" width="140" height="32" rx="16" fill="#4d2c17" stroke="url(#goldGrad)" stroke-width="1" />
+  <text x="180" y="461" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" fill="#fae29c" text-anchor="middle" font-weight="700">
     TOTAL SCORE
   </text>
-  <text x="302" y="550" font-family="'Cinzel', Georgia, serif" font-size="70" fill="url(#scoreGrad)" text-anchor="middle" font-weight="800">
+  <text x="302" y="545" font-family="'Cinzel', Georgia, serif" font-size="70" fill="url(#scoreGrad)" text-anchor="middle" font-weight="800">
     ${escapeXml(score)}
   </text>
-  <text x="302" y="590" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#dfd0c4" text-anchor="middle">
+  <text x="302" y="585" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#dfd0c4" text-anchor="middle">
     Score out of 100
   </text>
-  <rect x="130" y="615" width="345" height="8" rx="4" fill="#201209" />
-  <rect x="130" y="615" width="280" height="8" rx="4" fill="url(#goldGrad)" />
+  <rect x="130" y="610" width="345" height="8" rx="4" fill="#201209" />
+  <rect x="130" y="610" width="280" height="8" rx="4" fill="url(#goldGrad)" />
 
   <!-- Total Jadeed Card -->
   <g filter="url(#shadow)">
-    <rect x="555" y="420" width="445" height="235" rx="22" fill="url(#cardGrad)" stroke="#10b981" stroke-width="1.8" />
+    <rect x="555" y="415" width="445" height="235" rx="22" fill="url(#cardGrad)" stroke="#10b981" stroke-width="1.8" />
   </g>
-  <rect x="585" y="445" width="150" height="32" rx="16" fill="#143c29" stroke="#10b981" stroke-width="1" />
-  <text x="660" y="466" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" fill="#6ee7b7" text-anchor="middle" font-weight="700">
+  <rect x="585" y="440" width="150" height="32" rx="16" fill="#143c29" stroke="#10b981" stroke-width="1" />
+  <text x="660" y="461" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" fill="#6ee7b7" text-anchor="middle" font-weight="700">
     TOTAL JADEED
   </text>
-  <text x="777" y="550" font-family="'Amiri', 'Traditional Arabic', serif" font-size="52" fill="#34d399" text-anchor="middle" font-weight="bold">
+  <text x="777" y="545" font-family="'Amiri', 'Traditional Arabic', serif" font-size="52" fill="#34d399" text-anchor="middle" font-weight="bold">
     ${escapeXml(jadeed)}
   </text>
-  <text x="777" y="590" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#dfd0c4" text-anchor="middle">
+  <text x="777" y="585" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#dfd0c4" text-anchor="middle">
     Weekly Progress Achieved
   </text>
-  <rect x="605" y="615" width="345" height="8" rx="4" fill="#201209" />
-  <rect x="605" y="615" width="290" height="8" rx="4" fill="#10b981" />
+  <rect x="605" y="610" width="345" height="8" rx="4" fill="#201209" />
+  <rect x="605" y="610" width="290" height="8" rx="4" fill="#10b981" />
 
   <!-- Ranking Row -->
+  <!-- 1. Marhala Rank Card with Golden Crown Vector Icon -->
   <g filter="url(#shadow)">
-    <!-- Marhala Rank -->
-    <rect x="80" y="685" width="445" height="205" rx="22" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="1.8" />
+    <rect x="80" y="675" width="445" height="215" rx="22" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="2" />
   </g>
-  <text x="302" y="735" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="700" letter-spacing="1">
-    👑 MARHALA RANK
+  <!-- Royal Crown Vector Icon -->
+  <g transform="translate(160, 700)">
+    <path d="M4 22h24v3H4zm2-5l3-12 6 7 5-10 5 10 6-7 3 12H6z" fill="url(#goldGrad)" stroke="#fae29c" stroke-width="0.8" />
+    <circle cx="9" cy="4" r="2" fill="#fae29c" />
+    <circle cx="16" cy="1" r="2.2" fill="#fae29c" />
+    <circle cx="23" cy="4" r="2" fill="#fae29c" />
+  </g>
+  <text x="325" y="722" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="2">
+    MARHALA RANK
   </text>
-  <text x="302" y="820" font-family="'Cinzel', Georgia, serif" font-size="64" fill="#ffffff" text-anchor="middle" font-weight="800">
+  <text x="302" y="805" font-family="'Cinzel', Georgia, serif" font-size="66" fill="url(#goldGrad)" text-anchor="middle" font-weight="800" filter="url(#glow)">
     #${escapeXml(marhalaRank)}
   </text>
-  <text x="302" y="860" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#dfd0c4" text-anchor="middle">
-    Within Current Class Marhala
+  <text x="302" y="852" font-family="'Segoe UI', Roboto, sans-serif" font-size="15" fill="#dfd0c4" text-anchor="middle" font-weight="600">
+    ${escapeXml(mRankSubtitle)}
   </text>
 
-  <!-- Overall Rank -->
+  <!-- 2. Overall Rank Card with Sparkling Star / Trophy Vector Icon -->
   <g filter="url(#shadow)">
-    <rect x="555" y="685" width="445" height="205" rx="22" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="1.8" />
+    <rect x="555" y="675" width="445" height="215" rx="22" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="2" />
   </g>
-  <text x="777" y="735" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#fae29c" text-anchor="middle" font-weight="700" letter-spacing="1">
-    🌟 OVERALL RANK
+  <!-- Glowing Star Vector Icon -->
+  <g transform="translate(635, 700)">
+    <path d="M14 2l3.4 7.2 7.6 1.1-5.5 5.4 1.3 7.8-6.8-3.7-6.8 3.7 1.3-7.8-5.5-5.4 7.6-1.1z" fill="url(#goldGrad)" stroke="#fae29c" stroke-width="0.8" />
+  </g>
+  <text x="795" y="722" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="2">
+    OVERALL RANK
   </text>
-  <text x="777" y="820" font-family="'Cinzel', Georgia, serif" font-size="64" fill="#ffffff" text-anchor="middle" font-weight="800">
+  <text x="777" y="805" font-family="'Cinzel', Georgia, serif" font-size="66" fill="#ffffff" text-anchor="middle" font-weight="800" filter="url(#glow)">
     #${escapeXml(overallRank)}
   </text>
-  <text x="777" y="860" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#dfd0c4" text-anchor="middle">
-    Across All Registered Atfal
+  <text x="777" y="852" font-family="'Segoe UI', Roboto, sans-serif" font-size="15" fill="#dfd0c4" text-anchor="middle" font-weight="600">
+    ${escapeXml(oRankSubtitle)}
   </text>
 
   <!-- Academic Hifz Details Card -->
   <g filter="url(#shadow)">
-    <rect x="80" y="920" width="920" height="175" rx="22" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="1.8" />
+    <rect x="80" y="915" width="920" height="175" rx="22" fill="url(#cardGrad)" stroke="url(#goldGrad)" stroke-width="1.8" />
   </g>
-  <text x="540" y="960" font-family="'Segoe UI', Roboto, sans-serif" font-size="15" fill="#fae29c" text-anchor="middle" font-weight="700" letter-spacing="2">
-    📖 HIFZ &amp; ACADEMIC RECORD
+  <!-- Book / Quran Vector Icon -->
+  <g transform="translate(345, 936)">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z" stroke="#fae29c" stroke-width="2" fill="none" />
+  </g>
+  <text x="550" y="953" font-family="'Segoe UI', Roboto, sans-serif" font-size="15" fill="#fae29c" text-anchor="middle" font-weight="700" letter-spacing="2">
+    HIFZ &amp; ACADEMIC RECORD
   </text>
 
   <!-- Detail Box 1: Teacher & Group -->
-  <rect x="110" y="985" width="415" height="85" rx="14" fill="#24140b" stroke="rgba(212,175,55,0.4)" stroke-width="1" />
-  <text x="130" y="1018" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#dfd0c4">
-    👤 Assigned Ustad:
+  <rect x="110" y="980" width="415" height="88" rx="14" fill="#24140b" stroke="rgba(212,175,55,0.4)" stroke-width="1" />
+  <!-- User Vector Icon -->
+  <g transform="translate(130, 998)">
+    <circle cx="10" cy="8" r="6" fill="#fae29c" />
+    <path d="M2 24c0-4.4 3.6-8 8-8s8 3.6 8 8" fill="none" stroke="#fae29c" stroke-width="2.2" stroke-linecap="round" />
+  </g>
+  <text x="160" y="1014" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#dfd0c4">
+    Assigned Ustad:
   </text>
   <text x="130" y="1046" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#ffffff" font-weight="700">
     ${escapeXml(teacher)}
   </text>
 
   <!-- Detail Box 2: Hifz Progress -->
-  <rect x="555" y="985" width="415" height="85" rx="14" fill="#24140b" stroke="rgba(212,175,55,0.4)" stroke-width="1" />
-  <text x="575" y="1018" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#dfd0c4">
-    🎯 Current Hifz Target:
+  <rect x="555" y="980" width="415" height="88" rx="14" fill="#24140b" stroke="rgba(212,175,55,0.4)" stroke-width="1" />
+  <!-- Target Vector Icon -->
+  <g transform="translate(575, 998)">
+    <circle cx="10" cy="10" r="9" fill="none" stroke="#fae29c" stroke-width="2" />
+    <circle cx="10" cy="10" r="5" fill="none" stroke="#fae29c" stroke-width="1.8" />
+    <circle cx="10" cy="10" r="2" fill="#fae29c" />
+  </g>
+  <text x="605" y="1014" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#dfd0c4">
+    Current Hifz Target:
   </text>
   <text x="575" y="1046" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#fae29c" font-weight="700">
     Juz ${escapeXml(juz)}${surat && surat !== '—' ? ' • ' + escapeXml(surat) : ''}${group && group !== '—' ? ' (Gr ' + escapeXml(group) + ')' : ''}
   </text>
 
-  <!-- Official Verification Footer Banner -->
-  <rect x="80" y="1125" width="920" height="46" rx="23" fill="#20130a" stroke="#10b981" stroke-width="1.4" />
-  <text x="540" y="1154" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#34d399" text-anchor="middle" font-weight="700">
-    ✔ Verified Official Record • Rawdat Tahfeez al Atfal
+  <!-- Official Verification Footer Banner with Emerald Badge -->
+  <rect x="80" y="1115" width="920" height="46" rx="23" fill="#20130a" stroke="#10b981" stroke-width="1.4" />
+  <g transform="translate(310, 1126)">
+    <circle cx="12" cy="12" r="11" fill="#10b981" />
+    <path d="M7 12l3.5 3.5 7-7" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+  <text x="560" y="1144" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#34d399" text-anchor="middle" font-weight="700">
+    Verified Official Record • Rawdat Tahfeez al Atfal
   </text>
 
-  <!-- Student Portal Link Banner -->
-  <rect x="180" y="1205" width="720" height="56" rx="28" fill="#2e1a0e" stroke="url(#goldGrad)" stroke-width="2" />
-  <text x="540" y="1240" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="1">
-    🌐 STUDENT PORTAL: ${escapeXml(portalDomain)}
+  <!-- Student Portal Link Banner with Globe Vector Icon -->
+  <rect x="180" y="1185" width="720" height="56" rx="28" fill="#2e1a0e" stroke="url(#goldGrad)" stroke-width="2" />
+  <g transform="translate(290, 1200)">
+    <circle cx="13" cy="13" r="11" fill="none" stroke="#fae29c" stroke-width="2" />
+    <ellipse cx="13" cy="13" rx="5.5" ry="11" fill="none" stroke="#fae29c" stroke-width="1.8" />
+    <line x1="2" y1="13" x2="24" y2="13" stroke="#fae29c" stroke-width="1.8" />
+  </g>
+  <text x="560" y="1221" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#fae29c" text-anchor="middle" font-weight="800" letter-spacing="1">
+    STUDENT PORTAL: ${escapeXml(portalDomain)}
   </text>
 </svg>`;
 }
@@ -1991,61 +2248,67 @@ export function generateResultBase64(data) {
 }
 
 /**
- * Builds formatted text caption for WhatsApp notification.
+ * Builds short, clean text caption for WhatsApp result notification (referring to the image card).
  */
 export function buildResultCaption(data) {
   const name = data.name || data.studentName || 'Student';
-  const fromDate = data.fromDate || '';
-  const tillDate = data.tillDate || '';
-  const score = (data.weeklyScore !== undefined && data.weeklyScore !== null && data.weeklyScore !== '')
-    ? String(data.weeklyScore)
-    : '—';
-  const jadeed = data.totalJadeed || '—';
-  const mRank = data.marhalaRank || '—';
-  const oRank = data.overallRank || '—';
+  const tillDate = data.tillDate || data.weekDate || '';
 
-  const dateStr = (fromDate && tillDate && fromDate !== '—') ? `${fromDate} to ${tillDate}` : (tillDate || 'Latest Week');
-
-  return `*WEEKLY RESULT SUMMARY*\n\n` +
-    `Dear Parent,\n` +
-    `Here is the weekly performance summary for *${name}* (${dateStr}):\n\n` +
-    `📊 *Weekly Score:* ${score} / 100\n` +
-    `📖 *Total Jadeed:* ${jadeed}\n` +
-    `👑 *Marhala Rank:* #${mRank}\n` +
-    `🌟 *Overall Rank:* #${oRank}\n\n` +
-    `Official Result Image attached above 👆\n\n` +
-    `🌐 *Online Portal:* ${BOT_CONFIG.PORTAL_URL}`;
+  return `🌹 *Salam Jameel!*\n\n` +
+    `Here is the latest weekly performance result for *${name}*${tillDate && tillDate !== '—' ? ` (${tillDate})` : ''}.\n\n` +
+    `Official Result Card attached above 👆\n\n` +
+    `🌐 *Student Portal:* ${BOT_CONFIG.PORTAL_URL}`;
 }
 
 /**
  * Connects to Meta WhatsApp Multi-Device servers via Baileys socket.
  */
+let isConnecting = false;
 export async function initBaileysSocket() {
+  if (isConnecting) return sock;
+  isConnecting = true;
+
   if (!fs.existsSync(AUTH_DIR)) {
     fs.mkdirSync(AUTH_DIR, { recursive: true });
   }
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  let version = [2, 3000, 1015901307];
+  let version = [2, 3000, 1017531287];
   try {
     const v = await fetchLatestBaileysVersion();
-    version = v.version;
+    if (v && v.version) {
+      version = v.version;
+    }
   } catch (_) { }
 
-  sock = makeWASocket({
-    version,
-    logger: createSilentLogger(),
-    printQRInTerminal: true,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, createSilentLogger())
-    },
-    browser: Browsers.macOS('Desktop'),
-    syncFullHistory: false,
-    generateHighQualityLinkPreview: false,
-    markOnlineOnConnect: true,
-    getMessage: async () => ({ conversation: '' })
-  });
+  try {
+    sock = makeWASocket({
+      version,
+      logger: createSilentLogger(),
+      printQRInTerminal: true,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, createSilentLogger())
+      },
+      browser: Browsers.macOS('Desktop'),
+      syncFullHistory: false,
+      generateHighQualityLinkPreview: false,
+      markOnlineOnConnect: true,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 15000,
+      emitOwnEvents: false,
+      retryRequestDelayMs: 250,
+      getMessage: async () => ({ conversation: '' })
+    });
+  } catch (err) {
+    isConnecting = false;
+    console.error('[BAILEYS-INIT-ERR] Error creating socket:', err);
+    setTimeout(initBaileysSocket, 3000);
+    return null;
+  }
+
+  isConnecting = false;
 
   sock.ev.on('creds.update', saveCreds);
 
@@ -2068,15 +2331,19 @@ export async function initBaileysSocket() {
       const statusCode = (lastDisconnect?.error)?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
       baileysStatus = 'DISCONNECTED';
-      console.log(`[WHATSAPP BOT] Connection closed (code: ${statusCode}). Reconnecting: ${shouldReconnect}`);
+      console.log(`[WHATSAPP BOT] ⚠️ Connection closed (code: ${statusCode}). Reconnecting: ${shouldReconnect}`);
       if (shouldReconnect) {
-        setTimeout(initBaileysSocket, 3000);
+        setTimeout(() => {
+          initBaileysSocket().catch((e) => console.error('[RECONNECT-ERR]:', e.message));
+        }, 3000);
       } else if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
         console.log('[WHATSAPP BOT] Session logged out or credentials expired. Resetting auth directory for a fresh QR code...');
         try {
           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
         } catch (_) { }
-        setTimeout(initBaileysSocket, 2000);
+        setTimeout(() => {
+          initBaileysSocket().catch((e) => console.error('[RECONNECT-ERR]:', e.message));
+        }, 2000);
       }
     } else if (connection === 'open') {
       baileysStatus = 'CONNECTED';
@@ -2090,6 +2357,12 @@ export async function initBaileysSocket() {
       console.log(`📱 Phone ID : ${sock.user?.id}`);
       console.log(`🚀 Ready to dispatch real result images & answer parent queries!`);
       console.log(`======================================================\n`);
+      
+      // Send initial presence online signal
+      try {
+        sock.sendPresenceUpdate('available').catch(() => {});
+      } catch (_) {}
+
       initFirestoreRealtimeListeners();
     }
   });
@@ -2101,6 +2374,13 @@ export async function initBaileysSocket() {
       if (!msg || !msg.message) continue;
       // Never process bot's own outbound messages
       if (msg.key?.fromMe) continue;
+
+      // INSTANT READ RECEIPT: Turn 1 tick into 2 ticks / blue ticks immediately on sender's WhatsApp
+      try {
+        if (msg.key && sock?.readMessages) {
+          await sock.readMessages([msg.key]);
+        }
+      } catch (_) {}
 
       // Auto-extract and cache LID mapping immediately if message contains sender LID and phone
       try {
@@ -2123,6 +2403,21 @@ export async function initBaileysSocket() {
       }
     }
   });
+
+  // Self-healing watchdog: Keep connection hot and auto-reconnect if dropped
+  if (!global.__baileysWatchdogStarted) {
+    global.__baileysWatchdogStarted = true;
+    setInterval(async () => {
+      try {
+        if (sock && baileysStatus === 'CONNECTED') {
+          await sock.sendPresenceUpdate('available').catch(() => {});
+        } else if (baileysStatus === 'DISCONNECTED') {
+          console.log('[WATCHDOG] 🔄 Auto-reconnecting disconnected WhatsApp socket...');
+          initBaileysSocket().catch(() => {});
+        }
+      } catch (_) {}
+    }, 20000);
+  }
 
   return sock;
 }
@@ -2193,7 +2488,7 @@ export async function sendWhatsAppMessage(targetJid, content, senderPhone = '') 
         }
       }
     }
-    throw err;
+    return null;
   }
 }
 
@@ -2273,16 +2568,34 @@ export async function sendStudentResultImageWhatsApp(remoteJid, student, senderP
  * Sends today's live attendance status to WhatsApp parent.
  */
 export async function sendStudentAttendanceWhatsApp(remoteJid, student, senderPhone = '') {
-  const attRec = findStudentAttendance(student, senderPhone);
-  const status = attRec?.status || student?.latestAttendance?.status || 'Pending Marking';
+  try {
+    await syncTodayAttendanceFromFirestore();
+  } catch (_) {}
+
   const ist = getISTDateParts();
-  const date = attRec?.date || student?.latestAttendance?.date || ist.dateDisplay;
-  const statusEmoji = attRec?.statusEmoji || (/absent/i.test(status) ? '❌' : (/present/i.test(status) ? '✅' : '⏳'));
+  const attRec = findStudentAttendance(student, senderPhone);
+  const lvRec = findStudentLeave(student, senderPhone);
+
+  let status = 'Pending Marking';
+  let statusEmoji = '⏳';
+
+  if (lvRec && /approved/i.test(lvRec.status)) {
+    status = 'On Leave (Approved)';
+    statusEmoji = '📝';
+  } else if (lvRec && /pending/i.test(lvRec.status)) {
+    status = 'Leave Application Pending';
+    statusEmoji = '⏳';
+  } else if (attRec) {
+    status = attRec.status || 'Present';
+    statusEmoji = attRec.statusEmoji || (/absent/i.test(status) ? '❌' : (/present/i.test(status) ? '✅' : '⏳'));
+  }
+
+  const date = ist.dateDisplay; // Strictly today's present day date e.g. 06/10/2026
 
   await sendWhatsAppMessage(remoteJid, {
     text: `📋 *DAILY ATTENDANCE STATUS*\n\n` +
       `Student: *${student.name}*\n` +
-      `📅 Date: *${date}*\n` +
+      `📅 Date: *${date}* (Today)\n` +
       `Attendance: *${statusEmoji} ${status}*\n\n` +
       `🌐 *Student Portal:* ${BOT_CONFIG.PORTAL_URL}`
   }, senderPhone);

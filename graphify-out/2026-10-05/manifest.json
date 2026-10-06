@@ -5502,8 +5502,8 @@
     "semantic_hash": ""
   },
   "android/app/capacitor.build.gradle": {
-    "mtime": 1791182973.430784,
-    "seen": 1791186973.8769913,
+    "mtime": 1791196836.0607693,
+    "seen": 1791204226.6808388,
     "ast_hash": "f3c1db3e5a1641513a1e5a6bff1ee565",
     "semantic_hash": ""
   },
@@ -5550,8 +5550,8 @@
     "semantic_hash": "682315a426653617c6a74fc12bef55b6"
   },
   "android/capacitor.settings.gradle": {
-    "mtime": 1791182973.4297335,
-    "seen": 1791186973.8775384,
+    "mtime": 1791196836.05977,
+    "seen": 1791204226.6817307,
     "ast_hash": "4d3b13b87f1d8abf11219d4ea2d0fef1",
     "semantic_hash": ""
   },
@@ -6366,9 +6366,9 @@
     "semantic_hash": "74cf120911545770988f24be689305b0"
   },
   "src/App.jsx": {
-    "mtime": 1791186329.6454391,
-    "seen": 1791186973.888312,
-    "ast_hash": "3522ae9139183889b7bec9649d07a043",
+    "mtime": 1791214029.7831159,
+    "seen": 1791214129.4734118,
+    "ast_hash": "24a3c9d756a0a47d96576a1e57394bf4",
     "semantic_hash": ""
   },
   "src/AppUpdateManager.jsx": {
@@ -11064,9 +11064,9 @@
     "semantic_hash": ""
   },
   "src/components/AmazonBottomNav.jsx": {
-    "mtime": 1791186107.7640898,
-    "seen": 1791186973.889506,
-    "ast_hash": "04de322dd07f8728592149c14abd2dfe",
+    "mtime": 1791206978.5720413,
+    "seen": 1791207214.0744102,
+    "ast_hash": "3a2af97862a4974b8d9cce6e47222a7b",
     "semantic_hash": ""
   }
 }

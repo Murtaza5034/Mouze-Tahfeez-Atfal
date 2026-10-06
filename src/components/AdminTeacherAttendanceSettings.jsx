@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import {
   Clock,
   MapPin,
@@ -29,6 +27,7 @@ import {
   checkAttendanceWindow,
   getExactUserLocation,
 } from "../utils/attendanceSettingsHelper";
+import { loadGoogleMapsApi } from "../utils/googleMapsLoader";
 import {
   AdminTeacherRankingModal,
   AdminTeacherRankingTriggerButton,
@@ -45,28 +44,27 @@ const ALL_DAYS = [
   "Saturday",
 ];
 
-// Map tile layers including Real Google Maps layers
-const TILE_LAYERS = {
-  googleRoad: {
+// Original Google Map Types
+const GOOGLE_MAP_TYPES = {
+  roadmap: {
     name: "Google Streets",
     icon: "🗺️",
-    url: "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-    maxZoom: 20,
-    attribution: "&copy; Google Maps",
+    id: "roadmap",
   },
-  googleSat: {
+  satellite: {
     name: "Google Satellite",
     icon: "🛰️",
-    url: "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-    maxZoom: 20,
-    attribution: "&copy; Google Maps Satellite",
+    id: "satellite",
   },
-  osm: {
-    name: "OpenStreetMap",
+  hybrid: {
+    name: "Google Hybrid",
     icon: "🌐",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors",
+    id: "hybrid",
+  },
+  terrain: {
+    name: "Google Terrain",
+    icon: "⛰️",
+    id: "terrain",
   },
 };
 
@@ -114,9 +112,10 @@ export default function AdminTeacherAttendanceSettings({
   const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
   const [saveErrorMsg, setSaveErrorMsg] = useState("");
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [isMapLoading, setIsMapLoading] = useState(true);
 
   // Map state
-  const [activeMapLayerKey, setActiveMapLayerKey] = useState("googleRoad");
+  const [activeMapLayerKey, setActiveMapLayerKey] = useState("roadmap");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -124,10 +123,12 @@ export default function AdminTeacherAttendanceSettings({
 
   // Map refs
   const mapContainerRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const currentTileLayerRef = useRef(null);
-  const markerRef = useRef(null);
-  const circleRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const googleMapRef = useRef(null);
+  const googleMarkerRef = useRef(null);
+  const googleCircleRef = useRef(null);
+  const googleInfoWindowRef = useRef(null);
+  const googleAutocompleteRef = useRef(null);
   const searchTimeoutRef = useRef(null);
   const searchContainerRef = useRef(null);
 
@@ -159,187 +160,258 @@ export default function AdminTeacherAttendanceSettings({
     loadSettings(selectedSection);
   }, [selectedSection, loadSettings]);
 
-  // Leaflet custom mosque pin icon
-  const createMosquePinIcon = useCallback(() => {
-    return L.divIcon({
-      className: "att-leaflet-custom-marker",
-      html: `
-        <div style="
-          width: 36px;
-          height: 36px;
-          background: #ffffff;
-          border: 3px solid #d4af37;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.35);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
-          <div style="
-            transform: rotate(45deg);
-            color: #b8941f;
-            font-size: 16px;
-            font-weight: 800;
-          ">🕌</div>
-        </div>
-      `,
-      iconSize: [36, 36],
-      iconAnchor: [18, 36],
-      popupAnchor: [0, -36],
-    });
-  }, []);
-
-  // Initialize and update Leaflet Map
+  // -------------------------------------------------------------------------
+  // Initialize Original Google Maps API
+  // -------------------------------------------------------------------------
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    let isMounted = true;
 
-    const lat = Number(venueLat) || DEFAULT_ATTENDANCE_SETTINGS.venue_lat;
-    const lng = Number(venueLng) || DEFAULT_ATTENDANCE_SETTINGS.venue_lng;
-    const rad = Number(radius) || DEFAULT_ATTENDANCE_SETTINGS.radius;
+    async function initGoogleMap() {
+      if (!mapContainerRef.current) return;
 
-    if (!mapInstanceRef.current) {
-      const map = L.map(mapContainerRef.current, {
-        center: [lat, lng],
-        zoom: 18,
-        scrollWheelZoom: true,
-      });
+      const lat = Number(venueLat) || DEFAULT_ATTENDANCE_SETTINGS.venue_lat;
+      const lng = Number(venueLng) || DEFAULT_ATTENDANCE_SETTINGS.venue_lng;
+      const rad = Number(radius) || DEFAULT_ATTENDANCE_SETTINGS.radius;
 
-      // Default to Google Streets
-      const layerConfig = TILE_LAYERS[activeMapLayerKey] || TILE_LAYERS.googleRoad;
-      const tileLayer = L.tileLayer(layerConfig.url, {
-        attribution: layerConfig.attribution,
-        maxZoom: layerConfig.maxZoom,
-      }).addTo(map);
-      currentTileLayerRef.current = tileLayer;
+      try {
+        const googleMaps = await loadGoogleMapsApi();
+        if (!isMounted || !mapContainerRef.current) return;
 
-      // Marker
-      const marker = L.marker([lat, lng], {
-        draggable: true,
-        icon: createMosquePinIcon(),
-      }).addTo(map);
+        if (!googleMapRef.current) {
+          // Create Original Google Maps Instance
+          const map = new googleMaps.Map(mapContainerRef.current, {
+            center: { lat, lng },
+            zoom: 19,
+            mapTypeId: activeMapLayerKey || "roadmap",
+            mapTypeControl: false,
+            streetViewControl: true,
+            fullscreenControl: true,
+            zoomControl: true,
+            gestureHandling: "greedy",
+            styles: [
+              {
+                featureType: "poi",
+                elementType: "labels",
+                stylers: [{ visibility: "on" }],
+              },
+            ],
+          });
 
-      marker.bindPopup(
-        `<b>${venueName || "Venue"}</b><br>Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`
-      );
+          // Custom Gold Mosque Pin Icon SVG
+          const mosquePinSvg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="46" height="54" viewBox="0 0 46 54">
+              <defs>
+                <filter id="shadow" x="-30%" y="-20%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.4"/>
+                </filter>
+                <linearGradient id="goldPin" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fae392"/>
+                  <stop offset="45%" stop-color="#d4af37"/>
+                  <stop offset="100%" stop-color="#997a15"/>
+                </linearGradient>
+              </defs>
+              <path d="M23 2 C11.5 2 2 11.5 2 23 C2 35 23 52 23 52 C23 52 44 35 44 23 C44 11.5 34.5 2 23 2 Z" fill="url(#goldPin)" stroke="#ffffff" stroke-width="2.5" filter="url(#shadow)"/>
+              <circle cx="23" cy="22" r="14.5" fill="#ffffff"/>
+              <text x="23" y="27" font-size="16" text-anchor="middle" dominant-baseline="middle">🕌</text>
+            </svg>
+          `)}`;
 
-      // Geofence Circle
-      const circle = L.circle([lat, lng], {
-        color: "#d4af37",
-        fillColor: "#d4af37",
-        fillOpacity: 0.22,
-        weight: 2.5,
-        radius: rad,
-      }).addTo(map);
+          const marker = new googleMaps.Marker({
+            position: { lat, lng },
+            map,
+            draggable: true,
+            title: venueName || "Venue Location",
+            animation: googleMaps.Animation.DROP,
+            icon: {
+              url: mosquePinSvg,
+              scaledSize: new googleMaps.Size(42, 50),
+              anchor: new googleMaps.Point(21, 50),
+            },
+          });
 
-      // Drag event
-      marker.on("dragend", (e) => {
-        const pos = e.target.getLatLng();
-        const rLat = Math.round(pos.lat * 1e7) / 1e7;
-        const rLng = Math.round(pos.lng * 1e7) / 1e7;
-        setVenueLat(rLat);
-        setVenueLng(rLng);
-        circle.setLatLng(pos);
-        marker.setPopupContent(
-          `<b>${venueName || "Venue"}</b><br>Lat: ${rLat.toFixed(6)}, Lng: ${rLng.toFixed(6)}`
-        );
-      });
+          const circle = new googleMaps.Circle({
+            map,
+            center: { lat, lng },
+            radius: rad,
+            fillColor: "#d4af37",
+            fillOpacity: 0.22,
+            strokeColor: "#b8941f",
+            strokeOpacity: 0.85,
+            strokeWeight: 2.5,
+            clickable: false,
+          });
 
-      // Map click event
-      map.on("click", (e) => {
-        const { lat: clickLat, lng: clickLng } = e.latlng;
-        const rLat = Math.round(clickLat * 1e7) / 1e7;
-        const rLng = Math.round(clickLng * 1e7) / 1e7;
-        setVenueLat(rLat);
-        setVenueLng(rLng);
-        marker.setLatLng([clickLat, clickLng]);
-        circle.setLatLng([clickLat, clickLng]);
-        marker.setPopupContent(
-          `<b>${venueName || "Venue"}</b><br>Lat: ${rLat.toFixed(6)}, Lng: ${rLng.toFixed(6)}`
-        );
-      });
+          const infoWindow = new googleMaps.InfoWindow({
+            content: `<div style="font-family:inherit;padding:4px 6px;color:#2c2518;">
+              <strong style="font-size:13px;color:#856404;">🕌 ${venueName || "Attendance Venue"}</strong><br/>
+              <span style="font-size:11px;color:#666;">Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}</span><br/>
+              <span style="font-size:11px;color:#2e7d32;font-weight:bold;">Radius: ${rad}m</span>
+            </div>`,
+          });
 
-      mapInstanceRef.current = map;
-      markerRef.current = marker;
-      circleRef.current = circle;
-    } else {
-      // Update existing map markers & circle
-      const marker = markerRef.current;
-      const circle = circleRef.current;
+          marker.addListener("click", () => {
+            infoWindow.open(map, marker);
+          });
 
-      if (marker && circle) {
-        const newPos = [lat, lng];
-        marker.setLatLng(newPos);
-        circle.setLatLng(newPos);
-        circle.setRadius(rad);
-        marker.setPopupContent(
-          `<b>${venueName || "Venue"}</b><br>Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`
-        );
+          // Marker dragging
+          marker.addListener("drag", (e) => {
+            const curLat = e.latLng.lat();
+            const curLng = e.latLng.lng();
+            circle.setCenter({ lat: curLat, lng: curLng });
+          });
+
+          marker.addListener("dragend", (e) => {
+            const curLat = e.latLng.lat();
+            const curLng = e.latLng.lng();
+            const rLat = Math.round(curLat * 1e7) / 1e7;
+            const rLng = Math.round(curLng * 1e7) / 1e7;
+            setVenueLat(rLat);
+            setVenueLng(rLng);
+            circle.setCenter({ lat: curLat, lng: curLng });
+            infoWindow.setContent(
+              `<div style="font-family:inherit;padding:4px 6px;color:#2c2518;">
+                <strong style="font-size:13px;color:#856404;">🕌 ${venueName || "Attendance Venue"}</strong><br/>
+                <span style="font-size:11px;color:#666;">Lat: ${rLat.toFixed(6)}, Lng: ${rLng.toFixed(6)}</span><br/>
+                <span style="font-size:11px;color:#2e7d32;font-weight:bold;">Radius: ${radius}m</span>
+              </div>`
+            );
+          });
+
+          // Map click
+          map.addListener("click", (e) => {
+            const clickLat = e.latLng.lat();
+            const clickLng = e.latLng.lng();
+            const rLat = Math.round(clickLat * 1e7) / 1e7;
+            const rLng = Math.round(clickLng * 1e7) / 1e7;
+            setVenueLat(rLat);
+            setVenueLng(rLng);
+            marker.setPosition({ lat: clickLat, lng: clickLng });
+            circle.setCenter({ lat: clickLat, lng: clickLng });
+            infoWindow.setContent(
+              `<div style="font-family:inherit;padding:4px 6px;color:#2c2518;">
+                <strong style="font-size:13px;color:#856404;">🕌 ${venueName || "Attendance Venue"}</strong><br/>
+                <span style="font-size:11px;color:#666;">Lat: ${rLat.toFixed(6)}, Lng: ${rLng.toFixed(6)}</span><br/>
+                <span style="font-size:11px;color:#2e7d32;font-weight:bold;">Radius: ${radius}m</span>
+              </div>`
+            );
+          });
+
+          googleMapRef.current = map;
+          googleMarkerRef.current = marker;
+          googleCircleRef.current = circle;
+          googleInfoWindowRef.current = infoWindow;
+
+          // Setup Google Places Autocomplete if available
+          if (searchInputRef.current && googleMaps.places) {
+            try {
+              const autocomplete = new googleMaps.places.Autocomplete(searchInputRef.current, {
+                fields: ["geometry", "name", "formatted_address"],
+              });
+              autocomplete.bindTo("bounds", map);
+
+              autocomplete.addListener("place_changed", () => {
+                const place = autocomplete.getPlace();
+                if (place.geometry && place.geometry.location) {
+                  const pLat = place.geometry.location.lat();
+                  const pLng = place.geometry.location.lng();
+                  const rLat = Math.round(pLat * 1e7) / 1e7;
+                  const rLng = Math.round(pLng * 1e7) / 1e7;
+
+                  setVenueLat(rLat);
+                  setVenueLng(rLng);
+                  if (place.name) {
+                    setVenueName(place.name);
+                  }
+                  setSearchQuery(place.formatted_address || place.name || "");
+
+                  map.setCenter({ lat: pLat, lng: pLng });
+                  map.setZoom(19);
+                  marker.setPosition({ lat: pLat, lng: pLng });
+                  circle.setCenter({ lat: pLat, lng: pLng });
+
+                  if (onShowAction) {
+                    onShowAction(
+                      "success",
+                      `Google Map centered to: ${place.name || place.formatted_address}`
+                    );
+                  }
+                }
+              });
+              googleAutocompleteRef.current = autocomplete;
+            } catch (autoErr) {
+              console.warn("Places autocomplete setup warning:", autoErr);
+            }
+          }
+        } else {
+          // Update existing Google Map
+          const map = googleMapRef.current;
+          const marker = googleMarkerRef.current;
+          const circle = googleCircleRef.current;
+
+          if (map && marker && circle) {
+            const newPos = { lat, lng };
+            marker.setPosition(newPos);
+            circle.setCenter(newPos);
+            circle.setRadius(rad);
+          }
+        }
+      } catch (err) {
+        console.warn("Google Maps API initialization notice:", err);
+      } finally {
+        if (isMounted) setIsMapLoading(false);
       }
     }
-  }, [venueLat, venueLng, radius, venueName, createMosquePinIcon, activeMapLayerKey]);
 
-  // Switch Tile Layer when user toggles (Google Streets, Satellite, OSM)
+    initGoogleMap();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [venueLat, venueLng, radius, venueName, activeMapLayerKey, onShowAction]);
+
+  // Switch Map Layer (Google Streets, Satellite, Hybrid, Terrain)
   const handleSwitchMapLayer = (layerKey) => {
     setActiveMapLayerKey(layerKey);
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    if (currentTileLayerRef.current) {
-      map.removeLayer(currentTileLayerRef.current);
+    if (googleMapRef.current) {
+      googleMapRef.current.setMapTypeId(layerKey);
     }
-
-    const layerConfig = TILE_LAYERS[layerKey] || TILE_LAYERS.googleRoad;
-    const newLayer = L.tileLayer(layerConfig.url, {
-      attribution: layerConfig.attribution,
-      maxZoom: layerConfig.maxZoom,
-    }).addTo(map);
-    currentTileLayerRef.current = newLayer;
   };
-
-  // Clean up map on unmount
-  useEffect(() => {
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
-  }, []);
 
   // Update map when lat/lng/radius change via inputs
   const handleLatChange = (val) => {
     const num = parseFloat(val);
     setVenueLat(val);
-    if (!isNaN(num) && mapInstanceRef.current && markerRef.current && circleRef.current) {
+    if (!isNaN(num) && googleMapRef.current && googleMarkerRef.current && googleCircleRef.current) {
       const currentLng = Number(venueLng) || DEFAULT_ATTENDANCE_SETTINGS.venue_lng;
-      markerRef.current.setLatLng([num, currentLng]);
-      circleRef.current.setLatLng([num, currentLng]);
-      mapInstanceRef.current.panTo([num, currentLng]);
+      const pos = { lat: num, lng: currentLng };
+      googleMarkerRef.current.setPosition(pos);
+      googleCircleRef.current.setCenter(pos);
+      googleMapRef.current.panTo(pos);
     }
   };
 
   const handleLngChange = (val) => {
     const num = parseFloat(val);
     setVenueLng(val);
-    if (!isNaN(num) && mapInstanceRef.current && markerRef.current && circleRef.current) {
+    if (!isNaN(num) && googleMapRef.current && googleMarkerRef.current && googleCircleRef.current) {
       const currentLat = Number(venueLat) || DEFAULT_ATTENDANCE_SETTINGS.venue_lat;
-      markerRef.current.setLatLng([currentLat, num]);
-      circleRef.current.setLatLng([currentLat, num]);
-      mapInstanceRef.current.panTo([currentLat, num]);
+      const pos = { lat: currentLat, lng: num };
+      googleMarkerRef.current.setPosition(pos);
+      googleCircleRef.current.setCenter(pos);
+      googleMapRef.current.panTo(pos);
     }
   };
 
   const handleRadiusChange = (val) => {
     const num = parseInt(val, 10);
     setRadius(val);
-    if (!isNaN(num) && circleRef.current) {
-      circleRef.current.setRadius(num);
+    if (!isNaN(num) && googleCircleRef.current) {
+      googleCircleRef.current.setRadius(num);
     }
   };
 
   // -------------------------------------------------------------------------
-  // Location Search via Nominatim / OpenStreetMap Geocoding
+  // Location Search via Google Geocoder / Places
   // -------------------------------------------------------------------------
   const executeSearch = async (query) => {
     if (!query || query.trim().length < 2) {
@@ -350,24 +422,42 @@ export default function AdminTeacherAttendanceSettings({
 
     setIsSearching(true);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query.trim()
-        )}&limit=6&addressdetails=1`,
-        {
-          headers: {
-            "Accept-Language": "en",
-          },
+      if (typeof window !== "undefined" && window.google?.maps?.Geocoder) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: query.trim() }, (results, status) => {
+          setIsSearching(false);
+          if (status === "OK" && results && results.length > 0) {
+            const mapped = results.slice(0, 6).map((r) => ({
+              place_id: r.place_id,
+              name: r.formatted_address.split(",")[0],
+              display_name: r.formatted_address,
+              lat: r.geometry.location.lat(),
+              lon: r.geometry.location.lng(),
+            }));
+            setSearchResults(mapped);
+            setShowSearchResults(true);
+          } else {
+            setSearchResults([]);
+            setShowSearchResults(false);
+          }
+        });
+      } else {
+        // Fallback geocoding if Google API is still bootstrapping
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            query.trim()
+          )}&limit=6&addressdetails=1`,
+          { headers: { "Accept-Language": "en" } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data || []);
+          setShowSearchResults(true);
         }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setSearchResults(data || []);
-        setShowSearchResults(true);
+        setIsSearching(false);
       }
     } catch (err) {
       console.warn("Location search error:", err);
-    } finally {
       setIsSearching(false);
     }
   };
@@ -399,29 +489,24 @@ export default function AdminTeacherAttendanceSettings({
     setVenueLat(roundLat);
     setVenueLng(roundLng);
 
-    // Auto suggest venue name from location display name
     const placeTitle = item.name || item.display_name.split(",")[0];
     if (placeTitle && placeTitle.trim()) {
       setVenueName(placeTitle.trim());
     }
 
-    // Pan & Zoom map
-    if (mapInstanceRef.current && markerRef.current && circleRef.current) {
-      markerRef.current.setLatLng([roundLat, roundLng]);
-      circleRef.current.setLatLng([roundLat, roundLng]);
-      mapInstanceRef.current.flyTo([roundLat, roundLng], 18, {
-        duration: 1.2,
-      });
-      markerRef.current.setPopupContent(
-        `<b>${placeTitle || "Selected Venue"}</b><br>Lat: ${roundLat}, Lng: ${roundLng}`
-      );
+    if (googleMapRef.current && googleMarkerRef.current && googleCircleRef.current) {
+      const pos = { lat: roundLat, lng: roundLng };
+      googleMarkerRef.current.setPosition(pos);
+      googleCircleRef.current.setCenter(pos);
+      googleMapRef.current.setCenter(pos);
+      googleMapRef.current.setZoom(19);
     }
 
     setShowSearchResults(false);
     setSearchQuery(item.display_name);
 
     if (onShowAction) {
-      onShowAction("success", `Map centered to ${placeTitle}`);
+      onShowAction("success", `Google Map centered to ${placeTitle}`);
     }
   };
 
@@ -475,15 +560,17 @@ export default function AdminTeacherAttendanceSettings({
     setVenueName(defName);
     setSearchQuery("");
 
-    if (mapInstanceRef.current && markerRef.current && circleRef.current) {
-      markerRef.current.setLatLng([defLat, defLng]);
-      circleRef.current.setLatLng([defLat, defLng]);
-      circleRef.current.setRadius(defRad);
-      mapInstanceRef.current.flyTo([defLat, defLng], 18);
+    if (googleMapRef.current && googleMarkerRef.current && googleCircleRef.current) {
+      const pos = { lat: defLat, lng: defLng };
+      googleMarkerRef.current.setPosition(pos);
+      googleCircleRef.current.setCenter(pos);
+      googleCircleRef.current.setRadius(defRad);
+      googleMapRef.current.setCenter(pos);
+      googleMapRef.current.setZoom(19);
     }
 
     if (onShowAction) {
-      onShowAction("success", "Reset venue to Burhani Masjid, Galiakot coordinates!");
+      onShowAction("success", "Reset venue to Burhani Masjid, Galiakot coordinates on Google Maps!");
     }
   };
 
@@ -498,16 +585,20 @@ export default function AdminTeacherAttendanceSettings({
       setVenueLat(roundLat);
       setVenueLng(roundLng);
 
-      if (mapInstanceRef.current && markerRef.current && circleRef.current) {
-        markerRef.current.setLatLng([roundLat, roundLng]);
-        circleRef.current.setLatLng([roundLat, roundLng]);
-        mapInstanceRef.current.flyTo([roundLat, roundLng], 18);
+      if (googleMapRef.current && googleMarkerRef.current && googleCircleRef.current) {
+        const pos = { lat: roundLat, lng: roundLng };
+        googleMarkerRef.current.setPosition(pos);
+        googleCircleRef.current.setCenter(pos);
+        googleMapRef.current.setCenter(pos);
+        googleMapRef.current.setZoom(19);
       }
 
       if (onShowAction) {
         onShowAction(
           "success",
-          `Detected location: ${roundLat}, ${roundLng} (±${Math.round(loc.accuracy || 0)}m)`
+          `Google Map updated to your GPS location: ${roundLat}, ${roundLng} (±${Math.round(
+            loc.accuracy || 0
+          )}m)`
         );
       }
     } catch (err) {
@@ -624,7 +715,7 @@ export default function AdminTeacherAttendanceSettings({
             <div>
               <h2 className="att-settings-title">Teacher Attendance Settings</h2>
               <p className="att-settings-subtitle">
-                Configure timing rules, real Google Map venue coordinates, proximity steps & smart auto-marking
+                Configure timing rules, original Google Maps venue coordinates, proximity steps & smart auto-marking
               </p>
             </div>
           </div>
@@ -658,7 +749,7 @@ export default function AdminTeacherAttendanceSettings({
         </div>
       </div>
 
-      {/* Main Grid: Left = Time, Active Days & Auto-Mark, Right = Real Google Map & Location */}
+      {/* Main Grid: Left = Time, Active Days & Auto-Mark, Right = Original Google Map & Location */}
       <div className="att-settings-grid">
         {/* =========================================================
             CARD 1: TIME CONFIGURATION, ACTIVE DAYS & AUTO-MARK
@@ -734,7 +825,7 @@ export default function AdminTeacherAttendanceSettings({
                   </div>
                 </div>
 
-                <div className="att-days-grid">
+                <div className="att-settings-days-grid">
                   {ALL_DAYS.map((day) => {
                     const isSelected = activeDays.includes(day);
                     return (
@@ -817,7 +908,7 @@ export default function AdminTeacherAttendanceSettings({
         </div>
 
         {/* =========================================================
-            CARD 2: REAL GOOGLE MAP & GEOFENCE LOCATION
+            CARD 2: ORIGINAL GOOGLE MAP & GEOFENCE LOCATION
            ========================================================= */}
         <section className="att-card att-map-card">
           <div className="att-card-header">
@@ -825,7 +916,7 @@ export default function AdminTeacherAttendanceSettings({
               <div className="att-card-header-icon">
                 <MapPin size={18} />
               </div>
-              <h3 className="att-card-title">Real Google Map Location & Geofence</h3>
+              <h3 className="att-card-title">Original Google Map Location & Geofence</h3>
             </div>
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${venueLat},${venueLng}`}
@@ -839,14 +930,15 @@ export default function AdminTeacherAttendanceSettings({
           </div>
 
           <div className="att-card-body">
-            {/* Live Search Location Input */}
+            {/* Live Search Location Input with Google Places Autocomplete */}
             <div className="att-field-group" ref={searchContainerRef}>
               <label className="att-field-label">
-                <Search size={14} /> Search Venue / Mosque Location
+                <Search size={14} /> Search Venue / Mosque via Google Places
               </label>
               <div className="att-search-input-wrap">
                 <Search size={16} className="att-search-icon" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   className="att-search-input"
                   placeholder="Type any mosque, city, or address (e.g. Burhani Masjid Galiakot)..."
@@ -873,7 +965,7 @@ export default function AdminTeacherAttendanceSettings({
                 ) : null}
               </div>
 
-              {/* Autocomplete Dropdown */}
+              {/* Autocomplete Dropdown Fallback */}
               {showSearchResults && searchResults.length > 0 && (
                 <div className="att-search-results-dropdown">
                   {searchResults.map((item, idx) => (
@@ -897,14 +989,14 @@ export default function AdminTeacherAttendanceSettings({
               )}
             </div>
 
-            {/* Map Layer Switcher Pills */}
+            {/* Google Map Style Switcher Pills */}
             <div className="att-map-layer-selector">
               <div className="att-layer-pills-label">
                 <Layers size={13} />
-                <span>Map Style:</span>
+                <span>Google Map Style:</span>
               </div>
               <div className="att-layer-pills-group">
-                {Object.entries(TILE_LAYERS).map(([key, cfg]) => (
+                {Object.entries(GOOGLE_MAP_TYPES).map(([key, cfg]) => (
                   <button
                     key={key}
                     type="button"
@@ -918,11 +1010,17 @@ export default function AdminTeacherAttendanceSettings({
               </div>
             </div>
 
-            {/* Interactive Real Map View */}
+            {/* Interactive Original Google Map View */}
             <div className="att-map-wrapper">
               <div ref={mapContainerRef} className="att-map-container" />
+              {isMapLoading && (
+                <div className="att-map-loading-overlay">
+                  <RotateCw size={24} className="att-spin" style={{ color: "#d4af37" }} />
+                  <span>Loading Google Maps...</span>
+                </div>
+              )}
               <div className="att-map-overlay-badge">
-                <span>📍 Drag marker or click anywhere on map</span>
+                <span>📍 Drag marker or click anywhere on Google Map</span>
               </div>
             </div>
 
