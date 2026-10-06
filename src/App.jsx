@@ -35425,6 +35425,14 @@ function TeacherPortal({
     return () => clearInterval(interval);
   }, []);
   const [histStudentId, setHistStudentId] = useState("");
+  const [histFromDate, setHistFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 27);
+    return d.toISOString().slice(0, 10);
+  });
+  const [histTillDate, setHistTillDate] = useState(() => {
+    return new Date().toISOString().slice(0, 10);
+  });
   const [histDate, setHistDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -36040,16 +36048,18 @@ function TeacherPortal({
   useEffect(() => {
     if (!histStudentId) return;
     setHistLoading(true);
-    const endDate = new Date().toISOString().slice(0, 10);
-    const start = new Date();
-    start.setDate(start.getDate() - 28);
-    const startDate = start.toISOString().slice(0, 10);
+    const startDate =
+      histFromDate ||
+      new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10);
+    const endDate = histTillDate || new Date().toISOString().slice(0, 10);
+    const minD = startDate <= endDate ? startDate : endDate;
+    const maxD = startDate <= endDate ? endDate : startDate;
     supabase
       .from("student_daily_attendance")
       .select("*")
       .eq("student_id", String(histStudentId))
-      .gte("attendance_date", startDate)
-      .lte("attendance_date", endDate)
+      .gte("attendance_date", minD)
+      .lte("attendance_date", maxD)
       .then(({ data, error }) => {
         const map = {};
         if (!error && data) {
@@ -36060,7 +36070,7 @@ function TeacherPortal({
         setHistRecords(map);
         setHistLoading(false);
       });
-  }, [histStudentId]);
+  }, [histStudentId, histFromDate, histTillDate]);
 
   useEffect(() => {
     if (overviewStudents.length > 0 && !histStudentId) {
@@ -43209,10 +43219,11 @@ function TeacherPortal({
                           style={{ color: "var(--primary-gold)" }}
                         />
                         <h3>Attendance History</h3>
+                        <span className="att-history-premium-badge">PREMIUM</span>
                       </div>
                     </div>
 
-                    {/* Selectors */}
+                    {/* Selectors: Student, From Date, Till Date */}
                     <div className="att-history-selectors">
                       <div className="att-filter-col">
                         <label className="att-filter-label">
@@ -43231,7 +43242,6 @@ function TeacherPortal({
                           value={histStudentId || ""}
                           onChange={(v) => {
                             setHistStudentId(v);
-                            setHistDate(new Date().toISOString().slice(0, 10));
                             setHistStatus(null);
                           }}
                           placeholder="Select student…"
@@ -43246,16 +43256,44 @@ function TeacherPortal({
                             size={14}
                             style={{ color: "var(--primary-gold)" }}
                           />
-                          Select Date
+                          From Date
                         </label>
                         <PremiumDatePicker
-                          value={histDate}
+                          value={histFromDate}
                           onChange={(newDate) => {
+                            setHistFromDate(newDate);
+                            if (newDate > histTillDate) {
+                              setHistTillDate(newDate);
+                            }
                             setHistDate(newDate);
                             setHistStatus(null);
                           }}
                           maxDate={new Date().toISOString().slice(0, 10)}
-                          placeholder="Select attendance date..."
+                          placeholder="From date..."
+                        />
+                      </div>
+
+                      <div className="att-filter-col">
+                        <label className="att-filter-label">
+                          <Calendar
+                            size={14}
+                            style={{ color: "var(--primary-gold)" }}
+                          />
+                          Till Date
+                        </label>
+                        <PremiumDatePicker
+                          value={histTillDate}
+                          onChange={(newDate) => {
+                            setHistTillDate(newDate);
+                            if (newDate < histFromDate) {
+                              setHistFromDate(newDate);
+                            }
+                            setHistDate(newDate);
+                            setHistStatus(null);
+                          }}
+                          minDate={histFromDate}
+                          maxDate={new Date().toISOString().slice(0, 10)}
+                          placeholder="Till date..."
                         />
                       </div>
                     </div>
@@ -43274,36 +43312,61 @@ function TeacherPortal({
                             )}
                             <span>•</span>
                             <span>
+                              Range:{" "}
+                              <strong>
+                                {new Date(
+                                  histFromDate + "T00:00:00",
+                                ).toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                                {" — "}
+                                {new Date(
+                                  histTillDate + "T00:00:00",
+                                ).toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </strong>
+                            </span>
+                            <span>•</span>
+                            <span>
                               Selected:{" "}
-                              {new Date(
-                                histDate + "T00:00:00",
-                              ).toLocaleDateString("en-GB", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })}
+                              <strong>
+                                {new Date(
+                                  histDate + "T00:00:00",
+                                ).toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </strong>
                             </span>
                           </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Monthly Stats Ribbon */}
+                    {/* Range Stats Ribbon */}
                     {(() => {
-                      const tPresent = Object.values(histRecords).filter(
-                        (v) => v === "present",
+                      const minD = histFromDate <= histTillDate ? histFromDate : histTillDate;
+                      const maxD = histFromDate <= histTillDate ? histTillDate : histFromDate;
+                      const filteredEntries = Object.entries(histRecords).filter(
+                        ([d]) => d >= minD && d <= maxD,
+                      );
+                      const tPresent = filteredEntries.filter(
+                        ([, v]) => v === "present",
                       ).length;
-                      const tAbsent = Object.values(histRecords).filter(
-                        (v) => v === "absent",
+                      const tAbsent = filteredEntries.filter(
+                        ([, v]) => v === "absent",
                       ).length;
-                      const tHoliday = Object.values(histRecords).filter(
-                        (v) => v === "holiday",
+                      const tHoliday = filteredEntries.filter(
+                        ([, v]) => v === "holiday",
                       ).length;
-                      const tTotal = tPresent + tAbsent + tHoliday;
-                      if (!tTotal) return null;
                       return (
                         <div className="att-stats-ribbon">
-                          <div className="att-stat-label-col">Monthly</div>
+                          <div className="att-stat-label-col">Summary</div>
                           <div className="att-stat-item att-stat-present">
                             <span className="att-stat-name">Present</span>
                             <span className="att-stat-val">{tPresent}</span>
@@ -43368,14 +43431,14 @@ function TeacherPortal({
                       })}
                     </div>
 
-                    {/* Last 4 Weeks Overview with Perfectly Aligned Dates Grid */}
+                    {/* Dynamic Range Overview with Aligned Dates Grid */}
                     <div className="att-overview-section">
                       <h4>
                         <Calendar
                           size={18}
                           style={{ color: "var(--primary-gold)" }}
                         />
-                        Last 4 Weeks Overview
+                        Attendance Overview ({new Date(histFromDate + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — {new Date(histTillDate + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})
                       </h4>
 
                       {histLoading ? (
@@ -43395,20 +43458,32 @@ function TeacherPortal({
                       ) : (
                         (() => {
                           const weeks = [];
-                          const saturday = new Date();
-                          const dow = saturday.getDay();
-                          saturday.setDate(
-                            saturday.getDate() + (dow === 6 ? 0 : -(dow + 1)),
-                          );
-                          for (let w = 0; w < 4; w++) {
-                            const weekStart = new Date(saturday);
-                            weekStart.setDate(saturday.getDate() - w * 7);
+                          const minD = histFromDate <= histTillDate ? histFromDate : histTillDate;
+                          const maxD = histTillDate >= histFromDate ? histTillDate : histFromDate;
+                          const startDateObj = new Date(minD + "T00:00:00");
+                          const endDateObj = new Date(maxD + "T00:00:00");
+
+                          // Find Saturday of endDate's week
+                          const topSat = new Date(endDateObj);
+                          const topDow = topSat.getDay(); // 0: Sun, 1: Mon, ..., 6: Sat
+                          topSat.setDate(topSat.getDate() + (topDow === 6 ? 0 : -(topDow + 1)));
+
+                          // Find Saturday of startDate's week
+                          const botSat = new Date(startDateObj);
+                          const botDow = botSat.getDay();
+                          botSat.setDate(botSat.getDate() + (botDow === 6 ? 0 : -(botDow + 1)));
+
+                          let currSat = new Date(topSat);
+                          let weekNum = 1;
+
+                          while (currSat >= botSat && weekNum <= 52) {
                             const days = [];
                             for (let d = 0; d < 7; d++) {
-                              const date = new Date(weekStart);
-                              date.setDate(weekStart.getDate() + d);
+                              const date = new Date(currSat);
+                              date.setDate(currSat.getDate() + d);
                               const dateStr = date.toISOString().slice(0, 10);
                               const isSunday = d === 1;
+                              const inSelectedRange = dateStr >= minD && dateStr <= maxD;
                               const status = isSunday
                                 ? "holiday"
                                 : histRecords[dateStr] || null;
@@ -43426,10 +43501,21 @@ function TeacherPortal({
                                 dayNum: date.getDate(),
                                 status,
                                 isSunday,
+                                inSelectedRange,
                                 isPast: date <= new Date(),
                               });
                             }
-                            weeks.push({ start: weekStart, days });
+                            weeks.push({ start: new Date(currSat), days, weekNum });
+                            currSat.setDate(currSat.getDate() - 7);
+                            weekNum++;
+                          }
+
+                          if (weeks.length === 0) {
+                            return (
+                              <div style={{ textAlign: "center", padding: "20px", color: "var(--text-muted)" }}>
+                                No dates found in selected range.
+                              </div>
+                            );
                           }
 
                           return weeks.map((week, wi) => {
@@ -43443,7 +43529,7 @@ function TeacherPortal({
                                 <div className="att-week-card-header">
                                   <span className="att-week-pill">
                                     {wi === 0
-                                      ? "Week 1 (Current)"
+                                      ? "Week 1 (Latest)"
                                       : `Week ${wi + 1}`}
                                   </span>
                                   <span className="att-week-dates-text">
@@ -43473,8 +43559,8 @@ function TeacherPortal({
                                           setHistStatus(null);
                                         }}
                                         disabled={!day.isPast}
-                                        className={`att-day-card ${isSelected ? "selected" : ""} ${!day.isPast ? "disabled-day" : ""}`}
-                                        title={`${day.dayName}, ${day.dateStr}: ${day.status || "Not recorded"}`}
+                                        className={`att-day-card ${isSelected ? "selected" : ""} ${!day.isPast ? "disabled-day" : ""} ${!day.inSelectedRange ? "dimmed-day" : ""}`}
+                                        title={`${day.dayName}, ${day.dateStr}: ${day.status ? day.status.toUpperCase() : "Not recorded (Click to mark)"}`}
                                       >
                                         <span className="att-day-name">
                                           {day.dayName}

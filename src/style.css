@@ -15603,11 +15603,26 @@ button:not(.rp-btn-gold):not(.support-bot-send):not(.quick-action-btn):not(.side
 /* Selectors Grid — perfectly responsive for all devices */
 .att-history-selectors {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  grid-template-columns: minmax(180px, 1.4fr) 1fr 1fr;
+  gap: 12px;
   margin-bottom: 18px;
   width: 100%;
   box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .att-history-selectors {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .att-history-selectors > .att-filter-col:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.att-day-card.dimmed-day {
+  opacity: 0.4;
+  border-style: dashed;
 }
 
 .att-filter-col {
