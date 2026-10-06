@@ -47663,12 +47663,14 @@ export default function App() {
           const currentSelectedId =
             selectedStudentIdRef.current || selectedStudentId;
           const activeStudent =
-            processedStudents.find(
-              (p) => String(p.student_id) === String(currentSelectedId),
-            ) || processedStudents[0];
+            (processedStudents && processedStudents.length > 0)
+              ? (processedStudents.find(
+                  (p) => String(p.student_id) === String(currentSelectedId),
+                ) || processedStudents[0])
+              : null;
 
           // Bulletproof search for activeResult using the already matched latestResult from buildStudents
-          let activeResult = activeStudent.latestResult;
+          let activeResult = activeStudent?.latestResult || null;
 
           // Get global ranks from Edge Function (bypasses RLS) so ALL portals see
           // the exact same global rank as the admin's Rank Preview page
@@ -47685,9 +47687,11 @@ export default function App() {
               });
               // Re-find active result after rank override
               const updatedActive =
-                processedStudents.find(
-                  (p) => String(p.student_id) === String(currentSelectedId),
-                ) || processedStudents[0];
+                (processedStudents && processedStudents.length > 0)
+                  ? (processedStudents.find(
+                      (p) => String(p.student_id) === String(currentSelectedId),
+                    ) || processedStudents[0])
+                  : null;
               activeResult = updatedActive?.latestResult || activeResult;
             }
           } catch (_e) {
@@ -47695,10 +47699,11 @@ export default function App() {
           }
 
           const todayStr = getToday();
-          const activeAttendance = (attendanceResponse.data || []).find(
+          const activeAttendance = (attendanceResponse?.data || []).find(
             (a) =>
               a.attendance_date === todayStr &&
-              activeStudent.allIds.some(
+              activeStudent &&
+              (activeStudent.allIds || []).some(
                 (aid) =>
                   String(aid).trim().toLowerCase() ===
                   String(a.student_id || "")
@@ -47706,8 +47711,9 @@ export default function App() {
                     .toLowerCase(),
               ),
           );
-          const activeSchedule = (scheduleResponse.data || []).filter((s) =>
-            activeStudent.allIds.some(
+          const activeSchedule = (scheduleResponse?.data || []).filter((s) =>
+            activeStudent &&
+            (activeStudent.allIds || []).some(
               (aid) =>
                 String(aid).trim().toLowerCase() ===
                   String(s.student_id || "")
@@ -47724,9 +47730,10 @@ export default function App() {
           const monthStart = new Date();
           monthStart.setDate(1);
           const monthStartStr = monthStart.toISOString().split("T")[0];
-          const activeStudentResults = (resultsResponse.data || []).filter(
+          const activeStudentResults = (resultsResponse?.data || []).filter(
             (r) =>
-              activeStudent.allIds.some(
+              activeStudent &&
+              (activeStudent.allIds || []).some(
                 (aid) =>
                   String(aid).trim().toLowerCase() ===
                   String(r.student_id || "")
@@ -47751,14 +47758,14 @@ export default function App() {
             .join(", ");
 
           nextParentState = {
-            studentProfile: activeStudent,
-            allProfiles: processedStudents,
+            studentProfile: activeStudent || null,
+            allProfiles: processedStudents || [],
             /* Family-only result history (APPEND-ONLY): powers the Report Card
                Jadeed trend arrow. Bounded to this parent's children so the
                localStorage portal cache stays small. */
             weeklyResults: (() => {
               const familyIdSet = new Set(
-                processedStudents
+                (processedStudents || [])
                   .flatMap((p) => [
                     ...(p.allIds || []),
                     p.student_id,
@@ -47773,7 +47780,7 @@ export default function App() {
                   .filter(Boolean),
               );
               const familyNameSet = new Set(
-                processedStudents
+                (processedStudents || [])
                   .flatMap((p) => [p.name, p.full_name])
                   .map((n) => normalizeText(n || ""))
                   .filter(Boolean),
@@ -47794,10 +47801,10 @@ export default function App() {
               });
             })(),
             hifzDetails: {
-              juz: activeStudent.juz || "--",
-              surat: activeStudent.surat || "Pending",
-              muhaffiz_name: activeStudent.teacherName || "Pending",
-              teacher_note: activeStudent.latestResult?.attendance_note || null,
+              juz: activeStudent?.juz || "--",
+              surat: activeStudent?.surat || "Pending",
+              muhaffiz_name: activeStudent?.teacherName || "Pending",
+              teacher_note: activeStudent?.latestResult?.attendance_note || null,
               monthly_attendance: monthlyAttendanceCount,
               monthly_jadeed: monthlyJadeedTotal || monthlyJadeedRaw,
             },
@@ -47810,16 +47817,18 @@ export default function App() {
             reportSettings: reportSettingsResponse.data || [],
           };
 
-          if (!selectedStudentIdRef.current) {
+          if (activeStudent && !selectedStudentIdRef.current) {
             setSelectedStudentId(activeStudent.student_id);
           }
           // Remember the active child so a page refresh returns to the same child.
-          try {
-            localStorage.setItem(
-              "mauze-selected-child",
-              String(activeStudent.student_id),
-            );
-          } catch (_) {}
+          if (activeStudent?.student_id) {
+            try {
+              localStorage.setItem(
+                "mauze-selected-child",
+                String(activeStudent.student_id),
+              );
+            } catch (_) {}
+          }
         }
 
         setParentData(nextParentState);
