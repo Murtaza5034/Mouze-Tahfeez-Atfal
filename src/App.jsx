@@ -1482,6 +1482,8 @@ const NAV_ICONS = {
   "Online Tahfeez Tracking": Video,
   "Help Management": HelpCircle,
   "Hifz League Tracking": Trophy,
+  "Admission": UserPlus,
+  "Admissions": UserPlus,
 };
 
 const emptyParentData = {
@@ -20897,6 +20899,7 @@ function AdminPortal({
   const sidebarLinks = [
     "Rank Preview",
     "Student Registry",
+    "Admission",
     "Staff Profiles",
     "Assignments",
     "Portal Access",
@@ -33666,6 +33669,14 @@ function AdminPortal({
                 onDismiss={onDismissAnnounce}
                 onClearAll={onClearAllAnnounces}
                 dismissedIds={dismissedAnnounces}
+              />
+            </div>
+          ) : activePage === "Admission" || activePage === "Admissions" ? (
+            <div style={{ paddingBottom: "80px" }}>
+              <AdmissionAdminDashboard
+                defaultRole={isKibarAdmin ? "kibar_admin" : "atfal_admin"}
+                currentUser={user?.email || user?.name || "Admin"}
+                onBackToMain={() => setActivePage("Overview")}
               />
             </div>
           ) : activePage === "Online Tahfeez Tracking" ? (
@@ -51871,16 +51882,17 @@ export default function App() {
       rawPath === "/apply" ||
       rawPath === "/register" ||
       rawPath === "/admission-form" ||
+      rawPath === "/form" ||
       pageParam === "admission" ||
       pageParam === "admissions" ||
       pageParam === "apply" ||
-      pageParam === "register"
+      pageParam === "register" ||
+      pageParam === "form"
     ) {
       return (
         <AdmissionForm
           onGoToAdmin={() => {
-            window.history.pushState({}, "", "/admin/admissions");
-            window.dispatchEvent(new PopStateEvent("popstate"));
+            window.location.href = "/";
           }}
         />
       );
