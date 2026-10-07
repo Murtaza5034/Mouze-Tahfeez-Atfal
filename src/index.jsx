@@ -171,12 +171,45 @@ window.addEventListener('error', (event) => {
   }, true);
 })();
 
+import AdmissionForm from './components/admissions/AdmissionForm';
+
+function RootRouter() {
+  if (typeof window !== 'undefined') {
+    const rawPath = (window.location.pathname || '').toLowerCase();
+    const pageParam = (new URLSearchParams(window.location.search).get('page') || '').toLowerCase();
+
+    if (
+      rawPath === '/admission' ||
+      rawPath === '/admissions' ||
+      rawPath === '/apply' ||
+      rawPath === '/register' ||
+      rawPath === '/admission-form' ||
+      rawPath === '/form' ||
+      pageParam === 'admission' ||
+      pageParam === 'admissions' ||
+      pageParam === 'apply' ||
+      pageParam === 'register' ||
+      pageParam === 'form'
+    ) {
+      return (
+        <AdmissionForm
+          onGoToAdmin={() => {
+            window.location.href = '/';
+          }}
+        />
+      );
+    }
+  }
+
+  return <App />;
+}
+
 const rootElement = document.getElementById('root');
 const root = createRoot(rootElement);
 
 root.render(
   <StrictMode>
-    <App />
+    <RootRouter />
   </StrictMode>
 );
 
