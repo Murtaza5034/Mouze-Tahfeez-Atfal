@@ -93,6 +93,24 @@ export function getRefreshReg() {
     {
       name: 'dev-whatsapp-bot-proxy',
       configureServer(server) {
+        // Auto-launch WhatsApp bot background daemon on dev server start
+        const ensureBotRunning = async () => {
+          try {
+            const check = await fetch('http://127.0.0.1:2785/api/status', { signal: AbortSignal.timeout(1000) }).catch(() => null);
+            if (!check || !check.ok) {
+              const { spawn } = await import('child_process');
+              const botProc = spawn('node', ['scripts/mauze-whatsapp-bot.js'], {
+                detached: true,
+                stdio: 'ignore',
+                shell: true
+              });
+              botProc.unref();
+              console.log('\x1b[32m[VITE-BOT-AUTORUN] 📱 WhatsApp Bot daemon automatically launched in background on port 2785.\x1b[0m');
+            }
+          } catch (_) {}
+        };
+        setTimeout(ensureBotRunning, 1500);
+
         server.middlewares.use('/api/whatsapp-bot', async (req, res) => {
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -176,6 +194,8 @@ export function getRefreshReg() {
               res.end(text);
             }
           } catch (connErr) {
+            // Auto-trigger background launch on connection failure
+            ensureBotRunning();
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({
@@ -183,7 +203,7 @@ export function getRefreshReg() {
               botRunning: false,
               baileysStatus: 'DAEMON_OFFLINE',
               botEnabled: false,
-              reason: 'WhatsApp Bot daemon is stopped or port 2785 is inactive. Click "Start Bot" to launch it.',
+              reason: 'WhatsApp Bot daemon is starting up on port 2785. Please try again in 3 seconds.',
               port: 2785,
               helpline: '+91 81079 25353',
               error: connErr.message
