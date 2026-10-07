@@ -106,6 +106,19 @@ With age-appropriate memorization goals, playful repetition, rhythm, storytellin
 
 export async function getFormSettings() {
   try {
+    // Try serverless API first
+    const apiRes = await fetch("/api/admission-cms").then(r => r.ok ? r.json() : null).catch(() => null);
+    if (apiRes && apiRes.success && apiRes.data) {
+      return {
+        ...DEFAULT_CMS_SETTINGS,
+        ...apiRes.data,
+        programs_info: apiRes.data.programs_info || DEFAULT_CMS_SETTINGS.programs_info,
+        venue_photos: Array.isArray(apiRes.data.venue_photos) && apiRes.data.venue_photos.length > 0
+          ? apiRes.data.venue_photos
+          : DEFAULT_CMS_SETTINGS.venue_photos
+      };
+    }
+
     const { data, error } = await supabase
       .from("admission_cms_settings")
       .select("*")
@@ -113,7 +126,6 @@ export async function getFormSettings() {
       .maybeSingle();
 
     if (error || !data) {
-      // Return default settings if none saved yet
       return DEFAULT_CMS_SETTINGS;
     }
 
@@ -138,6 +150,19 @@ export async function saveFormSettings(settings) {
       ...settings,
       updated_at: new Date().toISOString()
     };
+
+    // Try serverless API first
+    try {
+      const res = await fetch("/api/admission-cms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) return { success: true, data: json.data };
+      }
+    } catch (_) {}
 
     const { data, error } = await supabase
       .from("admission_cms_settings")
@@ -165,6 +190,28 @@ export function generateApplicationId() {
 
 export async function submitAdmissionApplication(formData) {
   try {
+    // 1. Try serverless backend API (Firebase Admin SDK) first
+    // This bypasses any client Firestore security rule restrictions for public submissions
+    try {
+      const apiRes = await fetch("/api/submit-admission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (json.success) {
+          return {
+            success: true,
+            applicationId: json.applicationId,
+            data: json.data
+          };
+        }
+      }
+    } catch (apiErr) {
+      console.warn("Serverless submission endpoint unavailable, falling back:", apiErr);
+    }
+
     const appId = generateApplicationId();
     const timestamp = new Date().toISOString();
 
@@ -182,14 +229,14 @@ export async function submitAdmissionApplication(formData) {
 
     const applicationRecord = {
       application_id: appId,
-      full_name: formData.fullName?.trim(),
-      its_number: formData.itsNumber?.trim(),
-      gender: formData.gender,
+      full_name: formData.fullName?.trim() || formData.full_name?.trim() || "",
+      its_number: formData.itsNumber?.trim() || formData.its_number?.trim() || "",
+      gender: formData.gender || "male",
       age: parseInt(formData.age, 10) || null,
-      jamaat: formData.jamaat === "Other" ? (formData.jamaatOther?.trim() || "Other") : formData.jamaat,
-      email: formData.email?.trim()?.toLowerCase(),
-      whatsapp_number: formData.whatsappNumber?.trim(),
-      program: formData.program, // "Al-Kibar (Adults)", "Al-Atfal (7 to 15 yrs old)", "Al-Sigar (4 to 6 yrs old)"
+      jamaat: formData.jamaat === "Other" ? (formData.jamaatOther?.trim() || "Other") : (formData.jamaat || "Galiakot"),
+      email: formData.email?.trim()?.toLowerCase() || "",
+      whatsapp_number: formData.whatsappNumber?.trim() || formData.whatsapp_number?.trim() || "",
+      program: formData.program || "Al-Atfal (7 to 15 yrs old)",
       
       // Program-specific fields
       last_achieved_sanad: formData.lastAchievedSanad || null,
