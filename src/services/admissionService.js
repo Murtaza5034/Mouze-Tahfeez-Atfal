@@ -36,7 +36,7 @@ PS: These hifz classes are only for Galiakot Mumineen. No accommodation provided
       hub_raqam: "₹2,500 INR / month (Hijri month wise)",
       motto: "It’s never too late to begin your hifz journey",
       description: `Our Kibaar Hifz Programme is specially designed for adult Mumineen from all walks of life—students, housewives, professionals, businessmen, buzurgo—who wish to memorize Quran e Majeed. With dedicated morning and afternoon batches at two venues, the programme offers structured tasmee’, revision support, and regular progress tracking under experienced Muhaffizeen. Whether starting fresh or resuming their Hifz journey, students are guided to move forward with consistency and at their own pace.`,
-      info_url: "https://mauze-tahfeez.vercel.app/info/kibar"
+      info_url: "https://mouze-tahfeez-atfal.vercel.app/info/kibar"
     },
     atfal: {
       key: "Al-Atfal (7 to 15 yrs old)",
@@ -50,7 +50,7 @@ PS: These hifz classes are only for Galiakot Mumineen. No accommodation provided
       motto: "The Atfal Hifz experience is a joyful blend of memorization, motivation, and meaningful connection with Qur’an e Majeed",
       description: `Our Atfal Hifz Programme is tailor-made for school-going children aged 7 to 15, with afternoon timings that align with their academic schedules. The core of the programme focuses on one-to-one tasmee’, and steady progress under the guidance of trained Muhaffizeen.
 Alongside regular Hifz, we host year-round programmes including Saturday sessions combining memorization with understanding, themed events like Hifz Quizzes, Quran Treasure Hunts, Motivation Leagues, and outdoor experiences like Picnics and the year-end Fun Fair.`,
-      info_url: "https://mauze-tahfeez.vercel.app/info/atfal"
+      info_url: "https://mouze-tahfeez-atfal.vercel.app/info/atfal"
     },
     sigar: {
       key: "Al-Sigar (4 to 6 yrs old)",
@@ -64,7 +64,7 @@ Alongside regular Hifz, we host year-round programmes including Saturday session
       motto: "At SIGAR, we don’t just begin Hifz — we build memories around it",
       description: `Al-SIGAR Hifz Programme is a thoughtfully designed Hifz journey for children aged 4 to 6 years. This programme offers a gentle and joyful introduction to Hifz al-Quran in a nurturing environment that celebrates the uniqueness of every child.
 With age-appropriate memorization goals, playful repetition, rhythm, storytelling, and visual aids guided by trained Muhaffizeen who understand early childhood development. Special highlights include Snow Party ❄️, Pool Party, parental modeling, and celebration of small wins!`,
-      info_url: "https://mauze-tahfeez.vercel.app/info/sigar"
+      info_url: "https://mouze-tahfeez-atfal.vercel.app/info/sigar"
     }
   },
 
