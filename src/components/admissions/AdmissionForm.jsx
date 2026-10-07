@@ -653,31 +653,32 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
                       display: "flex",
                       alignItems: "flex-start",
                       gap: "14px",
-                      padding: "16px",
-                      borderRadius: "14px",
-                      background: "rgba(15, 23, 42, 0.75)",
-                      border: "1px solid rgba(51, 65, 85, 0.7)"
+                      padding: "16px 18px",
+                      borderRadius: "16px",
+                      background: "#fdfbf7",
+                      border: "1.5px solid var(--adm-gold-border)",
+                      boxShadow: "var(--adm-shadow-sm)"
                     }}
                   >
                     <div
                       style={{
-                        width: "24px",
-                        height: "24px",
+                        width: "26px",
+                        height: "26px",
                         borderRadius: "50%",
-                        background: "rgba(245, 158, 11, 0.2)",
-                        color: "#fbbf24",
-                        fontSize: "11px",
-                        fontWeight: 800,
+                        background: "var(--adm-gold-gradient)",
+                        color: "#ffffff",
+                        fontSize: "12px",
+                        fontWeight: 900,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         flexShrink: 0,
-                        border: "1px solid rgba(245, 158, 11, 0.4)"
+                        boxShadow: "0 2px 6px rgba(197, 155, 39, 0.35)"
                       }}
                     >
                       {idx + 1}
                     </div>
-                    <p style={{ margin: 0, fontSize: "14px", color: "#e2e8f0", lineHeight: 1.6 }}>
+                    <p style={{ margin: 0, fontSize: "14px", color: "var(--adm-espresso-main)", lineHeight: 1.6, fontWeight: 500 }}>
                       {line.replace(/^•\s*/, "")}
                     </p>
                   </div>
@@ -687,11 +688,11 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
               {/* Strict 10s Timer Action Bar */}
               <div className="adm-footer-action">
                 <div className="adm-timer-display">
-                  <Clock size={16} color="#10b981" />
+                  <Clock size={16} color="#d97706" />
                   {!guidelinesTimerDone ? (
                     <span>
                       Please review all guidelines. Unlocks in{" "}
-                      <strong className="adm-timer-sec" style={{ color: "#34d399" }}>{guidelinesTimer}s</strong>
+                      <strong className="adm-timer-sec">{guidelinesTimer}s</strong>
                     </span>
                   ) : (
                     <span className="adm-timer-ready">
@@ -713,7 +714,7 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
                     type="button"
                     onClick={handleNextPage}
                     disabled={!guidelinesTimerDone}
-                    className="adm-btn-primary adm-btn-emerald"
+                    className="adm-btn-primary"
                   >
                     <span>{guidelinesTimerDone ? "Select Program & Venue" : `Please wait (${guidelinesTimer}s)`}</span>
                     <ArrowRight size={16} />
@@ -828,15 +829,16 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
               {formData.program && (
                 <div
                   style={{
-                    background: "rgba(15, 23, 42, 0.9)",
-                    border: "1.5px solid rgba(245, 158, 11, 0.3)",
-                    borderRadius: "18px",
+                    background: "#fdfbf7",
+                    border: "1.5px solid var(--adm-gold-border)",
+                    borderRadius: "20px",
                     padding: "24px",
-                    marginBottom: "28px"
+                    marginBottom: "28px",
+                    boxShadow: "var(--adm-shadow-sm)"
                   }}
                 >
-                  <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", fontWeight: 800, textTransform: "uppercase", color: "#fde68a", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <BookOpen size={16} /> {formData.program} Specific Details
+                  <h4 style={{ margin: "0 0 16px 0", fontSize: "13px", fontWeight: 800, textTransform: "uppercase", color: "var(--adm-espresso-main)", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <BookOpen size={16} color="var(--adm-gold-dark)" /> {formData.program} Specific Details
                   </h4>
 
                   {/* KIBAR */}
@@ -849,9 +851,9 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
                           onChange={(e) => handleInputChange("lastAchievedSanad", e.target.value)}
                           className={`adm-input-custom adm-input-noicon ${formErrors.lastAchievedSanad ? "adm-input-error" : ""}`}
                         >
-                          <option value="" style={{ background: "#0b0f19" }}>-- Select Last Achieved Sanad --</option>
+                          <option value="">-- Select Last Achieved Sanad --</option>
                           {SANAD_OPTIONS.map((s) => (
-                            <option key={s} value={s} style={{ background: "#0b0f19" }}>{s}</option>
+                            <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
                         {formErrors.lastAchievedSanad && <p className="adm-err-msg"><AlertCircle size={12} /> {formErrors.lastAchievedSanad}</p>}
@@ -885,11 +887,11 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
                   {/* ATFAL */}
                   {formData.program === "Al-Atfal (7 to 15 yrs old)" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                      <div style={{ padding: "14px", borderRadius: "12px", background: "rgba(30, 41, 59, 0.7)", border: "1px solid rgba(71, 85, 105, 0.5)", fontSize: "13px", color: "#cbd5e1" }}>
-                        <p style={{ margin: "0 0 4px 0", fontWeight: 700, color: "#fde68a", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <MapPin size={14} /> Venue: Burhani Masjid (Pakhti Mubarak)
+                      <div style={{ padding: "16px", borderRadius: "14px", background: "linear-gradient(135deg, #fff9ea 0%, #fff4d6 100%)", border: "1.5px solid var(--adm-gold-border)", fontSize: "13px", color: "var(--adm-espresso-main)" }}>
+                        <p style={{ margin: "0 0 4px 0", fontWeight: 800, color: "var(--adm-espresso-main)", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <MapPin size={15} color="var(--adm-gold-dark)" /> Venue: Burhani Masjid (Pakhti Mubarak)
                         </p>
-                        <p style={{ margin: 0, color: "#94a3b8" }}>Timings: Afternoon 4:30 PM to 6:00 PM • Hub Raqam: ₹2700 / month</p>
+                        <p style={{ margin: 0, color: "var(--adm-text-muted)" }}>Timings: Afternoon 4:30 PM to 6:00 PM • Hub Raqam: ₹2700 / month</p>
                       </div>
 
                       <div className="adm-field">
@@ -899,9 +901,9 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
                           onChange={(e) => handleInputChange("lastAchievedSanad", e.target.value)}
                           className={`adm-input-custom adm-input-noicon ${formErrors.lastAchievedSanad ? "adm-input-error" : ""}`}
                         >
-                          <option value="" style={{ background: "#0b0f19" }}>-- Select Last Achieved Sanad --</option>
+                          <option value="">-- Select Last Achieved Sanad --</option>
                           {SANAD_OPTIONS.map((s) => (
-                            <option key={s} value={s} style={{ background: "#0b0f19" }}>{s}</option>
+                            <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
                         {formErrors.lastAchievedSanad && <p className="adm-err-msg"><AlertCircle size={12} /> {formErrors.lastAchievedSanad}</p>}
@@ -912,11 +914,11 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
                   {/* SIGAR */}
                   {formData.program === "Al-Sigar (4 to 6 yrs old)" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                      <div style={{ padding: "14px", borderRadius: "12px", background: "rgba(30, 41, 59, 0.7)", border: "1px solid rgba(71, 85, 105, 0.5)", fontSize: "13px", color: "#cbd5e1" }}>
-                        <p style={{ margin: "0 0 4px 0", fontWeight: 700, color: "#fde68a", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <MapPin size={14} /> Venue: Pakhti Mubarak
+                      <div style={{ padding: "16px", borderRadius: "14px", background: "linear-gradient(135deg, #fff9ea 0%, #fff4d6 100%)", border: "1.5px solid var(--adm-gold-border)", fontSize: "13px", color: "var(--adm-espresso-main)" }}>
+                        <p style={{ margin: "0 0 4px 0", fontWeight: 800, color: "var(--adm-espresso-main)", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <MapPin size={15} color="var(--adm-gold-dark)" /> Venue: Pakhti Mubarak
                         </p>
-                        <p style={{ margin: 0, color: "#94a3b8" }}>Timings: 5:00 PM to 6:00 PM • Hub Raqam: ₹3000 / month</p>
+                        <p style={{ margin: 0, color: "var(--adm-text-muted)" }}>Timings: 5:00 PM to 6:00 PM • Hub Raqam: ₹3000 / month</p>
                       </div>
 
                       <div className="adm-field">

@@ -530,6 +530,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .adm-input-icon {
@@ -537,6 +538,13 @@
   left: 14px;
   color: var(--adm-gold-dark);
   pointer-events: none;
+  z-index: 2;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.adm-input-icon-wrap:focus-within .adm-input-icon {
+  color: var(--adm-gold-primary);
+  transform: scale(1.05);
 }
 
 .adm-input-custom {
@@ -544,8 +552,9 @@
   background: #ffffff;
   border: 1.5px solid var(--adm-border-soft);
   border-radius: 14px;
-  padding: 12px 16px 12px 42px;
+  padding: 13px 16px 13px 42px;
   font-size: 14px;
+  font-weight: 500;
   color: var(--adm-espresso-main);
   outline: none;
   font-family: inherit;
@@ -563,8 +572,22 @@
   box-shadow: 0 0 0 3.5px var(--adm-gold-glow);
 }
 
+/* Ensure placeholder example text stays visible on click/focus and only vanishes when user types characters */
 .adm-input-custom::placeholder {
-  color: var(--adm-text-light);
+  color: #8c7e72;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.adm-input-custom:focus::placeholder {
+  color: #a39589;
+  opacity: 0.75;
+}
+
+.adm-input-custom option {
+  background: #ffffff;
+  color: var(--adm-espresso-main);
+  padding: 8px 12px;
 }
 
 .adm-input-error {

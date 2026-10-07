@@ -53,7 +53,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const formData = req.body || {};
+    let rawData = req.body;
+    if (typeof rawData === "string") {
+      try {
+        rawData = JSON.parse(rawData);
+      } catch (_) {}
+    }
+    const formData = rawData || {};
     const timestamp = new Date().toISOString();
 
     const year = "1447";
