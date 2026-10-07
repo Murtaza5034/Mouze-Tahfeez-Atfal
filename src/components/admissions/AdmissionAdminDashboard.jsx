@@ -257,17 +257,24 @@ export default function AdmissionAdminDashboard({
       <header className="adm-admin-header-box">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div className="adm-logo-badge">ط</div>
+            <img
+              src="/mauze-tahfeez-logo.png"
+              alt="Mauze Tahfeez"
+              className="adm-logo-img"
+              onError={(e) => {
+                e.currentTarget.src = "/logo.png";
+              }}
+            />
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <h1 style={{ fontSize: "22px", fontWeight: 900, color: "var(--adm-espresso-main)", margin: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                <h1 style={{ fontSize: "20px", fontWeight: 900, color: "var(--adm-espresso-main)", margin: 0 }}>
                   Admissions Management System
                 </h1>
                 <span className="adm-brand-tag">
                   {activeRole === "kibar" ? "Kibar Admin" : activeRole === "atfal" ? "Atfal Admin" : "Super Admin"}
                 </span>
               </div>
-              <p style={{ margin: "4px 0 0 0", fontSize: "12.5px", color: "var(--adm-text-muted)" }}>
+              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "var(--adm-text-muted)" }}>
                 Mauze Tahfeez Galiakot • Multi-Tier Role-Based Admissions, Exit Management & Automated WhatsApp Bot
               </p>
             </div>

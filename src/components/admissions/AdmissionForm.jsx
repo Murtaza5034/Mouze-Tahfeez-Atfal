@@ -310,7 +310,14 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
       <header className="adm-header">
         <div className="adm-header-inner">
           <div className="adm-brand-box">
-            <div className="adm-logo-badge">ط</div>
+            <img
+              src="/mauze-tahfeez-logo.png"
+              alt="Mauze Tahfeez"
+              className="adm-logo-img"
+              onError={(e) => {
+                e.currentTarget.src = "/logo.png";
+              }}
+            />
             <div>
               <h1 className="adm-brand-title">
                 <span>Tahfeez – Galiakot</span>
@@ -328,14 +335,6 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
             >
               <ImageIcon size={16} />
               <span>View Venue Photos</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onGoToAdmin}
-              className="adm-btn-text"
-            >
-              Admin Portal
             </button>
           </div>
         </div>
@@ -377,11 +376,10 @@ export default function AdmissionForm({ onGoToAdmin = () => {} }) {
               className="adm-card"
             >
               <div className="adm-title-center">
-                <p className="adm-arabic-bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
                 <h2 className="adm-h1">
                   {cmsSettings.form_title || "Registrations 1447-48H, Hifz Classes (Galiakot)"}
                 </h2>
-                <p className="adm-subtext" style={{ color: "#fbbf24", fontWeight: 700 }}>
+                <p className="adm-subtext" style={{ color: "var(--adm-gold-dark)", fontWeight: 800 }}>
                   {cmsSettings.organization_name || "Tahfeez – Galiakot"}
                 </p>
               </div>

@@ -125,31 +125,41 @@ export default function VenuePhotoGalleryModal({ isOpen, onClose, photos = [] })
           </div>
 
           {/* Photo Caption / Footer */}
-          <div style={{ padding: "16px 24px", background: "#ffffff", borderTop: "1.5px solid var(--adm-gold-border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-            <div>
-              <h4 style={{ margin: 0, fontSize: "14.5px", fontWeight: 800, color: "var(--adm-espresso-main)" }}>
+          <div style={{ padding: "14px 20px", background: "#ffffff", borderTop: "1.5px solid var(--adm-gold-border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 800, color: "var(--adm-espresso-main)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {currentPhoto.title || "Venue Preview"}
               </h4>
-              <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "var(--adm-text-muted)" }}>
+              <p style={{ margin: "2px 0 0 0", fontSize: "11.5px", color: "var(--adm-text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {currentPhoto.description || "Official Tahfeez classroom environment."}
               </p>
             </div>
 
             {/* Thumbnail dots */}
-            <div style={{ display: "flex", gap: "6px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
               {photos.map((_, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => setCurrentIndex(i)}
                   style={{
-                    width: "9px",
-                    height: "9px",
-                    borderRadius: "50%",
+                    width: currentIndex === i ? "16px" : "6px",
+                    height: "6px",
+                    minHeight: "6px",
+                    maxHeight: "6px",
+                    minWidth: currentIndex === i ? "16px" : "6px",
+                    padding: 0,
+                    margin: 0,
+                    borderRadius: "999px",
                     border: "none",
-                    background: currentIndex === i ? "var(--adm-gold-primary)" : "var(--adm-border-soft)",
+                    outline: "none",
+                    background: currentIndex === i ? "var(--adm-gold-primary)" : "#d8cec3",
                     cursor: "pointer",
-                    transition: "all 0.2s"
+                    transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                    display: "inline-block",
+                    boxShadow: currentIndex === i ? "0 0 6px rgba(197, 155, 39, 0.5)" : "none"
                   }}
+                  title={`Photo ${i + 1}`}
                 />
               ))}
             </div>
